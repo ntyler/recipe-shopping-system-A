@@ -28,6 +28,14 @@ PANTRY_DATE_FIELDS = (
 )
 PANTRY_STATUS_VALUES = {"available", "opened", "frozen", "used"}
 PANTRY_STORAGE_LOCATION_VALUES = {"pantry", "fridge", "freezer", "counter", "unknown"}
+PANTRY_STORAGE_LOCATION_LABELS = {
+    "pantry": "Pantry",
+    "fridge": "Fridge",
+    "freezer": "Freezer",
+    "counter": "Counter",
+    "unknown": "Review",
+    "": "Review",
+}
 DEFAULT_REMINDER_OFFSETS_DAYS = [1]
 
 DEFAULT_CONFIDENCE_BY_SOURCE = {
@@ -311,6 +319,10 @@ def clean_storage_location(value):
     }
     value = aliases.get(value, value)
     return value if value in PANTRY_STORAGE_LOCATION_VALUES else ""
+
+
+def storage_location_label(value):
+    return PANTRY_STORAGE_LOCATION_LABELS.get(clean_storage_location(value), "Review")
 
 
 def clean_pantry_status(value):
@@ -1190,6 +1202,9 @@ def receipt_candidate(line, product_name, quantity=None, price_line="", sale_lin
         "expiration_date": lifecycle_dates["expiration_date"],
         "freeze_by_date": lifecycle_dates["freeze_by_date"],
         "frozen_date": lifecycle_dates["frozen_date"],
+        "suggested_storage_location": lifecycle_dates["storage_location"],
+        "storage_location": receipt_candidate_display_storage_location(lifecycle_dates),
+        "storage_location_label": storage_location_label(receipt_candidate_display_storage_location(lifecycle_dates)),
         "confidence": receipt_line_confidence(product_name),
         "needs_review": True,
     }
@@ -1229,7 +1244,18 @@ def receipt_candidate_lifecycle_dates(product_name, normalized_name, purchased_d
         "expiration_date": suggested.get("expiration_date", ""),
         "freeze_by_date": suggested.get("freeze_by_date", ""),
         "frozen_date": suggested.get("frozen_date", ""),
+        "storage_location": clean_storage_location(suggested.get("storage_location")),
     }
+
+
+def receipt_candidate_display_storage_location(candidate):
+    if normalize_date_value((candidate or {}).get("frozen_date")):
+        return "freezer"
+
+    return clean_storage_location(
+        (candidate or {}).get("storage_location")
+        or (candidate or {}).get("suggested_storage_location")
+    )
 
 
 def hydrate_receipt_review_dates(review):
@@ -1268,6 +1294,13 @@ def hydrate_receipt_candidate_dates(candidate, purchased_date=""):
         if not hydrated.get(field) and lifecycle_dates.get(field):
             hydrated[field] = lifecycle_dates[field]
 
+    if not hydrated.get("suggested_storage_location"):
+        hydrated["suggested_storage_location"] = lifecycle_dates.get("storage_location", "")
+    if not hydrated.get("storage_location"):
+        hydrated["storage_location"] = lifecycle_dates.get("storage_location", "")
+    hydrated["suggested_storage_location"] = clean_storage_location(hydrated.get("suggested_storage_location"))
+    hydrated["storage_location"] = receipt_candidate_display_storage_location(hydrated)
+    hydrated["storage_location_label"] = storage_location_label(hydrated.get("storage_location"))
     hydrated["frozen_best_by_days"] = freezer_days_for_item(hydrated)
     hydrated["frozen_best_by_date"] = frozen_best_by_date(hydrated)
     hydrated["frozen_best_by_date_label"] = date_label(hydrated["frozen_best_by_date"])

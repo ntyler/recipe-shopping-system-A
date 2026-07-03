@@ -237,10 +237,13 @@ def test_parse_receipt_text_filters_meijer_receipt_sections():
     assert price_details["Green Onions"]["line_total_label"] == "$1.09"
     assert price_details["Green Onions"]["expiration_date"] == "2026-07-05"
     assert price_details["Green Onions"]["freeze_by_date"] == "2026-07-03"
+    assert price_details["Green Onions"]["storage_location"] == "fridge"
+    assert price_details["Green Onions"]["storage_location_label"] == "Fridge"
     assert price_details["Baked Beans"]["unit_price_label"] == "$2.39"
     assert price_details["Baked Beans"]["line_total_label"] == "$4.78"
     assert price_details["Baked Beans"]["expiration_date"] == "2027-06-28"
     assert price_details["Baked Beans"].get("freeze_by_date", "") == ""
+    assert price_details["Baked Beans"]["storage_location"] == "pantry"
     assert price_details["Honey Ham Stk"]["expiration_date"] == "2026-07-03"
     assert price_details["Honey Ham Stk"]["freeze_by_date"] == "2026-06-30"
     assert price_details["Hanks Soda"]["expiration_date"] == "2026-12-25"
@@ -248,12 +251,15 @@ def test_parse_receipt_text_filters_meijer_receipt_sections():
     assert price_details["Whole Milk"]["expiration_date"] == "2026-07-05"
     assert price_details["Frozen Pizza"]["expiration_date"] == "2026-12-25"
     assert price_details["Frozen Pizza"].get("freeze_by_date", "") == ""
+    assert price_details["Frozen Pizza"]["storage_location"] == "freezer"
     assert price_details["Meijer Jerky"]["expiration_date"] == "2026-12-25"
     assert price_details["Meijer Jerky"].get("freeze_by_date", "") == ""
+    assert price_details["Meijer Jerky"]["storage_location"] == "pantry"
     assert price_details["Atlantic Salmo"]["unit_price_label"] == "$9.99"
     assert price_details["Atlantic Salmo"]["line_total_label"] == "$19.98"
     assert price_details["Atlantic Salmo"]["expiration_date"] == "2026-06-29"
     assert price_details["Atlantic Salmo"]["freeze_by_date"] == "2026-06-29"
+    assert price_details["Atlantic Salmo"]["storage_location"] == "fridge"
     assert price_details["Cab Steak"]["unit_price_label"] == "$16.99"
     assert price_details["Cab Steak"]["line_total_label"] == "$33.98"
     assert price_details["Cab Steak"]["expiration_date"] == "2026-07-01"
@@ -313,6 +319,7 @@ def test_add_receipt_candidate_saves_lifecycle_dates(monkeypatch, tmp_path):
     assert "Use by 2026-07-08" in inventory[0]["notes"]
     assert "Freeze by 2026-07-05" in inventory[0]["notes"]
     assert "Frozen on 2026-07-04" in inventory[0]["notes"]
+    assert "Storage Freezer" in inventory[0]["notes"]
 
 
 def test_hydrate_receipt_review_dates_uses_receipt_history(monkeypatch, tmp_path):
@@ -547,6 +554,10 @@ def test_pantry_section_hydrates_old_receipt_review_dates(monkeypatch, tmp_path)
     assert 'name="candidate_0_frozen_date"' in html
     assert 'value="2026-06-28"' in html
     assert 'value="2026-06-29"' in html
+    assert 'data-pantry-review-storage="fridge"' in html
+    assert 'data-pantry-review-suggested-storage="fridge"' in html
+    assert "Storage: Fridge" in html
+    assert "ai-pantry-review-storage-fridge" in html
 
 
 def test_match_recipe_to_pantry_reports_missing_ingredients(monkeypatch, tmp_path):
@@ -687,8 +698,11 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert 'data-pantry-review-date-field="frozen_date"' in template
     assert "data-pantry-review-date-status" in template
     assert "data-pantry-review-row-status" in template
+    assert "data-pantry-review-storage-badge" in template
+    assert "data-pantry-review-suggested-storage" in template
     assert "ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}" in template
     assert "ai-pantry-review-date-badge" in template
+    assert "ai-pantry-review-storage-badge" in template
     assert "ai-pantry-date-field-{{ use_by_status.urgency or 'fresh' }}" in template
     assert "ai-pantry-date-field-{{ freeze_by_status.urgency or 'fresh' }}" in template
     assert "ai-pantry-date-field-{{ frozen_status.urgency or 'fresh' }}" in template
@@ -706,12 +720,17 @@ def test_ai_pantry_receipt_warning_assets_include_live_status_hooks():
 
     assert "function bindPantryReceiptDateWarnings" in js
     assert "function updatePantryReceiptReviewRow" in js
+    assert "function updatePantryReceiptStorageBadge" in js
+    assert "Storage: ${pantryReceiptStorageLabel(normalizedStorage)}" in js
     assert "Frozen before deadline" in js
     assert "Frozen after deadline" in js
     assert '["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings]' in js
     assert "bindPantryReceiptDateWarnings(options.root || document);" in js
     assert ".ai-pantry-date-field-frozen-late input" in css
     assert ".ai-pantry-date-field-frozen-safe input" in css
+    assert ".ai-pantry-review-storage-badge" in css
+    assert ".ai-pantry-review-storage-fridge" in css
+    assert ".ai-pantry-review-storage-freezer" in css
 
 
 def test_add_missing_ingredients_route_dedupes_shopping_list(monkeypatch, tmp_path):

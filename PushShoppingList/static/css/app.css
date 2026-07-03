@@ -21028,6 +21028,41 @@ body {
     font-weight: 900;
 }
 
+.ai-pantry-review-storage-badge {
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 2px 7px;
+    color: #cbd5e1;
+    background: rgba(71, 85, 105, 0.22);
+    font-weight: 900;
+}
+
+.ai-pantry-review-storage-fridge {
+    color: #bfdbfe;
+    background: rgba(30, 64, 175, 0.26);
+}
+
+.ai-pantry-review-storage-freezer {
+    color: #ccfbf1;
+    background: rgba(13, 88, 78, 0.26);
+}
+
+.ai-pantry-review-storage-pantry {
+    color: #fde68a;
+    background: rgba(113, 63, 18, 0.22);
+}
+
+.ai-pantry-review-storage-counter {
+    color: #e9d5ff;
+    background: rgba(88, 28, 135, 0.22);
+}
+
+.ai-pantry-review-storage-review,
+.ai-pantry-review-storage-unknown {
+    color: #e5e7eb;
+    background: rgba(75, 85, 99, 0.24);
+}
+
 .ai-pantry-review-row-freeze-expired .ai-pantry-review-date-badge {
     color: #fed7aa;
     background: rgba(120, 53, 15, 0.24);

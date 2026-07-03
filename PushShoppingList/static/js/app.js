@@ -15463,6 +15463,38 @@ function pantryReceiptFrozenBestByLabel(row, frozenDate) {
     return bestByLabel ? `Best frozen until ${bestByLabel}` : "";
 }
 
+function pantryReceiptStorageLabel(storage) {
+    switch (String(storage || "").trim().toLowerCase()) {
+    case "pantry":
+        return "Pantry";
+    case "fridge":
+        return "Fridge";
+    case "freezer":
+        return "Freezer";
+    case "counter":
+        return "Counter";
+    default:
+        return "Review";
+    }
+}
+
+function updatePantryReceiptStorageBadge(row, storage) {
+    const badge = row ? row.querySelector("[data-pantry-review-storage-badge]") : null;
+
+    if (!badge) {
+        return;
+    }
+
+    const normalizedStorage = ["pantry", "fridge", "freezer", "counter"].includes(String(storage || "").trim().toLowerCase())
+        ? String(storage || "").trim().toLowerCase()
+        : "review";
+    ["pantry", "fridge", "freezer", "counter", "review"].forEach(value => {
+        badge.classList.remove(`ai-pantry-review-storage-${value}`);
+    });
+    badge.classList.add(`ai-pantry-review-storage-${normalizedStorage}`);
+    badge.textContent = `Storage: ${pantryReceiptStorageLabel(normalizedStorage)}`;
+}
+
 function setPantryReceiptDateFieldStatus(row, field, urgency, label) {
     const fieldElement = row
         ? row.querySelector(`[data-pantry-review-date-field="${field}"]`)
@@ -15542,6 +15574,7 @@ function updatePantryReceiptReviewRow(row) {
     const today = pantryReviewTodayDate();
     const useByStatus = pantryReceiptDateStatus("expiration_date", useByValue, today);
     const freezeByStatus = pantryReceiptDateStatus("freeze_by_date", freezeByValue, today);
+    updatePantryReceiptStorageBadge(row, frozenDate ? "freezer" : (row.dataset.pantryReviewSuggestedStorage || row.dataset.pantryReviewStorage || ""));
 
     if (frozenDate && deadlineDate && frozenDate.getTime() <= deadlineDate.getTime()) {
         setPantryReceiptDateFieldStatus(row, "expiration_date", useByValue ? "frozen-safe" : "fresh", useByValue ? "Original use by preserved" : "");

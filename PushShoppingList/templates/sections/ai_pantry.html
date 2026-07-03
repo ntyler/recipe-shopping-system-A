@@ -386,6 +386,8 @@
                             {% set frozen_status = date_statuses.frozen_date if date_statuses.frozen_date else {} %}
                             <article class="ai-pantry-review-row ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}"
                                      data-pantry-review-freezer-days="{{ candidate.frozen_best_by_days or '' }}"
+                                     data-pantry-review-storage="{{ candidate.storage_location or '' }}"
+                                     data-pantry-review-suggested-storage="{{ candidate.suggested_storage_location or candidate.storage_location or '' }}"
                                      data-pantry-review-row>
                                 <label class="ai-pantry-review-select">
                                     <input type="checkbox" name="candidate_index" value="{{ loop.index0 }}" checked>
@@ -396,6 +398,10 @@
                                     {% if candidate.unit_price_label %}<small>Each {{ candidate.unit_price_label }}</small>{% endif %}
                                     {% if candidate.line_total_label %}<small>Total {{ candidate.line_total_label }}</small>{% endif %}
                                     <small>confidence {{ candidate.confidence }}</small>
+                                    <small class="ai-pantry-review-storage-badge ai-pantry-review-storage-{{ candidate.storage_location or 'review' }}"
+                                           data-pantry-review-storage-badge>
+                                        Storage: {{ candidate.storage_location_label or "Review" }}
+                                    </small>
                                     {% if review_status.label %}
                                         <small class="ai-pantry-review-date-badge" data-pantry-review-row-status>{{ review_status.label }}</small>
                                     {% endif %}

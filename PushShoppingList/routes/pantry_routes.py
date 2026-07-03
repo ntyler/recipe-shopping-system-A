@@ -9,7 +9,9 @@ from PushShoppingList.services.pantry_service import DEFAULT_CONFIDENCE_BY_SOURC
 from PushShoppingList.services.pantry_service import add_or_increment_pantry_item
 from PushShoppingList.services.pantry_service import delete_pantry_item
 from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
+from PushShoppingList.services.pantry_service import receipt_candidate_display_storage_location
 from PushShoppingList.services.pantry_service import save_receipt_upload
+from PushShoppingList.services.pantry_service import storage_location_label
 from PushShoppingList.services.pantry_service import update_pantry_item
 from PushShoppingList.services.pantry_service import update_pantry_item_lifecycle_action
 from PushShoppingList.services.pantry_service import update_receipt_history_status
@@ -192,11 +194,14 @@ def add_receipt_candidates_route():
             "freeze_by_date": request.form.get(f"candidate_{index}_freeze_by_date") or candidate.get("freeze_by_date", ""),
             "frozen_date": request.form.get(f"candidate_{index}_frozen_date") or candidate.get("frozen_date", ""),
         }
+        storage_location = receipt_candidate_display_storage_location({**candidate, **lifecycle_dates})
         receipt_details = [f"Qty {candidate.get('quantity') or 1}"]
         if candidate.get("unit_price_label"):
             receipt_details.append(f"Each {candidate.get('unit_price_label')}")
         if candidate.get("line_total_label"):
             receipt_details.append(f"Total {candidate.get('line_total_label')}")
+        if storage_location:
+            receipt_details.append(f"Storage {storage_location_label(storage_location)}")
         for label, field in (
             ("Bought", "purchased_date"),
             ("Opened", "opened_date"),
@@ -222,6 +227,7 @@ def add_receipt_candidates_route():
             "source": "receipt",
             "confidence": candidate.get("confidence", DEFAULT_CONFIDENCE_BY_SOURCE["receipt"]),
             "notes": receipt_note,
+            "storage_location": storage_location,
             **lifecycle_dates,
         })
         added.append(result["item"].get("ingredient_name") or candidate.get("product_name", "Item"))
