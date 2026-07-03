@@ -709,6 +709,13 @@ def frozen_on_or_before_deadline(item):
     return bool(frozen_date and deadline_date and frozen_date <= deadline_date)
 
 
+def frozen_after_deadline(item):
+    frozen_date = parse_date_value(item.get("frozen_date"))
+    deadline = pantry_freeze_deadline(item)
+    deadline_date = deadline.get("date")
+    return bool(frozen_date and deadline_date and frozen_date > deadline_date)
+
+
 def pantry_item_lifecycle_status(item, reference_date=None):
     today = parse_date_value(reference_date) or datetime.utcnow().date()
     status = clean_pantry_status(item.get("status"))
@@ -855,6 +862,12 @@ def receipt_candidate_review_status(candidate, reference_date=None):
             "urgency": "fresh",
             "label": "Frozen date recorded",
         }
+        if frozen_after_deadline(candidate):
+            statuses["frozen_date"] = {
+                "key": "frozen-late",
+                "urgency": "frozen-late",
+                "label": "Frozen after deadline",
+            }
 
     if frozen_on_or_before_deadline(candidate):
         statuses["frozen_date"] = {

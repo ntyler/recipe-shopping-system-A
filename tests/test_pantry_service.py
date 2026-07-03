@@ -410,6 +410,22 @@ def test_receipt_candidate_review_status_suppresses_use_by_when_frozen_before_de
     assert status["date_statuses"]["frozen_date"]["urgency"] == "frozen-safe"
 
 
+def test_receipt_candidate_review_status_marks_frozen_after_deadline():
+    status = pantry_service.receipt_candidate_review_status(
+        {
+            "expiration_date": "2026-07-05",
+            "freeze_by_date": "2026-06-30",
+            "frozen_date": "2026-07-01",
+        },
+        reference_date="2026-07-02",
+    )
+
+    assert status["row_status"] == "freeze-expired"
+    assert status["label"] == "Freeze window passed"
+    assert status["date_statuses"]["frozen_date"]["urgency"] == "frozen-late"
+    assert status["date_statuses"]["frozen_date"]["label"] == "Frozen after deadline"
+
+
 def test_pantry_section_marks_receipt_candidate_frozen_before_deadline(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     app = create_app()
@@ -623,6 +639,12 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert 'name="candidate_{{ loop.index0 }}_expiration_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_freeze_by_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_frozen_date"' in template
+    assert "data-pantry-review-row" in template
+    assert 'data-pantry-review-date-field="expiration_date"' in template
+    assert 'data-pantry-review-date-field="freeze_by_date"' in template
+    assert 'data-pantry-review-date-field="frozen_date"' in template
+    assert "data-pantry-review-date-status" in template
+    assert "data-pantry-review-row-status" in template
     assert "ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}" in template
     assert "ai-pantry-review-date-badge" in template
     assert "ai-pantry-date-field-{{ use_by_status.urgency or 'fresh' }}" in template
@@ -634,6 +656,20 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert "<span>Freeze by</span>" in template
     assert "<span>Frozen on</span>" in template
     assert "mark_opened" in template
+
+
+def test_ai_pantry_receipt_warning_assets_include_live_status_hooks():
+    js = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert "function bindPantryReceiptDateWarnings" in js
+    assert "function updatePantryReceiptReviewRow" in js
+    assert "Frozen before deadline" in js
+    assert "Frozen after deadline" in js
+    assert '["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings]' in js
+    assert "bindPantryReceiptDateWarnings(options.root || document);" in js
+    assert ".ai-pantry-date-field-frozen-late input" in css
+    assert ".ai-pantry-date-field-frozen-safe input" in css
 
 
 def test_add_missing_ingredients_route_dedupes_shopping_list(monkeypatch, tmp_path):

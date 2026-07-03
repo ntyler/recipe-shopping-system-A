@@ -21116,6 +21116,15 @@ body {
     color: #ccfbf1;
 }
 
+.ai-pantry-date-field-frozen-late input {
+    border-color: #f59e0b;
+    background: rgba(120, 53, 15, 0.34);
+}
+
+.ai-pantry-date-field-frozen-late small {
+    color: #fed7aa;
+}
+
 .ai-pantry-recipe-header {
     display: flex;
     align-items: center;

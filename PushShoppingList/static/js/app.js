@@ -3097,6 +3097,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
     bindRecipeEditCategorySourceTracking();
+    bindPantryReceiptDateWarnings(options.root || document);
     initDeferredImages(options.root || document);
     decorateRecipeCoverImages();
     applyKnownRecipeImageProgressItems();
@@ -15345,6 +15346,231 @@ function filterPantryItems(value) {
 
     document.querySelectorAll("[data-pantry-search-empty]").forEach(empty => {
         empty.hidden = !query || visibleCount > 0;
+    });
+}
+
+const PANTRY_RECEIPT_ROW_STATUS_CLASSES = [
+    "ai-pantry-review-row-fresh",
+    "ai-pantry-review-row-use-expired",
+    "ai-pantry-review-row-freeze-expired",
+    "ai-pantry-review-row-due-soon",
+    "ai-pantry-review-row-frozen-in-time",
+];
+
+const PANTRY_RECEIPT_FIELD_STATUS_CLASSES = [
+    "ai-pantry-date-field-fresh",
+    "ai-pantry-date-field-expired",
+    "ai-pantry-date-field-freeze-expired",
+    "ai-pantry-date-field-due-soon",
+    "ai-pantry-date-field-frozen-safe",
+    "ai-pantry-date-field-frozen-late",
+];
+
+function parsePantryReviewDate(value) {
+    const match = String(value || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    if (!match) {
+        return null;
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const day = Number(match[3]);
+    const parsed = new Date(year, month, day);
+
+    if (
+        Number.isNaN(parsed.getTime())
+        || parsed.getFullYear() !== year
+        || parsed.getMonth() !== month
+        || parsed.getDate() !== day
+    ) {
+        return null;
+    }
+
+    return parsed;
+}
+
+function pantryReviewTodayDate() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function daysUntilPantryReviewDate(targetDate, today = pantryReviewTodayDate()) {
+    return Math.round((targetDate.getTime() - today.getTime()) / 86400000);
+}
+
+function pantryReceiptDateStatus(field, value, today = pantryReviewTodayDate()) {
+    const targetDate = parsePantryReviewDate(value);
+
+    if (!targetDate || !["expiration_date", "freeze_by_date"].includes(field)) {
+        return { urgency: "fresh", label: "" };
+    }
+
+    const daysUntil = daysUntilPantryReviewDate(targetDate, today);
+    const isUseBy = field === "expiration_date";
+
+    if (daysUntil < 0) {
+        return {
+            urgency: isUseBy ? "expired" : "freeze-expired",
+            label: isUseBy ? "Past use by" : "Freeze window passed",
+        };
+    }
+    if (daysUntil === 0) {
+        return {
+            urgency: "due-soon",
+            label: isUseBy ? "Use today" : "Freeze today",
+        };
+    }
+    if (daysUntil === 1) {
+        return {
+            urgency: "due-soon",
+            label: isUseBy ? "Use by tomorrow" : "Freeze by tomorrow",
+        };
+    }
+
+    return { urgency: "fresh", label: "" };
+}
+
+function pantryReceiptReviewDateInput(row, field) {
+    const fieldElement = row
+        ? row.querySelector(`[data-pantry-review-date-field="${field}"]`)
+        : null;
+    return fieldElement ? fieldElement.querySelector("input[type='date']") : null;
+}
+
+function setPantryReceiptDateFieldStatus(row, field, urgency, label) {
+    const fieldElement = row
+        ? row.querySelector(`[data-pantry-review-date-field="${field}"]`)
+        : null;
+
+    if (!fieldElement) {
+        return;
+    }
+
+    PANTRY_RECEIPT_FIELD_STATUS_CLASSES.forEach(className => fieldElement.classList.remove(className));
+    fieldElement.classList.add(`ai-pantry-date-field-${urgency || "fresh"}`);
+
+    let statusElement = fieldElement.querySelector("[data-pantry-review-date-status]");
+
+    if (!label) {
+        if (statusElement) {
+            statusElement.remove();
+        }
+        return;
+    }
+
+    if (!statusElement) {
+        statusElement = document.createElement("small");
+        statusElement.dataset.pantryReviewDateStatus = "";
+        fieldElement.appendChild(statusElement);
+    }
+
+    statusElement.textContent = label;
+}
+
+function setPantryReceiptRowStatus(row, rowStatus, label) {
+    if (!row) {
+        return;
+    }
+
+    const normalizedStatus = rowStatus || "fresh";
+    PANTRY_RECEIPT_ROW_STATUS_CLASSES.forEach(className => row.classList.remove(className));
+    row.classList.add(`ai-pantry-review-row-${normalizedStatus}`);
+
+    const meta = row.querySelector(".ai-pantry-review-meta");
+    let badge = row.querySelector("[data-pantry-review-row-status]");
+
+    if (!label) {
+        if (badge) {
+            badge.remove();
+        }
+        return;
+    }
+
+    if (!badge && meta) {
+        badge = document.createElement("small");
+        badge.className = "ai-pantry-review-date-badge";
+        badge.dataset.pantryReviewRowStatus = "";
+        meta.appendChild(badge);
+    }
+
+    if (badge) {
+        badge.textContent = label;
+    }
+}
+
+function updatePantryReceiptReviewRow(row) {
+    if (!row) {
+        return;
+    }
+
+    const useByInput = pantryReceiptReviewDateInput(row, "expiration_date");
+    const freezeByInput = pantryReceiptReviewDateInput(row, "freeze_by_date");
+    const frozenInput = pantryReceiptReviewDateInput(row, "frozen_date");
+    const useByValue = useByInput ? useByInput.value : "";
+    const freezeByValue = freezeByInput ? freezeByInput.value : "";
+    const frozenValue = frozenInput ? frozenInput.value : "";
+    const useByDate = parsePantryReviewDate(useByValue);
+    const freezeByDate = parsePantryReviewDate(freezeByValue);
+    const frozenDate = parsePantryReviewDate(frozenValue);
+    const deadlineDate = freezeByDate || useByDate;
+    const today = pantryReviewTodayDate();
+    const useByStatus = pantryReceiptDateStatus("expiration_date", useByValue, today);
+    const freezeByStatus = pantryReceiptDateStatus("freeze_by_date", freezeByValue, today);
+
+    if (frozenDate && deadlineDate && frozenDate.getTime() <= deadlineDate.getTime()) {
+        setPantryReceiptDateFieldStatus(row, "expiration_date", useByValue ? "frozen-safe" : "fresh", useByValue ? "Original use by preserved" : "");
+        setPantryReceiptDateFieldStatus(row, "freeze_by_date", freezeByValue ? "frozen-safe" : "fresh", freezeByValue ? "Freeze deadline met" : "");
+        setPantryReceiptDateFieldStatus(row, "frozen_date", "frozen-safe", "Frozen before deadline");
+        setPantryReceiptRowStatus(row, "frozen-in-time", "Frozen before deadline");
+        return;
+    }
+
+    setPantryReceiptDateFieldStatus(row, "expiration_date", useByStatus.urgency, useByStatus.label);
+    setPantryReceiptDateFieldStatus(row, "freeze_by_date", freezeByStatus.urgency, freezeByStatus.label);
+
+    if (frozenDate && deadlineDate && frozenDate.getTime() > deadlineDate.getTime()) {
+        setPantryReceiptDateFieldStatus(row, "frozen_date", "frozen-late", "Frozen after deadline");
+    } else if (frozenDate) {
+        setPantryReceiptDateFieldStatus(row, "frozen_date", "fresh", "Frozen date recorded");
+    } else {
+        setPantryReceiptDateFieldStatus(row, "frozen_date", "fresh", "");
+    }
+
+    if (useByStatus.urgency === "expired") {
+        setPantryReceiptRowStatus(row, "use-expired", useByStatus.label || "Past use by");
+    } else if (freezeByStatus.urgency === "freeze-expired") {
+        setPantryReceiptRowStatus(row, "freeze-expired", freezeByStatus.label || "Freeze window passed");
+    } else if (useByStatus.urgency === "due-soon") {
+        setPantryReceiptRowStatus(row, "due-soon", useByStatus.label || "Use soon");
+    } else if (freezeByStatus.urgency === "due-soon") {
+        setPantryReceiptRowStatus(row, "due-soon", freezeByStatus.label || "Freeze soon");
+    } else {
+        setPantryReceiptRowStatus(row, "fresh", "");
+    }
+}
+
+function bindPantryReceiptDateWarnings(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+    const rows = [];
+
+    if (context.matches && context.matches("[data-pantry-review-row]")) {
+        rows.push(context);
+    }
+
+    context.querySelectorAll("[data-pantry-review-row]").forEach(row => rows.push(row));
+    rows.forEach(row => {
+        if (row.dataset.pantryReviewWarningsBound === "1") {
+            updatePantryReceiptReviewRow(row);
+            return;
+        }
+
+        row.dataset.pantryReviewWarningsBound = "1";
+        row.querySelectorAll(".ai-pantry-review-dates input[type='date']").forEach(input => {
+            input.addEventListener("input", () => updatePantryReceiptReviewRow(row));
+            input.addEventListener("change", () => updatePantryReceiptReviewRow(row));
+        });
+        updatePantryReceiptReviewRow(row);
     });
 }
 
@@ -29512,6 +29738,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindImportCookbookSelector", bindImportCookbookSelector],
         ["bindStoreButtons", bindStoreButtons],
         ["bindStoreLinks", bindStoreLinks],
+        ["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
         ["initJobActivityPanel", initJobActivityPanel],
         ["initLazySections", initLazySections],
