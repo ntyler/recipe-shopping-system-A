@@ -107,6 +107,7 @@
                                     {% if item.opened_date_label %}<span>Opened {{ item.opened_date_label }}</span>{% endif %}
                                     {% if item.freeze_by_date_label %}<span>Freeze by {{ item.freeze_by_date_label }}</span>{% endif %}
                                     {% if item.frozen_date_label %}<span>Frozen on {{ item.frozen_date_label }}</span>{% endif %}
+                                    {% if item.frozen_best_by_date_label %}<span>Best frozen until {{ item.frozen_best_by_date_label }}</span>{% endif %}
                                     {% if item.expiration_date_label %}<span>Use by {{ item.expiration_date_label }}</span>{% endif %}
                                 </div>
                             </div>
@@ -384,6 +385,7 @@
                             {% set freeze_by_status = date_statuses.freeze_by_date if date_statuses.freeze_by_date else {} %}
                             {% set frozen_status = date_statuses.frozen_date if date_statuses.frozen_date else {} %}
                             <article class="ai-pantry-review-row ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}"
+                                     data-pantry-review-freezer-days="{{ candidate.frozen_best_by_days or '' }}"
                                      data-pantry-review-row>
                                 <label class="ai-pantry-review-select">
                                     <input type="checkbox" name="candidate_index" value="{{ loop.index0 }}" checked>

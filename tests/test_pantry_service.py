@@ -396,6 +396,8 @@ def test_receipt_candidate_review_status_marks_today_or_tomorrow_dates_due_soon(
 def test_receipt_candidate_review_status_suppresses_use_by_when_frozen_before_deadline():
     status = pantry_service.receipt_candidate_review_status(
         {
+            "product_name": "Atlantic Salmo",
+            "normalized_name": "salmon",
             "expiration_date": "2026-06-29",
             "freeze_by_date": "2026-06-29",
             "frozen_date": "2026-06-29",
@@ -408,6 +410,8 @@ def test_receipt_candidate_review_status_suppresses_use_by_when_frozen_before_de
     assert status["date_statuses"]["expiration_date"]["urgency"] == "frozen-safe"
     assert status["date_statuses"]["freeze_by_date"]["urgency"] == "frozen-safe"
     assert status["date_statuses"]["frozen_date"]["urgency"] == "frozen-safe"
+    assert status["date_statuses"]["expiration_date"]["label"] == "Original use by preserved"
+    assert status["date_statuses"]["frozen_date"]["label"] == "Best frozen until Sep 27, 2026"
 
 
 def test_receipt_candidate_review_status_marks_frozen_after_deadline():
@@ -458,7 +462,33 @@ def test_pantry_section_marks_receipt_candidate_frozen_before_deadline(monkeypat
     assert "Frozen before deadline" in html
     assert "Original use by preserved" in html
     assert "Freeze deadline met" in html
+    assert "Best frozen until Sep 27, 2026" in html
+    assert 'data-pantry-review-freezer-days="90"' in html
     assert "ai-pantry-date-field-frozen-safe" in html
+
+
+def test_pantry_items_for_view_shows_best_frozen_until_for_frozen_items(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        pantry_service.add_or_increment_pantry_item({
+            "ingredient_name": "Green Onions",
+            "product_name": "Green Onions",
+            "normalized_name": "green onions",
+            "quantity": 1,
+            "source": "receipt",
+            "purchased_date": "2026-06-28",
+            "expiration_date": "2026-07-05",
+            "freeze_by_date": "2026-07-03",
+            "frozen_date": "2026-07-02",
+        })
+        items = pantry_service.pantry_items_for_view()
+
+    assert items[0]["expiration_date"] == "2026-07-05"
+    assert items[0]["frozen_best_by_date"] == "2026-09-30"
+    assert items[0]["frozen_best_by_date_label"] == "Sep 30, 2026"
 
 
 def test_pantry_receipt_date_fields_keep_inputs_top_aligned():

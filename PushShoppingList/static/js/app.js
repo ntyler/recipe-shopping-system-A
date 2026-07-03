@@ -15395,6 +15395,18 @@ function pantryReviewTodayDate() {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+function pantryReviewDateDisplayLabel(value) {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+        return "";
+    }
+
+    return value.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
+}
+
 function daysUntilPantryReviewDate(targetDate, today = pantryReviewTodayDate()) {
     return Math.round((targetDate.getTime() - today.getTime()) / 86400000);
 }
@@ -15436,6 +15448,19 @@ function pantryReceiptReviewDateInput(row, field) {
         ? row.querySelector(`[data-pantry-review-date-field="${field}"]`)
         : null;
     return fieldElement ? fieldElement.querySelector("input[type='date']") : null;
+}
+
+function pantryReceiptFrozenBestByLabel(row, frozenDate) {
+    const freezerDays = Number.parseInt(row && row.dataset ? row.dataset.pantryReviewFreezerDays : "", 10);
+
+    if (!Number.isFinite(freezerDays) || freezerDays <= 0 || !frozenDate) {
+        return "";
+    }
+
+    const bestByDate = new Date(frozenDate.getFullYear(), frozenDate.getMonth(), frozenDate.getDate());
+    bestByDate.setDate(bestByDate.getDate() + freezerDays);
+    const bestByLabel = pantryReviewDateDisplayLabel(bestByDate);
+    return bestByLabel ? `Best frozen until ${bestByLabel}` : "";
 }
 
 function setPantryReceiptDateFieldStatus(row, field, urgency, label) {
@@ -15521,7 +15546,7 @@ function updatePantryReceiptReviewRow(row) {
     if (frozenDate && deadlineDate && frozenDate.getTime() <= deadlineDate.getTime()) {
         setPantryReceiptDateFieldStatus(row, "expiration_date", useByValue ? "frozen-safe" : "fresh", useByValue ? "Original use by preserved" : "");
         setPantryReceiptDateFieldStatus(row, "freeze_by_date", freezeByValue ? "frozen-safe" : "fresh", freezeByValue ? "Freeze deadline met" : "");
-        setPantryReceiptDateFieldStatus(row, "frozen_date", "frozen-safe", "Frozen before deadline");
+        setPantryReceiptDateFieldStatus(row, "frozen_date", "frozen-safe", pantryReceiptFrozenBestByLabel(row, frozenDate) || "Frozen before deadline");
         setPantryReceiptRowStatus(row, "frozen-in-time", "Frozen before deadline");
         return;
     }

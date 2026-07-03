@@ -108,42 +108,49 @@ SHELF_LIFE_RULES = (
         "opened_days": 10,
         "fridge_days": 10,
         "freeze_by_days": 7,
+        "freezer_days": 90,
     },
     {
         "terms": ("chicken breast", "chicken breasts", "raw chicken", "chicken"),
         "storage_location": "fridge",
         "fridge_days": 2,
         "freeze_by_days": 1,
+        "freezer_days": 270,
     },
     {
         "terms": ("ground beef", "ground turkey", "ground pork", "ground meat"),
         "storage_location": "fridge",
         "fridge_days": 2,
         "freeze_by_days": 1,
+        "freezer_days": 120,
     },
     {
         "terms": ("fish", "salmon", "salmo", "tilapia", "cod", "shrimp", "crab", "lobster", "seafood"),
         "storage_location": "fridge",
         "fridge_days": 1,
         "freeze_by_days": 1,
+        "freezer_days": 90,
     },
     {
         "terms": ("beef", "pork", "steak", "roast", "meat"),
         "storage_location": "fridge",
         "fridge_days": 3,
         "freeze_by_days": 2,
+        "freezer_days": 180,
     },
     {
         "terms": ("ham", "ham stk", "ham steak", "honey ham", "deli meat", "lunch meat"),
         "storage_location": "fridge",
         "fridge_days": 5,
         "freeze_by_days": 2,
+        "freezer_days": 60,
     },
     {
         "terms": ("green onion", "green onions", "scallion", "scallions", "onion", "onions"),
         "storage_location": "fridge",
         "fridge_days": 7,
         "freeze_by_days": 5,
+        "freezer_days": 90,
     },
     {
         "terms": ("lettuce", "spinach", "greens", "leafy greens", "herbs", "cilantro", "parsley"),
@@ -658,6 +665,34 @@ def date_label(value):
     return parsed.strftime("%b %#d, %Y") if os.name == "nt" else parsed.strftime("%b %-d, %Y")
 
 
+def freezer_days_for_item(item):
+    rule = pantry_lifecycle_rule_for_item(item or {})
+    try:
+        freezer_days = int(rule.get("freezer_days"))
+    except (TypeError, ValueError):
+        return 0
+
+    return freezer_days if freezer_days > 0 else 0
+
+
+def frozen_best_by_date(item):
+    freezer_days = freezer_days_for_item(item or {})
+    if not freezer_days:
+        return ""
+
+    frozen_date = normalize_date_value((item or {}).get("frozen_date"))
+    if not frozen_date:
+        return ""
+
+    return date_plus_days(frozen_date, freezer_days)
+
+
+def frozen_best_by_label(item):
+    best_by = frozen_best_by_date(item)
+    best_by_label = date_label(best_by)
+    return f"Best frozen until {best_by_label}" if best_by_label else ""
+
+
 def pantry_target_dates(item):
     targets = []
     if item.get("freeze_by_date") and item.get("status") != "frozen":
@@ -870,10 +905,11 @@ def receipt_candidate_review_status(candidate, reference_date=None):
             }
 
     if frozen_on_or_before_deadline(candidate):
+        frozen_label = frozen_best_by_label(candidate) or "Frozen before deadline"
         statuses["frozen_date"] = {
             "key": "frozen-in-time",
             "urgency": "frozen-safe",
-            "label": "Frozen before deadline",
+            "label": frozen_label,
         }
         for field, label in (
             ("expiration_date", "Original use by preserved"),
@@ -931,6 +967,8 @@ def pantry_items_for_view():
         item["expiration_date_label"] = date_label(item.get("expiration_date"))
         item["freeze_by_date_label"] = date_label(item.get("freeze_by_date"))
         item["frozen_date_label"] = date_label(item.get("frozen_date"))
+        item["frozen_best_by_date"] = frozen_best_by_date(item)
+        item["frozen_best_by_date_label"] = date_label(item["frozen_best_by_date"])
         item["lifecycle_status"] = pantry_item_lifecycle_status(item)
 
     return items
@@ -1230,6 +1268,9 @@ def hydrate_receipt_candidate_dates(candidate, purchased_date=""):
         if not hydrated.get(field) and lifecycle_dates.get(field):
             hydrated[field] = lifecycle_dates[field]
 
+    hydrated["frozen_best_by_days"] = freezer_days_for_item(hydrated)
+    hydrated["frozen_best_by_date"] = frozen_best_by_date(hydrated)
+    hydrated["frozen_best_by_date_label"] = date_label(hydrated["frozen_best_by_date"])
     hydrated["review_status"] = receipt_candidate_review_status(hydrated)
 
     return hydrated
