@@ -400,6 +400,22 @@ def test_receipt_candidate_review_status_marks_today_or_tomorrow_dates_due_soon(
     assert status["label"] == "Use by tomorrow"
 
 
+def test_receipt_candidate_review_status_marks_blank_freezer_freeze_by_safe():
+    status = pantry_service.receipt_candidate_review_status(
+        {
+            "storage_location": "freezer",
+            "expiration_date": "2026-12-25",
+            "freeze_by_date": "",
+        },
+        reference_date="2026-07-02",
+    )
+
+    assert status["row_status"] == "fresh"
+    assert status["label"] == ""
+    assert status["date_statuses"]["freeze_by_date"]["urgency"] == "frozen-safe"
+    assert status["date_statuses"]["freeze_by_date"]["label"] == "Already in freezer"
+
+
 def test_receipt_candidate_review_status_suppresses_use_by_when_frozen_before_deadline():
     status = pantry_service.receipt_candidate_review_status(
         {
@@ -726,9 +742,11 @@ def test_ai_pantry_receipt_warning_assets_include_live_status_hooks():
     assert "function bindPantryReceiptDateWarnings" in js
     assert "function updatePantryReceiptReviewRow" in js
     assert "function updatePantryReceiptStorageBadge" in js
+    assert "function normalizePantryReceiptStorage" in js
     assert "Storage: ${pantryReceiptStorageLabel(normalizedStorage)}" in js
     assert "Frozen before deadline" in js
     assert "Frozen after deadline" in js
+    assert "Already in freezer" in js
     assert '["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings]' in js
     assert "bindPantryReceiptDateWarnings(options.root || document);" in js
     assert ".ai-pantry-date-field-frozen-late input" in css

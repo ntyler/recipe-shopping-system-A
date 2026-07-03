@@ -903,6 +903,15 @@ def receipt_candidate_review_status(candidate, reference_date=None):
         field: receipt_candidate_date_status(field, candidate.get(field), reference_date=reference_date)
         for field in ("expiration_date", "freeze_by_date")
     }
+    storage_location = clean_storage_location(
+        candidate.get("storage_location") or candidate.get("suggested_storage_location")
+    )
+    if storage_location == "freezer" and not normalize_date_value(candidate.get("freeze_by_date")):
+        statuses["freeze_by_date"] = {
+            "key": "already-in-freezer",
+            "urgency": "frozen-safe",
+            "label": "Already in freezer",
+        }
     if candidate.get("frozen_date"):
         statuses["frozen_date"] = receipt_candidate_date_status("frozen_date", candidate.get("frozen_date"), reference_date=reference_date) or {
             "key": "frozen-recorded",

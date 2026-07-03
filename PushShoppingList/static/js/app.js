@@ -15478,6 +15478,13 @@ function pantryReceiptStorageLabel(storage) {
     }
 }
 
+function normalizePantryReceiptStorage(storage) {
+    const normalizedStorage = String(storage || "").trim().toLowerCase();
+    return ["pantry", "fridge", "freezer", "counter"].includes(normalizedStorage)
+        ? normalizedStorage
+        : "review";
+}
+
 function updatePantryReceiptStorageBadge(row, storage) {
     const badge = row ? row.querySelector("[data-pantry-review-storage-badge]") : null;
 
@@ -15485,9 +15492,7 @@ function updatePantryReceiptStorageBadge(row, storage) {
         return;
     }
 
-    const normalizedStorage = ["pantry", "fridge", "freezer", "counter"].includes(String(storage || "").trim().toLowerCase())
-        ? String(storage || "").trim().toLowerCase()
-        : "review";
+    const normalizedStorage = normalizePantryReceiptStorage(storage);
     ["pantry", "fridge", "freezer", "counter", "review"].forEach(value => {
         badge.classList.remove(`ai-pantry-review-storage-${value}`);
     });
@@ -15574,18 +15579,28 @@ function updatePantryReceiptReviewRow(row) {
     const today = pantryReviewTodayDate();
     const useByStatus = pantryReceiptDateStatus("expiration_date", useByValue, today);
     const freezeByStatus = pantryReceiptDateStatus("freeze_by_date", freezeByValue, today);
-    updatePantryReceiptStorageBadge(row, frozenDate ? "freezer" : (row.dataset.pantryReviewSuggestedStorage || row.dataset.pantryReviewStorage || ""));
+    const storageValue = frozenDate ? "freezer" : (row.dataset.pantryReviewSuggestedStorage || row.dataset.pantryReviewStorage || "");
+    const isStoredInFreezer = normalizePantryReceiptStorage(storageValue) === "freezer";
+    const effectiveFreezeByStatus = isStoredInFreezer && !freezeByValue
+        ? { urgency: "frozen-safe", label: "Already in freezer" }
+        : freezeByStatus;
+    updatePantryReceiptStorageBadge(row, storageValue);
 
     if (frozenDate && deadlineDate && frozenDate.getTime() <= deadlineDate.getTime()) {
         setPantryReceiptDateFieldStatus(row, "expiration_date", useByValue ? "frozen-safe" : "fresh", useByValue ? "Original use by preserved" : "");
-        setPantryReceiptDateFieldStatus(row, "freeze_by_date", freezeByValue ? "frozen-safe" : "fresh", freezeByValue ? "Freeze deadline met" : "");
+        setPantryReceiptDateFieldStatus(
+            row,
+            "freeze_by_date",
+            freezeByValue ? "frozen-safe" : effectiveFreezeByStatus.urgency,
+            freezeByValue ? "Freeze deadline met" : effectiveFreezeByStatus.label
+        );
         setPantryReceiptDateFieldStatus(row, "frozen_date", "frozen-safe", pantryReceiptFrozenBestByLabel(row, frozenDate) || "Frozen before deadline");
         setPantryReceiptRowStatus(row, "frozen-in-time", "Frozen before deadline");
         return;
     }
 
     setPantryReceiptDateFieldStatus(row, "expiration_date", useByStatus.urgency, useByStatus.label);
-    setPantryReceiptDateFieldStatus(row, "freeze_by_date", freezeByStatus.urgency, freezeByStatus.label);
+    setPantryReceiptDateFieldStatus(row, "freeze_by_date", effectiveFreezeByStatus.urgency, effectiveFreezeByStatus.label);
 
     if (frozenDate && deadlineDate && frozenDate.getTime() > deadlineDate.getTime()) {
         setPantryReceiptDateFieldStatus(row, "frozen_date", "frozen-late", "Frozen after deadline");
@@ -15597,12 +15612,12 @@ function updatePantryReceiptReviewRow(row) {
 
     if (useByStatus.urgency === "expired") {
         setPantryReceiptRowStatus(row, "use-expired", useByStatus.label || "Past use by");
-    } else if (freezeByStatus.urgency === "freeze-expired") {
-        setPantryReceiptRowStatus(row, "freeze-expired", freezeByStatus.label || "Freeze window passed");
+    } else if (effectiveFreezeByStatus.urgency === "freeze-expired") {
+        setPantryReceiptRowStatus(row, "freeze-expired", effectiveFreezeByStatus.label || "Freeze window passed");
     } else if (useByStatus.urgency === "due-soon") {
         setPantryReceiptRowStatus(row, "due-soon", useByStatus.label || "Use soon");
-    } else if (freezeByStatus.urgency === "due-soon") {
-        setPantryReceiptRowStatus(row, "due-soon", freezeByStatus.label || "Freeze soon");
+    } else if (effectiveFreezeByStatus.urgency === "due-soon") {
+        setPantryReceiptRowStatus(row, "due-soon", effectiveFreezeByStatus.label || "Freeze soon");
     } else {
         setPantryReceiptRowStatus(row, "fresh", "");
     }
