@@ -701,8 +701,9 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert "data-pantry-review-storage-badge" in template
     assert "data-pantry-review-suggested-storage" in template
     meta_start = template.index('class="ai-pantry-review-meta"')
-    meta_end = template.index("</span>", meta_start)
+    meta_end = template.index('class="ai-pantry-review-dates"', meta_start)
     meta_markup = template[meta_start:meta_end]
+    assert meta_markup.index("ai-pantry-review-purchase-meta") < meta_markup.index("ai-pantry-review-badges")
     assert meta_markup.index("data-pantry-review-row-status") < meta_markup.index("data-pantry-review-storage-badge")
     assert "ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}" in template
     assert "ai-pantry-review-date-badge" in template
@@ -732,6 +733,11 @@ def test_ai_pantry_receipt_warning_assets_include_live_status_hooks():
     assert "bindPantryReceiptDateWarnings(options.root || document);" in js
     assert ".ai-pantry-date-field-frozen-late input" in css
     assert ".ai-pantry-date-field-frozen-safe input" in css
+    assert ".ai-pantry-review-meta {\n    display: grid;" in css
+    assert "grid-template-columns: minmax(250px, 1fr) auto;" in css
+    assert ".ai-pantry-review-purchase-meta" in css
+    assert ".ai-pantry-review-badges" in css
+    assert "@media (max-width: 650px)" in css
     assert ".ai-pantry-review-storage-badge" in css
     assert ".ai-pantry-review-storage-fridge" in css
     assert ".ai-pantry-review-storage-freezer" in css
