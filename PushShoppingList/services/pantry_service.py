@@ -898,6 +898,54 @@ def receipt_candidate_date_status(field, value, reference_date=None):
     }
 
 
+def receipt_candidate_next_action(candidate, date_statuses=None):
+    candidate = candidate or {}
+    date_statuses = date_statuses or {}
+    storage_location = clean_storage_location(
+        candidate.get("storage_location") or candidate.get("suggested_storage_location")
+    )
+    use_by = normalize_date_value(candidate.get("expiration_date"))
+    freeze_by = normalize_date_value(candidate.get("freeze_by_date"))
+    frozen_best_by = frozen_best_by_date(candidate)
+    use_status = date_statuses.get("expiration_date") or {}
+    freeze_status = date_statuses.get("freeze_by_date") or {}
+
+    def build(label, value, urgency="fresh", key="next-action"):
+        display_date = date_label(value)
+        if not display_date:
+            return {}
+        return {
+            "key": key,
+            "label": f"Next: {label} {display_date}",
+            "urgency": urgency,
+            "target_date": value,
+        }
+
+    if frozen_best_by:
+        return build("Best frozen until", frozen_best_by, urgency="safe", key="best-frozen-until")
+
+    if storage_location == "freezer":
+        if use_by and use_status.get("urgency") == "expired":
+            return build("Past frozen best by", use_by, urgency="expired", key="past-frozen-best-by")
+        if use_by:
+            urgency = "due-soon" if use_status.get("urgency") == "due-soon" else "safe"
+            return build("Best frozen until", use_by, urgency=urgency, key="best-frozen-until")
+        return {}
+
+    if use_by and use_status.get("urgency") == "expired":
+        return build("Past use by", use_by, urgency="expired", key="past-use-by")
+    if freeze_by and freeze_status.get("urgency") == "freeze-expired":
+        return build("Freeze window passed", freeze_by, urgency="warning", key="freeze-window-passed")
+    if freeze_by and freeze_status.get("urgency") == "due-soon":
+        return build("Freeze by", freeze_by, urgency="due-soon", key="freeze-by")
+    if use_by:
+        urgency = "due-soon" if use_status.get("urgency") == "due-soon" else "fresh"
+        return build("Use by", use_by, urgency=urgency, key="use-by")
+    if freeze_by:
+        return build("Freeze by", freeze_by, urgency="fresh", key="freeze-by")
+    return {}
+
+
 def receipt_candidate_review_status(candidate, reference_date=None):
     statuses = {
         field: receipt_candidate_date_status(field, candidate.get(field), reference_date=reference_date)
@@ -946,6 +994,7 @@ def receipt_candidate_review_status(candidate, reference_date=None):
         return {
             "row_status": "frozen-in-time",
             "label": "Frozen before deadline",
+            "next_action": receipt_candidate_next_action(candidate, statuses),
             "date_statuses": statuses,
         }
 
@@ -971,6 +1020,7 @@ def receipt_candidate_review_status(candidate, reference_date=None):
     return {
         "row_status": row_status,
         "label": label,
+        "next_action": receipt_candidate_next_action(candidate, statuses),
         "date_statuses": statuses,
     }
 

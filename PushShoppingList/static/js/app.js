@@ -15463,6 +15463,11 @@ function pantryReceiptFrozenBestByLabel(row, frozenDate) {
     return bestByLabel ? `Best frozen until ${bestByLabel}` : "";
 }
 
+function pantryReceiptNextActionLabel(prefix, targetDate) {
+    const dateLabel = pantryReviewDateDisplayLabel(targetDate);
+    return dateLabel ? `Next: ${prefix} ${dateLabel}` : "";
+}
+
 function pantryReceiptStorageLabel(storage) {
     switch (String(storage || "").trim().toLowerCase()) {
     case "pantry":
@@ -15530,6 +15535,31 @@ function setPantryReceiptDateFieldStatus(row, field, urgency, label) {
     statusElement.textContent = label;
 }
 
+function setPantryReceiptNextAction(row, nextAction) {
+    const badges = row ? row.querySelector(".ai-pantry-review-badges") : null;
+    let badge = row ? row.querySelector("[data-pantry-review-next-action]") : null;
+    const label = nextAction && nextAction.label ? nextAction.label : "";
+    const urgency = nextAction && nextAction.urgency ? nextAction.urgency : "fresh";
+
+    if (!label) {
+        if (badge) {
+            badge.remove();
+        }
+        return;
+    }
+
+    if (!badge && badges) {
+        badge = document.createElement("small");
+        badge.dataset.pantryReviewNextAction = "";
+        badges.insertBefore(badge, badges.firstChild);
+    }
+
+    if (badge) {
+        badge.className = `ai-pantry-review-next-badge ai-pantry-review-next-${urgency}`;
+        badge.textContent = label;
+    }
+}
+
 function setPantryReceiptRowStatus(row, rowStatus, label) {
     if (!row) {
         return;
@@ -15540,6 +15570,7 @@ function setPantryReceiptRowStatus(row, rowStatus, label) {
     row.classList.add(`ai-pantry-review-row-${normalizedStatus}`);
 
     const meta = row.querySelector(".ai-pantry-review-meta");
+    const badges = row.querySelector(".ai-pantry-review-badges");
     let badge = row.querySelector("[data-pantry-review-row-status]");
 
     if (!label) {
@@ -15549,16 +15580,66 @@ function setPantryReceiptRowStatus(row, rowStatus, label) {
         return;
     }
 
-    if (!badge && meta) {
+    if (!badge && (badges || meta)) {
         badge = document.createElement("small");
         badge.className = "ai-pantry-review-date-badge";
         badge.dataset.pantryReviewRowStatus = "";
-        meta.appendChild(badge);
+        if (badges) {
+            const storageBadge = badges.querySelector("[data-pantry-review-storage-badge]");
+            badges.insertBefore(badge, storageBadge || null);
+        } else {
+            meta.appendChild(badge);
+        }
     }
 
     if (badge) {
         badge.textContent = label;
     }
+}
+
+function pantryReceiptNextAction(row, options) {
+    const useByDate = options.useByDate;
+    const freezeByDate = options.freezeByDate;
+    const frozenDate = options.frozenDate;
+    const useByStatus = options.useByStatus || {};
+    const freezeByStatus = options.freezeByStatus || {};
+    const isStoredInFreezer = options.isStoredInFreezer;
+    const frozenBestLabel = frozenDate ? pantryReceiptFrozenBestByLabel(row, frozenDate) : "";
+
+    if (frozenBestLabel) {
+        return { urgency: "safe", label: `Next: ${frozenBestLabel}` };
+    }
+    if (isStoredInFreezer) {
+        if (useByDate && useByStatus.urgency === "expired") {
+            return { urgency: "expired", label: pantryReceiptNextActionLabel("Past frozen best by", useByDate) };
+        }
+        if (useByDate) {
+            return {
+                urgency: useByStatus.urgency === "due-soon" ? "due-soon" : "safe",
+                label: pantryReceiptNextActionLabel("Best frozen until", useByDate),
+            };
+        }
+        return {};
+    }
+    if (useByDate && useByStatus.urgency === "expired") {
+        return { urgency: "expired", label: pantryReceiptNextActionLabel("Past use by", useByDate) };
+    }
+    if (freezeByDate && freezeByStatus.urgency === "freeze-expired") {
+        return { urgency: "warning", label: pantryReceiptNextActionLabel("Freeze window passed", freezeByDate) };
+    }
+    if (freezeByDate && freezeByStatus.urgency === "due-soon") {
+        return { urgency: "due-soon", label: pantryReceiptNextActionLabel("Freeze by", freezeByDate) };
+    }
+    if (useByDate) {
+        return {
+            urgency: useByStatus.urgency === "due-soon" ? "due-soon" : "fresh",
+            label: pantryReceiptNextActionLabel("Use by", useByDate),
+        };
+    }
+    if (freezeByDate) {
+        return { urgency: "fresh", label: pantryReceiptNextActionLabel("Freeze by", freezeByDate) };
+    }
+    return {};
 }
 
 function updatePantryReceiptReviewRow(row) {
@@ -15585,6 +15666,14 @@ function updatePantryReceiptReviewRow(row) {
         ? { urgency: "frozen-safe", label: "Already in freezer" }
         : freezeByStatus;
     updatePantryReceiptStorageBadge(row, storageValue);
+    setPantryReceiptNextAction(row, pantryReceiptNextAction(row, {
+        useByDate,
+        freezeByDate,
+        frozenDate,
+        useByStatus,
+        freezeByStatus: effectiveFreezeByStatus,
+        isStoredInFreezer,
+    }));
 
     if (frozenDate && deadlineDate && frozenDate.getTime() <= deadlineDate.getTime()) {
         setPantryReceiptDateFieldStatus(row, "expiration_date", useByValue ? "frozen-safe" : "fresh", useByValue ? "Original use by preserved" : "");

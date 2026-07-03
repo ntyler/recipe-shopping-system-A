@@ -401,6 +401,10 @@
                                         <small>confidence {{ candidate.confidence }}</small>
                                     </span>
                                     <span class="ai-pantry-review-badges">
+                                        {% if review_status.next_action and review_status.next_action.label %}
+                                            <small class="ai-pantry-review-next-badge ai-pantry-review-next-{{ review_status.next_action.urgency or 'fresh' }}"
+                                                   data-pantry-review-next-action>{{ review_status.next_action.label }}</small>
+                                        {% endif %}
                                         {% if review_status.label %}
                                             <small class="ai-pantry-review-date-badge" data-pantry-review-row-status>{{ review_status.label }}</small>
                                         {% endif %}

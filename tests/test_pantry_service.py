@@ -385,6 +385,8 @@ def test_receipt_candidate_review_status_marks_past_freeze_by_amber():
 
     assert status["row_status"] == "freeze-expired"
     assert status["label"] == "Freeze window passed"
+    assert status["next_action"]["label"] == "Next: Freeze window passed Jun 30, 2026"
+    assert status["next_action"]["urgency"] == "warning"
 
 
 def test_receipt_candidate_review_status_marks_today_or_tomorrow_dates_due_soon():
@@ -398,6 +400,8 @@ def test_receipt_candidate_review_status_marks_today_or_tomorrow_dates_due_soon(
 
     assert status["row_status"] == "due-soon"
     assert status["label"] == "Use by tomorrow"
+    assert status["next_action"]["label"] == "Next: Use by Jul 3, 2026"
+    assert status["next_action"]["urgency"] == "due-soon"
 
 
 def test_receipt_candidate_review_status_marks_blank_freezer_freeze_by_safe():
@@ -414,6 +418,8 @@ def test_receipt_candidate_review_status_marks_blank_freezer_freeze_by_safe():
     assert status["label"] == ""
     assert status["date_statuses"]["freeze_by_date"]["urgency"] == "frozen-safe"
     assert status["date_statuses"]["freeze_by_date"]["label"] == "Already in freezer"
+    assert status["next_action"]["label"] == "Next: Best frozen until Dec 25, 2026"
+    assert status["next_action"]["urgency"] == "safe"
 
 
 def test_receipt_candidate_review_status_suppresses_use_by_when_frozen_before_deadline():
@@ -435,6 +441,8 @@ def test_receipt_candidate_review_status_suppresses_use_by_when_frozen_before_de
     assert status["date_statuses"]["frozen_date"]["urgency"] == "frozen-safe"
     assert status["date_statuses"]["expiration_date"]["label"] == "Original use by preserved"
     assert status["date_statuses"]["frozen_date"]["label"] == "Best frozen until Sep 27, 2026"
+    assert status["next_action"]["label"] == "Next: Best frozen until Sep 27, 2026"
+    assert status["next_action"]["urgency"] == "safe"
 
 
 def test_receipt_candidate_review_status_marks_frozen_after_deadline():
@@ -486,8 +494,39 @@ def test_pantry_section_marks_receipt_candidate_frozen_before_deadline(monkeypat
     assert "Original use by preserved" in html
     assert "Freeze deadline met" in html
     assert "Best frozen until Sep 27, 2026" in html
+    assert "Next: Best frozen until Sep 27, 2026" in html
     assert 'data-pantry-review-freezer-days="90"' in html
     assert "ai-pantry-date-field-frozen-safe" in html
+
+
+def test_pantry_section_shows_next_action_for_freezer_receipt_candidate(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_client() as client:
+        sign_in(client)
+        with client.session_transaction() as session:
+            session["pantry_receipt_review"] = {
+                "receipt_id": "receipt-1",
+                "purchased_date": "2026-06-28",
+                "candidates": [
+                    {
+                        "raw_line": "87000000000    FROZEN PIZZA      7.99  F",
+                        "product_name": "Frozen Pizza",
+                        "normalized_name": "frozen pizza",
+                        "quantity": 1,
+                        "confidence": 0.85,
+                    }
+                ],
+            }
+
+        response = client.get("/sections/pantry")
+        html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'data-pantry-review-next-action' in html
+    assert "Next: Best frozen until Dec 25, 2026" in html
+    assert "Already in freezer" in html
 
 
 def test_pantry_items_for_view_shows_best_frozen_until_for_frozen_items(monkeypatch, tmp_path):
@@ -716,12 +755,15 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert "data-pantry-review-row-status" in template
     assert "data-pantry-review-storage-badge" in template
     assert "data-pantry-review-suggested-storage" in template
+    assert "data-pantry-review-next-action" in template
     meta_start = template.index('class="ai-pantry-review-meta"')
     meta_end = template.index('class="ai-pantry-review-dates"', meta_start)
     meta_markup = template[meta_start:meta_end]
     assert meta_markup.index("ai-pantry-review-purchase-meta") < meta_markup.index("ai-pantry-review-badges")
+    assert meta_markup.index("data-pantry-review-next-action") < meta_markup.index("data-pantry-review-storage-badge")
     assert meta_markup.index("data-pantry-review-row-status") < meta_markup.index("data-pantry-review-storage-badge")
     assert "ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}" in template
+    assert "ai-pantry-review-next-badge" in template
     assert "ai-pantry-review-date-badge" in template
     assert "ai-pantry-review-storage-badge" in template
     assert "ai-pantry-date-field-{{ use_by_status.urgency or 'fresh' }}" in template
@@ -743,19 +785,25 @@ def test_ai_pantry_receipt_warning_assets_include_live_status_hooks():
     assert "function updatePantryReceiptReviewRow" in js
     assert "function updatePantryReceiptStorageBadge" in js
     assert "function normalizePantryReceiptStorage" in js
+    assert "function pantryReceiptNextAction" in js
+    assert "function setPantryReceiptNextAction" in js
+    assert "Next: ${prefix} ${dateLabel}" in js
     assert "Storage: ${pantryReceiptStorageLabel(normalizedStorage)}" in js
     assert "Frozen before deadline" in js
     assert "Frozen after deadline" in js
     assert "Already in freezer" in js
+    assert "Best frozen until" in js
     assert '["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings]' in js
     assert "bindPantryReceiptDateWarnings(options.root || document);" in js
+    assert ".ai-pantry-review-next-badge" in css
+    assert ".ai-pantry-review-next-safe" in css
     assert ".ai-pantry-date-field-frozen-late input" in css
     assert ".ai-pantry-date-field-frozen-safe input" in css
     assert ".ai-pantry-review-meta {\n    display: grid;" in css
     assert "grid-template-columns: minmax(0, 1fr) max-content;" in css
     assert ".ai-pantry-review-purchase-meta" in css
     assert ".ai-pantry-review-badges" in css
-    assert "flex-wrap: nowrap;" in css
+    assert "flex-wrap: wrap;" in css
     assert "@media (max-width: 560px)" in css
     assert ".ai-pantry-review-storage-badge" in css
     assert ".ai-pantry-review-storage-fridge" in css
