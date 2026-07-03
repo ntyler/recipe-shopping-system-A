@@ -398,13 +398,13 @@
                                     {% if candidate.unit_price_label %}<small>Each {{ candidate.unit_price_label }}</small>{% endif %}
                                     {% if candidate.line_total_label %}<small>Total {{ candidate.line_total_label }}</small>{% endif %}
                                     <small>confidence {{ candidate.confidence }}</small>
+                                    {% if review_status.label %}
+                                        <small class="ai-pantry-review-date-badge" data-pantry-review-row-status>{{ review_status.label }}</small>
+                                    {% endif %}
                                     <small class="ai-pantry-review-storage-badge ai-pantry-review-storage-{{ candidate.storage_location or 'review' }}"
                                            data-pantry-review-storage-badge>
                                         Storage: {{ candidate.storage_location_label or "Review" }}
                                     </small>
-                                    {% if review_status.label %}
-                                        <small class="ai-pantry-review-date-badge" data-pantry-review-row-status>{{ review_status.label }}</small>
-                                    {% endif %}
                                 </span>
                                 <div class="ai-pantry-review-dates" aria-label="Lifecycle dates for {{ candidate.product_name }}">
                                     <label>

@@ -700,6 +700,10 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert "data-pantry-review-row-status" in template
     assert "data-pantry-review-storage-badge" in template
     assert "data-pantry-review-suggested-storage" in template
+    meta_start = template.index('class="ai-pantry-review-meta"')
+    meta_end = template.index("</span>", meta_start)
+    meta_markup = template[meta_start:meta_end]
+    assert meta_markup.index("data-pantry-review-row-status") < meta_markup.index("data-pantry-review-storage-badge")
     assert "ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}" in template
     assert "ai-pantry-review-date-badge" in template
     assert "ai-pantry-review-storage-badge" in template
