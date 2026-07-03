@@ -21012,7 +21012,7 @@ body {
 
 .ai-pantry-review-meta {
     display: grid;
-    grid-template-columns: minmax(250px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) max-content;
     align-items: center;
     gap: 8px;
     color: #d1d5db;
@@ -21033,7 +21033,7 @@ body {
 }
 
 .ai-pantry-review-badges {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
 }
 
@@ -21140,13 +21140,14 @@ body {
     font-size: 12px;
 }
 
-@media (max-width: 650px) {
+@media (max-width: 560px) {
     .ai-pantry-review-row,
     .ai-pantry-review-meta {
         grid-template-columns: 1fr;
     }
 
     .ai-pantry-review-badges {
+        flex-wrap: wrap;
         justify-content: flex-start;
     }
 }
