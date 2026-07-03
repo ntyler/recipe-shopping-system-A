@@ -461,6 +461,18 @@ def test_pantry_section_marks_receipt_candidate_frozen_before_deadline(monkeypat
     assert "ai-pantry-date-field-frozen-safe" in html
 
 
+def test_pantry_receipt_date_fields_keep_inputs_top_aligned():
+    css = (Path(__file__).resolve().parents[1] / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    grid_start = css.index(".ai-pantry-review-dates {")
+    label_start = css.index(".ai-pantry-review-dates label {", grid_start)
+    grid_css = css[grid_start:label_start]
+    label_css = css[label_start:css.index("}", label_start)]
+
+    assert "align-items: start;" in grid_css
+    assert "align-content: start;" in label_css
+
+
 def test_pantry_section_hydrates_old_receipt_review_dates(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
