@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 
 from PushShoppingList.services.storage_service import GUEST_DATA_DIR
@@ -15,10 +16,15 @@ from PushShoppingList.services.user_account_service import user_display_name
 
 DEVICE_STATUS_EVENTS_FILE = "device_status_events.json"
 DEVICE_STATUS_MAX_EVENTS = 500
+DEVICE_STATUS_ACTIVE_MINUTES = 60
 
 
 def now_iso():
     return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+def current_utc():
+    return datetime.now(timezone.utc)
 
 
 def clamp_string(value, limit=500):
@@ -35,6 +41,48 @@ def clamp_float(value):
         return 0.0
 
     return round(number, 2)
+
+
+def parse_status_datetime(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+
+    return parsed.astimezone(timezone.utc)
+
+
+def minutes_since_status_datetime(value, reference_time=None):
+    parsed = parse_status_datetime(value)
+    if not parsed:
+        return None
+
+    reference = reference_time or current_utc()
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+    else:
+        reference = reference.astimezone(timezone.utc)
+
+    minutes = (reference - parsed).total_seconds() / 60
+    return round(max(0.0, minutes), 1)
+
+
+def device_activity_key(last_active_at, is_stale=False, reference_time=None):
+    inactive_minutes = minutes_since_status_datetime(
+        last_active_at,
+        reference_time=reference_time,
+    )
+    if inactive_minutes is None:
+        return "inactive" if is_stale else "active"
+
+    return "active" if inactive_minutes < DEVICE_STATUS_ACTIVE_MINUTES else "inactive"
 
 
 def device_status_events_path(user_id="", guest_session_id=""):
@@ -239,6 +287,9 @@ def device_status_event_for_render(entry, account_lookup=None):
     last_active_at = str(entry.get("last_active_at") or "")
     user_id = str(entry.get("user_id") or "")
     account = (account_lookup or {}).get(user_id, {})
+    is_stale = bool(entry.get("is_stale"))
+    current_minutes_inactive = minutes_since_status_datetime(last_active_at)
+    activity_key = device_activity_key(last_active_at, is_stale=is_stale)
     event = {
         "event_id": str(entry.get("event_id") or ""),
         "user_id": user_id,
@@ -246,14 +297,16 @@ def device_status_event_for_render(entry, account_lookup=None):
         "device_id": str(entry.get("device_id") or ""),
         "route": str(entry.get("route") or ""),
         "stale_reason": str(entry.get("stale_reason") or "stale"),
-        "is_stale": bool(entry.get("is_stale")),
+        "is_stale": is_stale,
+        "activity_key": activity_key,
+        "activity_label": "Active" if activity_key == "active" else "Inactive",
         "account_email": str(account.get("account_email") or ""),
         "account_display_name": str(account.get("account_display_name") or ""),
         "timestamp": timestamp,
         "timestamp_label": display_datetime(timestamp) or timestamp,
         "last_active_at": last_active_at,
         "last_active_label": display_datetime(last_active_at) or last_active_at or "Unknown",
-        "minutes_inactive": entry.get("minutes_inactive", 0),
+        "minutes_inactive": current_minutes_inactive if current_minutes_inactive is not None else entry.get("minutes_inactive", 0),
         "minutes_hidden": entry.get("minutes_hidden", 0),
         "user_agent": str(entry.get("user_agent") or ""),
         "device_label": device_label_from_user_agent(entry.get("user_agent")),

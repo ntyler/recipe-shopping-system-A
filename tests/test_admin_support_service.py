@@ -1,4 +1,6 @@
 import json
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 
 from PushShoppingList.app import create_app
@@ -165,6 +167,11 @@ def test_owner_admin_can_grant_and_revoke_delegated_admin_access(monkeypatch, tm
 def test_device_status_summary_includes_matching_account_email(monkeypatch, tmp_path):
     configure_admin_support(monkeypatch, tmp_path)
     configure_device_status(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        device_status,
+        "current_utc",
+        lambda: datetime(2026, 7, 4, 2, 30, tzinfo=timezone.utc),
+    )
     accounts.save_users({"users": [admin_user(), target_user()]})
 
     device_status.record_device_stale_event(
@@ -189,6 +196,9 @@ def test_device_status_summary_includes_matching_account_email(monkeypatch, tmp_
     assert events[0]["account_display_name"] == "Customer Account"
     assert events[0]["device_filter_key"] == "account:customer"
     assert events[0]["device_filter_label"] == "Customer Account - customer@example.com"
+    assert events[0]["activity_key"] == "inactive"
+    assert events[0]["activity_label"] == "Inactive"
+    assert events[0]["minutes_inactive"] == 90.0
 
     options = device_status.device_status_filter_options(events)
 
@@ -201,6 +211,11 @@ def test_device_status_summary_includes_matching_account_email(monkeypatch, tmp_
 def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path):
     configure_admin_support(monkeypatch, tmp_path)
     configure_device_status(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        device_status,
+        "current_utc",
+        lambda: datetime(2026, 7, 4, 3, 30, tzinfo=timezone.utc),
+    )
     accounts.save_users({"users": [admin_user(), target_user()]})
     device_status.record_device_stale_event(
         {
@@ -229,10 +244,9 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
         {
             "device_id": "active-device",
             "route": "/items",
-            "stale_reason": "heartbeat",
-            "is_stale": False,
-            "timestamp": "2026-07-04T04:00:00Z",
-            "last_active_at": "2026-07-04T04:00:00Z",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:20:00Z",
+            "last_active_at": "2026-07-04T03:20:00Z",
             "minutes_inactive": 0,
             "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/149.0.0.0",
         },

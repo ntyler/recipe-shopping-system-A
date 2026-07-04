@@ -276,7 +276,7 @@
                 {% for event in admin_support.device_status_events %}
                     <li data-device-status-row
                         data-device-status-filter-key="{{ event.device_filter_key }}"
-                        data-device-status-activity-key="{{ 'inactive' if event.is_stale else 'active' }}">
+                        data-device-status-activity-key="{{ event.activity_key }}">
                         <div class="admin-support-audit-top">
                             <strong>{{ event.device_label }}</strong>
                             <span>Last stale event {{ event.timestamp_label }}</span>
@@ -285,7 +285,7 @@
                             {{ event.stale_reason }} - {{ event.route or "Route unavailable" }}
                         </div>
                         <div class="admin-device-status-meta">
-                            <span>Status {{ "Inactive" if event.is_stale else "Active" }}</span>
+                            <span>Status {{ event.activity_label }}</span>
                             <span>Last active {{ event.last_active_label }}</span>
                             {% if event.account_email %}
                                 <span>Account {{ event.account_display_name or event.account_email }}{% if event.account_display_name %} - {{ event.account_email }}{% endif %}</span>
