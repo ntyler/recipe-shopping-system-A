@@ -48,6 +48,10 @@ mimetypes.add_type("image/webp", ".webp")
 PUBLIC_ENDPOINTS = {
     "main_bp.index",
     "main_bp.api_device_stale_route",
+    "main_bp.current_recipes_section",
+    "main_bp.cookbooks_section",
+    "main_bp.recipe_view_section",
+    "main_bp.rules_section",
     "static",
     "account_bp.firebase_session_route",
     "account_bp.firebase_login_route",
