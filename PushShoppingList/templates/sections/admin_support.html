@@ -265,7 +265,12 @@
                         <div class="admin-device-status-meta">
                             <span>Status {{ "Stale" if event.is_stale else "Active" }}</span>
                             <span>Last active {{ event.last_active_label }}</span>
-                            <span>User {{ event.user_id or event.guest_session_id or "anonymous" }}</span>
+                            {% if event.account_email %}
+                                <span>Account {{ event.account_display_name or event.account_email }}{% if event.account_display_name %} - {{ event.account_email }}{% endif %}</span>
+                                <span>User ID {{ event.user_id }}</span>
+                            {% else %}
+                                <span>User {{ event.user_id or event.guest_session_id or "anonymous" }}</span>
+                            {% endif %}
                             <span>Device {{ event.device_id }}</span>
                             <span>Inactive {{ event.minutes_inactive }}m</span>
                             <span>Hidden {{ event.minutes_hidden }}m</span>

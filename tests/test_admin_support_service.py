@@ -2,6 +2,7 @@ import json
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import admin_support_service as support
+from PushShoppingList.services import device_status_service as device_status
 from PushShoppingList.services import email_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service as accounts
@@ -152,6 +153,35 @@ def test_owner_admin_can_grant_and_revoke_delegated_admin_access(monkeypatch, tm
     assert [entry["admin_access_action"] for entry in admin_access_entries] == ["Revoked", "Granted"]
     assert admin_access_entries[0]["target_email"] == "customer@example.com"
     assert support.support_access_notices_for_user(target_user(), limit=None) == []
+
+
+def test_device_status_summary_includes_matching_account_email(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    monkeypatch.setattr(device_status, "USER_DATA_DIR", tmp_path / "user_data")
+    monkeypatch.setattr(device_status, "GUEST_DATA_DIR", tmp_path / "guest_data")
+    monkeypatch.setattr(device_status, "PACKAGE_DIR", tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+
+    device_status.record_device_stale_event(
+        {
+            "device_id": "desktop-device",
+            "route": "/#userAccountSection",
+            "stale_reason": "inactive-timeout",
+            "timestamp": "2026-07-04T02:00:00Z",
+            "last_active_at": "2026-07-04T01:00:00Z",
+            "minutes_inactive": 60,
+            "minutes_hidden": 0,
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/149.0.0.0",
+        },
+        session_user_id="customer",
+    )
+
+    events = device_status.device_status_summary()
+
+    assert len(events) == 1
+    assert events[0]["user_id"] == "customer"
+    assert events[0]["account_email"] == "customer@example.com"
+    assert events[0]["account_display_name"] == "Customer Account"
 
 
 def test_delegated_admin_cannot_manage_admin_access(monkeypatch, tmp_path):

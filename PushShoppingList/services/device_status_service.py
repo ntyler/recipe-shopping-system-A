@@ -9,6 +9,8 @@ from PushShoppingList.services.storage_service import PACKAGE_DIR
 from PushShoppingList.services.storage_service import USER_DATA_DIR
 from PushShoppingList.services.storage_service import safe_user_id
 from PushShoppingList.services.user_account_service import display_datetime
+from PushShoppingList.services.user_account_service import load_users
+from PushShoppingList.services.user_account_service import user_display_name
 
 
 DEVICE_STATUS_EVENTS_FILE = "device_status_events.json"
@@ -155,17 +157,36 @@ def device_label_from_user_agent(user_agent):
     return f"{browser} on {platform}"
 
 
-def device_status_event_for_render(entry):
+def account_identity_lookup():
+    lookup = {}
+    for user in load_users().get("users", []):
+        user_id = str(user.get("user_id") or "").strip()
+        if not user_id:
+            continue
+
+        lookup[user_id] = {
+            "account_email": str(user.get("email") or "").strip(),
+            "account_display_name": user_display_name(user),
+        }
+
+    return lookup
+
+
+def device_status_event_for_render(entry, account_lookup=None):
     timestamp = str(entry.get("timestamp") or entry.get("created_at") or "")
     last_active_at = str(entry.get("last_active_at") or "")
+    user_id = str(entry.get("user_id") or "")
+    account = (account_lookup or {}).get(user_id, {})
     return {
         "event_id": str(entry.get("event_id") or ""),
-        "user_id": str(entry.get("user_id") or ""),
+        "user_id": user_id,
         "guest_session_id": str(entry.get("guest_session_id") or ""),
         "device_id": str(entry.get("device_id") or ""),
         "route": str(entry.get("route") or ""),
         "stale_reason": str(entry.get("stale_reason") or "stale"),
         "is_stale": bool(entry.get("is_stale")),
+        "account_email": str(account.get("account_email") or ""),
+        "account_display_name": str(account.get("account_display_name") or ""),
         "timestamp": timestamp,
         "timestamp_label": display_datetime(timestamp) or timestamp,
         "last_active_at": last_active_at,
@@ -223,7 +244,7 @@ def load_events_from_file(path, scope):
     return rendered
 
 
-def recent_device_status_events(limit=20):
+def recent_device_status_events(limit=20, account_lookup=None):
     events = []
     for path, scope in iter_status_event_files():
         events.extend(load_events_from_file(path, scope))
@@ -233,13 +254,20 @@ def recent_device_status_events(limit=20):
         key=lambda entry: str(entry.get("timestamp") or entry.get("created_at") or ""),
         reverse=True,
     )
-    return [device_status_event_for_render(entry) for entry in events[:limit]]
+    return [
+        device_status_event_for_render(entry, account_lookup=account_lookup)
+        for entry in events[:limit]
+    ]
 
 
 def device_status_summary(limit=20):
     latest_by_device = {}
+    account_lookup = account_identity_lookup()
 
-    for event in recent_device_status_events(limit=DEVICE_STATUS_MAX_EVENTS):
+    for event in recent_device_status_events(
+        limit=DEVICE_STATUS_MAX_EVENTS,
+        account_lookup=account_lookup,
+    ):
         device_key = "|".join([
             event.get("user_id") or event.get("guest_session_id") or "anonymous",
             event.get("device_id") or "",
