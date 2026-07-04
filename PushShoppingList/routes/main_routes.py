@@ -130,7 +130,7 @@ from PushShoppingList.services.admin_support_service import admin_support_dashbo
 from PushShoppingList.services.admin_support_service import support_access_notices_for_user
 from PushShoppingList.services.device_status_service import device_status_summary
 from PushShoppingList.services.device_status_service import device_status_filter_options
-from PushShoppingList.services.device_status_service import record_device_stale_event
+from PushShoppingList.services.device_status_service import record_device_status_event
 
 main_bp = Blueprint("main_bp", __name__)
 address_openai_client = None
@@ -463,6 +463,11 @@ def admin_support_context(active_public_user=None):
 
 @main_bp.route("/api/device-stale", methods=["POST"])
 def api_device_stale_route():
+    return api_device_status_route()
+
+
+@main_bp.route("/api/device-status", methods=["POST"])
+def api_device_status_route():
     payload = request.get_json(silent=True) or {}
     active_public_user = current_public_user() or {}
     user_id = str(
@@ -472,7 +477,7 @@ def api_device_stale_route():
         or ""
     ).strip()
     guest_session_id = str(session.get("guest_session_id") or "").strip()
-    event = record_device_stale_event(
+    event = record_device_status_event(
         payload,
         request_user_agent=request.headers.get("User-Agent", ""),
         session_user_id=user_id,

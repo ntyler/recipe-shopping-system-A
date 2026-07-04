@@ -151,7 +151,7 @@ def normalize_device_status_event(payload, request_user_agent="", session_user_i
     }
 
 
-def record_device_stale_event(payload, request_user_agent="", session_user_id="", guest_session_id=""):
+def record_device_status_event(payload, request_user_agent="", session_user_id="", guest_session_id=""):
     event = normalize_device_status_event(
         payload,
         request_user_agent=request_user_agent,
@@ -169,6 +169,15 @@ def record_device_stale_event(payload, request_user_agent="", session_user_id=""
         guest_session_id=event.get("guest_session_id"),
     )
     return event
+
+
+def record_device_stale_event(payload, request_user_agent="", session_user_id="", guest_session_id=""):
+    return record_device_status_event(
+        payload,
+        request_user_agent=request_user_agent,
+        session_user_id=session_user_id,
+        guest_session_id=guest_session_id,
+    )
 
 
 def device_label_from_user_agent(user_agent):

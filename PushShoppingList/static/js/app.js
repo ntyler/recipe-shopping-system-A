@@ -75,8 +75,10 @@ const COOKBOOKS_HIDE_AI_INFERRED_BADGE_KEY = "cookbooks-hide-ai-inferred-badge";
 const DEVICE_ID_STORAGE_KEY = "shopping-device-id";
 const DEVICE_STALE_LAST_ACTIVITY_KEY = "shopping-device-last-activity-at";
 const DEVICE_STALE_LAST_SENT_KEY = "shopping-device-stale-last-sent";
+const DEVICE_STATUS_ACTIVE_LAST_SENT_KEY = "shopping-device-active-last-sent";
 const DEVICE_STALE_REVALIDATE_EVENT = "shopping:device-stale-revalidate";
 const DEVICE_STALE_MIN_SEND_INTERVAL_MS = 60 * 1000;
+const DEVICE_STATUS_ACTIVE_SEND_INTERVAL_MS = 5 * 60 * 1000;
 const AUTH_COLLAPSE_CONTENT_KEYS = [
     "ai-pantry",
     "job-activity",
@@ -2758,9 +2760,12 @@ function shoppingRouteForDeviceStatus() {
     return `${window.location.pathname || "/"}${window.location.search || ""}${window.location.hash || ""}`;
 }
 
-function markDeviceUserActivity() {
+function markDeviceUserActivity(options = {}) {
     deviceLastUserActivityAt = Date.now();
     safeStorageSet(localStorage, DEVICE_STALE_LAST_ACTIVITY_KEY, String(deviceLastUserActivityAt));
+    if (options.reportActive) {
+        sendDeviceActiveReport("active-heartbeat");
+    }
 }
 
 function deviceStaleReportRecentlySent(reason) {
@@ -2801,6 +2806,67 @@ function buildDeviceStalePayload(reason, options = {}) {
     };
 }
 
+function buildDeviceActivePayload(reason = "active-heartbeat") {
+    return {
+        user_id: document.body ? document.body.dataset.userId || "" : "",
+        device_id: shoppingDeviceId(),
+        route: shoppingRouteForDeviceStatus(),
+        user_agent: navigator.userAgent || "",
+        timestamp: new Date().toISOString(),
+        last_active_at: deviceLastUserActivityAt
+            ? new Date(deviceLastUserActivityAt).toISOString()
+            : new Date().toISOString(),
+        stale_reason: reason,
+        minutes_inactive: 0,
+        minutes_hidden: document.hidden ? minutesSince(devicePageHiddenAt) : 0,
+        is_stale: false,
+    };
+}
+
+function deviceActiveReportRecentlySent(force = false) {
+    if (force) {
+        safeStorageSet(sessionStorage, DEVICE_STATUS_ACTIVE_LAST_SENT_KEY, String(Date.now()));
+        return false;
+    }
+
+    const previousSentAt = Number(safeStorageGet(sessionStorage, DEVICE_STATUS_ACTIVE_LAST_SENT_KEY) || 0);
+    if (previousSentAt && Date.now() - previousSentAt < DEVICE_STATUS_ACTIVE_SEND_INTERVAL_MS) {
+        return true;
+    }
+
+    safeStorageSet(sessionStorage, DEVICE_STATUS_ACTIVE_LAST_SENT_KEY, String(Date.now()));
+    return false;
+}
+
+function postDeviceStatusPayload(url, payload) {
+    const body = JSON.stringify(payload);
+
+    let sent = false;
+    if (navigator.sendBeacon) {
+        try {
+            sent = navigator.sendBeacon(
+                url,
+                new Blob([body], { type: "application/json" })
+            );
+        } catch (err) {
+            sent = false;
+        }
+    }
+
+    if (!sent && window.fetch) {
+        fetch(url, {
+            method: "POST",
+            body,
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+        }).catch(err => {
+            if (performanceDiagnostics.enabled) {
+                console.warn("Device status report failed.", err);
+            }
+        });
+    }
+}
+
 function applyDeviceStalePerformanceMode() {
     performanceStartupForced = true;
 
@@ -2820,35 +2886,18 @@ function sendDeviceStaleReport(reason, options = {}) {
     }
 
     const payload = buildDeviceStalePayload(reason, options);
-    const body = JSON.stringify(payload);
     applyDeviceStalePerformanceMode();
-
-    let sent = false;
-    if (navigator.sendBeacon) {
-        try {
-            sent = navigator.sendBeacon(
-                "/api/device-stale",
-                new Blob([body], { type: "application/json" })
-            );
-        } catch (err) {
-            sent = false;
-        }
-    }
-
-    if (!sent && window.fetch) {
-        fetch("/api/device-stale", {
-            method: "POST",
-            body,
-            headers: { "Content-Type": "application/json" },
-            keepalive: true,
-        }).catch(err => {
-            if (performanceDiagnostics.enabled) {
-                console.warn("Device stale report failed.", err);
-            }
-        });
-    }
+    postDeviceStatusPayload("/api/device-stale", payload);
 
     window.dispatchEvent(new CustomEvent(DEVICE_STALE_REVALIDATE_EVENT, { detail: payload }));
+}
+
+function sendDeviceActiveReport(reason = "active-heartbeat", options = {}) {
+    if (!reason || deviceActiveReportRecentlySent(options.force === true)) {
+        return;
+    }
+
+    postDeviceStatusPayload("/api/device-status", buildDeviceActivePayload(reason));
 }
 
 function handleDeviceVisibilityChange() {
@@ -2860,6 +2909,7 @@ function handleDeviceVisibilityChange() {
     const hiddenMinutes = minutesSince(devicePageHiddenAt);
     deviceLastHiddenMinutes = hiddenMinutes;
     devicePageHiddenAt = 0;
+    markDeviceUserActivity({ reportActive: true });
 
     if (hiddenMinutes >= 60) {
         sendDeviceStaleReport("hidden-timeout", { minutesHidden: hiddenMinutes });
@@ -2889,9 +2939,10 @@ function initDeviceStaleReporting() {
         deviceLastUserActivityAt = savedActivityAt;
     }
     markDeviceUserActivity();
+    sendDeviceActiveReport("active-heartbeat", { force: true });
 
     ["pointerdown", "keydown", "touchstart", "scroll"].forEach(eventName => {
-        window.addEventListener(eventName, markDeviceUserActivity, { passive: true });
+        window.addEventListener(eventName, () => markDeviceUserActivity({ reportActive: true }), { passive: true });
     });
 
     document.addEventListener("visibilitychange", handleDeviceVisibilityChange);
