@@ -20549,6 +20549,39 @@ body {
     flex-wrap: wrap;
 }
 
+.ai-pantry-review-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.ai-pantry-review-header-actions p {
+    margin: 0;
+}
+
+.ai-pantry-confidence-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 5px 8px;
+    border: 1px solid #4b5563;
+    border-radius: 8px;
+    color: #d9eef2;
+    background: rgba(20, 28, 31, 0.72);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.ai-pantry-confidence-toggle input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: #38bdf8;
+}
+
 .move-bought-pantry-btn,
 .ai-pantry-action-btn,
 .ai-pantry-placeholder-actions a {
@@ -21180,6 +21213,10 @@ body {
 .ai-pantry-review-purchase-meta small,
 .ai-pantry-review-badges small {
     white-space: nowrap;
+}
+
+[data-pantry-review-confidence][hidden] {
+    display: none !important;
 }
 
 .ai-pantry-review-badges .ai-pantry-review-next-badge {

@@ -374,7 +374,15 @@
             <section id="aiPantryReceiptReview" class="ai-pantry-section ai-pantry-review-section">
                 <div class="ai-pantry-section-header">
                     <h3>Detected Purchases</h3>
-                    <p>{{ receipt_candidates|length }} purchase line(s), {{ receipt_candidates|sum(attribute="quantity") }} total item(s)</p>
+                    <div class="ai-pantry-review-header-actions">
+                        <label class="ai-pantry-confidence-toggle">
+                            <input type="checkbox"
+                                   data-pantry-review-confidence-toggle
+                                   checked>
+                            <span>Show confidence</span>
+                        </label>
+                        <p>{{ receipt_candidates|length }} purchase line(s), {{ receipt_candidates|sum(attribute="quantity") }} total item(s)</p>
+                    </div>
                 </div>
                 <form method="POST" action="{{ url_for('pantry_bp.add_receipt_candidates_route') }}">
                     <div class="ai-pantry-review-list">
@@ -398,7 +406,7 @@
                                         <small>Qty {{ candidate.quantity or 1 }}</small>
                                         {% if candidate.unit_price_label %}<small>Each {{ candidate.unit_price_label }}</small>{% endif %}
                                         {% if candidate.line_total_label %}<small>Total {{ candidate.line_total_label }}</small>{% endif %}
-                                        <small>confidence {{ candidate.confidence }}</small>
+                                        <small data-pantry-review-confidence>confidence {{ candidate.confidence }}</small>
                                     </span>
                                     <span class="ai-pantry-review-badges">
                                         {% if review_status.next_action and review_status.next_action.label %}

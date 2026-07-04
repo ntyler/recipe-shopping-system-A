@@ -3178,6 +3178,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
     bindRecipeEditCategorySourceTracking();
+    bindPantryReceiptConfidenceToggle(options.root || document);
     bindPantryReceiptDateWarnings(options.root || document);
     initDeviceStatusFilters(options.root || document);
     initDeferredImages(options.root || document);
@@ -15562,6 +15563,51 @@ const PANTRY_RECEIPT_FIELD_STATUS_CLASSES = [
     "ai-pantry-date-field-frozen-safe",
     "ai-pantry-date-field-frozen-late",
 ];
+
+const PANTRY_RECEIPT_CONFIDENCE_STORAGE_KEY = "ai-pantry-receipt-confidence-visible";
+
+function pantryReceiptConfidenceIsVisible() {
+    return localStorage.getItem(PANTRY_RECEIPT_CONFIDENCE_STORAGE_KEY) !== "0";
+}
+
+function setPantryReceiptConfidenceVisibility(visible, options = {}) {
+    const shouldShow = visible !== false;
+
+    document.querySelectorAll("[data-pantry-review-confidence]").forEach(element => {
+        element.hidden = !shouldShow;
+    });
+
+    document.querySelectorAll("[data-pantry-review-confidence-toggle]").forEach(toggle => {
+        toggle.checked = shouldShow;
+    });
+
+    if (options.persist) {
+        localStorage.setItem(PANTRY_RECEIPT_CONFIDENCE_STORAGE_KEY, shouldShow ? "1" : "0");
+    }
+}
+
+function bindPantryReceiptConfidenceToggle(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+    const toggles = [];
+
+    if (context.matches && context.matches("[data-pantry-review-confidence-toggle]")) {
+        toggles.push(context);
+    }
+
+    context.querySelectorAll("[data-pantry-review-confidence-toggle]").forEach(toggle => toggles.push(toggle));
+    setPantryReceiptConfidenceVisibility(pantryReceiptConfidenceIsVisible(), { persist: false });
+
+    toggles.forEach(toggle => {
+        if (toggle.dataset.pantryReviewConfidenceBound === "1") {
+            return;
+        }
+
+        toggle.dataset.pantryReviewConfidenceBound = "1";
+        toggle.addEventListener("change", event => {
+            setPantryReceiptConfidenceVisibility(event.currentTarget.checked, { persist: true });
+        });
+    });
+}
 
 function parsePantryReviewDate(value) {
     const match = String(value || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -30099,6 +30145,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindImportCookbookSelector", bindImportCookbookSelector],
         ["bindStoreButtons", bindStoreButtons],
         ["bindStoreLinks", bindStoreLinks],
+        ["bindPantryReceiptConfidenceToggle", bindPantryReceiptConfidenceToggle],
         ["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
         ["initJobActivityPanel", initJobActivityPanel],

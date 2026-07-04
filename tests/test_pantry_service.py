@@ -756,10 +756,14 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert "data-pantry-review-storage-badge" in template
     assert "data-pantry-review-suggested-storage" in template
     assert "data-pantry-review-next-action" in template
+    assert "data-pantry-review-confidence-toggle" in template
+    assert "data-pantry-review-confidence" in template
+    assert "Show confidence" in template
     meta_start = template.index('class="ai-pantry-review-meta"')
     meta_end = template.index('class="ai-pantry-review-dates"', meta_start)
     meta_markup = template[meta_start:meta_end]
     assert meta_markup.index("ai-pantry-review-purchase-meta") < meta_markup.index("ai-pantry-review-badges")
+    assert meta_markup.index("data-pantry-review-confidence") < meta_markup.index("ai-pantry-review-badges")
     assert meta_markup.index("data-pantry-review-next-action") < meta_markup.index("data-pantry-review-storage-badge")
     assert meta_markup.index("data-pantry-review-row-status") < meta_markup.index("data-pantry-review-storage-badge")
     assert "ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}" in template
@@ -787,14 +791,20 @@ def test_ai_pantry_receipt_warning_assets_include_live_status_hooks():
     assert "function normalizePantryReceiptStorage" in js
     assert "function pantryReceiptNextAction" in js
     assert "function setPantryReceiptNextAction" in js
+    assert "function bindPantryReceiptConfidenceToggle" in js
+    assert "PANTRY_RECEIPT_CONFIDENCE_STORAGE_KEY" in js
     assert "Next: ${prefix} ${dateLabel}" in js
     assert "Storage: ${pantryReceiptStorageLabel(normalizedStorage)}" in js
     assert "Frozen before deadline" in js
     assert "Frozen after deadline" in js
     assert "Already in freezer" in js
     assert "Best frozen until" in js
+    assert '["bindPantryReceiptConfidenceToggle", bindPantryReceiptConfidenceToggle]' in js
+    assert "bindPantryReceiptConfidenceToggle(options.root || document);" in js
     assert '["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings]' in js
     assert "bindPantryReceiptDateWarnings(options.root || document);" in js
+    assert ".ai-pantry-confidence-toggle" in css
+    assert "[data-pantry-review-confidence][hidden]" in css
     assert ".ai-pantry-review-next-badge" in css
     assert ".ai-pantry-review-next-safe" in css
     assert ".ai-pantry-date-field-frozen-late input" in css
