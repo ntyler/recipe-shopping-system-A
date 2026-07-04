@@ -800,10 +800,12 @@ def test_ai_pantry_receipt_warning_assets_include_live_status_hooks():
     assert ".ai-pantry-date-field-frozen-late input" in css
     assert ".ai-pantry-date-field-frozen-safe input" in css
     assert ".ai-pantry-review-meta {\n    display: grid;" in css
-    assert "grid-template-columns: minmax(0, 1fr) max-content;" in css
+    assert "grid-template-columns: max-content minmax(0, 1fr);" in css
     assert ".ai-pantry-review-purchase-meta" in css
     assert ".ai-pantry-review-badges" in css
     assert "flex-wrap: wrap;" in css
+    assert "overflow: hidden;" in css
+    assert "white-space: normal;" in css
     assert "@media (max-width: 560px)" in css
     assert ".ai-pantry-review-storage-badge" in css
     assert ".ai-pantry-review-storage-fridge" in css

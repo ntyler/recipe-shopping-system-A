@@ -21012,8 +21012,8 @@ body {
 
 .ai-pantry-review-meta {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) max-content;
-    align-items: center;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: start;
     gap: 8px;
     color: #d1d5db;
     min-width: 0;
@@ -21036,6 +21036,7 @@ body {
     flex-wrap: wrap;
     justify-content: flex-end;
     max-width: 100%;
+    overflow: hidden;
 }
 
 .ai-pantry-review-purchase-meta small,
@@ -21059,6 +21060,9 @@ body {
     color: #bae6fd;
     background: rgba(3, 105, 161, 0.24);
     font-weight: 900;
+    max-width: 100%;
+    line-height: 1.2;
+    white-space: normal;
 }
 
 .ai-pantry-review-next-safe {
