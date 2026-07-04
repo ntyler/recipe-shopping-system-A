@@ -276,6 +276,8 @@
                 {% for event in admin_support.device_status_events %}
                     <li data-device-status-row
                         data-device-status-filter-key="{{ event.device_filter_key }}"
+                        data-device-status-group-key="{{ event.device_status_group_key }}"
+                        data-device-status-group-keys="{{ event.device_status_group_keys }}"
                         data-device-status-activity-key="{{ event.activity_key }}">
                         <div class="admin-support-audit-top">
                             <strong>{{ event.device_label }}</strong>

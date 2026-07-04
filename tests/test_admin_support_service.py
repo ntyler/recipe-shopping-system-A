@@ -205,10 +205,16 @@ def test_device_status_summary_includes_matching_account_email(monkeypatch, tmp_
 
     options = device_status.device_status_filter_options(events)
 
-    assert options == [{
-        "key": "account:customer",
-        "label": "Customer Account - customer@example.com",
-    }]
+    assert options == [
+        {
+            "key": "group:non-guest-demo",
+            "label": "Non Guest Demo accounts (1)",
+        },
+        {
+            "key": "account:customer",
+            "label": "Customer Account - customer@example.com",
+        },
+    ]
 
 
 def test_device_status_summary_marks_guest_demo_expiration(monkeypatch, tmp_path):
@@ -280,6 +286,20 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
         lambda: datetime(2026, 7, 4, 3, 30, tzinfo=timezone.utc),
     )
     accounts.save_users({"users": [admin_user(), target_user()]})
+    guest_session_service.save_guest_sessions({
+        "guest_sessions": [
+            {
+                "id": "active-guest",
+                "expires_at": "2026-07-04T04:30:00Z",
+                "is_active": True,
+            },
+            {
+                "id": "expired-guest",
+                "expires_at": "2026-07-04T02:00:00Z",
+                "is_active": False,
+            },
+        ],
+    })
     device_status.record_device_stale_event(
         {
             "device_id": "desktop-device",
@@ -291,6 +311,30 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
             "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/149.0.0.0",
         },
         session_user_id="customer",
+    )
+    device_status.record_device_stale_event(
+        {
+            "device_id": "guest-demo-device",
+            "route": "/#userAccountSection",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:10:00Z",
+            "last_active_at": "2026-07-04T03:10:00Z",
+            "minutes_inactive": 0,
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1",
+        },
+        guest_session_id="active-guest",
+    )
+    device_status.record_device_stale_event(
+        {
+            "device_id": "expired-demo-device",
+            "route": "/#userAccountSection",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:05:00Z",
+            "last_active_at": "2026-07-04T02:00:00Z",
+            "minutes_inactive": 65,
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1",
+        },
+        guest_session_id="expired-guest",
     )
     device_status.record_device_stale_event(
         {
@@ -328,11 +372,26 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert 'data-device-status-activity-filter' in html
     assert '<option value="active">Recently active</option>' in html
     assert '<option value="inactive">Inactive</option>' in html
+    assert 'value="group:guest-demo"' in html
+    assert "Guest Demo accounts (2)" in html
+    assert 'value="group:guest-demo-active"' in html
+    assert "Guest Demo Active accounts (1)" in html
+    assert 'value="group:guest-demo-expired"' in html
+    assert "Guest Demo expired accounts (1)" in html
+    assert 'value="group:non-guest-demo"' in html
+    assert "Non Guest Demo accounts (3)" in html
     assert 'value="account:customer"' in html
     assert "Customer Account - customer@example.com" in html
     assert 'value="anonymous"' in html
     assert 'data-device-status-filter-key="account:customer"' in html
     assert 'data-device-status-filter-key="anonymous"' in html
+    assert 'data-device-status-filter-key="guest:active-guest"' in html
+    assert 'data-device-status-filter-key="guest:expired-guest"' in html
+    assert 'data-device-status-group-key="group:guest-demo"' in html
+    assert 'data-device-status-group-key="group:non-guest-demo"' in html
+    assert 'data-device-status-group-keys="group:guest-demo group:guest-demo-active"' in html
+    assert 'data-device-status-group-keys="group:guest-demo group:guest-demo-expired"' in html
+    assert 'data-device-status-group-keys="group:non-guest-demo"' in html
     assert 'data-device-status-activity-key="active"' in html
     assert 'data-device-status-activity-key="inactive"' in html
     assert "admin-device-status-activity-active" in html
@@ -593,6 +652,7 @@ def test_device_status_filter_hides_non_matching_rows():
     assert 'label.textContent = isActive ? "Demo Active" : "Demo expired";' in script
     assert 'const selectedActivity = activityFilter ? activityFilter.value || "all" : "all";' in script
     assert 'const matchesActivity = selectedActivity === "all" || row.dataset.deviceStatusActivityKey === selectedActivity;' in script
+    assert "groupKeys.includes(selectedKey)" in script
     assert 'activityFilter.addEventListener("change", applyFilter);' in script
     assert ".admin-device-status-list [data-device-status-row][hidden]" in css
     assert ".admin-device-status-list [data-device-status-row].admin-device-status-row-hidden" in css

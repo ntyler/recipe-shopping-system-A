@@ -301,6 +301,25 @@ def device_status_filter_label(event):
     return "Unlinked Browser"
 
 
+def device_status_group_key(event):
+    return "group:guest-demo" if str(event.get("guest_session_id") or "").strip() else "group:non-guest-demo"
+
+
+def device_status_group_keys(event):
+    keys = [device_status_group_key(event)]
+    if str(event.get("guest_session_id") or "").strip():
+        if event.get("guest_session_expired") is True:
+            keys.append("group:guest-demo-expired")
+        elif event.get("guest_session_expires_at") or event.get("guest_session_active"):
+            keys.append("group:guest-demo-active")
+
+    return keys
+
+
+def device_status_group_keys_value(event):
+    return " ".join(device_status_group_keys(event))
+
+
 def device_identity_score(event):
     event = event if isinstance(event, dict) else {}
 
@@ -367,6 +386,8 @@ def apply_device_identity_match(event, identity_event):
 
     matched["device_filter_key"] = device_status_filter_key(matched)
     matched["device_filter_label"] = device_status_filter_label(matched)
+    matched["device_status_group_key"] = device_status_group_key(matched)
+    matched["device_status_group_keys"] = device_status_group_keys_value(matched)
     return matched
 
 
@@ -385,8 +406,20 @@ def device_status_summary_key(event):
 def device_status_filter_options(events):
     options = []
     seen = set()
+    group_labels = [
+        ("group:guest-demo", "Guest Demo accounts"),
+        ("group:guest-demo-active", "Guest Demo Active accounts"),
+        ("group:guest-demo-expired", "Guest Demo expired accounts"),
+        ("group:non-guest-demo", "Non Guest Demo accounts"),
+    ]
+    group_counts = {key: 0 for key, _label in group_labels}
 
     for event in events if isinstance(events, list) else []:
+        event_group_keys = device_status_group_keys(event)
+        for group_key in set(event_group_keys):
+            if group_key in group_counts:
+                group_counts[group_key] += 1
+
         key = str(event.get("device_filter_key") or device_status_filter_key(event))
         if not key or key in seen:
             continue
@@ -397,7 +430,13 @@ def device_status_filter_options(events):
             "label": str(event.get("device_filter_label") or device_status_filter_label(event)),
         })
 
-    return sorted(options, key=lambda option: option.get("label", "").lower())
+    group_options = [
+        {"key": key, "label": f"{label} ({group_counts[key]})"}
+        for key, label in group_labels
+        if group_counts.get(key)
+    ]
+
+    return group_options + sorted(options, key=lambda option: option.get("label", "").lower())
 
 
 def guest_expiry_context(guest_record):
@@ -459,6 +498,8 @@ def device_status_event_for_render(entry, account_lookup=None, guest_lookup=None
     }
     event["device_filter_key"] = device_status_filter_key(event)
     event["device_filter_label"] = device_status_filter_label(event)
+    event["device_status_group_key"] = device_status_group_key(event)
+    event["device_status_group_keys"] = device_status_group_keys_value(event)
     return event
 
 

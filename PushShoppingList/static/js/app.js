@@ -4863,7 +4863,12 @@ function initDeviceStatusFilters(scope = document) {
             let visibleCount = 0;
 
             rows.forEach(row => {
-                const matchesAccount = selectedKey === "all" || row.dataset.deviceStatusFilterKey === selectedKey;
+                const groupKeys = String(row.dataset.deviceStatusGroupKeys || row.dataset.deviceStatusGroupKey || "")
+                    .split(/\s+/)
+                    .filter(Boolean);
+                const matchesAccount = selectedKey === "all"
+                    || row.dataset.deviceStatusFilterKey === selectedKey
+                    || groupKeys.includes(selectedKey);
                 const matchesActivity = selectedActivity === "all" || row.dataset.deviceStatusActivityKey === selectedActivity;
                 const matches = matchesAccount && matchesActivity;
                 row.hidden = !matches;
