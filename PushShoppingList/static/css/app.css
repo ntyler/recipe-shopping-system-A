@@ -19783,6 +19783,12 @@ body {
     color: #fee2e2;
 }
 
+.admin-device-status-meta .admin-device-status-unlinked-match {
+    border-color: #f59e0b;
+    background: #2f2306;
+    color: #fef3c7;
+}
+
 .admin-device-status-meta .admin-device-status-guest-expiry {
     gap: 4px;
 }

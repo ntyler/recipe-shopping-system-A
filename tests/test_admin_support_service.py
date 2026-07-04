@@ -324,7 +324,7 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
 
     assert 'data-device-status-filter' in html
     assert 'data-device-status-activity-filter' in html
-    assert '<option value="active">Active</option>' in html
+    assert '<option value="active">Recently active</option>' in html
     assert '<option value="inactive">Inactive</option>' in html
     assert 'value="account:customer"' in html
     assert "Customer Account - customer@example.com" in html
@@ -335,7 +335,7 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert 'data-device-status-activity-key="inactive"' in html
     assert "admin-device-status-activity-active" in html
     assert "admin-device-status-activity-inactive" in html
-    assert "Status Active" in html
+    assert "Status Recently active" in html
     assert "Status Inactive" in html
 
 
@@ -444,7 +444,7 @@ def test_device_status_route_records_active_status_for_current_user(monkeypatch,
     assert events[0]["stale_reason"] == "active-heartbeat"
     assert events[0]["is_stale"] is False
     assert events[0]["activity_key"] == "active"
-    assert events[0]["activity_label"] == "Active"
+    assert events[0]["activity_label"] == "Recently active"
     assert events[0]["minutes_inactive"] == 1.0
 
 
@@ -481,7 +481,99 @@ def test_device_status_route_ignores_anonymous_payload_user_id(monkeypatch, tmp_
     assert len(events) == 1
     assert events[0]["user_id"] == ""
     assert events[0]["device_filter_key"] == "anonymous"
-    assert events[0]["device_filter_label"] == "Anonymous Browser"
+    assert events[0]["device_filter_label"] == "Unlinked Browser"
+
+
+def test_device_status_summary_matches_unlinked_ping_to_known_same_device(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    configure_device_status(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        device_status,
+        "current_utc",
+        lambda: datetime(2026, 7, 4, 3, 30, tzinfo=timezone.utc),
+    )
+    accounts.save_users({"users": [admin_user(), target_user()]})
+
+    device_status.record_device_stale_event(
+        {
+            "device_id": "same-browser",
+            "route": "/#userAccountSection",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:20:00Z",
+            "last_active_at": "2026-07-04T03:20:00Z",
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/149.0.0.0",
+        },
+        session_user_id="customer",
+    )
+    device_status.record_device_status_event(
+        {
+            "device_id": "same-browser",
+            "route": "/#userAccountSection",
+            "stale_reason": "active-heartbeat",
+            "timestamp": "2026-07-04T03:29:00Z",
+            "last_active_at": "2026-07-04T03:29:00Z",
+            "is_stale": False,
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/149.0.0.0",
+        }
+    )
+
+    events = device_status.device_status_summary()
+
+    assert len(events) == 1
+    assert events[0]["device_id"] == "same-browser"
+    assert events[0]["user_id"] == "customer"
+    assert events[0]["account_email"] == "customer@example.com"
+    assert events[0]["stale_reason"] == "active-heartbeat"
+    assert events[0]["matched_identity_from_device"] is True
+    assert events[0]["device_filter_key"] == "account:customer"
+    assert events[0]["activity_label"] == "Recently active"
+
+
+def test_admin_support_route_labels_unlinked_same_device_heartbeat(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    configure_device_status(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        device_status,
+        "current_utc",
+        lambda: datetime(2026, 7, 4, 3, 30, tzinfo=timezone.utc),
+    )
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    device_status.record_device_stale_event(
+        {
+            "device_id": "same-browser",
+            "route": "/#userAccountSection",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:20:00Z",
+            "last_active_at": "2026-07-04T03:20:00Z",
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/149.0.0.0",
+        },
+        session_user_id="customer",
+    )
+    device_status.record_device_status_event(
+        {
+            "device_id": "same-browser",
+            "route": "/#userAccountSection",
+            "stale_reason": "active-heartbeat",
+            "timestamp": "2026-07-04T03:29:00Z",
+            "last_active_at": "2026-07-04T03:29:00Z",
+            "is_stale": False,
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/149.0.0.0",
+        }
+    )
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "admin"
+
+        page = client.get("/sections/admin-support")
+        html = page.data.decode("utf-8")
+
+    assert page.status_code == 200
+    assert "Last report Jul 4, 2026 3:29 AM UTC" in html
+    assert "Account Customer Account - customer@example.com" in html
+    assert "Unlinked heartbeat matched by device ID" in html
+    assert "Unlinked browser session" not in html
 
 
 def test_device_status_filter_hides_non_matching_rows():

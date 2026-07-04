@@ -266,7 +266,7 @@
                     <span>Status</span>
                     <select data-device-status-activity-filter>
                         <option value="all">All statuses</option>
-                        <option value="active">Active</option>
+                        <option value="active">Recently active</option>
                         <option value="inactive">Inactive</option>
                     </select>
                 </label>
@@ -279,7 +279,7 @@
                         data-device-status-activity-key="{{ event.activity_key }}">
                         <div class="admin-support-audit-top">
                             <strong>{{ event.device_label }}</strong>
-                            <span>Last stale event {{ event.timestamp_label }}</span>
+                            <span>Last report {{ event.timestamp_label }}</span>
                         </div>
                         <div class="admin-support-audit-meta">
                             {{ event.stale_reason }} - {{ event.route or "Route unavailable" }}
@@ -311,7 +311,10 @@
                                     {% endif %}
                                 {% endif %}
                             {% else %}
-                                <span>Anonymous browser</span>
+                                <span>Unlinked browser session</span>
+                            {% endif %}
+                            {% if event.matched_identity_from_device %}
+                                <span class="admin-device-status-unlinked-match">Unlinked heartbeat matched by device ID</span>
                             {% endif %}
                             <span>Device {{ event.device_id }}</span>
                             <span>Inactive {{ event.minutes_inactive }}m</span>

@@ -86,6 +86,10 @@ def device_activity_key(last_active_at, is_stale=False, reference_time=None):
     return "active" if inactive_minutes < DEVICE_STATUS_ACTIVE_MINUTES else "inactive"
 
 
+def device_activity_label(activity_key):
+    return "Recently active" if activity_key == "active" else "Inactive"
+
+
 def device_status_events_path(user_id="", guest_session_id=""):
     safe_id = safe_user_id(user_id)
     if safe_id:
@@ -288,7 +292,88 @@ def device_status_filter_label(event):
     if guest_session_id:
         return f"Guest Demo {short_device_identity(guest_session_id)}"
 
-    return "Anonymous Browser"
+    return "Unlinked Browser"
+
+
+def device_identity_score(event):
+    event = event if isinstance(event, dict) else {}
+
+    if event.get("account_email") and event.get("user_id"):
+        return 4
+
+    if event.get("user_id"):
+        return 3
+
+    if event.get("guest_session_id"):
+        return 2
+
+    return 0
+
+
+def device_event_sort_key(event):
+    return str(event.get("timestamp") or event.get("created_at") or "")
+
+
+def stronger_device_identity(candidate, current):
+    candidate_score = device_identity_score(candidate)
+    current_score = device_identity_score(current or {})
+
+    if candidate_score != current_score:
+        return candidate_score > current_score
+
+    return device_event_sort_key(candidate) > device_event_sort_key(current or {})
+
+
+def device_identity_lookup(events):
+    lookup = {}
+
+    for event in events if isinstance(events, list) else []:
+        device_id = str(event.get("device_id") or "").strip()
+        if not device_id or device_identity_score(event) <= 0:
+            continue
+
+        if stronger_device_identity(event, lookup.get(device_id)):
+            lookup[device_id] = event
+
+    return lookup
+
+
+def apply_device_identity_match(event, identity_event):
+    if device_identity_score(event) > 0 or device_identity_score(identity_event) <= 0:
+        return event
+
+    matched = dict(event)
+    matched["matched_identity_from_device"] = True
+    matched["user_id"] = str(identity_event.get("user_id") or "")
+    matched["guest_session_id"] = str(identity_event.get("guest_session_id") or "")
+    matched["account_email"] = str(identity_event.get("account_email") or "")
+    matched["account_display_name"] = str(identity_event.get("account_display_name") or "")
+
+    for key in (
+        "guest_session_expires_at",
+        "guest_session_expires_label",
+        "guest_session_active",
+        "guest_session_expired",
+        "guest_session_remaining_label",
+    ):
+        if key in identity_event:
+            matched[key] = identity_event.get(key)
+
+    matched["device_filter_key"] = device_status_filter_key(matched)
+    matched["device_filter_label"] = device_status_filter_label(matched)
+    return matched
+
+
+def device_status_summary_key(event):
+    device_id = str(event.get("device_id") or "").strip()
+    if device_id and device_id != "guest-session":
+        return device_id
+
+    return "|".join([
+        event.get("user_id") or event.get("guest_session_id") or "anonymous",
+        device_id,
+        event.get("route") or "",
+    ])
 
 
 def device_status_filter_options(events):
@@ -352,7 +437,7 @@ def device_status_event_for_render(entry, account_lookup=None, guest_lookup=None
         "stale_reason": str(entry.get("stale_reason") or "stale"),
         "is_stale": is_stale,
         "activity_key": activity_key,
-        "activity_label": "Active" if activity_key == "active" else "Inactive",
+        "activity_label": device_activity_label(activity_key),
         "account_email": str(account.get("account_email") or ""),
         "account_display_name": str(account.get("account_display_name") or ""),
         "timestamp": timestamp,
@@ -363,6 +448,7 @@ def device_status_event_for_render(entry, account_lookup=None, guest_lookup=None
         "minutes_hidden": entry.get("minutes_hidden", 0),
         "user_agent": str(entry.get("user_agent") or ""),
         "device_label": device_label_from_user_agent(entry.get("user_agent")),
+        "matched_identity_from_device": bool(entry.get("matched_identity_from_device")),
         **guest_context,
     }
     event["device_filter_key"] = device_status_filter_key(event)
@@ -506,12 +592,12 @@ def device_status_summary(limit=20):
         key=lambda event: str(event.get("timestamp") or event.get("created_at") or ""),
         reverse=True,
     )
+    identity_by_device = device_identity_lookup(events)
 
     for event in events:
-        device_key = "|".join([
-            event.get("user_id") or event.get("guest_session_id") or "anonymous",
-            event.get("device_id") or "",
-        ])
+        device_id = str(event.get("device_id") or "").strip()
+        event = apply_device_identity_match(event, identity_by_device.get(device_id))
+        device_key = device_status_summary_key(event)
         if device_key not in latest_by_device:
             latest_by_device[device_key] = event
 
