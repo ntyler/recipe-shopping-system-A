@@ -9,6 +9,7 @@ from PushShoppingList.services.storage_service import GUEST_DATA_DIR
 from PushShoppingList.services.storage_service import PACKAGE_DIR
 from PushShoppingList.services.storage_service import USER_DATA_DIR
 from PushShoppingList.services.storage_service import safe_user_id
+from PushShoppingList.services.guest_session_service import load_guest_sessions
 from PushShoppingList.services.user_account_service import display_datetime
 from PushShoppingList.services.user_account_service import load_users
 from PushShoppingList.services.user_account_service import user_display_name
@@ -229,6 +230,23 @@ def account_identity_lookup():
     return lookup
 
 
+def guest_session_lookup():
+    lookup = {}
+    payload = load_guest_sessions()
+
+    for record in payload.get("guest_sessions", []):
+        if not isinstance(record, dict):
+            continue
+
+        session_id = str(record.get("id") or record.get("session_id") or "").strip()
+        if not session_id:
+            continue
+
+        lookup[session_id] = record
+
+    return lookup
+
+
 def short_device_identity(value):
     text = str(value or "").strip()
     if len(text) <= 16:
@@ -268,9 +286,9 @@ def device_status_filter_label(event):
 
     guest_session_id = str(event.get("guest_session_id") or "").strip()
     if guest_session_id:
-        return f"Guest {short_device_identity(guest_session_id)}"
+        return f"Guest Demo {short_device_identity(guest_session_id)}"
 
-    return "Anonymous"
+    return "Anonymous Browser"
 
 
 def device_status_filter_options(events):
@@ -291,18 +309,39 @@ def device_status_filter_options(events):
     return sorted(options, key=lambda option: option.get("label", "").lower())
 
 
-def device_status_event_for_render(entry, account_lookup=None):
+def guest_expiry_context(guest_record):
+    if not isinstance(guest_record, dict):
+        return {}
+
+    expires_at = str(guest_record.get("expires_at") or "").strip()
+    expires_datetime = parse_status_datetime(expires_at)
+    remaining_seconds = 0
+    if expires_datetime:
+        remaining_seconds = max(0, int((expires_datetime - current_utc()).total_seconds()))
+
+    hours = remaining_seconds // 3600
+    minutes = (remaining_seconds % 3600) // 60
+    return {
+        "guest_session_expires_at": expires_at,
+        "guest_session_active": bool(guest_record.get("is_active")),
+        "guest_session_remaining_label": f"{hours:02d}:{minutes:02d}",
+    }
+
+
+def device_status_event_for_render(entry, account_lookup=None, guest_lookup=None):
     timestamp = str(entry.get("timestamp") or entry.get("created_at") or "")
     last_active_at = str(entry.get("last_active_at") or "")
     user_id = str(entry.get("user_id") or "")
+    guest_session_id = str(entry.get("guest_session_id") or "")
     account = (account_lookup or {}).get(user_id, {})
+    guest_context = guest_expiry_context((guest_lookup or {}).get(guest_session_id))
     is_stale = bool(entry.get("is_stale"))
     current_minutes_inactive = minutes_since_status_datetime(last_active_at)
     activity_key = device_activity_key(last_active_at, is_stale=is_stale)
     event = {
         "event_id": str(entry.get("event_id") or ""),
         "user_id": user_id,
-        "guest_session_id": str(entry.get("guest_session_id") or ""),
+        "guest_session_id": guest_session_id,
         "device_id": str(entry.get("device_id") or ""),
         "route": str(entry.get("route") or ""),
         "stale_reason": str(entry.get("stale_reason") or "stale"),
@@ -319,6 +358,7 @@ def device_status_event_for_render(entry, account_lookup=None):
         "minutes_hidden": entry.get("minutes_hidden", 0),
         "user_agent": str(entry.get("user_agent") or ""),
         "device_label": device_label_from_user_agent(entry.get("user_agent")),
+        **guest_context,
     }
     event["device_filter_key"] = device_status_filter_key(event)
     event["device_filter_label"] = device_status_filter_label(event)
@@ -371,7 +411,7 @@ def load_events_from_file(path, scope):
     return rendered
 
 
-def recent_device_status_events(limit=20, account_lookup=None):
+def recent_device_status_events(limit=20, account_lookup=None, guest_lookup=None):
     events = []
     for path, scope in iter_status_event_files():
         events.extend(load_events_from_file(path, scope))
@@ -382,7 +422,11 @@ def recent_device_status_events(limit=20, account_lookup=None):
         reverse=True,
     )
     return [
-        device_status_event_for_render(entry, account_lookup=account_lookup)
+        device_status_event_for_render(
+            entry,
+            account_lookup=account_lookup,
+            guest_lookup=guest_lookup,
+        )
         for entry in events[:limit]
     ]
 
@@ -390,10 +434,12 @@ def recent_device_status_events(limit=20, account_lookup=None):
 def device_status_summary(limit=20):
     latest_by_device = {}
     account_lookup = account_identity_lookup()
+    guests = guest_session_lookup()
 
     for event in recent_device_status_events(
         limit=DEVICE_STATUS_MAX_EVENTS,
         account_lookup=account_lookup,
+        guest_lookup=guests,
     ):
         device_key = "|".join([
             event.get("user_id") or event.get("guest_session_id") or "anonymous",

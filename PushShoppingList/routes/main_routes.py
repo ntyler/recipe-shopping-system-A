@@ -473,10 +473,12 @@ def api_device_status_route():
     user_id = str(
         active_public_user.get("user_id")
         or session.get("user_id")
-        or payload.get("user_id")
         or ""
     ).strip()
     guest_session_id = str(session.get("guest_session_id") or "").strip()
+    if not user_id:
+        payload = dict(payload)
+        payload.pop("user_id", None)
     event = record_device_status_event(
         payload,
         request_user_agent=request.headers.get("User-Agent", ""),

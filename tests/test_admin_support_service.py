@@ -320,6 +320,42 @@ def test_device_status_route_records_active_status_for_current_user(monkeypatch,
     assert events[0]["minutes_inactive"] == 1.0
 
 
+def test_device_status_route_ignores_anonymous_payload_user_id(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    configure_device_status(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        device_status,
+        "current_utc",
+        lambda: datetime(2026, 7, 4, 3, 30, tzinfo=timezone.utc),
+    )
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    app = create_app()
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/device-status",
+            json={
+                "user_id": "anonymous",
+                "device_id": "anonymous-browser",
+                "route": "/",
+                "stale_reason": "active-heartbeat",
+                "timestamp": "2026-07-04T03:29:00Z",
+                "last_active_at": "2026-07-04T03:29:00Z",
+                "minutes_inactive": 0,
+                "is_stale": False,
+            },
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/149.0.0.0"},
+        )
+
+    assert response.status_code == 200
+    events = device_status.device_status_summary()
+
+    assert len(events) == 1
+    assert events[0]["user_id"] == ""
+    assert events[0]["device_filter_key"] == "anonymous"
+    assert events[0]["device_filter_label"] == "Anonymous Browser"
+
+
 def test_device_status_filter_hides_non_matching_rows():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

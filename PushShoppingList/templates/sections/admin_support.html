@@ -290,8 +290,19 @@
                             {% if event.account_email %}
                                 <span>Account {{ event.account_display_name or event.account_email }}{% if event.account_display_name %} - {{ event.account_email }}{% endif %}</span>
                                 <span>User ID {{ event.user_id }}</span>
+                            {% elif event.guest_session_id %}
+                                <span>Guest Demo {{ event.guest_session_id }}</span>
+                                {% if event.guest_session_expires_at %}
+                                    <span>
+                                        Demo deletes in
+                                        <strong data-guest-countdown
+                                                data-guest-expires-at="{{ event.guest_session_expires_at }}">
+                                            {{ event.guest_session_remaining_label }}
+                                        </strong>
+                                    </span>
+                                {% endif %}
                             {% else %}
-                                <span>User {{ event.user_id or event.guest_session_id or "anonymous" }}</span>
+                                <span>Anonymous browser</span>
                             {% endif %}
                             <span>Device {{ event.device_id }}</span>
                             <span>Inactive {{ event.minutes_inactive }}m</span>
