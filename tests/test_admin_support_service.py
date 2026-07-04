@@ -376,10 +376,12 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert '<option value="inactive">Inactive</option>' in html
     assert 'value="group:guest-demo"' in html
     assert "Guest Demo accounts (2)" in html
+    assert 'value="group:guest-demo-active"' in html
+    assert "Existing Guest Demo accounts (1)" in html
+    assert 'value="group:guest-demo-expired"' in html
+    assert "Expired Guest Demo accounts (1)" in html
     assert 'value="group:active-account"' in html
     assert "Active accounts (2)" in html
-    assert "Guest Demo Active accounts" not in html
-    assert "Guest Demo expired accounts" not in html
     assert "Unlinked browsers" not in html
     assert 'value="account:customer"' in html
     assert "Customer Account - customer@example.com" in html

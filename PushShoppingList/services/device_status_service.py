@@ -430,6 +430,8 @@ def device_status_filter_options(events):
 def device_status_account_type_filter_options(events):
     group_labels = [
         ("group:guest-demo", "Guest Demo accounts"),
+        ("group:guest-demo-active", "Existing Guest Demo accounts"),
+        ("group:guest-demo-expired", "Expired Guest Demo accounts"),
         ("group:active-account", "Active accounts"),
     ]
     group_counts = {key: 0 for key, _label in group_labels}
