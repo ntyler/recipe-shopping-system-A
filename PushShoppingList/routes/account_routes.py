@@ -29,6 +29,7 @@ from PushShoppingList.services.sms_service import password_reset_sms_configured
 from PushShoppingList.services.sms_service import send_password_reset_sms
 from PushShoppingList.services.sms_service import send_phone_verification_sms
 from PushShoppingList.services.admin_support_service import open_admin_support_record
+from PushShoppingList.services.admin_support_service import delete_expired_guest_demo_sessions_for_admin
 from PushShoppingList.services.admin_support_service import update_account_admin_access
 from PushShoppingList.services.user_account_service import authenticate_user
 from PushShoppingList.services.user_account_service import cancel_two_factor_setup
@@ -659,6 +660,31 @@ def update_admin_access_route():
         session["admin_support_errors"] = result.get(
             "errors",
             ["Unable to update admin access."],
+        )
+        for error in session["admin_support_errors"]:
+            flash(error, "error")
+
+    return redirect(url_for("main_bp.index", _anchor="adminSupportSection"))
+
+
+@account_bp.route("/account/admin-support/delete-expired-guest-demos", methods=["POST"])
+def delete_expired_guest_demos_route():
+    admin_user = current_public_user()
+
+    if not is_admin_user(admin_user):
+        clear_admin_support_session()
+        flash("Admin access is required.", "error")
+        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+    result = delete_expired_guest_demo_sessions_for_admin(admin_user)
+
+    if result.get("ok"):
+        session.pop("admin_support_errors", None)
+        flash(result.get("message") or "Expired guest demo sessions deleted.", "success")
+    else:
+        session["admin_support_errors"] = result.get(
+            "errors",
+            ["Unable to delete expired guest demo sessions."],
         )
         for error in session["admin_support_errors"]:
             flash(error, "error")

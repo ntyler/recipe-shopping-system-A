@@ -248,9 +248,20 @@
     {% endif %}
 
     {% if admin_support.device_status_events %}
+        {% set expired_guest_demo_count = admin_support.expired_guest_demo_count|default(0)|int %}
         <div class="admin-support-audit admin-device-status">
-            <div class="admin-support-audit-header">
+            <div class="admin-support-audit-header admin-device-status-header">
                 <h3>Device Status</h3>
+                <form class="admin-device-status-cleanup-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.delete_expired_guest_demos_route') }}"
+                      onsubmit="return confirm('Delete {{ expired_guest_demo_count }} expired guest demo session{% if expired_guest_demo_count != 1 %}s{% endif %}? This cannot be undone.');">
+                    <button type="submit"
+                            class="pdf-share-action-btn danger admin-device-status-cleanup-btn"
+                            {% if expired_guest_demo_count < 1 %}disabled{% endif %}>
+                        Delete Expired Guest Demos ({{ expired_guest_demo_count }})
+                    </button>
+                </form>
             </div>
             <div class="admin-device-status-filter">
                 <label class="admin-device-status-filter-field admin-device-status-account-field">

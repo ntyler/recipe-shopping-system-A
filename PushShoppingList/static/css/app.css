@@ -19611,6 +19611,21 @@ body {
     background: #101820;
 }
 
+.admin-device-status-header {
+    align-items: center;
+}
+
+.admin-device-status-cleanup-form {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.admin-device-status-cleanup-btn {
+    min-width: 220px;
+    white-space: normal;
+}
+
 .admin-device-status-filter {
     display: flex;
     align-items: end;

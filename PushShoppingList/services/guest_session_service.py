@@ -121,6 +121,17 @@ def guest_session_is_valid(record, at_time=None):
     return expires_at > (at_time or now_utc())
 
 
+def guest_session_is_expired(record, at_time=None):
+    if not isinstance(record, dict):
+        return False
+
+    if not record.get("is_active", False):
+        return True
+
+    expires_at = parse_iso_datetime(record.get("expires_at"))
+    return bool(expires_at and expires_at <= (at_time or now_utc()))
+
+
 def clear_guest_session_flags():
     if not has_request_context():
         return
@@ -209,9 +220,7 @@ def cleanup_expired_guest_sessions(at_time=None):
         if not isinstance(record, dict):
             continue
 
-        expires_at = parse_iso_datetime(record.get("expires_at"))
-        should_cleanup = not record.get("is_active", False) or (expires_at and expires_at <= at_time)
-        if not should_cleanup:
+        if not guest_session_is_expired(record, at_time=at_time):
             continue
 
         if record.get("is_active", False):
@@ -224,6 +233,46 @@ def cleanup_expired_guest_sessions(at_time=None):
         save_guest_sessions(payload)
 
     return payload
+
+
+def expired_guest_session_count(at_time=None):
+    at_time = at_time or now_utc()
+    payload = load_guest_sessions()
+    return sum(
+        1
+        for record in payload.get("guest_sessions", [])
+        if isinstance(record, dict) and guest_session_is_expired(record, at_time=at_time)
+    )
+
+
+def delete_expired_guest_sessions(at_time=None):
+    at_time = at_time or now_utc()
+    payload = load_guest_sessions()
+    kept = []
+    deleted_ids = []
+
+    for record in payload.get("guest_sessions", []):
+        if not isinstance(record, dict) or not guest_session_is_expired(record, at_time=at_time):
+            kept.append(record)
+            continue
+
+        guest_session_id = str(record.get("id") or record.get("session_id") or "").strip()
+        if not guest_session_id:
+            kept.append(record)
+            continue
+
+        delete_guest_temporary_data(guest_session_id)
+        deleted_ids.append(guest_session_id)
+
+    if deleted_ids:
+        payload["guest_sessions"] = kept
+        save_guest_sessions(payload)
+
+    return {
+        "ok": True,
+        "deleted_count": len(deleted_ids),
+        "guest_session_ids": deleted_ids,
+    }
 
 
 def deactivate_guest_session(guest_session_id, delete_data=True):

@@ -301,6 +301,51 @@ def test_device_status_account_type_filter_shows_zero_non_expired_guest_demo_opt
     ]
 
 
+def test_admin_delete_expired_guest_demo_sessions_removes_only_expired_guest_data(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    configure_device_status(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    guest_session_service.save_guest_sessions({
+        "guest_sessions": [
+            {
+                "id": "active-guest",
+                "expires_at": "2026-07-04T04:30:00Z",
+                "is_active": True,
+            },
+            {
+                "id": "expired-guest",
+                "expires_at": "2026-07-04T02:00:00Z",
+                "is_active": False,
+            },
+        ],
+    })
+    active_file = tmp_path / "guest_data" / "active-guest" / "keep.txt"
+    active_file.parent.mkdir(parents=True, exist_ok=True)
+    active_file.write_text("active demo", encoding="utf-8")
+    expired_file = tmp_path / "guest_data" / "expired-guest" / "delete.txt"
+    expired_file.parent.mkdir(parents=True, exist_ok=True)
+    expired_file.write_text("expired demo", encoding="utf-8")
+    real_user_file = tmp_path / "user_data" / "customer" / "shopping_list.txt"
+    real_user_file.parent.mkdir(parents=True, exist_ok=True)
+    real_user_file.write_text("real account data", encoding="utf-8")
+
+    result = support.delete_expired_guest_demo_sessions_for_admin(admin_user())
+
+    assert result["ok"] is True
+    assert result["deleted_count"] == 1
+    assert result["guest_session_ids"] == ["expired-guest"]
+    assert active_file.exists()
+    assert not expired_file.exists()
+    assert real_user_file.exists()
+    payload = guest_session_service.load_guest_sessions()
+    assert [record["id"] for record in payload["guest_sessions"]] == ["active-guest"]
+    audit_entries = support.load_audit_entries()
+    assert len(audit_entries) == 1
+    assert audit_entries[0]["action"] == "delete_expired_guest_demo_sessions"
+    assert audit_entries[0]["deleted_count"] == 1
+    assert audit_entries[0]["guest_session_ids"] == ["expired-guest"]
+
+
 def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path):
     configure_admin_support(monkeypatch, tmp_path)
     configure_device_status(monkeypatch, tmp_path)
@@ -398,6 +443,9 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert '<option value="all">All accounts</option>' in html
     assert '<option value="active">Recently active</option>' in html
     assert '<option value="inactive">Inactive</option>' in html
+    assert 'action="/account/admin-support/delete-expired-guest-demos"' in html
+    assert "Delete Expired Guest Demos (1)" in html
+    assert "Delete 1 expired guest demo session? This cannot be undone." in html
     assert 'value="group:guest-demo"' in html
     assert "Guest Demo accounts (2)" in html
     assert 'value="group:guest-demo-active"' in html

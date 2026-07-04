@@ -5,6 +5,8 @@ from datetime import datetime
 from pathlib import Path
 
 from PushShoppingList.services.email_service import send_admin_support_access_email
+from PushShoppingList.services.guest_session_service import delete_expired_guest_sessions
+from PushShoppingList.services.guest_session_service import expired_guest_session_count
 from PushShoppingList.services.storage_service import USER_DATA_DIR
 from PushShoppingList.services.storage_service import safe_user_id
 from PushShoppingList.services.user_account_service import display_datetime
@@ -23,6 +25,7 @@ ADMIN_SUPPORT_AUDIT_FILE = Path(
 )
 AUDIT_ACTION = "view_account_support_record"
 ADMIN_ACCESS_AUDIT_ACTION = "update_admin_access"
+GUEST_DEMO_CLEANUP_AUDIT_ACTION = "delete_expired_guest_demo_sessions"
 
 
 def now_iso():
@@ -310,6 +313,38 @@ def record_admin_access_change(admin_user, target_user, enabled):
     return entry
 
 
+def record_expired_guest_demo_cleanup(admin_user, cleanup_result):
+    actor_private_email = str((admin_user or {}).get("email") or "")
+    created_at = now_iso()
+    deleted_count = int((cleanup_result or {}).get("deleted_count") or 0)
+    guest_session_ids = [
+        str(guest_id)
+        for guest_id in (cleanup_result or {}).get("guest_session_ids", [])
+        if str(guest_id)
+    ]
+    entry = {
+        "audit_id": uuid.uuid4().hex,
+        "action": GUEST_DEMO_CLEANUP_AUDIT_ACTION,
+        "timestamp": created_at,
+        "createdAt": created_at,
+        "actorUid": str((admin_user or {}).get("user_id") or ""),
+        "actorPrivateEmail": actor_private_email,
+        "actorPublicEmail": get_public_support_identity(actor_private_email),
+        "admin_user_id": str((admin_user or {}).get("user_id") or ""),
+        "admin_email": actor_private_email,
+        "target_user_id": "",
+        "target_email": "",
+        "targetUserEmail": "",
+        "deleted_count": deleted_count,
+        "guest_session_ids": guest_session_ids,
+        "reason": f"Deleted {deleted_count} expired guest demo session{'s' if deleted_count != 1 else ''}.",
+    }
+    entries = load_audit_entries()
+    entries.append(entry)
+    save_audit_entries(entries[-500:])
+    return entry
+
+
 def normalize_reason(reason):
     return str(reason or "").strip()[:300]
 
@@ -404,6 +439,25 @@ def update_account_admin_access(admin_user, target_user_id, enabled):
     }
 
 
+def delete_expired_guest_demo_sessions_for_admin(admin_user):
+    if not is_admin_user(admin_user):
+        return {
+            "ok": False,
+            "errors": ["Admin access is required."],
+        }
+
+    result = delete_expired_guest_sessions()
+    audit_entry = record_expired_guest_demo_cleanup(admin_user, result)
+    deleted_count = int(result.get("deleted_count") or 0)
+    return {
+        "ok": True,
+        "deleted_count": deleted_count,
+        "guest_session_ids": result.get("guest_session_ids", []),
+        "audit_entry": audit_entry_for_render(audit_entry),
+        "message": f"Deleted {deleted_count} expired guest demo session{'s' if deleted_count != 1 else ''}.",
+    }
+
+
 def admin_support_dashboard_for_user(admin_user, selected_user=None, errors=None, reason=""):
     is_admin = is_admin_user(admin_user)
     can_manage_access = can_manage_admin_access(admin_user)
@@ -416,4 +470,5 @@ def admin_support_dashboard_for_user(admin_user, selected_user=None, errors=None
         "reason": normalize_reason(reason) if is_admin else "",
         "recent_audit": recent_support_audit_entries() if is_admin else [],
         "recent_admin_access": recent_admin_access_audit_entries() if can_manage_access else [],
+        "expired_guest_demo_count": expired_guest_session_count() if is_admin else 0,
     }
