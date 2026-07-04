@@ -3178,6 +3178,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
     bindRecipeEditCategorySourceTracking();
+    bindPantryInventoryDetails(options.root || document);
     bindPantryReceiptConfidenceToggle(options.root || document);
     bindPantryReceiptDateWarnings(options.root || document);
     initDeviceStatusFilters(options.root || document);
@@ -15544,6 +15545,56 @@ function filterPantryItems(value) {
 
     document.querySelectorAll("[data-pantry-search-empty]").forEach(empty => {
         empty.hidden = !query || visibleCount > 0;
+    });
+}
+
+function setPantryInventoryDetailsCollapsed(row, collapsed) {
+    if (!row) {
+        return;
+    }
+
+    const isCollapsed = collapsed !== false;
+    const details = row.querySelector("[data-pantry-inventory-details]");
+    const toggle = row.querySelector("[data-pantry-inventory-details-toggle]");
+    row.classList.toggle("ai-pantry-inventory-row-collapsed", isCollapsed);
+
+    if (details) {
+        details.hidden = isCollapsed;
+    }
+
+    if (toggle) {
+        toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+        toggle.title = isCollapsed ? "Show inventory details" : "Hide inventory details";
+        const ingredient = row.dataset.pantryIngredient || "inventory item";
+        toggle.setAttribute(
+            "aria-label",
+            `${isCollapsed ? "Show" : "Hide"} inventory details for ${ingredient}`
+        );
+    }
+}
+
+function togglePantryInventoryDetails(button) {
+    const row = button ? button.closest("[data-pantry-inventory-row]") : null;
+    const shouldExpand = row ? row.classList.contains("ai-pantry-inventory-row-collapsed") : false;
+    closeRecipeEditRowMenus();
+    setPantryInventoryDetailsCollapsed(row, !shouldExpand);
+    return false;
+}
+
+function bindPantryInventoryDetails(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+    const rows = [];
+
+    if (context.matches && context.matches("[data-pantry-inventory-row]")) {
+        rows.push(context);
+    }
+
+    context.querySelectorAll("[data-pantry-inventory-row]").forEach(row => rows.push(row));
+    rows.forEach(row => {
+        setPantryInventoryDetailsCollapsed(
+            row,
+            row.classList.contains("ai-pantry-inventory-row-collapsed")
+        );
     });
 }
 
@@ -30202,6 +30253,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindImportCookbookSelector", bindImportCookbookSelector],
         ["bindStoreButtons", bindStoreButtons],
         ["bindStoreLinks", bindStoreLinks],
+        ["bindPantryInventoryDetails", bindPantryInventoryDetails],
         ["bindPantryReceiptConfidenceToggle", bindPantryReceiptConfidenceToggle],
         ["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],

@@ -78,8 +78,9 @@
             {% if pantry_items %}
                 <div class="ai-pantry-inventory-list ai-pantry-editor-list">
                     {% for item in pantry_items %}
-                        <article class="ai-pantry-item ai-pantry-inventory-row"
+                        <article class="ai-pantry-item ai-pantry-inventory-row ai-pantry-inventory-row-collapsed"
                                  data-pantry-item
+                                 data-pantry-inventory-row
                                  data-pantry-ingredient="{{ item.ingredient_name }}"
                                  data-pantry-product="{{ item.product_name }}"
                                  data-pantry-quantity="{{ item.quantity }}"
@@ -110,11 +111,16 @@
                                     {% if item.frozen_best_by_date_label %}<span>Best frozen until {{ item.frozen_best_by_date_label }}</span>{% endif %}
                                     {% if item.expiration_date_label %}<span>Use by {{ item.expiration_date_label }}</span>{% endif %}
                                 </div>
+                                {% if item.notes %}
+                                    <p class="ai-pantry-inventory-notes-preview">{{ item.notes }}</p>
+                                {% endif %}
                             </div>
                             <form class="ai-pantry-inline-form"
                                   id="pantryUpdate{{ loop.index }}"
                                   method="POST"
-                                  action="{{ url_for('pantry_bp.update_pantry_item_route', item_id=item.id) }}">
+                                  action="{{ url_for('pantry_bp.update_pantry_item_route', item_id=item.id) }}"
+                                  data-pantry-inventory-details
+                                  hidden>
                                 <label class="ai-pantry-inventory-qty-label">
                                     <span>Qty</span>
                                     <input name="quantity"
@@ -226,6 +232,15 @@
                                 <input type="hidden" name="action" value="dismiss_today">
                             </form>
                             <div class="recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap">
+                                <button type="button"
+                                        class="ai-pantry-inventory-details-toggle"
+                                        data-pantry-inventory-details-toggle
+                                        aria-label="Show inventory details for {{ item.ingredient_name }}"
+                                        aria-expanded="false"
+                                        title="Show inventory details"
+                                        onclick="return togglePantryInventoryDetails(this)">
+                                    <span class="ai-pantry-inventory-details-icon" aria-hidden="true"></span>
+                                </button>
                                 <button type="button"
                                         class="recipe-edit-row-menu-btn ai-pantry-inventory-menu-btn"
                                         aria-label="Inventory actions for {{ item.ingredient_name }}"
