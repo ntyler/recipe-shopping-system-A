@@ -252,9 +252,21 @@
             <div class="admin-support-audit-header">
                 <h3>Device Status</h3>
             </div>
-            <ol class="admin-support-audit-list admin-device-status-list">
+            <div class="admin-device-status-filter">
+                <label>
+                    <span>Filter</span>
+                    <select data-device-status-filter>
+                        <option value="all">All devices</option>
+                        {% for option in admin_support.device_status_filter_options|default([]) %}
+                            <option value="{{ option.key }}">{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <span data-device-status-filter-count>{{ admin_support.device_status_events|length }} shown</span>
+            </div>
+            <ol class="admin-support-audit-list admin-device-status-list" data-device-status-list>
                 {% for event in admin_support.device_status_events %}
-                    <li>
+                    <li data-device-status-row data-device-status-filter-key="{{ event.device_filter_key }}">
                         <div class="admin-support-audit-top">
                             <strong>{{ event.device_label }}</strong>
                             <span>Last stale event {{ event.timestamp_label }}</span>
@@ -279,6 +291,9 @@
                     </li>
                 {% endfor %}
             </ol>
+            <div class="admin-device-status-empty" data-device-status-empty hidden>
+                No device status events match this filter.
+            </div>
         </div>
     {% endif %}
 </section>

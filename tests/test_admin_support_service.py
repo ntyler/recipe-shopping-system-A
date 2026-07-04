@@ -21,6 +21,12 @@ def configure_admin_support(monkeypatch, tmp_path):
     )
 
 
+def configure_device_status(monkeypatch, tmp_path):
+    monkeypatch.setattr(device_status, "USER_DATA_DIR", tmp_path / "user_data")
+    monkeypatch.setattr(device_status, "GUEST_DATA_DIR", tmp_path / "guest_data")
+    monkeypatch.setattr(device_status, "PACKAGE_DIR", tmp_path)
+
+
 def admin_user():
     return {
         "user_id": "admin",
@@ -157,9 +163,7 @@ def test_owner_admin_can_grant_and_revoke_delegated_admin_access(monkeypatch, tm
 
 def test_device_status_summary_includes_matching_account_email(monkeypatch, tmp_path):
     configure_admin_support(monkeypatch, tmp_path)
-    monkeypatch.setattr(device_status, "USER_DATA_DIR", tmp_path / "user_data")
-    monkeypatch.setattr(device_status, "GUEST_DATA_DIR", tmp_path / "guest_data")
-    monkeypatch.setattr(device_status, "PACKAGE_DIR", tmp_path)
+    configure_device_status(monkeypatch, tmp_path)
     accounts.save_users({"users": [admin_user(), target_user()]})
 
     device_status.record_device_stale_event(
@@ -182,6 +186,59 @@ def test_device_status_summary_includes_matching_account_email(monkeypatch, tmp_
     assert events[0]["user_id"] == "customer"
     assert events[0]["account_email"] == "customer@example.com"
     assert events[0]["account_display_name"] == "Customer Account"
+    assert events[0]["device_filter_key"] == "account:customer"
+    assert events[0]["device_filter_label"] == "Customer Account - customer@example.com"
+
+    options = device_status.device_status_filter_options(events)
+
+    assert options == [{
+        "key": "account:customer",
+        "label": "Customer Account - customer@example.com",
+    }]
+
+
+def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    configure_device_status(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    device_status.record_device_stale_event(
+        {
+            "device_id": "desktop-device",
+            "route": "/#userAccountSection",
+            "stale_reason": "inactive-timeout",
+            "timestamp": "2026-07-04T02:00:00Z",
+            "last_active_at": "2026-07-04T01:00:00Z",
+            "minutes_inactive": 60,
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/149.0.0.0",
+        },
+        session_user_id="customer",
+    )
+    device_status.record_device_stale_event(
+        {
+            "device_id": "anonymous-device",
+            "route": "/",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:00:00Z",
+            "last_active_at": "2026-07-04T02:55:00Z",
+            "minutes_inactive": 5,
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1",
+        }
+    )
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "admin"
+
+        page = client.get("/sections/admin-support")
+        html = page.data.decode("utf-8")
+
+    assert 'data-device-status-filter' in html
+    assert 'value="account:customer"' in html
+    assert "Customer Account - customer@example.com" in html
+    assert 'value="anonymous"' in html
+    assert 'data-device-status-filter-key="account:customer"' in html
+    assert 'data-device-status-filter-key="anonymous"' in html
 
 
 def test_delegated_admin_cannot_manage_admin_access(monkeypatch, tmp_path):

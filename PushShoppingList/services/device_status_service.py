@@ -172,12 +172,74 @@ def account_identity_lookup():
     return lookup
 
 
+def short_device_identity(value):
+    text = str(value or "").strip()
+    if len(text) <= 16:
+        return text
+
+    return f"{text[:12]}..."
+
+
+def device_status_filter_key(event):
+    user_id = str(event.get("user_id") or "").strip()
+    guest_session_id = str(event.get("guest_session_id") or "").strip()
+
+    if event.get("account_email") and user_id:
+        return f"account:{user_id}"
+
+    if user_id:
+        return f"user:{user_id}"
+
+    if guest_session_id:
+        return f"guest:{guest_session_id}"
+
+    return "anonymous"
+
+
+def device_status_filter_label(event):
+    if event.get("account_email"):
+        display = str(event.get("account_display_name") or event.get("account_email") or "").strip()
+        email = str(event.get("account_email") or "").strip()
+        if display and display != email:
+            return f"{display} - {email}"
+
+        return email
+
+    user_id = str(event.get("user_id") or "").strip()
+    if user_id:
+        return f"User {short_device_identity(user_id)}"
+
+    guest_session_id = str(event.get("guest_session_id") or "").strip()
+    if guest_session_id:
+        return f"Guest {short_device_identity(guest_session_id)}"
+
+    return "Anonymous"
+
+
+def device_status_filter_options(events):
+    options = []
+    seen = set()
+
+    for event in events if isinstance(events, list) else []:
+        key = str(event.get("device_filter_key") or device_status_filter_key(event))
+        if not key or key in seen:
+            continue
+
+        seen.add(key)
+        options.append({
+            "key": key,
+            "label": str(event.get("device_filter_label") or device_status_filter_label(event)),
+        })
+
+    return sorted(options, key=lambda option: option.get("label", "").lower())
+
+
 def device_status_event_for_render(entry, account_lookup=None):
     timestamp = str(entry.get("timestamp") or entry.get("created_at") or "")
     last_active_at = str(entry.get("last_active_at") or "")
     user_id = str(entry.get("user_id") or "")
     account = (account_lookup or {}).get(user_id, {})
-    return {
+    event = {
         "event_id": str(entry.get("event_id") or ""),
         "user_id": user_id,
         "guest_session_id": str(entry.get("guest_session_id") or ""),
@@ -196,6 +258,9 @@ def device_status_event_for_render(entry, account_lookup=None):
         "user_agent": str(entry.get("user_agent") or ""),
         "device_label": device_label_from_user_agent(entry.get("user_agent")),
     }
+    event["device_filter_key"] = device_status_filter_key(event)
+    event["device_filter_label"] = device_status_filter_label(event)
+    return event
 
 
 def iter_status_event_files():

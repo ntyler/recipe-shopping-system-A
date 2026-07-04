@@ -3128,6 +3128,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeTaskChecks();
     bindRecipeEditCategorySourceTracking();
     bindPantryReceiptDateWarnings(options.root || document);
+    initDeviceStatusFilters(options.root || document);
     initDeferredImages(options.root || document);
     decorateRecipeCoverImages();
     applyKnownRecipeImageProgressItems();
@@ -4773,6 +4774,52 @@ function closeAdminSupportPanel() {
     }
 
     return false;
+}
+
+function initDeviceStatusFilters(scope = document) {
+    const root = scope && scope.querySelectorAll ? scope : document;
+    const filters = [
+        ...(root.matches && root.matches("[data-device-status-filter]") ? [root] : []),
+        ...root.querySelectorAll("[data-device-status-filter]"),
+    ];
+
+    filters.forEach(filter => {
+        if (filter.dataset.deviceStatusFilterBound === "1") {
+            return;
+        }
+
+        const panel = filter.closest(".admin-device-status");
+        const rows = panel ? [...panel.querySelectorAll("[data-device-status-row]")] : [];
+        const count = panel ? panel.querySelector("[data-device-status-filter-count]") : null;
+        const empty = panel ? panel.querySelector("[data-device-status-empty]") : null;
+
+        const applyFilter = () => {
+            const selectedKey = filter.value || "all";
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const matches = selectedKey === "all" || row.dataset.deviceStatusFilterKey === selectedKey;
+                row.hidden = !matches;
+                if (matches) {
+                    visibleCount += 1;
+                }
+            });
+
+            if (count) {
+                count.textContent = selectedKey === "all"
+                    ? `${rows.length} shown`
+                    : `${visibleCount} of ${rows.length} shown`;
+            }
+
+            if (empty) {
+                empty.hidden = visibleCount > 0;
+            }
+        };
+
+        filter.dataset.deviceStatusFilterBound = "1";
+        filter.addEventListener("change", applyFilter);
+        applyFilter();
+    });
 }
 
 async function openSharedRecipePdfsPanel() {
@@ -29955,6 +30002,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindFirebaseAuthInfo", bindFirebaseAuthInfo],
         ["bindPasswordSafetyInfo", bindPasswordSafetyInfo],
         ["restoreRememberedAccountPanelOpen", restoreRememberedAccountPanelOpen],
+        ["initDeviceStatusFilters", initDeviceStatusFilters],
         ["initGuestCountdowns", initGuestCountdowns],
         ["bindGuestAuthChoices", bindGuestAuthChoices],
         ["bindFeedbackTickets", bindFeedbackTickets],
