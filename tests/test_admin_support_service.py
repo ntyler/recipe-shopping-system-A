@@ -272,6 +272,8 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert 'data-device-status-filter-key="anonymous"' in html
     assert 'data-device-status-activity-key="active"' in html
     assert 'data-device-status-activity-key="inactive"' in html
+    assert "admin-device-status-activity-active" in html
+    assert "admin-device-status-activity-inactive" in html
     assert "Status Active" in html
     assert "Status Inactive" in html
 
@@ -370,6 +372,8 @@ def test_device_status_filter_hides_non_matching_rows():
     assert 'activityFilter.addEventListener("change", applyFilter);' in script
     assert ".admin-device-status-list [data-device-status-row][hidden]" in css
     assert ".admin-device-status-list [data-device-status-row].admin-device-status-row-hidden" in css
+    assert ".admin-device-status-meta .admin-device-status-activity-active" in css
+    assert ".admin-device-status-meta .admin-device-status-activity-inactive" in css
     assert "display: none !important;" in css
 
 

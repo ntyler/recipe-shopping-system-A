@@ -285,7 +285,9 @@
                             {{ event.stale_reason }} - {{ event.route or "Route unavailable" }}
                         </div>
                         <div class="admin-device-status-meta">
-                            <span>Status {{ event.activity_label }}</span>
+                            <span class="admin-device-status-activity admin-device-status-activity-{{ event.activity_key }}">
+                                Status {{ event.activity_label }}
+                            </span>
                             <span>Last active {{ event.last_active_label }}</span>
                             {% if event.account_email %}
                                 <span>Account {{ event.account_display_name or event.account_email }}{% if event.account_display_name %} - {{ event.account_email }}{% endif %}</span>

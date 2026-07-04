@@ -19771,6 +19771,18 @@ body {
     background: #091521;
 }
 
+.admin-device-status-meta .admin-device-status-activity-active {
+    border-color: #22c55e;
+    background: #052e1a;
+    color: #dcfce7;
+}
+
+.admin-device-status-meta .admin-device-status-activity-inactive {
+    border-color: #ef4444;
+    background: #3b0d0d;
+    color: #fee2e2;
+}
+
 .admin-device-status-agent {
     overflow-wrap: anywhere;
     color: #96a3ad;
