@@ -1124,6 +1124,8 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("body.store-maps-hidden", css)
         self.assertIn("function toggleStoreOptionsDisplay", script)
         self.assertIn("function restoreStoreOptionsDisplaySettings", script)
+        self.assertIn("function storeOptionsDefaultShouldShow", script)
+        self.assertIn('kind === "maps" && storeOptionsPublicView()', script)
         self.assertIn("function storeOptionsAccountStorageKey(baseKey)", script)
         self.assertIn("storeOptionsAccountStorageKey(storeOptionsDisplayStorageKey(kind))", script)
 

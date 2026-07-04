@@ -107,6 +107,20 @@ def test_auth_transition_can_request_collapse_before_lazy_sections_load():
     assert "safeStorageRemove(localStorage, USER_ACCOUNT_OPEN_PANEL_KEY);" in script
 
 
+def test_public_workspace_starts_collapsed_before_lazy_sections_load():
+    script = read_text("PushShoppingList/static/js/app.js")
+    index_template = read_text("PushShoppingList/templates/index.html")
+
+    assert 'data-public-workspace="{{ \'1\' if not current_user and not is_guest_demo else \'0\' }}"' in index_template
+    assert "function initPublicWorkspaceCollapsedState()" in script
+    assert 'document.body.dataset.publicWorkspace === "1"' in script
+    assert "persistShoppingListCollapsedState();" in script
+    assert "applyShoppingListCollapsedDomState({ showStatus: true });" in script
+    assert script.index('["initPublicWorkspaceCollapsedState", initPublicWorkspaceCollapsedState]') < script.index(
+        '["initLazySections", initLazySections]'
+    )
+
+
 def test_auth_collapse_still_allows_manual_lazy_section_open():
     script = read_text("PushShoppingList/static/js/app.js")
     index_template = read_text("PushShoppingList/templates/index.html")

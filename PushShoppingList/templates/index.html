@@ -11,6 +11,7 @@
 
 <body class="{% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}"
       data-performance-diagnostics="{{ '1' if performance_diagnostics_enabled else '0' }}"
+      data-public-workspace="{{ '1' if not current_user and not is_guest_demo else '0' }}"
       data-user-id="{{ current_user.user_id if current_user else '' }}">
 
 <h1>Shopping List</h1>

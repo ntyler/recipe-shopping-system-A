@@ -377,6 +377,7 @@ def store_options_context():
         "enabled_stores": store_settings["enabled_stores"],
         "can_toggle_stores": can_edit_workspace_stores,
         "can_edit_store_credentials": can_edit_workspace_stores,
+        "store_options_public_view": not can_edit_workspace_stores,
     }
 
 

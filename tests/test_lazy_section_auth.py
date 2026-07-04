@@ -73,6 +73,7 @@ def test_logged_out_store_options_section_is_read_only_and_sanitized(monkeypatch
     assert 'id="storeOptionsSection"' in html
     assert 'data-store-can-toggle="false"' in html
     assert 'data-store-can-edit-credentials="false"' in html
+    assert 'data-store-public-view="true"' in html
     assert "Secret Store" in html
     assert "secret@example.com" not in html
     assert "top-secret-password" not in html
@@ -89,6 +90,7 @@ def test_logged_out_index_shows_store_options_placeholder(monkeypatch, tmp_path)
 
     html = response.get_data(as_text=True)
     assert response.status_code == 200
+    assert 'data-public-workspace="1"' in html
     assert 'id="storeOptionsSection"' in html
     assert 'data-lazy-section="store-options"' in html
     assert ">Store Options<" in html

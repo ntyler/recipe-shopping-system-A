@@ -2994,6 +2994,19 @@ function consumeAuthCollapseAllRequest() {
     return true;
 }
 
+function publicWorkspaceStartsCollapsed() {
+    return document.body && document.body.dataset.publicWorkspace === "1";
+}
+
+function initPublicWorkspaceCollapsedState() {
+    if (!publicWorkspaceStartsCollapsed()) {
+        return;
+    }
+
+    persistShoppingListCollapsedState();
+    applyShoppingListCollapsedDomState({ showStatus: true });
+}
+
 function loadDeferredImage(image) {
     if (!image || image.dataset.deferredLoaded === "1") {
         return;
@@ -14853,6 +14866,19 @@ function storeOptionsAccountStorageKey(baseKey) {
     return accountId ? `${baseKey}:account:${accountId}` : baseKey;
 }
 
+function storeOptionsPublicView() {
+    const section = storeOptionsSection();
+    if (section && section.dataset && section.dataset.storePublicView === "true") {
+        return true;
+    }
+
+    return document.body && document.body.dataset.publicWorkspace === "1";
+}
+
+function storeOptionsDefaultShouldShow(kind) {
+    return !(kind === "maps" && storeOptionsPublicView());
+}
+
 function setStoreOptionsDisplay(kind, shouldShow, options = {}) {
     const bodyClass = storeOptionsDisplayBodyClass(kind);
 
@@ -14888,7 +14914,12 @@ function restoreStoreOptionsDisplaySettings() {
             localStorage,
             storeOptionsAccountStorageKey(storeOptionsDisplayStorageKey(kind))
         );
-        setStoreOptionsDisplay(kind, savedValue === null ? true : savedValue === "1");
+        const useSavedValue = savedValue !== null && !(kind === "maps" && storeOptionsPublicView());
+
+        setStoreOptionsDisplay(
+            kind,
+            useSavedValue ? savedValue === "1" : storeOptionsDefaultShouldShow(kind)
+        );
     });
 }
 
@@ -29912,6 +29943,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initPerformanceStartupMode", initPerformanceStartupMode],
         ["initDeviceStaleReporting", initDeviceStaleReporting],
         ["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest],
+        ["initPublicWorkspaceCollapsedState", initPublicWorkspaceCollapsedState],
         ["restoreScroll", restoreScroll],
         ["restoreScreenSettings", restoreScreenSettings],
         ["restoreCardCollapseState", restoreCardCollapseState],
