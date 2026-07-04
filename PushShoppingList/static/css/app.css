@@ -20847,6 +20847,7 @@ body {
 .ai-pantry-inventory-row .ai-pantry-inline-form input,
 .ai-pantry-inventory-row .ai-pantry-inline-form select {
     width: 100%;
+    min-width: 0;
     min-height: 38px;
     box-sizing: border-box;
     border: 1px solid #344154;
@@ -20872,6 +20873,43 @@ body {
     grid-row: 1;
     align-self: center;
     justify-self: end;
+}
+
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row {
+    grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
+    gap: 12px;
+    min-height: 0;
+    padding: 14px;
+}
+
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-handle {
+    grid-column: 1 / 2;
+    grid-row: 1;
+}
+
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-number {
+    grid-column: 2 / 3;
+    grid-row: 1;
+    width: 38px;
+    height: 38px;
+    font-size: 16px;
+}
+
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-name {
+    grid-column: 3 / 4;
+    grid-row: 1;
+}
+
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-menu-wrap {
+    grid-column: 4 / 5;
+    grid-row: 1;
+}
+
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row .ai-pantry-inline-form {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+    gap: 10px;
 }
 
 .ai-pantry-inventory-menu {
@@ -21423,6 +21461,45 @@ body {
 
 .ai-pantry-review-storage-field input {
     margin-top: 5px;
+}
+
+@media (max-width: 980px) {
+    .ai-pantry-inventory-row {
+        grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
+        gap: 12px;
+        min-height: 0;
+        padding: 14px;
+    }
+
+    .ai-pantry-inventory-handle {
+        grid-column: 1 / 2;
+        grid-row: 1;
+    }
+
+    .ai-pantry-inventory-number {
+        grid-column: 2 / 3;
+        grid-row: 1;
+        width: 38px;
+        height: 38px;
+        font-size: 16px;
+    }
+
+    .ai-pantry-inventory-name {
+        grid-column: 3 / 4;
+        grid-row: 1;
+    }
+
+    .ai-pantry-inventory-menu-wrap {
+        grid-column: 4 / 5;
+        grid-row: 1;
+    }
+
+    .ai-pantry-inventory-row .ai-pantry-inline-form {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+        gap: 10px;
+    }
 }
 
 @media (max-width: 560px) {
