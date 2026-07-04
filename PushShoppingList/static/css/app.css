@@ -20549,6 +20549,14 @@ body {
     flex-wrap: wrap;
 }
 
+.ai-pantry-section-header h3 {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 16px;
+    font-weight: 850;
+    line-height: 1.2;
+}
+
 .ai-pantry-review-header-actions {
     display: flex;
     align-items: center;
@@ -20638,6 +20646,17 @@ body {
     margin-top: 16px;
     padding-top: 14px;
     border-top: 1px solid #384146;
+}
+
+.ai-pantry-form-surface {
+    margin-top: 10px;
+    border: 1px solid #233044;
+    border-radius: 8px;
+    padding: 12px;
+    background:
+        linear-gradient(145deg, rgba(18, 28, 41, 0.74), rgba(10, 16, 25, 0.94)),
+        #111821;
+    box-sizing: border-box;
 }
 
 .ai-pantry-messages {
@@ -20952,8 +20971,52 @@ body {
 .ai-pantry-inline-form,
 .ai-pantry-add-form {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 132px), 1fr));
+    gap: 10px;
+    align-items: start;
+}
+
+.ai-pantry-form-field {
+    display: grid;
+    align-content: start;
+    gap: 5px;
+    min-width: 0;
+    color: #cbd5e1;
+    font-weight: 800;
+}
+
+.ai-pantry-form-field > span {
+    color: #d1d5db;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1;
+}
+
+.ai-pantry-form-field-wide {
+    grid-column: span 2;
+}
+
+.ai-pantry-form-field-compact {
+    min-width: 104px;
+}
+
+.ai-pantry-submit-btn {
+    align-self: end;
+    width: 100%;
+    margin: 0;
+    min-height: 38px;
+    padding: 9px 12px;
+    border: 1px solid #1d6f78;
+    border-radius: 8px;
+    background: #1f6f78;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 850;
+}
+
+.ai-pantry-submit-btn:hover,
+.ai-pantry-submit-btn:focus-visible {
+    background: #25828d;
 }
 
 .ai-pantry-add-date-label {
@@ -21102,9 +21165,6 @@ body {
 
 .ai-pantry-receipt-form label {
     display: grid;
-    gap: 5px;
-    color: #cbd5e1;
-    font-weight: 800;
 }
 
 .ai-pantry-history {
@@ -21132,10 +21192,12 @@ body {
     grid-template-columns: minmax(170px, 0.45fr) minmax(0, 1fr);
     align-items: center;
     gap: 8px 12px;
-    border: 1px solid #4d514c;
+    border: 1px solid #233044;
     border-radius: 8px;
     padding: 9px 10px;
-    background: #1b1f20;
+    background:
+        linear-gradient(145deg, rgba(18, 28, 41, 0.74), rgba(10, 16, 25, 0.94)),
+        #111821;
 }
 
 .ai-pantry-review-row-use-expired {
@@ -21372,6 +21434,16 @@ body {
     .ai-pantry-review-badges {
         flex-wrap: wrap;
         justify-content: flex-start;
+    }
+
+    .ai-pantry-form-surface {
+        padding: 10px;
+    }
+}
+
+@media (max-width: 340px) {
+    .ai-pantry-form-field-wide {
+        grid-column: auto;
     }
 }
 

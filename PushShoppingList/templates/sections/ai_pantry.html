@@ -289,49 +289,76 @@
                     <a href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">Scan Barcode</a>
                 </div>
             </div>
-            <form class="ai-pantry-add-form"
+            <form class="ai-pantry-add-form ai-pantry-form-surface"
                   method="POST"
                   action="{{ url_for('pantry_bp.add_pantry_item_route') }}">
-                <input name="ingredient_name" placeholder="Ingredient name" required>
-                <input name="product_name" placeholder="Product name optional">
-                <input name="store" placeholder="Store optional">
-                <input name="quantity" type="number" min="0" step="0.25" value="1">
-                <input name="unit" placeholder="Unit">
-                <input name="category" placeholder="Category">
-                <select name="storage_location" aria-label="Storage location">
-                    <option value="">Storage location</option>
-                    <option value="pantry">Pantry</option>
-                    <option value="fridge">Fridge</option>
-                    <option value="freezer">Freezer</option>
-                    <option value="counter">Counter</option>
-                </select>
-                <select name="status" aria-label="Pantry status">
-                    <option value="available">Available</option>
-                    <option value="opened">Opened</option>
-                    <option value="frozen">Frozen</option>
-                </select>
-                <label class="ai-pantry-add-date-label">
+                <label class="ai-pantry-form-field ai-pantry-form-field-wide">
+                    <span>Ingredient</span>
+                    <input name="ingredient_name" placeholder="Ingredient name" required>
+                </label>
+                <label class="ai-pantry-form-field ai-pantry-form-field-wide">
+                    <span>Product</span>
+                    <input name="product_name" placeholder="Product name optional">
+                </label>
+                <label class="ai-pantry-form-field">
+                    <span>Store</span>
+                    <input name="store" placeholder="Store optional">
+                </label>
+                <label class="ai-pantry-form-field ai-pantry-form-field-compact">
+                    <span>Qty</span>
+                    <input name="quantity" type="number" min="0" step="0.25" value="1">
+                </label>
+                <label class="ai-pantry-form-field">
+                    <span>Unit</span>
+                    <input name="unit" placeholder="Unit">
+                </label>
+                <label class="ai-pantry-form-field">
+                    <span>Category</span>
+                    <input name="category" placeholder="Category">
+                </label>
+                <label class="ai-pantry-form-field">
+                    <span>Storage</span>
+                    <select name="storage_location" aria-label="Storage location">
+                        <option value="">Storage location</option>
+                        <option value="pantry">Pantry</option>
+                        <option value="fridge">Fridge</option>
+                        <option value="freezer">Freezer</option>
+                        <option value="counter">Counter</option>
+                    </select>
+                </label>
+                <label class="ai-pantry-form-field">
+                    <span>Status</span>
+                    <select name="status" aria-label="Pantry status">
+                        <option value="available">Available</option>
+                        <option value="opened">Opened</option>
+                        <option value="frozen">Frozen</option>
+                    </select>
+                </label>
+                <label class="ai-pantry-form-field ai-pantry-add-date-label">
                     <span>Bought</span>
                     <input name="purchased_date" type="date" aria-label="Purchased date">
                 </label>
-                <label class="ai-pantry-add-date-label">
+                <label class="ai-pantry-form-field ai-pantry-add-date-label">
                     <span>Opened</span>
                     <input name="opened_date" type="date" aria-label="Opened date">
                 </label>
-                <label class="ai-pantry-add-date-label">
+                <label class="ai-pantry-form-field ai-pantry-add-date-label">
                     <span>Use by</span>
                     <input name="expiration_date" type="date" aria-label="Expiration date">
                 </label>
-                <label class="ai-pantry-add-date-label">
+                <label class="ai-pantry-form-field ai-pantry-add-date-label">
                     <span>Freeze by</span>
                     <input name="freeze_by_date" type="date" aria-label="Freeze-by date">
                 </label>
-                <label class="ai-pantry-add-date-label">
+                <label class="ai-pantry-form-field ai-pantry-add-date-label">
                     <span>Frozen on</span>
                     <input name="frozen_date" type="date" aria-label="Frozen-on date">
                 </label>
-                <input name="notes" placeholder="Notes">
-                <button type="submit">Add to Pantry</button>
+                <label class="ai-pantry-form-field ai-pantry-form-field-wide">
+                    <span>Notes</span>
+                    <input name="notes" placeholder="Notes">
+                </label>
+                <button type="submit" class="ai-pantry-submit-btn">Add to Pantry</button>
             </form>
         </section>
 
@@ -339,19 +366,19 @@
             <div class="ai-pantry-section-header">
                 <h3>Upload Receipt</h3>
             </div>
-            <form class="ai-pantry-receipt-form"
+            <form class="ai-pantry-receipt-form ai-pantry-form-surface"
                   method="POST"
                   action="{{ url_for('pantry_bp.upload_receipt_route') }}"
                   enctype="multipart/form-data">
-                <label>
+                <label class="ai-pantry-form-field">
                     <span>Receipt image or PDF</span>
                     <input type="file" name="receipt_file" accept="image/*,.pdf,.txt,.csv">
                 </label>
-                <label>
+                <label class="ai-pantry-form-field">
                     <span>Pasted receipt text</span>
                     <textarea name="receipt_text" rows="6" placeholder="Paste receipt text here"></textarea>
                 </label>
-                <button type="submit">Parse Receipt</button>
+                <button type="submit" class="ai-pantry-submit-btn">Parse Receipt</button>
             </form>
 
             {% if pantry_receipt_history %}

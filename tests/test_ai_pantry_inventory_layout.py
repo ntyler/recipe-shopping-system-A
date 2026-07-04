@@ -26,9 +26,25 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "background: transparent;" in css
 
 
+def test_ai_pantry_entry_forms_share_panel_layout():
+    template = (ROOT / "PushShoppingList/templates/sections/ai_pantry.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert 'class="ai-pantry-add-form ai-pantry-form-surface"' in template
+    assert 'class="ai-pantry-receipt-form ai-pantry-form-surface"' in template
+    assert "ai-pantry-form-field-wide" in template
+    assert "ai-pantry-submit-btn" in template
+    assert ".ai-pantry-form-surface {" in css
+    assert ".ai-pantry-form-field {" in css
+    assert ".ai-pantry-submit-btn {" in css
+
+
 def test_ai_pantry_inventory_renders_inventory_heading():
     with app.test_client() as client:
-        response = client.get("/")
+        with client.session_transaction() as sess:
+            sess["user_id"] = "pantry-user"
+
+        response = client.get("/sections/pantry")
 
     html = response.get_data(as_text=True)
 
