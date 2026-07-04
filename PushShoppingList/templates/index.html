@@ -157,21 +157,19 @@
     {% if not is_guest_demo %}
         {% include "sections/home_address.html" %}
     {% endif %}
-    {% if current_user and current_user.is_authenticated and not is_guest_demo %}
-        <div id="storeOptionsSection"
-             class="app-card lazy-section-placeholder"
-             data-lazy-section="store-options"
-             data-store-options-account-id="{{ current_user.user_id if current_user else '' }}"
-             data-lazy-url="{{ url_for('main_bp.store_options_section') }}"
-             aria-busy="false">
-            <button type="button"
-                    class="card-collapse-toggle store-options-title-toggle"
-                    onclick="loadLazySection('store-options', { focus: true }); return false;">
-                <span>Store Options</span>
-            </button>
-            <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
-        </div>
-    {% endif %}
+    <div id="storeOptionsSection"
+         class="app-card lazy-section-placeholder"
+         data-lazy-section="store-options"
+         data-store-options-account-id="{{ current_user.user_id if current_user else '' }}"
+         data-lazy-url="{{ url_for('main_bp.store_options_section') }}"
+         aria-busy="false">
+        <button type="button"
+                class="card-collapse-toggle store-options-title-toggle"
+                onclick="loadLazySection('store-options', { focus: true }); return false;">
+            <span>Store Options</span>
+        </button>
+        <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+    </div>
     {% include "sections/view_behavior.html" %}
     <div id="shoppingViewsSection"
          class="app-card lazy-section-placeholder"

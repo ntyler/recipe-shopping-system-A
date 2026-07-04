@@ -109,6 +109,7 @@ from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.shopping_list_service import save_items
+from PushShoppingList.services.store_settings_service import clean_store_settings
 from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.firebase_auth_service import firebase_web_config
 from PushShoppingList.services.openai_model_service import chatgpt_models_dashboard_for_user
@@ -357,6 +358,11 @@ def shopping_views_context():
 
 def store_options_context():
     store_settings = load_store_settings()
+    can_edit_workspace_stores = bool(current_public_user() or is_guest_session())
+
+    if not can_edit_workspace_stores:
+        store_settings = clean_store_settings(store_settings)
+
     nearest_store_results = load_nearest_store_results()
 
     return {
@@ -369,6 +375,8 @@ def store_options_context():
         ),
         "available_stores": store_settings["stores"],
         "enabled_stores": store_settings["enabled_stores"],
+        "can_toggle_stores": can_edit_workspace_stores,
+        "can_edit_store_credentials": can_edit_workspace_stores,
     }
 
 
@@ -2176,9 +2184,6 @@ def pantry_section():
 
 @main_bp.route("/sections/store-options")
 def store_options_section():
-    if is_guest_session():
-        return "", 204
-
     return render_template(
         "sections/store_options.html",
         **store_options_context(),

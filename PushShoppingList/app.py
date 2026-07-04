@@ -52,6 +52,7 @@ PUBLIC_ENDPOINTS = {
     "main_bp.cookbooks_section",
     "main_bp.recipe_view_section",
     "main_bp.rules_section",
+    "main_bp.store_options_section",
     "static",
     "account_bp.firebase_session_route",
     "account_bp.firebase_login_route",

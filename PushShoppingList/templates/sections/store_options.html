@@ -1,6 +1,6 @@
 {% set can_manage_stores = current_user and current_user.is_admin %}
-{% set can_toggle_stores = true %}
-{% set can_edit_store_credentials = true %}
+{% set can_toggle_stores = can_toggle_stores|default(true) %}
+{% set can_edit_store_credentials = can_edit_store_credentials|default(true) %}
 <div class="app-card"
      id="storeOptionsSection"
      data-store-options-account-id="{{ current_user.user_id if current_user else '' }}"
@@ -202,22 +202,24 @@
                                 <a class="store-detail-link" href="{{ store.urlStoreSelector }}" target="_blank">{{ store.urlStoreSelector }}</a>
                             </div>
                         {% endif %}
-                        <div class="store-detail-line">
-                            <span class="store-detail-label">Username / Email</span>
-                            {% if store.username %}
-                                <span class="store-detail-value">{{ store.username }}</span>
-                            {% else %}
-                                <span class="store-detail-value store-detail-empty">Not set</span>
-                            {% endif %}
-                        </div>
-                        <div class="store-detail-line">
-                            <span class="store-detail-label">Password</span>
-                            {% if store.password %}
-                                <span class="store-detail-value store-detail-secret">********</span>
-                            {% else %}
-                                <span class="store-detail-value store-detail-empty">Not set</span>
-                            {% endif %}
-                        </div>
+                        {% if can_edit_store_credentials %}
+                            <div class="store-detail-line">
+                                <span class="store-detail-label">Username / Email</span>
+                                {% if store.username %}
+                                    <span class="store-detail-value">{{ store.username }}</span>
+                                {% else %}
+                                    <span class="store-detail-value store-detail-empty">Not set</span>
+                                {% endif %}
+                            </div>
+                            <div class="store-detail-line">
+                                <span class="store-detail-label">Password</span>
+                                {% if store.password %}
+                                    <span class="store-detail-value store-detail-secret">********</span>
+                                {% else %}
+                                    <span class="store-detail-value store-detail-empty">Not set</span>
+                                {% endif %}
+                            </div>
+                        {% endif %}
                     </div>
 
                     <div class="store-action-row">
