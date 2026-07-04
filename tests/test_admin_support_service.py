@@ -277,6 +277,30 @@ def test_device_status_summary_marks_guest_demo_expiration(monkeypatch, tmp_path
     assert events["expired-guest"]["device_filter_label"] == "Guest Demo expired expired-guest"
 
 
+def test_device_status_account_type_filter_shows_zero_non_expired_guest_demo_option():
+    options = device_status.device_status_account_type_filter_options([
+        {
+            "guest_session_id": "expired-guest",
+            "guest_session_expired": True,
+        },
+    ])
+
+    assert options == [
+        {
+            "key": "group:guest-demo",
+            "label": "Guest Demo accounts (1)",
+        },
+        {
+            "key": "group:guest-demo-active",
+            "label": "Non Expired Guest Demo accounts (0)",
+        },
+        {
+            "key": "group:guest-demo-expired",
+            "label": "Expired Guest Demo accounts (1)",
+        },
+    ]
+
+
 def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path):
     configure_admin_support(monkeypatch, tmp_path)
     configure_device_status(monkeypatch, tmp_path)
@@ -377,7 +401,7 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert 'value="group:guest-demo"' in html
     assert "Guest Demo accounts (2)" in html
     assert 'value="group:guest-demo-active"' in html
-    assert "Existing Guest Demo accounts (1)" in html
+    assert "Non Expired Guest Demo accounts (1)" in html
     assert 'value="group:guest-demo-expired"' in html
     assert "Expired Guest Demo accounts (1)" in html
     assert 'value="group:active-account"' in html

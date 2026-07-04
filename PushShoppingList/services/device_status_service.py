@@ -430,7 +430,7 @@ def device_status_filter_options(events):
 def device_status_account_type_filter_options(events):
     group_labels = [
         ("group:guest-demo", "Guest Demo accounts"),
-        ("group:guest-demo-active", "Existing Guest Demo accounts"),
+        ("group:guest-demo-active", "Non Expired Guest Demo accounts"),
         ("group:guest-demo-expired", "Expired Guest Demo accounts"),
         ("group:active-account", "Active accounts"),
     ]
@@ -441,10 +441,13 @@ def device_status_account_type_filter_options(events):
             if group_key in group_counts:
                 group_counts[group_key] += 1
 
+    guest_demo_count = group_counts.get("group:guest-demo", 0)
+    guest_demo_subgroups = {"group:guest-demo-active", "group:guest-demo-expired"}
+
     return [
         {"key": key, "label": f"{label} ({group_counts[key]})"}
         for key, label in group_labels
-        if group_counts.get(key)
+        if group_counts.get(key) or (guest_demo_count and key in guest_demo_subgroups)
     ]
 
 
