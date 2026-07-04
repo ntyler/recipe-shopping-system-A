@@ -197,10 +197,10 @@
                                 </label>
                                 <label class="ai-pantry-inventory-notes-label">
                                     <span>Notes</span>
-                                    <input name="notes"
-                                           value="{{ item.notes }}"
-                                           placeholder="Notes"
-                                           aria-label="Notes for {{ item.ingredient_name }}">
+                                    <textarea name="notes"
+                                              rows="2"
+                                              placeholder="Notes"
+                                              aria-label="Notes for {{ item.ingredient_name }}">{{ item.notes or "" }}</textarea>
                                 </label>
                             </form>
                             <form method="POST"

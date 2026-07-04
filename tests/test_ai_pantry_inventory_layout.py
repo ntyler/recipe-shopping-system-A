@@ -20,9 +20,14 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap" in template
     assert "Save inventory item" in template
     assert "Delete inventory item" in template
+    assert "<textarea name=\"notes\"" in template
     assert ".ai-pantry-inventory-row" in css
     assert ".ai-pantry-inventory-header .recipe-edit-section-title h3" in css
     assert "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row" in css
+    assert ".ai-pantry-inventory-row .ai-pantry-inventory-notes-label" in css
+    assert "grid-column: 1 / -1;" in css
+    assert ".ai-pantry-inventory-row .ai-pantry-inline-form textarea" in css
+    assert "min-height: 58px;" in css
     assert "grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));" in css
     assert "@media (max-width: 980px)" in css
     assert ".ai-pantry-card {\n    border: 0;" in css
