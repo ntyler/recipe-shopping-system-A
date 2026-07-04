@@ -142,6 +142,27 @@ def test_auth_collapse_still_allows_manual_lazy_section_open():
     assert 'await loadLazySection("shared-recipe-pdfs", { focus: false, userInitiated: true });' in script
 
 
+def test_lazy_section_loader_rejects_auth_redirect_and_full_page_markup():
+    script = read_text("PushShoppingList/static/js/app.js")
+    app = read_text("PushShoppingList/app.py")
+
+    assert 'or request.path.startswith("/sections/")' in app
+    assert "const LAZY_SECTION_ROOT_SELECTORS = {" in script
+    assert '"current-recipes": "#currentRecipeUrlLogCard"' in script
+    assert '"recipe-view": "#shoppingViewsSection"' in script
+    assert 'function firstRenderableElementFromHtml(html, sectionName = "")' in script
+    assert "nextPage.body.querySelector(expectedSelector)" in script
+    assert '"X-Requested-With": "fetch"' in script
+    assert "if (response.redirected)" in script
+    assert 'throw new Error("Section load redirected.");' in script
+    assert 'response.headers.get("content-type")' in script
+    assert "await response.json().catch(() => ({}))" in script
+    assert 'err.message === "Sign in before managing this workspace."' in script
+    assert "Sign in or try the demo to open this section." in script
+    assert "firstRenderableElementFromHtml(await response.text(), sectionName)" in script
+    assert 'throw new Error("Section returned unexpected markup.");' in script
+
+
 def test_cookbooks_lazy_section_keeps_images_lazy():
     index_template = read_text("PushShoppingList/templates/index.html")
     cookbooks_template = read_text("PushShoppingList/templates/sections/cookbooks.html")

@@ -125,6 +125,7 @@ def wants_json_response():
     return (
         request.path.startswith("/api/")
         or request.path.startswith("/auth/")
+        or request.path.startswith("/sections/")
         or request.path == "/recipe_pdf_link"
         or request.headers.get("X-Requested-With") == "fetch"
         or request.accept_mimetypes.best == "application/json"

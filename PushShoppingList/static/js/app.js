@@ -3060,8 +3060,25 @@ function initDeferredImages(scope = document) {
     images.forEach(image => deferredImageObserver.observe(image));
 }
 
-function firstRenderableElementFromHtml(html) {
+const LAZY_SECTION_ROOT_SELECTORS = {
+    "admin-support": "#adminSupportSection",
+    pantry: "#aiPantrySection",
+    "current-recipes": "#currentRecipeUrlLogCard",
+    cookbooks: "#cookbooksCard",
+    rules: "#rulesCard",
+    "store-options": "#storeOptionsSection",
+    "recipe-view": "#shoppingViewsSection",
+    "shared-recipe-pdfs": "#sharedRecipePdfsSection",
+};
+
+function firstRenderableElementFromHtml(html, sectionName = "") {
     const nextPage = new DOMParser().parseFromString(html, "text/html");
+    const expectedSelector = LAZY_SECTION_ROOT_SELECTORS[sectionName] || "";
+
+    if (expectedSelector && nextPage.body) {
+        return nextPage.body.querySelector(expectedSelector);
+    }
+
     return nextPage.body ? nextPage.body.firstElementChild : null;
 }
 
@@ -3172,18 +3189,34 @@ async function loadLazySection(sectionName, options = {}) {
         }
 
         try {
-            const response = await fetch(requestUrl.toString(), { cache: "no-store" });
+            const response = await fetch(requestUrl.toString(), {
+                cache: "no-store",
+                headers: {
+                    "X-Requested-With": "fetch",
+                },
+            });
             if (response.status === 204) {
                 placeholder.remove();
                 return null;
             }
+            if (response.redirected) {
+                throw new Error("Section load redirected.");
+            }
             if (!response.ok) {
-                throw new Error("Unable to load section.");
+                let errorMessage = "";
+                const contentType = response.headers.get("content-type") || "";
+
+                if (contentType.includes("application/json")) {
+                    const payload = await response.json().catch(() => ({}));
+                    errorMessage = payload && payload.error ? payload.error : "";
+                }
+
+                throw new Error(errorMessage || "Unable to load section.");
             }
 
-            const nextElement = firstRenderableElementFromHtml(await response.text());
+            const nextElement = firstRenderableElementFromHtml(await response.text(), sectionName);
             if (!nextElement) {
-                throw new Error("Section returned empty markup.");
+                throw new Error("Section returned unexpected markup.");
             }
 
             nextElement.dataset.lazySection = sectionName;
@@ -3208,7 +3241,10 @@ async function loadLazySection(sectionName, options = {}) {
         } catch (err) {
             console.warn(`Unable to load ${sectionName}.`, err);
             placeholder.dataset.lazyState = "error";
-            setLazySectionStatus(placeholder, "Unable to load. Tap to retry.", true);
+            const statusText = err && err.message === "Sign in before managing this workspace."
+                ? "Sign in or try the demo to open this section."
+                : "Unable to load. Tap to retry.";
+            setLazySectionStatus(placeholder, statusText, true);
             return null;
         } finally {
             if (performanceDiagnostics.enabled && timingLabel) {
