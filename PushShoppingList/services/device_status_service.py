@@ -302,7 +302,13 @@ def device_status_filter_label(event):
 
 
 def device_status_group_key(event):
-    return "group:guest-demo" if str(event.get("guest_session_id") or "").strip() else "group:non-guest-demo"
+    if str(event.get("guest_session_id") or "").strip():
+        return "group:guest-demo"
+
+    if str(event.get("user_id") or "").strip() or str(event.get("account_email") or "").strip():
+        return "group:active-account"
+
+    return "group:unlinked-browser"
 
 
 def device_status_group_keys(event):
@@ -406,20 +412,8 @@ def device_status_summary_key(event):
 def device_status_filter_options(events):
     options = []
     seen = set()
-    group_labels = [
-        ("group:guest-demo", "Guest Demo accounts"),
-        ("group:guest-demo-active", "Guest Demo Active accounts"),
-        ("group:guest-demo-expired", "Guest Demo expired accounts"),
-        ("group:non-guest-demo", "Non Guest Demo accounts"),
-    ]
-    group_counts = {key: 0 for key, _label in group_labels}
 
     for event in events if isinstance(events, list) else []:
-        event_group_keys = device_status_group_keys(event)
-        for group_key in set(event_group_keys):
-            if group_key in group_counts:
-                group_counts[group_key] += 1
-
         key = str(event.get("device_filter_key") or device_status_filter_key(event))
         if not key or key in seen:
             continue
@@ -430,13 +424,29 @@ def device_status_filter_options(events):
             "label": str(event.get("device_filter_label") or device_status_filter_label(event)),
         })
 
-    group_options = [
+    return sorted(options, key=lambda option: option.get("label", "").lower())
+
+
+def device_status_account_type_filter_options(events):
+    group_labels = [
+        ("group:guest-demo", "Guest Demo accounts"),
+        ("group:guest-demo-active", "Guest Demo Active accounts"),
+        ("group:guest-demo-expired", "Guest Demo expired accounts"),
+        ("group:active-account", "Active accounts"),
+        ("group:unlinked-browser", "Unlinked browsers"),
+    ]
+    group_counts = {key: 0 for key, _label in group_labels}
+
+    for event in events if isinstance(events, list) else []:
+        for group_key in set(device_status_group_keys(event)):
+            if group_key in group_counts:
+                group_counts[group_key] += 1
+
+    return [
         {"key": key, "label": f"{label} ({group_counts[key]})"}
         for key, label in group_labels
         if group_counts.get(key)
     ]
-
-    return group_options + sorted(options, key=lambda option: option.get("label", "").lower())
 
 
 def guest_expiry_context(guest_record):

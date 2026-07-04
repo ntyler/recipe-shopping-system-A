@@ -4852,6 +4852,7 @@ function initDeviceStatusFilters(scope = document) {
         }
 
         const accountFilter = panel.querySelector("[data-device-status-filter]");
+        const accountTypeFilter = panel.querySelector("[data-device-status-account-type-filter]");
         const activityFilter = panel.querySelector("[data-device-status-activity-filter]");
         const rows = panel ? [...panel.querySelectorAll("[data-device-status-row]")] : [];
         const count = panel ? panel.querySelector("[data-device-status-filter-count]") : null;
@@ -4859,6 +4860,7 @@ function initDeviceStatusFilters(scope = document) {
 
         const applyFilter = () => {
             const selectedKey = accountFilter ? accountFilter.value || "all" : "all";
+            const selectedType = accountTypeFilter ? accountTypeFilter.value || "all" : "all";
             const selectedActivity = activityFilter ? activityFilter.value || "all" : "all";
             let visibleCount = 0;
 
@@ -4866,11 +4868,10 @@ function initDeviceStatusFilters(scope = document) {
                 const groupKeys = String(row.dataset.deviceStatusGroupKeys || row.dataset.deviceStatusGroupKey || "")
                     .split(/\s+/)
                     .filter(Boolean);
-                const matchesAccount = selectedKey === "all"
-                    || row.dataset.deviceStatusFilterKey === selectedKey
-                    || groupKeys.includes(selectedKey);
+                const matchesAccount = selectedKey === "all" || row.dataset.deviceStatusFilterKey === selectedKey;
+                const matchesType = selectedType === "all" || groupKeys.includes(selectedType);
                 const matchesActivity = selectedActivity === "all" || row.dataset.deviceStatusActivityKey === selectedActivity;
-                const matches = matchesAccount && matchesActivity;
+                const matches = matchesAccount && matchesType && matchesActivity;
                 row.hidden = !matches;
                 row.classList.toggle("admin-device-status-row-hidden", !matches);
                 if (matches) {
@@ -4892,6 +4893,9 @@ function initDeviceStatusFilters(scope = document) {
         panel.dataset.deviceStatusFilterBound = "1";
         if (accountFilter) {
             accountFilter.addEventListener("change", applyFilter);
+        }
+        if (accountTypeFilter) {
+            accountTypeFilter.addEventListener("change", applyFilter);
         }
         if (activityFilter) {
             activityFilter.addEventListener("change", applyFilter);

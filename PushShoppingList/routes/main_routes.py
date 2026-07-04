@@ -129,6 +129,7 @@ from PushShoppingList.services.user_account_service import public_two_factor_rec
 from PushShoppingList.services.admin_support_service import admin_support_dashboard_for_user
 from PushShoppingList.services.admin_support_service import support_access_notices_for_user
 from PushShoppingList.services.device_status_service import device_status_summary
+from PushShoppingList.services.device_status_service import device_status_account_type_filter_options
 from PushShoppingList.services.device_status_service import device_status_filter_options
 from PushShoppingList.services.device_status_service import record_device_status_event
 
@@ -184,6 +185,8 @@ def shared_page_context(active_public_user=None):
             "users": [],
             "recent_audit": [],
             "device_status_events": [],
+            "device_status_filter_options": [],
+            "device_status_account_type_filter_options": [],
             "selected_user": None,
             "errors": [],
             "reason": session.get("admin_support_reason", ""),
@@ -452,6 +455,9 @@ def admin_support_context(active_public_user=None):
     if dashboard.get("is_admin"):
         dashboard["device_status_events"] = device_status_summary()
         dashboard["device_status_filter_options"] = device_status_filter_options(
+            dashboard["device_status_events"]
+        )
+        dashboard["device_status_account_type_filter_options"] = device_status_account_type_filter_options(
             dashboard["device_status_events"]
         )
 

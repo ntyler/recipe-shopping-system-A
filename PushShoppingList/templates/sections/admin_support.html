@@ -262,6 +262,15 @@
                         {% endfor %}
                     </select>
                 </label>
+                <label class="admin-device-status-filter-field admin-device-status-type-field">
+                    <span>Account Type</span>
+                    <select data-device-status-account-type-filter>
+                        <option value="all">All accounts</option>
+                        {% for option in admin_support.device_status_account_type_filter_options|default([]) %}
+                            <option value="{{ option.key }}">{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
                 <label class="admin-device-status-filter-field admin-device-status-activity-field">
                     <span>Status</span>
                     <select data-device-status-activity-filter>

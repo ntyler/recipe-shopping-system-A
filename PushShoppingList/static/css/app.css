@@ -19626,11 +19626,15 @@ body {
 }
 
 .admin-device-status-account-field {
-    flex: 1 1 320px;
+    flex: 1 1 280px;
+}
+
+.admin-device-status-type-field {
+    flex: 0 1 230px;
 }
 
 .admin-device-status-activity-field {
-    flex: 0 1 190px;
+    flex: 0 1 170px;
 }
 
 .admin-device-status-filter label span {

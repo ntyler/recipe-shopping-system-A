@@ -31,6 +31,7 @@ def configure_device_status(monkeypatch, tmp_path):
     monkeypatch.setattr(device_status, "PACKAGE_DIR", tmp_path)
     monkeypatch.setattr(guest_session_service, "GUEST_SESSIONS_FILE", tmp_path / "guest_sessions.json")
     monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guest_data")
+    monkeypatch.setattr(guest_session_service, "now_utc", lambda: datetime(2026, 7, 4, 3, 30))
 
 
 def admin_user():
@@ -204,17 +205,16 @@ def test_device_status_summary_includes_matching_account_email(monkeypatch, tmp_
     assert events[0]["minutes_inactive"] == 90.0
 
     options = device_status.device_status_filter_options(events)
+    account_type_options = device_status.device_status_account_type_filter_options(events)
 
-    assert options == [
-        {
-            "key": "group:non-guest-demo",
-            "label": "Non Guest Demo accounts (1)",
-        },
-        {
-            "key": "account:customer",
-            "label": "Customer Account - customer@example.com",
-        },
-    ]
+    assert options == [{
+        "key": "account:customer",
+        "label": "Customer Account - customer@example.com",
+    }]
+    assert account_type_options == [{
+        "key": "group:active-account",
+        "label": "Active accounts (1)",
+    }]
 
 
 def test_device_status_summary_marks_guest_demo_expiration(monkeypatch, tmp_path):
@@ -369,7 +369,9 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
         html = page.data.decode("utf-8")
 
     assert 'data-device-status-filter' in html
+    assert 'data-device-status-account-type-filter' in html
     assert 'data-device-status-activity-filter' in html
+    assert '<option value="all">All accounts</option>' in html
     assert '<option value="active">Recently active</option>' in html
     assert '<option value="inactive">Inactive</option>' in html
     assert 'value="group:guest-demo"' in html
@@ -378,8 +380,10 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert "Guest Demo Active accounts (1)" in html
     assert 'value="group:guest-demo-expired"' in html
     assert "Guest Demo expired accounts (1)" in html
-    assert 'value="group:non-guest-demo"' in html
-    assert "Non Guest Demo accounts (3)" in html
+    assert 'value="group:active-account"' in html
+    assert "Active accounts (2)" in html
+    assert 'value="group:unlinked-browser"' in html
+    assert "Unlinked browsers (1)" in html
     assert 'value="account:customer"' in html
     assert "Customer Account - customer@example.com" in html
     assert 'value="anonymous"' in html
@@ -388,10 +392,12 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert 'data-device-status-filter-key="guest:active-guest"' in html
     assert 'data-device-status-filter-key="guest:expired-guest"' in html
     assert 'data-device-status-group-key="group:guest-demo"' in html
-    assert 'data-device-status-group-key="group:non-guest-demo"' in html
+    assert 'data-device-status-group-key="group:active-account"' in html
+    assert 'data-device-status-group-key="group:unlinked-browser"' in html
     assert 'data-device-status-group-keys="group:guest-demo group:guest-demo-active"' in html
     assert 'data-device-status-group-keys="group:guest-demo group:guest-demo-expired"' in html
-    assert 'data-device-status-group-keys="group:non-guest-demo"' in html
+    assert 'data-device-status-group-keys="group:active-account"' in html
+    assert 'data-device-status-group-keys="group:unlinked-browser"' in html
     assert 'data-device-status-activity-key="active"' in html
     assert 'data-device-status-activity-key="inactive"' in html
     assert "admin-device-status-activity-active" in html
@@ -650,9 +656,14 @@ def test_device_status_filter_hides_non_matching_rows():
     assert 'markDeviceUserActivity({ reportActive: true })' in script
     assert 'expiryChip.classList.toggle("admin-device-status-guest-active", isActive);' in script
     assert 'label.textContent = isActive ? "Demo Active" : "Demo expired";' in script
+    assert 'const accountTypeFilter = panel.querySelector("[data-device-status-account-type-filter]");' in script
+    assert 'const selectedType = accountTypeFilter ? accountTypeFilter.value || "all" : "all";' in script
     assert 'const selectedActivity = activityFilter ? activityFilter.value || "all" : "all";' in script
+    assert 'const matchesAccount = selectedKey === "all" || row.dataset.deviceStatusFilterKey === selectedKey;' in script
+    assert "const matchesType = selectedType === \"all\" || groupKeys.includes(selectedType);" in script
     assert 'const matchesActivity = selectedActivity === "all" || row.dataset.deviceStatusActivityKey === selectedActivity;' in script
-    assert "groupKeys.includes(selectedKey)" in script
+    assert "const matches = matchesAccount && matchesType && matchesActivity;" in script
+    assert 'accountTypeFilter.addEventListener("change", applyFilter);' in script
     assert 'activityFilter.addEventListener("change", applyFilter);' in script
     assert ".admin-device-status-list [data-device-status-row][hidden]" in css
     assert ".admin-device-status-list [data-device-status-row].admin-device-status-row-hidden" in css
