@@ -156,6 +156,8 @@
     </div>
     {% if not is_guest_demo %}
         {% include "sections/home_address.html" %}
+    {% endif %}
+    {% if current_user and current_user.is_authenticated and not is_guest_demo %}
         <div id="storeOptionsSection"
              class="app-card lazy-section-placeholder"
              data-lazy-section="store-options"

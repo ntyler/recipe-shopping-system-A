@@ -52,3 +52,19 @@ def test_logged_out_sensitive_lazy_section_returns_auth_error_not_index(monkeypa
     assert response.is_json
     assert response.get_json()["error"] == "Sign in before managing this workspace."
     assert b"<h1>Shopping List</h1>" not in response.data
+
+
+def test_logged_out_index_does_not_show_store_options_placeholder(monkeypatch, tmp_path):
+    configure_auth_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        response = client.get("/")
+
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert 'id="storeOptionsSection"' not in html
+    assert 'data-lazy-section="store-options"' not in html
+    assert ">Store Options<" not in html
+    assert ">Home Address<" in html

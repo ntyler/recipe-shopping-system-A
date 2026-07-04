@@ -1117,6 +1117,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("data-store-display-toggle=\"maps\"", store_template)
         self.assertIn('data-store-options-account-id="{{ current_user.user_id if current_user else \'\' }}"', store_template)
         self.assertIn('data-store-options-account-id="{{ current_user.user_id if current_user else \'\' }}"', index_template)
+        self.assertIn("{% if current_user and current_user.is_authenticated and not is_guest_demo %}", index_template)
         self.assertIn(".overflow-menu .recipe-view-store-toggle", css)
         self.assertIn("body.store-addresses-hidden", css)
         self.assertIn("body.store-maps-hidden", css)
