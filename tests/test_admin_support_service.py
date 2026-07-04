@@ -376,14 +376,11 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert '<option value="inactive">Inactive</option>' in html
     assert 'value="group:guest-demo"' in html
     assert "Guest Demo accounts (2)" in html
-    assert 'value="group:guest-demo-active"' in html
-    assert "Guest Demo Active accounts (1)" in html
-    assert 'value="group:guest-demo-expired"' in html
-    assert "Guest Demo expired accounts (1)" in html
     assert 'value="group:active-account"' in html
     assert "Active accounts (2)" in html
-    assert 'value="group:unlinked-browser"' in html
-    assert "Unlinked browsers (1)" in html
+    assert "Guest Demo Active accounts" not in html
+    assert "Guest Demo expired accounts" not in html
+    assert "Unlinked browsers" not in html
     assert 'value="account:customer"' in html
     assert "Customer Account - customer@example.com" in html
     assert 'value="anonymous"' in html
@@ -663,6 +660,7 @@ def test_device_status_filter_hides_non_matching_rows():
     assert "const matchesType = selectedType === \"all\" || groupKeys.includes(selectedType);" in script
     assert 'const matchesActivity = selectedActivity === "all" || row.dataset.deviceStatusActivityKey === selectedActivity;' in script
     assert "const matches = matchesAccount && matchesType && matchesActivity;" in script
+    assert 'const hasActiveFilter = selectedKey !== "all" || selectedType !== "all" || selectedActivity !== "all";' in script
     assert 'accountTypeFilter.addEventListener("change", applyFilter);' in script
     assert 'activityFilter.addEventListener("change", applyFilter);' in script
     assert ".admin-device-status-list [data-device-status-row][hidden]" in css

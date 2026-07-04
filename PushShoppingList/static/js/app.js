@@ -4880,7 +4880,8 @@ function initDeviceStatusFilters(scope = document) {
             });
 
             if (count) {
-                count.textContent = selectedKey === "all"
+                const hasActiveFilter = selectedKey !== "all" || selectedType !== "all" || selectedActivity !== "all";
+                count.textContent = !hasActiveFilter
                     ? `${rows.length} shown`
                     : `${visibleCount} of ${rows.length} shown`;
             }

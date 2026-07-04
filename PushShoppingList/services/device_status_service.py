@@ -430,10 +430,7 @@ def device_status_filter_options(events):
 def device_status_account_type_filter_options(events):
     group_labels = [
         ("group:guest-demo", "Guest Demo accounts"),
-        ("group:guest-demo-active", "Guest Demo Active accounts"),
-        ("group:guest-demo-expired", "Guest Demo expired accounts"),
         ("group:active-account", "Active accounts"),
-        ("group:unlinked-browser", "Unlinked browsers"),
     ]
     group_counts = {key: 0 for key, _label in group_labels}
 
