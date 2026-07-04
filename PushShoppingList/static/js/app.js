@@ -3480,7 +3480,7 @@ function updateGuestCountdownElement(element) {
         expiryChip.classList.toggle("admin-device-status-guest-expired", !isActive);
         const label = expiryChip.querySelector("[data-guest-expiry-label]");
         if (label) {
-            label.textContent = isActive ? "Demo expires in" : "Demo expired";
+            label.textContent = isActive ? "Demo Active" : "Demo expired";
         }
     }
 

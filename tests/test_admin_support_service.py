@@ -264,9 +264,11 @@ def test_device_status_summary_marks_guest_demo_expiration(monkeypatch, tmp_path
     assert events["active-guest"]["guest_session_expired"] is False
     assert events["active-guest"]["guest_session_remaining_label"] == "01:00"
     assert events["active-guest"]["guest_session_expires_label"] == "Jul 4, 2026 4:30 AM UTC"
+    assert events["active-guest"]["device_filter_label"] == "Guest Demo Active active-guest"
     assert events["expired-guest"]["guest_session_expired"] is True
     assert events["expired-guest"]["guest_session_remaining_label"] == "00:00"
     assert events["expired-guest"]["guest_session_expires_label"] == "Jul 4, 2026 2:00 AM UTC"
+    assert events["expired-guest"]["device_filter_label"] == "Guest Demo expired expired-guest"
 
 
 def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path):
@@ -395,10 +397,12 @@ def test_admin_support_route_labels_guest_demo_expiration(monkeypatch, tmp_path)
 
     assert page.status_code == 200
     assert "Guest Demo active-guest" in html
-    assert "Demo expires in" in html
+    assert "Guest Demo Active active-guest" in html
+    assert "Demo Active" in html
     assert 'data-guest-expiry-chip' in html
     assert "admin-device-status-guest-active" in html
     assert "Guest Demo expired-guest" in html
+    assert "Guest Demo expired expired-guest" in html
     assert "Demo expired Jul 4, 2026 2:00 AM UTC" in html
     assert "admin-device-status-guest-expired" in html
     assert "Demo deletes in" not in html
@@ -586,7 +590,7 @@ def test_device_status_filter_hides_non_matching_rows():
     assert 'sendDeviceActiveReport("active-heartbeat", { force: true });' in script
     assert 'markDeviceUserActivity({ reportActive: true })' in script
     assert 'expiryChip.classList.toggle("admin-device-status-guest-active", isActive);' in script
-    assert 'label.textContent = isActive ? "Demo expires in" : "Demo expired";' in script
+    assert 'label.textContent = isActive ? "Demo Active" : "Demo expired";' in script
     assert 'const selectedActivity = activityFilter ? activityFilter.value || "all" : "all";' in script
     assert 'const matchesActivity = selectedActivity === "all" || row.dataset.deviceStatusActivityKey === selectedActivity;' in script
     assert 'activityFilter.addEventListener("change", applyFilter);' in script

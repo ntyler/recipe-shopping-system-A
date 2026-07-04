@@ -290,7 +290,13 @@ def device_status_filter_label(event):
 
     guest_session_id = str(event.get("guest_session_id") or "").strip()
     if guest_session_id:
-        return f"Guest Demo {short_device_identity(guest_session_id)}"
+        demo_status = ""
+        if event.get("guest_session_expired") is True:
+            demo_status = " expired"
+        elif event.get("guest_session_expires_at") or event.get("guest_session_active"):
+            demo_status = " Active"
+
+        return f"Guest Demo{demo_status} {short_device_identity(guest_session_id)}"
 
     return "Unlinked Browser"
 
