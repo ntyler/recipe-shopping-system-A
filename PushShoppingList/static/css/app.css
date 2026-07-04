@@ -19725,6 +19725,11 @@ body {
     background: #0b1118;
 }
 
+.admin-device-status-list [data-device-status-row][hidden],
+.admin-device-status-list [data-device-status-row].admin-device-status-row-hidden {
+    display: none !important;
+}
+
 .admin-support-audit-top strong {
     min-width: 0;
     color: #f8fafc;

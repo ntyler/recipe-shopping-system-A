@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import admin_support_service as support
@@ -239,6 +240,16 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert 'value="anonymous"' in html
     assert 'data-device-status-filter-key="account:customer"' in html
     assert 'data-device-status-filter-key="anonymous"' in html
+
+
+def test_device_status_filter_hides_non_matching_rows():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert 'row.classList.toggle("admin-device-status-row-hidden", !matches)' in script
+    assert ".admin-device-status-list [data-device-status-row][hidden]" in css
+    assert ".admin-device-status-list [data-device-status-row].admin-device-status-row-hidden" in css
+    assert "display: none !important;" in css
 
 
 def test_delegated_admin_cannot_manage_admin_access(monkeypatch, tmp_path):

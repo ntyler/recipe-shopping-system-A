@@ -4800,6 +4800,7 @@ function initDeviceStatusFilters(scope = document) {
             rows.forEach(row => {
                 const matches = selectedKey === "all" || row.dataset.deviceStatusFilterKey === selectedKey;
                 row.hidden = !matches;
+                row.classList.toggle("admin-device-status-row-hidden", !matches);
                 if (matches) {
                     visibleCount += 1;
                 }
