@@ -295,13 +295,20 @@
                             {% elif event.guest_session_id %}
                                 <span>Guest Demo {{ event.guest_session_id }}</span>
                                 {% if event.guest_session_expires_at %}
-                                    <span>
-                                        Demo deletes in
-                                        <strong data-guest-countdown
-                                                data-guest-expires-at="{{ event.guest_session_expires_at }}">
-                                            {{ event.guest_session_remaining_label }}
-                                        </strong>
-                                    </span>
+                                    {% if event.guest_session_expired %}
+                                        <span class="admin-device-status-guest-expiry admin-device-status-guest-expired">
+                                            Demo expired{% if event.guest_session_expires_label %} {{ event.guest_session_expires_label }}{% endif %}
+                                        </span>
+                                    {% else %}
+                                        <span class="admin-device-status-guest-expiry admin-device-status-guest-active"
+                                              data-guest-expiry-chip>
+                                            <span data-guest-expiry-label>Demo expires in</span>
+                                            <strong data-guest-countdown
+                                                    data-guest-expires-at="{{ event.guest_session_expires_at }}">
+                                                {{ event.guest_session_remaining_label }}
+                                            </strong>
+                                        </span>
+                                    {% endif %}
                                 {% endif %}
                             {% else %}
                                 <span>Anonymous browser</span>

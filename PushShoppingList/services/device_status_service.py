@@ -315,15 +315,20 @@ def guest_expiry_context(guest_record):
 
     expires_at = str(guest_record.get("expires_at") or "").strip()
     expires_datetime = parse_status_datetime(expires_at)
+    reference_time = current_utc()
     remaining_seconds = 0
     if expires_datetime:
-        remaining_seconds = max(0, int((expires_datetime - current_utc()).total_seconds()))
+        remaining_seconds = max(0, int((expires_datetime - reference_time).total_seconds()))
 
     hours = remaining_seconds // 3600
     minutes = (remaining_seconds % 3600) // 60
+    active = bool(guest_record.get("is_active"))
+    expired = not active or not expires_datetime or expires_datetime <= reference_time
     return {
         "guest_session_expires_at": expires_at,
-        "guest_session_active": bool(guest_record.get("is_active")),
+        "guest_session_expires_label": display_datetime(expires_at) or expires_at,
+        "guest_session_active": active,
+        "guest_session_expired": expired,
         "guest_session_remaining_label": f"{hours:02d}:{minutes:02d}",
     }
 
@@ -431,16 +436,78 @@ def recent_device_status_events(limit=20, account_lookup=None, guest_lookup=None
     ]
 
 
+def guest_session_expiration_events(guest_lookup=None, represented_guest_ids=None):
+    represented_guest_ids = set(represented_guest_ids or [])
+    reference_time = current_utc()
+    rendered = []
+
+    for session_id, record in (guest_lookup or {}).items():
+        if session_id in represented_guest_ids or not isinstance(record, dict):
+            continue
+
+        expires_at = str(record.get("expires_at") or "").strip()
+        expires_datetime = parse_status_datetime(expires_at)
+        is_active = bool(record.get("is_active"))
+        if is_active and expires_datetime and expires_datetime > reference_time:
+            continue
+
+        timestamp = str(
+            record.get("ended_at")
+            or expires_at
+            or record.get("used_at")
+            or record.get("created_at")
+            or now_iso()
+        )
+        last_active_at = str(record.get("used_at") or record.get("created_at") or expires_at)
+        rendered.append(device_status_event_for_render(
+            {
+                "event_id": f"guest-expired-{session_id}",
+                "guest_session_id": session_id,
+                "device_id": "guest-session",
+                "route": "/guest/expired",
+                "stale_reason": "guest-demo-expired",
+                "is_stale": True,
+                "timestamp": timestamp,
+                "last_active_at": last_active_at,
+                "minutes_inactive": 0,
+                "minutes_hidden": 0,
+                "user_agent": "Guest demo session expired after 24 hours.",
+            },
+            guest_lookup=guest_lookup,
+        ))
+
+    return sorted(
+        rendered,
+        key=lambda event: str(event.get("timestamp") or event.get("created_at") or ""),
+        reverse=True,
+    )
+
+
 def device_status_summary(limit=20):
     latest_by_device = {}
     account_lookup = account_identity_lookup()
     guests = guest_session_lookup()
-
-    for event in recent_device_status_events(
+    events = recent_device_status_events(
         limit=DEVICE_STATUS_MAX_EVENTS,
         account_lookup=account_lookup,
         guest_lookup=guests,
-    ):
+    )
+    represented_guest_ids = {
+        str(event.get("guest_session_id") or "").strip()
+        for event in events
+        if str(event.get("guest_session_id") or "").strip()
+    }
+    events.extend(guest_session_expiration_events(
+        guest_lookup=guests,
+        represented_guest_ids=represented_guest_ids,
+    ))
+    events = sorted(
+        events,
+        key=lambda event: str(event.get("timestamp") or event.get("created_at") or ""),
+        reverse=True,
+    )
+
+    for event in events:
         device_key = "|".join([
             event.get("user_id") or event.get("guest_session_id") or "anonymous",
             event.get("device_id") or "",

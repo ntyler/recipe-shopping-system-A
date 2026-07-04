@@ -7,6 +7,7 @@ from PushShoppingList.app import create_app
 from PushShoppingList.services import admin_support_service as support
 from PushShoppingList.services import device_status_service as device_status
 from PushShoppingList.services import email_service
+from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service as accounts
 
@@ -28,6 +29,8 @@ def configure_device_status(monkeypatch, tmp_path):
     monkeypatch.setattr(device_status, "USER_DATA_DIR", tmp_path / "user_data")
     monkeypatch.setattr(device_status, "GUEST_DATA_DIR", tmp_path / "guest_data")
     monkeypatch.setattr(device_status, "PACKAGE_DIR", tmp_path)
+    monkeypatch.setattr(guest_session_service, "GUEST_SESSIONS_FILE", tmp_path / "guest_sessions.json")
+    monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guest_data")
 
 
 def admin_user():
@@ -208,6 +211,64 @@ def test_device_status_summary_includes_matching_account_email(monkeypatch, tmp_
     }]
 
 
+def test_device_status_summary_marks_guest_demo_expiration(monkeypatch, tmp_path):
+    configure_device_status(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        device_status,
+        "current_utc",
+        lambda: datetime(2026, 7, 4, 3, 30, tzinfo=timezone.utc),
+    )
+    guest_session_service.save_guest_sessions({
+        "guest_sessions": [
+            {
+                "id": "active-guest",
+                "expires_at": "2026-07-04T04:30:00Z",
+                "is_active": True,
+            },
+            {
+                "id": "expired-guest",
+                "expires_at": "2026-07-04T02:00:00Z",
+                "is_active": False,
+            },
+        ],
+    })
+
+    device_status.record_device_stale_event(
+        {
+            "device_id": "active-demo-device",
+            "route": "/#userAccountSection",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:20:00Z",
+            "last_active_at": "2026-07-04T03:20:00Z",
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1",
+        },
+        guest_session_id="active-guest",
+    )
+    device_status.record_device_stale_event(
+        {
+            "device_id": "expired-demo-device",
+            "route": "/#userAccountSection",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:10:00Z",
+            "last_active_at": "2026-07-04T02:00:00Z",
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1",
+        },
+        guest_session_id="expired-guest",
+    )
+
+    events = {
+        event["guest_session_id"]: event
+        for event in device_status.device_status_summary()
+    }
+
+    assert events["active-guest"]["guest_session_expired"] is False
+    assert events["active-guest"]["guest_session_remaining_label"] == "01:00"
+    assert events["active-guest"]["guest_session_expires_label"] == "Jul 4, 2026 4:30 AM UTC"
+    assert events["expired-guest"]["guest_session_expired"] is True
+    assert events["expired-guest"]["guest_session_remaining_label"] == "00:00"
+    assert events["expired-guest"]["guest_session_expires_label"] == "Jul 4, 2026 2:00 AM UTC"
+
+
 def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path):
     configure_admin_support(monkeypatch, tmp_path)
     configure_device_status(monkeypatch, tmp_path)
@@ -276,6 +337,71 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert "admin-device-status-activity-inactive" in html
     assert "Status Active" in html
     assert "Status Inactive" in html
+
+
+def test_admin_support_route_labels_guest_demo_expiration(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    configure_device_status(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        device_status,
+        "current_utc",
+        lambda: datetime(2026, 7, 4, 3, 30, tzinfo=timezone.utc),
+    )
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    guest_session_service.save_guest_sessions({
+        "guest_sessions": [
+            {
+                "id": "active-guest",
+                "expires_at": "2026-07-04T04:30:00Z",
+                "is_active": True,
+            },
+            {
+                "id": "expired-guest",
+                "expires_at": "2026-07-04T02:00:00Z",
+                "is_active": False,
+            },
+        ],
+    })
+    device_status.record_device_stale_event(
+        {
+            "device_id": "active-demo-device",
+            "route": "/#userAccountSection",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:20:00Z",
+            "last_active_at": "2026-07-04T03:20:00Z",
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1",
+        },
+        guest_session_id="active-guest",
+    )
+    device_status.record_device_stale_event(
+        {
+            "device_id": "expired-demo-device",
+            "route": "/#userAccountSection",
+            "stale_reason": "session-revalidation",
+            "timestamp": "2026-07-04T03:10:00Z",
+            "last_active_at": "2026-07-04T02:00:00Z",
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1",
+        },
+        guest_session_id="expired-guest",
+    )
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "admin"
+
+        page = client.get("/sections/admin-support")
+        html = page.data.decode("utf-8")
+
+    assert page.status_code == 200
+    assert "Guest Demo active-guest" in html
+    assert "Demo expires in" in html
+    assert 'data-guest-expiry-chip' in html
+    assert "admin-device-status-guest-active" in html
+    assert "Guest Demo expired-guest" in html
+    assert "Demo expired Jul 4, 2026 2:00 AM UTC" in html
+    assert "admin-device-status-guest-expired" in html
+    assert "Demo deletes in" not in html
 
 
 def test_device_status_route_records_active_status_for_current_user(monkeypatch, tmp_path):
@@ -367,6 +493,8 @@ def test_device_status_filter_hides_non_matching_rows():
     assert 'postDeviceStatusPayload("/api/device-status", buildDeviceActivePayload(reason));' in script
     assert 'sendDeviceActiveReport("active-heartbeat", { force: true });' in script
     assert 'markDeviceUserActivity({ reportActive: true })' in script
+    assert 'expiryChip.classList.toggle("admin-device-status-guest-active", isActive);' in script
+    assert 'label.textContent = isActive ? "Demo expires in" : "Demo expired";' in script
     assert 'const selectedActivity = activityFilter ? activityFilter.value || "all" : "all";' in script
     assert 'const matchesActivity = selectedActivity === "all" || row.dataset.deviceStatusActivityKey === selectedActivity;' in script
     assert 'activityFilter.addEventListener("change", applyFilter);' in script
@@ -374,6 +502,8 @@ def test_device_status_filter_hides_non_matching_rows():
     assert ".admin-device-status-list [data-device-status-row].admin-device-status-row-hidden" in css
     assert ".admin-device-status-meta .admin-device-status-activity-active" in css
     assert ".admin-device-status-meta .admin-device-status-activity-inactive" in css
+    assert ".admin-device-status-meta .admin-device-status-guest-active" in css
+    assert ".admin-device-status-meta .admin-device-status-guest-expired" in css
     assert "display: none !important;" in css
 
 

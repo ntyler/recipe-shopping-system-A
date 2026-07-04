@@ -3471,8 +3471,20 @@ function updateGuestCountdownElement(element) {
     }
 
     const remaining = expiresAt - Date.now();
-    element.textContent = remaining > 0 ? formatGuestCountdown(remaining) : "Expired";
-    return remaining > 0;
+    const isActive = remaining > 0;
+    element.textContent = isActive ? formatGuestCountdown(remaining) : "Expired";
+
+    const expiryChip = element.closest("[data-guest-expiry-chip]");
+    if (expiryChip) {
+        expiryChip.classList.toggle("admin-device-status-guest-active", isActive);
+        expiryChip.classList.toggle("admin-device-status-guest-expired", !isActive);
+        const label = expiryChip.querySelector("[data-guest-expiry-label]");
+        if (label) {
+            label.textContent = isActive ? "Demo expires in" : "Demo expired";
+        }
+    }
+
+    return isActive;
 }
 
 function initGuestCountdowns() {

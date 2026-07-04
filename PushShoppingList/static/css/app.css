@@ -19783,6 +19783,22 @@ body {
     color: #fee2e2;
 }
 
+.admin-device-status-meta .admin-device-status-guest-expiry {
+    gap: 4px;
+}
+
+.admin-device-status-meta .admin-device-status-guest-active {
+    border-color: #f59e0b;
+    background: #2f2306;
+    color: #fef3c7;
+}
+
+.admin-device-status-meta .admin-device-status-guest-expired {
+    border-color: #ef4444;
+    background: #3b0d0d;
+    color: #fee2e2;
+}
+
 .admin-device-status-agent {
     overflow-wrap: anywhere;
     color: #96a3ad;
