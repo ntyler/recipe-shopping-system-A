@@ -7,6 +7,7 @@ from flask import url_for
 
 from PushShoppingList.services.pantry_service import DEFAULT_CONFIDENCE_BY_SOURCE
 from PushShoppingList.services.pantry_service import add_or_increment_pantry_item
+from PushShoppingList.services.pantry_service import clean_storage_location
 from PushShoppingList.services.pantry_service import delete_pantry_item
 from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
 from PushShoppingList.services.pantry_service import receipt_candidate_display_storage_location
@@ -23,6 +24,12 @@ pantry_bp = Blueprint("pantry_bp", __name__)
 
 def pantry_message(category, text):
     session["pantry_messages"] = [{"category": category, "text": text}]
+
+
+def selected_storage_location(choice, custom_value=""):
+    if str(choice or "") == "__custom__":
+        return clean_storage_location(custom_value)
+    return clean_storage_location(choice)
 
 
 @pantry_bp.route("/pantry/items/add", methods=["POST"])
@@ -194,7 +201,14 @@ def add_receipt_candidates_route():
             "freeze_by_date": request.form.get(f"candidate_{index}_freeze_by_date") or candidate.get("freeze_by_date", ""),
             "frozen_date": request.form.get(f"candidate_{index}_frozen_date") or candidate.get("frozen_date", ""),
         }
-        storage_location = receipt_candidate_display_storage_location({**candidate, **lifecycle_dates})
+        storage_field = f"candidate_{index}_storage_location"
+        if storage_field in request.form:
+            storage_location = selected_storage_location(
+                request.form.get(storage_field, ""),
+                request.form.get(f"{storage_field}_custom", ""),
+            )
+        else:
+            storage_location = receipt_candidate_display_storage_location({**candidate, **lifecycle_dates})
         receipt_details = [f"Qty {candidate.get('quantity') or 1}"]
         if candidate.get("unit_price_label"):
             receipt_details.append(f"Each {candidate.get('unit_price_label')}")

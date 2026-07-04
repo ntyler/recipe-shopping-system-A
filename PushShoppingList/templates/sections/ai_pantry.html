@@ -140,11 +140,16 @@
                                 </label>
                                 <label class="ai-pantry-inventory-location-label">
                                     <span>Location</span>
+                                    {% set storage_options = ["pantry", "fridge", "freezer", "counter"] %}
+                                    {% set item_storage = item.storage_location or "" %}
                                     <select name="storage_location" aria-label="Storage location for {{ item.ingredient_name }}">
                                         <option value="">Unset</option>
-                                        {% for location in ["pantry", "fridge", "freezer", "counter"] %}
+                                        {% for location in storage_options %}
                                             <option value="{{ location }}" {% if item.storage_location == location %}selected{% endif %}>{{ location|title }}</option>
                                         {% endfor %}
+                                        {% if item_storage and item_storage not in storage_options %}
+                                            <option value="{{ item_storage }}" selected>{{ item.storage_location_label }}</option>
+                                        {% endif %}
                                     </select>
                                 </label>
                                 <label class="ai-pantry-inventory-status-label">
@@ -392,6 +397,9 @@
                             {% set use_by_status = date_statuses.expiration_date if date_statuses.expiration_date else {} %}
                             {% set freeze_by_status = date_statuses.freeze_by_date if date_statuses.freeze_by_date else {} %}
                             {% set frozen_status = date_statuses.frozen_date if date_statuses.frozen_date else {} %}
+                            {% set storage_options = ["pantry", "fridge", "freezer", "counter"] %}
+                            {% set candidate_storage = candidate.storage_location or "" %}
+                            {% set candidate_storage_is_custom = candidate_storage and candidate_storage not in storage_options %}
                             <article class="ai-pantry-review-row ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}"
                                      data-pantry-review-freezer-days="{{ candidate.frozen_best_by_days or '' }}"
                                      data-pantry-review-storage="{{ candidate.storage_location or '' }}"
@@ -469,6 +477,25 @@
                                         {% if frozen_status.label %}
                                             <small data-pantry-review-date-status>{{ frozen_status.label }}</small>
                                         {% endif %}
+                                    </label>
+                                    <label class="ai-pantry-date-field ai-pantry-review-storage-field"
+                                           data-pantry-review-storage-field>
+                                        <span>Storage</span>
+                                        <select name="candidate_{{ loop.index0 }}_storage_location"
+                                                data-pantry-review-storage-select
+                                                aria-label="Storage location for {{ candidate.product_name }}">
+                                            <option value="" {% if not candidate_storage %}selected{% endif %}>Review</option>
+                                            {% for location in storage_options %}
+                                                <option value="{{ location }}" {% if candidate_storage == location %}selected{% endif %}>{{ location|title }}</option>
+                                            {% endfor %}
+                                            <option value="__custom__" {% if candidate_storage_is_custom %}selected{% endif %}>Custom...</option>
+                                        </select>
+                                        <input name="candidate_{{ loop.index0 }}_storage_location_custom"
+                                               data-pantry-review-storage-custom
+                                               value="{% if candidate_storage_is_custom %}{{ candidate.storage_location_label }}{% endif %}"
+                                               placeholder="New storage"
+                                               aria-label="New storage location for {{ candidate.product_name }}"
+                                               {% if not candidate_storage_is_custom %}hidden{% endif %}>
                                     </label>
                                 </div>
                             </article>

@@ -21293,6 +21293,11 @@ body {
     background: rgba(88, 28, 135, 0.22);
 }
 
+.ai-pantry-review-storage-custom {
+    color: #ddd6fe;
+    background: rgba(76, 29, 149, 0.24);
+}
+
 .ai-pantry-review-storage-review,
 .ai-pantry-review-storage-unknown {
     color: #e5e7eb;
@@ -21342,7 +21347,8 @@ body {
     line-height: 1;
 }
 
-.ai-pantry-review-dates input {
+.ai-pantry-review-dates input,
+.ai-pantry-review-dates select {
     width: 100%;
     box-sizing: border-box;
     background: #202425;
@@ -21351,6 +21357,10 @@ body {
     border-radius: 8px;
     padding: 8px 9px;
     font-size: 12px;
+}
+
+.ai-pantry-review-storage-field input {
+    margin-top: 5px;
 }
 
 @media (max-width: 560px) {

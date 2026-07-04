@@ -318,11 +318,21 @@ def clean_storage_location(value):
         "shelf": "pantry",
     }
     value = aliases.get(value, value)
-    return value if value in PANTRY_STORAGE_LOCATION_VALUES else ""
+    if value in PANTRY_STORAGE_LOCATION_VALUES:
+        return value
+
+    value = re.sub(r"['’]", "", value)
+    value = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
+    return value[:40].strip("-")
 
 
 def storage_location_label(value):
-    return PANTRY_STORAGE_LOCATION_LABELS.get(clean_storage_location(value), "Review")
+    cleaned = clean_storage_location(value)
+    if cleaned in PANTRY_STORAGE_LOCATION_LABELS:
+        return PANTRY_STORAGE_LOCATION_LABELS[cleaned]
+    if cleaned:
+        return " ".join(part.capitalize() for part in re.split(r"[-_]+", cleaned) if part)
+    return "Review"
 
 
 def clean_pantry_status(value):
@@ -1033,6 +1043,7 @@ def pantry_items_for_view():
 
     for item in items:
         item["confidence_label"] = confidence_label(item.get("confidence"))
+        item["storage_location_label"] = storage_location_label(item.get("storage_location"))
         item["purchased_date_label"] = date_label(item.get("purchased_date"))
         item["opened_date_label"] = date_label(item.get("opened_date"))
         item["expiration_date_label"] = date_label(item.get("expiration_date"))

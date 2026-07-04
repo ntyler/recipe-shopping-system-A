@@ -15712,7 +15712,10 @@ function pantryReceiptNextActionLabel(prefix, targetDate) {
 }
 
 function pantryReceiptStorageLabel(storage) {
-    switch (String(storage || "").trim().toLowerCase()) {
+    const rawStorage = String(storage || "").trim();
+    const normalizedStorage = rawStorage.toLowerCase();
+
+    switch (normalizedStorage) {
     case "pantry":
         return "Pantry";
     case "fridge":
@@ -15722,15 +15725,57 @@ function pantryReceiptStorageLabel(storage) {
     case "counter":
         return "Counter";
     default:
-        return "Review";
+        return rawStorage
+            ? rawStorage.replace(/[-_]+/g, " ").replace(/\b\w/g, letter => letter.toUpperCase())
+            : "Review";
     }
 }
 
 function normalizePantryReceiptStorage(storage) {
     const normalizedStorage = String(storage || "").trim().toLowerCase();
-    return ["pantry", "fridge", "freezer", "counter"].includes(normalizedStorage)
-        ? normalizedStorage
+    if (["pantry", "fridge", "freezer", "counter"].includes(normalizedStorage)) {
+        return normalizedStorage;
+    }
+    return normalizedStorage && normalizedStorage !== "unknown"
+        ? "custom"
         : "review";
+}
+
+function pantryReceiptReviewStorageValue(row) {
+    const select = row ? row.querySelector("[data-pantry-review-storage-select]") : null;
+
+    if (!select) {
+        return row ? (row.dataset.pantryReviewSuggestedStorage || row.dataset.pantryReviewStorage || "") : "";
+    }
+
+    if (select.value === "__custom__") {
+        const customInput = row.querySelector("[data-pantry-review-storage-custom]");
+        return customInput ? customInput.value : "";
+    }
+
+    return select.value;
+}
+
+function syncPantryReceiptStorageCustomInput(row) {
+    const select = row ? row.querySelector("[data-pantry-review-storage-select]") : null;
+    const customInput = row ? row.querySelector("[data-pantry-review-storage-custom]") : null;
+
+    if (!select || !customInput) {
+        return;
+    }
+
+    customInput.hidden = select.value !== "__custom__";
+}
+
+function pantryReceiptStorageIsFreezer(storage) {
+    return String(storage || "").trim().toLowerCase() === "freezer";
+}
+
+function pantryReceiptStorageBadgeClass(storage) {
+    const normalizedStorage = normalizePantryReceiptStorage(storage);
+    return ["pantry", "fridge", "freezer", "counter", "review", "unknown", "custom"].includes(normalizedStorage)
+        ? normalizedStorage
+        : "custom";
 }
 
 function updatePantryReceiptStorageBadge(row, storage) {
@@ -15740,12 +15785,12 @@ function updatePantryReceiptStorageBadge(row, storage) {
         return;
     }
 
-    const normalizedStorage = normalizePantryReceiptStorage(storage);
-    ["pantry", "fridge", "freezer", "counter", "review"].forEach(value => {
+    const normalizedStorage = pantryReceiptStorageBadgeClass(storage);
+    ["pantry", "fridge", "freezer", "counter", "review", "unknown", "custom"].forEach(value => {
         badge.classList.remove(`ai-pantry-review-storage-${value}`);
     });
     badge.classList.add(`ai-pantry-review-storage-${normalizedStorage}`);
-    badge.textContent = `Storage: ${pantryReceiptStorageLabel(normalizedStorage)}`;
+    badge.textContent = `Storage: ${pantryReceiptStorageLabel(storage)}`;
 }
 
 function setPantryReceiptDateFieldStatus(row, field, urgency, label) {
@@ -15903,8 +15948,9 @@ function updatePantryReceiptReviewRow(row) {
     const today = pantryReviewTodayDate();
     const useByStatus = pantryReceiptDateStatus("expiration_date", useByValue, today);
     const freezeByStatus = pantryReceiptDateStatus("freeze_by_date", freezeByValue, today);
-    const storageValue = frozenDate ? "freezer" : (row.dataset.pantryReviewSuggestedStorage || row.dataset.pantryReviewStorage || "");
-    const isStoredInFreezer = normalizePantryReceiptStorage(storageValue) === "freezer";
+    const selectedStorageValue = pantryReceiptReviewStorageValue(row);
+    const storageValue = String(selectedStorageValue || "").trim() || (frozenDate ? "freezer" : "");
+    const isStoredInFreezer = pantryReceiptStorageIsFreezer(storageValue);
     const effectiveFreezeByStatus = isStoredInFreezer && !freezeByValue
         ? { urgency: "frozen-safe", label: "Already in freezer" }
         : freezeByStatus;
@@ -15975,6 +16021,17 @@ function bindPantryReceiptDateWarnings(root = document) {
             input.addEventListener("input", () => updatePantryReceiptReviewRow(row));
             input.addEventListener("change", () => updatePantryReceiptReviewRow(row));
         });
+        row.querySelectorAll("[data-pantry-review-storage-select]").forEach(select => {
+            select.addEventListener("change", () => {
+                syncPantryReceiptStorageCustomInput(row);
+                updatePantryReceiptReviewRow(row);
+            });
+        });
+        row.querySelectorAll("[data-pantry-review-storage-custom]").forEach(input => {
+            input.addEventListener("input", () => updatePantryReceiptReviewRow(row));
+            input.addEventListener("change", () => updatePantryReceiptReviewRow(row));
+        });
+        syncPantryReceiptStorageCustomInput(row);
         updatePantryReceiptReviewRow(row);
     });
 }

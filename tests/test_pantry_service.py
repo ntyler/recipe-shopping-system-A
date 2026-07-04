@@ -322,6 +322,45 @@ def test_add_receipt_candidate_saves_lifecycle_dates(monkeypatch, tmp_path):
     assert "Storage Freezer" in inventory[0]["notes"]
 
 
+def test_add_receipt_candidate_saves_custom_storage_location(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
+    app = create_app()
+    candidate = pantry_service.parse_receipt_text(
+        """
+        07/01/26             LEXI
+        1234567890     BAKED BEANS        2.39  F
+        """
+    )[0]
+
+    with app.test_client() as client:
+        sign_in(client)
+        with client.session_transaction() as session:
+            session["pantry_receipt_review"] = {
+                "receipt_id": "receipt-1",
+                "candidates": [candidate],
+            }
+
+        response = client.post(
+            "/pantry/receipt/add",
+            data={
+                "action": "selected",
+                "candidate_index": "0",
+                "candidate_0_storage_location": "__custom__",
+                "candidate_0_storage_location_custom": "Garage shelf",
+            },
+        )
+
+    assert response.status_code == 302
+    inventory_file = tmp_path / "user_data" / "pantry-user" / "pantry_inventory.json"
+    inventory = json.loads(inventory_file.read_text(encoding="utf-8"))["items"]
+
+    assert inventory[0]["storage_location"] == "garage-shelf"
+    assert "Storage Garage Shelf" in inventory[0]["notes"]
+
+    assert pantry_service.storage_location_label(inventory[0]["storage_location"]) == "Garage Shelf"
+
+
 def test_hydrate_receipt_review_dates_uses_receipt_history(monkeypatch, tmp_path):
     monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
     pantry_service.save_receipt_history(
@@ -737,6 +776,7 @@ def test_ai_pantry_template_includes_lifecycle_controls():
 
     assert 'href="#aiPantryUseSoon"' in template
     assert "pantry-lifecycle-badge" in template
+    assert "item.storage_location_label" in template
     assert 'name="opened_date"' in template
     assert 'name="freeze_by_date"' in template
     assert 'name="frozen_date"' in template
@@ -747,10 +787,15 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert 'name="candidate_{{ loop.index0 }}_expiration_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_freeze_by_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_frozen_date"' in template
+    assert 'name="candidate_{{ loop.index0 }}_storage_location"' in template
+    assert 'name="candidate_{{ loop.index0 }}_storage_location_custom"' in template
     assert "data-pantry-review-row" in template
     assert 'data-pantry-review-date-field="expiration_date"' in template
     assert 'data-pantry-review-date-field="freeze_by_date"' in template
     assert 'data-pantry-review-date-field="frozen_date"' in template
+    assert "data-pantry-review-storage-select" in template
+    assert "data-pantry-review-storage-custom" in template
+    assert "Custom..." in template
     assert "data-pantry-review-date-status" in template
     assert "data-pantry-review-row-status" in template
     assert "data-pantry-review-storage-badge" in template
@@ -778,6 +823,7 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert "<span>Use by</span>" in template
     assert "<span>Freeze by</span>" in template
     assert "<span>Frozen on</span>" in template
+    assert "<span>Storage</span>" in template
     assert "mark_opened" in template
 
 
@@ -789,22 +835,28 @@ def test_ai_pantry_receipt_warning_assets_include_live_status_hooks():
     assert "function updatePantryReceiptReviewRow" in js
     assert "function updatePantryReceiptStorageBadge" in js
     assert "function normalizePantryReceiptStorage" in js
+    assert "function pantryReceiptReviewStorageValue" in js
+    assert "function syncPantryReceiptStorageCustomInput" in js
     assert "function pantryReceiptNextAction" in js
     assert "function setPantryReceiptNextAction" in js
     assert "function bindPantryReceiptConfidenceToggle" in js
     assert "PANTRY_RECEIPT_CONFIDENCE_STORAGE_KEY" in js
     assert "Next: ${prefix} ${dateLabel}" in js
-    assert "Storage: ${pantryReceiptStorageLabel(normalizedStorage)}" in js
+    assert "Storage: ${pantryReceiptStorageLabel(storage)}" in js
     assert "Frozen before deadline" in js
     assert "Frozen after deadline" in js
     assert "Already in freezer" in js
     assert "Best frozen until" in js
+    assert "data-pantry-review-storage-select" in js
+    assert "data-pantry-review-storage-custom" in js
     assert '["bindPantryReceiptConfidenceToggle", bindPantryReceiptConfidenceToggle]' in js
     assert "bindPantryReceiptConfidenceToggle(options.root || document);" in js
     assert '["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings]' in js
     assert "bindPantryReceiptDateWarnings(options.root || document);" in js
     assert ".ai-pantry-confidence-toggle" in css
     assert "[data-pantry-review-confidence][hidden]" in css
+    assert ".ai-pantry-review-storage-custom" in css
+    assert ".ai-pantry-review-storage-field input" in css
     assert ".ai-pantry-review-next-badge" in css
     assert ".ai-pantry-review-next-safe" in css
     assert ".ai-pantry-date-field-frozen-late input" in css
