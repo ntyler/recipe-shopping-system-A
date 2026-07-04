@@ -253,8 +253,8 @@
                 <h3>Device Status</h3>
             </div>
             <div class="admin-device-status-filter">
-                <label>
-                    <span>Filter</span>
+                <label class="admin-device-status-filter-field admin-device-status-account-field">
+                    <span>Account / Device</span>
                     <select data-device-status-filter>
                         <option value="all">All devices</option>
                         {% for option in admin_support.device_status_filter_options|default([]) %}
@@ -262,11 +262,21 @@
                         {% endfor %}
                     </select>
                 </label>
+                <label class="admin-device-status-filter-field admin-device-status-activity-field">
+                    <span>Status</span>
+                    <select data-device-status-activity-filter>
+                        <option value="all">All statuses</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </label>
                 <span data-device-status-filter-count>{{ admin_support.device_status_events|length }} shown</span>
             </div>
             <ol class="admin-support-audit-list admin-device-status-list" data-device-status-list>
                 {% for event in admin_support.device_status_events %}
-                    <li data-device-status-row data-device-status-filter-key="{{ event.device_filter_key }}">
+                    <li data-device-status-row
+                        data-device-status-filter-key="{{ event.device_filter_key }}"
+                        data-device-status-activity-key="{{ 'inactive' if event.is_stale else 'active' }}">
                         <div class="admin-support-audit-top">
                             <strong>{{ event.device_label }}</strong>
                             <span>Last stale event {{ event.timestamp_label }}</span>
@@ -275,7 +285,7 @@
                             {{ event.stale_reason }} - {{ event.route or "Route unavailable" }}
                         </div>
                         <div class="admin-device-status-meta">
-                            <span>Status {{ "Stale" if event.is_stale else "Active" }}</span>
+                            <span>Status {{ "Inactive" if event.is_stale else "Active" }}</span>
                             <span>Last active {{ event.last_active_label }}</span>
                             {% if event.account_email %}
                                 <span>Account {{ event.account_display_name or event.account_email }}{% if event.account_display_name %} - {{ event.account_email }}{% endif %}</span>

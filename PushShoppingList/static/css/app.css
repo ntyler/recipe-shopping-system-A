@@ -19622,7 +19622,15 @@ body {
 .admin-device-status-filter label {
     display: grid;
     gap: 6px;
-    min-width: min(100%, 320px);
+    min-width: min(100%, 180px);
+}
+
+.admin-device-status-account-field {
+    flex: 1 1 320px;
+}
+
+.admin-device-status-activity-field {
+    flex: 0 1 190px;
 }
 
 .admin-device-status-filter label span {

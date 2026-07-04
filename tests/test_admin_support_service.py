@@ -225,6 +225,19 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
             "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1",
         }
     )
+    device_status.record_device_stale_event(
+        {
+            "device_id": "active-device",
+            "route": "/items",
+            "stale_reason": "heartbeat",
+            "is_stale": False,
+            "timestamp": "2026-07-04T04:00:00Z",
+            "last_active_at": "2026-07-04T04:00:00Z",
+            "minutes_inactive": 0,
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/149.0.0.0",
+        },
+        session_user_id="customer",
+    )
     app = create_app()
 
     with app.test_client() as client:
@@ -235,11 +248,18 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
         html = page.data.decode("utf-8")
 
     assert 'data-device-status-filter' in html
+    assert 'data-device-status-activity-filter' in html
+    assert '<option value="active">Active</option>' in html
+    assert '<option value="inactive">Inactive</option>' in html
     assert 'value="account:customer"' in html
     assert "Customer Account - customer@example.com" in html
     assert 'value="anonymous"' in html
     assert 'data-device-status-filter-key="account:customer"' in html
     assert 'data-device-status-filter-key="anonymous"' in html
+    assert 'data-device-status-activity-key="active"' in html
+    assert 'data-device-status-activity-key="inactive"' in html
+    assert "Status Active" in html
+    assert "Status Inactive" in html
 
 
 def test_device_status_filter_hides_non_matching_rows():
@@ -247,6 +267,9 @@ def test_device_status_filter_hides_non_matching_rows():
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     assert 'row.classList.toggle("admin-device-status-row-hidden", !matches)' in script
+    assert 'const selectedActivity = activityFilter ? activityFilter.value || "all" : "all";' in script
+    assert 'const matchesActivity = selectedActivity === "all" || row.dataset.deviceStatusActivityKey === selectedActivity;' in script
+    assert 'activityFilter.addEventListener("change", applyFilter);' in script
     assert ".admin-device-status-list [data-device-status-row][hidden]" in css
     assert ".admin-device-status-list [data-device-status-row].admin-device-status-row-hidden" in css
     assert "display: none !important;" in css

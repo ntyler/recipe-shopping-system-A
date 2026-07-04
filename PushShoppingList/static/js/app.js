@@ -4778,27 +4778,31 @@ function closeAdminSupportPanel() {
 
 function initDeviceStatusFilters(scope = document) {
     const root = scope && scope.querySelectorAll ? scope : document;
-    const filters = [
-        ...(root.matches && root.matches("[data-device-status-filter]") ? [root] : []),
-        ...root.querySelectorAll("[data-device-status-filter]"),
+    const panels = [
+        ...(root.matches && root.matches(".admin-device-status") ? [root] : []),
+        ...root.querySelectorAll(".admin-device-status"),
     ];
 
-    filters.forEach(filter => {
-        if (filter.dataset.deviceStatusFilterBound === "1") {
+    panels.forEach(panel => {
+        if (panel.dataset.deviceStatusFilterBound === "1") {
             return;
         }
 
-        const panel = filter.closest(".admin-device-status");
+        const accountFilter = panel.querySelector("[data-device-status-filter]");
+        const activityFilter = panel.querySelector("[data-device-status-activity-filter]");
         const rows = panel ? [...panel.querySelectorAll("[data-device-status-row]")] : [];
         const count = panel ? panel.querySelector("[data-device-status-filter-count]") : null;
         const empty = panel ? panel.querySelector("[data-device-status-empty]") : null;
 
         const applyFilter = () => {
-            const selectedKey = filter.value || "all";
+            const selectedKey = accountFilter ? accountFilter.value || "all" : "all";
+            const selectedActivity = activityFilter ? activityFilter.value || "all" : "all";
             let visibleCount = 0;
 
             rows.forEach(row => {
-                const matches = selectedKey === "all" || row.dataset.deviceStatusFilterKey === selectedKey;
+                const matchesAccount = selectedKey === "all" || row.dataset.deviceStatusFilterKey === selectedKey;
+                const matchesActivity = selectedActivity === "all" || row.dataset.deviceStatusActivityKey === selectedActivity;
+                const matches = matchesAccount && matchesActivity;
                 row.hidden = !matches;
                 row.classList.toggle("admin-device-status-row-hidden", !matches);
                 if (matches) {
@@ -4817,8 +4821,13 @@ function initDeviceStatusFilters(scope = document) {
             }
         };
 
-        filter.dataset.deviceStatusFilterBound = "1";
-        filter.addEventListener("change", applyFilter);
+        panel.dataset.deviceStatusFilterBound = "1";
+        if (accountFilter) {
+            accountFilter.addEventListener("change", applyFilter);
+        }
+        if (activityFilter) {
+            activityFilter.addEventListener("change", applyFilter);
+        }
         applyFilter();
     });
 }
