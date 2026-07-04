@@ -13,6 +13,17 @@ def test_ntylerbert_gmail_is_admin():
     assert accounts.public_user(user)["role"] == "Admin"
 
 
+def test_delegated_admin_access_is_record_backed():
+    user = {"email": "helper@example.com", "admin_access_enabled": True}
+    public = accounts.public_user(user)
+
+    assert accounts.is_admin_user(user) is True
+    assert public["role"] == "Admin"
+    assert public["admin_access_enabled"] is True
+    assert public["admin_access_locked"] is False
+    assert accounts.can_manage_admin_access(user) is False
+
+
 def test_two_factor_remember_checkbox_text_stays_adjacent():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -689,6 +700,13 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
 
     assert "admin_support_dashboard.is_admin" in index_template
     assert 'id="adminSupportSection"' in support_template
+    assert "Admin Access" in support_template
+    assert "update_admin_access_route" in route
+    assert "update_account_admin_access" in route
+    assert "admin_access_action" in support_template
+    assert "Grant Admin" in support_template
+    assert "Revoke Admin" in support_template
+    assert "Recent Admin Access Changes" in support_template
     assert 'name="support_reason"' in support_template
     assert "required" in support_template
     assert "open_admin_support_record_route" in route
@@ -735,6 +753,8 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "password_hash" not in support_template
     assert "two_factor.secret" not in support_template
     assert ".admin-support-card" in css
+    assert ".admin-access-form" in css
+    assert ".admin-access-revoke-btn" in css
 
     notices_css_start = css.index(".user-account-access-notices {")
     notices_css_end = css.index(".user-account-notices-divider", notices_css_start)

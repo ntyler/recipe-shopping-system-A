@@ -19534,6 +19534,10 @@ body {
     background: #07111c;
 }
 
+.admin-access-form {
+    grid-template-columns: minmax(220px, 1fr) auto;
+}
+
 .admin-support-form label {
     display: grid;
     gap: 6px;
@@ -19577,6 +19581,24 @@ body {
 .admin-support-submit-btn:hover,
 .admin-support-submit-btn:focus-visible {
     background: #0f6fb7;
+}
+
+.admin-access-actions {
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-access-revoke-btn {
+    border-color: #991b1b;
+    background: #8f1d1d;
+}
+
+.admin-access-revoke-btn:hover,
+.admin-access-revoke-btn:focus-visible {
+    background: #b91c1c;
 }
 
 .admin-support-selected,
@@ -21311,6 +21333,10 @@ body {
         justify-content: flex-start;
     }
 
+    .admin-access-actions {
+        justify-content: stretch;
+    }
+
     .chatgpt-model-table-wrap {
         overflow-x: auto;
     }
@@ -21338,6 +21364,7 @@ body {
     }
 
     .admin-support-submit-btn,
+    .admin-access-actions .admin-support-submit-btn,
     .chatgpt-model-refresh-btn,
     .chatgpt-model-use-proposed-btn,
     .chatgpt-model-save-btn {

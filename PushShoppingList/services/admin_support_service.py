@@ -8,10 +8,13 @@ from PushShoppingList.services.email_service import send_admin_support_access_em
 from PushShoppingList.services.storage_service import USER_DATA_DIR
 from PushShoppingList.services.storage_service import safe_user_id
 from PushShoppingList.services.user_account_service import display_datetime
+from PushShoppingList.services.user_account_service import can_manage_admin_access
 from PushShoppingList.services.user_account_service import get_public_support_identity
 from PushShoppingList.services.user_account_service import is_admin_user
+from PushShoppingList.services.user_account_service import is_owner_admin_user
 from PushShoppingList.services.user_account_service import load_users
 from PushShoppingList.services.user_account_service import public_user
+from PushShoppingList.services.user_account_service import save_users
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent.parent
@@ -19,6 +22,7 @@ ADMIN_SUPPORT_AUDIT_FILE = Path(
     os.getenv("SHOPPING_APP_ADMIN_SUPPORT_AUDIT_FILE", PACKAGE_DIR / "admin_support_audit.json")
 )
 AUDIT_ACTION = "view_account_support_record"
+ADMIN_ACCESS_AUDIT_ACTION = "update_admin_access"
 
 
 def now_iso():
@@ -53,11 +57,28 @@ def save_audit_entries(entries):
 
 def recent_support_audit_entries(limit=20):
     entries = sorted(
-        load_audit_entries(),
-        key=lambda entry: str(entry.get("timestamp") or ""),
+        [
+            (index, entry)
+            for index, entry in enumerate(load_audit_entries())
+            if str(entry.get("action") or "") == AUDIT_ACTION
+        ],
+        key=lambda item: (str(item[1].get("timestamp") or ""), item[0]),
         reverse=True,
     )
-    return [audit_entry_for_render(entry) for entry in entries[:limit]]
+    return [audit_entry_for_render(entry) for _index, entry in entries[:limit]]
+
+
+def recent_admin_access_audit_entries(limit=20):
+    entries = sorted(
+        [
+            (index, entry)
+            for index, entry in enumerate(load_audit_entries())
+            if str(entry.get("action") or "") == ADMIN_ACCESS_AUDIT_ACTION
+        ],
+        key=lambda item: (str(item[1].get("timestamp") or ""), item[0]),
+        reverse=True,
+    )
+    return [admin_access_audit_entry_for_render(entry) for _index, entry in entries[:limit]]
 
 
 def support_access_notices_for_user(user, limit=2):
@@ -69,6 +90,9 @@ def support_access_notices_for_user(user, limit=2):
 
     notices = []
     for index, entry in enumerate(load_audit_entries()):
+        if str(entry.get("action") or "") != AUDIT_ACTION:
+            continue
+
         target_user_id = str(entry.get("target_user_id") or "").strip()
         target_email = str(entry.get("target_email") or "").strip().lower()
         if (user_id and target_user_id == user_id) or (email and target_email == email):
@@ -119,6 +143,16 @@ def audit_entry_for_render(entry):
     }
 
 
+def admin_access_audit_entry_for_render(entry):
+    rendered = audit_entry_for_render(entry)
+    enabled = bool(entry.get("admin_access_enabled"))
+    rendered.update({
+        "admin_access_enabled": enabled,
+        "admin_access_action": "Granted" if enabled else "Revoked",
+    })
+    return rendered
+
+
 def support_users():
     rows = [
         safe_account_summary(user)
@@ -149,6 +183,8 @@ def find_support_target(target_user_id):
 
 def safe_account_summary(user):
     public = public_user(user) or {}
+    admin_access_enabled = bool(public.get("admin_access_enabled"))
+    admin_access_locked = bool(public.get("admin_access_locked"))
     return {
         "user_id": str(public.get("user_id") or ""),
         "display_name": str(public.get("display_name") or ""),
@@ -158,6 +194,9 @@ def safe_account_summary(user):
         "provider_label": str(public.get("provider_label") or public.get("provider") or ""),
         "role": str(public.get("role") or "User"),
         "is_admin": bool(public.get("is_admin")),
+        "admin_access_enabled": admin_access_enabled,
+        "admin_access_locked": admin_access_locked,
+        "admin_access_label": admin_access_label(public),
         "account_status": str(public.get("account_status") or "active"),
         "email_verified": bool(public.get("email_verified")),
         "phone_verified": bool(public.get("phone_verified")),
@@ -169,6 +208,19 @@ def safe_account_summary(user):
         "last_sign_in_at": str(public.get("last_sign_in_at") or ""),
         "last_sign_in_at_label": str(public.get("last_sign_in_at_label") or public.get("last_sign_in_at") or ""),
     }
+
+
+def admin_access_label(user):
+    if bool((user or {}).get("admin_access_locked")):
+        return "Main admin"
+
+    if bool((user or {}).get("admin_access_enabled")):
+        return "Granted admin"
+
+    if bool((user or {}).get("is_admin")):
+        return "Configured admin"
+
+    return "User"
 
 
 def support_workspace_summary(user_id):
@@ -232,6 +284,32 @@ def record_support_access(admin_user, target_user, reason):
     return entry
 
 
+def record_admin_access_change(admin_user, target_user, enabled):
+    actor_private_email = str((admin_user or {}).get("email") or "")
+    created_at = now_iso()
+    target_user_email = str((target_user or {}).get("email") or "")
+    entry = {
+        "audit_id": uuid.uuid4().hex,
+        "action": ADMIN_ACCESS_AUDIT_ACTION,
+        "timestamp": created_at,
+        "createdAt": created_at,
+        "actorUid": str((admin_user or {}).get("user_id") or ""),
+        "actorPrivateEmail": actor_private_email,
+        "actorPublicEmail": get_public_support_identity(actor_private_email),
+        "admin_user_id": str((admin_user or {}).get("user_id") or ""),
+        "admin_email": actor_private_email,
+        "target_user_id": str((target_user or {}).get("user_id") or ""),
+        "target_email": target_user_email,
+        "targetUserEmail": target_user_email,
+        "admin_access_enabled": bool(enabled),
+        "reason": "Granted admin access" if enabled else "Revoked admin access",
+    }
+    entries = load_audit_entries()
+    entries.append(entry)
+    save_audit_entries(entries[-500:])
+    return entry
+
+
 def normalize_reason(reason):
     return str(reason or "").strip()[:300]
 
@@ -272,13 +350,70 @@ def open_admin_support_record(admin_user, target_user_id, reason):
     }
 
 
+def update_account_admin_access(admin_user, target_user_id, enabled):
+    if not can_manage_admin_access(admin_user):
+        return {
+            "ok": False,
+            "errors": ["Only the main admin can manage admin access."],
+        }
+
+    target_user_id = str(target_user_id or "").strip()
+    if not target_user_id:
+        return {
+            "ok": False,
+            "errors": ["Choose a user account before changing admin access."],
+        }
+
+    payload = load_users()
+    target_user = next(
+        (
+            user
+            for user in payload.get("users", [])
+            if str(user.get("user_id") or "").strip() == target_user_id
+        ),
+        None,
+    )
+    if not target_user:
+        return {
+            "ok": False,
+            "errors": ["Choose a valid user account before changing admin access."],
+        }
+
+    if is_owner_admin_user(target_user):
+        return {
+            "ok": False,
+            "errors": ["Main admin access is built in and cannot be changed here."],
+            "selected_user": safe_account_detail(target_user),
+        }
+
+    previous_enabled = bool(target_user.get("admin_access_enabled"))
+    target_user["admin_access_enabled"] = bool(enabled)
+    target_user["admin_access_updated_at"] = now_iso()
+    target_user["admin_access_updated_by"] = str((admin_user or {}).get("user_id") or "")
+    target_user["admin_access_updated_by_email"] = str((admin_user or {}).get("email") or "")
+    save_users(payload)
+
+    audit_entry = record_admin_access_change(admin_user, target_user, enabled)
+    action = "granted" if enabled else "revoked"
+    return {
+        "ok": True,
+        "changed": previous_enabled != bool(enabled),
+        "selected_user": safe_account_detail(target_user),
+        "audit_entry": admin_access_audit_entry_for_render(audit_entry),
+        "message": f"Admin access {action} for {target_user.get('email') or 'that account'}.",
+    }
+
+
 def admin_support_dashboard_for_user(admin_user, selected_user=None, errors=None, reason=""):
     is_admin = is_admin_user(admin_user)
+    can_manage_access = can_manage_admin_access(admin_user)
     return {
         "is_admin": is_admin,
+        "can_manage_admin_access": can_manage_access,
         "users": support_users() if is_admin else [],
         "selected_user": selected_user if is_admin and isinstance(selected_user, dict) else None,
         "errors": errors if is_admin and isinstance(errors, list) else [],
         "reason": normalize_reason(reason) if is_admin else "",
         "recent_audit": recent_support_audit_entries() if is_admin else [],
+        "recent_admin_access": recent_admin_access_audit_entries() if can_manage_access else [],
     }

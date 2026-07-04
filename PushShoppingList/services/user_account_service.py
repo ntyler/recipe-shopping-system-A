@@ -391,6 +391,8 @@ def public_user(user):
     email_verified = bool(user.get("firebase_email_verified")) if is_firebase else account_email_verified(user)
     last_sign_in_at = user.get("firebase_last_login_at") or user.get("last_login_at") or ""
     notification_preferences = normalize_notification_preferences(user.get("notification_preferences"))
+    admin_user = is_admin_user(user)
+    owner_admin = is_owner_admin_user(user)
 
     return {
         "user_id": user.get("user_id", ""),
@@ -444,8 +446,11 @@ def public_user(user):
         "last_sign_in_at": last_sign_in_at,
         "last_sign_in_at_label": display_datetime(last_sign_in_at),
         "updated_at": user.get("updated_at", ""),
-        "is_admin": is_admin_user(user),
-        "role": "Admin" if is_admin_user(user) else "User",
+        "is_admin": admin_user,
+        "role": "Admin" if admin_user else "User",
+        "admin_access_enabled": admin_access_enabled(user),
+        "admin_access_locked": owner_admin,
+        "can_manage_admin_access": can_manage_admin_access(user),
         "two_factor_enabled": bool(two_factor.get("enabled")),
         "two_factor_backup_codes_remaining": backup_codes_remaining(two_factor) if two_factor.get("enabled") else 0,
     }
@@ -477,8 +482,28 @@ def is_admin_email(email):
     )
 
 
+def is_owner_admin_email(email):
+    email_key = normalize_email_key(email)
+    return (
+        email_key == normalize_email_key(ADMIN_EMAIL)
+        or email_key in BUILT_IN_ADMIN_EMAILS
+    )
+
+
+def admin_access_enabled(user):
+    return bool((user or {}).get("admin_access_enabled"))
+
+
 def is_admin_user(user):
-    return is_admin_email((user or {}).get("email"))
+    return is_admin_email((user or {}).get("email")) or admin_access_enabled(user)
+
+
+def is_owner_admin_user(user):
+    return is_owner_admin_email((user or {}).get("email"))
+
+
+def can_manage_admin_access(user):
+    return is_owner_admin_user(user)
 
 
 def provider_label(user):

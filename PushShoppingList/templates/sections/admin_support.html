@@ -67,6 +67,47 @@
     </div>
 
     {% set selected_user = admin_support.selected_user %}
+    {% if admin_support.can_manage_admin_access %}
+        <div class="admin-support-audit admin-access-manager">
+            <div class="admin-support-audit-header">
+                <div>
+                    <h3>Admin Access</h3>
+                    <p>Grant or revoke delegated admin access. Main admin accounts stay locked.</p>
+                </div>
+            </div>
+            <form class="admin-support-form admin-access-form"
+                  method="POST"
+                  action="{{ url_for('account_bp.update_admin_access_route') }}">
+                <label>
+                    <span>Account</span>
+                    <select name="target_user_id" required>
+                        <option value="">Choose account</option>
+                        {% for user in admin_support.users %}
+                            <option value="{{ user.user_id }}"
+                                    {% if selected_user and selected_user.user_id == user.user_id %}selected{% endif %}>
+                                {{ user.display_name or user.email }} - {{ user.email }} ({{ user.admin_access_label }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="admin-access-actions" role="group" aria-label="Admin access actions">
+                    <button type="submit"
+                            name="admin_access_action"
+                            value="grant"
+                            class="admin-support-submit-btn admin-access-grant-btn">
+                        Grant Admin
+                    </button>
+                    <button type="submit"
+                            name="admin_access_action"
+                            value="revoke"
+                            class="admin-support-submit-btn admin-access-revoke-btn">
+                        Revoke Admin
+                    </button>
+                </div>
+            </form>
+        </div>
+    {% endif %}
+
     <form class="admin-support-form"
           method="POST"
           action="{{ url_for('account_bp.open_admin_support_record_route') }}">
@@ -104,6 +145,10 @@
             </div>
 
             <dl class="admin-support-detail-grid">
+                <div>
+                    <dt>Admin Access</dt>
+                    <dd>{{ selected_user.admin_access_label }}</dd>
+                </div>
                 <div>
                     <dt>Username</dt>
                     <dd>{{ selected_user.username or "Not set" }}</dd>
@@ -157,6 +202,27 @@
                     <dd>{{ selected_user.workspace.uploaded_files }}</dd>
                 </div>
             </dl>
+        </div>
+    {% endif %}
+
+    {% if admin_support.recent_admin_access %}
+        <div class="admin-support-audit admin-access-audit">
+            <div class="admin-support-audit-header">
+                <h3>Recent Admin Access Changes</h3>
+            </div>
+            <ol class="admin-support-audit-list">
+                {% for entry in admin_support.recent_admin_access %}
+                    <li>
+                        <div class="admin-support-audit-top">
+                            <strong>{{ entry.target_email }}</strong>
+                            <span>{{ entry.timestamp_label }}</span>
+                        </div>
+                        <div class="admin-support-audit-meta">
+                            {{ entry.admin_access_action }} by {{ entry.actorPrivateEmail or entry.admin_email }}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ol>
         </div>
     {% endif %}
 

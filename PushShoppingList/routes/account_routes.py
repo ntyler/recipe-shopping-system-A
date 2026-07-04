@@ -29,6 +29,7 @@ from PushShoppingList.services.sms_service import password_reset_sms_configured
 from PushShoppingList.services.sms_service import send_password_reset_sms
 from PushShoppingList.services.sms_service import send_phone_verification_sms
 from PushShoppingList.services.admin_support_service import open_admin_support_record
+from PushShoppingList.services.admin_support_service import update_account_admin_access
 from PushShoppingList.services.user_account_service import authenticate_user
 from PushShoppingList.services.user_account_service import cancel_two_factor_setup
 from PushShoppingList.services.user_account_service import cancel_two_factor_sign_in
@@ -623,6 +624,44 @@ def open_admin_support_record_route():
             ["Unable to open that support record."],
         )
         session.pop("admin_support_selected_user", None)
+
+    return redirect(url_for("main_bp.index", _anchor="adminSupportSection"))
+
+
+@account_bp.route("/account/admin-access", methods=["POST"])
+def update_admin_access_route():
+    admin_user = current_public_user()
+
+    if not is_admin_user(admin_user):
+        clear_admin_support_session()
+        flash("Admin access is required.", "error")
+        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+    action = str(request.form.get("admin_access_action") or "").strip().lower()
+    if action not in {"grant", "revoke"}:
+        session["admin_support_errors"] = ["Choose whether to grant or revoke admin access."]
+        return redirect(url_for("main_bp.index", _anchor="adminSupportSection"))
+
+    result = update_account_admin_access(
+        admin_user,
+        request.form.get("target_user_id", ""),
+        action == "grant",
+    )
+
+    if result.get("ok"):
+        session["admin_support_selected_user"] = result.get("selected_user") or {}
+        session.pop("admin_support_errors", None)
+        flash(result.get("message") or "Admin access updated.", "success")
+    else:
+        selected_user = result.get("selected_user")
+        if isinstance(selected_user, dict):
+            session["admin_support_selected_user"] = selected_user
+        session["admin_support_errors"] = result.get(
+            "errors",
+            ["Unable to update admin access."],
+        )
+        for error in session["admin_support_errors"]:
+            flash(error, "error")
 
     return redirect(url_for("main_bp.index", _anchor="adminSupportSection"))
 

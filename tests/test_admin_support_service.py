@@ -126,6 +126,61 @@ def test_admin_support_record_is_sanitized_and_audited(monkeypatch, tmp_path):
     assert result["email_notice"]["configured"] is False
 
 
+def test_owner_admin_can_grant_and_revoke_delegated_admin_access(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+
+    grant = support.update_account_admin_access(admin_user(), "customer", True)
+
+    assert grant["ok"]
+    assert grant["changed"] is True
+    assert grant["selected_user"]["is_admin"] is True
+    assert grant["selected_user"]["admin_access_enabled"] is True
+    assert grant["selected_user"]["admin_access_label"] == "Granted admin"
+    assert accounts.find_user_by_id("customer")["admin_access_enabled"] is True
+    assert accounts.is_admin_user(accounts.find_user_by_id("customer")) is True
+
+    revoke = support.update_account_admin_access(admin_user(), "customer", False)
+
+    assert revoke["ok"]
+    assert revoke["changed"] is True
+    assert revoke["selected_user"]["is_admin"] is False
+    assert revoke["selected_user"]["admin_access_enabled"] is False
+    assert accounts.find_user_by_id("customer")["admin_access_enabled"] is False
+
+    admin_access_entries = support.recent_admin_access_audit_entries()
+    assert [entry["admin_access_action"] for entry in admin_access_entries] == ["Revoked", "Granted"]
+    assert admin_access_entries[0]["target_email"] == "customer@example.com"
+    assert support.support_access_notices_for_user(target_user(), limit=None) == []
+
+
+def test_delegated_admin_cannot_manage_admin_access(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    delegated_admin = {
+        **target_user(),
+        "admin_access_enabled": True,
+    }
+    accounts.save_users({"users": [admin_user(), delegated_admin]})
+
+    result = support.update_account_admin_access(accounts.public_user(delegated_admin), "admin", False)
+
+    assert not result["ok"]
+    assert result["errors"] == ["Only the main admin can manage admin access."]
+    assert accounts.is_admin_user(accounts.find_user_by_id("customer")) is True
+
+
+def test_owner_admin_access_cannot_be_revoked_from_admin_panel(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+
+    result = support.update_account_admin_access(admin_user(), "admin", False)
+
+    assert not result["ok"]
+    assert result["errors"] == ["Main admin access is built in and cannot be changed here."]
+    assert result["selected_user"]["admin_access_locked"] is True
+    assert accounts.is_admin_user(accounts.find_user_by_id("admin")) is True
+
+
 def test_admin_support_record_emails_user_when_configured(monkeypatch, tmp_path):
     configure_admin_support(monkeypatch, tmp_path)
     accounts.save_users({"users": [admin_user(), target_user()]})
@@ -257,6 +312,35 @@ def test_admin_support_route_stores_only_sanitized_record(monkeypatch, tmp_path)
             assert "ntfy_topic" not in selected
 
     assert len(support.load_audit_entries()) == 1
+
+
+def test_admin_access_route_updates_account_and_keeps_selected_user(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "admin"
+
+        response = client.post(
+            "/account/admin-access",
+            data={
+                "target_user_id": "customer",
+                "admin_access_action": "grant",
+            },
+        )
+
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/#adminSupportSection")
+
+        with client.session_transaction() as session:
+            selected = session["admin_support_selected_user"]
+            assert selected["email"] == "customer@example.com"
+            assert selected["is_admin"] is True
+            assert selected["admin_access_enabled"] is True
+
+    assert accounts.find_user_by_id("customer")["admin_access_enabled"] is True
 
 
 def test_admin_support_route_notice_renders_for_target_user(monkeypatch, tmp_path):
