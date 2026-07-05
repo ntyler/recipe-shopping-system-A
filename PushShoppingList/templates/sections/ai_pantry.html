@@ -350,9 +350,6 @@
                                     {% if item.frozen_best_by_date_label %}<span>Best frozen until {{ item.frozen_best_by_date_label }}</span>{% endif %}
                                     {% if item.expiration_date_label %}<span>Use by {{ item.expiration_date_label }}</span>{% endif %}
                                 </div>
-                                {% if item.notes %}
-                                    <p class="ai-pantry-inventory-notes-preview">{{ item.notes }}</p>
-                                {% endif %}
                                 <div class="recipe-step-image-panel ai-pantry-image-panel"
                                      data-pantry-image-panel
                                      data-pantry-item-id="{{ item.id }}"

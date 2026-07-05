@@ -21388,24 +21388,6 @@ body {
     transform: rotate(225deg) translate(-1px, -1px);
 }
 
-.ai-pantry-inventory-row-collapsed .ai-pantry-inventory-notes-preview {
-    display: -webkit-box;
-    max-width: 100%;
-    margin: 8px 0 0;
-    overflow: hidden;
-    color: #cbd5e1;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1.25;
-    text-transform: none;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-
-.ai-pantry-inventory-row:not(.ai-pantry-inventory-row-collapsed) .ai-pantry-inventory-notes-preview {
-    display: none;
-}
-
 .ai-pantry-name-suggestion,
 .ai-pantry-review-name-suggestion {
     display: flex;
