@@ -219,6 +219,12 @@
                            aria-label="Group pantry inventory by store section">
                     <span>Group by section</span>
                 </label>
+                <label class="ai-pantry-confidence-toggle ai-pantry-inventory-group-toggle">
+                    <input type="checkbox"
+                           data-pantry-inventory-location-toggle
+                           aria-label="Group pantry inventory by location, then store section">
+                    <span>Group by Location</span>
+                </label>
                 {% if pantry_name_suggestion_filters.count|int > 0 %}
                     <div class="ai-pantry-name-question-nav"
                          data-pantry-name-question-nav
@@ -351,6 +357,7 @@
                                  data-pantry-image-source="{% if item_is_image_source %}1{% else %}0{% endif %}"
                                  data-pantry-item-image-source="{% if item.image_url or item_source|lower == 'photo' %}1{% else %}0{% endif %}"
                                  data-pantry-storage="{{ item.storage_location }}"
+                                 data-pantry-storage-label="{% if item.storage_location %}{{ item.storage_location_label }}{% else %}Unset{% endif %}"
                                  data-pantry-status="{{ item.status }}"
                                  data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.store_section ~ ' ' ~ item.category ~ ' ' ~ item_source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">
                             <span class="recipe-edit-row-handle ai-pantry-inventory-handle" aria-hidden="true"></span>

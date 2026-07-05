@@ -16206,18 +16206,91 @@ function bindPantryInventoryBulkDelete(root = document) {
 }
 
 const PANTRY_INVENTORY_GROUP_STORAGE_KEY = "ai-pantry-inventory-group-by-section";
+const PANTRY_INVENTORY_LOCATION_GROUP_STORAGE_KEY = "ai-pantry-inventory-group-by-location";
 const PANTRY_INVENTORY_SECTION_COLLAPSE_STORAGE_PREFIX = "ai-pantry-inventory-section-collapsed:";
+const PANTRY_INVENTORY_LOCATION_COLLAPSE_STORAGE_PREFIX = "ai-pantry-inventory-location-collapsed:";
+const PANTRY_INVENTORY_LOCATION_SECTION_COLLAPSE_STORAGE_PREFIX = "ai-pantry-inventory-location-section-collapsed:";
+const PANTRY_INVENTORY_UNSET_LOCATION_KEY = "__unset";
 
 function pantryInventoryGroupBySectionIsEnabled() {
     return localStorage.getItem(PANTRY_INVENTORY_GROUP_STORAGE_KEY) === "1";
 }
 
-function pantryInventorySectionStorageKey(section) {
-    return `${PANTRY_INVENTORY_SECTION_COLLAPSE_STORAGE_PREFIX}${encodeURIComponent(section || "MISC")}`;
+function pantryInventoryGroupByLocationIsEnabled() {
+    return localStorage.getItem(PANTRY_INVENTORY_LOCATION_GROUP_STORAGE_KEY) === "1";
 }
 
-function pantryInventorySectionIsCollapsed(section) {
-    return localStorage.getItem(pantryInventorySectionStorageKey(section)) === "1";
+function pantryInventoryStorageKeyPart(value, fallback = "MISC") {
+    return encodeURIComponent(String(value || fallback || "").trim() || fallback);
+}
+
+function pantryInventorySectionStorageKey(section, locationKey = "") {
+    if (locationKey) {
+        return `${PANTRY_INVENTORY_LOCATION_SECTION_COLLAPSE_STORAGE_PREFIX}${pantryInventoryStorageKeyPart(locationKey, PANTRY_INVENTORY_UNSET_LOCATION_KEY)}:${pantryInventoryStorageKeyPart(section)}`;
+    }
+    return `${PANTRY_INVENTORY_SECTION_COLLAPSE_STORAGE_PREFIX}${pantryInventoryStorageKeyPart(section)}`;
+}
+
+function pantryInventoryLocationStorageKey(locationKey) {
+    return `${PANTRY_INVENTORY_LOCATION_COLLAPSE_STORAGE_PREFIX}${pantryInventoryStorageKeyPart(locationKey, PANTRY_INVENTORY_UNSET_LOCATION_KEY)}`;
+}
+
+function pantryInventorySectionIsCollapsed(section, locationKey = "") {
+    return localStorage.getItem(pantryInventorySectionStorageKey(section, locationKey)) === "1";
+}
+
+function pantryInventoryLocationIsCollapsed(locationKey) {
+    return localStorage.getItem(pantryInventoryLocationStorageKey(locationKey)) === "1";
+}
+
+function pantryInventoryNormalizeLocationKey(value) {
+    const cleaned = String(value || "").trim().toLowerCase();
+    return cleaned || PANTRY_INVENTORY_UNSET_LOCATION_KEY;
+}
+
+function pantryInventoryLabelFromValue(value, fallback = "Unset") {
+    const cleaned = String(value || "").trim();
+
+    if (!cleaned) {
+        return fallback;
+    }
+
+    return cleaned
+        .replace(/[-_]+/g, " ")
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ") || fallback;
+}
+
+function pantryInventoryLocationValue(row) {
+    const rawLocation = String(row && row.dataset ? row.dataset.pantryStorage || "" : "").trim();
+    const label = String(row && row.dataset ? row.dataset.pantryStorageLabel || "" : "").trim()
+        || pantryInventoryLabelFromValue(rawLocation);
+
+    return {
+        key: pantryInventoryNormalizeLocationKey(rawLocation),
+        label,
+    };
+}
+
+function pantryInventoryLocationOrderMap() {
+    const order = new Map();
+
+    order.set(PANTRY_INVENTORY_UNSET_LOCATION_KEY, 0);
+    document.querySelectorAll(".ai-pantry-inventory-location-label select option").forEach(option => {
+        const key = pantryInventoryNormalizeLocationKey(option.value);
+
+        if (!order.has(key)) {
+            order.set(key, order.size);
+        }
+    });
+
+    return order;
+}
+
+function pantryInventoryLocationSortRank(key, orderMap) {
+    return orderMap.has(key) ? orderMap.get(key) : orderMap.size + 1000;
 }
 
 function pantryInventorySectionValue(row) {
@@ -16238,6 +16311,27 @@ function pantryInventoryListRows(list) {
     });
 }
 
+function pantryInventoryRowOriginalIndex(row) {
+    const index = Number.parseInt(row && row.dataset ? row.dataset.pantryInventoryOriginalIndex || "" : "", 10);
+    return Number.isFinite(index) ? index : 0;
+}
+
+function ensurePantryInventoryOriginalOrder(list) {
+    pantryInventoryListRows(list).forEach((row, index) => {
+        if (!row.dataset.pantryInventoryOriginalIndex) {
+            row.dataset.pantryInventoryOriginalIndex = String(index);
+        }
+    });
+}
+
+function restorePantryInventoryOriginalOrder(list) {
+    pantryInventoryListRows(list)
+        .sort((left, right) => pantryInventoryRowOriginalIndex(left) - pantryInventoryRowOriginalIndex(right))
+        .forEach(row => {
+            list.appendChild(row);
+        });
+}
+
 function removePantryInventorySectionHeaders(list) {
     Array.from(list ? list.children : []).forEach(child => {
         if (child.matches && child.matches("[data-pantry-section-header]")) {
@@ -16246,11 +16340,11 @@ function removePantryInventorySectionHeaders(list) {
     });
 }
 
-function pantryInventorySectionGroups(list) {
+function pantryInventorySectionGroupsFromRows(rows) {
     const groups = [];
     const groupBySection = new Map();
 
-    pantryInventoryListRows(list).forEach(row => {
+    rows.forEach(row => {
         const section = pantryInventorySectionValue(row);
         let group = groupBySection.get(section);
         if (!group) {
@@ -16267,25 +16361,93 @@ function pantryInventorySectionGroups(list) {
     return groups;
 }
 
-function createPantryInventorySectionHeader(section, visibleCount, collapsed) {
+function pantryInventorySectionGroups(list) {
+    return pantryInventorySectionGroupsFromRows(pantryInventoryListRows(list));
+}
+
+function pantryInventoryLocationGroups(rows) {
+    const orderMap = pantryInventoryLocationOrderMap();
+    const groups = [];
+    const groupByLocation = new Map();
+
+    rows.forEach(row => {
+        const location = pantryInventoryLocationValue(row);
+        let group = groupByLocation.get(location.key);
+
+        if (!group) {
+            group = {
+                key: location.key,
+                label: location.label,
+                firstIndex: pantryInventoryRowOriginalIndex(row),
+                sectionByKey: new Map(),
+                sections: [],
+            };
+            groupByLocation.set(location.key, group);
+            groups.push(group);
+        }
+
+        const section = pantryInventorySectionValue(row);
+        let sectionGroup = group.sectionByKey.get(section);
+        if (!sectionGroup) {
+            sectionGroup = {
+                section,
+                rows: [],
+            };
+            group.sectionByKey.set(section, sectionGroup);
+            group.sections.push(sectionGroup);
+        }
+        sectionGroup.rows.push(row);
+    });
+
+    return groups.sort((left, right) => {
+        const rankDifference = pantryInventoryLocationSortRank(left.key, orderMap)
+            - pantryInventoryLocationSortRank(right.key, orderMap);
+
+        if (rankDifference) {
+            return rankDifference;
+        }
+
+        return left.firstIndex - right.firstIndex;
+    });
+}
+
+function createPantryInventorySectionHeader(section, visibleCount, collapsed, options = {}) {
     const header = document.createElement("div");
     const button = document.createElement("button");
     const chevron = document.createElement("span");
     const label = document.createElement("span");
     const count = document.createElement("span");
     const itemLabel = visibleCount === 1 ? "item" : "items";
+    const groupType = options.type || "section";
+    const groupLabel = String(options.label || section || "MISC");
+    const groupKey = String(options.key || section || groupLabel);
+    const groupLevel = Number.parseInt(options.level || "1", 10) || 1;
+    const groupNoun = groupType === "location" ? "location" : "section";
 
-    header.className = "ai-pantry-inventory-section-header";
+    header.className = `ai-pantry-inventory-section-header ai-pantry-inventory-section-header-${groupType}`;
+    if (groupLevel > 1) {
+        header.classList.add("ai-pantry-inventory-section-header-nested");
+    }
     header.dataset.pantrySectionHeader = "1";
-    header.dataset.pantrySectionKey = section;
+    header.dataset.pantryGroupType = groupType;
+    header.dataset.pantryGroupKey = groupKey;
+    if (groupType === "location") {
+        header.dataset.pantryLocationKey = groupKey;
+    } else {
+        header.dataset.pantrySectionKey = options.sectionKey || section || groupKey;
+        if (options.locationKey) {
+            header.dataset.pantryLocationKey = options.locationKey;
+        }
+    }
 
     button.type = "button";
     button.className = "ai-pantry-inventory-section-toggle";
     button.dataset.pantrySectionToggle = "1";
+    button.dataset.pantryGroupToggle = groupType;
     button.setAttribute("aria-expanded", collapsed ? "false" : "true");
     button.setAttribute(
         "aria-label",
-        `${collapsed ? "Expand" : "Collapse"} ${section} pantry section, ${visibleCount} ${itemLabel}`
+        `${collapsed ? "Expand" : "Collapse"} ${groupLabel} pantry ${groupNoun}, ${visibleCount} ${itemLabel}`
     );
     button.addEventListener("click", () => {
         togglePantryInventorySectionGroup(button);
@@ -16295,7 +16457,7 @@ function createPantryInventorySectionHeader(section, visibleCount, collapsed) {
     chevron.setAttribute("aria-hidden", "true");
 
     label.className = "ai-pantry-inventory-section-label";
-    label.textContent = section;
+    label.textContent = groupLabel;
 
     count.className = "ai-pantry-inventory-section-count";
     count.dataset.pantrySectionCount = "1";
@@ -16307,17 +16469,68 @@ function createPantryInventorySectionHeader(section, visibleCount, collapsed) {
 }
 
 function updatePantryInventorySectionGrouping() {
-    const shouldGroup = pantryInventoryGroupBySectionIsEnabled();
+    const shouldGroupByLocation = pantryInventoryGroupByLocationIsEnabled();
+    const shouldGroupBySection = pantryInventoryGroupBySectionIsEnabled();
 
     document.querySelectorAll("[data-pantry-inventory-list]").forEach(list => {
+        ensurePantryInventoryOriginalOrder(list);
         removePantryInventorySectionHeaders(list);
-        const groups = pantryInventorySectionGroups(list);
+        restorePantryInventoryOriginalOrder(list);
+        const rows = pantryInventoryListRows(list);
 
-        if (!shouldGroup) {
-            groups.forEach(group => {
-                group.rows.forEach(row => {
-                    row.hidden = !pantryInventoryRowFilterVisible(row);
+        if (shouldGroupByLocation) {
+            pantryInventoryLocationGroups(rows).forEach(locationGroup => {
+                const locationVisibleCount = locationGroup.sections.reduce((total, sectionGroup) => {
+                    return total + sectionGroup.rows.filter(row => pantryInventoryRowFilterVisible(row)).length;
+                }, 0);
+                const locationCollapsed = pantryInventoryLocationIsCollapsed(locationGroup.key);
+                const locationHeader = createPantryInventorySectionHeader(
+                    locationGroup.label,
+                    locationVisibleCount,
+                    locationCollapsed,
+                    {
+                        key: locationGroup.key,
+                        label: locationGroup.label,
+                        type: "location",
+                        level: 1,
+                    }
+                );
+                locationHeader.hidden = locationVisibleCount === 0;
+                list.appendChild(locationHeader);
+
+                locationGroup.sections.forEach(sectionGroup => {
+                    const sectionVisibleCount = sectionGroup.rows.filter(row => pantryInventoryRowFilterVisible(row)).length;
+                    const sectionCollapsed = pantryInventorySectionIsCollapsed(sectionGroup.section, locationGroup.key);
+                    const sectionHeader = createPantryInventorySectionHeader(
+                        sectionGroup.section,
+                        sectionVisibleCount,
+                        sectionCollapsed,
+                        {
+                            key: `${locationGroup.key}:${sectionGroup.section}`,
+                            sectionKey: sectionGroup.section,
+                            locationKey: locationGroup.key,
+                            type: "section",
+                            level: 2,
+                        }
+                    );
+                    sectionHeader.hidden = locationCollapsed || sectionVisibleCount === 0;
+                    list.appendChild(sectionHeader);
+
+                    sectionGroup.rows.forEach(row => {
+                        row.hidden = !pantryInventoryRowFilterVisible(row) || locationCollapsed || sectionCollapsed;
+                        list.appendChild(row);
+                    });
                 });
+            });
+            return;
+        }
+
+        const groups = pantryInventorySectionGroupsFromRows(rows);
+
+        if (!shouldGroupBySection) {
+            rows.forEach(row => {
+                row.hidden = !pantryInventoryRowFilterVisible(row);
+                list.appendChild(row);
             });
             return;
         }
@@ -16327,10 +16540,11 @@ function updatePantryInventorySectionGrouping() {
             const collapsed = pantryInventorySectionIsCollapsed(group.section);
             const header = createPantryInventorySectionHeader(group.section, visibleCount, collapsed);
             header.hidden = visibleCount === 0;
-            list.insertBefore(header, group.rows[0]);
+            list.appendChild(header);
 
             group.rows.forEach(row => {
                 row.hidden = !pantryInventoryRowFilterVisible(row) || collapsed;
+                list.appendChild(row);
             });
         });
     });
@@ -16351,32 +16565,98 @@ function setPantryInventoryGroupBySectionEnabled(enabled, options = {}) {
     updatePantryInventoryBulkDeleteState();
 }
 
-function setPantryInventorySectionCollapsed(section, collapsed) {
-    localStorage.setItem(
-        pantryInventorySectionStorageKey(section),
-        collapsed ? "1" : "0"
-    );
+function setPantryInventoryGroupByLocationEnabled(enabled, options = {}) {
+    const shouldGroup = enabled === true;
+
+    document.querySelectorAll("[data-pantry-inventory-location-toggle]").forEach(toggle => {
+        toggle.checked = shouldGroup;
+    });
+
+    if (options.persist) {
+        localStorage.setItem(PANTRY_INVENTORY_LOCATION_GROUP_STORAGE_KEY, shouldGroup ? "1" : "0");
+    }
+
     updatePantryInventorySectionGrouping();
     updatePantryInventoryBulkDeleteState();
 }
 
+function setPantryInventorySectionCollapsed(section, collapsed, locationKey = "", options = {}) {
+    localStorage.setItem(
+        pantryInventorySectionStorageKey(section, locationKey),
+        collapsed ? "1" : "0"
+    );
+
+    if (options.update !== false) {
+        updatePantryInventorySectionGrouping();
+        updatePantryInventoryBulkDeleteState();
+    }
+}
+
+function setPantryInventoryLocationCollapsed(locationKey, collapsed, options = {}) {
+    localStorage.setItem(
+        pantryInventoryLocationStorageKey(locationKey),
+        collapsed ? "1" : "0"
+    );
+
+    if (options.update !== false) {
+        updatePantryInventorySectionGrouping();
+        updatePantryInventoryBulkDeleteState();
+    }
+}
+
 function togglePantryInventorySectionGroup(button) {
     const header = button ? button.closest("[data-pantry-section-header]") : null;
+    const groupType = header ? header.dataset.pantryGroupType || "section" : "";
     const section = header ? header.dataset.pantrySectionKey || "" : "";
+    const locationKey = header ? header.dataset.pantryLocationKey || "" : "";
+
+    if (groupType === "location") {
+        if (!locationKey) {
+            return false;
+        }
+
+        setPantryInventoryLocationCollapsed(locationKey, !pantryInventoryLocationIsCollapsed(locationKey));
+        return false;
+    }
 
     if (!section) {
         return false;
     }
 
-    setPantryInventorySectionCollapsed(section, !pantryInventorySectionIsCollapsed(section));
+    setPantryInventorySectionCollapsed(section, !pantryInventorySectionIsCollapsed(section, locationKey), locationKey);
     return false;
 }
 
 function expandPantryInventorySectionForRow(row) {
-    if (!row || !pantryInventoryGroupBySectionIsEnabled()) {
+    if (!row) {
         return;
     }
 
+    if (pantryInventoryGroupByLocationIsEnabled()) {
+        const location = pantryInventoryLocationValue(row);
+        const section = pantryInventorySectionValue(row);
+        let changed = false;
+
+        if (pantryInventoryLocationIsCollapsed(location.key)) {
+            setPantryInventoryLocationCollapsed(location.key, false, { update: false });
+            changed = true;
+        }
+
+        if (pantryInventorySectionIsCollapsed(section, location.key)) {
+            setPantryInventorySectionCollapsed(section, false, location.key, { update: false });
+            changed = true;
+        }
+
+        if (changed) {
+            updatePantryInventorySectionGrouping();
+            updatePantryInventoryBulkDeleteState();
+        }
+        return;
+    }
+
+    if (!pantryInventoryGroupBySectionIsEnabled()) {
+        return;
+    }
     const section = pantryInventorySectionValue(row);
     if (!pantryInventorySectionIsCollapsed(section)) {
         return;
@@ -16387,14 +16667,20 @@ function expandPantryInventorySectionForRow(row) {
 
 function bindPantryInventorySectionGrouping(root = document) {
     const context = root && root.querySelectorAll ? root : document;
-    const toggles = [];
+    const sectionToggles = [];
+    const locationToggles = [];
 
     if (context.matches && context.matches("[data-pantry-inventory-section-toggle]")) {
-        toggles.push(context);
+        sectionToggles.push(context);
     }
-    context.querySelectorAll("[data-pantry-inventory-section-toggle]").forEach(toggle => toggles.push(toggle));
+    context.querySelectorAll("[data-pantry-inventory-section-toggle]").forEach(toggle => sectionToggles.push(toggle));
 
-    toggles.forEach(toggle => {
+    if (context.matches && context.matches("[data-pantry-inventory-location-toggle]")) {
+        locationToggles.push(context);
+    }
+    context.querySelectorAll("[data-pantry-inventory-location-toggle]").forEach(toggle => locationToggles.push(toggle));
+
+    sectionToggles.forEach(toggle => {
         toggle.checked = pantryInventoryGroupBySectionIsEnabled();
 
         if (toggle.dataset.pantryInventorySectionToggleBound === "1") {
@@ -16404,6 +16690,19 @@ function bindPantryInventorySectionGrouping(root = document) {
         toggle.dataset.pantryInventorySectionToggleBound = "1";
         toggle.addEventListener("change", event => {
             setPantryInventoryGroupBySectionEnabled(event.currentTarget.checked, { persist: true });
+        });
+    });
+
+    locationToggles.forEach(toggle => {
+        toggle.checked = pantryInventoryGroupByLocationIsEnabled();
+
+        if (toggle.dataset.pantryInventoryLocationToggleBound === "1") {
+            return;
+        }
+
+        toggle.dataset.pantryInventoryLocationToggleBound = "1";
+        toggle.addEventListener("change", event => {
+            setPantryInventoryGroupByLocationEnabled(event.currentTarget.checked, { persist: true });
         });
     });
 

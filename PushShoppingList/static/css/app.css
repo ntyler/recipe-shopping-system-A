@@ -20937,6 +20937,22 @@ body {
     display: none !important;
 }
 
+.ai-pantry-inventory-section-header-location .ai-pantry-inventory-section-toggle {
+    border-color: #2dd4bf;
+    background: rgba(15, 118, 110, 0.34);
+    color: #e0f2fe;
+}
+
+.ai-pantry-inventory-section-header-nested {
+    padding-left: 18px;
+}
+
+.ai-pantry-inventory-section-header-nested .ai-pantry-inventory-section-toggle {
+    min-height: 34px;
+    border-color: #315477;
+    background: rgba(8, 30, 49, 0.5);
+}
+
 .ai-pantry-inventory-section-toggle {
     display: flex;
     align-items: center;

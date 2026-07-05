@@ -128,6 +128,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "Show Confidence" in template
     assert "data-pantry-inventory-section-toggle" in template
     assert "Group by section" in template
+    assert "data-pantry-inventory-location-toggle" in template
+    assert "Group by Location" in template
+    assert "data-pantry-storage-label" in template
     assert 'data-pantry-inventory-list' in template
     assert "{% if pantry_name_suggestion_filters.count|int > 0 %}" in template
     assert "Suggested names:" in template
@@ -149,6 +152,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "min-width: 58px;" in css
     assert "rgba(95, 39, 0" in css
     assert ".ai-pantry-inventory-section-header" in css
+    assert ".ai-pantry-inventory-section-header-location" in css
+    assert ".ai-pantry-inventory-section-header-nested" in css
     assert ".ai-pantry-inventory-section-toggle" in css
     assert ".ai-pantry-inventory-section-chevron" in css
     assert ".ai-pantry-inventory-section-count" in css
@@ -207,6 +212,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "PANTRY_INVENTORY_CONFIDENCE_STORAGE_KEY" in js
     assert "function bindPantryInventoryConfidenceToggle" in js
     assert "PANTRY_INVENTORY_GROUP_STORAGE_KEY" in js
+    assert "PANTRY_INVENTORY_LOCATION_GROUP_STORAGE_KEY" in js
+    assert "function pantryInventoryGroupByLocationIsEnabled" in js
+    assert "function pantryInventoryLocationGroups" in js
     assert "function bindPantryInventorySectionGrouping" in js
     assert "function updatePantryInventorySectionGrouping" in js
     assert "function togglePantryInventorySectionGroup" in js
