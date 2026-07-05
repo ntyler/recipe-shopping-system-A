@@ -8,6 +8,7 @@ from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import cookbook_service
+from PushShoppingList.services import menu_mega_json_service
 from PushShoppingList.services import menu_store_service
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import storage_service
@@ -434,6 +435,74 @@ def test_lightweight_recipe_edit_views_keep_all_hydrated_menu_section_choices():
             assert cookbook_view["recipes"] == []
             assert cookbook_view["menu_sections"] == {}
             assert cookbook_view["menu_section_choices"] == ["Kitchen Appetizers", "Fried Rice & Noodles"]
+
+
+def test_lightweight_recipe_edit_views_keep_menu_snapshot_section_choices():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ), patch.object(
+        menu_store_service,
+        "MENU_STORE_FILE",
+        Path(temp_dir) / "restaurant_menus.json",
+    ), patch.object(
+        menu_mega_json_service,
+        "workspace_data_root",
+        lambda: Path(temp_dir) / "workspace",
+    ):
+        source_url = "https://piscomarindy.com/Menu.html"
+        recipe_url = f"{source_url}?menu_item=menu-item-20-Tallarin_Saltado"
+        cookbook = cookbook_service.create_cookbook("piscomarindy")
+        cookbook_service.move_recipes_to_cookbook(
+            cookbook["id"],
+            [recipe_url],
+            [{
+                "name": "Tallarin Saltado",
+                "url": recipe_url,
+                "menu_section": "PESCADOS Y MARISCOS",
+            }],
+        )
+        mega_json = menu_mega_json_service.build_mega_menu_json(
+            source_url,
+            [
+                {
+                    "section_name": "PESCADOS Y MARISCOS",
+                    "items": [{"item_name": "Jalea Real", "menu_section": "PESCADOS Y MARISCOS"}],
+                },
+                {
+                    "section_name": "CHAUFAS",
+                    "items": [{"item_name": "Chaufa Amazonico", "menu_section": "CHAUFAS"}],
+                },
+                {
+                    "section_name": "SALTADOS",
+                    "items": [{"item_name": "Tallarin Saltado", "menu_section": "SALTADOS"}],
+                },
+                {
+                    "section_name": "FETTUCCINE PASTAS",
+                    "items": [{"item_name": "Fettuccine Pisco Mar", "menu_section": "FETTUCCINE PASTAS"}],
+                },
+            ],
+            diagnostics={"restaurant": {"restaurant_name": "Piscomar"}},
+        )
+        menu_mega_json_service.save_menu_mega_json_snapshot(
+            mega_json,
+            job_id="job-piscomar",
+            cookbook_id=cookbook["id"],
+            cookbook_name=cookbook["name"],
+        )
+
+        view = recipe_routes.recipe_edit_cookbook_view()
+        cookbook_view = view["cookbooks"][0]
+
+        assert cookbook_view["recipes"] == []
+        assert cookbook_view["menu_sections"] == {}
+        assert cookbook_view["menu_section_choices"] == [
+            "PESCADOS Y MARISCOS",
+            "CHAUFAS",
+            "SALTADOS",
+            "FETTUCCINE PASTAS",
+        ]
 
 
 def test_chatgpt_category_decision_normalizes_to_dropdown_choices():

@@ -11,6 +11,7 @@ from flask import has_request_context
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import scoped_package_path
 from PushShoppingList.services import menu_store_service
+from PushShoppingList.services import menu_mega_json_service
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 COOKBOOKS_FILE = scoped_package_path("cookbooks.json")
@@ -1324,6 +1325,93 @@ def ordered_cookbook_menu_sections(cookbook):
     )
 
 
+def append_unique_menu_sections(choices, sections):
+    choices = list(choices or [])
+    seen = {
+        clean_text(section).lower()
+        for section in choices
+        if clean_text(section)
+    }
+
+    for section in sections or []:
+        label = clean_text(section)
+        key = label.lower()
+        if label and key not in seen:
+            choices.append(label)
+            seen.add(key)
+
+    return choices
+
+
+def menu_mega_json_section_choices(mega_json):
+    mega_json = mega_json if isinstance(mega_json, dict) else {}
+    menu = mega_json.get("menu") if isinstance(mega_json.get("menu"), dict) else {}
+    sections = []
+
+    for section in menu.get("sections") or []:
+        if not isinstance(section, dict):
+            continue
+        label = clean_text(
+            section.get("section_name")
+            or section.get("name")
+            or section.get("title")
+        )
+        if label:
+            sections.append(label)
+
+    return append_unique_menu_sections([], sections)
+
+
+def cookbook_menu_snapshot_ids(cookbook):
+    snapshot_ids = set()
+
+    for recipe in (cookbook if isinstance(cookbook, dict) else {}).get("recipes", []):
+        if not isinstance(recipe, dict):
+            continue
+        for field in ("parent_menu_snapshot_id", "menu_mega_snapshot_id", "menu_snapshot_id"):
+            snapshot_id = clean_text(recipe.get(field))
+            if snapshot_id:
+                snapshot_ids.add(snapshot_id)
+
+    return snapshot_ids
+
+
+def cookbook_menu_snapshot_section_choices(cookbook, snapshot_index=None):
+    cookbook = cookbook if isinstance(cookbook, dict) else {}
+    cookbook_id = clean_text(cookbook.get("id"))
+    cookbook_name = clean_text(cookbook.get("name"))
+    cookbook_name_key = normalize_text(cookbook_name)
+    snapshot_ids = cookbook_menu_snapshot_ids(cookbook)
+    choices = []
+    snapshot_index = snapshot_index if isinstance(snapshot_index, dict) else menu_mega_json_service.load_snapshot_index()
+
+    for summary in snapshot_index.get("snapshots", []) if isinstance(snapshot_index.get("snapshots"), list) else []:
+        if not isinstance(summary, dict):
+            continue
+
+        summary_id = clean_text(summary.get("id") or summary.get("snapshot_id"))
+        summary_cookbook_id = clean_text(summary.get("cookbook_id"))
+        summary_cookbook_name = clean_text(summary.get("cookbook_name"))
+        matches = (
+            (summary_id and summary_id in snapshot_ids)
+            or (cookbook_id and summary_cookbook_id == cookbook_id)
+            or (cookbook_name_key and normalize_text(summary_cookbook_name) == cookbook_name_key)
+        )
+        if not matches:
+            continue
+
+        record = menu_mega_json_service.load_menu_mega_json_snapshot(summary_id)
+        if not record:
+            continue
+
+        choices = append_unique_menu_sections(
+            choices,
+            menu_mega_json_section_choices(record.get("menu_mega_json")),
+        )
+
+    return choices
+
+
 def cookbook_menu_section_order_index(section_order):
     return {
         section.lower(): index
@@ -1459,13 +1547,17 @@ def prepare_cookbook_menu_view(view):
     view["menu_sort_options"] = cookbook_menu_sort_options()
     view["category_choices"] = cookbook_category_choices()
     menu_store = menu_store_service.load_menu_store()
+    snapshot_index = menu_mega_json_service.load_snapshot_index()
 
     for cookbook in view.get("cookbooks", []):
         for recipe in cookbook.get("recipes", []):
             apply_menu_store_metadata_to_recipe(recipe, menu_store, cookbook.get("id", ""))
             apply_recipe_menu_metadata(recipe)
 
-        menu_section_choices = ordered_cookbook_menu_sections(cookbook)
+        menu_section_choices = append_unique_menu_sections(
+            ordered_cookbook_menu_sections(cookbook),
+            cookbook_menu_snapshot_section_choices(cookbook, snapshot_index=snapshot_index),
+        )
         menu_section_order = cookbook_menu_section_order_index(menu_section_choices)
 
         for recipe in cookbook.get("recipes", []):
