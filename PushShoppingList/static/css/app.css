@@ -21828,6 +21828,13 @@ body {
     line-height: 1.2;
 }
 
+.ai-pantry-inventory-status-badge {
+    justify-self: end;
+    max-width: 100%;
+    text-align: center;
+    white-space: nowrap;
+}
+
 .pantry-lifecycle-expired {
     border-color: #7f1d1d;
     background: #371517;

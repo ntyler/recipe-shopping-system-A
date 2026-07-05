@@ -82,6 +82,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     source_link_index = template.index("ai-pantry-inventory-source-link")
     assert frozen_on_index < store_section_index < source_link_index < notes_index
     assert "recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap" in template
+    menu_wrap_index = template.index("recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap")
+    status_badge_index = template.index("ai-pantry-inventory-status-badge")
+    details_toggle_index = template.index("data-pantry-inventory-details-toggle")
+    assert menu_wrap_index < status_badge_index < details_toggle_index
     assert "ai-pantry-inventory-row-collapsed" in template
     assert 'id="pantryItem-{{ item.id }}"' in template
     assert 'data-pantry-item-id="{{ item.id }}"' in template
@@ -117,6 +121,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-row-collapsed .ai-pantry-image-panel" in css
     assert ".ai-pantry-inventory-details-toggle" in css
     assert ".ai-pantry-inventory-details-icon" in css
+    assert ".ai-pantry-inventory-status-badge" in css
     assert "ai-pantry-inventory-notes-preview" not in template
     assert "ai-pantry-inventory-notes-preview" not in css
     assert ".ai-pantry-inventory-bulk-actions" in css
