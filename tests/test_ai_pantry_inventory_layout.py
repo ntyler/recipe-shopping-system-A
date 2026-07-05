@@ -23,8 +23,11 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "Delete Selected" in template
     assert "data-pantry-inventory-select-visible" in template
     assert "data-pantry-store-section" in template
+    assert "ai-pantry-meta-store-section" in template
+    assert 'form="pantryUpdate{{ loop.index }}"' in template
     assert 'name="store_section"' in template
     assert "Store Section" in template
+    assert "ai-pantry-inventory-store-section-label" not in template
     assert "recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap" in template
     assert "ai-pantry-inventory-row-collapsed" in template
     assert "data-pantry-inventory-row" in template
@@ -61,6 +64,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-select" in css
     assert ".ai-pantry-inventory-select:hover" in css
     assert "min-width: 44px;" in css
+    assert ".ai-pantry-meta-store-section select" in css
     assert ".ai-pantry-delete-selected-btn" in css
     assert ".ai-pantry-inventory-row [data-pantry-inventory-details][hidden]" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inventory-notes-label" in css

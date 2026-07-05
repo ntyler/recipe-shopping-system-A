@@ -20910,6 +20910,34 @@ body {
     margin-top: 6px;
 }
 
+.ai-pantry-meta-store-section {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+}
+
+.ai-pantry-meta-store-section select {
+    width: clamp(128px, 16vw, 190px);
+    max-width: 100%;
+    min-height: 28px;
+    box-sizing: border-box;
+    border: 1px solid #315477;
+    border-radius: 6px;
+    background: #0b111a;
+    color: #f8fafc;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.2;
+    padding: 3px 24px 3px 7px;
+}
+
+.ai-pantry-meta-store-section select:focus {
+    border-color: #5b8cff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.18);
+}
+
 .ai-pantry-inventory-row .ai-pantry-inline-form {
     grid-column: 5 / 6;
     grid-row: 1;
@@ -20985,7 +21013,7 @@ body {
 }
 
 .ai-pantry-inventory-row-collapsed {
-    grid-template-columns: 24px 44px 34px minmax(0, 1fr) 42px;
+    grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;
     gap: 12px;
     min-height: 0;
     padding: 14px;
