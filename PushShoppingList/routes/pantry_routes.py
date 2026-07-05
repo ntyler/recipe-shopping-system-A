@@ -7,10 +7,12 @@ from flask import url_for
 
 from PushShoppingList.services.pantry_service import DEFAULT_CONFIDENCE_BY_SOURCE
 from PushShoppingList.services.pantry_service import add_or_increment_pantry_item
+from PushShoppingList.services.pantry_service import apply_pantry_item_name_suggestion
 from PushShoppingList.services.pantry_service import clean_storage_location
 from PushShoppingList.services.pantry_service import delete_pantry_item
 from PushShoppingList.services.pantry_service import generate_pantry_item_image
 from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
+from PushShoppingList.services.pantry_service import pantry_name_suggestion
 from PushShoppingList.services.pantry_service import receipt_candidate_display_storage_location
 from PushShoppingList.services.pantry_service import save_receipt_upload
 from PushShoppingList.services.pantry_service import save_pantry_item_image_upload
@@ -147,6 +149,17 @@ def pantry_item_image_upload_route():
     return jsonify(result), status
 
 
+@pantry_bp.route("/api/pantry_item_name", methods=["POST"])
+def pantry_item_name_route():
+    data = request.get_json(silent=True) or {}
+    item_id = str(data.get("item_id") or data.get("pantry_item_id") or "").strip()
+    suggested_name = str(data.get("suggested_name") or data.get("product_name") or "").strip()
+    result = apply_pantry_item_name_suggestion(item_id, suggested_name=suggested_name)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
+
+
 @pantry_bp.route("/pantry/move_bought_items", methods=["POST"])
 def move_bought_items_to_pantry_route():
     data = request.get_json(silent=True) or {}
@@ -251,6 +264,22 @@ def add_receipt_candidates_route():
             )
         else:
             storage_location = receipt_candidate_display_storage_location({**candidate, **lifecycle_dates})
+        use_suggested_name = str(request.form.get(f"candidate_{index}_use_suggested_name") or "").lower() in {"1", "true", "yes", "on"}
+        name_suggestion = pantry_name_suggestion(
+            candidate.get("product_name", ""),
+            candidate.get("normalized_name", ""),
+        )
+        product_name = candidate.get("product_name", "")
+        ingredient_name = candidate.get("normalized_name") or product_name
+        if use_suggested_name:
+            suggested_product_name = (
+                request.form.get(f"candidate_{index}_suggested_product_name")
+                or name_suggestion.get("suggested_name")
+                or ""
+            ).strip()
+            if suggested_product_name:
+                product_name = suggested_product_name
+                ingredient_name = suggested_product_name
         receipt_details = [f"Qty {candidate.get('quantity') or 1}"]
         if candidate.get("unit_price_label"):
             receipt_details.append(f"Each {candidate.get('unit_price_label')}")
@@ -267,6 +296,8 @@ def add_receipt_candidates_route():
         ):
             if lifecycle_dates.get(field):
                 receipt_details.append(f"{label} {lifecycle_dates[field]}")
+        if use_suggested_name and product_name != candidate.get("product_name", ""):
+            receipt_details.append(f"Name corrected from {candidate.get('product_name', '')} to {product_name}")
         receipt_note = " | ".join(
             part
             for part in [
@@ -277,8 +308,8 @@ def add_receipt_candidates_route():
         )
 
         result = add_or_increment_pantry_item({
-            "ingredient_name": candidate.get("normalized_name") or candidate.get("product_name"),
-            "product_name": candidate.get("product_name", ""),
+            "ingredient_name": ingredient_name,
+            "product_name": product_name,
             "quantity": candidate.get("quantity") or 1,
             "source": "receipt",
             "confidence": candidate.get("confidence", DEFAULT_CONFIDENCE_BY_SOURCE["receipt"]),

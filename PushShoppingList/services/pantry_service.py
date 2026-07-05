@@ -119,6 +119,14 @@ VARIANT_NORMALIZATION = {
     "eggs": "egg",
 }
 
+NAME_CORRECTION_RULES = (
+    {
+        "pattern": re.compile(r"\bsalmo\b", re.IGNORECASE),
+        "replacement": "salmon",
+        "reason": "Receipt text may have clipped salmon.",
+    },
+)
+
 SHELF_LIFE_RULES = (
     {
         "terms": ("chicken broth", "beef broth", "vegetable broth", "broth", "stock"),
@@ -484,6 +492,52 @@ def normalize_ingredient_name(name):
     return text
 
 
+def display_pantry_name(name):
+    text = " ".join(str(name or "").split())
+    return text.title() if text else ""
+
+
+def pantry_name_suggestion(source_name, fallback_name=""):
+    original_name = " ".join(str(source_name or fallback_name or "").split())
+    if not original_name:
+        return {}
+
+    proposed_name = original_name
+    applied_reason = ""
+    for rule in NAME_CORRECTION_RULES:
+        corrected = rule["pattern"].sub(rule["replacement"], proposed_name)
+        if corrected != proposed_name and not applied_reason:
+            applied_reason = rule.get("reason", "")
+        proposed_name = corrected
+
+    proposed_name = display_pantry_name(proposed_name)
+    original_display = display_pantry_name(original_name)
+
+    if not proposed_name or proposed_name.lower() == original_display.lower():
+        return {}
+
+    return {
+        "original_name": original_display or original_name,
+        "suggested_name": proposed_name,
+        "suggested_normalized_name": normalize_ingredient_name(proposed_name),
+        "reason": applied_reason or "Name appears to be a receipt/OCR shorthand.",
+        "confidence": 0.9,
+    }
+
+
+def attach_pantry_name_suggestion(item):
+    item = item if isinstance(item, dict) else {}
+    suggestion = pantry_name_suggestion(
+        item.get("product_name"),
+        item.get("ingredient_name") or item.get("normalized_name"),
+    )
+    item["name_suggestion"] = suggestion
+    item["suggested_product_name"] = suggestion.get("suggested_name", "")
+    item["suggested_normalized_name"] = suggestion.get("suggested_normalized_name", "")
+    item["name_suggestion_reason"] = suggestion.get("reason", "")
+    return item
+
+
 def pantry_lifecycle_rule_for_item(item):
     search_text = " ".join(
         str(item.get(key) or "")
@@ -813,6 +867,37 @@ def generate_pantry_item_image(item_id, user_id=None, guest_session_id=None):
     save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
 
     return pantry_item_image_response(item, image_url, generated_at)
+
+
+def apply_pantry_item_name_suggestion(item_id, suggested_name="", user_id=None, guest_session_id=None):
+    payload = load_pantry_inventory(user_id=user_id, guest_session_id=guest_session_id)
+    item_index, item = find_pantry_item(payload, item_id)
+
+    if item is None:
+        return {"ok": False, "error": "Pantry item was not found."}
+
+    suggestion = pantry_name_suggestion(
+        item.get("product_name"),
+        item.get("ingredient_name") or item.get("normalized_name"),
+    )
+    proposed_name = display_pantry_name(suggested_name or suggestion.get("suggested_name"))
+    if not proposed_name:
+        return {"ok": False, "error": "No name suggestion is available for this pantry item."}
+
+    item["ingredient_name"] = proposed_name
+    item["product_name"] = proposed_name
+    item["normalized_name"] = normalize_ingredient_name(proposed_name)
+    item["last_updated"] = now_iso()
+    payload["items"][item_index] = item
+    save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+
+    return {
+        "ok": True,
+        "item_id": item.get("id"),
+        "ingredient_name": item.get("ingredient_name", ""),
+        "product_name": item.get("product_name", ""),
+        "normalized_name": item.get("normalized_name", ""),
+    }
 
 
 def pantry_item_image_response(item, image_url, generated_at):
@@ -1328,6 +1413,7 @@ def pantry_items_for_view():
         item["image_display_url"] = image_variants.get("display_url") or item.get("image_url", "")
         item["image_srcset"] = image_variants.get("srcset", "")
         item["image_full_url"] = image_variants.get("full_url") or item.get("image_url", "")
+        attach_pantry_name_suggestion(item)
 
     return items
 
@@ -1530,6 +1616,7 @@ def receipt_candidate(line, product_name, quantity=None, price_line="", sale_lin
     quantity = quantity if quantity is not None else receipt_line_quantity(line)
     price_details = receipt_price_details(line, quantity=quantity, price_line=price_line, sale_line=sale_line)
     lifecycle_dates = receipt_candidate_lifecycle_dates(product_name, normalized_name, purchased_date)
+    name_suggestion = pantry_name_suggestion(product_name, normalized_name)
 
     if not normalized_name:
         return None
@@ -1553,6 +1640,10 @@ def receipt_candidate(line, product_name, quantity=None, price_line="", sale_lin
         "storage_location_label": storage_location_label(receipt_candidate_display_storage_location(lifecycle_dates)),
         "confidence": receipt_line_confidence(product_name),
         "needs_review": True,
+        "name_suggestion": name_suggestion,
+        "suggested_product_name": name_suggestion.get("suggested_name", ""),
+        "suggested_normalized_name": name_suggestion.get("suggested_normalized_name", ""),
+        "name_suggestion_reason": name_suggestion.get("reason", ""),
     }
 
 
@@ -1630,6 +1721,7 @@ def hydrate_receipt_review_dates(review):
 
 def hydrate_receipt_candidate_dates(candidate, purchased_date=""):
     hydrated = dict(candidate or {})
+    attach_pantry_name_suggestion(hydrated)
     lifecycle_dates = receipt_candidate_lifecycle_dates(
         hydrated.get("product_name") or hydrated.get("normalized_name") or "",
         hydrated.get("normalized_name") or normalize_ingredient_name(hydrated.get("product_name")),

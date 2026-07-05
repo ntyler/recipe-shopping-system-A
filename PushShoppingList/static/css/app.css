@@ -20971,6 +20971,61 @@ body {
     display: none;
 }
 
+.ai-pantry-name-suggestion,
+.ai-pantry-review-name-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    width: fit-content;
+    max-width: 100%;
+    margin: 6px 0 0;
+    padding: 5px 7px;
+    border: 1px solid rgba(59, 130, 246, 0.55);
+    border-radius: 7px;
+    background: rgba(30, 64, 175, 0.2);
+    color: #dbeafe;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.ai-pantry-name-suggestion strong,
+.ai-pantry-review-name-suggestion strong {
+    color: #f8fafc;
+}
+
+.ai-pantry-name-suggestion button,
+.ai-pantry-review-name-suggestion label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    width: auto;
+    min-height: 26px;
+    margin: 0;
+    padding: 4px 8px;
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    background: #124d8b;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1.1;
+}
+
+.ai-pantry-review-name-suggestion {
+    grid-column: 1 / -1;
+    margin-top: 0;
+}
+
+.ai-pantry-review-name-suggestion label {
+    cursor: pointer;
+}
+
+.ai-pantry-review-name-suggestion input {
+    margin: 0;
+}
+
 .ai-pantry-image-panel.recipe-step-image-panel {
     width: min(420px, 100%);
     max-width: 100%;

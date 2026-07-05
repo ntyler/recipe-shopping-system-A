@@ -16956,6 +16956,105 @@ async function moveBoughtItemsToPantry(button) {
     return false;
 }
 
+function pantryNameSuggestionFromButton(button) {
+    return button ? button.closest("[data-pantry-name-suggestion]") : null;
+}
+
+function updatePantryRowName(row, data) {
+    if (!row || !data) {
+        return;
+    }
+
+    const ingredientName = String(data.ingredient_name || "").trim();
+    const productName = String(data.product_name || "").trim();
+    const nameDisplay = row.querySelector("[data-pantry-name-display]");
+    const productDisplay = row.querySelector("[data-pantry-product-display]");
+
+    if (ingredientName && nameDisplay) {
+        nameDisplay.textContent = ingredientName;
+    }
+
+    if (productDisplay) {
+        productDisplay.textContent = productName;
+        productDisplay.hidden = !productName;
+    }
+
+    if (ingredientName) {
+        row.dataset.pantryIngredient = ingredientName;
+    }
+
+    if (productName) {
+        row.dataset.pantryProduct = productName;
+    }
+
+    const category = row.dataset.pantryCategory || "";
+    const source = row.dataset.pantrySource || "";
+    const storage = row.dataset.pantryStorage || "";
+    const status = row.dataset.pantryStatus || "";
+    row.dataset.pantrySearch = [
+        ingredientName,
+        productName,
+        category,
+        source,
+        storage,
+        status,
+    ].join(" ").toLowerCase();
+}
+
+async function applyPantryNameSuggestion(button) {
+    const suggestion = pantryNameSuggestionFromButton(button);
+    const row = button ? button.closest("[data-pantry-inventory-row]") : null;
+    const itemId = suggestion ? suggestion.dataset.pantryItemId || "" : "";
+    const suggestedName = suggestion ? suggestion.dataset.suggestedName || "" : "";
+    const originalText = button ? button.textContent : "";
+
+    if (!suggestion || !row || !itemId || !suggestedName) {
+        showRecipeQuantityUpdatedMessage("", "", "", "This name suggestion could not be applied.");
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Applying...";
+    }
+
+    try {
+        const response = await fetch("/api/pantry_item_name", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                item_id: itemId,
+                suggested_name: suggestedName,
+            }),
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to apply this name.");
+        }
+
+        updatePantryRowName(row, data);
+        suggestion.remove();
+        showRecipeQuantityUpdatedMessage("", "", "", "Pantry item name updated.");
+    } catch (err) {
+        console.warn("Unable to apply pantry name suggestion.", err);
+        showRecipeQuantityUpdatedMessage("", "", "", err.message || "Unable to apply this name.");
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Use name";
+        }
+    }
+
+    return false;
+}
+
 function pantryImagePanelFromControl(control) {
     return control ? control.closest("[data-pantry-image-panel]") : null;
 }

@@ -86,15 +86,26 @@
                                  data-pantry-quantity="{{ item.quantity }}"
                                  data-pantry-unit="{{ item.unit }}"
                                  data-pantry-category="{{ item.category }}"
+                                 data-pantry-source="{{ item.source }}"
                                  data-pantry-storage="{{ item.storage_location }}"
                                  data-pantry-status="{{ item.status }}"
                                  data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.category ~ ' ' ~ item.source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">
                             <span class="recipe-edit-row-handle ai-pantry-inventory-handle" aria-hidden="true"></span>
                             <span class="recipe-edit-row-number ai-pantry-inventory-number">{{ loop.index }}</span>
                             <div class="ai-pantry-item-main ai-pantry-inventory-name">
-                                <h4>{{ item.ingredient_name }}</h4>
-                                {% if item.product_name %}
-                                    <span>{{ item.product_name }}</span>
+                                <h4 data-pantry-name-display>{{ item.ingredient_name }}</h4>
+                                <span data-pantry-product-display {% if not item.product_name %}hidden{% endif %}>{{ item.product_name }}</span>
+                                {% if item.name_suggestion and item.name_suggestion.suggested_name %}
+                                    <div class="ai-pantry-name-suggestion"
+                                         data-pantry-name-suggestion
+                                         data-pantry-item-id="{{ item.id }}"
+                                         data-suggested-name="{{ item.name_suggestion.suggested_name }}">
+                                        <span>Suggested name: <strong>{{ item.name_suggestion.suggested_name }}</strong></span>
+                                        <button type="button"
+                                                onclick="return applyPantryNameSuggestion(this)">
+                                            Use name
+                                        </button>
+                                    </div>
                                 {% endif %}
                                 <div class="ai-pantry-item-meta">
                                     <span>{{ item.quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</span>
@@ -499,6 +510,20 @@
                                     <input type="checkbox" name="candidate_index" value="{{ loop.index0 }}" checked>
                                     <span class="ai-pantry-review-name">{{ candidate.product_name }}</span>
                                 </label>
+                                {% if candidate.name_suggestion and candidate.name_suggestion.suggested_name %}
+                                    <div class="ai-pantry-review-name-suggestion">
+                                        <span>Suggested name: <strong>{{ candidate.name_suggestion.suggested_name }}</strong></span>
+                                        <label>
+                                            <input type="checkbox"
+                                                   name="candidate_{{ loop.index0 }}_use_suggested_name"
+                                                   value="1">
+                                            <span>Use name</span>
+                                        </label>
+                                        <input type="hidden"
+                                               name="candidate_{{ loop.index0 }}_suggested_product_name"
+                                               value="{{ candidate.name_suggestion.suggested_name }}">
+                                    </div>
+                                {% endif %}
                                 <span class="ai-pantry-review-meta">
                                     <span class="ai-pantry-review-purchase-meta">
                                         <small>Qty {{ candidate.quantity or 1 }}</small>

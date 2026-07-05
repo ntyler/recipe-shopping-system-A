@@ -130,6 +130,40 @@ def test_pantry_item_image_upload_persists_image_fields(monkeypatch, tmp_path):
     assert any((tmp_path / "pantry_images").iterdir())
 
 
+def test_pantry_name_suggestion_keeps_original_until_applied():
+    suggestion = pantry_service.pantry_name_suggestion("Atlantic Salmo")
+
+    assert suggestion["original_name"] == "Atlantic Salmo"
+    assert suggestion["suggested_name"] == "Atlantic Salmon"
+    assert suggestion["suggested_normalized_name"] == "atlantic salmon"
+
+
+def test_apply_pantry_item_name_suggestion_updates_display_and_normalized_name(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        created = pantry_service.add_or_increment_pantry_item(
+            {
+                "ingredient_name": "atlantic salmo",
+                "product_name": "Atlantic Salmo",
+                "quantity": 1,
+                "source": "receipt",
+            },
+            reference_date="2026-07-02",
+        )
+        result = pantry_service.apply_pantry_item_name_suggestion(created["item"]["id"])
+        inventory = pantry_service.load_pantry_inventory()["items"]
+
+    assert result["ok"] is True
+    assert result["ingredient_name"] == "Atlantic Salmon"
+    assert result["product_name"] == "Atlantic Salmon"
+    assert result["normalized_name"] == "atlantic salmon"
+    assert inventory[0]["ingredient_name"] == "Atlantic Salmon"
+    assert inventory[0]["product_name"] == "Atlantic Salmon"
+
+
 def test_opened_broth_gets_opened_shelf_life_suggestions(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     app = create_app()
@@ -263,6 +297,9 @@ def test_parse_receipt_text_filters_meijer_receipt_sections():
     assert quantities["Cab Steak"] == 2
     assert quantities["Mjr Im Crab"] == 1
     assert sum(candidate["quantity"] for candidate in candidates) == 18
+    atlantic_salmo = next(candidate for candidate in candidates if candidate["product_name"] == "Atlantic Salmo")
+    assert atlantic_salmo["suggested_product_name"] == "Atlantic Salmon"
+    assert atlantic_salmo["suggested_normalized_name"] == "atlantic salmon"
 
     price_details = {candidate["product_name"]: candidate for candidate in candidates}
     assert {candidate["purchased_date"] for candidate in candidates} == {"2026-06-28"}
@@ -571,6 +608,44 @@ def test_pantry_section_marks_receipt_candidate_frozen_before_deadline(monkeypat
     assert "ai-pantry-date-field-frozen-safe" in html
 
 
+def test_add_receipt_candidate_can_use_suggested_name(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_client() as client:
+        sign_in(client)
+        with client.session_transaction() as session:
+            session["pantry_receipt_review"] = {
+                "receipt_id": "receipt-1",
+                "candidates": [
+                    {
+                        "raw_line": "71373360156    ATLANTIC SALMO",
+                        "product_name": "Atlantic Salmo",
+                        "normalized_name": "atlantic salmo",
+                        "quantity": 2,
+                        "confidence": 0.85,
+                        "purchased_date": "2026-06-28",
+                    }
+                ],
+            }
+
+        response = client.post(
+            "/pantry/receipt/add",
+            data={
+                "candidate_index": "0",
+                "candidate_0_use_suggested_name": "1",
+                "candidate_0_suggested_product_name": "Atlantic Salmon",
+            },
+        )
+        inventory = pantry_service.load_pantry_inventory(user_id="pantry-user")["items"]
+
+    assert response.status_code == 302
+    assert inventory[0]["ingredient_name"] == "Atlantic Salmon"
+    assert inventory[0]["product_name"] == "Atlantic Salmon"
+    assert inventory[0]["normalized_name"] == "atlantic salmon"
+    assert "Name corrected from Atlantic Salmo to Atlantic Salmon" in inventory[0]["notes"]
+
+
 def test_pantry_section_shows_next_action_for_freezer_receipt_candidate(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     app = create_app()
@@ -824,6 +899,9 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert "data-pantry-image-panel" in template
     assert "generatePantryItemImage(this)" in template
     assert "uploadPantryItemImage(this)" in template
+    assert "data-pantry-name-suggestion" in template
+    assert "applyPantryNameSuggestion(this)" in template
+    assert 'name="candidate_{{ loop.index0 }}_use_suggested_name"' in template
     assert 'name="candidate_{{ loop.index0 }}_storage_location_custom"' in template
     assert "data-pantry-review-row" in template
     assert 'data-pantry-review-date-field="expiration_date"' in template
