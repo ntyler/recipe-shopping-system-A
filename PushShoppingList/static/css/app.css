@@ -20726,6 +20726,56 @@ body {
     flex: 1 1 100%;
 }
 
+.ai-pantry-name-question-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    min-width: 0;
+    padding: 7px;
+    border: 1px solid rgba(217, 119, 6, 0.72);
+    border-radius: 8px;
+    background: rgba(95, 39, 0, 0.42);
+    color: #ffd166;
+}
+
+.ai-pantry-name-question-status {
+    flex: 1 1 auto;
+    min-width: 120px;
+    color: #ffe8a3;
+    font-size: 12px;
+    font-weight: 850;
+}
+
+.ai-pantry-name-question-nav-btn {
+    min-height: 32px;
+    margin: 0;
+    padding: 6px 10px;
+    border: 1px solid #d97706;
+    border-radius: 7px;
+    background: #5f2700;
+    color: #ffd166;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.ai-pantry-name-question-nav-btn:hover,
+.ai-pantry-name-question-nav-btn:focus {
+    border-color: #fbbf24;
+    background: #78350f;
+    color: #fff7d6;
+}
+
+.ai-pantry-name-question-nav-btn:disabled {
+    border-color: rgba(120, 53, 15, 0.7);
+    background: rgba(67, 34, 13, 0.55);
+    color: rgba(255, 209, 102, 0.58);
+    cursor: not-allowed;
+}
+
 .ai-pantry-source-filter-groups {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
@@ -21129,6 +21179,13 @@ body {
     box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.22);
 }
 
+.ai-pantry-name-question-active {
+    border-color: #fbbf24;
+    box-shadow:
+        0 0 0 1px rgba(251, 191, 36, 0.34),
+        0 0 20px rgba(217, 119, 6, 0.18);
+}
+
 .ai-pantry-inventory-handle {
     grid-column: 1 / 2;
     grid-row: 1;
@@ -21467,10 +21524,10 @@ body {
     max-width: 100%;
     margin: 6px 0 0;
     padding: 5px 7px;
-    border: 1px solid rgba(59, 130, 246, 0.55);
+    border: 1px solid rgba(217, 119, 6, 0.82);
     border-radius: 7px;
-    background: rgba(30, 64, 175, 0.2);
-    color: #dbeafe;
+    background: rgba(95, 39, 0, 0.68);
+    color: #ffd166;
     font-size: 12px;
     font-weight: 800;
     line-height: 1.25;
@@ -21478,7 +21535,7 @@ body {
 
 .ai-pantry-name-suggestion strong,
 .ai-pantry-review-name-suggestion strong {
-    color: #f8fafc;
+    color: #fff7d6;
 }
 
 .ai-pantry-name-suggestion button,
@@ -21490,13 +21547,22 @@ body {
     min-height: 26px;
     margin: 0;
     padding: 4px 8px;
-    border: 1px solid #3b82f6;
+    border: 1px solid #f59e0b;
     border-radius: 6px;
-    background: #124d8b;
-    color: #ffffff;
+    background: #78350f;
+    color: #fff7d6;
     font-size: 11px;
     font-weight: 900;
     line-height: 1.1;
+}
+
+.ai-pantry-name-suggestion button:hover,
+.ai-pantry-name-suggestion button:focus,
+.ai-pantry-review-name-suggestion label:hover,
+.ai-pantry-review-name-suggestion label:focus-within {
+    border-color: #fbbf24;
+    background: #92400e;
+    color: #ffffff;
 }
 
 .ai-pantry-review-name-suggestion {

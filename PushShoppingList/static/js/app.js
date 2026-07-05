@@ -3254,6 +3254,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindPantryLocationChoices(options.root || document);
     bindPantryInventoryDetails(options.root || document);
     bindPantryInventoryBulkDelete(options.root || document);
+    updatePantryNameQuestionNav();
     bindPantryReceiptConfidenceToggle(options.root || document);
     bindPantryReceiptDateWarnings(options.root || document);
     initDeviceStatusFilters(options.root || document);
@@ -15805,6 +15806,110 @@ function filterPantryItems(value) {
     });
 
     updatePantryInventoryBulkDeleteState();
+    updatePantryNameQuestionNav();
+}
+
+function pantryNameQuestionRows(options = {}) {
+    const visibleOnly = options.visibleOnly !== false;
+    return Array.from(document.querySelectorAll("[data-pantry-name-questioned-row='1']")).filter(row => {
+        return !visibleOnly || !row.hidden;
+    });
+}
+
+function currentPantryNameQuestionIndex(rows) {
+    const activeElement = document.activeElement;
+    const activeRow = activeElement && activeElement.closest
+        ? activeElement.closest("[data-pantry-name-questioned-row='1']")
+        : null;
+
+    if (activeRow) {
+        const activeIndex = rows.indexOf(activeRow);
+        if (activeIndex >= 0) {
+            return activeIndex;
+        }
+    }
+
+    const markedIndex = rows.findIndex(row => row.classList.contains("ai-pantry-name-question-active"));
+    if (markedIndex >= 0) {
+        return markedIndex;
+    }
+
+    const hashTargetId = targetIdFromHash();
+    const hashRow = hashTargetId ? document.getElementById(hashTargetId) : null;
+    if (hashRow) {
+        const hashIndex = rows.indexOf(hashRow);
+        if (hashIndex >= 0) {
+            return hashIndex;
+        }
+    }
+
+    const viewportIndex = rows.findIndex(row => {
+        const rect = row.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < window.innerHeight;
+    });
+
+    return viewportIndex >= 0 ? viewportIndex : -1;
+}
+
+function setActivePantryNameQuestionRow(row) {
+    document.querySelectorAll(".ai-pantry-name-question-active").forEach(activeRow => {
+        activeRow.classList.remove("ai-pantry-name-question-active");
+    });
+
+    if (row) {
+        row.classList.add("ai-pantry-name-question-active");
+    }
+
+    updatePantryNameQuestionNav();
+}
+
+function updatePantryNameQuestionNav() {
+    const rows = pantryNameQuestionRows();
+    const activeIndex = rows.findIndex(row => row.classList.contains("ai-pantry-name-question-active"));
+
+    document.querySelectorAll("[data-pantry-name-question-nav]").forEach(nav => {
+        const status = nav.querySelector("[data-pantry-name-question-status]");
+        const buttons = nav.querySelectorAll("[data-pantry-name-question-prev], [data-pantry-name-question-next]");
+        nav.hidden = rows.length === 0;
+
+        if (status) {
+            status.textContent = activeIndex >= 0
+                ? `${activeIndex + 1} of ${rows.length} questioned names`
+                : `${rows.length} questioned name${rows.length === 1 ? "" : "s"}`;
+        }
+
+        buttons.forEach(button => {
+            button.disabled = rows.length < 2;
+        });
+    });
+}
+
+function jumpPantryNameQuestion(direction = 1) {
+    const rows = pantryNameQuestionRows();
+
+    if (!rows.length) {
+        return false;
+    }
+
+    const currentIndex = currentPantryNameQuestionIndex(rows);
+    const offset = direction < 0 ? -1 : 1;
+    const nextIndex = currentIndex >= 0
+        ? (currentIndex + offset + rows.length) % rows.length
+        : 0;
+    const row = rows[nextIndex];
+
+    setActivePantryNameQuestionRow(row);
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    const focusTarget = row.querySelector("[data-pantry-name-suggestion] button")
+        || row.querySelector(".ai-pantry-inventory-name-input")
+        || row;
+
+    if (focusTarget && typeof focusTarget.focus === "function") {
+        focusTarget.focus({ preventScroll: true });
+    }
+
+    return false;
 }
 
 function pantryInventoryCheckboxes(root = document) {
@@ -17589,7 +17694,10 @@ async function applyPantryNameSuggestion(button) {
         }
 
         updatePantryRowName(row, data);
+        row.dataset.pantryNameQuestionedRow = "0";
+        row.classList.remove("ai-pantry-name-question-active");
         suggestion.remove();
+        updatePantryNameQuestionNav();
         showRecipeQuantityUpdatedMessage("", "", "", "Pantry item name updated.");
     } catch (err) {
         console.warn("Unable to apply pantry name suggestion.", err);

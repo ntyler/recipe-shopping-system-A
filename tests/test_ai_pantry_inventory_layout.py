@@ -122,6 +122,13 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-filter-actions" in css
     assert ".ai-pantry-inventory-filter-btn" in css
     assert '.ai-pantry-inventory-filter-btn[aria-pressed="true"]' in css
+    assert "data-pantry-name-question-nav" in template
+    assert "data-pantry-name-questioned-row" in template
+    assert "jumpPantryNameQuestion(-1)" in template
+    assert "jumpPantryNameQuestion(1)" in template
+    assert ".ai-pantry-name-question-nav" in css
+    assert ".ai-pantry-name-question-active" in css
+    assert "rgba(95, 39, 0" in css
     assert ".ai-pantry-source-filter-groups" in css
     assert ".ai-pantry-source-filter-chip" in css
     assert '.ai-pantry-source-filter-chip[aria-pressed="true"]' in css
@@ -174,6 +181,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-card {\n    border: 0;" in css
     assert "background: transparent;" in css
     assert "function togglePantryInventorySourceFilter" in js
+    assert "function pantryNameQuestionRows" in js
+    assert "function jumpPantryNameQuestion" in js
+    assert "updatePantryNameQuestionNav();" in js
+    assert 'row.dataset.pantryNameQuestionedRow = "0";' in js
     assert 'row.querySelector(".ai-pantry-inventory-name-input")' in js
     assert 'row.querySelector(".ai-pantry-inventory-product-input")' in js
     assert "nameInput.value = ingredientName;" in js

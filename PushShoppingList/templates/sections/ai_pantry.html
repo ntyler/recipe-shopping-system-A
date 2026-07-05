@@ -154,9 +154,13 @@
             {% set receipt_pdf_filters = namespace(ids=[], items=[]) %}
             {% set uploaded_image_filters = namespace(ids=[], items=[]) %}
             {% set pantry_item_image_filters = namespace(count=0) %}
+            {% set pantry_name_suggestion_filters = namespace(count=0) %}
             {% for item in pantry_items or [] %}
                 {% set item_source_for_filters = item.source or "" %}
                 {% set item_receipt_for_filters = item.source_receipt if item.source_receipt and item.source_receipt.receipt_id else none %}
+                {% if item.name_suggestion and item.name_suggestion.suggested_name %}
+                    {% set pantry_name_suggestion_filters.count = pantry_name_suggestion_filters.count + 1 %}
+                {% endif %}
                 {% if item_receipt_for_filters %}
                     {% set receipt_id_for_filters = item_receipt_for_filters.receipt_id %}
                     {% if item_receipt_for_filters.is_pdf %}
@@ -203,6 +207,28 @@
                         Image Taken
                     </button>
                 </div>
+                {% if pantry_name_suggestion_filters.count %}
+                    <div class="ai-pantry-name-question-nav"
+                         data-pantry-name-question-nav
+                         aria-label="Questioned item name navigation">
+                        <button type="button"
+                                class="ai-pantry-name-question-nav-btn"
+                                data-pantry-name-question-prev
+                                onclick="return jumpPantryNameQuestion(-1)">
+                            Prev Name
+                        </button>
+                        <span class="ai-pantry-name-question-status"
+                              data-pantry-name-question-status>
+                            {{ pantry_name_suggestion_filters.count }} questioned name{% if pantry_name_suggestion_filters.count != 1 %}s{% endif %}
+                        </span>
+                        <button type="button"
+                                class="ai-pantry-name-question-nav-btn"
+                                data-pantry-name-question-next
+                                onclick="return jumpPantryNameQuestion(1)">
+                            Next Name
+                        </button>
+                    </div>
+                {% endif %}
                 <div class="ai-pantry-source-filter-groups"
                      data-pantry-source-filter-groups
                      aria-label="Inventory source file filters">
@@ -291,12 +317,14 @@
                         {% set item_receipt_id = item.source_receipt.receipt_id if item.source_receipt and item.source_receipt.receipt_id else "" %}
                         {% set item_receipt_file_kind = "pdf" if item.source_receipt and item.source_receipt.receipt_id and item.source_receipt.is_pdf else ("image" if item.source_receipt and item.source_receipt.receipt_id else "") %}
                         {% set item_is_image_source = item_source|lower == "photo" or item.image_url or item_receipt_file_kind == "image" %}
+                        {% set item_has_name_suggestion = item.name_suggestion and item.name_suggestion.suggested_name %}
                         <article id="pantryItem-{{ item.id }}"
                                  class="ai-pantry-item ai-pantry-inventory-row ai-pantry-inventory-row-collapsed"
                                  tabindex="-1"
                                  data-pantry-item
                                  data-pantry-inventory-row
                                  data-pantry-item-id="{{ item.id }}"
+                                 data-pantry-name-questioned-row="{% if item_has_name_suggestion %}1{% else %}0{% endif %}"
                                  data-pantry-ingredient="{{ item.ingredient_name }}"
                                  data-pantry-product="{{ item.product_name }}"
                                  data-pantry-quantity="{{ item.quantity }}"
@@ -357,7 +385,7 @@
                                            placeholder="Product name"
                                            aria-label="Product name for {{ item.ingredient_name }}">
                                 </label>
-                                {% if item.name_suggestion and item.name_suggestion.suggested_name %}
+                                {% if item_has_name_suggestion %}
                                     <div class="ai-pantry-name-suggestion"
                                          data-pantry-name-suggestion
                                          data-pantry-item-id="{{ item.id }}"
