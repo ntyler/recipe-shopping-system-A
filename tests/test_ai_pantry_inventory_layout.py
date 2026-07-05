@@ -26,10 +26,19 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "Receipt Items" in template
     assert "data-pantry-image-filter" in template
     assert "Image Taken" in template
+    assert "Receipt PDFs" in template
+    assert "Uploaded Images" in template
+    assert "data-pantry-source-detail-filter" in template
+    assert 'data-pantry-source-detail-type="receipt-pdf"' in template
+    assert 'data-pantry-source-detail-type="receipt-image"' in template
+    assert 'data-pantry-source-detail-type="pantry-item-images"' in template
     assert "togglePantryInventorySourceFilter(this)" in template
     assert "data-pantry-store-section" in template
     assert "data-pantry-receipt-source" in template
+    assert "data-pantry-receipt-id" in template
+    assert "data-pantry-receipt-file-kind" in template
     assert "data-pantry-image-source" in template
+    assert "data-pantry-item-image-source" in template
     assert "pantry_storage_locations" in template
     assert "pantry_storage_location_values" in template
     assert "pantry_has_removable_storage_locations" in template
@@ -99,6 +108,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-filter-actions" in css
     assert ".ai-pantry-inventory-filter-btn" in css
     assert '.ai-pantry-inventory-filter-btn[aria-pressed="true"]' in css
+    assert ".ai-pantry-source-filter-groups" in css
+    assert ".ai-pantry-source-filter-chip" in css
+    assert '.ai-pantry-source-filter-chip[aria-pressed="true"]' in css
     assert ".ai-pantry-location-manager" in css
     assert 'grid-template-areas: "locations controls";' in css
     assert ".ai-pantry-location-form" in css
@@ -132,12 +144,18 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-card {\n    border: 0;" in css
     assert "background: transparent;" in css
     assert "function togglePantryInventorySourceFilter" in js
+    assert "function activePantryInventoryDetailFilters" in js
+    assert "function pantryItemMatchesInventoryDetailFilter" in js
     assert "function pantryItemMatchesInventorySourceFilters" in js
     assert "function pantryItemMatchesReceiptFilter" in js
     assert "function pantryItemMatchesImageFilter" in js
     assert 'item.dataset.pantryReceiptSource === "1"' in js
     assert 'item.dataset.pantryImageSource === "1"' in js
     assert 'row.dataset.pantryImageSource = "1";' in js
+    assert 'row.dataset.pantryItemImageSource = "1";' in js
+    assert 'filter.type === "receipt-pdf"' in js
+    assert 'filter.type === "receipt-image"' in js
+    assert 'filter.type === "pantry-item-images"' in js
     assert 'activeFilters.has("receipt")' in js
     assert 'activeFilters.has("image")' in js
     assert "function togglePantryInventoryDetails" in js
@@ -189,6 +207,8 @@ def test_ai_pantry_inventory_renders_inventory_heading():
     assert "Receipt Items" in html
     assert "data-pantry-image-filter" in html
     assert "Image Taken" in html
+    assert "Receipt PDFs" in html
+    assert "Uploaded Images" in html
     assert "Pantry" in html
     assert "Fridge" in html
     assert "Freezer" in html

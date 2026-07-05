@@ -150,6 +150,31 @@
                 </div>
             </div>
 
+            {% set receipt_pdf_filters = namespace(ids=[], items=[]) %}
+            {% set uploaded_image_filters = namespace(ids=[], items=[]) %}
+            {% set pantry_item_image_filters = namespace(count=0) %}
+            {% for item in pantry_items or [] %}
+                {% set item_source_for_filters = item.source or "" %}
+                {% set item_receipt_for_filters = item.source_receipt if item.source_receipt and item.source_receipt.receipt_id else none %}
+                {% if item_receipt_for_filters %}
+                    {% set receipt_id_for_filters = item_receipt_for_filters.receipt_id %}
+                    {% if item_receipt_for_filters.is_pdf %}
+                        {% if receipt_id_for_filters not in receipt_pdf_filters.ids %}
+                            {% set _ = receipt_pdf_filters.ids.append(receipt_id_for_filters) %}
+                            {% set _ = receipt_pdf_filters.items.append(item_receipt_for_filters) %}
+                        {% endif %}
+                    {% else %}
+                        {% if receipt_id_for_filters not in uploaded_image_filters.ids %}
+                            {% set _ = uploaded_image_filters.ids.append(receipt_id_for_filters) %}
+                            {% set _ = uploaded_image_filters.items.append(item_receipt_for_filters) %}
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
+                {% if item.image_url or item_source_for_filters|lower == "photo" %}
+                    {% set pantry_item_image_filters.count = pantry_item_image_filters.count + 1 %}
+                {% endif %}
+            {% endfor %}
+
             <div class="ai-pantry-search">
                 <input id="pantrySearchInput"
                        type="search"
@@ -176,6 +201,63 @@
                             onclick="return togglePantryInventorySourceFilter(this)">
                         Image Taken
                     </button>
+                </div>
+                <div class="ai-pantry-source-filter-groups"
+                     data-pantry-source-filter-groups
+                     aria-label="Inventory source file filters">
+                    <div class="ai-pantry-source-filter-group">
+                        <div class="ai-pantry-source-filter-heading">Receipt PDFs</div>
+                        <div class="ai-pantry-source-filter-options">
+                            {% for receipt in receipt_pdf_filters.items %}
+                                <button type="button"
+                                        class="ai-pantry-source-filter-chip"
+                                        data-pantry-source-detail-filter
+                                        data-pantry-source-detail-group="receipt"
+                                        data-pantry-source-detail-type="receipt-pdf"
+                                        data-pantry-source-detail-id="{{ receipt.receipt_id }}"
+                                        aria-pressed="false"
+                                        title="Show items from {{ receipt.file_label }}"
+                                        onclick="return togglePantryInventorySourceFilter(this)">
+                                    {{ receipt.file_label }}
+                                </button>
+                            {% else %}
+                                <span class="ai-pantry-source-filter-empty">No receipt PDFs</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="ai-pantry-source-filter-group">
+                        <div class="ai-pantry-source-filter-heading">Uploaded Images</div>
+                        <div class="ai-pantry-source-filter-options">
+                            {% for receipt in uploaded_image_filters.items %}
+                                <button type="button"
+                                        class="ai-pantry-source-filter-chip"
+                                        data-pantry-source-detail-filter
+                                        data-pantry-source-detail-group="image"
+                                        data-pantry-source-detail-type="receipt-image"
+                                        data-pantry-source-detail-id="{{ receipt.receipt_id }}"
+                                        aria-pressed="false"
+                                        title="Show items from {{ receipt.file_label }}"
+                                        onclick="return togglePantryInventorySourceFilter(this)">
+                                    {{ receipt.file_label }}
+                                </button>
+                            {% endfor %}
+                            {% if pantry_item_image_filters.count %}
+                                <button type="button"
+                                        class="ai-pantry-source-filter-chip"
+                                        data-pantry-source-detail-filter
+                                        data-pantry-source-detail-group="image"
+                                        data-pantry-source-detail-type="pantry-item-images"
+                                        data-pantry-source-detail-id="pantry-item-images"
+                                        aria-pressed="false"
+                                        title="Show items with saved pantry item images"
+                                        onclick="return togglePantryInventorySourceFilter(this)">
+                                    Pantry Item Images
+                                </button>
+                            {% elif not uploaded_image_filters.items %}
+                                <span class="ai-pantry-source-filter-empty">No uploaded images</span>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -205,7 +287,9 @@
                     {% for item in pantry_items %}
                         {% set item_source = item.source or "" %}
                         {% set item_is_receipt_source = item_source|lower == "receipt" or (item.source_receipt and item.source_receipt.receipt_id) %}
-                        {% set item_is_image_source = item_source|lower == "photo" or item.image_url %}
+                        {% set item_receipt_id = item.source_receipt.receipt_id if item.source_receipt and item.source_receipt.receipt_id else "" %}
+                        {% set item_receipt_file_kind = "pdf" if item.source_receipt and item.source_receipt.receipt_id and item.source_receipt.is_pdf else ("image" if item.source_receipt and item.source_receipt.receipt_id else "") %}
+                        {% set item_is_image_source = item_source|lower == "photo" or item.image_url or item_receipt_file_kind == "image" %}
                         <article class="ai-pantry-item ai-pantry-inventory-row ai-pantry-inventory-row-collapsed"
                                  data-pantry-item
                                  data-pantry-inventory-row
@@ -217,7 +301,10 @@
                                  data-pantry-store-section="{{ item.store_section }}"
                                  data-pantry-source="{{ item_source }}"
                                  data-pantry-receipt-source="{% if item_is_receipt_source %}1{% else %}0{% endif %}"
+                                 data-pantry-receipt-id="{{ item_receipt_id }}"
+                                 data-pantry-receipt-file-kind="{{ item_receipt_file_kind }}"
                                  data-pantry-image-source="{% if item_is_image_source %}1{% else %}0{% endif %}"
+                                 data-pantry-item-image-source="{% if item.image_url or item_source|lower == 'photo' %}1{% else %}0{% endif %}"
                                  data-pantry-storage="{{ item.storage_location }}"
                                  data-pantry-status="{{ item.status }}"
                                  data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.store_section ~ ' ' ~ item.category ~ ' ' ~ item_source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">

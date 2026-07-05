@@ -15544,10 +15544,29 @@ function activePantryInventorySourceFilters() {
         .filter(Boolean));
 }
 
+function activePantryInventoryDetailFilters() {
+    return Array.from(document.querySelectorAll("[data-pantry-source-detail-filter]"))
+        .filter(button => button.getAttribute("aria-pressed") === "true")
+        .map(button => ({
+            group: String(button.dataset.pantrySourceDetailGroup || "").trim().toLowerCase(),
+            type: String(button.dataset.pantrySourceDetailType || "").trim().toLowerCase(),
+            id: String(button.dataset.pantrySourceDetailId || "").trim(),
+        }))
+        .filter(filter => filter.type && filter.id);
+}
+
 function syncPantryInventorySourceFilterButtons() {
-    document.querySelectorAll("[data-pantry-inventory-filter]").forEach(button => {
+    document.querySelectorAll("[data-pantry-inventory-filter], [data-pantry-source-detail-filter]").forEach(button => {
         const active = button.getAttribute("aria-pressed") === "true";
         button.classList.toggle("is-active", active);
+    });
+}
+
+function deactivatePantrySourceFilterButtons(selector, exceptButton = null) {
+    document.querySelectorAll(selector).forEach(button => {
+        if (button !== exceptButton) {
+            button.setAttribute("aria-pressed", "false");
+        }
     });
 }
 
@@ -15569,19 +15588,42 @@ function pantryItemMatchesImageFilter(item, imageOnly) {
     return item.dataset.pantryImageSource === "1" || source === "photo";
 }
 
-function pantryItemMatchesInventorySourceFilters(item, activeFilters) {
-    if (!activeFilters || !activeFilters.size) {
+function pantryItemMatchesInventoryDetailFilter(item, filter) {
+    if (!filter || !filter.type) {
+        return false;
+    }
+
+    if (filter.type === "receipt-pdf") {
+        return item.dataset.pantryReceiptId === filter.id
+            && item.dataset.pantryReceiptFileKind === "pdf";
+    }
+
+    if (filter.type === "receipt-image") {
+        return item.dataset.pantryReceiptId === filter.id
+            && item.dataset.pantryReceiptFileKind === "image";
+    }
+
+    if (filter.type === "pantry-item-images") {
+        return item.dataset.pantryItemImageSource === "1";
+    }
+
+    return false;
+}
+
+function pantryItemMatchesInventorySourceFilters(item, activeFilters, detailFilters = []) {
+    if ((!activeFilters || !activeFilters.size) && (!detailFilters || !detailFilters.length)) {
         return true;
     }
 
     return (
         (activeFilters.has("receipt") && pantryItemMatchesReceiptFilter(item, true))
         || (activeFilters.has("image") && pantryItemMatchesImageFilter(item, true))
+        || detailFilters.some(filter => pantryItemMatchesInventoryDetailFilter(item, filter))
     );
 }
 
-function pantryInventoryFilterEmptyMessage(query, activeFilters) {
-    if (!activeFilters || !activeFilters.size) {
+function pantryInventoryFilterEmptyMessage(query, activeFilters, detailFilters = []) {
+    if ((!activeFilters || !activeFilters.size) && (!detailFilters || !detailFilters.length)) {
         return "No pantry items match that search.";
     }
 
@@ -15591,6 +15633,12 @@ function pantryInventoryFilterEmptyMessage(query, activeFilters) {
     }
     if (activeFilters.has("image")) {
         filterLabels.push("image-taken");
+    }
+    if (detailFilters.some(filter => filter.type === "receipt-pdf")) {
+        filterLabels.push("selected receipt PDF");
+    }
+    if (detailFilters.some(filter => filter.type === "receipt-image" || filter.type === "pantry-item-images")) {
+        filterLabels.push("selected image set");
     }
     const filterText = filterLabels.join(" or ");
 
@@ -15605,6 +15653,16 @@ function togglePantryInventorySourceFilter(button) {
 
     if (button) {
         button.setAttribute("aria-pressed", nextActive ? "true" : "false");
+        if (nextActive && button.dataset.pantryInventoryFilter) {
+            deactivatePantrySourceFilterButtons(
+                `[data-pantry-source-detail-group="${button.dataset.pantryInventoryFilter}"]`,
+                button,
+            );
+        }
+        if (nextActive && button.dataset.pantrySourceDetailGroup) {
+            deactivatePantrySourceFilterButtons("[data-pantry-inventory-filter]", button);
+            deactivatePantrySourceFilterButtons("[data-pantry-source-detail-filter]", button);
+        }
     }
     syncPantryInventorySourceFilterButtons();
     filterPantryItems(searchInput ? searchInput.value : "");
@@ -15618,12 +15676,13 @@ function togglePantryReceiptFilter(button) {
 function filterPantryItems(value) {
     const query = String(value || "").trim().toLowerCase();
     const activeFilters = activePantryInventorySourceFilters();
+    const detailFilters = activePantryInventoryDetailFilters();
     let visibleCount = 0;
 
     document.querySelectorAll("[data-pantry-item]").forEach(item => {
         const searchText = item.dataset.pantrySearch || item.textContent || "";
         const matchesQuery = !query || searchText.toLowerCase().includes(query);
-        const visible = matchesQuery && pantryItemMatchesInventorySourceFilters(item, activeFilters);
+        const visible = matchesQuery && pantryItemMatchesInventorySourceFilters(item, activeFilters, detailFilters);
         item.hidden = !visible;
 
         if (visible) {
@@ -15632,8 +15691,8 @@ function filterPantryItems(value) {
     });
 
     document.querySelectorAll("[data-pantry-search-empty]").forEach(empty => {
-        empty.hidden = (!query && !activeFilters.size) || visibleCount > 0;
-        empty.textContent = pantryInventoryFilterEmptyMessage(query, activeFilters);
+        empty.hidden = (!query && !activeFilters.size && !detailFilters.length) || visibleCount > 0;
+        empty.textContent = pantryInventoryFilterEmptyMessage(query, activeFilters, detailFilters);
     });
 
     updatePantryInventoryBulkDeleteState();
@@ -17488,6 +17547,7 @@ function setPantryImagePanelComplete(panel, data, message = "Pantry image update
         const row = panel.closest("[data-pantry-item]");
         if (row) {
             row.dataset.pantryImageSource = "1";
+            row.dataset.pantryItemImageSource = "1";
         }
     }
 

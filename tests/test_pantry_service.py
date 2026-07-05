@@ -656,10 +656,71 @@ def test_pantry_inventory_links_uploaded_receipt_pdf(monkeypatch, tmp_path):
 
     assert section_response.status_code == 200
     assert "View Receipt PDF" in html
+    assert "Receipt PDFs" in html
+    assert "meijer.pdf" in html
+    assert 'data-pantry-source-detail-type="receipt-pdf"' in html
+    assert 'data-pantry-source-detail-id="receipt-1"' in html
+    assert 'data-pantry-receipt-id="receipt-1"' in html
+    assert 'data-pantry-receipt-file-kind="pdf"' in html
     assert "/pantry/receipts/receipt-1/file" in html
     assert file_response.status_code == 200
     assert file_response.mimetype == "application/pdf"
     assert file_response.get_data().startswith(b"%PDF-1.4")
+
+
+def test_pantry_inventory_filters_uploaded_receipt_images(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        stored_name = "receipt-img_meijer.jpg"
+        (pantry_service.PANTRY_RECEIPT_UPLOAD_DIR / stored_name).write_bytes(b"fake image")
+        pantry_service.save_receipt_history({
+            "receipts": [
+                {
+                    "receipt_id": "receipt-img",
+                    "created_at": "2026-07-02T22:25:11Z",
+                    "stored_path": f"pantry_receipts/{stored_name}",
+                    "text_excerpt": "4068           GREEN ONIONS       1.09  F",
+                    "candidate_count": 1,
+                    "status": "added",
+                }
+            ],
+        })
+        pantry_service.save_pantry_inventory({
+            "items": [
+                {
+                    "id": "onion-1",
+                    "ingredient_name": "green onion",
+                    "product_name": "Green Onions",
+                    "quantity": 1,
+                    "source": "receipt",
+                    "source_receipt_id": "receipt-img",
+                    "source_receipt_line": "4068           GREEN ONIONS       1.09  F",
+                }
+            ],
+        })
+        item = pantry_service.pantry_items_for_view()[0]
+
+    assert item["source_receipt"]["receipt_id"] == "receipt-img"
+    assert item["source_receipt"]["file_label"] == "meijer.jpg"
+    assert item["source_receipt"]["is_pdf"] is False
+
+    with app.test_client() as client:
+        sign_in(client)
+        section_response = client.get("/sections/pantry")
+
+    html = section_response.get_data(as_text=True)
+
+    assert section_response.status_code == 200
+    assert "Uploaded Images" in html
+    assert "meijer.jpg" in html
+    assert 'data-pantry-source-detail-type="receipt-image"' in html
+    assert 'data-pantry-source-detail-id="receipt-img"' in html
+    assert 'data-pantry-receipt-id="receipt-img"' in html
+    assert 'data-pantry-receipt-file-kind="image"' in html
+    assert 'data-pantry-image-source="1"' in html
 
 
 def test_pantry_inventory_links_legacy_receipt_item_from_notes(monkeypatch, tmp_path):
