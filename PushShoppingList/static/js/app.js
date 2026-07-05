@@ -3254,6 +3254,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindPantryLocationChoices(options.root || document);
     bindPantryInventoryDetails(options.root || document);
     bindPantryInventoryBulkDelete(options.root || document);
+    bindPantryInventoryConfidenceToggle(options.root || document);
     updatePantryNameQuestionNav();
     bindPantryReceiptConfidenceToggle(options.root || document);
     bindPantryReceiptDateWarnings(options.root || document);
@@ -16265,6 +16266,50 @@ const PANTRY_RECEIPT_FIELD_STATUS_CLASSES = [
 ];
 
 const PANTRY_RECEIPT_CONFIDENCE_STORAGE_KEY = "ai-pantry-receipt-confidence-visible";
+const PANTRY_INVENTORY_CONFIDENCE_STORAGE_KEY = "ai-pantry-inventory-confidence-visible";
+
+function pantryInventoryConfidenceIsVisible() {
+    return localStorage.getItem(PANTRY_INVENTORY_CONFIDENCE_STORAGE_KEY) === "1";
+}
+
+function setPantryInventoryConfidenceVisibility(visible, options = {}) {
+    const shouldShow = visible === true;
+
+    document.querySelectorAll("[data-pantry-inventory-confidence]").forEach(element => {
+        element.hidden = !shouldShow;
+    });
+
+    document.querySelectorAll("[data-pantry-inventory-confidence-toggle]").forEach(toggle => {
+        toggle.checked = shouldShow;
+    });
+
+    if (options.persist) {
+        localStorage.setItem(PANTRY_INVENTORY_CONFIDENCE_STORAGE_KEY, shouldShow ? "1" : "0");
+    }
+}
+
+function bindPantryInventoryConfidenceToggle(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+    const toggles = [];
+
+    if (context.matches && context.matches("[data-pantry-inventory-confidence-toggle]")) {
+        toggles.push(context);
+    }
+
+    context.querySelectorAll("[data-pantry-inventory-confidence-toggle]").forEach(toggle => toggles.push(toggle));
+    setPantryInventoryConfidenceVisibility(pantryInventoryConfidenceIsVisible(), { persist: false });
+
+    toggles.forEach(toggle => {
+        if (toggle.dataset.pantryInventoryConfidenceBound === "1") {
+            return;
+        }
+
+        toggle.dataset.pantryInventoryConfidenceBound = "1";
+        toggle.addEventListener("change", event => {
+            setPantryInventoryConfidenceVisibility(event.currentTarget.checked, { persist: true });
+        });
+    });
+}
 
 function pantryReceiptConfidenceIsVisible() {
     return localStorage.getItem(PANTRY_RECEIPT_CONFIDENCE_STORAGE_KEY) !== "0";
@@ -31307,6 +31352,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindPantryLocationChoices", bindPantryLocationChoices],
         ["bindPantryInventoryDetails", bindPantryInventoryDetails],
         ["bindPantryInventoryBulkDelete", bindPantryInventoryBulkDelete],
+        ["bindPantryInventoryConfidenceToggle", bindPantryInventoryConfidenceToggle],
         ["bindPantryReceiptConfidenceToggle", bindPantryReceiptConfidenceToggle],
         ["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],

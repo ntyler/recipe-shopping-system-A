@@ -20589,6 +20589,13 @@ body {
     font-weight: 800;
 }
 
+.ai-pantry-inventory-confidence-toggle {
+    justify-content: center;
+    min-height: 39px;
+    margin: 0;
+    cursor: pointer;
+}
+
 .ai-pantry-confidence-toggle input {
     width: 14px;
     height: 14px;
@@ -20809,6 +20816,7 @@ body {
 }
 
 .ai-pantry-inventory-filter-btn {
+    width: 100%;
     min-height: 39px;
     margin: 0;
     padding: 9px 12px;
@@ -22041,6 +22049,10 @@ body {
 }
 
 [data-pantry-review-confidence][hidden] {
+    display: none !important;
+}
+
+[data-pantry-inventory-confidence][hidden] {
     display: none !important;
 }
 

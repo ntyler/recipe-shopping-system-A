@@ -122,6 +122,11 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-filter-actions" in css
     assert ".ai-pantry-inventory-filter-btn" in css
     assert '.ai-pantry-inventory-filter-btn[aria-pressed="true"]' in css
+    assert "data-pantry-inventory-confidence-toggle" in template
+    assert "data-pantry-inventory-confidence" in template
+    assert "Show Confidence" in template
+    assert ".ai-pantry-inventory-confidence-toggle" in css
+    assert "[data-pantry-inventory-confidence][hidden]" in css
     assert "data-pantry-name-question-nav" in template
     assert "data-pantry-name-questioned-row" in template
     assert "jumpPantryNameQuestion(-1)" in template
@@ -181,6 +186,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-card {\n    border: 0;" in css
     assert "background: transparent;" in css
     assert "function togglePantryInventorySourceFilter" in js
+    assert "PANTRY_INVENTORY_CONFIDENCE_STORAGE_KEY" in js
+    assert "function bindPantryInventoryConfidenceToggle" in js
+    assert "bindPantryInventoryConfidenceToggle(options.root || document);" in js
+    assert '["bindPantryInventoryConfidenceToggle", bindPantryInventoryConfidenceToggle]' in js
     assert "function pantryNameQuestionRows" in js
     assert "function jumpPantryNameQuestion" in js
     assert "updatePantryNameQuestionNav();" in js

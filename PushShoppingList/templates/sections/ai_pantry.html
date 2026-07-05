@@ -206,6 +206,12 @@
                             onclick="return togglePantryInventorySourceFilter(this)">
                         Image Taken
                     </button>
+                    <label class="ai-pantry-confidence-toggle ai-pantry-inventory-confidence-toggle">
+                        <input type="checkbox"
+                               data-pantry-inventory-confidence-toggle
+                               aria-label="Show inventory confidence levels">
+                        <span>Show Confidence</span>
+                    </label>
                 </div>
                 {% if pantry_name_suggestion_filters.count %}
                     <div class="ai-pantry-name-question-nav"
@@ -401,7 +407,9 @@
                                     <span>{{ item.quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</span>
                                     <span>{{ item.store_section or "MISC" }}</span>
                                     <span>{{ item_source }}</span>
-                                    <span class="confidence-pill confidence-{{ item.confidence_label|lower }}">{{ item.confidence_label }}</span>
+                                    <span class="confidence-pill confidence-{{ item.confidence_label|lower }}"
+                                          data-pantry-inventory-confidence
+                                          hidden>{{ item.confidence_label }}</span>
                                     <span class="pantry-lifecycle-badge pantry-lifecycle-{{ item.lifecycle_status.urgency }}">{{ item.lifecycle_status.label }}</span>
                                 </div>
                                 <div class="ai-pantry-lifecycle-summary">
