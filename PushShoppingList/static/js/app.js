@@ -17544,6 +17544,7 @@ function setPantryImagePanelGenerating(panel, message) {
 
     if (status) {
         status.textContent = message;
+        status.hidden = false;
         status.classList.remove("empty");
     }
 
@@ -17578,12 +17579,12 @@ function setPantryImagePanelComplete(panel, data, message = "Pantry image update
 
     if (imageUrl && image) {
         setRecipeImageElementSource(image, imageUrl, "card", "(max-width: 700px) 100vw, 360px");
-        image.hidden = false;
+        image.removeAttribute("hidden");
     }
 
-    if (imageUrl && download) {
-        download.href = imageUrl;
-        download.hidden = false;
+    if (download) {
+        download.href = imageUrl || "#";
+        download.hidden = !imageUrl;
     }
 
     if (imageUrl) {
@@ -17597,6 +17598,7 @@ function setPantryImagePanelComplete(panel, data, message = "Pantry image update
     if (status) {
         status.textContent = imageUrl ? "" : "Image updated. Refresh to view it.";
         status.classList.toggle("empty", Boolean(imageUrl));
+        status.hidden = Boolean(imageUrl);
     }
 
     if (generateButton) {
@@ -17632,6 +17634,7 @@ function setPantryImagePanelFailed(panel, message) {
 
     if (status) {
         status.textContent = message || "Unable to update this image.";
+        status.hidden = false;
         status.classList.remove("empty");
     }
 
@@ -24454,6 +24457,10 @@ function setRecipeImageElementSource(image, originalUrl, displayVariant = "card"
     if (original) {
         image.src = displayUrl || original;
         image.dataset.fullSrc = original;
+        image.dataset.deferredLoaded = "1";
+        image.removeAttribute("data-deferred-src");
+        image.removeAttribute("data-deferred-srcset");
+        image.classList.remove("deferred-image-pending");
         image.loading = "lazy";
         image.decoding = "async";
         image.sizes = sizes;

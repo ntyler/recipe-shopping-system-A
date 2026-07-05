@@ -1084,6 +1084,32 @@ def save_pantry_image_file(item, image_source, extension=".png"):
     return f"{PANTRY_IMAGE_URL_PREFIX}/{filename}"
 
 
+def recovered_pantry_item_image_url(item):
+    if not item or item.get("image_url"):
+        return ""
+
+    image_key = pantry_image_file_key(item)
+    if not image_key or not PANTRY_IMAGE_FOLDER.is_dir():
+        return ""
+
+    try:
+        candidates = [
+            path
+            for path in PANTRY_IMAGE_FOLDER.glob(f"{image_key}_*")
+            if path.is_file()
+            and "__" not in path.stem
+            and path.suffix.lower() in PANTRY_IMAGE_EXTENSIONS
+        ]
+    except OSError:
+        return ""
+
+    if not candidates:
+        return ""
+
+    latest = max(candidates, key=lambda path: path.stat().st_mtime)
+    return f"{PANTRY_IMAGE_URL_PREFIX}/{latest.name}"
+
+
 def find_pantry_item(payload, item_id):
     item_id = str(item_id or "").strip()
     if not item_id:
@@ -1711,6 +1737,8 @@ def pantry_items_for_view():
         item["frozen_best_by_date"] = frozen_best_by_date(item)
         item["frozen_best_by_date_label"] = date_label(item["frozen_best_by_date"])
         item["lifecycle_status"] = pantry_item_lifecycle_status(item)
+        if not item.get("image_url"):
+            item["image_url"] = recovered_pantry_item_image_url(item)
         image_variants = local_static_image_variants(item.get("image_url")) if item.get("image_url") else {}
         item["image_display_url"] = image_variants.get("display_url") or item.get("image_url", "")
         item["image_srcset"] = image_variants.get("srcset", "")

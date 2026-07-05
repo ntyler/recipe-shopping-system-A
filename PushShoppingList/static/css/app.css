@@ -4258,6 +4258,10 @@ body {
             background: #0f615d;
         }
 
+        .recipe-step-image-actions [hidden] {
+            display: none !important;
+        }
+
         .recipe-step-image-btn:disabled,
         .recipe-step-image-upload:disabled,
         .recipe-step-image-panel.generating .recipe-step-image-download,

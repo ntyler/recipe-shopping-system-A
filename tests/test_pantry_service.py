@@ -272,6 +272,40 @@ def test_pantry_item_image_upload_persists_image_fields(monkeypatch, tmp_path):
     assert any((tmp_path / "pantry_images").iterdir())
 
 
+def test_pantry_inventory_recovers_matching_generated_image(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    monkeypatch.setattr(pantry_service, "PANTRY_IMAGE_FOLDER", tmp_path / "pantry_images")
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        pantry_service.PANTRY_IMAGE_FOLDER.mkdir(parents=True)
+        (pantry_service.PANTRY_IMAGE_FOLDER / "orphan_parsley_fc45e8f772e2.png").write_bytes(b"fake image")
+        pantry_service.save_pantry_inventory({
+            "items": [
+                {
+                    "id": "orphan-parsley-1",
+                    "ingredient_name": "orphan parsley",
+                    "product_name": "Orphan Parsley",
+                    "quantity": 1,
+                    "source": "receipt",
+                    "image_url": "",
+                }
+            ],
+        })
+
+    with app.test_client() as client:
+        sign_in(client)
+        response = client.get("/sections/pantry")
+
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "No image generated for this item." not in html
+    assert "/static/generated/pantry_items/orphan_parsley_fc45e8f772e2.png" in html
+    assert 'data-deferred-src="/static/generated/pantry_items/orphan_parsley_fc45e8f772e2.png"' in html
+
+
 def test_pantry_name_suggestion_keeps_original_until_applied():
     suggestion = pantry_service.pantry_name_suggestion("Atlantic Salmo")
 

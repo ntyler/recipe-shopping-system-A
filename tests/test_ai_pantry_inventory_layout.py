@@ -153,6 +153,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "grid-column: 1 / -1;" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inline-form textarea" in css
     assert "min-height: 58px;" in css
+    assert ".recipe-step-image-actions [hidden]" in css
+    assert "display: none !important;" in css
     assert "grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));" in css
     assert "@media (max-width: 980px)" in css
     assert ".ai-pantry-card {\n    border: 0;" in css
@@ -168,6 +170,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert 'item.dataset.pantryImageSource === "1"' in js
     assert 'row.dataset.pantryImageSource = "1";' in js
     assert 'row.dataset.pantryItemImageSource = "1";' in js
+    assert 'image.removeAttribute("hidden");' in js
+    assert 'download.hidden = !imageUrl;' in js
+    assert "status.hidden = Boolean(imageUrl);" in js
+    assert 'image.removeAttribute("data-deferred-src");' in js
     assert 'filter.type === "receipt-pdf"' in js
     assert 'filter.type === "receipt-image"' in js
     assert 'filter.type === "pantry-item-images"' in js
