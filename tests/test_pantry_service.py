@@ -710,6 +710,65 @@ def test_add_receipt_candidate_saves_source_receipt_reference(monkeypatch, tmp_p
     assert inventory[0]["source_receipt_line"] == candidate["raw_line"]
 
 
+def test_add_receipt_candidate_creates_new_lot_for_existing_item(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
+    app = create_app()
+    candidate = pantry_service.parse_receipt_text(
+        """
+        07/08/26             LEXI
+        4068           GREEN ONIONS       1.09  F
+        """
+    )[0]
+
+    with app.test_client() as client:
+        sign_in(client)
+        with app.test_request_context("/"):
+            pantry_service.add_or_increment_pantry_item(
+                {
+                    "ingredient_name": "green onion",
+                    "product_name": "Green Onions",
+                    "quantity": 1,
+                    "source": "receipt",
+                    "purchased_date": "2026-06-28",
+                    "expiration_date": "2026-07-05",
+                    "source_receipt_id": "receipt-old",
+                },
+                user_id="pantry-user",
+            )
+        with client.session_transaction() as session:
+            session["user_id"] = "pantry-user"
+            session["pantry_receipt_review"] = {
+                "receipt_id": "receipt-new",
+                "candidates": [candidate],
+            }
+
+        response = client.post(
+            "/pantry/receipt/add",
+            data={
+                "action": "selected",
+                "candidate_index": "0",
+                "candidate_0_purchased_date": "2026-07-08",
+                "candidate_0_expiration_date": "2026-07-15",
+            },
+        )
+
+    inventory = pantry_service.load_pantry_inventory(user_id="pantry-user")["items"]
+
+    assert response.status_code == 302
+    assert len(inventory) == 2
+    assert [item["normalized_name"] for item in inventory] == ["green onion", "green onion"]
+    assert inventory[0]["quantity"] == 1
+    assert inventory[0]["purchased_date"] == "2026-06-28"
+    assert inventory[0]["expiration_date"] == "2026-07-05"
+    assert inventory[0]["source_receipt_id"] == "receipt-old"
+    assert inventory[1]["quantity"] == 1
+    assert inventory[1]["purchased_date"] == "2026-07-08"
+    assert inventory[1]["expiration_date"] == "2026-07-15"
+    assert inventory[1]["source_receipt_id"] == "receipt-new"
+    assert inventory[1]["source_receipt_line"] == candidate["raw_line"]
+
+
 def test_pantry_inventory_links_uploaded_receipt_pdf(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     app = create_app()

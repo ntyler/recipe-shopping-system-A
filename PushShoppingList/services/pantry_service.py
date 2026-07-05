@@ -855,7 +855,7 @@ def prepare_pantry_item_for_add(item, reference_date=None):
     return apply_lifecycle_suggestions(prepared, reference_date=reference)
 
 
-def add_or_increment_pantry_item(item, user_id=None, guest_session_id=None, reference_date=None):
+def add_or_increment_pantry_item(item, user_id=None, guest_session_id=None, reference_date=None, merge_existing=True):
     payload = load_pantry_inventory(user_id=user_id, guest_session_id=guest_session_id)
     incoming = normalize_pantry_item({
         **prepare_pantry_item_for_add(item, reference_date=reference_date),
@@ -867,42 +867,43 @@ def add_or_increment_pantry_item(item, user_id=None, guest_session_id=None, refe
     })
     timestamp = now_iso()
 
-    for existing in payload["items"]:
-        if existing.get("normalized_name") == incoming["normalized_name"]:
-            existing["quantity"] = parse_quantity(existing.get("quantity"), default=0) + parse_quantity(
-                incoming.get("quantity"),
-                default=1,
-            )
-            if incoming.get("product_name"):
-                existing["product_name"] = incoming["product_name"]
-            if incoming.get("store"):
-                existing["store"] = incoming["store"]
-            if incoming.get("unit"):
-                existing["unit"] = incoming["unit"]
-            if incoming.get("category"):
-                existing["category"] = incoming["category"]
-            if incoming.get("store_section"):
-                existing["store_section"] = incoming["store_section"]
-            existing["source"] = incoming["source"]
-            existing["confidence"] = max(existing.get("confidence", 0.0), incoming["confidence"])
-            existing["last_updated"] = timestamp
-            existing["notes"] = incoming.get("notes") or existing.get("notes", "")
-            for field in PANTRY_DATE_FIELDS:
-                if incoming.get(field) and not existing.get(field):
-                    existing[field] = incoming[field]
-            for field in ["storage_location", "status"]:
-                if incoming.get(field) and not existing.get(field):
-                    existing[field] = incoming[field]
-            if incoming.get("reminder_offsets_days") and not existing.get("reminder_offsets_days"):
-                existing["reminder_offsets_days"] = incoming["reminder_offsets_days"]
-            for field in ["image_url", "image_generated_at"]:
-                if incoming.get(field) and not existing.get(field):
-                    existing[field] = incoming[field]
-            for field in ["source_receipt_id", "source_receipt_line"]:
-                if incoming.get(field):
-                    existing[field] = incoming[field]
-            save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
-            return {"item": existing, "created": False}
+    if merge_existing:
+        for existing in payload["items"]:
+            if existing.get("normalized_name") == incoming["normalized_name"]:
+                existing["quantity"] = parse_quantity(existing.get("quantity"), default=0) + parse_quantity(
+                    incoming.get("quantity"),
+                    default=1,
+                )
+                if incoming.get("product_name"):
+                    existing["product_name"] = incoming["product_name"]
+                if incoming.get("store"):
+                    existing["store"] = incoming["store"]
+                if incoming.get("unit"):
+                    existing["unit"] = incoming["unit"]
+                if incoming.get("category"):
+                    existing["category"] = incoming["category"]
+                if incoming.get("store_section"):
+                    existing["store_section"] = incoming["store_section"]
+                existing["source"] = incoming["source"]
+                existing["confidence"] = max(existing.get("confidence", 0.0), incoming["confidence"])
+                existing["last_updated"] = timestamp
+                existing["notes"] = incoming.get("notes") or existing.get("notes", "")
+                for field in PANTRY_DATE_FIELDS:
+                    if incoming.get(field) and not existing.get(field):
+                        existing[field] = incoming[field]
+                for field in ["storage_location", "status"]:
+                    if incoming.get(field) and not existing.get(field):
+                        existing[field] = incoming[field]
+                if incoming.get("reminder_offsets_days") and not existing.get("reminder_offsets_days"):
+                    existing["reminder_offsets_days"] = incoming["reminder_offsets_days"]
+                for field in ["image_url", "image_generated_at"]:
+                    if incoming.get(field) and not existing.get(field):
+                        existing[field] = incoming[field]
+                for field in ["source_receipt_id", "source_receipt_line"]:
+                    if incoming.get(field):
+                        existing[field] = incoming[field]
+                save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+                return {"item": existing, "created": False}
 
     incoming["date_added"] = timestamp
     incoming["last_updated"] = timestamp

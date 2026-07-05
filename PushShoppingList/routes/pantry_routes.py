@@ -409,7 +409,7 @@ def add_receipt_candidates_route():
             "source_receipt_id": review.get("receipt_id", ""),
             "source_receipt_line": candidate.get("raw_line", ""),
             **lifecycle_dates,
-        })
+        }, merge_existing=False)
         added.append(result["item"].get("ingredient_name") or candidate.get("product_name", "Item"))
 
     update_receipt_history_status(review.get("receipt_id", ""), "added", len(added))
