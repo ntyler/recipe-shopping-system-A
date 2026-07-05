@@ -125,7 +125,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "data-pantry-inventory-confidence-toggle" in template
     assert "data-pantry-inventory-confidence" in template
     assert "Show Confidence" in template
-    assert "pantry_name_suggestion_filters.count > 1" in template
+    assert "{% if pantry_name_suggestion_filters.count %}" in template
+    assert "Suggested names:" in template
     assert ".ai-pantry-inventory-confidence-toggle" in css
     assert ".ai-pantry-inventory-confidence-toggle span" in css
     assert ".ai-pantry-search .ai-pantry-inventory-confidence-toggle input" in css
@@ -140,7 +141,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-name-question-active" in css
     assert "width: fit-content;" in css
     assert ".ai-pantry-name-question-nav-btn:disabled" in css
-    assert "display: none;" in css
+    assert "min-width: 58px;" in css
     assert "rgba(95, 39, 0" in css
     assert ".ai-pantry-source-filter-groups" in css
     assert ".ai-pantry-source-filter-chip" in css
@@ -200,6 +201,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert '["bindPantryInventoryConfidenceToggle", bindPantryInventoryConfidenceToggle]' in js
     assert "function pantryNameQuestionRows" in js
     assert "function jumpPantryNameQuestion" in js
+    assert "Suggested names: ${activeIndex + 1} of ${rows.length}" in js
+    assert 'nextButton.textContent = rows.length === 1 ? "Go To Name" : "Next";' in js
+    assert "pantryNameQuestionRows({ visibleOnly: false })" in js
+    assert 'filterPantryItems("");' in js
     assert "updatePantryNameQuestionNav();" in js
     assert 'row.dataset.pantryNameQuestionedRow = "0";' in js
     assert 'row.querySelector(".ai-pantry-inventory-name-input")' in js

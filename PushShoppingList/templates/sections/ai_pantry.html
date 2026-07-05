@@ -213,25 +213,25 @@
                            aria-label="Show inventory confidence levels">
                     <span>Show Confidence</span>
                 </label>
-                {% if pantry_name_suggestion_filters.count > 1 %}
+                {% if pantry_name_suggestion_filters.count %}
                     <div class="ai-pantry-name-question-nav"
                          data-pantry-name-question-nav
-                         aria-label="Questioned item name navigation">
+                         aria-label="Suggested item name navigation">
                         <button type="button"
                                 class="ai-pantry-name-question-nav-btn"
                                 data-pantry-name-question-prev
                                 onclick="return jumpPantryNameQuestion(-1)">
-                            Prev Name
+                            Prev
                         </button>
                         <span class="ai-pantry-name-question-status"
                               data-pantry-name-question-status>
-                            {{ pantry_name_suggestion_filters.count }} questioned name{% if pantry_name_suggestion_filters.count != 1 %}s{% endif %}
+                            Suggested names: {{ pantry_name_suggestion_filters.count }}
                         </span>
                         <button type="button"
                                 class="ai-pantry-name-question-nav-btn"
                                 data-pantry-name-question-next
                                 onclick="return jumpPantryNameQuestion(1)">
-                            Next Name
+                            Next
                         </button>
                     </div>
                 {% endif %}

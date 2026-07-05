@@ -15865,28 +15865,40 @@ function setActivePantryNameQuestionRow(row) {
 }
 
 function updatePantryNameQuestionNav() {
-    const rows = pantryNameQuestionRows();
+    const rows = pantryNameQuestionRows({ visibleOnly: false });
     const activeIndex = rows.findIndex(row => row.classList.contains("ai-pantry-name-question-active"));
 
     document.querySelectorAll("[data-pantry-name-question-nav]").forEach(nav => {
         const status = nav.querySelector("[data-pantry-name-question-status]");
-        const buttons = nav.querySelectorAll("[data-pantry-name-question-prev], [data-pantry-name-question-next]");
+        const prevButton = nav.querySelector("[data-pantry-name-question-prev]");
+        const nextButton = nav.querySelector("[data-pantry-name-question-next]");
         nav.hidden = rows.length === 0;
 
         if (status) {
-            status.textContent = activeIndex >= 0
-                ? `${activeIndex + 1} of ${rows.length} questioned names`
-                : `${rows.length} questioned name${rows.length === 1 ? "" : "s"}`;
+            if (rows.length === 1) {
+                status.textContent = "Suggested names: 1";
+            } else {
+                status.textContent = activeIndex >= 0
+                    ? `Suggested names: ${activeIndex + 1} of ${rows.length}`
+                    : `Suggested names: ${rows.length}`;
+            }
         }
 
-        buttons.forEach(button => {
-            button.disabled = rows.length < 2;
-        });
+        if (prevButton) {
+            prevButton.hidden = rows.length < 2;
+            prevButton.disabled = rows.length < 2;
+        }
+
+        if (nextButton) {
+            nextButton.hidden = false;
+            nextButton.disabled = rows.length === 0;
+            nextButton.textContent = rows.length === 1 ? "Go To Name" : "Next";
+        }
     });
 }
 
 function jumpPantryNameQuestion(direction = 1) {
-    const rows = pantryNameQuestionRows();
+    const rows = pantryNameQuestionRows({ visibleOnly: false });
 
     if (!rows.length) {
         return false;
@@ -15900,6 +15912,16 @@ function jumpPantryNameQuestion(direction = 1) {
     const row = rows[nextIndex];
 
     setActivePantryNameQuestionRow(row);
+    if (row.hidden) {
+        const searchInput = document.getElementById("pantrySearchInput");
+        if (searchInput) {
+            searchInput.value = "";
+        }
+        deactivatePantrySourceFilterButtons("[data-pantry-inventory-filter]");
+        deactivatePantrySourceFilterButtons("[data-pantry-source-detail-filter]");
+        syncPantryInventorySourceFilterButtons();
+        filterPantryItems("");
+    }
     row.scrollIntoView({ behavior: "smooth", block: "center" });
 
     const focusTarget = row.querySelector("[data-pantry-name-suggestion] button")
