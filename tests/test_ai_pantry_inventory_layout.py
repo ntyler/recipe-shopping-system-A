@@ -113,6 +113,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
         "    grid-row: 1;"
     ) in css
     assert ".ai-pantry-inventory-row-collapsed {" in css
+    assert ".ai-pantry-inventory-row[hidden]" in css
     assert ".ai-pantry-inventory-row-collapsed .ai-pantry-image-panel" in css
     assert ".ai-pantry-inventory-details-toggle" in css
     assert ".ai-pantry-inventory-details-icon" in css
@@ -125,9 +126,13 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "data-pantry-inventory-confidence-toggle" in template
     assert "data-pantry-inventory-confidence" in template
     assert "Show Confidence" in template
-    assert "{% if pantry_name_suggestion_filters.count %}" in template
+    assert "data-pantry-inventory-section-toggle" in template
+    assert "Group by section" in template
+    assert 'data-pantry-inventory-list' in template
+    assert "{% if pantry_name_suggestion_filters.count|int > 0 %}" in template
     assert "Suggested names:" in template
     assert ".ai-pantry-inventory-confidence-toggle" in css
+    assert ".ai-pantry-inventory-group-toggle" in css
     assert ".ai-pantry-inventory-confidence-toggle span" in css
     assert ".ai-pantry-search .ai-pantry-inventory-confidence-toggle input" in css
     assert "flex: 0 0 14px;" in css
@@ -143,6 +148,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-name-question-nav-btn:disabled" in css
     assert "min-width: 58px;" in css
     assert "rgba(95, 39, 0" in css
+    assert ".ai-pantry-inventory-section-header" in css
+    assert ".ai-pantry-inventory-section-toggle" in css
+    assert ".ai-pantry-inventory-section-chevron" in css
+    assert ".ai-pantry-inventory-section-count" in css
     assert ".ai-pantry-source-filter-groups" in css
     assert ".ai-pantry-source-filter-chip" in css
     assert '.ai-pantry-source-filter-chip[aria-pressed="true"]' in css
@@ -197,11 +206,21 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "function togglePantryInventorySourceFilter" in js
     assert "PANTRY_INVENTORY_CONFIDENCE_STORAGE_KEY" in js
     assert "function bindPantryInventoryConfidenceToggle" in js
+    assert "PANTRY_INVENTORY_GROUP_STORAGE_KEY" in js
+    assert "function bindPantryInventorySectionGrouping" in js
+    assert "function updatePantryInventorySectionGrouping" in js
+    assert "function togglePantryInventorySectionGroup" in js
+    assert "function expandPantryInventorySectionForRow" in js
+    assert 'item.dataset.pantryFilterVisible = visible ? "1" : "0";' in js
+    assert "updatePantryInventorySectionGrouping();" in js
+    assert "bindPantryInventorySectionGrouping(options.root || document);" in js
+    assert '["bindPantryInventorySectionGrouping", bindPantryInventorySectionGrouping]' in js
     assert "bindPantryInventoryConfidenceToggle(options.root || document);" in js
     assert '["bindPantryInventoryConfidenceToggle", bindPantryInventoryConfidenceToggle]' in js
     assert "function pantryNameQuestionRows" in js
     assert "function jumpPantryNameQuestion" in js
     assert "Suggested names: ${activeIndex + 1} of ${rows.length}" in js
+    assert "nextButton.hidden = rows.length === 0;" in js
     assert 'nextButton.textContent = rows.length === 1 ? "Go To Name" : "Next";' in js
     assert "pantryNameQuestionRows({ visibleOnly: false })" in js
     assert 'filterPantryItems("");' in js

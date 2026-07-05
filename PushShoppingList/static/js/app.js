@@ -3254,6 +3254,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindPantryLocationChoices(options.root || document);
     bindPantryInventoryDetails(options.root || document);
     bindPantryInventoryBulkDelete(options.root || document);
+    bindPantryInventorySectionGrouping(options.root || document);
     bindPantryInventoryConfidenceToggle(options.root || document);
     updatePantryNameQuestionNav();
     bindPantryReceiptConfidenceToggle(options.root || document);
@@ -15794,6 +15795,7 @@ function filterPantryItems(value) {
         const searchText = item.dataset.pantrySearch || item.textContent || "";
         const matchesQuery = !query || searchText.toLowerCase().includes(query);
         const visible = matchesQuery && pantryItemMatchesInventorySourceFilters(item, activeFilters, detailFilters);
+        item.dataset.pantryFilterVisible = visible ? "1" : "0";
         item.hidden = !visible;
 
         if (visible) {
@@ -15806,6 +15808,7 @@ function filterPantryItems(value) {
         empty.textContent = pantryInventoryFilterEmptyMessage(query, activeFilters, detailFilters);
     });
 
+    updatePantryInventorySectionGrouping();
     updatePantryInventoryBulkDeleteState();
     updatePantryNameQuestionNav();
 }
@@ -15890,7 +15893,7 @@ function updatePantryNameQuestionNav() {
         }
 
         if (nextButton) {
-            nextButton.hidden = false;
+            nextButton.hidden = rows.length === 0;
             nextButton.disabled = rows.length === 0;
             nextButton.textContent = rows.length === 1 ? "Go To Name" : "Next";
         }
@@ -15922,6 +15925,7 @@ function jumpPantryNameQuestion(direction = 1) {
         syncPantryInventorySourceFilterButtons();
         filterPantryItems("");
     }
+    expandPantryInventorySectionForRow(row);
     row.scrollIntoView({ behavior: "smooth", block: "center" });
 
     const focusTarget = row.querySelector("[data-pantry-name-suggestion] button")
@@ -16199,6 +16203,211 @@ function bindPantryInventoryBulkDelete(root = document) {
     });
 
     updatePantryInventoryBulkDeleteState(context);
+}
+
+const PANTRY_INVENTORY_GROUP_STORAGE_KEY = "ai-pantry-inventory-group-by-section";
+const PANTRY_INVENTORY_SECTION_COLLAPSE_STORAGE_PREFIX = "ai-pantry-inventory-section-collapsed:";
+
+function pantryInventoryGroupBySectionIsEnabled() {
+    return localStorage.getItem(PANTRY_INVENTORY_GROUP_STORAGE_KEY) === "1";
+}
+
+function pantryInventorySectionStorageKey(section) {
+    return `${PANTRY_INVENTORY_SECTION_COLLAPSE_STORAGE_PREFIX}${encodeURIComponent(section || "MISC")}`;
+}
+
+function pantryInventorySectionIsCollapsed(section) {
+    return localStorage.getItem(pantryInventorySectionStorageKey(section)) === "1";
+}
+
+function pantryInventorySectionValue(row) {
+    const section = String(row && row.dataset ? row.dataset.pantryStoreSection || "" : "").trim().toUpperCase();
+    return section || "MISC";
+}
+
+function pantryInventoryRowFilterVisible(row) {
+    if (!row.dataset.pantryFilterVisible) {
+        row.dataset.pantryFilterVisible = row.hidden ? "0" : "1";
+    }
+    return row.dataset.pantryFilterVisible !== "0";
+}
+
+function pantryInventoryListRows(list) {
+    return Array.from(list ? list.children : []).filter(child => {
+        return child.matches && child.matches("[data-pantry-inventory-row]");
+    });
+}
+
+function removePantryInventorySectionHeaders(list) {
+    Array.from(list ? list.children : []).forEach(child => {
+        if (child.matches && child.matches("[data-pantry-section-header]")) {
+            child.remove();
+        }
+    });
+}
+
+function pantryInventorySectionGroups(list) {
+    const groups = [];
+    const groupBySection = new Map();
+
+    pantryInventoryListRows(list).forEach(row => {
+        const section = pantryInventorySectionValue(row);
+        let group = groupBySection.get(section);
+        if (!group) {
+            group = {
+                section,
+                rows: [],
+            };
+            groupBySection.set(section, group);
+            groups.push(group);
+        }
+        group.rows.push(row);
+    });
+
+    return groups;
+}
+
+function createPantryInventorySectionHeader(section, visibleCount, collapsed) {
+    const header = document.createElement("div");
+    const button = document.createElement("button");
+    const chevron = document.createElement("span");
+    const label = document.createElement("span");
+    const count = document.createElement("span");
+    const itemLabel = visibleCount === 1 ? "item" : "items";
+
+    header.className = "ai-pantry-inventory-section-header";
+    header.dataset.pantrySectionHeader = "1";
+    header.dataset.pantrySectionKey = section;
+
+    button.type = "button";
+    button.className = "ai-pantry-inventory-section-toggle";
+    button.dataset.pantrySectionToggle = "1";
+    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    button.setAttribute(
+        "aria-label",
+        `${collapsed ? "Expand" : "Collapse"} ${section} pantry section, ${visibleCount} ${itemLabel}`
+    );
+    button.addEventListener("click", () => {
+        togglePantryInventorySectionGroup(button);
+    });
+
+    chevron.className = "ai-pantry-inventory-section-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+
+    label.className = "ai-pantry-inventory-section-label";
+    label.textContent = section;
+
+    count.className = "ai-pantry-inventory-section-count";
+    count.dataset.pantrySectionCount = "1";
+    count.textContent = `(${visibleCount})`;
+
+    button.append(chevron, label, count);
+    header.append(button);
+    return header;
+}
+
+function updatePantryInventorySectionGrouping() {
+    const shouldGroup = pantryInventoryGroupBySectionIsEnabled();
+
+    document.querySelectorAll("[data-pantry-inventory-list]").forEach(list => {
+        removePantryInventorySectionHeaders(list);
+        const groups = pantryInventorySectionGroups(list);
+
+        if (!shouldGroup) {
+            groups.forEach(group => {
+                group.rows.forEach(row => {
+                    row.hidden = !pantryInventoryRowFilterVisible(row);
+                });
+            });
+            return;
+        }
+
+        groups.forEach(group => {
+            const visibleCount = group.rows.filter(row => pantryInventoryRowFilterVisible(row)).length;
+            const collapsed = pantryInventorySectionIsCollapsed(group.section);
+            const header = createPantryInventorySectionHeader(group.section, visibleCount, collapsed);
+            header.hidden = visibleCount === 0;
+            list.insertBefore(header, group.rows[0]);
+
+            group.rows.forEach(row => {
+                row.hidden = !pantryInventoryRowFilterVisible(row) || collapsed;
+            });
+        });
+    });
+}
+
+function setPantryInventoryGroupBySectionEnabled(enabled, options = {}) {
+    const shouldGroup = enabled === true;
+
+    document.querySelectorAll("[data-pantry-inventory-section-toggle]").forEach(toggle => {
+        toggle.checked = shouldGroup;
+    });
+
+    if (options.persist) {
+        localStorage.setItem(PANTRY_INVENTORY_GROUP_STORAGE_KEY, shouldGroup ? "1" : "0");
+    }
+
+    updatePantryInventorySectionGrouping();
+    updatePantryInventoryBulkDeleteState();
+}
+
+function setPantryInventorySectionCollapsed(section, collapsed) {
+    localStorage.setItem(
+        pantryInventorySectionStorageKey(section),
+        collapsed ? "1" : "0"
+    );
+    updatePantryInventorySectionGrouping();
+    updatePantryInventoryBulkDeleteState();
+}
+
+function togglePantryInventorySectionGroup(button) {
+    const header = button ? button.closest("[data-pantry-section-header]") : null;
+    const section = header ? header.dataset.pantrySectionKey || "" : "";
+
+    if (!section) {
+        return false;
+    }
+
+    setPantryInventorySectionCollapsed(section, !pantryInventorySectionIsCollapsed(section));
+    return false;
+}
+
+function expandPantryInventorySectionForRow(row) {
+    if (!row || !pantryInventoryGroupBySectionIsEnabled()) {
+        return;
+    }
+
+    const section = pantryInventorySectionValue(row);
+    if (!pantryInventorySectionIsCollapsed(section)) {
+        return;
+    }
+
+    setPantryInventorySectionCollapsed(section, false);
+}
+
+function bindPantryInventorySectionGrouping(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+    const toggles = [];
+
+    if (context.matches && context.matches("[data-pantry-inventory-section-toggle]")) {
+        toggles.push(context);
+    }
+    context.querySelectorAll("[data-pantry-inventory-section-toggle]").forEach(toggle => toggles.push(toggle));
+
+    toggles.forEach(toggle => {
+        toggle.checked = pantryInventoryGroupBySectionIsEnabled();
+
+        if (toggle.dataset.pantryInventorySectionToggleBound === "1") {
+            return;
+        }
+
+        toggle.dataset.pantryInventorySectionToggleBound = "1";
+        toggle.addEventListener("change", event => {
+            setPantryInventoryGroupBySectionEnabled(event.currentTarget.checked, { persist: true });
+        });
+    });
+
+    updatePantryInventorySectionGrouping();
 }
 
 function setPantryInventoryDetailsCollapsed(row, collapsed) {
@@ -31374,6 +31583,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindPantryLocationChoices", bindPantryLocationChoices],
         ["bindPantryInventoryDetails", bindPantryInventoryDetails],
         ["bindPantryInventoryBulkDelete", bindPantryInventoryBulkDelete],
+        ["bindPantryInventorySectionGrouping", bindPantryInventorySectionGrouping],
         ["bindPantryInventoryConfidenceToggle", bindPantryInventoryConfidenceToggle],
         ["bindPantryReceiptConfidenceToggle", bindPantryReceiptConfidenceToggle],
         ["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings],

@@ -213,7 +213,13 @@
                            aria-label="Show inventory confidence levels">
                     <span>Show Confidence</span>
                 </label>
-                {% if pantry_name_suggestion_filters.count %}
+                <label class="ai-pantry-confidence-toggle ai-pantry-inventory-group-toggle">
+                    <input type="checkbox"
+                           data-pantry-inventory-section-toggle
+                           aria-label="Group pantry inventory by store section">
+                    <span>Group by section</span>
+                </label>
+                {% if pantry_name_suggestion_filters.count|int > 0 %}
                     <div class="ai-pantry-name-question-nav"
                          data-pantry-name-question-nav
                          aria-label="Suggested item name navigation">
@@ -316,7 +322,8 @@
                         Delete Selected
                     </button>
                 </div>
-                <div class="ai-pantry-inventory-list ai-pantry-editor-list">
+                <div class="ai-pantry-inventory-list ai-pantry-editor-list"
+                     data-pantry-inventory-list>
                     {% for item in pantry_items %}
                         {% set item_source = item.source or "" %}
                         {% set item_is_receipt_source = item_source|lower == "receipt" or (item.source_receipt and item.source_receipt.receipt_id) %}

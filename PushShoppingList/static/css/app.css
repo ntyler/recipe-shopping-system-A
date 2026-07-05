@@ -20589,25 +20589,35 @@ body {
     font-weight: 800;
 }
 
-.ai-pantry-inventory-confidence-toggle {
+.ai-pantry-inventory-confidence-toggle,
+.ai-pantry-inventory-group-toggle {
     flex: 0 0 auto;
     justify-content: center;
     width: auto;
     min-width: max-content;
     min-height: 39px;
-    margin: 0 0 0 auto;
     padding-inline: 10px;
     cursor: pointer;
     white-space: nowrap;
 }
 
-.ai-pantry-search .ai-pantry-inventory-confidence-toggle {
+.ai-pantry-inventory-confidence-toggle {
+    margin: 0 0 0 auto;
+}
+
+.ai-pantry-inventory-group-toggle {
+    margin: 0;
+}
+
+.ai-pantry-search .ai-pantry-inventory-confidence-toggle,
+.ai-pantry-search .ai-pantry-inventory-group-toggle {
     flex: 0 0 auto;
     width: auto;
     max-width: 100%;
 }
 
-.ai-pantry-inventory-confidence-toggle span {
+.ai-pantry-inventory-confidence-toggle span,
+.ai-pantry-inventory-group-toggle span {
     flex: 0 0 auto;
     white-space: nowrap;
 }
@@ -20619,7 +20629,8 @@ body {
     accent-color: #38bdf8;
 }
 
-.ai-pantry-search .ai-pantry-inventory-confidence-toggle input {
+.ai-pantry-search .ai-pantry-inventory-confidence-toggle input,
+.ai-pantry-search .ai-pantry-inventory-group-toggle input {
     flex: 0 0 14px;
     width: 14px;
     min-width: 14px;
@@ -20916,6 +20927,75 @@ body {
     display: grid;
     gap: 10px;
     margin-top: 10px;
+}
+
+.ai-pantry-inventory-section-header {
+    min-width: 0;
+}
+
+.ai-pantry-inventory-section-header[hidden] {
+    display: none !important;
+}
+
+.ai-pantry-inventory-section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 38px;
+    margin: 0;
+    padding: 8px 11px;
+    border: 1px solid #315477;
+    border-radius: 8px;
+    background: rgba(10, 54, 88, 0.44);
+    color: #dbeafe;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.ai-pantry-inventory-section-toggle:hover,
+.ai-pantry-inventory-section-toggle:focus-visible {
+    border-color: #60a5fa;
+    background: rgba(14, 116, 144, 0.5);
+    color: #f8fafc;
+    outline: none;
+}
+
+.ai-pantry-inventory-section-chevron {
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg) translate(-1px, -1px);
+    transition: transform 0.15s ease;
+}
+
+.ai-pantry-inventory-section-toggle[aria-expanded="false"] .ai-pantry-inventory-section-chevron {
+    transform: rotate(-45deg);
+}
+
+.ai-pantry-inventory-section-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-pantry-inventory-section-count {
+    margin-left: auto;
+    border: 1px solid #315477;
+    border-radius: 999px;
+    padding: 2px 8px;
+    background: rgba(7, 17, 29, 0.62);
+    color: #c7e8ff;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
 .ai-pantry-item,
@@ -21217,6 +21297,10 @@ body {
     background:
         linear-gradient(145deg, rgba(18, 28, 41, 0.9), rgba(10, 16, 25, 0.96)),
         #0d1520;
+}
+
+.ai-pantry-inventory-row[hidden] {
+    display: none !important;
 }
 
 .ai-pantry-inventory-row-selected {
