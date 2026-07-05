@@ -138,6 +138,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-group-toggle" in css
     assert ".ai-pantry-inventory-confidence-toggle span" in css
     assert ".ai-pantry-search .ai-pantry-inventory-confidence-toggle input" in css
+    assert ".ai-pantry-inventory-group-toggle:has([data-pantry-inventory-section-toggle]:disabled)" in css
     assert "flex: 0 0 14px;" in css
     assert "white-space: nowrap;" in css
     assert "[data-pantry-inventory-confidence][hidden]" in css
@@ -214,6 +215,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "PANTRY_INVENTORY_GROUP_STORAGE_KEY" in js
     assert "PANTRY_INVENTORY_LOCATION_GROUP_STORAGE_KEY" in js
     assert "function pantryInventoryGroupByLocationIsEnabled" in js
+    assert "function syncPantryInventoryGroupingToggles" in js
+    assert "toggle.disabled = locationEnabled;" in js
+    assert "Section grouping is included because Location grouping uses section as level 2." in js
     assert "function pantryInventoryLocationGroups" in js
     assert "function bindPantryInventorySectionGrouping" in js
     assert "function updatePantryInventorySectionGrouping" in js

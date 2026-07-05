@@ -20641,6 +20641,11 @@ body {
     appearance: auto;
 }
 
+.ai-pantry-inventory-group-toggle:has([data-pantry-inventory-section-toggle]:disabled) {
+    cursor: default;
+    opacity: 0.82;
+}
+
 .move-bought-pantry-btn,
 .ai-pantry-action-btn,
 .ai-pantry-placeholder-actions a {

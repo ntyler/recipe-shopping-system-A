@@ -16220,6 +16220,28 @@ function pantryInventoryGroupByLocationIsEnabled() {
     return localStorage.getItem(PANTRY_INVENTORY_LOCATION_GROUP_STORAGE_KEY) === "1";
 }
 
+function syncPantryInventoryGroupingToggles() {
+    const locationEnabled = pantryInventoryGroupByLocationIsEnabled();
+    const sectionEnabled = pantryInventoryGroupBySectionIsEnabled() || locationEnabled;
+    const forcedSectionTitle = "Section grouping is included because Location grouping uses section as level 2.";
+
+    document.querySelectorAll("[data-pantry-inventory-section-toggle]").forEach(toggle => {
+        const label = toggle.closest(".ai-pantry-inventory-group-toggle");
+
+        toggle.checked = sectionEnabled;
+        toggle.disabled = locationEnabled;
+        toggle.setAttribute("aria-disabled", locationEnabled ? "true" : "false");
+
+        if (label) {
+            label.title = locationEnabled ? forcedSectionTitle : "";
+        }
+    });
+
+    document.querySelectorAll("[data-pantry-inventory-location-toggle]").forEach(toggle => {
+        toggle.checked = locationEnabled;
+    });
+}
+
 function pantryInventoryStorageKeyPart(value, fallback = "MISC") {
     return encodeURIComponent(String(value || fallback || "").trim() || fallback);
 }
@@ -16553,14 +16575,11 @@ function updatePantryInventorySectionGrouping() {
 function setPantryInventoryGroupBySectionEnabled(enabled, options = {}) {
     const shouldGroup = enabled === true;
 
-    document.querySelectorAll("[data-pantry-inventory-section-toggle]").forEach(toggle => {
-        toggle.checked = shouldGroup;
-    });
-
     if (options.persist) {
         localStorage.setItem(PANTRY_INVENTORY_GROUP_STORAGE_KEY, shouldGroup ? "1" : "0");
     }
 
+    syncPantryInventoryGroupingToggles();
     updatePantryInventorySectionGrouping();
     updatePantryInventoryBulkDeleteState();
 }
@@ -16568,14 +16587,11 @@ function setPantryInventoryGroupBySectionEnabled(enabled, options = {}) {
 function setPantryInventoryGroupByLocationEnabled(enabled, options = {}) {
     const shouldGroup = enabled === true;
 
-    document.querySelectorAll("[data-pantry-inventory-location-toggle]").forEach(toggle => {
-        toggle.checked = shouldGroup;
-    });
-
     if (options.persist) {
         localStorage.setItem(PANTRY_INVENTORY_LOCATION_GROUP_STORAGE_KEY, shouldGroup ? "1" : "0");
     }
 
+    syncPantryInventoryGroupingToggles();
     updatePantryInventorySectionGrouping();
     updatePantryInventoryBulkDeleteState();
 }
@@ -16681,8 +16697,6 @@ function bindPantryInventorySectionGrouping(root = document) {
     context.querySelectorAll("[data-pantry-inventory-location-toggle]").forEach(toggle => locationToggles.push(toggle));
 
     sectionToggles.forEach(toggle => {
-        toggle.checked = pantryInventoryGroupBySectionIsEnabled();
-
         if (toggle.dataset.pantryInventorySectionToggleBound === "1") {
             return;
         }
@@ -16694,8 +16708,6 @@ function bindPantryInventorySectionGrouping(root = document) {
     });
 
     locationToggles.forEach(toggle => {
-        toggle.checked = pantryInventoryGroupByLocationIsEnabled();
-
         if (toggle.dataset.pantryInventoryLocationToggleBound === "1") {
             return;
         }
@@ -16706,6 +16718,7 @@ function bindPantryInventorySectionGrouping(root = document) {
         });
     });
 
+    syncPantryInventoryGroupingToggles();
     updatePantryInventorySectionGrouping();
 }
 
