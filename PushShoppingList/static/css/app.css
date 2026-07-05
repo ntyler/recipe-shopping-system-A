@@ -20681,6 +20681,10 @@ body {
 }
 
 .ai-pantry-search {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    flex-wrap: wrap;
     margin: 10px 0;
 }
 
@@ -20701,6 +20705,40 @@ body {
     border-radius: 8px;
     padding: 10px 11px;
     font-size: 13px;
+}
+
+.ai-pantry-search input {
+    width: auto;
+    flex: 1 1 260px;
+    min-width: min(100%, 220px);
+}
+
+.ai-pantry-receipt-filter-btn {
+    flex: 0 0 auto;
+    min-height: 39px;
+    margin: 0;
+    padding: 9px 12px;
+    border: 1px solid #344154;
+    border-radius: 8px;
+    background: rgba(11, 17, 26, 0.78);
+    color: #d9eef2;
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.ai-pantry-receipt-filter-btn:hover,
+.ai-pantry-receipt-filter-btn:focus {
+    border-color: #60a5fa;
+    color: #f8fafc;
+}
+
+.ai-pantry-receipt-filter-btn[aria-pressed="true"],
+.ai-pantry-receipt-filter-btn.is-active {
+    border-color: #38bdf8;
+    background: rgba(14, 116, 144, 0.46);
+    color: #f8fafc;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.22);
 }
 
 .ai-pantry-inventory-list,

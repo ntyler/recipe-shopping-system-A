@@ -157,6 +157,14 @@
                        autocomplete="off"
                        oninput="filterPantryItems(this.value)"
                        aria-label="Search pantry items">
+                <button type="button"
+                        class="ai-pantry-receipt-filter-btn"
+                        data-pantry-receipt-filter
+                        aria-pressed="false"
+                        title="Show inventory items added from receipts"
+                        onclick="return togglePantryReceiptFilter(this)">
+                    Receipt Items
+                </button>
             </div>
 
             {% if pantry_items %}
@@ -183,6 +191,8 @@
                 </div>
                 <div class="ai-pantry-inventory-list ai-pantry-editor-list">
                     {% for item in pantry_items %}
+                        {% set item_source = item.source or "" %}
+                        {% set item_is_receipt_source = item_source|lower == "receipt" or (item.source_receipt and item.source_receipt.receipt_id) %}
                         <article class="ai-pantry-item ai-pantry-inventory-row ai-pantry-inventory-row-collapsed"
                                  data-pantry-item
                                  data-pantry-inventory-row
@@ -192,10 +202,11 @@
                                  data-pantry-unit="{{ item.unit }}"
                                  data-pantry-category="{{ item.category }}"
                                  data-pantry-store-section="{{ item.store_section }}"
-                                 data-pantry-source="{{ item.source }}"
+                                 data-pantry-source="{{ item_source }}"
+                                 data-pantry-receipt-source="{% if item_is_receipt_source %}1{% else %}0{% endif %}"
                                  data-pantry-storage="{{ item.storage_location }}"
                                  data-pantry-status="{{ item.status }}"
-                                 data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.store_section ~ ' ' ~ item.category ~ ' ' ~ item.source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">
+                                 data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.store_section ~ ' ' ~ item.category ~ ' ' ~ item_source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">
                             <span class="recipe-edit-row-handle ai-pantry-inventory-handle" aria-hidden="true"></span>
                             <span class="recipe-edit-row-number ai-pantry-inventory-number">{{ loop.index }}</span>
                             <label class="ai-pantry-inventory-select"
@@ -225,7 +236,7 @@
                                 <div class="ai-pantry-item-meta">
                                     <span>{{ item.quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</span>
                                     <span>{{ item.store_section or "MISC" }}</span>
-                                    <span>{{ item.source }}</span>
+                                    <span>{{ item_source }}</span>
                                     <span class="confidence-pill confidence-{{ item.confidence_label|lower }}">{{ item.confidence_label }}</span>
                                     <span class="pantry-lifecycle-badge pantry-lifecycle-{{ item.lifecycle_status.urgency }}">{{ item.lifecycle_status.label }}</span>
                                 </div>

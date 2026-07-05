@@ -22,7 +22,11 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "pantryBulkDeleteForm" in template
     assert "Delete Selected" in template
     assert "data-pantry-inventory-select-visible" in template
+    assert "data-pantry-receipt-filter" in template
+    assert "Receipt Items" in template
+    assert "togglePantryReceiptFilter(this)" in template
     assert "data-pantry-store-section" in template
+    assert "data-pantry-receipt-source" in template
     assert "pantry_storage_locations" in template
     assert "pantry_storage_location_values" in template
     assert "pantry_has_removable_storage_locations" in template
@@ -89,6 +93,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-details-icon" in css
     assert ".ai-pantry-inventory-row-collapsed .ai-pantry-inventory-notes-preview" in css
     assert ".ai-pantry-inventory-bulk-actions" in css
+    assert ".ai-pantry-receipt-filter-btn" in css
+    assert '.ai-pantry-receipt-filter-btn[aria-pressed="true"]' in css
     assert ".ai-pantry-location-manager" in css
     assert 'grid-template-areas: "locations controls";' in css
     assert ".ai-pantry-location-form" in css
@@ -121,6 +127,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "@media (max-width: 980px)" in css
     assert ".ai-pantry-card {\n    border: 0;" in css
     assert "background: transparent;" in css
+    assert "function togglePantryReceiptFilter" in js
+    assert "function pantryItemMatchesReceiptFilter" in js
+    assert 'item.dataset.pantryReceiptSource === "1"' in js
+    assert "pantryItemMatchesReceiptFilter(item, receiptOnly)" in js
     assert "function togglePantryInventoryDetails" in js
     assert "function bindPantryLocationChoices" in js
     assert "function bindPantryInventoryDetails" in js
@@ -166,6 +176,8 @@ def test_ai_pantry_inventory_renders_inventory_heading():
     assert "ai-pantry-inventory-section" in html
     assert "ai-pantry-inventory-count" in html
     assert "ai-pantry-location-manager" in html
+    assert "data-pantry-receipt-filter" in html
+    assert "Receipt Items" in html
     assert "Pantry" in html
     assert "Fridge" in html
     assert "Freezer" in html

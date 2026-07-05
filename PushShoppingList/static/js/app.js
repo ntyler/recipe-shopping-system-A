@@ -15531,13 +15531,46 @@ function toggleItemCheckbox(row, checkbox, itemText, key) {
     checkbox.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+function pantryReceiptFilterIsActive() {
+    return Array.from(document.querySelectorAll("[data-pantry-receipt-filter]")).some(button => {
+        return button.getAttribute("aria-pressed") === "true";
+    });
+}
+
+function syncPantryReceiptFilterButtons(active) {
+    document.querySelectorAll("[data-pantry-receipt-filter]").forEach(button => {
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+        button.classList.toggle("is-active", Boolean(active));
+    });
+}
+
+function pantryItemMatchesReceiptFilter(item, receiptOnly) {
+    if (!receiptOnly) {
+        return true;
+    }
+
+    const source = String(item.dataset.pantrySource || "").trim().toLowerCase();
+    return item.dataset.pantryReceiptSource === "1" || source === "receipt";
+}
+
+function togglePantryReceiptFilter(button) {
+    const nextActive = !(button && button.getAttribute("aria-pressed") === "true");
+    const searchInput = document.getElementById("pantrySearchInput");
+
+    syncPantryReceiptFilterButtons(nextActive);
+    filterPantryItems(searchInput ? searchInput.value : "");
+    return false;
+}
+
 function filterPantryItems(value) {
     const query = String(value || "").trim().toLowerCase();
+    const receiptOnly = pantryReceiptFilterIsActive();
     let visibleCount = 0;
 
     document.querySelectorAll("[data-pantry-item]").forEach(item => {
         const searchText = item.dataset.pantrySearch || item.textContent || "";
-        const visible = !query || searchText.toLowerCase().includes(query);
+        const matchesQuery = !query || searchText.toLowerCase().includes(query);
+        const visible = matchesQuery && pantryItemMatchesReceiptFilter(item, receiptOnly);
         item.hidden = !visible;
 
         if (visible) {
@@ -15546,7 +15579,10 @@ function filterPantryItems(value) {
     });
 
     document.querySelectorAll("[data-pantry-search-empty]").forEach(empty => {
-        empty.hidden = !query || visibleCount > 0;
+        empty.hidden = (!query && !receiptOnly) || visibleCount > 0;
+        empty.textContent = receiptOnly
+            ? (query ? "No receipt pantry items match that search." : "No pantry items from receipts.")
+            : "No pantry items match that search.";
     });
 
     updatePantryInventoryBulkDeleteState();
