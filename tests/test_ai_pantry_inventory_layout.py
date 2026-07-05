@@ -83,6 +83,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert frozen_on_index < store_section_index < source_link_index < notes_index
     assert "recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap" in template
     assert "ai-pantry-inventory-row-collapsed" in template
+    assert 'id="pantryItem-{{ item.id }}"' in template
+    assert 'data-pantry-item-id="{{ item.id }}"' in template
+    assert 'tabindex="-1"' in template
     assert "data-pantry-inventory-row" in template
     assert "data-pantry-inventory-details" in template
     assert "data-pantry-inventory-details-toggle" in template
@@ -187,6 +190,15 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert 'activeFilters.has("receipt")' in js
     assert 'activeFilters.has("image")' in js
     assert "function togglePantryInventoryDetails" in js
+    assert "function targetIdFromHash" in js
+    assert 'String(targetId || "").startsWith("pantryItem-")' in js
+    assert "function accountPanelKeyFromHash" in js
+    assert 'targetIdFromHash(hashValue).startsWith("pantryItem-")' in js
+    assert "function scrollToLazySectionTarget" in js
+    assert "setPantryInventoryDetailsCollapsed(target, false);" in js
+    assert "openAiPantryPanel({ targetId: hashTargetId });" in js
+    assert "loadLazySection(hashSection, { focus: true, targetId: hashTargetId });" in js
+    assert "const hashPanelKey = accountPanelKeyFromHash();" in js
     assert '"#aiPantryInventory": "aiPantry"' in js
     assert '"#aiPantryLocations": "aiPantry"' in js
     assert 'aiPantryInventory: "pantry"' in js

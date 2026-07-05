@@ -221,7 +221,25 @@ function lazySectionElement(sectionName) {
     return document.querySelector(`[data-lazy-section="${sectionName}"]`);
 }
 
+function targetIdFromHash(hash = window.location.hash) {
+    const rawTargetId = String(hash || "").replace(/^#/, "");
+
+    if (!rawTargetId) {
+        return "";
+    }
+
+    try {
+        return decodeURIComponent(rawTargetId);
+    } catch (error) {
+        return rawTargetId;
+    }
+}
+
 function lazySectionFromTargetId(targetId) {
+    if (String(targetId || "").startsWith("pantryItem-")) {
+        return "pantry";
+    }
+
     const sectionsByTargetId = {
         adminSupportSection: "admin-support",
         aiPantryAddItems: "pantry",
@@ -245,6 +263,45 @@ function lazySectionFromTargetId(targetId) {
     };
 
     return sectionsByTargetId[targetId] || "";
+}
+
+function accountPanelKeyFromHash(hash = window.location.hash) {
+    const hashValue = String(hash || "");
+
+    if (targetIdFromHash(hashValue).startsWith("pantryItem-")) {
+        return "aiPantry";
+    }
+
+    return USER_ACCOUNT_PANEL_HASH_KEYS[hashValue] || "";
+}
+
+function scrollToLazySectionTarget(targetId, fallbackTarget = null, options = {}) {
+    const target = targetId ? document.getElementById(targetId) : null;
+    const scrollTarget = target || fallbackTarget;
+
+    if (!scrollTarget || typeof scrollTarget.scrollIntoView !== "function") {
+        return false;
+    }
+
+    if (
+        target
+        && target.matches
+        && target.matches("[data-pantry-inventory-row]")
+        && typeof setPantryInventoryDetailsCollapsed === "function"
+    ) {
+        setPantryInventoryDetailsCollapsed(target, false);
+    }
+
+    scrollTarget.scrollIntoView({
+        behavior: options.behavior || "smooth",
+        block: options.block || "start",
+    });
+
+    if (target && options.focusTarget !== false && typeof target.focus === "function") {
+        target.focus({ preventScroll: true });
+    }
+
+    return Boolean(target);
 }
 
 function lazySectionStatusElement(placeholder) {
@@ -3239,6 +3296,13 @@ async function loadLazySection(sectionName, options = {}) {
     }
 
     if (placeholder.dataset.lazyLoaded === "1") {
+        if (options.focus) {
+            window.requestAnimationFrame(() => {
+                scrollToLazySectionTarget(options.targetId || "", placeholder, {
+                    focusTarget: Boolean(options.targetId),
+                });
+            });
+        }
         return placeholder;
     }
 
@@ -3318,7 +3382,9 @@ async function loadLazySection(sectionName, options = {}) {
 
             if (options.focus) {
                 window.requestAnimationFrame(() => {
-                    nextElement.scrollIntoView({ behavior: "smooth", block: "start" });
+                    scrollToLazySectionTarget(options.targetId || "", nextElement, {
+                        focusTarget: Boolean(options.targetId),
+                    });
                 });
             }
 
@@ -3378,15 +3444,15 @@ function initLazySections() {
         return;
     }
 
-    const hashTargetId = (window.location.hash || "").replace(/^#/, "");
+    const hashTargetId = targetIdFromHash();
     const hashSection = hashTargetId ? lazySectionFromTargetId(hashTargetId) : "";
     if (hashSection) {
         if (hashSection === "pantry" && document.querySelector("[data-ai-pantry-panel]")) {
-            openAiPantryPanel();
+            openAiPantryPanel({ targetId: hashTargetId });
             return;
         }
 
-        loadLazySection(hashSection, { focus: true });
+        loadLazySection(hashSection, { focus: true, targetId: hashTargetId });
         return;
     }
 
@@ -3882,7 +3948,7 @@ function shouldRestoreAccountPanelOpen(panelKey) {
         return false;
     }
 
-    const hashPanelKey = USER_ACCOUNT_PANEL_HASH_KEYS[window.location.hash || ""];
+    const hashPanelKey = accountPanelKeyFromHash();
     if (hashPanelKey && hashPanelKey !== panelKey) {
         return false;
     }
@@ -4745,7 +4811,7 @@ function expandJobActivityContent() {
     }
 }
 
-async function openAiPantryPanel() {
+async function openAiPantryPanel(options = {}) {
     const panel = document.querySelector("[data-ai-pantry-panel]");
 
     if (!panel) {
@@ -4773,12 +4839,15 @@ async function openAiPantryPanel() {
 
     window.requestAnimationFrame(() => {
         const loadedPanel = document.querySelector("[data-ai-pantry-panel]") || activePanel;
-        loadedPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        const targetId = options.targetId || "";
+        const foundTarget = scrollToLazySectionTarget(targetId, loadedPanel, {
+            focusTarget: Boolean(targetId),
+        });
         const firstControl = loadedPanel.querySelector("[data-ai-pantry-close]")
             || loadedPanel.querySelector("[data-collapse-toggle='ai-pantry']")
             || loadedPanel.querySelector("button, input, select, textarea");
 
-        if (firstControl) {
+        if (!foundTarget && firstControl) {
             firstControl.focus({ preventScroll: true });
         }
     });

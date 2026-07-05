@@ -292,7 +292,7 @@ def test_update_pantry_item_route_persists_inventory_row_changes(monkeypatch, tm
     item = inventory["items"][0]
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/#aiPantryInventory")
+    assert response.headers["Location"].endswith("/#pantryItem-green-onion-1")
     assert item["quantity"] == 2
     assert item["unit"] == "bunch"
     assert item["storage_location"] == "xxx"

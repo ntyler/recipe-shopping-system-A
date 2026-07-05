@@ -291,9 +291,12 @@
                         {% set item_receipt_id = item.source_receipt.receipt_id if item.source_receipt and item.source_receipt.receipt_id else "" %}
                         {% set item_receipt_file_kind = "pdf" if item.source_receipt and item.source_receipt.receipt_id and item.source_receipt.is_pdf else ("image" if item.source_receipt and item.source_receipt.receipt_id else "") %}
                         {% set item_is_image_source = item_source|lower == "photo" or item.image_url or item_receipt_file_kind == "image" %}
-                        <article class="ai-pantry-item ai-pantry-inventory-row ai-pantry-inventory-row-collapsed"
+                        <article id="pantryItem-{{ item.id }}"
+                                 class="ai-pantry-item ai-pantry-inventory-row ai-pantry-inventory-row-collapsed"
+                                 tabindex="-1"
                                  data-pantry-item
                                  data-pantry-inventory-row
+                                 data-pantry-item-id="{{ item.id }}"
                                  data-pantry-ingredient="{{ item.ingredient_name }}"
                                  data-pantry-product="{{ item.product_name }}"
                                  data-pantry-quantity="{{ item.quantity }}"

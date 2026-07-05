@@ -107,7 +107,8 @@ def update_pantry_item_route(item_id):
         },
     )
     pantry_message("success" if result.get("ok") else "error", "Pantry item updated." if result.get("ok") else result.get("error", "Unable to update pantry item."))
-    return redirect(url_for("main_bp.index", _anchor="aiPantryInventory"))
+    anchor = f"pantryItem-{item_id}" if result.get("ok") else "aiPantryInventory"
+    return redirect(url_for("main_bp.index", _anchor=anchor))
 
 
 @pantry_bp.route("/pantry/locations/add", methods=["POST"])
