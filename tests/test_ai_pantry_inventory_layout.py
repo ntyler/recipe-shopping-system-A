@@ -38,6 +38,21 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-row" in css
     assert ".ai-pantry-inventory-header .recipe-edit-section-title h3" in css
     assert "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row" in css
+    assert (
+        "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row {\n"
+        "    grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;"
+    ) in css
+    assert (
+        "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-select {\n"
+        "    grid-column: 3 / 4;\n"
+        "    grid-row: 1;\n"
+        "}"
+    ) in css
+    assert (
+        "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-name {\n"
+        "    grid-column: 4 / 5;\n"
+        "    grid-row: 1;"
+    ) in css
     assert ".ai-pantry-inventory-row-collapsed {" in css
     assert ".ai-pantry-inventory-details-toggle" in css
     assert ".ai-pantry-inventory-details-icon" in css

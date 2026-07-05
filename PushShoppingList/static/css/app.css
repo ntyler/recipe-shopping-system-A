@@ -20815,7 +20815,7 @@ body {
 
 .ai-pantry-inventory-row {
     display: grid;
-    grid-template-columns: 26px 54px 34px minmax(210px, 1.15fr) minmax(360px, 2fr) 42px;
+    grid-template-columns: 26px 54px 44px minmax(210px, 1.15fr) minmax(360px, 2fr) 42px;
     gap: 14px 18px;
     align-items: center;
     min-height: 128px;
@@ -21128,7 +21128,7 @@ body {
 }
 
 #aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row {
-    grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
+    grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;
     gap: 12px;
     min-height: 0;
     padding: 14px;
@@ -21147,13 +21147,18 @@ body {
     font-size: 16px;
 }
 
-#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-name {
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-select {
     grid-column: 3 / 4;
     grid-row: 1;
 }
 
-#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-menu-wrap {
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-name {
     grid-column: 4 / 5;
+    grid-row: 1;
+}
+
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-menu-wrap {
+    grid-column: 5 / 6;
     grid-row: 1;
 }
 
@@ -21717,7 +21722,7 @@ body {
 
 @media (max-width: 980px) {
     .ai-pantry-inventory-row {
-        grid-template-columns: 24px 44px 34px minmax(0, 1fr) 42px;
+        grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;
         gap: 12px;
         min-height: 0;
         padding: 14px;
@@ -22011,7 +22016,7 @@ body {
     }
 
     .ai-pantry-inventory-row {
-        grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
+        grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;
         gap: 12px;
         min-height: 0;
         padding: 14px;
@@ -22030,13 +22035,18 @@ body {
         font-size: 16px;
     }
 
-    .ai-pantry-inventory-name {
+    .ai-pantry-inventory-select {
         grid-column: 3 / 4;
         grid-row: 1;
     }
 
-    .ai-pantry-inventory-menu-wrap {
+    .ai-pantry-inventory-name {
         grid-column: 4 / 5;
+        grid-row: 1;
+    }
+
+    .ai-pantry-inventory-menu-wrap {
+        grid-column: 5 / 6;
         grid-row: 1;
     }
 
