@@ -20761,7 +20761,8 @@ body {
 
 .ai-pantry-location-manager {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    grid-template-areas: "locations controls";
     gap: 10px;
     align-items: end;
     margin: 10px 0;
@@ -20772,6 +20773,7 @@ body {
 }
 
 .ai-pantry-location-list {
+    grid-area: locations;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -20867,10 +20869,12 @@ body {
 }
 
 .ai-pantry-location-control-stack {
+    grid-area: controls;
+    width: min(100%, 340px);
+    justify-self: end;
     display: grid;
     gap: 8px;
     align-items: end;
-    min-width: min(100%, 340px);
 }
 
 .ai-pantry-location-update-actions {
@@ -20878,6 +20882,7 @@ body {
     flex-wrap: wrap;
     gap: 6px;
     justify-content: flex-end;
+    width: 100%;
 }
 
 .ai-pantry-location-remove-btn {
@@ -20903,7 +20908,7 @@ body {
     gap: 8px;
     align-items: end;
     justify-content: flex-end;
-    min-width: min(100%, 330px);
+    width: 100%;
 }
 
 .ai-pantry-location-form label {
@@ -22220,6 +22225,17 @@ body {
     .ai-pantry-location-form {
         grid-template-columns: 1fr;
         align-items: stretch;
+    }
+
+    .ai-pantry-location-manager {
+        grid-template-areas:
+            "locations"
+            "controls";
+    }
+
+    .ai-pantry-location-control-stack {
+        width: 100%;
+        justify-self: stretch;
     }
 
     .ai-pantry-location-form {

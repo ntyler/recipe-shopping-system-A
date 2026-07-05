@@ -39,6 +39,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "data-pantry-location-edit-input" in template
     assert "ai-pantry-location-remove-btn" in template
     assert "data-pantry-location-remove-selected" in template
+    location_controls_index = template.index('class="ai-pantry-location-control-stack"')
+    save_updates_index = template.index('aria-label="Save pantry location updates"', location_controls_index)
+    add_location_form_index = template.index('class="ai-pantry-location-form"', location_controls_index)
+    assert location_controls_index < save_updates_index < add_location_form_index
     assert 'role="checkbox"' in template
     assert 'aria-checked="false"' in template
     assert 'name="store_section"' in template
@@ -86,7 +90,11 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-row-collapsed .ai-pantry-inventory-notes-preview" in css
     assert ".ai-pantry-inventory-bulk-actions" in css
     assert ".ai-pantry-location-manager" in css
+    assert 'grid-template-areas: "locations controls";' in css
     assert ".ai-pantry-location-form" in css
+    assert ".ai-pantry-location-control-stack" in css
+    assert "justify-self: end;" in css
+    assert "grid-area: controls;" in css
     assert ".ai-pantry-location-choice" in css
     assert ".ai-pantry-location-choice-check" in css
     assert "opacity: 0;" in css
