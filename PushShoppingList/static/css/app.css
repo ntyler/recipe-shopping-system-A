@@ -21077,8 +21077,7 @@ body {
     font-weight: 850;
 }
 
-.ai-pantry-inventory-select-visible input,
-.ai-pantry-inventory-select input {
+.ai-pantry-inventory-select-visible input {
     width: 17px;
     height: 17px;
     margin: 0;
@@ -21111,7 +21110,7 @@ body {
 
 .ai-pantry-inventory-row {
     display: grid;
-    grid-template-columns: 26px 54px 44px minmax(210px, 1.15fr) minmax(360px, 2fr) 42px;
+    grid-template-columns: 26px 54px minmax(210px, 1.15fr) minmax(360px, 2fr) 42px;
     gap: 14px 18px;
     align-items: center;
     min-height: 128px;
@@ -21145,45 +21144,37 @@ body {
     grid-column: 2 / 3;
     grid-row: 1;
     align-self: start;
+    position: relative;
     width: 44px;
     height: 44px;
     font-size: 18px;
-}
-
-.ai-pantry-inventory-select {
-    grid-column: 3 / 4;
-    grid-row: 1;
-    align-self: start;
-    justify-self: center;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    min-height: 44px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: rgba(15, 23, 42, 0.36);
     cursor: pointer;
     transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.ai-pantry-inventory-select:hover,
-.ai-pantry-inventory-select:focus-within {
+.ai-pantry-inventory-number:hover,
+.ai-pantry-inventory-number:focus-within {
     border-color: #38bdf8;
     background: rgba(14, 116, 144, 0.22);
     box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.14);
 }
 
-.ai-pantry-inventory-select input {
-    width: 20px;
-    height: 20px;
+.ai-pantry-inventory-number:has([data-pantry-inventory-checkbox]:checked) {
+    border-color: #22c55e;
+    background: rgba(22, 101, 52, 0.5);
+    color: #dcfce7;
+}
+
+.ai-pantry-inventory-number input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
     cursor: pointer;
 }
 
 .ai-pantry-inventory-name {
-    grid-column: 4 / 5;
+    grid-column: 3 / 4;
     grid-row: 1;
     min-width: 0;
 }
@@ -21207,7 +21198,7 @@ body {
 }
 
 .ai-pantry-inventory-row .ai-pantry-inline-form {
-    grid-column: 5 / 6;
+    grid-column: 4 / 5;
     grid-row: 1;
     display: grid;
     grid-template-columns: repeat(4, minmax(104px, 1fr));
@@ -21332,7 +21323,7 @@ body {
 }
 
 .ai-pantry-inventory-menu-wrap {
-    grid-column: 6 / 7;
+    grid-column: 5 / 6;
     grid-row: 1;
     align-self: start;
     justify-self: end;
@@ -21343,14 +21334,14 @@ body {
 }
 
 .ai-pantry-inventory-row-collapsed {
-    grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;
+    grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
     gap: 12px;
     min-height: 0;
     padding: 14px;
 }
 
 .ai-pantry-inventory-row-collapsed .ai-pantry-inventory-menu-wrap {
-    grid-column: 5 / 6;
+    grid-column: 4 / 5;
 }
 
 .ai-pantry-inventory-details-toggle {
@@ -21486,7 +21477,7 @@ body {
 }
 
 #aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row {
-    grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;
+    grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
     gap: 12px;
     min-height: 0;
     padding: 14px;
@@ -21505,18 +21496,13 @@ body {
     font-size: 16px;
 }
 
-#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-select {
+#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-name {
     grid-column: 3 / 4;
     grid-row: 1;
 }
 
-#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-name {
-    grid-column: 4 / 5;
-    grid-row: 1;
-}
-
 #aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-menu-wrap {
-    grid-column: 5 / 6;
+    grid-column: 4 / 5;
     grid-row: 1;
 }
 
@@ -22080,7 +22066,7 @@ body {
 
 @media (max-width: 980px) {
     .ai-pantry-inventory-row {
-        grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;
+        grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
         gap: 12px;
         min-height: 0;
         padding: 14px;
@@ -22099,18 +22085,13 @@ body {
         font-size: 16px;
     }
 
-    .ai-pantry-inventory-select {
+    .ai-pantry-inventory-name {
         grid-column: 3 / 4;
         grid-row: 1;
     }
 
-    .ai-pantry-inventory-name {
-        grid-column: 4 / 5;
-        grid-row: 1;
-    }
-
     .ai-pantry-inventory-menu-wrap {
-        grid-column: 5 / 6;
+        grid-column: 4 / 5;
         grid-row: 1;
     }
 
@@ -22400,7 +22381,7 @@ body {
     }
 
     .ai-pantry-inventory-row {
-        grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;
+        grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
         gap: 12px;
         min-height: 0;
         padding: 14px;
@@ -22419,18 +22400,13 @@ body {
         font-size: 16px;
     }
 
-    .ai-pantry-inventory-select {
+    .ai-pantry-inventory-name {
         grid-column: 3 / 4;
         grid-row: 1;
     }
 
-    .ai-pantry-inventory-name {
-        grid-column: 4 / 5;
-        grid-row: 1;
-    }
-
     .ai-pantry-inventory-menu-wrap {
-        grid-column: 5 / 6;
+        grid-column: 4 / 5;
         grid-row: 1;
     }
 

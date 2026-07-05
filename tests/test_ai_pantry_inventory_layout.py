@@ -19,6 +19,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "ai-pantry-inventory-row" in template
     assert "recipe-edit-row-number ai-pantry-inventory-number" in template
     assert "data-pantry-inventory-checkbox" in template
+    assert 'class="ai-pantry-inventory-select"' not in template
     assert "pantryBulkDeleteForm" in template
     assert "Delete Selected" in template
     assert "data-pantry-inventory-select-visible" in template
@@ -93,17 +94,11 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row" in css
     assert (
         "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row {\n"
-        "    grid-template-columns: 24px 44px 44px minmax(0, 1fr) 42px;"
-    ) in css
-    assert (
-        "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-select {\n"
-        "    grid-column: 3 / 4;\n"
-        "    grid-row: 1;\n"
-        "}"
+        "    grid-template-columns: 24px 44px minmax(0, 1fr) 42px;"
     ) in css
     assert (
         "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-name {\n"
-        "    grid-column: 4 / 5;\n"
+        "    grid-column: 3 / 4;\n"
         "    grid-row: 1;"
     ) in css
     assert ".ai-pantry-inventory-row-collapsed {" in css
@@ -134,8 +129,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "flex: 0 1 auto;" in css
     assert ".ai-pantry-location-save-btn" in css
     assert ".ai-pantry-location-remove-btn" in css
-    assert ".ai-pantry-inventory-select" in css
-    assert ".ai-pantry-inventory-select:hover" in css
+    assert ".ai-pantry-inventory-number:hover" in css
+    assert ".ai-pantry-inventory-number:has([data-pantry-inventory-checkbox]:checked)" in css
     assert "min-width: 44px;" in css
     assert ".ai-pantry-meta-store-section select" not in css
     assert ".ai-pantry-delete-selected-btn" in css
@@ -149,7 +144,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-row .ai-pantry-inventory-notes-label" in css
     assert ".ai-pantry-inventory-handle {\n    grid-column: 1 / 2;\n    grid-row: 1;\n    align-self: start;" in css
     assert ".ai-pantry-inventory-number {\n    grid-column: 2 / 3;\n    grid-row: 1;\n    align-self: start;" in css
-    assert ".ai-pantry-inventory-menu-wrap {\n    grid-column: 6 / 7;\n    grid-row: 1;\n    align-self: start;" in css
+    assert ".ai-pantry-inventory-menu-wrap {\n    grid-column: 5 / 6;\n    grid-row: 1;\n    align-self: start;" in css
     assert "grid-column: 1 / -1;" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inline-form textarea" in css
     assert "min-height: 58px;" in css
@@ -181,6 +176,13 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert 'activeFilters.has("receipt")' in js
     assert 'activeFilters.has("image")' in js
     assert "function togglePantryInventoryDetails" in js
+    assert '"#aiPantryInventory": "aiPantry"' in js
+    assert '"#aiPantryLocations": "aiPantry"' in js
+    assert 'aiPantryInventory: "pantry"' in js
+    assert 'aiPantryLocations: "pantry"' in js
+    assert "function submitPantryInventoryUpdate" in js
+    assert "form.requestSubmit();" in js
+    assert "onclick=\"return submitPantryInventoryUpdate(this)\"" in template
     assert "function resizePantryLocationEditInput" in js
     assert "resizePantryLocationEditInput(input);" in js
     assert 'input.addEventListener("input", event => {' in js

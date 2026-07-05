@@ -310,9 +310,9 @@
                                  data-pantry-status="{{ item.status }}"
                                  data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.store_section ~ ' ' ~ item.category ~ ' ' ~ item_source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">
                             <span class="recipe-edit-row-handle ai-pantry-inventory-handle" aria-hidden="true"></span>
-                            <span class="recipe-edit-row-number ai-pantry-inventory-number">{{ loop.index }}</span>
-                            <label class="ai-pantry-inventory-select"
+                            <label class="recipe-edit-row-number ai-pantry-inventory-number"
                                    title="Select {{ item.ingredient_name }}">
+                                <span>{{ loop.index }}</span>
                                 <input type="checkbox"
                                        name="pantry_item_id"
                                        value="{{ item.id }}"
@@ -561,7 +561,9 @@
                                     <span aria-hidden="true"></span>
                                 </button>
                                 <div class="recipe-edit-row-menu ai-pantry-inventory-menu" hidden>
-                                    <button type="submit" form="pantryUpdate{{ loop.index }}">Save inventory item</button>
+                                    <button type="submit"
+                                            form="pantryUpdate{{ loop.index }}"
+                                            onclick="return submitPantryInventoryUpdate(this)">Save inventory item</button>
                                     <button type="submit" form="pantryOpen{{ loop.index }}">Mark opened today</button>
                                     <button type="submit" form="pantryFreeze{{ loop.index }}">Mark frozen</button>
                                     <button type="submit" form="pantryDismiss{{ loop.index }}">Dismiss reminders today</button>

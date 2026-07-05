@@ -125,7 +125,15 @@ const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#userProfileEditForm": "accountSettings",
     "#accountNoticesPanel": "accountNotices",
     "#accountUsageDashboardPanel": "usageDashboard",
+    "#aiPantryAddItems": "aiPantry",
+    "#aiPantryCookWhatImFeeling": "aiPantry",
+    "#aiPantryCookWithWhatIHave": "aiPantry",
+    "#aiPantryInventory": "aiPantry",
+    "#aiPantryLocations": "aiPantry",
+    "#aiPantryMissingIngredients": "aiPantry",
     "#aiPantrySection": "aiPantry",
+    "#aiPantryUploadReceipt": "aiPantry",
+    "#aiPantryUseSoon": "aiPantry",
     "#adminSupportSection": "adminSupport",
     "#chatGptModelsSection": "chatGptModels",
     "#jobActivitySection": "jobActivity",
@@ -216,6 +224,14 @@ function lazySectionElement(sectionName) {
 function lazySectionFromTargetId(targetId) {
     const sectionsByTargetId = {
         adminSupportSection: "admin-support",
+        aiPantryAddItems: "pantry",
+        aiPantryCookWhatImFeeling: "pantry",
+        aiPantryCookWithWhatIHave: "pantry",
+        aiPantryInventory: "pantry",
+        aiPantryLocations: "pantry",
+        aiPantryMissingIngredients: "pantry",
+        aiPantryUploadReceipt: "pantry",
+        aiPantryUseSoon: "pantry",
         aiPantrySection: "pantry",
         currentRecipeUrlLogCard: "current-recipes",
         cookbooksCard: "cookbooks",
@@ -16018,6 +16034,25 @@ function togglePantryInventoryDetails(button) {
     const shouldExpand = row ? row.classList.contains("ai-pantry-inventory-row-collapsed") : false;
     closeRecipeEditRowMenus();
     setPantryInventoryDetailsCollapsed(row, !shouldExpand);
+    return false;
+}
+
+function submitPantryInventoryUpdate(button) {
+    const formId = button ? button.getAttribute("form") : "";
+    const form = formId ? document.getElementById(formId) : null;
+
+    if (!form) {
+        return true;
+    }
+
+    closeRecipeEditRowMenus();
+
+    if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+    } else {
+        form.submit();
+    }
+
     return false;
 }
 

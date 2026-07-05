@@ -241,6 +241,69 @@ def test_update_pantry_storage_location_route_renames_custom_location(monkeypatc
     assert "garage-freezer" in inventory["storage_locations"]
 
 
+def test_update_pantry_item_route_persists_inventory_row_changes(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    pantry_service.save_pantry_inventory(
+        {
+            "storage_locations": ["fridge", "xxx"],
+            "items": [
+                {
+                    "id": "green-onion-1",
+                    "ingredient_name": "green onion",
+                    "product_name": "Green Onions",
+                    "quantity": 1,
+                    "unit": "",
+                    "source": "receipt",
+                    "store_section": "PRODUCE",
+                    "storage_location": "fridge",
+                    "status": "available",
+                    "purchased_date": "2026-06-28",
+                    "expiration_date": "2026-07-05",
+                    "freeze_by_date": "2026-07-03",
+                    "notes": "old note",
+                }
+            ],
+        },
+        user_id="pantry-route-user",
+    )
+
+    with app.test_client() as client:
+        sign_in(client, "pantry-route-user")
+        response = client.post(
+            "/pantry/items/green-onion-1/update",
+            data={
+                "quantity": "2",
+                "unit": "bunch",
+                "storage_location": "xxx",
+                "status": "opened",
+                "purchased_date": "2026-06-29",
+                "opened_date": "2026-07-04",
+                "expiration_date": "2026-07-06",
+                "freeze_by_date": "2026-07-04",
+                "frozen_date": "",
+                "store_section": "PRODUCE",
+                "notes": "updated from row menu",
+            },
+        )
+
+    inventory = pantry_service.load_pantry_inventory(user_id="pantry-route-user")
+    item = inventory["items"][0]
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/#aiPantryInventory")
+    assert item["quantity"] == 2
+    assert item["unit"] == "bunch"
+    assert item["storage_location"] == "xxx"
+    assert item["status"] == "opened"
+    assert item["purchased_date"] == "2026-06-29"
+    assert item["opened_date"] == "2026-07-04"
+    assert item["expiration_date"] == "2026-07-06"
+    assert item["freeze_by_date"] == "2026-07-04"
+    assert item["notes"] == "updated from row menu"
+
+
 def test_pantry_item_image_upload_persists_image_fields(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     monkeypatch.setattr(pantry_service, "PANTRY_IMAGE_FOLDER", tmp_path / "pantry_images")
