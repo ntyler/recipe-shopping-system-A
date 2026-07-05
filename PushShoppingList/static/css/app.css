@@ -20932,11 +20932,16 @@ body {
 .ai-pantry-location-edit-form {
     display: inline-flex;
     align-items: center;
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 100%;
     min-width: 0;
 }
 
 .ai-pantry-location-edit-input {
-    width: clamp(38px, calc(var(--pantry-location-input-ch, 6) * 1ch), min(100%, 260px));
+    flex: 0 1 auto;
+    width: calc(var(--pantry-location-input-ch, 6) * 1ch);
+    min-width: 38px;
     max-width: min(100%, 260px);
     min-height: 22px;
     box-sizing: border-box;

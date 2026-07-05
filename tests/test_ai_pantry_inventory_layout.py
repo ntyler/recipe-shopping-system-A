@@ -53,6 +53,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "data-pantry-location-choice" in template
     assert "data-pantry-location-checkbox" in template
     assert "data-pantry-location-edit-input" in template
+    assert 'size="1"' in template
     assert "ai-pantry-location-remove-btn" in template
     assert "data-pantry-location-remove-selected" in template
     location_controls_index = template.index('class="ai-pantry-location-control-stack"')
@@ -128,7 +129,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-location-choice:has(.ai-pantry-location-choice-check:checked)" in css
     assert ".ai-pantry-location-edit-input" in css
     assert "--pantry-location-input-ch" in css
-    assert "calc(var(--pantry-location-input-ch, 6) * 1ch)" in css
+    assert "width: calc(var(--pantry-location-input-ch, 6) * 1ch);" in css
+    assert "min-width: 38px;" in css
+    assert "flex: 0 1 auto;" in css
     assert ".ai-pantry-location-save-btn" in css
     assert ".ai-pantry-location-remove-btn" in css
     assert ".ai-pantry-inventory-select" in css
