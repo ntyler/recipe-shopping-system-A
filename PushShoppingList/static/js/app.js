@@ -16956,6 +16956,262 @@ async function moveBoughtItemsToPantry(button) {
     return false;
 }
 
+function pantryImagePanelFromControl(control) {
+    return control ? control.closest("[data-pantry-image-panel]") : null;
+}
+
+function pantryImagePanelStatus(panel) {
+    return panel ? panel.querySelector("[data-pantry-image-status]") : null;
+}
+
+function pantryImagePanelImage(panel) {
+    return panel ? panel.querySelector(".ai-pantry-image") : null;
+}
+
+function pantryImagePanelGenerateButton(panel) {
+    return panel ? panel.querySelector("[data-pantry-image-generate]") : null;
+}
+
+function pantryImagePanelUploadButton(panel) {
+    return panel ? panel.querySelector("[data-pantry-image-upload-button]") : null;
+}
+
+function pantryImagePanelUploadInput(panel) {
+    return panel ? panel.querySelector("[data-pantry-image-upload]") : null;
+}
+
+function pantryImagePanelDownload(panel) {
+    return panel ? panel.querySelector("[data-pantry-image-download]") : null;
+}
+
+function pantryImagePanelHasImage(panel) {
+    const image = pantryImagePanelImage(panel);
+    return Boolean(image && !image.hidden && String(image.getAttribute("src") || "").trim());
+}
+
+function setPantryImagePanelGenerating(panel, message) {
+    if (!panel) {
+        return;
+    }
+
+    const status = pantryImagePanelStatus(panel);
+    const generateButton = pantryImagePanelGenerateButton(panel);
+    const uploadButton = pantryImagePanelUploadButton(panel);
+    const uploadInput = pantryImagePanelUploadInput(panel);
+
+    panel.classList.add("generating");
+
+    if (status) {
+        status.textContent = message;
+        status.classList.remove("empty");
+    }
+
+    if (generateButton) {
+        generateButton.disabled = true;
+        generateButton.textContent = "Generating...";
+    }
+
+    if (uploadButton) {
+        uploadButton.disabled = true;
+    }
+
+    if (uploadInput) {
+        uploadInput.disabled = true;
+    }
+}
+
+function setPantryImagePanelComplete(panel, data, message = "Pantry image updated.") {
+    if (!panel) {
+        return;
+    }
+
+    const imageUrl = String((data && (data.image_url || data.pantry_image_url)) || "").trim();
+    const status = pantryImagePanelStatus(panel);
+    const image = pantryImagePanelImage(panel);
+    const download = pantryImagePanelDownload(panel);
+    const generateButton = pantryImagePanelGenerateButton(panel);
+    const uploadButton = pantryImagePanelUploadButton(panel);
+    const uploadInput = pantryImagePanelUploadInput(panel);
+
+    panel.classList.remove("generating");
+
+    if (imageUrl && image) {
+        setRecipeImageElementSource(image, imageUrl, "card", "(max-width: 700px) 100vw, 360px");
+        image.hidden = false;
+    }
+
+    if (imageUrl && download) {
+        download.href = imageUrl;
+        download.hidden = false;
+    }
+
+    if (status) {
+        status.textContent = imageUrl ? "" : "Image updated. Refresh to view it.";
+        status.classList.toggle("empty", Boolean(imageUrl));
+    }
+
+    if (generateButton) {
+        generateButton.disabled = false;
+        generateButton.textContent = imageUrl || pantryImagePanelHasImage(panel)
+            ? "Regenerate"
+            : "Generate Image";
+    }
+
+    if (uploadButton) {
+        uploadButton.disabled = false;
+        uploadButton.textContent = imageUrl || pantryImagePanelHasImage(panel) ? "Replace" : "Upload";
+    }
+
+    if (uploadInput) {
+        uploadInput.disabled = false;
+    }
+
+    showRecipeQuantityUpdatedMessage("", "", "", message);
+}
+
+function setPantryImagePanelFailed(panel, message) {
+    if (!panel) {
+        return;
+    }
+
+    const status = pantryImagePanelStatus(panel);
+    const generateButton = pantryImagePanelGenerateButton(panel);
+    const uploadButton = pantryImagePanelUploadButton(panel);
+    const uploadInput = pantryImagePanelUploadInput(panel);
+
+    panel.classList.remove("generating");
+
+    if (status) {
+        status.textContent = message || "Unable to update this image.";
+        status.classList.remove("empty");
+    }
+
+    if (generateButton) {
+        generateButton.disabled = false;
+        generateButton.textContent = pantryImagePanelHasImage(panel) ? "Regenerate" : "Generate Image";
+    }
+
+    if (uploadButton) {
+        uploadButton.disabled = false;
+        uploadButton.textContent = pantryImagePanelHasImage(panel) ? "Replace" : "Upload";
+    }
+
+    if (uploadInput) {
+        uploadInput.disabled = false;
+    }
+}
+
+function openPantryItemImageUpload(button) {
+    const panel = pantryImagePanelFromControl(button);
+    const input = pantryImagePanelUploadInput(panel);
+
+    if (input) {
+        input.click();
+    }
+
+    return false;
+}
+
+async function uploadPantryItemImage(input) {
+    const panel = pantryImagePanelFromControl(input);
+    const file = input && input.files ? input.files[0] : null;
+    const itemId = panel ? panel.dataset.pantryItemId || "" : "";
+
+    if (!file) {
+        return false;
+    }
+
+    if (!panel || !itemId) {
+        setPantryImagePanelFailed(panel, "This inventory item could not be found.");
+        if (input) {
+            input.value = "";
+        }
+        return false;
+    }
+
+    setPantryImagePanelGenerating(panel, "Uploading image...");
+
+    const formData = new FormData();
+    formData.append("item_id", itemId);
+    formData.append("image", file);
+
+    try {
+        const response = await fetch("/api/pantry_item_image", {
+            method: "POST",
+            body: formData,
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+
+        if (!response.ok || !data.ok || !data.image_url) {
+            throw new Error((data && data.error) || "Unable to upload this image.");
+        }
+
+        setPantryImagePanelComplete(panel, data, "Pantry image uploaded.");
+    } catch (err) {
+        console.warn("Unable to upload pantry item image.", err);
+        setPantryImagePanelFailed(panel, err.message || "Unable to upload this image.");
+    } finally {
+        if (input) {
+            input.value = "";
+        }
+    }
+
+    return false;
+}
+
+async function generatePantryItemImage(button) {
+    const panel = pantryImagePanelFromControl(button);
+    const itemId = panel ? panel.dataset.pantryItemId || "" : "";
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 120000);
+
+    if (!panel || !itemId) {
+        setPantryImagePanelFailed(panel, "This inventory item could not be found.");
+        return false;
+    }
+
+    setPantryImagePanelGenerating(panel, "Generating pantry image...");
+
+    try {
+        const response = await fetch("/api/pantry_item_image/generate", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ item_id: itemId }),
+            signal: controller.signal,
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+        syncOpenAiUsageDashboardFromResponse(data);
+
+        if (!response.ok || !data.ok || !data.image_url) {
+            throw new Error((data && data.error) || "Unable to generate this image.");
+        }
+
+        setPantryImagePanelComplete(panel, data, "Pantry image generated.");
+    } catch (err) {
+        const timedOut = err && err.name === "AbortError";
+        const message = timedOut
+            ? "Image generation timed out. Please try again."
+            : (err.message || "Image generation failed. Please try again.");
+        setPantryImagePanelFailed(panel, message);
+    } finally {
+        window.clearTimeout(timeout);
+    }
+
+    return false;
+}
+
 function bindRecipeUrlLogDragAndDrop() {
     const list = document.querySelector("[data-recipe-url-sort-list]");
 

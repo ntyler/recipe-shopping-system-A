@@ -114,6 +114,54 @@
                                 {% if item.notes %}
                                     <p class="ai-pantry-inventory-notes-preview">{{ item.notes }}</p>
                                 {% endif %}
+                                <div class="recipe-step-image-panel ai-pantry-image-panel"
+                                     data-pantry-image-panel
+                                     data-pantry-item-id="{{ item.id }}"
+                                     data-pantry-item-name="{{ item.ingredient_name }}">
+                                    <div class="recipe-step-image-status{% if item.image_url %} empty{% endif %}"
+                                         data-pantry-image-status>
+                                        {% if not item.image_url %}
+                                            No image generated for this item.
+                                        {% endif %}
+                                    </div>
+                                    <img class="recipe-step-image ai-pantry-image"
+                                         {% if item.image_url %}src="data:image/gif;base64,R0lGODlhAQABAAAAACw="{% endif %}
+                                         {% if item.image_url %}data-deferred-src="{{ item.image_display_url or item.image_url }}"{% endif %}
+                                         {% if item.image_srcset %}data-deferred-srcset="{{ item.image_srcset }}"{% endif %}
+                                         sizes="(max-width: 700px) 100vw, 360px"
+                                         data-full-src="{{ item.image_full_url or item.image_url }}"
+                                         alt="{{ item.ingredient_name }} inventory image"
+                                         loading="lazy"
+                                         decoding="async"
+                                         fetchpriority="low"
+                                         {% if not item.image_url %}hidden{% endif %}>
+                                    <div class="recipe-step-image-actions">
+                                        <button type="button"
+                                                class="recipe-step-image-btn"
+                                                data-pantry-image-generate
+                                                onclick="return generatePantryItemImage(this)">
+                                            {% if item.image_url %}Regenerate{% else %}Generate Image{% endif %}
+                                        </button>
+                                        <a class="recipe-step-image-download"
+                                           data-pantry-image-download
+                                           href="{{ item.image_url or '#' }}"
+                                           download
+                                           {% if not item.image_url %}hidden{% endif %}>
+                                            Download
+                                        </a>
+                                        <button type="button"
+                                                class="recipe-step-image-upload"
+                                                data-pantry-image-upload-button
+                                                onclick="return openPantryItemImageUpload(this)">
+                                            {% if item.image_url %}Replace{% else %}Upload{% endif %}
+                                        </button>
+                                        <input type="file"
+                                               class="recipe-step-image-file-input"
+                                               data-pantry-image-upload
+                                               accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                                               onchange="return uploadPantryItemImage(this)">
+                                    </div>
+                                </div>
                             </div>
                             <form class="ai-pantry-inline-form"
                                   id="pantryUpdate{{ loop.index }}"

@@ -9,14 +9,18 @@ from PushShoppingList.services.pantry_service import DEFAULT_CONFIDENCE_BY_SOURC
 from PushShoppingList.services.pantry_service import add_or_increment_pantry_item
 from PushShoppingList.services.pantry_service import clean_storage_location
 from PushShoppingList.services.pantry_service import delete_pantry_item
+from PushShoppingList.services.pantry_service import generate_pantry_item_image
 from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
 from PushShoppingList.services.pantry_service import receipt_candidate_display_storage_location
 from PushShoppingList.services.pantry_service import save_receipt_upload
+from PushShoppingList.services.pantry_service import save_pantry_item_image_upload
 from PushShoppingList.services.pantry_service import storage_location_label
 from PushShoppingList.services.pantry_service import update_pantry_item
 from PushShoppingList.services.pantry_service import update_pantry_item_lifecycle_action
 from PushShoppingList.services.pantry_service import update_receipt_history_status
+from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.shopping_list_service import add_items
+from PushShoppingList.services.user_account_service import current_user
 
 
 pantry_bp = Blueprint("pantry_bp", __name__)
@@ -24,6 +28,16 @@ pantry_bp = Blueprint("pantry_bp", __name__)
 
 def pantry_message(category, text):
     session["pantry_messages"] = [{"category": category, "text": text}]
+
+
+def with_openai_usage_dashboard(result):
+    if not isinstance(result, dict):
+        return result
+
+    return {
+        **result,
+        "openai_usage_dashboard": openai_usage_dashboard_for_user(current_user()),
+    }
 
 
 def selected_storage_location(choice, custom_value=""):
@@ -103,6 +117,34 @@ def delete_pantry_item_route(item_id):
     result = delete_pantry_item(item_id)
     pantry_message("success" if result.get("ok") else "error", "Pantry item deleted." if result.get("ok") else "Pantry item was not found.")
     return redirect(url_for("main_bp.index", _anchor="aiPantryInventory"))
+
+
+@pantry_bp.route("/api/pantry_item_image/generate", methods=["POST"])
+def generate_pantry_item_image_route():
+    data = request.get_json(silent=True) or {}
+    item_id = str(data.get("item_id") or data.get("pantry_item_id") or "").strip()
+    result = generate_pantry_item_image(item_id)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(with_openai_usage_dashboard(result)), status
+
+
+@pantry_bp.route("/api/pantry_item_image", methods=["POST"])
+def pantry_item_image_upload_route():
+    item_id = str(
+        request.form.get("item_id")
+        or request.form.get("pantry_item_id")
+        or ""
+    ).strip()
+    uploaded_file = (
+        request.files.get("image")
+        or request.files.get("pantry_image")
+        or request.files.get("item_image")
+    )
+    result = save_pantry_item_image_upload(item_id, uploaded_file)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
 
 
 @pantry_bp.route("/pantry/move_bought_items", methods=["POST"])

@@ -1,7 +1,9 @@
 import json
+from io import BytesIO
 from pathlib import Path
 
 from flask import session
+from werkzeug.datastructures import FileStorage
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import pantry_service
@@ -95,6 +97,37 @@ def test_mark_frozen_records_frozen_date(monkeypatch, tmp_path):
     assert updated["item"]["status"] == "frozen"
     assert updated["item"]["storage_location"] == "freezer"
     assert updated["item"]["frozen_date"] == "2026-07-03"
+
+
+def test_pantry_item_image_upload_persists_image_fields(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    monkeypatch.setattr(pantry_service, "PANTRY_IMAGE_FOLDER", tmp_path / "pantry_images")
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        created = pantry_service.add_or_increment_pantry_item(
+            {
+                "ingredient_name": "Atlantic salmon",
+                "quantity": 1,
+                "source": "manual",
+            },
+            reference_date="2026-07-02",
+        )
+        upload = FileStorage(
+            stream=BytesIO(b"not-a-real-image-but-valid-upload-by-extension"),
+            filename="salmon.png",
+            content_type="image/png",
+        )
+        result = pantry_service.save_pantry_item_image_upload(created["item"]["id"], upload)
+        inventory = pantry_service.load_pantry_inventory()["items"]
+
+    assert result["ok"] is True
+    assert result["image_url"].startswith("/static/generated/pantry_items/atlantic_salmon_")
+    assert result["image_generated_at"]
+    assert inventory[0]["image_url"] == result["image_url"]
+    assert inventory[0]["image_generated_at"] == result["image_generated_at"]
+    assert any((tmp_path / "pantry_images").iterdir())
 
 
 def test_opened_broth_gets_opened_shelf_life_suggestions(monkeypatch, tmp_path):
@@ -788,6 +821,9 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert 'name="candidate_{{ loop.index0 }}_freeze_by_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_frozen_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_storage_location"' in template
+    assert "data-pantry-image-panel" in template
+    assert "generatePantryItemImage(this)" in template
+    assert "uploadPantryItemImage(this)" in template
     assert 'name="candidate_{{ loop.index0 }}_storage_location_custom"' in template
     assert "data-pantry-review-row" in template
     assert 'data-pantry-review-date-field="expiration_date"' in template

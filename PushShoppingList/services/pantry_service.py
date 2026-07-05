@@ -1,4 +1,6 @@
+import base64
 import json
+import mimetypes
 import os
 import re
 import uuid
@@ -10,6 +12,11 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 
 from PushShoppingList.services import storage_service
+from PushShoppingList.services.image_variant_service import ensure_webp_variants
+from PushShoppingList.services.image_variant_service import local_static_image_variants
+from PushShoppingList.services.openai_throttle_service import throttled_image_generation
+from PushShoppingList.services.openai_usage_service import record_openai_usage
+from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.storage_service import scoped_package_path
 
 
@@ -18,6 +25,9 @@ PANTRY_INVENTORY_FILENAME = "pantry_inventory.json"
 PANTRY_INVENTORY_FILE = scoped_package_path("pantry_inventory.json")
 PANTRY_RECEIPT_HISTORY_FILE = scoped_package_path("pantry_receipt_history.json")
 PANTRY_RECEIPT_UPLOAD_DIR = scoped_package_path("pantry_receipts")
+PANTRY_IMAGE_FOLDER = Path(__file__).resolve().parents[1] / "static" / "generated" / "pantry_items"
+PANTRY_IMAGE_URL_PREFIX = "/static/generated/pantry_items"
+PANTRY_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif"}
 PANTRY_DATE_FIELDS = (
     "purchased_date",
     "opened_date",
@@ -300,6 +310,12 @@ def normalize_pantry_item(item):
         "reminder_dismissed_until": normalize_date_value(item.get("reminder_dismissed_until")),
         "last_reminded_at": str(item.get("last_reminded_at") or "").strip(),
         "last_reminder_key": str(item.get("last_reminder_key") or "").strip(),
+        "image_url": str(item.get("image_url") or item.get("pantry_image_url") or "").strip(),
+        "image_generated_at": str(
+            item.get("image_generated_at")
+            or item.get("pantry_image_generated_at")
+            or ""
+        ).strip(),
     }
 
 
@@ -575,6 +591,9 @@ def add_or_increment_pantry_item(item, user_id=None, guest_session_id=None, refe
                     existing[field] = incoming[field]
             if incoming.get("reminder_offsets_days") and not existing.get("reminder_offsets_days"):
                 existing["reminder_offsets_days"] = incoming["reminder_offsets_days"]
+            for field in ["image_url", "image_generated_at"]:
+                if incoming.get(field) and not existing.get(field):
+                    existing[field] = incoming[field]
             save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
             return {"item": existing, "created": False}
 
@@ -612,6 +631,9 @@ def update_pantry_item(item_id, updates, user_id=None, guest_session_id=None, su
             item["reminder_enabled"] = clean_bool(updates.get("reminder_enabled"), default=True)
         if "reminder_offsets_days" in updates:
             item["reminder_offsets_days"] = normalize_reminder_offsets(updates.get("reminder_offsets_days"))
+        for field in ["image_url", "image_generated_at"]:
+            if field in updates:
+                item[field] = str(updates.get(field) or "").strip()
         if suggest_dates:
             item.update(apply_lifecycle_suggestions(item))
 
@@ -668,6 +690,256 @@ def delete_pantry_item(item_id, user_id=None, guest_session_id=None):
     payload["items"] = [item for item in payload["items"] if item.get("id") != item_id]
     save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
     return {"ok": len(payload["items"]) != before_count}
+
+
+def pantry_image_upload_extension(filename, mime_type=""):
+    suffix = Path(str(filename or "")).suffix.lower()
+    if suffix in PANTRY_IMAGE_EXTENSIONS:
+        return suffix
+
+    guessed = mimetypes.guess_extension(str(mime_type or "").split(";", 1)[0].strip().lower())
+    if guessed == ".jpe":
+        guessed = ".jpg"
+
+    return guessed if guessed in PANTRY_IMAGE_EXTENSIONS else ""
+
+
+def pantry_image_file_key(item):
+    item = item if isinstance(item, dict) else {}
+    raw_key = (
+        item.get("normalized_name")
+        or item.get("ingredient_name")
+        or item.get("product_name")
+        or item.get("id")
+        or "pantry_item"
+    )
+    key = secure_filename(str(raw_key).strip().lower().replace(" ", "_"))
+    return (key or "pantry_item")[:80]
+
+
+def save_pantry_image_file(item, image_source, extension=".png"):
+    PANTRY_IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
+    extension = extension if extension in PANTRY_IMAGE_EXTENSIONS else ".png"
+    filename = f"{pantry_image_file_key(item)}_{uuid.uuid4().hex[:12]}{extension}"
+    image_path = PANTRY_IMAGE_FOLDER / filename
+
+    if isinstance(image_source, (bytes, bytearray)):
+        image_path.write_bytes(bytes(image_source))
+    else:
+        image_source.save(image_path)
+
+    ensure_webp_variants(image_path)
+    return f"{PANTRY_IMAGE_URL_PREFIX}/{filename}"
+
+
+def find_pantry_item(payload, item_id):
+    item_id = str(item_id or "").strip()
+    if not item_id:
+        return -1, None
+
+    for index, item in enumerate(payload.get("items", [])):
+        if item.get("id") == item_id:
+            return index, item
+
+    return -1, None
+
+
+def save_pantry_item_image_upload(item_id, uploaded_file, user_id=None, guest_session_id=None):
+    payload = load_pantry_inventory(user_id=user_id, guest_session_id=guest_session_id)
+    item_index, item = find_pantry_item(payload, item_id)
+
+    if item is None:
+        return {"ok": False, "error": "Pantry item was not found."}
+
+    if not uploaded_file or not uploaded_file.filename:
+        return {"ok": False, "error": "No image was selected."}
+
+    mime_type = str(
+        uploaded_file.mimetype
+        or mimetypes.guess_type(uploaded_file.filename or "")[0]
+        or ""
+    ).split(";", 1)[0].strip().lower()
+    guessed_mime_type = str(mimetypes.guess_type(uploaded_file.filename or "")[0] or "").lower()
+    if not mime_type.startswith("image/") and guessed_mime_type.startswith("image/"):
+        mime_type = guessed_mime_type
+
+    extension = pantry_image_upload_extension(uploaded_file.filename, mime_type)
+    if not extension or (mime_type and not mime_type.startswith("image/")):
+        return {"ok": False, "error": "Choose a PNG, JPG, WebP, GIF, BMP, or AVIF image."}
+
+    image_url = save_pantry_image_file(item, uploaded_file, extension=extension)
+    generated_at = now_iso()
+    item["image_url"] = image_url
+    item["image_generated_at"] = generated_at
+    item["last_updated"] = generated_at
+    payload["items"][item_index] = item
+    save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+
+    return pantry_item_image_response(item, image_url, generated_at)
+
+
+def generate_pantry_item_image(item_id, user_id=None, guest_session_id=None):
+    payload = load_pantry_inventory(user_id=user_id, guest_session_id=guest_session_id)
+    item_index, item = find_pantry_item(payload, item_id)
+
+    if item is None:
+        return {"ok": False, "error": "Pantry item was not found."}
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {"ok": False, "error": "Image generation is not set up yet."}
+
+    item_name = str(item.get("ingredient_name") or item.get("product_name") or "").strip()
+    if not item_name:
+        return {"ok": False, "error": "Add an item name before generating an image."}
+
+    prompt = build_pantry_item_image_prompt(item)
+
+    try:
+        image_bytes = request_pantry_item_image_bytes(prompt)
+    except TimeoutError:
+        return {"ok": False, "error": "Image generation timed out. Please try again."}
+    except Exception:
+        return {"ok": False, "error": "Image generation failed. Please try again."}
+
+    if not image_bytes:
+        return {"ok": False, "error": "Image generation did not return an image. Please try again."}
+
+    image_url = save_pantry_image_file(item, image_bytes, extension=".png")
+    generated_at = now_iso()
+    item["image_url"] = image_url
+    item["image_generated_at"] = generated_at
+    item["last_updated"] = generated_at
+    payload["items"][item_index] = item
+    save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+
+    return pantry_item_image_response(item, image_url, generated_at)
+
+
+def pantry_item_image_response(item, image_url, generated_at):
+    return {
+        "ok": True,
+        "item_id": item.get("id"),
+        "ingredient_name": item.get("ingredient_name", ""),
+        "product_name": item.get("product_name", ""),
+        "image_url": image_url,
+        "pantry_image_url": image_url,
+        "image_generated_at": generated_at,
+        "pantry_image_generated_at": generated_at,
+    }
+
+
+def build_pantry_item_image_prompt(item):
+    item = item if isinstance(item, dict) else {}
+    ingredient_name = str(item.get("ingredient_name") or "").strip()
+    product_name = str(item.get("product_name") or "").strip()
+    category = str(item.get("category") or "").strip()
+    storage = storage_location_label(item.get("storage_location"))
+    notes = str(item.get("notes") or "").strip()
+
+    return f"""Generate a realistic grocery inventory image for one pantry item.
+
+Ingredient:
+{ingredient_name or "Not specified"}
+
+Product:
+{product_name or "Not specified"}
+
+Category:
+{category or "Not specified"}
+
+Storage location:
+{storage or "Not specified"}
+
+Notes:
+{notes or "Not specified"}
+
+Visual requirements:
+- Show one clear, appetizing food or grocery item matching the ingredient
+- Use realistic food photography with bright natural kitchen lighting
+- Use a clean shelf, fridge, freezer, pantry, or countertop setting that fits the storage location
+- Avoid readable text, labels, barcodes, logos, or branded packaging
+- Do not include people or hands
+- Do not include captions, watermarks, badges, or UI elements
+"""
+
+
+def request_pantry_item_image_bytes(prompt):
+    timeout_seconds = int(os.getenv("OPENAI_PANTRY_IMAGE_TIMEOUT_SECONDS", os.getenv("OPENAI_STEP_IMAGE_TIMEOUT_SECONDS", "90")))
+    model = os.getenv("OPENAI_PANTRY_IMAGE_MODEL", os.getenv("OPENAI_STEP_IMAGE_MODEL", "gpt-image-1"))
+    size = os.getenv("OPENAI_PANTRY_IMAGE_SIZE", os.getenv("OPENAI_STEP_IMAGE_SIZE", "1024x1024"))
+    quality = os.getenv("OPENAI_PANTRY_IMAGE_QUALITY", os.getenv("OPENAI_STEP_IMAGE_QUALITY", "medium"))
+
+    client = get_openai_client()
+    if hasattr(client, "with_options"):
+        client = client.with_options(timeout=timeout_seconds)
+
+    try:
+        print(
+            f"[OpenAI] action=pantry-item-image model={model} "
+            "temperature_included=False"
+        )
+        response = throttled_image_generation(
+            client,
+            {
+                "model": model,
+                "prompt": prompt,
+                "size": size,
+                "quality": quality,
+                "n": 1,
+            },
+            action_name="pantry-item-image",
+            model=model,
+        )
+        record_openai_usage(
+            response,
+            "pantry-item-image",
+            model=model,
+            metadata={"size": size, "quality": quality},
+        )
+    except Exception as exc:
+        if "timeout" in str(exc).lower() or "timed out" in str(exc).lower():
+            raise TimeoutError() from exc
+        raise
+
+    image_record = first_openai_image_record(response)
+    if not image_record:
+        return b""
+
+    b64_json = openai_image_field(image_record, "b64_json")
+    if b64_json:
+        encoded = str(b64_json).split(",", 1)[-1]
+        return base64.b64decode(encoded)
+
+    image_url = openai_image_field(image_record, "url")
+    if image_url:
+        import requests
+
+        try:
+            result = requests.get(image_url, timeout=timeout_seconds)
+            result.raise_for_status()
+        except requests.Timeout as exc:
+            raise TimeoutError() from exc
+        return result.content
+
+    return b""
+
+
+def first_openai_image_record(response):
+    data = getattr(response, "data", None)
+    if data is None and isinstance(response, dict):
+        data = response.get("data")
+
+    if not data:
+        return None
+
+    return data[0]
+
+
+def openai_image_field(image_record, field_name):
+    if isinstance(image_record, dict):
+        return image_record.get(field_name)
+
+    return getattr(image_record, field_name, None)
 
 
 def confidence_label(confidence):
@@ -1052,6 +1324,10 @@ def pantry_items_for_view():
         item["frozen_best_by_date"] = frozen_best_by_date(item)
         item["frozen_best_by_date_label"] = date_label(item["frozen_best_by_date"])
         item["lifecycle_status"] = pantry_item_lifecycle_status(item)
+        image_variants = local_static_image_variants(item.get("image_url")) if item.get("image_url") else {}
+        item["image_display_url"] = image_variants.get("display_url") or item.get("image_url", "")
+        item["image_srcset"] = image_variants.get("srcset", "")
+        item["image_full_url"] = image_variants.get("full_url") or item.get("image_url", "")
 
     return items
 

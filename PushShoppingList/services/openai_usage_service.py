@@ -25,6 +25,7 @@ PRODUCT_SEARCH_FEATURES = {
     "final-product-selection",
 }
 GENERATED_IMAGE_FEATURES = {
+    "pantry-item-image",
     "recipe-step-image",
 }
 RECIPE_IMPORT_ACTIVITY_FEATURES = {

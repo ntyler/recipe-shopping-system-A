@@ -20971,6 +20971,21 @@ body {
     display: none;
 }
 
+.ai-pantry-image-panel.recipe-step-image-panel {
+    width: min(420px, 100%);
+    max-width: 100%;
+    margin: 12px 0 0;
+    background: rgba(7, 17, 29, 0.72);
+}
+
+.ai-pantry-image-panel .recipe-step-image {
+    width: min(320px, 100%);
+}
+
+.ai-pantry-image-panel .recipe-step-image-status {
+    color: #d9e8f7;
+}
+
 #aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row {
     grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
     gap: 12px;
@@ -21611,6 +21626,12 @@ body {
 
     .ai-pantry-form-surface {
         padding: 10px;
+    }
+
+    .ai-pantry-image-panel .recipe-step-image-btn,
+    .ai-pantry-image-panel .recipe-step-image-download,
+    .ai-pantry-image-panel .recipe-step-image-upload {
+        flex: 1 1 100%;
     }
 }
 
