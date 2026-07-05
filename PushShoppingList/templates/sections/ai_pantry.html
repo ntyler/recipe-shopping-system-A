@@ -206,14 +206,14 @@
                             onclick="return togglePantryInventorySourceFilter(this)">
                         Image Taken
                     </button>
-                    <label class="ai-pantry-confidence-toggle ai-pantry-inventory-confidence-toggle">
-                        <input type="checkbox"
-                               data-pantry-inventory-confidence-toggle
-                               aria-label="Show inventory confidence levels">
-                        <span>Show Confidence</span>
-                    </label>
                 </div>
-                {% if pantry_name_suggestion_filters.count %}
+                <label class="ai-pantry-confidence-toggle ai-pantry-inventory-confidence-toggle">
+                    <input type="checkbox"
+                           data-pantry-inventory-confidence-toggle
+                           aria-label="Show inventory confidence levels">
+                    <span>Show Confidence</span>
+                </label>
+                {% if pantry_name_suggestion_filters.count > 1 %}
                     <div class="ai-pantry-name-question-nav"
                          data-pantry-name-question-nav
                          aria-label="Questioned item name navigation">
