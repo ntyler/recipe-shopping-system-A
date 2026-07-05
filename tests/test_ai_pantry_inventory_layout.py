@@ -32,11 +32,13 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "delete_pantry_storage_locations_route" in template
     assert "ai-pantry-location-choice" in template
     assert "ai-pantry-location-remove-btn" in template
-    assert "ai-pantry-meta-store-section" in template
-    assert 'form="pantryUpdate{{ loop.index }}"' in template
     assert 'name="store_section"' in template
     assert "Store Section" in template
-    assert "ai-pantry-inventory-store-section-label" not in template
+    assert "ai-pantry-inventory-store-section-label" in template
+    frozen_on_index = template.index("<span>Frozen On</span>")
+    store_section_index = template.index("ai-pantry-inventory-store-section-label")
+    notes_index = template.index("ai-pantry-inventory-notes-label")
+    assert frozen_on_index < store_section_index < notes_index
     assert "recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap" in template
     assert "ai-pantry-inventory-row-collapsed" in template
     assert "data-pantry-inventory-row" in template
@@ -77,7 +79,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-select" in css
     assert ".ai-pantry-inventory-select:hover" in css
     assert "min-width: 44px;" in css
-    assert ".ai-pantry-meta-store-section select" in css
+    assert ".ai-pantry-meta-store-section select" not in css
     assert ".ai-pantry-delete-selected-btn" in css
     assert ".ai-pantry-inventory-row [data-pantry-inventory-details][hidden]" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inventory-notes-label" in css
