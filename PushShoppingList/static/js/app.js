@@ -17544,6 +17544,30 @@ function pantryImagePanelImage(panel) {
     return panel ? panel.querySelector(".ai-pantry-image") : null;
 }
 
+function pantryInventoryThumbnail(row) {
+    return row ? row.querySelector("[data-pantry-image-thumbnail]") : null;
+}
+
+function updatePantryInventoryThumbnail(row, imageUrl) {
+    const thumbnail = pantryInventoryThumbnail(row);
+    const image = thumbnail ? thumbnail.querySelector(".ai-pantry-inventory-thumbnail-image") : null;
+    const nextUrl = String(imageUrl || "").trim();
+
+    if (!thumbnail || !image) {
+        return;
+    }
+
+    if (!nextUrl) {
+        thumbnail.hidden = true;
+        image.hidden = true;
+        return;
+    }
+
+    setRecipeImageElementSource(image, nextUrl, "thumb", "58px");
+    image.removeAttribute("hidden");
+    thumbnail.hidden = false;
+}
+
 function pantryImagePanelGenerateButton(panel) {
     return panel ? panel.querySelector("[data-pantry-image-generate]") : null;
 }
@@ -17627,6 +17651,7 @@ function setPantryImagePanelComplete(panel, data, message = "Pantry image update
         if (row) {
             row.dataset.pantryImageSource = "1";
             row.dataset.pantryItemImageSource = "1";
+            updatePantryInventoryThumbnail(row, imageUrl);
         }
     }
 

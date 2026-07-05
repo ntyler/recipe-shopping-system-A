@@ -320,6 +320,21 @@
                                        data-pantry-inventory-checkbox
                                        aria-label="Select {{ item.ingredient_name }} for bulk delete">
                             </label>
+                            <div class="ai-pantry-inventory-thumbnail"
+                                 data-pantry-image-thumbnail
+                                 {% if not item.image_url %}hidden{% endif %}>
+                                <img class="ai-pantry-inventory-thumbnail-image"
+                                     {% if item.image_url %}src="data:image/gif;base64,R0lGODlhAQABAAAAACw="{% endif %}
+                                     {% if item.image_url %}data-deferred-src="{{ item.image_display_url or item.image_url }}"{% endif %}
+                                     {% if item.image_srcset %}data-deferred-srcset="{{ item.image_srcset }}"{% endif %}
+                                     sizes="58px"
+                                     data-full-src="{{ item.image_full_url or item.image_url }}"
+                                     alt="{{ item.ingredient_name }} inventory thumbnail"
+                                     loading="lazy"
+                                     decoding="async"
+                                     fetchpriority="low"
+                                     {% if not item.image_url %}hidden{% endif %}>
+                            </div>
                             <div class="ai-pantry-item-main ai-pantry-inventory-name">
                                 <h4 data-pantry-name-display>{{ item.ingredient_name }}</h4>
                                 <span data-pantry-product-display {% if not item.product_name %}hidden{% endif %}>{{ item.product_name }}</span>

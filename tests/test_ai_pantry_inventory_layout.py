@@ -19,6 +19,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "ai-pantry-inventory-row" in template
     assert "recipe-edit-row-number ai-pantry-inventory-number" in template
     assert "data-pantry-inventory-checkbox" in template
+    assert "data-pantry-image-thumbnail" in template
+    assert "ai-pantry-inventory-thumbnail-image" in template
     assert 'class="ai-pantry-inventory-select"' not in template
     assert "pantryBulkDeleteForm" in template
     assert "Delete Selected" in template
@@ -94,11 +96,12 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row" in css
     assert (
         "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-row {\n"
-        "    grid-template-columns: 24px 44px minmax(0, 1fr) 42px;"
+        "    grid-template-columns: 24px 44px 54px minmax(0, 1fr) 42px;"
     ) in css
+    assert "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-thumbnail" in css
     assert (
         "#aiPantrySection.user-ai-pantry-panel .ai-pantry-inventory-name {\n"
-        "    grid-column: 3 / 4;\n"
+        "    grid-column: 4 / 5;\n"
         "    grid-row: 1;"
     ) in css
     assert ".ai-pantry-inventory-row-collapsed {" in css
@@ -146,7 +149,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-row .ai-pantry-inventory-notes-label" in css
     assert ".ai-pantry-inventory-handle {\n    grid-column: 1 / 2;\n    grid-row: 1;\n    align-self: start;" in css
     assert ".ai-pantry-inventory-number {\n    grid-column: 2 / 3;\n    grid-row: 1;\n    align-self: start;" in css
-    assert ".ai-pantry-inventory-menu-wrap {\n    grid-column: 5 / 6;\n    grid-row: 1;\n    align-self: start;" in css
+    assert ".ai-pantry-inventory-thumbnail {\n    grid-column: 3 / 4;\n    grid-row: 1;" in css
+    assert ".ai-pantry-inventory-name {\n    grid-column: 4 / 5;\n    grid-row: 1;" in css
+    assert ".ai-pantry-inventory-menu-wrap {\n    grid-column: 6 / 7;\n    grid-row: 1;\n    align-self: start;" in css
     assert "grid-column: 1 / -1;" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inline-form textarea" in css
     assert "min-height: 58px;" in css
@@ -167,6 +172,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert 'item.dataset.pantryImageSource === "1"' in js
     assert 'row.dataset.pantryImageSource = "1";' in js
     assert 'row.dataset.pantryItemImageSource = "1";' in js
+    assert "function updatePantryInventoryThumbnail" in js
+    assert 'setRecipeImageElementSource(image, nextUrl, "thumb", "58px");' in js
     assert 'image.removeAttribute("hidden");' in js
     assert 'download.hidden = !imageUrl;' in js
     assert "status.hidden = Boolean(imageUrl);" in js
