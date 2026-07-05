@@ -10949,6 +10949,378 @@ def extract_structured_menu_items_from_html(html_text, source_url):
     return sections, "html_heuristic" if sections else ""
 
 
+def menu_image_vision_enabled():
+    return env_flag("OPENAI_MENU_IMAGE_VISION_ENABLED", True)
+
+
+def menu_image_candidate_limit():
+    return max(1, min(20, _safe_int(os.getenv("OPENAI_MENU_IMAGE_MAX_CANDIDATES"), 8)))
+
+
+def menu_image_max_bytes():
+    return max(256_000, min(25_000_000, _safe_int(os.getenv("OPENAI_MENU_IMAGE_MAX_BYTES"), 12_000_000)))
+
+
+def _first_srcset_url(srcset):
+    for candidate in str(srcset or "").split(","):
+        url = candidate.strip().split(" ", 1)[0].strip()
+        if url:
+            return url
+    return ""
+
+
+def _menu_image_dimensions_from_text(*values):
+    text = " ".join(str(value or "") for value in values)
+    match = re.search(r"(?<!\d)(?P<width>\d{2,5})[xX](?P<height>\d{2,5})(?!\d)", text)
+    if not match:
+        return 0, 0
+    return int(match.group("width")), int(match.group("height"))
+
+
+def _menu_image_candidate_context(img):
+    parts = []
+    for element in [img, *list(img.parents)[:4]]:
+        if not getattr(element, "attrs", None):
+            continue
+        parts.extend(str(value or "") for value in (element.get("class") or []))
+        parts.append(str(element.get("id") or ""))
+    for heading in img.find_all_previous(["h1", "h2", "h3", "h4"], limit=2):
+        parts.append(heading.get_text(" ", strip=True))
+    return " ".join(part for part in parts if part)
+
+
+def menu_image_candidates_from_html(html_text, source_url):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+    candidates = []
+    seen = set()
+    source_lower = str(source_url or "").lower()
+
+    for img in soup.find_all("img"):
+        raw_src = (
+            img.get("src")
+            or img.get("data-src")
+            or img.get("data-lazy-src")
+            or img.get("data-original")
+            or _first_srcset_url(img.get("srcset"))
+            or _first_srcset_url(img.get("data-srcset"))
+            or ""
+        )
+        raw_src = str(raw_src or "").strip()
+        if not raw_src or raw_src.startswith("data:image/gif"):
+            continue
+
+        image_url = urljoin(source_url, raw_src)
+        parsed = urlparse(image_url)
+        if not parsed.scheme.startswith("http"):
+            continue
+
+        normalized = image_url.split("#", 1)[0]
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+
+        alt = str(img.get("alt") or "")
+        title = str(img.get("title") or "")
+        width, height = _menu_image_dimensions_from_text(
+            img.get("width"),
+            img.get("height"),
+            img.get("style"),
+            raw_src,
+            image_url,
+        )
+        context = _menu_image_candidate_context(img)
+        haystack = " ".join([raw_src, image_url, alt, title, context]).lower()
+
+        if any(term in haystack for term in ("logo", "favicon", "iconfont", "socicon", "sprite", "google-map")):
+            continue
+        if any(term in haystack for term in ("tracking", "analytics", "spacer")):
+            continue
+
+        score = 0
+        if "menu" in source_lower:
+            score += 2
+        if any(term in haystack for term in ("menu", "documento", "a4", "gallery", "food", "dish", "restaurant")):
+            score += 4
+        if width and height:
+            area = width * height
+            if area >= 360_000:
+                score += 3
+            elif area >= 90_000:
+                score += 1
+        if Path(parsed.path).suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
+            score += 1
+
+        if score < 4:
+            continue
+
+        candidates.append({
+            "url": normalized,
+            "raw_src": raw_src,
+            "alt": clean_recipe_text(alt),
+            "title": clean_recipe_text(title),
+            "width": width,
+            "height": height,
+            "score": score,
+        })
+
+    candidates.sort(key=lambda item: item.get("score") or 0, reverse=True)
+    return candidates[:menu_image_candidate_limit()]
+
+
+def download_menu_image_candidate(menu_url, candidate, index, cancellation_check=None):
+    run_cancellation_check(cancellation_check)
+    image_url = str(candidate.get("url") if isinstance(candidate, dict) else candidate or "").strip()
+    if not image_url:
+        raise ValueError("Menu image URL is missing.")
+
+    response = requests.get(
+        image_url,
+        headers={
+            **menu_page_request_headers(),
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "Referer": menu_url,
+        },
+        timeout=(8, 30),
+        stream=True,
+    )
+    try:
+        response.raise_for_status()
+        content_type = str(response.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+        if content_type and not content_type.startswith("image/"):
+            raise ValueError(f"Menu image response was not an image: {content_type}")
+
+        suffix = Path(urlparse(image_url).path).suffix.lower()
+        if suffix not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+            suffix = mimetypes.guess_extension(content_type) or ".jpg"
+        image_path = RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_IMAGE_{int(index):02d}{suffix}"
+        max_bytes = menu_image_max_bytes()
+        total = 0
+        with image_path.open("wb") as handle:
+            for chunk in response.iter_content(chunk_size=65536):
+                run_cancellation_check(cancellation_check)
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > max_bytes:
+                    raise ValueError(f"Menu image is larger than {max_bytes} bytes.")
+                handle.write(chunk)
+        return str(image_path), {
+            "url": image_url,
+            "path": str(image_path),
+            "content_type": content_type,
+            "bytes": total,
+        }
+    finally:
+        response.close()
+
+
+def build_menu_image_sections_prompt(menu_url, image_url="", image_index=1, image_count=1):
+    return f"""
+Extract visible restaurant menu items from this menu image.
+
+Menu page URL: {menu_url}
+Image URL: {image_url}
+Image {image_index} of {image_count}
+
+Rules:
+- Read only visible menu text in the image.
+- Group items under the visible section/category heading when possible.
+- Preserve menu item names exactly when readable.
+- Preserve visible descriptions and prices when present.
+- Do not create full recipes in this step.
+- Do not include navigation, hours, address, contact info, ads, policies, social links, or decorative text as menu items.
+- Return only valid JSON.
+
+Return this JSON shape:
+{{
+  "menu_sections": [
+    {{
+      "section_name": "Ceviches",
+      "items": [
+        {{
+          "item_name": "Ceviche Mixto",
+          "description": "Visible menu description if present",
+          "price": "$18.99"
+        }}
+      ]
+    }}
+  ]
+}}
+"""
+
+
+def menu_sections_from_vision_payload(payload, source_url, image_url=""):
+    payload = payload if isinstance(payload, dict) else {}
+    raw_sections = payload.get("menu_sections") or payload.get("sections") or []
+    if not isinstance(raw_sections, list):
+        return []
+
+    sections = []
+    for section_index, section in enumerate(raw_sections):
+        if not isinstance(section, dict):
+            continue
+        section_name = clean_recipe_text(
+            section.get("section_name")
+            or section.get("name")
+            or section.get("title")
+            or f"Menu Image Section {section_index + 1}"
+        )
+        items = []
+        raw_items = section.get("items") or section.get("menu_items") or []
+        if not isinstance(raw_items, list):
+            continue
+        for item_index, item in enumerate(raw_items):
+            if not isinstance(item, dict):
+                continue
+            item_name = clean_recipe_text(
+                item.get("item_name")
+                or item.get("name")
+                or item.get("title")
+                or item.get("recipe_title")
+                or ""
+            )
+            if not item_name:
+                continue
+            description = clean_recipe_text(
+                item.get("description")
+                or item.get("menu_description")
+                or item.get("item_description")
+                or ""
+            )
+            price = clean_recipe_text(item.get("price") or item.get("price_text") or "")
+            items.append({
+                "item_name": item_name,
+                "menu_section": section_name,
+                "section_name": section_name,
+                "description": description,
+                "item_description": description,
+                "price": price,
+                "price_text": price,
+                "source_url": source_url,
+                "image_url": image_url,
+                "raw_text": " | ".join(part for part in [section_name, item_name, description, price] if part),
+                "display_order": item_index + 1,
+                "item_display_order": item_index + 1,
+            })
+        if items:
+            sections.append({
+                "section_name": section_name,
+                "description": clean_recipe_text(section.get("description") or ""),
+                "items": items,
+            })
+    return sections
+
+
+def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_callback=None, cancellation_check=None):
+    debug = {
+        "enabled": menu_image_vision_enabled(),
+        "candidates_found": 0,
+        "candidates": [],
+        "images_attempted": 0,
+        "images_succeeded": 0,
+        "items_found": 0,
+        "status": "disabled" if not menu_image_vision_enabled() else "not_attempted",
+        "errors": [],
+    }
+    if not debug["enabled"]:
+        return [], debug
+
+    candidates = menu_image_candidates_from_html(html_text, menu_url)
+    debug["candidates_found"] = len(candidates)
+    debug["candidates"] = [
+        {
+            "url": candidate.get("url", ""),
+            "width": candidate.get("width", 0),
+            "height": candidate.get("height", 0),
+            "score": candidate.get("score", 0),
+        }
+        for candidate in candidates
+    ]
+    if not candidates:
+        debug["status"] = "no_candidates"
+        return [], debug
+
+    sections = []
+    image_count = len(candidates)
+    for index, candidate in enumerate(candidates, start=1):
+        run_cancellation_check(cancellation_check)
+        image_url = candidate.get("url", "")
+        if progress_callback:
+            progress_callback(
+                "Reading menu images",
+                f"Extracting visible menu items from image {index} of {image_count}.",
+            )
+        try:
+            image_path, image_debug = download_menu_image_candidate(
+                menu_url,
+                candidate,
+                index,
+                cancellation_check=cancellation_check,
+            )
+            debug["images_attempted"] += 1
+            vision_debug = build_vision_debug(
+                uploaded_file_path=image_path,
+                filename=Path(image_path).name,
+                mime_type=image_debug.get("content_type", ""),
+            )
+            vision_debug["action"] = "menu-url-image-section-extraction"
+            vision_debug["source_menu_url"] = menu_url
+            vision_debug["image_url"] = image_url
+            vision_result = call_openai_vision_image(
+                image_path,
+                build_menu_image_sections_prompt(menu_url, image_url, index, image_count),
+                "menu-url-image-section-extraction",
+                preferred_model=resolve_menu_model(),
+                debug=vision_debug,
+            )
+            image_debug["vision"] = vision_result.to_dict()
+            if not vision_result.ok:
+                debug["errors"].append({
+                    "image_url": image_url,
+                    "error_code": vision_result.error_code,
+                    "error_message": vision_result.error_message,
+                    "technical_message": vision_result.technical_message,
+                })
+                debug["status"] = "partial" if debug["items_found"] else (vision_result.error_code or "vision_failed")
+                if vision_result.error_code == "OPENAI_API_KEY_MISSING":
+                    break
+                continue
+
+            raw_response_path = RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_IMAGE_{index:02d}_VISION_RESPONSE.txt"
+            raw_response_path.write_text(vision_result.text, encoding="utf-8")
+            payload = json.loads(clean_json_response(vision_result.text))
+            image_sections = menu_sections_from_vision_payload(payload, menu_url, image_url=image_url)
+            item_count = len(flatten_menu_sections(image_sections))
+            image_debug["sections_found"] = len(image_sections)
+            image_debug["items_found"] = item_count
+            if item_count:
+                sections.extend(image_sections)
+                debug["images_succeeded"] += 1
+                debug["items_found"] += item_count
+                debug["status"] = "ok"
+        except Exception as exc:
+            if is_job_cancelled_exception(exc):
+                raise
+            debug["errors"].append({
+                "image_url": image_url,
+                "error_code": type(exc).__name__,
+                "error_message": str(exc),
+            })
+            if debug["items_found"]:
+                debug["status"] = "partial"
+            elif debug["status"] in {"not_attempted", "ok"}:
+                debug["status"] = "failed"
+
+    if debug["items_found"] and debug["errors"]:
+        debug["status"] = "partial"
+    elif debug["items_found"]:
+        debug["status"] = "ok"
+    elif debug["status"] == "not_attempted":
+        debug["status"] = "no_items"
+
+    return sections, debug
+
+
 def build_menu_item_recipe_prompt(menu_url, item, index, total):
     item = item if isinstance(item, dict) else {}
     predicted_equipment = normalize_equipment_prediction_records(item.get("predicted_equipment"))
@@ -13615,6 +13987,10 @@ def menu_diagnostics_message(diagnostics, failures=None):
         parts.append(f"failed_items={len(failures)}")
     if diagnostics.get("menu_fetch_error"):
         parts.append(f"fetch_error={diagnostics.get('menu_fetch_error')}")
+    if diagnostics.get("menu_image_candidates_found") not in (None, ""):
+        parts.append(f"image_candidates={int(diagnostics.get('menu_image_candidates_found') or 0)}")
+    if diagnostics.get("menu_image_vision_status"):
+        parts.append(f"image_vision={diagnostics.get('menu_image_vision_status')}")
     return "; ".join(parts)
 
 
@@ -14110,6 +14486,27 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
                     raise
                 diagnostics["rendered_page_error"] = str(exc)
                 print(f"[recipe_import] action=menu_rendered_fetch_failed url={menu_url} error={exc}")
+
+        check_cancelled()
+        if not flatten_menu_sections(sections) and html_text:
+            report(
+                "Reading menu images",
+                "The page did not expose menu text, so AI vision is checking menu images.",
+            )
+            image_sections, image_debug = extract_menu_sections_from_image_candidates(
+                menu_url,
+                html_text,
+                progress_callback=progress_callback,
+                cancellation_check=check_cancelled,
+            )
+            diagnostics["menu_image_vision"] = image_debug
+            diagnostics["menu_image_candidates_found"] = int(image_debug.get("candidates_found") or 0)
+            diagnostics["menu_image_vision_status"] = image_debug.get("status") or ""
+            diagnostics["menu_image_pages_attempted"] = int(image_debug.get("images_attempted") or 0)
+            diagnostics["menu_image_pages_succeeded"] = int(image_debug.get("images_succeeded") or 0)
+            if flatten_menu_sections(image_sections):
+                sections = image_sections
+                diagnostics["menu_extraction_source"] = "menu_image_vision"
 
         check_cancelled()
         diagnostics["html_snapshot_path"] = html_snapshot_path

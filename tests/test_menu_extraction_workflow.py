@@ -532,6 +532,86 @@ def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkey
     assert saved[0][1]["pdf_generation"]["status"] == "not_generated"
 
 
+def test_menu_stub_url_import_reads_image_only_menu_page_with_vision(monkeypatch, tmp_path):
+    monkeypatch.delenv("OPENAI_MENU_CLEANUP_ENABLED", raising=False)
+    monkeypatch.setenv("DISABLE_BROWSER_RECIPE_FETCH", "1")
+    monkeypatch.setattr(menu_mega_json_service, "workspace_data_root", lambda: tmp_path)
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path)
+    source_url = "https://piscomarindy.com/Menu.html"
+    image_url = (
+        "https://piscomarindy.com/assets/images/"
+        "black-simple-new-menu-facebook-post-documento-a4-1-1545x2000.png"
+    )
+    saved = []
+
+    def fake_fetch_menu_page_html(url, cancellation_check=None, return_metadata=False):
+        html = f"""
+        <html>
+          <title>Piscomar | Typical Peruvian food | Our Menu</title>
+          <section class="gallery1">
+            <img src="assets/images/black-simple-new-menu-facebook-post-documento-a4-1-1545x2000.png"
+                 alt="Mobirise Website Builder">
+          </section>
+        </html>
+        """
+        metadata = {"final_url": url, "http_status": 200, "content_type": "text/html"}
+        return (html, metadata) if return_metadata else html
+
+    def fake_download(url, candidate, index, cancellation_check=None):
+        image_path = tmp_path / f"menu-image-{index}.png"
+        image_path.write_bytes(b"fake image")
+        assert candidate["url"] == image_url
+        return str(image_path), {"url": image_url, "content_type": "image/png", "bytes": 10}
+
+    def fake_vision(image_path, prompt, action_name, preferred_model=None, debug=None):
+        return recipe_extract_service.VisionResult(
+            ok=True,
+            text=json.dumps({
+                "menu_sections": [
+                    {
+                        "section_name": "Ceviches",
+                        "items": [
+                            {
+                                "item_name": "Ceviche Mixto",
+                                "description": "Fish and seafood in leche de tigre.",
+                                "price": "$18.99",
+                            }
+                        ],
+                    }
+                ]
+            }),
+            model_used="gpt-5.5",
+            model_source="test",
+            action_name=action_name,
+        )
+
+    monkeypatch.setattr(recipe_extract_service, "fetch_menu_page_html", fake_fetch_menu_page_html)
+    monkeypatch.setattr(recipe_extract_service, "fetch_cartana_menu_payload", lambda url, html, cancellation_check=None: (None, {"ok": False}))
+    monkeypatch.setattr(recipe_extract_service, "download_menu_image_candidate", fake_download)
+    monkeypatch.setattr(recipe_extract_service, "call_openai_vision_image", fake_vision)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "save_extracted_recipe_json",
+        lambda recipe_url, json_data: saved.append((recipe_url, dict(json_data))) or tmp_path / "stub.json",
+    )
+
+    result = recipe_extract_service.extract_menu_stubs_from_url(
+        source_url,
+        create_source_pdf=False,
+    )
+
+    assert result["ok"] is True
+    assert result["stubs_created"] == 1
+    assert result["debug"]["menu_extraction_source"] == "menu_image_vision"
+    assert result["debug"]["menu_image_candidates_found"] == 1
+    assert result["debug"]["menu_image_vision_status"] == "ok"
+    assert result["debug"]["menu_items_found"] == 1
+    assert saved[0][1]["recipe_title"] == "Ceviche Mixto"
+    assert saved[0][1]["menu_section"] == "Ceviches"
+    assert saved[0][1]["menu_price"] == "$18.99"
+    assert saved[0][1]["source_metadata"]["image_url"] == image_url
+
+
 def test_mega_menu_json_viewer_static_hooks_are_present():
     template = Path("PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
