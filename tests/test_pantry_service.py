@@ -656,6 +656,8 @@ def test_pantry_inventory_links_uploaded_receipt_pdf(monkeypatch, tmp_path):
 
     assert section_response.status_code == 200
     assert "View Receipt PDF" in html
+    assert "Filter This Receipt" in html
+    assert "ai-pantry-inventory-source-filter-btn" in html
     assert "Receipt PDFs" in html
     assert "meijer.pdf" in html
     assert 'data-pantry-source-detail-type="receipt-pdf"' in html
@@ -715,6 +717,8 @@ def test_pantry_inventory_filters_uploaded_receipt_images(monkeypatch, tmp_path)
 
     assert section_response.status_code == 200
     assert "Uploaded Images" in html
+    assert "Filter Image Set" in html
+    assert "ai-pantry-inventory-source-filter-btn" in html
     assert "meijer.jpg" in html
     assert 'data-pantry-source-detail-type="receipt-image"' in html
     assert 'data-pantry-source-detail-id="receipt-img"' in html

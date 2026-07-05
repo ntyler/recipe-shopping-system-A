@@ -21222,6 +21222,7 @@ body {
 }
 
 .ai-pantry-inventory-row .ai-pantry-inventory-source-link {
+    grid-column: span 2;
     display: grid;
     gap: 6px;
     min-width: 0;
@@ -21232,7 +21233,15 @@ body {
     text-transform: uppercase;
 }
 
-.ai-pantry-inventory-source-link a {
+.ai-pantry-inventory-source-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 118px), 1fr));
+    gap: 6px;
+    min-width: 0;
+}
+
+.ai-pantry-inventory-source-link a,
+.ai-pantry-inventory-source-filter-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -21244,6 +21253,7 @@ body {
     color: #dbeafe;
     font-size: 13px;
     font-weight: 850;
+    font-family: inherit;
     line-height: 1.2;
     padding: 6px 10px;
     text-align: center;
@@ -21251,9 +21261,25 @@ body {
     text-transform: none;
 }
 
+.ai-pantry-inventory-source-filter-btn {
+    border-color: #2f6f65;
+    background: rgba(13, 93, 86, 0.58);
+    color: #d8fff7;
+    cursor: pointer;
+}
+
 .ai-pantry-inventory-source-link a:hover,
-.ai-pantry-inventory-source-link a:focus {
+.ai-pantry-inventory-source-link a:focus,
+.ai-pantry-inventory-source-filter-btn:hover,
+.ai-pantry-inventory-source-filter-btn:focus {
     border-color: #60a5fa;
+    color: #f8fafc;
+}
+
+.ai-pantry-inventory-source-filter-btn[aria-pressed="true"],
+.ai-pantry-inventory-source-filter-btn.is-active {
+    border-color: #38bdf8;
+    background: rgba(14, 116, 144, 0.7);
     color: #f8fafc;
 }
 

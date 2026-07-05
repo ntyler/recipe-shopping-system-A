@@ -490,11 +490,24 @@
                                 {% if item.source_receipt and item.source_receipt.receipt_id %}
                                     <div class="ai-pantry-inventory-source-link">
                                         <span>Source</span>
-                                        <a href="{{ url_for('pantry_bp.view_pantry_receipt_file_route', receipt_id=item.source_receipt.receipt_id) }}"
-                                           target="_blank"
-                                           rel="noopener noreferrer">
-                                            {% if item.source_receipt.is_pdf %}View Receipt PDF{% else %}View Receipt{% endif %}
-                                        </a>
+                                        <div class="ai-pantry-inventory-source-actions">
+                                            <a href="{{ url_for('pantry_bp.view_pantry_receipt_file_route', receipt_id=item.source_receipt.receipt_id) }}"
+                                               target="_blank"
+                                               rel="noopener noreferrer">
+                                                {% if item.source_receipt.is_pdf %}View Receipt PDF{% else %}View Receipt{% endif %}
+                                            </a>
+                                            <button type="button"
+                                                    class="ai-pantry-inventory-source-filter-btn"
+                                                    data-pantry-source-detail-filter
+                                                    data-pantry-source-detail-group="{% if item.source_receipt.is_pdf %}receipt{% else %}image{% endif %}"
+                                                    data-pantry-source-detail-type="{% if item.source_receipt.is_pdf %}receipt-pdf{% else %}receipt-image{% endif %}"
+                                                    data-pantry-source-detail-id="{{ item.source_receipt.receipt_id }}"
+                                                    aria-pressed="false"
+                                                    title="Show items from {{ item.source_receipt.file_label }}"
+                                                    onclick="return togglePantryInventorySourceFilter(this)">
+                                                {% if item.source_receipt.is_pdf %}Filter This Receipt{% else %}Filter Image Set{% endif %}
+                                            </button>
+                                        </div>
                                     </div>
                                 {% endif %}
                                 <label class="ai-pantry-inventory-notes-label">

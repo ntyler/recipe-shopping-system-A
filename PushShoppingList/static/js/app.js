@@ -15545,14 +15545,22 @@ function activePantryInventorySourceFilters() {
 }
 
 function activePantryInventoryDetailFilters() {
-    return Array.from(document.querySelectorAll("[data-pantry-source-detail-filter]"))
-        .filter(button => button.getAttribute("aria-pressed") === "true")
-        .map(button => ({
+    const filters = new Map();
+    document.querySelectorAll("[data-pantry-source-detail-filter]").forEach(button => {
+        if (button.getAttribute("aria-pressed") !== "true") {
+            return;
+        }
+
+        const filter = {
             group: String(button.dataset.pantrySourceDetailGroup || "").trim().toLowerCase(),
             type: String(button.dataset.pantrySourceDetailType || "").trim().toLowerCase(),
             id: String(button.dataset.pantrySourceDetailId || "").trim(),
-        }))
-        .filter(filter => filter.type && filter.id);
+        };
+        if (filter.type && filter.id) {
+            filters.set(`${filter.group}|${filter.type}|${filter.id}`, filter);
+        }
+    });
+    return Array.from(filters.values());
 }
 
 function syncPantryInventorySourceFilterButtons() {
@@ -15567,6 +15575,23 @@ function deactivatePantrySourceFilterButtons(selector, exceptButton = null) {
         if (button !== exceptButton) {
             button.setAttribute("aria-pressed", "false");
         }
+    });
+}
+
+function setMatchingPantrySourceDetailFiltersActive(sourceButton, active) {
+    if (!sourceButton) {
+        return;
+    }
+
+    const detailGroup = String(sourceButton.dataset.pantrySourceDetailGroup || "").trim().toLowerCase();
+    const detailType = String(sourceButton.dataset.pantrySourceDetailType || "").trim().toLowerCase();
+    const detailId = String(sourceButton.dataset.pantrySourceDetailId || "").trim();
+
+    document.querySelectorAll("[data-pantry-source-detail-filter]").forEach(button => {
+        const matches = detailGroup === String(button.dataset.pantrySourceDetailGroup || "").trim().toLowerCase()
+            && detailType === String(button.dataset.pantrySourceDetailType || "").trim().toLowerCase()
+            && detailId === String(button.dataset.pantrySourceDetailId || "").trim();
+        button.setAttribute("aria-pressed", active && matches ? "true" : "false");
     });
 }
 
@@ -15651,17 +15676,16 @@ function togglePantryInventorySourceFilter(button) {
     const nextActive = !(button && button.getAttribute("aria-pressed") === "true");
     const searchInput = document.getElementById("pantrySearchInput");
 
-    if (button) {
+    if (button && button.dataset.pantrySourceDetailGroup) {
+        deactivatePantrySourceFilterButtons("[data-pantry-inventory-filter]");
+        setMatchingPantrySourceDetailFiltersActive(button, nextActive);
+    } else if (button) {
         button.setAttribute("aria-pressed", nextActive ? "true" : "false");
         if (nextActive && button.dataset.pantryInventoryFilter) {
             deactivatePantrySourceFilterButtons(
                 `[data-pantry-source-detail-group="${button.dataset.pantryInventoryFilter}"]`,
                 button,
             );
-        }
-        if (nextActive && button.dataset.pantrySourceDetailGroup) {
-            deactivatePantrySourceFilterButtons("[data-pantry-inventory-filter]", button);
-            deactivatePantrySourceFilterButtons("[data-pantry-source-detail-filter]", button);
         }
     }
     syncPantryInventorySourceFilterButtons();
