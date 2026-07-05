@@ -1,7 +1,11 @@
+import mimetypes
+
 from flask import Blueprint
+from flask import abort
 from flask import jsonify
 from flask import redirect
 from flask import request
+from flask import send_file
 from flask import session
 from flask import url_for
 
@@ -15,6 +19,7 @@ from PushShoppingList.services.pantry_service import delete_pantry_items
 from PushShoppingList.services.pantry_service import generate_pantry_item_image
 from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
 from PushShoppingList.services.pantry_service import pantry_name_suggestion
+from PushShoppingList.services.pantry_service import pantry_receipt_upload_file_path
 from PushShoppingList.services.pantry_service import receipt_candidate_display_storage_location
 from PushShoppingList.services.pantry_service import remove_pantry_storage_locations
 from PushShoppingList.services.pantry_service import rename_pantry_storage_location
@@ -286,6 +291,22 @@ def upload_receipt_route():
     return redirect(url_for("main_bp.index", _anchor="aiPantryReceiptReview"))
 
 
+@pantry_bp.route("/pantry/receipts/<receipt_id>/file")
+def view_pantry_receipt_file_route(receipt_id):
+    receipt_path = pantry_receipt_upload_file_path(receipt_id)
+
+    if not receipt_path:
+        abort(404)
+
+    return send_file(
+        receipt_path,
+        mimetype=mimetypes.guess_type(receipt_path.name)[0] or "application/octet-stream",
+        as_attachment=False,
+        download_name=receipt_path.name,
+        max_age=0,
+    )
+
+
 @pantry_bp.route("/pantry/receipt/add", methods=["POST"])
 def add_receipt_candidates_route():
     review = session.get("pantry_receipt_review") if isinstance(session.get("pantry_receipt_review"), dict) else {}
@@ -379,6 +400,8 @@ def add_receipt_candidates_route():
             "confidence": candidate.get("confidence", DEFAULT_CONFIDENCE_BY_SOURCE["receipt"]),
             "notes": receipt_note,
             "storage_location": storage_location,
+            "source_receipt_id": review.get("receipt_id", ""),
+            "source_receipt_line": candidate.get("raw_line", ""),
             **lifecycle_dates,
         })
         added.append(result["item"].get("ingredient_name") or candidate.get("product_name", "Item"))

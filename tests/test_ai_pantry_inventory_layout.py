@@ -44,10 +44,14 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert 'name="store_section"' in template
     assert "Store Section" in template
     assert "ai-pantry-inventory-store-section-label" in template
+    assert "ai-pantry-inventory-source-link" in template
+    assert "view_pantry_receipt_file_route" in template
+    assert "View Receipt PDF" in template
     frozen_on_index = template.index("<span>Frozen On</span>")
     store_section_index = template.index("ai-pantry-inventory-store-section-label")
     notes_index = template.index("ai-pantry-inventory-notes-label")
-    assert frozen_on_index < store_section_index < notes_index
+    source_link_index = template.index("ai-pantry-inventory-source-link")
+    assert frozen_on_index < store_section_index < source_link_index < notes_index
     assert "recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap" in template
     assert "ai-pantry-inventory-row-collapsed" in template
     assert "data-pantry-inventory-row" in template
@@ -96,6 +100,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-meta-store-section select" not in css
     assert ".ai-pantry-delete-selected-btn" in css
     assert ".ai-pantry-inventory-row [data-pantry-inventory-details][hidden]" in css
+    assert ".ai-pantry-inventory-row .ai-pantry-inventory-source-link" in css
+    assert ".ai-pantry-inventory-source-link a" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inventory-notes-label" in css
     assert ".ai-pantry-inventory-handle {\n    grid-column: 1 / 2;\n    grid-row: 1;\n    align-self: start;" in css
     assert ".ai-pantry-inventory-number {\n    grid-column: 2 / 3;\n    grid-row: 1;\n    align-self: start;" in css

@@ -573,6 +573,134 @@ def test_add_receipt_candidate_saves_custom_storage_location(monkeypatch, tmp_pa
     assert pantry_service.storage_location_label(inventory[0]["storage_location"]) == "Garage Shelf"
 
 
+def test_add_receipt_candidate_saves_source_receipt_reference(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
+    app = create_app()
+    candidate = pantry_service.parse_receipt_text(
+        """
+        07/01/26             LEXI
+        4148302201     WHOLE MILK         5.29  F
+        """
+    )[0]
+
+    with app.test_client() as client:
+        sign_in(client)
+        with client.session_transaction() as session:
+            session["pantry_receipt_review"] = {
+                "receipt_id": "receipt-1",
+                "candidates": [candidate],
+            }
+
+        response = client.post(
+            "/pantry/receipt/add",
+            data={
+                "action": "selected",
+                "candidate_index": "0",
+            },
+        )
+
+    inventory_file = tmp_path / "user_data" / "pantry-user" / "pantry_inventory.json"
+    inventory = json.loads(inventory_file.read_text(encoding="utf-8"))["items"]
+
+    assert response.status_code == 302
+    assert inventory[0]["source_receipt_id"] == "receipt-1"
+    assert inventory[0]["source_receipt_line"] == candidate["raw_line"]
+
+
+def test_pantry_inventory_links_uploaded_receipt_pdf(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        stored_name = "receipt-1_meijer.pdf"
+        (pantry_service.PANTRY_RECEIPT_UPLOAD_DIR / stored_name).write_bytes(b"%PDF-1.4\nreceipt")
+        pantry_service.save_receipt_history({
+            "receipts": [
+                {
+                    "receipt_id": "receipt-1",
+                    "created_at": "2026-07-02T22:25:11Z",
+                    "stored_path": f"pantry_receipts/{stored_name}",
+                    "text_excerpt": "4148302201     WHOLE MILK         5.29  F",
+                    "candidate_count": 1,
+                    "status": "added",
+                }
+            ],
+        })
+        pantry_service.save_pantry_inventory({
+            "items": [
+                {
+                    "id": "milk-1",
+                    "ingredient_name": "milk",
+                    "product_name": "Whole Milk",
+                    "quantity": 1,
+                    "source": "receipt",
+                    "source_receipt_id": "receipt-1",
+                    "source_receipt_line": "4148302201     WHOLE MILK         5.29  F",
+                }
+            ],
+        })
+        item = pantry_service.pantry_items_for_view()[0]
+
+    assert item["source_receipt"]["receipt_id"] == "receipt-1"
+    assert item["source_receipt"]["file_label"] == "meijer.pdf"
+    assert item["source_receipt"]["is_pdf"] is True
+
+    with app.test_client() as client:
+        sign_in(client)
+        section_response = client.get("/sections/pantry")
+        file_response = client.get("/pantry/receipts/receipt-1/file")
+
+    html = section_response.get_data(as_text=True)
+
+    assert section_response.status_code == 200
+    assert "View Receipt PDF" in html
+    assert "/pantry/receipts/receipt-1/file" in html
+    assert file_response.status_code == 200
+    assert file_response.mimetype == "application/pdf"
+    assert file_response.get_data().startswith(b"%PDF-1.4")
+
+
+def test_pantry_inventory_links_legacy_receipt_item_from_notes(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+    raw_line = "4068           GREEN ONIONS       1.09  F"
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        stored_name = "receipt-legacy_meijer.pdf"
+        (pantry_service.PANTRY_RECEIPT_UPLOAD_DIR / stored_name).write_bytes(b"%PDF-1.4\nlegacy")
+        pantry_service.save_receipt_history({
+            "receipts": [
+                {
+                    "receipt_id": "receipt-legacy",
+                    "created_at": "2026-07-02T22:25:11Z",
+                    "stored_path": f"pantry_receipts/{stored_name}",
+                    "text_excerpt": raw_line,
+                    "candidate_count": 1,
+                    "status": "added",
+                }
+            ],
+        })
+        pantry_service.save_pantry_inventory({
+            "items": [
+                {
+                    "id": "onion-1",
+                    "ingredient_name": "green onion",
+                    "product_name": "Green Onions",
+                    "quantity": 1,
+                    "source": "receipt",
+                    "notes": f"{raw_line} | Receipt details: Qty 1",
+                }
+            ],
+        })
+        item = pantry_service.pantry_items_for_view()[0]
+
+    assert item["source_receipt"]["receipt_id"] == "receipt-legacy"
+    assert item["source_receipt"]["file_label"] == "meijer.pdf"
+
+
 def test_hydrate_receipt_review_dates_uses_receipt_history(monkeypatch, tmp_path):
     monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
     pantry_service.save_receipt_history(

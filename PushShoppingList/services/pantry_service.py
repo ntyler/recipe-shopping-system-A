@@ -347,6 +347,8 @@ def normalize_pantry_item(item):
             or item.get("pantry_image_generated_at")
             or ""
         ).strip(),
+        "source_receipt_id": str(item.get("source_receipt_id") or item.get("receipt_id") or "").strip(),
+        "source_receipt_line": str(item.get("source_receipt_line") or item.get("receipt_raw_line") or "").strip(),
     }
 
 
@@ -895,6 +897,9 @@ def add_or_increment_pantry_item(item, user_id=None, guest_session_id=None, refe
                 existing["reminder_offsets_days"] = incoming["reminder_offsets_days"]
             for field in ["image_url", "image_generated_at"]:
                 if incoming.get(field) and not existing.get(field):
+                    existing[field] = incoming[field]
+            for field in ["source_receipt_id", "source_receipt_line"]:
+                if incoming.get(field):
                     existing[field] = incoming[field]
             save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
             return {"item": existing, "created": False}
@@ -1710,6 +1715,7 @@ def pantry_items_for_view():
         item["image_display_url"] = image_variants.get("display_url") or item.get("image_url", "")
         item["image_srcset"] = image_variants.get("srcset", "")
         item["image_full_url"] = image_variants.get("full_url") or item.get("image_url", "")
+        item["source_receipt"] = pantry_item_source_receipt(item)
         attach_pantry_name_suggestion(item)
 
     return items
@@ -2063,6 +2069,99 @@ def receipt_purchase_date_from_history(receipt_id):
                 return purchased_date
 
     return ""
+
+
+def receipt_history_record(receipt_id):
+    receipt_id = str(receipt_id or "").strip()
+    if not receipt_id:
+        return {}
+
+    for receipt in load_receipt_history().get("receipts", []):
+        if receipt.get("receipt_id") == receipt_id:
+            return dict(receipt)
+
+    return {}
+
+
+def receipt_raw_line_from_notes(notes):
+    notes = str(notes or "").strip()
+    if not notes:
+        return ""
+
+    return notes.split("| Receipt details:", 1)[0].strip()
+
+
+def receipt_history_record_for_line(raw_line):
+    raw_line = str(raw_line or "").strip()
+    if not raw_line:
+        return {}
+
+    for receipt in reversed(load_receipt_history().get("receipts", [])):
+        receipt_text = "\n".join(
+            str(receipt.get(field) or "")
+            for field in ("text_excerpt", "pasted_text")
+        )
+        if receipt.get("stored_path") and raw_line in receipt_text:
+            return dict(receipt)
+
+    return {}
+
+
+def pantry_receipt_file_label(receipt):
+    stored_name = Path(str((receipt or {}).get("stored_path") or "")).name
+    if not stored_name:
+        return "Receipt"
+
+    prefix = f"{receipt.get('receipt_id', '')}_"
+    if prefix and stored_name.startswith(prefix):
+        return stored_name[len(prefix):] or stored_name
+
+    return stored_name
+
+
+def pantry_receipt_upload_file_path(receipt_id):
+    receipt = receipt_history_record(receipt_id)
+    stored_path = str(receipt.get("stored_path") or "").strip()
+    if not stored_path:
+        return None
+
+    upload_root = Path(PANTRY_RECEIPT_UPLOAD_DIR).resolve()
+    candidate = (upload_root / Path(stored_path).name).resolve()
+
+    try:
+        candidate.relative_to(upload_root)
+    except ValueError:
+        return None
+
+    if not candidate.exists() or not candidate.is_file():
+        return None
+
+    return candidate
+
+
+def pantry_item_source_receipt(item):
+    item = item if isinstance(item, dict) else {}
+    if item.get("source") != "receipt":
+        return {}
+
+    receipt = receipt_history_record(item.get("source_receipt_id"))
+    if not receipt:
+        raw_line = item.get("source_receipt_line") or receipt_raw_line_from_notes(item.get("notes"))
+        receipt = receipt_history_record_for_line(raw_line)
+
+    if not receipt or not receipt.get("stored_path"):
+        return {}
+
+    receipt_id = str(receipt.get("receipt_id") or "").strip()
+    if not receipt_id or not pantry_receipt_upload_file_path(receipt_id):
+        return {}
+
+    label = pantry_receipt_file_label(receipt)
+    return {
+        "receipt_id": receipt_id,
+        "file_label": label,
+        "is_pdf": Path(label).suffix.lower() == ".pdf",
+    }
 
 
 def structured_receipt_product_name(line):
