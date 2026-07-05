@@ -20593,6 +20593,7 @@ body {
     flex: 0 0 auto;
     justify-content: center;
     width: auto;
+    min-width: max-content;
     min-height: 39px;
     margin: 0 0 0 auto;
     padding-inline: 10px;
@@ -20600,7 +20601,14 @@ body {
     white-space: nowrap;
 }
 
+.ai-pantry-search .ai-pantry-inventory-confidence-toggle {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+}
+
 .ai-pantry-inventory-confidence-toggle span {
+    flex: 0 0 auto;
     white-space: nowrap;
 }
 
@@ -20609,6 +20617,17 @@ body {
     height: 14px;
     margin: 0;
     accent-color: #38bdf8;
+}
+
+.ai-pantry-search .ai-pantry-inventory-confidence-toggle input {
+    flex: 0 0 14px;
+    width: 14px;
+    min-width: 14px;
+    height: 14px;
+    min-height: 14px;
+    padding: 0;
+    border-radius: 2px;
+    appearance: auto;
 }
 
 .move-bought-pantry-btn,

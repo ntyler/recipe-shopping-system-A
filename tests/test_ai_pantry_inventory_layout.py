@@ -128,6 +128,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "pantry_name_suggestion_filters.count > 1" in template
     assert ".ai-pantry-inventory-confidence-toggle" in css
     assert ".ai-pantry-inventory-confidence-toggle span" in css
+    assert ".ai-pantry-search .ai-pantry-inventory-confidence-toggle input" in css
+    assert "flex: 0 0 14px;" in css
     assert "white-space: nowrap;" in css
     assert "[data-pantry-inventory-confidence][hidden]" in css
     assert "data-pantry-name-question-nav" in template
