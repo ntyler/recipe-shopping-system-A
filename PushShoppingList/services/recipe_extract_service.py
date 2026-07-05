@@ -240,6 +240,13 @@ VISION_MAX_RETRIES = _safe_int(
     os.getenv("OPENAI_VISION_MAX_RETRIES", "2"),
     2,
 )
+MENU_IMAGE_VISION_RETRYABLE_ERROR_CODES = {
+    "OPENAI_CONNECTION_ERROR",
+    "OPENAI_TIMEOUT",
+    "OPENAI_RATE_LIMIT_ERROR",
+    "OPENAI_EMPTY_RESPONSE",
+    "AI_REQUEST_FAILED",
+}
 print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API_KEY')) else 'no'}")
 print(f"[Recipe AI] Recipe model: {os.getenv('OPENAI_RECIPE_MODEL') or OPENAI_RECIPE_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu model: {os.getenv('OPENAI_MENU_MODEL') or OPENAI_MENU_MODEL_DEFAULT}")
@@ -11222,6 +11229,91 @@ def menu_sections_from_vision_payload(payload, source_url, image_url=""):
     return sections
 
 
+def menu_image_vision_retry_config():
+    max_retries = _safe_int(
+        os.getenv(
+            "OPENAI_MENU_IMAGE_VISION_MAX_RETRIES",
+            os.getenv("OPENAI_VISION_MAX_RETRIES", str(VISION_MAX_RETRIES)),
+        ),
+        VISION_MAX_RETRIES,
+    )
+    retry_delay = _safe_float(
+        os.getenv(
+            "OPENAI_MENU_IMAGE_VISION_RETRY_DELAY_SECONDS",
+            os.getenv("OPENAI_VISION_RETRY_DELAY_SECONDS", str(VISION_RETRY_DELAY_SECONDS)),
+        ),
+        VISION_RETRY_DELAY_SECONDS,
+    )
+    return max(0, min(max_retries, 5)), max(0.0, min(retry_delay, 10.0))
+
+
+def menu_image_vision_result_can_retry(result):
+    if not isinstance(result, VisionResult):
+        return False
+    return str(result.error_code or "").strip() in MENU_IMAGE_VISION_RETRYABLE_ERROR_CODES
+
+
+def menu_image_partial_import_allowed():
+    return env_flag("OPENAI_MENU_IMAGE_ALLOW_PARTIAL_IMPORT", False)
+
+
+def menu_image_debug_is_partial_failure(image_debug):
+    image_debug = image_debug if isinstance(image_debug, dict) else {}
+    if menu_image_partial_import_allowed():
+        return False
+    status = str(image_debug.get("status") or "").strip().lower()
+    images_attempted = int(image_debug.get("images_attempted") or 0)
+    images_succeeded = int(image_debug.get("images_succeeded") or 0)
+    return status == "partial" and images_attempted > 1 and images_succeeded < images_attempted
+
+
+def menu_image_failure_records_from_debug(image_debug):
+    image_debug = image_debug if isinstance(image_debug, dict) else {}
+    failures = []
+    for error in image_debug.get("errors") or []:
+        if not isinstance(error, dict):
+            continue
+        image_index = error.get("image_index") or error.get("index") or ""
+        image_label = f"menu image {image_index}" if image_index else "menu image"
+        error_message = clean_recipe_text(
+            error.get("error_message")
+            or error.get("technical_message")
+            or "Menu image extraction failed."
+        )
+        failures.append({
+            "item_name": image_label,
+            "menu_section": "Menu image extraction",
+            "image_index": image_index,
+            "image_url": error.get("image_url", ""),
+            "attempts": error.get("attempts") or 1,
+            "error_code": error.get("error_code") or "MENU_IMAGE_EXTRACTION_FAILED",
+            "error_message": error_message,
+            "technical_message": error.get("technical_message") or error_message,
+        })
+    return failures
+
+
+def menu_image_partial_error_message(diagnostics, failures=None):
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    failures = failures if isinstance(failures, list) else []
+    attempted = int(diagnostics.get("menu_image_pages_attempted") or 0)
+    succeeded = int(diagnostics.get("menu_image_pages_succeeded") or 0)
+    found = int(diagnostics.get("menu_items_found") or 0)
+    failed = len(failures)
+    failed_text = (
+        f", but {failed} image page{'' if failed == 1 else 's'} failed"
+        if failed
+        else ""
+    )
+    return (
+        f"Only {succeeded} of {attempted} menu image page"
+        f"{'' if attempted == 1 else 's'} could be read, so the import was stopped "
+        "before saving a partial menu. "
+        f"{found} menu item{'' if found == 1 else 's'} were found on successful pages"
+        f"{failed_text}."
+    )
+
+
 def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_callback=None, cancellation_check=None):
     debug = {
         "enabled": menu_image_vision_enabled(),
@@ -11251,6 +11343,10 @@ def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_ca
         debug["status"] = "no_candidates"
         return [], debug
 
+    max_retries, retry_delay = menu_image_vision_retry_config()
+    debug["vision_max_retries"] = max_retries
+    debug["vision_retry_delay_seconds"] = retry_delay
+
     sections = []
     image_count = len(candidates)
     for index, candidate in enumerate(candidates, start=1):
@@ -11268,26 +11364,63 @@ def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_ca
                 index,
                 cancellation_check=cancellation_check,
             )
+            candidate_debug = (
+                debug["candidates"][index - 1]
+                if 0 <= index - 1 < len(debug.get("candidates") or [])
+                else {}
+            )
+            if isinstance(candidate_debug, dict):
+                candidate_debug["download"] = image_debug
             debug["images_attempted"] += 1
-            vision_debug = build_vision_debug(
-                uploaded_file_path=image_path,
-                filename=Path(image_path).name,
-                mime_type=image_debug.get("content_type", ""),
-            )
-            vision_debug["action"] = "menu-url-image-section-extraction"
-            vision_debug["source_menu_url"] = menu_url
-            vision_debug["image_url"] = image_url
-            vision_result = call_openai_vision_image(
-                image_path,
-                build_menu_image_sections_prompt(menu_url, image_url, index, image_count),
-                "menu-url-image-section-extraction",
-                preferred_model=resolve_menu_model(),
-                debug=vision_debug,
-            )
-            image_debug["vision"] = vision_result.to_dict()
+            image_debug["vision_attempts"] = []
+            vision_result = None
+            for attempt_index in range(max_retries + 1):
+                run_cancellation_check(cancellation_check)
+                attempt_number = attempt_index + 1
+                vision_debug = build_vision_debug(
+                    uploaded_file_path=image_path,
+                    filename=Path(image_path).name,
+                    mime_type=image_debug.get("content_type", ""),
+                )
+                vision_debug["action"] = "menu-url-image-section-extraction"
+                vision_debug["source_menu_url"] = menu_url
+                vision_debug["image_url"] = image_url
+                vision_debug["image_index"] = index
+                vision_debug["image_count"] = image_count
+                vision_debug["attempt"] = attempt_number
+                vision_debug["max_attempts"] = max_retries + 1
+                vision_result = call_openai_vision_image(
+                    image_path,
+                    build_menu_image_sections_prompt(menu_url, image_url, index, image_count),
+                    "menu-url-image-section-extraction",
+                    preferred_model=resolve_menu_model(),
+                    debug=vision_debug,
+                )
+                attempt_record = vision_result.to_dict()
+                attempt_record["attempt"] = attempt_number
+                attempt_record["max_attempts"] = max_retries + 1
+                image_debug["vision_attempts"].append(attempt_record)
+                image_debug["vision"] = attempt_record
+                if isinstance(candidate_debug, dict):
+                    candidate_debug["vision_attempts"] = image_debug["vision_attempts"]
+                    candidate_debug["vision"] = attempt_record
+                if vision_result.ok:
+                    break
+                if attempt_index >= max_retries or not menu_image_vision_result_can_retry(vision_result):
+                    break
+                print(
+                    "[Import Menu URL] stage=menu_image_vision_retry "
+                    f"image_index={index} attempt={attempt_number} "
+                    f"error_code={vision_result.error_code} delay_seconds={retry_delay}"
+                )
+                if retry_delay:
+                    time.sleep(retry_delay)
+
             if not vision_result.ok:
                 debug["errors"].append({
+                    "image_index": index,
                     "image_url": image_url,
+                    "attempts": len(image_debug.get("vision_attempts") or []),
                     "error_code": vision_result.error_code,
                     "error_message": vision_result.error_message,
                     "technical_message": vision_result.technical_message,
@@ -11305,6 +11438,9 @@ def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_ca
             item_count = len(flatten_menu_sections(image_sections))
             image_debug["sections_found"] = section_count
             image_debug["items_found"] = item_count
+            if isinstance(candidate_debug, dict):
+                candidate_debug["sections_found"] = section_count
+                candidate_debug["items_found"] = item_count
             if section_count:
                 sections.extend(image_sections)
                 debug["images_succeeded"] += 1
@@ -13606,6 +13742,11 @@ def build_menu_stub_extract_result_from_items(
         for section in cleaned_sections
         if isinstance(section, dict)
     ]
+    image_failures = menu_image_failure_records_from_debug(
+        diagnostics.get("menu_image_vision")
+        if isinstance(diagnostics.get("menu_image_vision"), dict)
+        else {}
+    )
 
     if not recipes:
         message = "Menu items were found, but every item was skipped as a duplicate or non-recipe item."
@@ -13641,7 +13782,7 @@ def build_menu_stub_extract_result_from_items(
             "menu_items_found": len(flatten_menu_sections(cleaned_sections)),
             "recipes_created": 0,
             "pdfs_generated": 0,
-            "item_failures": skipped,
+            "item_failures": [*skipped, *image_failures],
         }
 
     return {
@@ -13685,9 +13826,9 @@ def build_menu_stub_extract_result_from_items(
         "menu_items_found": len(flatten_menu_sections(cleaned_sections)),
         "recipes_created": len(recipes),
         "items_skipped": skipped,
-        "item_failures": [],
-        "partial_failure": False,
-        "diagnostics_message": menu_diagnostics_message(diagnostics, skipped),
+        "item_failures": image_failures,
+        "partial_failure": bool(image_failures),
+        "diagnostics_message": menu_diagnostics_message(diagnostics, [*skipped, *image_failures]),
     }
 
 
@@ -14523,6 +14664,8 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
         check_cancelled()
         diagnostics["html_snapshot_path"] = html_snapshot_path
         diagnostics["restaurant"] = extract_menu_restaurant_metadata_from_html(menu_url, html_text, page_text)
+        diagnostics["menu_sections_found"] = len(sections or [])
+        diagnostics["menu_items_found"] = len(flatten_menu_sections(sections))
         print(
             "[Import Menu URL] stage=parse_menu "
             f"sections={len(sections or [])} "
@@ -14530,6 +14673,39 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
             f"elapsed={time.perf_counter() - started_at:.2f}s "
             f"source={diagnostics.get('menu_extraction_source', '')}"
         )
+        image_debug = diagnostics.get("menu_image_vision") if isinstance(diagnostics.get("menu_image_vision"), dict) else {}
+        if (
+            diagnostics.get("menu_extraction_source") == "menu_image_vision"
+            and menu_image_debug_is_partial_failure(image_debug)
+        ):
+            failures = menu_image_failure_records_from_debug(image_debug)
+            message = menu_image_partial_error_message(diagnostics, failures)
+            print(
+                "[Import Menu URL] stage=parse_menu_partial_failed "
+                f"sections={len(sections or [])} items={len(flatten_menu_sections(sections))} "
+                f"image_pages_attempted={diagnostics.get('menu_image_pages_attempted', 0)} "
+                f"image_pages_succeeded={diagnostics.get('menu_image_pages_succeeded', 0)}"
+            )
+            return {
+                "ok": False,
+                "success": False,
+                "source_url": menu_url,
+                "source_type": "menu_url",
+                "menu_extract": True,
+                "sections": [],
+                "partial_sections": sections,
+                "extracted_text": page_text,
+                "html_text": html_text,
+                "html_snapshot_path": html_snapshot_path,
+                "diagnostics": diagnostics,
+                "debug": diagnostics,
+                "error": message,
+                "error_code": "PARTIAL_MENU_IMAGE_EXTRACTION",
+                "error_message": message,
+                "technical_message": menu_diagnostics_message(diagnostics, failures),
+                "item_failures": failures,
+                "partial_failure": True,
+            }
         return {
             "ok": True,
             "success": True,

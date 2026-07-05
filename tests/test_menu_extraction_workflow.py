@@ -658,6 +658,147 @@ def test_menu_stub_url_import_reads_image_only_menu_page_with_vision(monkeypatch
     assert saved[0][1]["source_metadata"]["image_url"] == image_url
 
 
+def test_menu_image_vision_retries_transient_failure(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENAI_MENU_IMAGE_VISION_MAX_RETRIES", "1")
+    monkeypatch.setenv("OPENAI_MENU_IMAGE_VISION_RETRY_DELAY_SECONDS", "0")
+    source_url = "https://piscomarindy.com/Menu.html"
+    image_url = "https://piscomarindy.com/assets/images/menu-page-1.png"
+    calls = []
+
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_image_candidates_from_html",
+        lambda html, url: [{"url": image_url, "width": 1545, "height": 2000, "score": 10}],
+    )
+
+    def fake_download(url, candidate, index, cancellation_check=None):
+        image_path = tmp_path / f"menu-image-{index}.png"
+        image_path.write_bytes(b"fake image")
+        return str(image_path), {"url": candidate["url"], "content_type": "image/png", "bytes": 10}
+
+    def fake_vision(image_path, prompt, action_name, preferred_model=None, debug=None):
+        calls.append(Path(image_path).name)
+        if len(calls) == 1:
+            return recipe_extract_service.VisionResult(
+                ok=False,
+                error_code="OPENAI_CONNECTION_ERROR",
+                error_message="Vision AI connection failed.",
+                technical_message="temporary SSL failure",
+                action_name=action_name,
+            )
+        return recipe_extract_service.VisionResult(
+            ok=True,
+            text=json.dumps({
+                "menu_sections": [{
+                    "section_name": "CEVICHE",
+                    "items": [{"item_name": "Ceviche Mixto"}],
+                }]
+            }),
+            model_used="gpt-5.5",
+            model_source="test",
+            action_name=action_name,
+        )
+
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path)
+    monkeypatch.setattr(recipe_extract_service, "download_menu_image_candidate", fake_download)
+    monkeypatch.setattr(recipe_extract_service, "call_openai_vision_image", fake_vision)
+
+    sections, debug = recipe_extract_service.extract_menu_sections_from_image_candidates(
+        source_url,
+        "<html></html>",
+    )
+
+    assert len(calls) == 2
+    assert debug["status"] == "ok"
+    assert debug["images_succeeded"] == 1
+    assert debug["errors"] == []
+    assert len(debug["candidates"][0]["vision_attempts"]) == 2
+    assert sections[0]["items"][0]["item_name"] == "Ceviche Mixto"
+
+
+def test_menu_stub_url_import_stops_on_partial_multi_image_vision(monkeypatch, tmp_path):
+    monkeypatch.delenv("OPENAI_MENU_CLEANUP_ENABLED", raising=False)
+    monkeypatch.setenv("DISABLE_BROWSER_RECIPE_FETCH", "1")
+    monkeypatch.setenv("OPENAI_MENU_IMAGE_VISION_MAX_RETRIES", "0")
+    monkeypatch.setattr(menu_mega_json_service, "workspace_data_root", lambda: tmp_path)
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path)
+    source_url = "https://piscomarindy.com/Menu.html"
+    image_urls = [
+        "https://piscomarindy.com/assets/images/menu-page-1.png",
+        "https://piscomarindy.com/assets/images/menu-page-2.png",
+    ]
+    saved = []
+
+    def fake_fetch_menu_page_html(url, cancellation_check=None, return_metadata=False):
+        html = """
+        <html>
+          <img src="assets/images/menu-page-1.png">
+          <img src="assets/images/menu-page-2.png">
+        </html>
+        """
+        metadata = {"final_url": url, "http_status": 200, "content_type": "text/html"}
+        return (html, metadata) if return_metadata else html
+
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_image_candidates_from_html",
+        lambda html, url: [
+            {"url": image_urls[0], "width": 1545, "height": 2000, "score": 10},
+            {"url": image_urls[1], "width": 1545, "height": 2000, "score": 10},
+        ],
+    )
+
+    def fake_download(url, candidate, index, cancellation_check=None):
+        image_path = tmp_path / f"menu-image-{index}.png"
+        image_path.write_bytes(b"fake image")
+        return str(image_path), {"url": candidate["url"], "content_type": "image/png", "bytes": 10}
+
+    def fake_vision(image_path, prompt, action_name, preferred_model=None, debug=None):
+        if Path(image_path).name.endswith("-1.png"):
+            return recipe_extract_service.VisionResult(
+                ok=True,
+                text=json.dumps({
+                    "menu_sections": [{
+                        "section_name": "CEVICHE",
+                        "items": [{"item_name": "Ceviche Mixto"}],
+                    }]
+                }),
+                model_used="gpt-5.5",
+                model_source="test",
+                action_name=action_name,
+            )
+        return recipe_extract_service.VisionResult(
+            ok=False,
+            error_code="OPENAI_CONNECTION_ERROR",
+            error_message="Vision AI connection failed.",
+            technical_message="temporary SSL failure",
+            action_name=action_name,
+        )
+
+    monkeypatch.setattr(recipe_extract_service, "fetch_menu_page_html", fake_fetch_menu_page_html)
+    monkeypatch.setattr(recipe_extract_service, "fetch_cartana_menu_payload", lambda url, html, cancellation_check=None: (None, {"ok": False}))
+    monkeypatch.setattr(recipe_extract_service, "download_menu_image_candidate", fake_download)
+    monkeypatch.setattr(recipe_extract_service, "call_openai_vision_image", fake_vision)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "save_extracted_recipe_json",
+        lambda recipe_url, json_data: saved.append((recipe_url, dict(json_data))) or tmp_path / "stub.json",
+    )
+
+    result = recipe_extract_service.extract_menu_stubs_from_url(
+        source_url,
+        create_source_pdf=False,
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "PARTIAL_MENU_IMAGE_EXTRACTION"
+    assert result["stubs_created"] == 0
+    assert result["created_count"] == 0
+    assert result["item_failures"][0]["image_index"] == 2
+    assert "Only 1 of 2 menu image pages could be read" in result["error"]
+    assert saved == []
+
+
 def test_menu_vision_payload_keeps_heading_only_sections():
     sections = recipe_extract_service.menu_sections_from_vision_payload(
         {
