@@ -157,14 +157,26 @@
                        autocomplete="off"
                        oninput="filterPantryItems(this.value)"
                        aria-label="Search pantry items">
-                <button type="button"
-                        class="ai-pantry-receipt-filter-btn"
-                        data-pantry-receipt-filter
-                        aria-pressed="false"
-                        title="Show inventory items added from receipts"
-                        onclick="return togglePantryReceiptFilter(this)">
-                    Receipt Items
-                </button>
+                <div class="ai-pantry-inventory-filter-actions" aria-label="Inventory source filters">
+                    <button type="button"
+                            class="ai-pantry-inventory-filter-btn ai-pantry-receipt-filter-btn"
+                            data-pantry-inventory-filter="receipt"
+                            data-pantry-receipt-filter
+                            aria-pressed="false"
+                            title="Show inventory items added from receipts"
+                            onclick="return togglePantryInventorySourceFilter(this)">
+                        Receipt Items
+                    </button>
+                    <button type="button"
+                            class="ai-pantry-inventory-filter-btn"
+                            data-pantry-inventory-filter="image"
+                            data-pantry-image-filter
+                            aria-pressed="false"
+                            title="Show inventory items with a pantry image or photo source"
+                            onclick="return togglePantryInventorySourceFilter(this)">
+                        Image Taken
+                    </button>
+                </div>
             </div>
 
             {% if pantry_items %}
@@ -193,6 +205,7 @@
                     {% for item in pantry_items %}
                         {% set item_source = item.source or "" %}
                         {% set item_is_receipt_source = item_source|lower == "receipt" or (item.source_receipt and item.source_receipt.receipt_id) %}
+                        {% set item_is_image_source = item_source|lower == "photo" or item.image_url %}
                         <article class="ai-pantry-item ai-pantry-inventory-row ai-pantry-inventory-row-collapsed"
                                  data-pantry-item
                                  data-pantry-inventory-row
@@ -204,6 +217,7 @@
                                  data-pantry-store-section="{{ item.store_section }}"
                                  data-pantry-source="{{ item_source }}"
                                  data-pantry-receipt-source="{% if item_is_receipt_source %}1{% else %}0{% endif %}"
+                                 data-pantry-image-source="{% if item_is_image_source %}1{% else %}0{% endif %}"
                                  data-pantry-storage="{{ item.storage_location }}"
                                  data-pantry-status="{{ item.status }}"
                                  data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.store_section ~ ' ' ~ item.category ~ ' ' ~ item_source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">
