@@ -511,7 +511,7 @@ def build_mega_menu_json(
                     canonical_item[optional_field] = item.get(optional_field)
             canonical_items.append(normalize_menu_item_placeholders(canonical_item))
 
-        if canonical_items:
+        if section_name:
             canonical_sections.append({
                 "section_id": section_id,
                 "section_name": section_name,
@@ -946,13 +946,12 @@ def unpack_mega_menu_json_to_sections(mega_json, snapshot_id=""):
                 unpacked_item["duplicate_of_index"] = duplicate_group_id.replace("duplicate-of-", "", 1)
             items.append(unpacked_item)
 
-        if items:
-            sections.append({
-                "section_id": section_id,
-                "section_name": section_name,
-                "section_description": clean_text(section.get("section_description") or ""),
-                "display_order": section_display_order,
-                "items": items,
-            })
+        sections.append({
+            "section_id": section_id,
+            "section_name": section_name,
+            "section_description": clean_text(section.get("section_description") or ""),
+            "display_order": section_display_order,
+            "items": items,
+        })
 
     return sections

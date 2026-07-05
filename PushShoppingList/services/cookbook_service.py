@@ -1304,8 +1304,8 @@ def cookbook_menu_section_choices(recipes, section_order=None):
 
     for section in clean_menu_section_order(section_order):
         key = section.lower()
-        if key in labels_by_key and key not in ordered_seen:
-            ordered_choices.append(labels_by_key[key])
+        if key not in ordered_seen:
+            ordered_choices.append(labels_by_key.get(key, section))
             ordered_seen.add(key)
 
     for section in choices:
@@ -1408,6 +1408,21 @@ def cookbook_menu_snapshot_section_choices(cookbook, snapshot_index=None):
             choices,
             menu_mega_json_section_choices(record.get("menu_mega_json")),
         )
+
+    return choices
+
+
+def merged_cookbook_menu_section_choices(cookbook, snapshot_index=None):
+    recipe_choices = ordered_cookbook_menu_sections(cookbook)
+    snapshot_choices = cookbook_menu_snapshot_section_choices(cookbook, snapshot_index=snapshot_index)
+
+    if not snapshot_choices:
+        return recipe_choices
+
+    choices = append_unique_menu_sections(snapshot_choices, recipe_choices)
+    saved_order = clean_menu_section_order((cookbook if isinstance(cookbook, dict) else {}).get("menu_section_order", []))
+    if saved_order and len(saved_order) >= len(snapshot_choices):
+        choices = append_unique_menu_sections(saved_order, choices)
 
     return choices
 
@@ -1554,10 +1569,7 @@ def prepare_cookbook_menu_view(view):
             apply_menu_store_metadata_to_recipe(recipe, menu_store, cookbook.get("id", ""))
             apply_recipe_menu_metadata(recipe)
 
-        menu_section_choices = append_unique_menu_sections(
-            ordered_cookbook_menu_sections(cookbook),
-            cookbook_menu_snapshot_section_choices(cookbook, snapshot_index=snapshot_index),
-        )
+        menu_section_choices = merged_cookbook_menu_section_choices(cookbook, snapshot_index=snapshot_index)
         menu_section_order = cookbook_menu_section_order_index(menu_section_choices)
 
         for recipe in cookbook.get("recipes", []):

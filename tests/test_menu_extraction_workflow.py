@@ -438,6 +438,44 @@ def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch)
     assert cleaned_item["skip_reason"] == "duplicate"
 
 
+def test_mega_menu_json_preserves_heading_only_sections(tmp_path, monkeypatch):
+    monkeypatch.setattr(menu_mega_json_service, "workspace_data_root", lambda: tmp_path)
+    source_url = "https://piscomarindy.com/Menu.html"
+
+    mega_json = menu_mega_json_service.build_mega_menu_json(
+        source_url,
+        [
+            {"section_name": "APPETIZERS", "items": []},
+            {
+                "section_name": "PESCADOS Y MARISCOS",
+                "items": [{"item_name": "Jalea Real", "menu_section": "PESCADOS Y MARISCOS"}],
+            },
+            {"section_name": "JUGOS", "items": []},
+        ],
+    )
+    snapshot = menu_mega_json_service.save_menu_mega_json_snapshot(mega_json, job_id="job-1")
+    unpacked = menu_mega_json_service.unpack_mega_menu_json_to_sections(
+        snapshot["menu_mega_json"],
+        snapshot_id=snapshot["id"],
+    )
+
+    assert snapshot["section_count"] == 3
+    assert snapshot["item_count"] == 1
+    assert [section["section_name"] for section in snapshot["menu_mega_json"]["menu"]["sections"]] == [
+        "APPETIZERS",
+        "PESCADOS Y MARISCOS",
+        "JUGOS",
+    ]
+    assert [section["section_name"] for section in unpacked] == [
+        "APPETIZERS",
+        "PESCADOS Y MARISCOS",
+        "JUGOS",
+    ]
+    assert unpacked[0]["items"] == []
+    assert unpacked[1]["items"][0]["item_name"] == "Jalea Real"
+    assert unpacked[2]["items"] == []
+
+
 def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkeypatch, tmp_path):
     monkeypatch.delenv("OPENAI_MENU_CLEANUP_ENABLED", raising=False)
     monkeypatch.setattr(menu_mega_json_service, "workspace_data_root", lambda: tmp_path)
@@ -569,6 +607,10 @@ def test_menu_stub_url_import_reads_image_only_menu_page_with_vision(monkeypatch
             text=json.dumps({
                 "menu_sections": [
                     {
+                        "section_name": "APPETIZERS",
+                        "items": [],
+                    },
+                    {
                         "section_name": "Ceviches",
                         "items": [
                             {
@@ -606,10 +648,35 @@ def test_menu_stub_url_import_reads_image_only_menu_page_with_vision(monkeypatch
     assert result["debug"]["menu_image_candidates_found"] == 1
     assert result["debug"]["menu_image_vision_status"] == "ok"
     assert result["debug"]["menu_items_found"] == 1
+    assert [section["section_name"] for section in result["raw_menu"]["menu_sections"][:2]] == [
+        "APPETIZERS",
+        "Ceviches",
+    ]
     assert saved[0][1]["recipe_title"] == "Ceviche Mixto"
     assert saved[0][1]["menu_section"] == "Ceviches"
     assert saved[0][1]["menu_price"] == "$18.99"
     assert saved[0][1]["source_metadata"]["image_url"] == image_url
+
+
+def test_menu_vision_payload_keeps_heading_only_sections():
+    sections = recipe_extract_service.menu_sections_from_vision_payload(
+        {
+            "menu_sections": [
+                {"section_name": "APPETIZERS", "items": []},
+                {
+                    "section_name": "CEVICHE",
+                    "items": [{"item_name": "Ceviche Mixto", "price": "$18.99"}],
+                },
+            ]
+        },
+        "https://piscomarindy.com/Menu.html",
+        image_url="https://piscomarindy.com/menu-page.png",
+    )
+
+    assert [section["section_name"] for section in sections] == ["APPETIZERS", "CEVICHE"]
+    assert sections[0]["items"] == []
+    assert sections[0]["image_url"] == "https://piscomarindy.com/menu-page.png"
+    assert sections[1]["items"][0]["item_name"] == "Ceviche Mixto"
 
 
 def test_mega_menu_json_viewer_static_hooks_are_present():

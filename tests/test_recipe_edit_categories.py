@@ -467,6 +467,14 @@ def test_lightweight_recipe_edit_views_keep_menu_snapshot_section_choices():
             source_url,
             [
                 {
+                    "section_name": "APPETIZERS",
+                    "items": [],
+                },
+                {
+                    "section_name": "CEVICHE",
+                    "items": [],
+                },
+                {
                     "section_name": "PESCADOS Y MARISCOS",
                     "items": [{"item_name": "Jalea Real", "menu_section": "PESCADOS Y MARISCOS"}],
                 },
@@ -475,12 +483,44 @@ def test_lightweight_recipe_edit_views_keep_menu_snapshot_section_choices():
                     "items": [{"item_name": "Chaufa Amazonico", "menu_section": "CHAUFAS"}],
                 },
                 {
+                    "section_name": "CLASICOS",
+                    "items": [],
+                },
+                {
                     "section_name": "SALTADOS",
                     "items": [{"item_name": "Tallarin Saltado", "menu_section": "SALTADOS"}],
                 },
                 {
                     "section_name": "FETTUCCINE PASTAS",
                     "items": [{"item_name": "Fettuccine Pisco Mar", "menu_section": "FETTUCCINE PASTAS"}],
+                },
+                {
+                    "section_name": "SOPA",
+                    "items": [],
+                },
+                {
+                    "section_name": "GRILL",
+                    "items": [],
+                },
+                {
+                    "section_name": "GARDEN SALAD",
+                    "items": [],
+                },
+                {
+                    "section_name": "KIDS",
+                    "items": [],
+                },
+                {
+                    "section_name": "SIDES",
+                    "items": [],
+                },
+                {
+                    "section_name": "JUGOS",
+                    "items": [],
+                },
+                {
+                    "section_name": "DESERTS",
+                    "items": [],
                 },
             ],
             diagnostics={"restaurant": {"restaurant_name": "Piscomar"}},
@@ -498,10 +538,20 @@ def test_lightweight_recipe_edit_views_keep_menu_snapshot_section_choices():
         assert cookbook_view["recipes"] == []
         assert cookbook_view["menu_sections"] == {}
         assert cookbook_view["menu_section_choices"] == [
+            "APPETIZERS",
+            "CEVICHE",
             "PESCADOS Y MARISCOS",
             "CHAUFAS",
+            "CLASICOS",
             "SALTADOS",
             "FETTUCCINE PASTAS",
+            "SOPA",
+            "GRILL",
+            "GARDEN SALAD",
+            "KIDS",
+            "SIDES",
+            "JUGOS",
+            "DESERTS",
         ]
 
 

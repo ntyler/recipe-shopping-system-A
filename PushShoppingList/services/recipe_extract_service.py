@@ -11127,6 +11127,7 @@ Rules:
 - Group items under the visible section/category heading when possible.
 - Preserve menu item names exactly when readable.
 - Preserve visible descriptions and prices when present.
+- Include visible section/category headings even when no readable menu items are under that heading yet; use an empty items list for those sections.
 - Do not create full recipes in this step.
 - Do not include navigation, hours, address, contact info, ads, policies, social links, or decorative text as menu items.
 - Return only valid JSON.
@@ -11207,6 +11208,16 @@ def menu_sections_from_vision_payload(payload, source_url, image_url=""):
                 "section_name": section_name,
                 "description": clean_recipe_text(section.get("description") or ""),
                 "items": items,
+                "image_url": image_url,
+                "display_order": section_index + 1,
+            })
+        elif section_name:
+            sections.append({
+                "section_name": section_name,
+                "description": clean_recipe_text(section.get("description") or ""),
+                "items": [],
+                "image_url": image_url,
+                "display_order": section_index + 1,
             })
     return sections
 
@@ -11290,10 +11301,11 @@ def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_ca
             raw_response_path.write_text(vision_result.text, encoding="utf-8")
             payload = json.loads(clean_json_response(vision_result.text))
             image_sections = menu_sections_from_vision_payload(payload, menu_url, image_url=image_url)
+            section_count = len(image_sections)
             item_count = len(flatten_menu_sections(image_sections))
-            image_debug["sections_found"] = len(image_sections)
+            image_debug["sections_found"] = section_count
             image_debug["items_found"] = item_count
-            if item_count:
+            if section_count:
                 sections.extend(image_sections)
                 debug["images_succeeded"] += 1
                 debug["items_found"] += item_count
@@ -11311,9 +11323,9 @@ def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_ca
             elif debug["status"] in {"not_attempted", "ok"}:
                 debug["status"] = "failed"
 
-    if debug["items_found"] and debug["errors"]:
+    if sections and debug["errors"]:
         debug["status"] = "partial"
-    elif debug["items_found"]:
+    elif sections:
         debug["status"] = "ok"
     elif debug["status"] == "not_attempted":
         debug["status"] = "no_items"
@@ -13151,7 +13163,7 @@ def apply_menu_cleanup_to_sections(sections, cleanup_payload):
                 or next_section.get("section_name")
                 or ""
             )
-            updated_sections.append(next_section)
+        updated_sections.append(next_section)
 
     return updated_sections
 
@@ -14504,7 +14516,7 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
             diagnostics["menu_image_vision_status"] = image_debug.get("status") or ""
             diagnostics["menu_image_pages_attempted"] = int(image_debug.get("images_attempted") or 0)
             diagnostics["menu_image_pages_succeeded"] = int(image_debug.get("images_succeeded") or 0)
-            if flatten_menu_sections(image_sections):
+            if image_sections:
                 sections = image_sections
                 diagnostics["menu_extraction_source"] = "menu_image_vision"
 
