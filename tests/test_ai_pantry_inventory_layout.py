@@ -102,6 +102,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
         "    grid-row: 1;"
     ) in css
     assert ".ai-pantry-inventory-row-collapsed {" in css
+    assert ".ai-pantry-inventory-row-collapsed .ai-pantry-image-panel" in css
     assert ".ai-pantry-inventory-details-toggle" in css
     assert ".ai-pantry-inventory-details-icon" in css
     assert "ai-pantry-inventory-notes-preview" not in template

@@ -21344,6 +21344,10 @@ body {
     grid-column: 4 / 5;
 }
 
+.ai-pantry-inventory-row-collapsed .ai-pantry-image-panel {
+    display: none;
+}
+
 .ai-pantry-inventory-details-toggle {
     position: relative;
     display: inline-flex;
