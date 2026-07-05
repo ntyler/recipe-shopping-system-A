@@ -37,6 +37,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-row-collapsed .ai-pantry-inventory-notes-preview" in css
     assert ".ai-pantry-inventory-row [data-pantry-inventory-details][hidden]" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inventory-notes-label" in css
+    assert ".ai-pantry-inventory-handle {\n    grid-column: 1 / 2;\n    grid-row: 1;\n    align-self: start;" in css
+    assert ".ai-pantry-inventory-number {\n    grid-column: 2 / 3;\n    grid-row: 1;\n    align-self: start;" in css
+    assert ".ai-pantry-inventory-menu-wrap {\n    grid-column: 5 / 6;\n    grid-row: 1;\n    align-self: start;" in css
     assert "grid-column: 1 / -1;" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inline-form textarea" in css
     assert "min-height: 58px;" in css
