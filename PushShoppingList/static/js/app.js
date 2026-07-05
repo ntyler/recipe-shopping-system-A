@@ -15847,6 +15847,16 @@ function setPantryLocationChoiceChecked(choice, checked) {
     updatePantryLocationRemoveState(choice);
 }
 
+function resizePantryLocationEditInput(input) {
+    if (!input) {
+        return;
+    }
+
+    const textLength = String(input.value || input.placeholder || "").length;
+    const widthCh = Math.min(Math.max(textLength + 2, 4), 34);
+    input.style.setProperty("--pantry-location-input-ch", String(widthCh));
+}
+
 function bindPantryLocationChoices(root = document) {
     const context = root && root.querySelectorAll ? root : document;
 
@@ -15891,6 +15901,8 @@ function bindPantryLocationChoices(root = document) {
     });
 
     context.querySelectorAll("[data-pantry-location-edit-input]").forEach(input => {
+        resizePantryLocationEditInput(input);
+
         if (input.dataset.pantryLocationEditBound === "1") {
             return;
         }
@@ -15898,8 +15910,15 @@ function bindPantryLocationChoices(root = document) {
         input.dataset.pantryLocationEditBound = "1";
         input.addEventListener("focus", event => {
             const choice = event.currentTarget.closest("[data-pantry-location-choice]");
+            resizePantryLocationEditInput(event.currentTarget);
             event.currentTarget.select();
             setPantryLocationChoiceChecked(choice, true);
+        });
+        input.addEventListener("input", event => {
+            resizePantryLocationEditInput(event.currentTarget);
+        });
+        input.addEventListener("change", event => {
+            resizePantryLocationEditInput(event.currentTarget);
         });
     });
 

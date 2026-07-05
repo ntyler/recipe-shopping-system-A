@@ -122,6 +122,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "opacity: 0;" in css
     assert ".ai-pantry-location-choice:has(.ai-pantry-location-choice-check:checked)" in css
     assert ".ai-pantry-location-edit-input" in css
+    assert "--pantry-location-input-ch" in css
+    assert "calc(var(--pantry-location-input-ch, 6) * 1ch)" in css
     assert ".ai-pantry-location-save-btn" in css
     assert ".ai-pantry-location-remove-btn" in css
     assert ".ai-pantry-inventory-select" in css
@@ -159,6 +161,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert 'activeFilters.has("receipt")' in js
     assert 'activeFilters.has("image")' in js
     assert "function togglePantryInventoryDetails" in js
+    assert "function resizePantryLocationEditInput" in js
+    assert "resizePantryLocationEditInput(input);" in js
+    assert 'input.addEventListener("input", event => {' in js
+    assert 'input.addEventListener("change", event => {' in js
     assert "function bindPantryLocationChoices" in js
     assert "function bindPantryInventoryDetails" in js
     assert "function bindPantryInventoryBulkDelete" in js

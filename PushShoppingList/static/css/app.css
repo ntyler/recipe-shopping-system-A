@@ -20936,7 +20936,8 @@ body {
 }
 
 .ai-pantry-location-edit-input {
-    width: clamp(42px, 7vw, 112px);
+    width: clamp(38px, calc(var(--pantry-location-input-ch, 6) * 1ch), min(100%, 260px));
+    max-width: min(100%, 260px);
     min-height: 22px;
     box-sizing: border-box;
     border: 1px solid transparent;
