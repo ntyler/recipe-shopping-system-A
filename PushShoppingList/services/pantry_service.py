@@ -519,6 +519,65 @@ def remove_pantry_storage_locations(locations, user_id=None, guest_session_id=No
     }
 
 
+def rename_pantry_storage_location(old_location, new_location, user_id=None, guest_session_id=None):
+    old_cleaned = clean_storage_location(old_location)
+    new_cleaned = clean_storage_location(new_location)
+
+    if not old_cleaned or old_cleaned == "unknown":
+        return {"ok": False, "error": "Choose a pantry location to edit."}
+    if not new_cleaned or new_cleaned == "unknown":
+        return {"ok": False, "error": "Enter a pantry location name."}
+
+    default_locations = set(DEFAULT_PANTRY_STORAGE_LOCATIONS)
+    if old_cleaned in default_locations:
+        return {"ok": False, "error": "Default pantry locations cannot be renamed."}
+
+    payload = load_pantry_inventory(user_id=user_id, guest_session_id=guest_session_id)
+    current_locations = normalize_pantry_storage_locations(
+        payload.get("storage_locations"),
+        include_defaults=True,
+    )
+    item_locations = [
+        clean_storage_location(item.get("storage_location"))
+        for item in payload.get("items", [])
+        if isinstance(item, dict)
+    ]
+
+    if old_cleaned not in current_locations and old_cleaned not in item_locations:
+        return {"ok": False, "error": "No matching pantry location was found."}
+
+    if old_cleaned == new_cleaned:
+        return {
+            "ok": True,
+            "changed": False,
+            "location": new_cleaned,
+            "label": storage_location_label(new_cleaned),
+        }
+
+    next_locations = [
+        location for location in current_locations
+        if location != old_cleaned
+    ]
+    if new_cleaned not in next_locations:
+        next_locations.append(new_cleaned)
+
+    for item in payload.get("items", []):
+        if isinstance(item, dict) and clean_storage_location(item.get("storage_location")) == old_cleaned:
+            item["storage_location"] = new_cleaned
+
+    payload["storage_locations"] = next_locations
+    save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+
+    return {
+        "ok": True,
+        "changed": True,
+        "old_location": old_cleaned,
+        "location": new_cleaned,
+        "label": storage_location_label(new_cleaned),
+        "merged": new_cleaned in current_locations,
+    }
+
+
 def clean_pantry_store_section(value, fallback_text=""):
     section = re.sub(r"\s+", " ", str(value or "").strip().upper())
     if section in STORE_SECTION_ORDER:

@@ -72,28 +72,57 @@
 
             <div class="ai-pantry-location-manager" id="aiPantryLocations">
                 <form method="POST"
+                      id="pantryLocationDeleteForm"
                       action="{{ url_for('pantry_bp.delete_pantry_storage_locations_route') }}"
-                      class="ai-pantry-location-list"
-                      aria-label="Pantry locations">
+                      class="ai-pantry-location-remove-form"></form>
+                <div class="ai-pantry-location-list"
+                     aria-label="Pantry locations">
                     {% for location in pantry_storage_locations %}
                         {% if location.removable %}
-                            <label class="ai-pantry-location-choice">
+                            <div class="ai-pantry-location-choice"
+                                 data-pantry-location-choice
+                                 role="checkbox"
+                                 tabindex="0"
+                                 aria-checked="false"
+                                 aria-label="Select {{ location.label }} for removal or edit its name">
                                 <input type="checkbox"
+                                       class="ai-pantry-location-choice-check"
                                        name="storage_location"
                                        value="{{ location.value }}"
+                                       form="pantryLocationDeleteForm"
+                                       data-pantry-location-checkbox
                                        aria-label="Select {{ location.label }} for removal">
-                                <span>{{ location.label }}</span>
-                            </label>
+                                <form method="POST"
+                                      action="{{ url_for('pantry_bp.update_pantry_storage_location_route') }}"
+                                      class="ai-pantry-location-edit-form">
+                                    <input type="hidden"
+                                           name="old_storage_location"
+                                           value="{{ location.value }}">
+                                    <input name="storage_location"
+                                           class="ai-pantry-location-edit-input"
+                                           value="{{ location.label }}"
+                                           autocomplete="off"
+                                           data-pantry-location-edit-input
+                                           aria-label="Edit pantry location {{ location.label }}">
+                                    <button type="submit"
+                                            class="ai-pantry-location-save-btn"
+                                            aria-label="Save pantry location {{ location.label }}">
+                                        Save
+                                    </button>
+                                </form>
+                            </div>
                         {% else %}
                             <span class="ai-pantry-location-pill">{{ location.label }}</span>
                         {% endif %}
                     {% endfor %}
                     <button type="submit"
+                            form="pantryLocationDeleteForm"
                             class="ai-pantry-location-remove-btn"
+                            data-pantry-location-remove-selected
                             {% if not pantry_has_removable_storage_locations %}disabled{% endif %}>
                         Remove Selected
                     </button>
-                </form>
+                </div>
                 <form method="POST"
                       action="{{ url_for('pantry_bp.add_pantry_storage_location_route') }}"
                       class="ai-pantry-location-form">

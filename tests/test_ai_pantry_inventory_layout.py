@@ -30,8 +30,17 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "aiPantryLocations" in template
     assert "add_pantry_storage_location_route" in template
     assert "delete_pantry_storage_locations_route" in template
+    assert "update_pantry_storage_location_route" in template
+    assert "pantryLocationDeleteForm" in template
     assert "ai-pantry-location-choice" in template
+    assert "ai-pantry-location-choice-check" in template
+    assert "data-pantry-location-choice" in template
+    assert "data-pantry-location-checkbox" in template
+    assert "data-pantry-location-edit-input" in template
     assert "ai-pantry-location-remove-btn" in template
+    assert "data-pantry-location-remove-selected" in template
+    assert 'role="checkbox"' in template
+    assert 'aria-checked="false"' in template
     assert 'name="store_section"' in template
     assert "Store Section" in template
     assert "ai-pantry-inventory-store-section-label" in template
@@ -75,6 +84,11 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-location-manager" in css
     assert ".ai-pantry-location-form" in css
     assert ".ai-pantry-location-choice" in css
+    assert ".ai-pantry-location-choice-check" in css
+    assert "opacity: 0;" in css
+    assert ".ai-pantry-location-choice:has(.ai-pantry-location-choice-check:checked)" in css
+    assert ".ai-pantry-location-edit-input" in css
+    assert ".ai-pantry-location-save-btn" in css
     assert ".ai-pantry-location-remove-btn" in css
     assert ".ai-pantry-inventory-select" in css
     assert ".ai-pantry-inventory-select:hover" in css
@@ -94,11 +108,14 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-card {\n    border: 0;" in css
     assert "background: transparent;" in css
     assert "function togglePantryInventoryDetails" in js
+    assert "function bindPantryLocationChoices" in js
     assert "function bindPantryInventoryDetails" in js
     assert "function bindPantryInventoryBulkDelete" in js
     assert "function confirmDeleteSelectedPantryItems" in js
+    assert "bindPantryLocationChoices(options.root || document);" in js
     assert "bindPantryInventoryDetails(options.root || document);" in js
     assert "bindPantryInventoryBulkDelete(options.root || document);" in js
+    assert '["bindPantryLocationChoices", bindPantryLocationChoices]' in js
     assert '["bindPantryInventoryDetails", bindPantryInventoryDetails]' in js
     assert '["bindPantryInventoryBulkDelete", bindPantryInventoryBulkDelete]' in js
     toggle_function_index = js.index("function togglePantryInventoryDetails")

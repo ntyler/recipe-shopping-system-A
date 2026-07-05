@@ -20779,6 +20779,10 @@ body {
     min-width: 0;
 }
 
+.ai-pantry-location-remove-form {
+    display: none;
+}
+
 .ai-pantry-location-pill,
 .ai-pantry-location-choice {
     display: inline-flex;
@@ -20796,15 +20800,71 @@ body {
 }
 
 .ai-pantry-location-choice {
+    position: relative;
     cursor: pointer;
 }
 
-.ai-pantry-location-choice input {
-    width: 14px;
-    height: 14px;
+.ai-pantry-location-choice:has(.ai-pantry-location-choice-check:checked),
+.ai-pantry-location-choice.is-selected {
+    border-color: #38bdf8;
+    background: rgba(14, 116, 144, 0.46);
+    color: #f8fafc;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.32);
+}
+
+.ai-pantry-location-choice-check {
+    position: absolute;
+    width: 1px;
+    height: 1px;
     margin: 0;
-    accent-color: #38bdf8;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ai-pantry-location-edit-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+}
+
+.ai-pantry-location-edit-input {
+    width: clamp(42px, 7vw, 112px);
+    min-height: 22px;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: 1.2;
+    padding: 1px 4px;
+}
+
+.ai-pantry-location-edit-input:focus {
+    border-color: #38bdf8;
+    outline: none;
+    background: #0b111a;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+}
+
+.ai-pantry-location-save-btn {
+    min-height: 22px;
+    border: 1px solid #1d4ed8;
+    border-radius: 999px;
+    background: rgba(30, 64, 175, 0.72);
+    color: #dbeafe;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1;
+    padding: 3px 8px;
     cursor: pointer;
+}
+
+.ai-pantry-location-save-btn:hover,
+.ai-pantry-location-save-btn:focus {
+    border-color: #60a5fa;
+    color: #f8fafc;
 }
 
 .ai-pantry-location-remove-btn {

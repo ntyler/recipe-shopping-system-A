@@ -3178,6 +3178,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
     bindRecipeEditCategorySourceTracking();
+    bindPantryLocationChoices(options.root || document);
     bindPantryInventoryDetails(options.root || document);
     bindPantryInventoryBulkDelete(options.root || document);
     bindPantryReceiptConfidenceToggle(options.root || document);
@@ -15643,6 +15644,120 @@ function confirmDeleteSelectedPantryItems() {
     return window.confirm(
         `Delete ${selectedCount} selected pantry item${selectedCount === 1 ? "" : "s"}?`
     );
+}
+
+function pantryLocationChoices(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+    const choices = [];
+
+    if (context.matches && context.matches("[data-pantry-location-choice]")) {
+        choices.push(context);
+    }
+
+    context.querySelectorAll("[data-pantry-location-choice]").forEach(choice => {
+        choices.push(choice);
+    });
+
+    return choices;
+}
+
+function syncPantryLocationChoice(choice) {
+    if (!choice) {
+        return;
+    }
+
+    const checkbox = choice.querySelector("[data-pantry-location-checkbox]");
+    const checked = Boolean(checkbox && checkbox.checked);
+    choice.classList.toggle("is-selected", checked);
+    choice.setAttribute("aria-checked", checked ? "true" : "false");
+}
+
+function updatePantryLocationRemoveState(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+    const manager = context.closest && context.closest(".ai-pantry-location-manager")
+        ? context.closest(".ai-pantry-location-manager")
+        : document.getElementById("aiPantryLocations");
+
+    const managers = manager ? [manager] : Array.from(context.querySelectorAll(".ai-pantry-location-manager"));
+    managers.forEach(locationManager => {
+        const removeButton = locationManager.querySelector("[data-pantry-location-remove-selected]");
+        if (!removeButton) {
+            return;
+        }
+
+        const checkboxes = Array.from(locationManager.querySelectorAll("[data-pantry-location-checkbox]"));
+        removeButton.disabled = !checkboxes.length || !checkboxes.some(checkbox => checkbox.checked);
+    });
+}
+
+function setPantryLocationChoiceChecked(choice, checked) {
+    const checkbox = choice ? choice.querySelector("[data-pantry-location-checkbox]") : null;
+    if (!checkbox) {
+        return;
+    }
+
+    checkbox.checked = Boolean(checked);
+    syncPantryLocationChoice(choice);
+    updatePantryLocationRemoveState(choice);
+}
+
+function bindPantryLocationChoices(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+
+    pantryLocationChoices(context).forEach(choice => {
+        syncPantryLocationChoice(choice);
+
+        if (choice.dataset.pantryLocationChoiceBound === "1") {
+            return;
+        }
+
+        choice.dataset.pantryLocationChoiceBound = "1";
+        choice.addEventListener("click", event => {
+            const editInput = event.target.closest("[data-pantry-location-edit-input]");
+            if (event.target.closest("button")) {
+                return;
+            }
+
+            if (editInput) {
+                editInput.select();
+                setPantryLocationChoiceChecked(choice, true);
+                return;
+            }
+
+            const checkbox = choice.querySelector("[data-pantry-location-checkbox]");
+            setPantryLocationChoiceChecked(choice, !(checkbox && checkbox.checked));
+        });
+        choice.addEventListener("keydown", event => {
+            if (
+                event.target.closest("[data-pantry-location-edit-input]")
+                || event.target.closest("button")
+            ) {
+                return;
+            }
+            if (event.key !== " " && event.key !== "Enter") {
+                return;
+            }
+
+            event.preventDefault();
+            const checkbox = choice.querySelector("[data-pantry-location-checkbox]");
+            setPantryLocationChoiceChecked(choice, !(checkbox && checkbox.checked));
+        });
+    });
+
+    context.querySelectorAll("[data-pantry-location-edit-input]").forEach(input => {
+        if (input.dataset.pantryLocationEditBound === "1") {
+            return;
+        }
+
+        input.dataset.pantryLocationEditBound = "1";
+        input.addEventListener("focus", event => {
+            const choice = event.currentTarget.closest("[data-pantry-location-choice]");
+            event.currentTarget.select();
+            setPantryLocationChoiceChecked(choice, true);
+        });
+    });
+
+    updatePantryLocationRemoveState(context);
 }
 
 function bindPantryInventoryBulkDelete(root = document) {
@@ -30746,6 +30861,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindImportCookbookSelector", bindImportCookbookSelector],
         ["bindStoreButtons", bindStoreButtons],
         ["bindStoreLinks", bindStoreLinks],
+        ["bindPantryLocationChoices", bindPantryLocationChoices],
         ["bindPantryInventoryDetails", bindPantryInventoryDetails],
         ["bindPantryInventoryBulkDelete", bindPantryInventoryBulkDelete],
         ["bindPantryReceiptConfidenceToggle", bindPantryReceiptConfidenceToggle],

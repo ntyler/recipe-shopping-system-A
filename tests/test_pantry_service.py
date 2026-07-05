@@ -146,6 +146,34 @@ def test_remove_pantry_storage_location_keeps_defaults(monkeypatch, tmp_path):
     assert "fridge" in values
 
 
+def test_rename_pantry_storage_location_updates_items(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user-a"
+        pantry_service.add_pantry_storage_location("Garage shelf")
+        pantry_service.add_or_increment_pantry_item({
+            "ingredient_name": "Paper towels",
+            "quantity": 1,
+            "source": "manual",
+            "storage_location": "garage-shelf",
+        })
+        result = pantry_service.rename_pantry_storage_location("garage-shelf", "Basement shelf")
+        inventory = pantry_service.load_pantry_inventory()
+        options = pantry_service.pantry_storage_location_options_for_view()
+
+    values = [option["value"] for option in options]
+
+    assert result["ok"] is True
+    assert result["changed"] is True
+    assert result["old_location"] == "garage-shelf"
+    assert result["location"] == "basement-shelf"
+    assert "garage-shelf" not in values
+    assert "basement-shelf" in values
+    assert inventory["items"][0]["storage_location"] == "basement-shelf"
+
+
 def test_add_pantry_storage_location_route_persists_for_account(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     app = create_app()
@@ -185,6 +213,32 @@ def test_delete_pantry_storage_location_route_removes_selected_custom(monkeypatc
     assert response.headers["Location"].endswith("/#aiPantryLocations")
     assert "basement-freezer" not in inventory["storage_locations"]
     assert "fridge" in inventory["storage_locations"]
+
+
+def test_update_pantry_storage_location_route_renames_custom_location(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_client() as client:
+        sign_in(client, "pantry-route-user")
+        client.post(
+            "/pantry/locations/add",
+            data={"storage_location": "Basement freezer"},
+        )
+        response = client.post(
+            "/pantry/locations/update",
+            data={
+                "old_storage_location": "basement-freezer",
+                "storage_location": "Garage freezer",
+            },
+        )
+
+    inventory = pantry_service.load_pantry_inventory(user_id="pantry-route-user")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/#aiPantryLocations")
+    assert "basement-freezer" not in inventory["storage_locations"]
+    assert "garage-freezer" in inventory["storage_locations"]
 
 
 def test_pantry_item_image_upload_persists_image_fields(monkeypatch, tmp_path):

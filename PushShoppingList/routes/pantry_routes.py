@@ -17,6 +17,7 @@ from PushShoppingList.services.pantry_service import hydrate_receipt_review_date
 from PushShoppingList.services.pantry_service import pantry_name_suggestion
 from PushShoppingList.services.pantry_service import receipt_candidate_display_storage_location
 from PushShoppingList.services.pantry_service import remove_pantry_storage_locations
+from PushShoppingList.services.pantry_service import rename_pantry_storage_location
 from PushShoppingList.services.pantry_service import save_receipt_upload
 from PushShoppingList.services.pantry_service import save_pantry_item_image_upload
 from PushShoppingList.services.pantry_service import storage_location_label
@@ -126,6 +127,23 @@ def delete_pantry_storage_locations_route():
         pantry_message("success", f"Removed {deleted_count} pantry {location_label}.")
     else:
         pantry_message("error", result.get("error", "Unable to remove pantry locations."))
+
+    return redirect(url_for("main_bp.index", _anchor="aiPantryLocations"))
+
+
+@pantry_bp.route("/pantry/locations/update", methods=["POST"])
+def update_pantry_storage_location_route():
+    result = rename_pantry_storage_location(
+        request.form.get("old_storage_location", ""),
+        request.form.get("storage_location", ""),
+    )
+
+    if result.get("ok") and result.get("changed"):
+        pantry_message("success", f"Updated pantry location to {result.get('label')}.")
+    elif result.get("ok"):
+        pantry_message("success", f"Pantry location {result.get('label')} is unchanged.")
+    else:
+        pantry_message("error", result.get("error", "Unable to update pantry location."))
 
     return redirect(url_for("main_bp.index", _anchor="aiPantryLocations"))
 
