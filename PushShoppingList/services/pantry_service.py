@@ -16,6 +16,8 @@ from PushShoppingList.services.image_variant_service import ensure_webp_variants
 from PushShoppingList.services.image_variant_service import local_static_image_variants
 from PushShoppingList.services.openai_throttle_service import throttled_image_generation
 from PushShoppingList.services.openai_usage_service import record_openai_usage
+from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
+from PushShoppingList.services.recipe_extract_service import classify_store_section
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.storage_service import scoped_package_path
 
@@ -46,6 +48,12 @@ PANTRY_STORAGE_LOCATION_LABELS = {
     "unknown": "Review",
     "": "Review",
 }
+PANTRY_STORE_SECTION_KEYWORDS = (
+    ("baked beans", "CANNED"),
+    ("baked bean", "CANNED"),
+    ("canned beans", "CANNED"),
+    ("canned bean", "CANNED"),
+)
 DEFAULT_REMINDER_OFFSETS_DAYS = [1]
 
 DEFAULT_CONFIDENCE_BY_SOURCE = {
@@ -284,6 +292,8 @@ def normalize_pantry_item(item):
     timestamp = str(item.get("date_added") or now_iso())
     source = clean_source(item.get("source"))
     ingredient_name = str(item.get("ingredient_name") or item.get("product_name") or "").strip()
+    product_name = str(item.get("product_name") or "").strip()
+    category = str(item.get("category") or "").strip()
     normalized_name = normalize_ingredient_name(item.get("normalized_name") or ingredient_name)
     opened_date = normalize_date_value(item.get("opened_date"))
     frozen_date = normalize_date_value(item.get("frozen_date"))
@@ -296,11 +306,15 @@ def normalize_pantry_item(item):
         "id": str(item.get("id") or uuid.uuid4().hex),
         "ingredient_name": ingredient_name,
         "normalized_name": normalized_name,
-        "product_name": str(item.get("product_name") or "").strip(),
+        "product_name": product_name,
         "store": str(item.get("store") or "").strip(),
         "quantity": parse_quantity(item.get("quantity"), default=1),
         "unit": str(item.get("unit") or "").strip(),
-        "category": str(item.get("category") or "").strip(),
+        "category": category,
+        "store_section": clean_pantry_store_section(
+            item.get("store_section") or item.get("store_type") or category,
+            fallback_text=" ".join(part for part in (ingredient_name, product_name, category) if part),
+        ),
         "source": source,
         "confidence": clamp_confidence(item.get("confidence"), DEFAULT_CONFIDENCE_BY_SOURCE[source]),
         "date_added": timestamp,
@@ -325,6 +339,10 @@ def normalize_pantry_item(item):
             or ""
         ).strip(),
     }
+
+
+def pantry_store_sections_for_view():
+    return list(STORE_SECTION_ORDER.keys())
 
 
 def clean_source(source):
@@ -357,6 +375,33 @@ def storage_location_label(value):
     if cleaned:
         return " ".join(part.capitalize() for part in re.split(r"[-_]+", cleaned) if part)
     return "Review"
+
+
+def clean_pantry_store_section(value, fallback_text=""):
+    section = re.sub(r"\s+", " ", str(value or "").strip().upper())
+    if section in STORE_SECTION_ORDER:
+        return section
+
+    normalized_fallback = re.sub(r"\s+", " ", str(fallback_text or "").strip().lower())
+    for keyword, keyword_section in PANTRY_STORE_SECTION_KEYWORDS:
+        if keyword in normalized_fallback:
+            return keyword_section
+
+    inferred = classify_store_section(fallback_text)
+    return inferred if inferred in STORE_SECTION_ORDER else "MISC"
+
+
+def pantry_store_section_sort_key(item):
+    item = item or {}
+    section = clean_pantry_store_section(
+        item.get("store_section") or item.get("category"),
+        fallback_text=" ".join(
+            str(item.get(field) or "").strip()
+            for field in ("ingredient_name", "product_name", "category")
+        ),
+    )
+    name = str(item.get("ingredient_name") or item.get("product_name") or "").lower()
+    return (STORE_SECTION_ORDER.get(section, STORE_SECTION_ORDER["MISC"]), name)
 
 
 def clean_pantry_status(value):
@@ -633,6 +678,8 @@ def add_or_increment_pantry_item(item, user_id=None, guest_session_id=None, refe
                 existing["unit"] = incoming["unit"]
             if incoming.get("category"):
                 existing["category"] = incoming["category"]
+            if incoming.get("store_section"):
+                existing["store_section"] = incoming["store_section"]
             existing["source"] = incoming["source"]
             existing["confidence"] = max(existing.get("confidence", 0.0), incoming["confidence"])
             existing["last_updated"] = timestamp
@@ -668,6 +715,19 @@ def update_pantry_item(item_id, updates, user_id=None, guest_session_id=None, su
         for field in ["quantity", "unit", "category", "notes"]:
             if field in updates:
                 item[field] = parse_quantity(updates[field]) if field == "quantity" else str(updates[field] or "").strip()
+
+        if "store_section" in updates:
+            item["store_section"] = clean_pantry_store_section(
+                updates.get("store_section"),
+                fallback_text=" ".join(
+                    part for part in (
+                        item.get("ingredient_name"),
+                        item.get("product_name"),
+                        item.get("category"),
+                    )
+                    if part
+                ),
+            )
 
         for field in PANTRY_DATE_FIELDS:
             if field in updates:
@@ -1427,12 +1487,16 @@ def receipt_candidate_review_status(candidate, reference_date=None):
 def pantry_items_for_view():
     items = sorted(
         load_pantry_inventory()["items"],
-        key=lambda item: (item.get("ingredient_name") or item.get("product_name") or "").lower(),
+        key=pantry_store_section_sort_key,
     )
 
     for item in items:
         item["confidence_label"] = confidence_label(item.get("confidence"))
         item["storage_location_label"] = storage_location_label(item.get("storage_location"))
+        item["store_section_order"] = STORE_SECTION_ORDER.get(
+            item.get("store_section"),
+            STORE_SECTION_ORDER["MISC"],
+        )
         item["purchased_date_label"] = date_label(item.get("purchased_date"))
         item["opened_date_label"] = date_label(item.get("opened_date"))
         item["expiration_date_label"] = date_label(item.get("expiration_date"))

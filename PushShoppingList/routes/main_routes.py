@@ -68,6 +68,7 @@ from PushShoppingList.services.item_state_service import save_item_manual_qty
 from PushShoppingList.services.item_state_service import save_item_purchase_mapping
 from PushShoppingList.services.pantry_service import pantry_items_for_view
 from PushShoppingList.services.pantry_service import pantry_recipe_matches_for_view
+from PushShoppingList.services.pantry_service import pantry_store_sections_for_view
 from PushShoppingList.services.pantry_service import pantry_use_soon_items_for_view
 from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
 from PushShoppingList.services.pantry_service import receipt_history_for_view
@@ -411,6 +412,7 @@ def pantry_context():
     return {
         **recipe_context,
         "pantry_items": pantry_items,
+        "pantry_store_sections": pantry_store_sections_for_view(),
         "pantry_use_soon_items": pantry_use_soon_items_for_view(),
         "pantry_recipe_matches": pantry_recipe_matches_for_view(
             recipe_context["recipe_view_rows"],

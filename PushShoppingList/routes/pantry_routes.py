@@ -63,7 +63,7 @@ def add_pantry_item_route():
         "store": request.form.get("store", ""),
         "quantity": request.form.get("quantity") or 1,
         "unit": request.form.get("unit", ""),
-        "category": request.form.get("category", ""),
+        "store_section": request.form.get("store_section", ""),
         "source": "manual",
         "confidence": DEFAULT_CONFIDENCE_BY_SOURCE["manual"],
         "notes": request.form.get("notes", ""),
@@ -87,7 +87,7 @@ def update_pantry_item_route(item_id):
         {
             "quantity": request.form.get("quantity"),
             "unit": request.form.get("unit"),
-            "category": request.form.get("category"),
+            "store_section": request.form.get("store_section"),
             "notes": request.form.get("notes"),
             "purchased_date": request.form.get("purchased_date"),
             "opened_date": request.form.get("opened_date"),

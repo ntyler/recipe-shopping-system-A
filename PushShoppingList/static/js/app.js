@@ -17124,12 +17124,14 @@ function updatePantryRowName(row, data) {
     }
 
     const category = row.dataset.pantryCategory || "";
+    const storeSection = row.dataset.pantryStoreSection || "";
     const source = row.dataset.pantrySource || "";
     const storage = row.dataset.pantryStorage || "";
     const status = row.dataset.pantryStatus || "";
     row.dataset.pantrySearch = [
         ingredientName,
         productName,
+        storeSection,
         category,
         source,
         storage,

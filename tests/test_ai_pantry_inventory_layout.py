@@ -22,6 +22,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "pantryBulkDeleteForm" in template
     assert "Delete Selected" in template
     assert "data-pantry-inventory-select-visible" in template
+    assert "data-pantry-store-section" in template
+    assert 'name="store_section"' in template
+    assert "Store Section" in template
     assert "recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap" in template
     assert "ai-pantry-inventory-row-collapsed" in template
     assert "data-pantry-inventory-row" in template

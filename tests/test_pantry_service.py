@@ -700,6 +700,49 @@ def test_pantry_items_for_view_shows_best_frozen_until_for_frozen_items(monkeypa
     assert items[0]["frozen_best_by_date_label"] == "Sep 30, 2026"
 
 
+def test_pantry_items_for_view_sorts_by_store_section(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        pantry_service.save_pantry_inventory({
+            "items": [
+                {
+                    "id": "beans-1",
+                    "ingredient_name": "Baked beans",
+                    "category": "receipt",
+                    "source": "receipt",
+                },
+                {
+                    "id": "salmon-1",
+                    "ingredient_name": "Atlantic salmon",
+                    "category": "receipt",
+                    "source": "receipt",
+                },
+                {
+                    "id": "apple-1",
+                    "ingredient_name": "Apple",
+                    "store_section": "PRODUCE",
+                    "source": "manual",
+                },
+            ],
+        })
+
+        items = pantry_service.pantry_items_for_view()
+
+    assert [item["ingredient_name"] for item in items] == [
+        "Apple",
+        "Atlantic salmon",
+        "Baked beans",
+    ]
+    assert [item["store_section"] for item in items] == [
+        "PRODUCE",
+        "MEAT & SEAFOOD",
+        "CANNED",
+    ]
+
+
 def test_pantry_receipt_date_fields_keep_inputs_top_aligned():
     css = (Path(__file__).resolve().parents[1] / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
