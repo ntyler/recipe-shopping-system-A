@@ -20590,10 +20590,18 @@ body {
 }
 
 .ai-pantry-inventory-confidence-toggle {
+    flex: 0 0 auto;
     justify-content: center;
+    width: auto;
     min-height: 39px;
     margin: 0;
+    padding-inline: 10px;
     cursor: pointer;
+    white-space: nowrap;
+}
+
+.ai-pantry-inventory-confidence-toggle span {
+    white-space: nowrap;
 }
 
 .ai-pantry-confidence-toggle input {
@@ -20727,20 +20735,23 @@ body {
 }
 
 .ai-pantry-inventory-filter-actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
-    gap: 8px;
-    flex: 1 1 100%;
-}
-
-.ai-pantry-name-question-nav {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     gap: 8px;
     flex: 1 1 100%;
     flex-wrap: wrap;
+}
+
+.ai-pantry-name-question-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
     min-width: 0;
-    padding: 7px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 5px 7px;
     border: 1px solid rgba(217, 119, 6, 0.72);
     border-radius: 8px;
     background: rgba(95, 39, 0, 0.42);
@@ -20748,14 +20759,18 @@ body {
 }
 
 .ai-pantry-name-question-status {
-    flex: 1 1 auto;
-    min-width: 120px;
+    flex: 0 0 auto;
+    min-width: 0;
     color: #ffe8a3;
     font-size: 12px;
     font-weight: 850;
+    white-space: nowrap;
 }
 
 .ai-pantry-name-question-nav-btn {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 82px;
     min-height: 32px;
     margin: 0;
     padding: 6px 10px;
@@ -20767,6 +20782,7 @@ body {
     font-family: inherit;
     font-size: 12px;
     font-weight: 900;
+    white-space: nowrap;
 }
 
 .ai-pantry-name-question-nav-btn:hover,
@@ -20777,6 +20793,7 @@ body {
 }
 
 .ai-pantry-name-question-nav-btn:disabled {
+    display: none;
     border-color: rgba(120, 53, 15, 0.7);
     background: rgba(67, 34, 13, 0.55);
     color: rgba(255, 209, 102, 0.58);
@@ -20816,7 +20833,8 @@ body {
 }
 
 .ai-pantry-inventory-filter-btn {
-    width: 100%;
+    flex: 1 1 180px;
+    width: auto;
     min-height: 39px;
     margin: 0;
     padding: 9px 12px;

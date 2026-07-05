@@ -126,6 +126,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "data-pantry-inventory-confidence" in template
     assert "Show Confidence" in template
     assert ".ai-pantry-inventory-confidence-toggle" in css
+    assert ".ai-pantry-inventory-confidence-toggle span" in css
+    assert "white-space: nowrap;" in css
     assert "[data-pantry-inventory-confidence][hidden]" in css
     assert "data-pantry-name-question-nav" in template
     assert "data-pantry-name-questioned-row" in template
@@ -133,6 +135,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "jumpPantryNameQuestion(1)" in template
     assert ".ai-pantry-name-question-nav" in css
     assert ".ai-pantry-name-question-active" in css
+    assert "width: fit-content;" in css
+    assert ".ai-pantry-name-question-nav-btn:disabled" in css
+    assert "display: none;" in css
     assert "rgba(95, 39, 0" in css
     assert ".ai-pantry-source-filter-groups" in css
     assert ".ai-pantry-source-filter-chip" in css
