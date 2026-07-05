@@ -76,6 +76,27 @@
             </div>
 
             {% if pantry_items %}
+                <form method="POST"
+                      id="pantryBulkDeleteForm"
+                      action="{{ url_for('pantry_bp.delete_selected_pantry_items_route') }}"
+                      onsubmit="return confirmDeleteSelectedPantryItems(this);"></form>
+                <div class="ai-pantry-inventory-bulk-actions" data-pantry-inventory-bulk-actions>
+                    <label class="ai-pantry-inventory-select-visible">
+                        <input type="checkbox"
+                               data-pantry-inventory-select-visible
+                               aria-label="Select visible pantry items">
+                        <span>Select visible</span>
+                    </label>
+                    <span class="ai-pantry-inventory-selected-count"
+                          data-pantry-inventory-selected-count>0 selected</span>
+                    <button type="submit"
+                            form="pantryBulkDeleteForm"
+                            class="ai-pantry-action-btn ai-pantry-delete-selected-btn"
+                            data-pantry-inventory-delete-selected
+                            disabled>
+                        Delete Selected
+                    </button>
+                </div>
                 <div class="ai-pantry-inventory-list ai-pantry-editor-list">
                     {% for item in pantry_items %}
                         <article class="ai-pantry-item ai-pantry-inventory-row ai-pantry-inventory-row-collapsed"
@@ -92,6 +113,14 @@
                                  data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.category ~ ' ' ~ item.source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">
                             <span class="recipe-edit-row-handle ai-pantry-inventory-handle" aria-hidden="true"></span>
                             <span class="recipe-edit-row-number ai-pantry-inventory-number">{{ loop.index }}</span>
+                            <label class="ai-pantry-inventory-select">
+                                <input type="checkbox"
+                                       name="pantry_item_id"
+                                       value="{{ item.id }}"
+                                       form="pantryBulkDeleteForm"
+                                       data-pantry-inventory-checkbox
+                                       aria-label="Select {{ item.ingredient_name }} for bulk delete">
+                            </label>
                             <div class="ai-pantry-item-main ai-pantry-inventory-name">
                                 <h4 data-pantry-name-display>{{ item.ingredient_name }}</h4>
                                 <span data-pantry-product-display {% if not item.product_name %}hidden{% endif %}>{{ item.product_name }}</span>

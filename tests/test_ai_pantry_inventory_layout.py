@@ -18,6 +18,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "Inventory <span class=\"ai-pantry-inventory-count\"" in template
     assert "ai-pantry-inventory-row" in template
     assert "recipe-edit-row-number ai-pantry-inventory-number" in template
+    assert "data-pantry-inventory-checkbox" in template
+    assert "pantryBulkDeleteForm" in template
+    assert "Delete Selected" in template
+    assert "data-pantry-inventory-select-visible" in template
     assert "recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap" in template
     assert "ai-pantry-inventory-row-collapsed" in template
     assert "data-pantry-inventory-row" in template
@@ -35,11 +39,14 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-details-toggle" in css
     assert ".ai-pantry-inventory-details-icon" in css
     assert ".ai-pantry-inventory-row-collapsed .ai-pantry-inventory-notes-preview" in css
+    assert ".ai-pantry-inventory-bulk-actions" in css
+    assert ".ai-pantry-inventory-select" in css
+    assert ".ai-pantry-delete-selected-btn" in css
     assert ".ai-pantry-inventory-row [data-pantry-inventory-details][hidden]" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inventory-notes-label" in css
     assert ".ai-pantry-inventory-handle {\n    grid-column: 1 / 2;\n    grid-row: 1;\n    align-self: start;" in css
     assert ".ai-pantry-inventory-number {\n    grid-column: 2 / 3;\n    grid-row: 1;\n    align-self: start;" in css
-    assert ".ai-pantry-inventory-menu-wrap {\n    grid-column: 5 / 6;\n    grid-row: 1;\n    align-self: start;" in css
+    assert ".ai-pantry-inventory-menu-wrap {\n    grid-column: 6 / 7;\n    grid-row: 1;\n    align-self: start;" in css
     assert "grid-column: 1 / -1;" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inline-form textarea" in css
     assert "min-height: 58px;" in css
@@ -49,8 +56,12 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "background: transparent;" in css
     assert "function togglePantryInventoryDetails" in js
     assert "function bindPantryInventoryDetails" in js
+    assert "function bindPantryInventoryBulkDelete" in js
+    assert "function confirmDeleteSelectedPantryItems" in js
     assert "bindPantryInventoryDetails(options.root || document);" in js
+    assert "bindPantryInventoryBulkDelete(options.root || document);" in js
     assert '["bindPantryInventoryDetails", bindPantryInventoryDetails]' in js
+    assert '["bindPantryInventoryBulkDelete", bindPantryInventoryBulkDelete]' in js
     toggle_function_index = js.index("function togglePantryInventoryDetails")
     assert js.index("closeRecipeEditRowMenus();", toggle_function_index) < js.index(
         "setPantryInventoryDetailsCollapsed(row, !shouldExpand);",

@@ -814,6 +814,35 @@ def test_move_bought_items_to_pantry_route(monkeypatch, tmp_path):
     assert all(item["source"] == "shopping_list" for item in inventory)
 
 
+def test_delete_selected_pantry_items_route(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+    pantry_service.save_pantry_inventory(
+        {
+            "items": [
+                {"id": "milk-1", "ingredient_name": "Milk", "normalized_name": "milk"},
+                {"id": "egg-1", "ingredient_name": "Eggs", "normalized_name": "egg"},
+                {"id": "bean-1", "ingredient_name": "Beans", "normalized_name": "bean"},
+            ],
+        },
+        user_id="pantry-user",
+    )
+
+    with app.test_client() as client:
+        sign_in(client)
+        response = client.post(
+            "/pantry/items/delete_selected",
+            data={"pantry_item_id": ["milk-1", "bean-1"]},
+        )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/#aiPantryInventory")
+
+    inventory = pantry_service.load_pantry_inventory(user_id="pantry-user")["items"]
+
+    assert [item["id"] for item in inventory] == ["egg-1"]
+
+
 def test_send_due_pantry_reminders_sends_once_and_records_marker(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     configure_users_file(monkeypatch, tmp_path)

@@ -738,12 +738,44 @@ def update_pantry_item_lifecycle_action(item_id, action, user_id=None, guest_ses
     return {"ok": False, "error": "Unsupported pantry action."}
 
 
-def delete_pantry_item(item_id, user_id=None, guest_session_id=None):
+def delete_pantry_items(item_ids, user_id=None, guest_session_id=None):
+    selected_ids = []
+    seen_ids = set()
+    for item_id in item_ids or []:
+        item_id = str(item_id or "").strip()
+        if item_id and item_id not in seen_ids:
+            selected_ids.append(item_id)
+            seen_ids.add(item_id)
+
+    if not selected_ids:
+        return {
+            "ok": False,
+            "deleted_count": 0,
+            "requested_count": 0,
+            "error": "No pantry items were selected.",
+        }
+
     payload = load_pantry_inventory(user_id=user_id, guest_session_id=guest_session_id)
     before_count = len(payload["items"])
-    payload["items"] = [item for item in payload["items"] if item.get("id") != item_id]
-    save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
-    return {"ok": len(payload["items"]) != before_count}
+    selected_id_set = set(selected_ids)
+    payload["items"] = [
+        item for item in payload["items"]
+        if item.get("id") not in selected_id_set
+    ]
+    deleted_count = before_count - len(payload["items"])
+
+    if deleted_count:
+        save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+
+    return {
+        "ok": deleted_count > 0,
+        "deleted_count": deleted_count,
+        "requested_count": len(selected_ids),
+    }
+
+
+def delete_pantry_item(item_id, user_id=None, guest_session_id=None):
+    return delete_pantry_items([item_id], user_id=user_id, guest_session_id=guest_session_id)
 
 
 def pantry_image_upload_extension(filename, mime_type=""):

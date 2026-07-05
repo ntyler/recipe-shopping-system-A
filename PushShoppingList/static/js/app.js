@@ -3179,6 +3179,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeTaskChecks();
     bindRecipeEditCategorySourceTracking();
     bindPantryInventoryDetails(options.root || document);
+    bindPantryInventoryBulkDelete(options.root || document);
     bindPantryReceiptConfidenceToggle(options.root || document);
     bindPantryReceiptDateWarnings(options.root || document);
     initDeviceStatusFilters(options.root || document);
@@ -15546,6 +15547,141 @@ function filterPantryItems(value) {
     document.querySelectorAll("[data-pantry-search-empty]").forEach(empty => {
         empty.hidden = !query || visibleCount > 0;
     });
+
+    updatePantryInventoryBulkDeleteState();
+}
+
+function pantryInventoryCheckboxes(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+    const checkboxes = [];
+
+    if (context.matches && context.matches("[data-pantry-inventory-checkbox]")) {
+        checkboxes.push(context);
+    }
+
+    context.querySelectorAll("[data-pantry-inventory-checkbox]").forEach(checkbox => {
+        checkboxes.push(checkbox);
+    });
+
+    return checkboxes;
+}
+
+function selectedPantryInventoryItemCount() {
+    return pantryInventoryCheckboxes().filter(checkbox => checkbox.checked).length;
+}
+
+function syncPantryInventoryCheckboxRow(checkbox) {
+    const row = checkbox ? checkbox.closest("[data-pantry-inventory-row]") : null;
+    if (row) {
+        row.classList.toggle("ai-pantry-inventory-row-selected", checkbox.checked);
+    }
+}
+
+function visiblePantryInventoryCheckboxes() {
+    return pantryInventoryCheckboxes().filter(checkbox => {
+        const row = checkbox.closest("[data-pantry-inventory-row]");
+        return row && !row.hidden;
+    });
+}
+
+function updatePantryInventoryBulkDeleteState(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+    const selectedCount = selectedPantryInventoryItemCount();
+    const visibleCheckboxes = visiblePantryInventoryCheckboxes();
+    const selectedVisibleCount = visibleCheckboxes.filter(checkbox => checkbox.checked).length;
+
+    document.querySelectorAll("[data-pantry-inventory-selected-count]").forEach(countElement => {
+        countElement.textContent = selectedCount
+            ? `${selectedCount} selected`
+            : "0 selected";
+    });
+
+    document.querySelectorAll("[data-pantry-inventory-delete-selected]").forEach(button => {
+        button.disabled = selectedCount === 0;
+        button.textContent = selectedCount
+            ? `Delete ${selectedCount} Selected`
+            : "Delete Selected";
+    });
+
+    const selectVisibleToggles = [];
+    if (context.matches && context.matches("[data-pantry-inventory-select-visible]")) {
+        selectVisibleToggles.push(context);
+    }
+    context.querySelectorAll("[data-pantry-inventory-select-visible]").forEach(toggle => {
+        selectVisibleToggles.push(toggle);
+    });
+
+    if (!selectVisibleToggles.length && context !== document) {
+        document.querySelectorAll("[data-pantry-inventory-select-visible]").forEach(toggle => {
+            selectVisibleToggles.push(toggle);
+        });
+    }
+
+    selectVisibleToggles.forEach(toggle => {
+        toggle.disabled = visibleCheckboxes.length === 0;
+        toggle.checked = visibleCheckboxes.length > 0 && selectedVisibleCount === visibleCheckboxes.length;
+        toggle.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visibleCheckboxes.length;
+    });
+}
+
+function setVisiblePantryInventorySelection(checked) {
+    visiblePantryInventoryCheckboxes().forEach(checkbox => {
+        checkbox.checked = Boolean(checked);
+        syncPantryInventoryCheckboxRow(checkbox);
+    });
+    updatePantryInventoryBulkDeleteState();
+}
+
+function confirmDeleteSelectedPantryItems() {
+    const selectedCount = selectedPantryInventoryItemCount();
+
+    if (!selectedCount) {
+        showRecipeQuantityUpdatedMessage("", "", "", "Select at least one pantry item to delete.");
+        return false;
+    }
+
+    return window.confirm(
+        `Delete ${selectedCount} selected pantry item${selectedCount === 1 ? "" : "s"}?`
+    );
+}
+
+function bindPantryInventoryBulkDelete(root = document) {
+    const context = root && root.querySelectorAll ? root : document;
+
+    pantryInventoryCheckboxes(context).forEach(checkbox => {
+        syncPantryInventoryCheckboxRow(checkbox);
+
+        if (checkbox.dataset.pantryInventoryBulkBound === "1") {
+            return;
+        }
+
+        checkbox.dataset.pantryInventoryBulkBound = "1";
+        checkbox.addEventListener("change", event => {
+            syncPantryInventoryCheckboxRow(event.currentTarget);
+            updatePantryInventoryBulkDeleteState();
+        });
+    });
+
+    const selectVisibleToggles = [];
+    if (context.matches && context.matches("[data-pantry-inventory-select-visible]")) {
+        selectVisibleToggles.push(context);
+    }
+    context.querySelectorAll("[data-pantry-inventory-select-visible]").forEach(toggle => {
+        selectVisibleToggles.push(toggle);
+    });
+
+    selectVisibleToggles.forEach(toggle => {
+        if (toggle.dataset.pantryInventorySelectVisibleBound === "1") {
+            return;
+        }
+
+        toggle.dataset.pantryInventorySelectVisibleBound = "1";
+        toggle.addEventListener("change", event => {
+            setVisiblePantryInventorySelection(event.currentTarget.checked);
+        });
+    });
+
+    updatePantryInventoryBulkDeleteState(context);
 }
 
 function setPantryInventoryDetailsCollapsed(row, collapsed) {
@@ -30609,6 +30745,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindStoreButtons", bindStoreButtons],
         ["bindStoreLinks", bindStoreLinks],
         ["bindPantryInventoryDetails", bindPantryInventoryDetails],
+        ["bindPantryInventoryBulkDelete", bindPantryInventoryBulkDelete],
         ["bindPantryReceiptConfidenceToggle", bindPantryReceiptConfidenceToggle],
         ["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],

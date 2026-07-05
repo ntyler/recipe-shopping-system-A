@@ -10,6 +10,7 @@ from PushShoppingList.services.pantry_service import add_or_increment_pantry_ite
 from PushShoppingList.services.pantry_service import apply_pantry_item_name_suggestion
 from PushShoppingList.services.pantry_service import clean_storage_location
 from PushShoppingList.services.pantry_service import delete_pantry_item
+from PushShoppingList.services.pantry_service import delete_pantry_items
 from PushShoppingList.services.pantry_service import generate_pantry_item_image
 from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
 from PushShoppingList.services.pantry_service import pantry_name_suggestion
@@ -112,6 +113,23 @@ def update_pantry_item_lifecycle_route(item_id):
         "Pantry item updated." if result.get("ok") else result.get("error", "Unable to update pantry item."),
     )
     return redirect(url_for("main_bp.index", _anchor="aiPantryUseSoon"))
+
+
+@pantry_bp.route("/pantry/items/delete_selected", methods=["POST"])
+def delete_selected_pantry_items_route():
+    item_ids = request.form.getlist("pantry_item_id") or request.form.getlist("item_id")
+    result = delete_pantry_items(item_ids)
+    deleted_count = int(result.get("deleted_count") or 0)
+
+    if not item_ids:
+        pantry_message("error", "Select at least one pantry item to delete.")
+    elif deleted_count:
+        item_label = "item" if deleted_count == 1 else "items"
+        pantry_message("success", f"Deleted {deleted_count} pantry {item_label}.")
+    else:
+        pantry_message("error", "No matching pantry items were found.")
+
+    return redirect(url_for("main_bp.index", _anchor="aiPantryInventory"))
 
 
 @pantry_bp.route("/pantry/items/<item_id>/delete", methods=["POST"])
