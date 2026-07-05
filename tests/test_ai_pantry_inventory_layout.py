@@ -44,6 +44,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-row-collapsed .ai-pantry-inventory-notes-preview" in css
     assert ".ai-pantry-inventory-bulk-actions" in css
     assert ".ai-pantry-inventory-select" in css
+    assert ".ai-pantry-inventory-select:hover" in css
+    assert "min-width: 44px;" in css
     assert ".ai-pantry-delete-selected-btn" in css
     assert ".ai-pantry-inventory-row [data-pantry-inventory-details][hidden]" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inventory-notes-label" in css

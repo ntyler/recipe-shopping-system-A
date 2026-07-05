@@ -115,7 +115,8 @@
                                  data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.store_section ~ ' ' ~ item.category ~ ' ' ~ item.source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">
                             <span class="recipe-edit-row-handle ai-pantry-inventory-handle" aria-hidden="true"></span>
                             <span class="recipe-edit-row-number ai-pantry-inventory-number">{{ loop.index }}</span>
-                            <label class="ai-pantry-inventory-select">
+                            <label class="ai-pantry-inventory-select"
+                                   title="Select {{ item.ingredient_name }}">
                                 <input type="checkbox"
                                        name="pantry_item_id"
                                        value="{{ item.id }}"

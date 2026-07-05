@@ -20862,8 +20862,27 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
+    width: 44px;
+    min-width: 44px;
     height: 44px;
+    min-height: 44px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.36);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ai-pantry-inventory-select:hover,
+.ai-pantry-inventory-select:focus-within {
+    border-color: #38bdf8;
+    background: rgba(14, 116, 144, 0.22);
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.14);
+}
+
+.ai-pantry-inventory-select input {
+    width: 20px;
+    height: 20px;
     cursor: pointer;
 }
 
