@@ -89,6 +89,11 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "data-pantry-inventory-row" in template
     assert "data-pantry-inventory-details" in template
     assert "data-pantry-inventory-details-toggle" in template
+    assert 'class="ai-pantry-inventory-name-input"' in template
+    assert 'name="ingredient_name"' in template
+    assert 'form="pantryUpdate{{ loop.index }}"' in template
+    assert 'class="ai-pantry-inventory-product-input"' in template
+    assert 'name="product_name"' in template
     assert "ai-pantry-inventory-details-icon" in template
     assert "togglePantryInventoryDetails(this)" in template
     assert "Save inventory item" in template
@@ -155,6 +160,9 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-thumbnail {\n    grid-column: 3 / 4;\n    grid-row: 1;" in css
     assert ".ai-pantry-inventory-thumbnail-image[src]:not([hidden])" in css
     assert ".ai-pantry-inventory-name {\n    grid-column: 4 / 5;\n    grid-row: 1;" in css
+    assert ".ai-pantry-inventory-name-input" in css
+    assert ".ai-pantry-inventory-product-input" in css
+    assert ".ai-pantry-inventory-name-input:focus" in css
     assert ".ai-pantry-inventory-menu-wrap {\n    grid-column: 6 / 7;\n    grid-row: 1;\n    align-self: start;" in css
     assert "grid-column: 1 / -1;" in css
     assert ".ai-pantry-inventory-row .ai-pantry-inline-form textarea" in css
@@ -166,6 +174,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-card {\n    border: 0;" in css
     assert "background: transparent;" in css
     assert "function togglePantryInventorySourceFilter" in js
+    assert 'row.querySelector(".ai-pantry-inventory-name-input")' in js
+    assert 'row.querySelector(".ai-pantry-inventory-product-input")' in js
+    assert "nameInput.value = ingredientName;" in js
+    assert "productInput.value = productName;" in js
     assert "function activePantryInventoryDetailFilters" in js
     assert "function setMatchingPantrySourceDetailFiltersActive" in js
     assert "function pantryItemMatchesInventoryDetailFilter" in js

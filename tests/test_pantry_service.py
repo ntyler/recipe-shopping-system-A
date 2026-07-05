@@ -274,6 +274,8 @@ def test_update_pantry_item_route_persists_inventory_row_changes(monkeypatch, tm
         response = client.post(
             "/pantry/items/green-onion-1/update",
             data={
+                "ingredient_name": "scallion",
+                "product_name": "Scallion Bunch",
                 "quantity": "2",
                 "unit": "bunch",
                 "storage_location": "xxx",
@@ -293,6 +295,9 @@ def test_update_pantry_item_route_persists_inventory_row_changes(monkeypatch, tm
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/#pantryItem-green-onion-1")
+    assert item["ingredient_name"] == "scallion"
+    assert item["normalized_name"] == "scallion"
+    assert item["product_name"] == "Scallion Bunch"
     assert item["quantity"] == 2
     assert item["unit"] == "bunch"
     assert item["storage_location"] == "xxx"

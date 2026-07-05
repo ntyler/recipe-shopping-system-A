@@ -339,8 +339,24 @@
                                      {% if not item.image_url %}hidden{% endif %}>
                             </div>
                             <div class="ai-pantry-item-main ai-pantry-inventory-name">
-                                <h4 data-pantry-name-display>{{ item.ingredient_name }}</h4>
-                                <span data-pantry-product-display {% if not item.product_name %}hidden{% endif %}>{{ item.product_name }}</span>
+                                <label class="ai-pantry-inventory-name-field">
+                                    <span class="sr-only">Ingredient name</span>
+                                    <input class="ai-pantry-inventory-name-input"
+                                           name="ingredient_name"
+                                           value="{{ item.ingredient_name }}"
+                                           form="pantryUpdate{{ loop.index }}"
+                                           required
+                                           aria-label="Ingredient name for {{ item.ingredient_name }}">
+                                </label>
+                                <label class="ai-pantry-inventory-product-field">
+                                    <span class="sr-only">Product name</span>
+                                    <input class="ai-pantry-inventory-product-input"
+                                           name="product_name"
+                                           value="{{ item.product_name }}"
+                                           form="pantryUpdate{{ loop.index }}"
+                                           placeholder="Product name"
+                                           aria-label="Product name for {{ item.ingredient_name }}">
+                                </label>
                                 {% if item.name_suggestion and item.name_suggestion.suggested_name %}
                                     <div class="ai-pantry-name-suggestion"
                                          data-pantry-name-suggestion

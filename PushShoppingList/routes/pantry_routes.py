@@ -90,21 +90,26 @@ def add_pantry_item_route():
 
 @pantry_bp.route("/pantry/items/<item_id>/update", methods=["POST"])
 def update_pantry_item_route(item_id):
+    updates = {
+        "quantity": request.form.get("quantity"),
+        "unit": request.form.get("unit"),
+        "store_section": request.form.get("store_section"),
+        "notes": request.form.get("notes"),
+        "purchased_date": request.form.get("purchased_date"),
+        "opened_date": request.form.get("opened_date"),
+        "expiration_date": request.form.get("expiration_date"),
+        "freeze_by_date": request.form.get("freeze_by_date"),
+        "frozen_date": request.form.get("frozen_date"),
+        "storage_location": request.form.get("storage_location"),
+        "status": request.form.get("status"),
+    }
+    for field in ("ingredient_name", "product_name"):
+        if field in request.form:
+            updates[field] = request.form.get(field)
+
     result = update_pantry_item(
         item_id,
-        {
-            "quantity": request.form.get("quantity"),
-            "unit": request.form.get("unit"),
-            "store_section": request.form.get("store_section"),
-            "notes": request.form.get("notes"),
-            "purchased_date": request.form.get("purchased_date"),
-            "opened_date": request.form.get("opened_date"),
-            "expiration_date": request.form.get("expiration_date"),
-            "freeze_by_date": request.form.get("freeze_by_date"),
-            "frozen_date": request.form.get("frozen_date"),
-            "storage_location": request.form.get("storage_location"),
-            "status": request.form.get("status"),
-        },
+        updates,
     )
     pantry_message("success" if result.get("ok") else "error", "Pantry item updated." if result.get("ok") else result.get("error", "Unable to update pantry item."))
     anchor = f"pantryItem-{item_id}" if result.get("ok") else "aiPantryInventory"

@@ -918,6 +918,16 @@ def update_pantry_item(item_id, updates, user_id=None, guest_session_id=None, su
         if item.get("id") != item_id:
             continue
 
+        if "ingredient_name" in updates:
+            ingredient_name = str(updates.get("ingredient_name") or "").strip()
+            if not ingredient_name:
+                return {"ok": False, "error": "Ingredient name is required."}
+            item["ingredient_name"] = ingredient_name
+            item["normalized_name"] = normalize_ingredient_name(ingredient_name)
+
+        if "product_name" in updates:
+            item["product_name"] = str(updates.get("product_name") or "").strip()
+
         for field in ["quantity", "unit", "category", "notes"]:
             if field in updates:
                 item[field] = parse_quantity(updates[field]) if field == "quantity" else str(updates[field] or "").strip()

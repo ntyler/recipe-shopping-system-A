@@ -17511,24 +17511,26 @@ function updatePantryRowName(row, data) {
 
     const ingredientName = String(data.ingredient_name || "").trim();
     const productName = String(data.product_name || "").trim();
-    const nameDisplay = row.querySelector("[data-pantry-name-display]");
-    const productDisplay = row.querySelector("[data-pantry-product-display]");
+    const nameInput = row.querySelector(".ai-pantry-inventory-name-input");
+    const productInput = row.querySelector(".ai-pantry-inventory-product-input");
+    const imagePanel = row.querySelector("[data-pantry-image-panel]");
 
-    if (ingredientName && nameDisplay) {
-        nameDisplay.textContent = ingredientName;
+    if (ingredientName && nameInput) {
+        nameInput.value = ingredientName;
     }
 
-    if (productDisplay) {
-        productDisplay.textContent = productName;
-        productDisplay.hidden = !productName;
+    if (productInput) {
+        productInput.value = productName;
     }
 
     if (ingredientName) {
         row.dataset.pantryIngredient = ingredientName;
     }
 
-    if (productName) {
-        row.dataset.pantryProduct = productName;
+    row.dataset.pantryProduct = productName;
+
+    if (imagePanel && ingredientName) {
+        imagePanel.dataset.pantryItemName = ingredientName;
     }
 
     const category = row.dataset.pantryCategory || "";

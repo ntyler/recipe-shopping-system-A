@@ -21205,18 +21205,57 @@ body {
     min-width: 0;
 }
 
-.ai-pantry-inventory-name h4 {
-    margin: 0 0 8px;
+.ai-pantry-inventory-name-field,
+.ai-pantry-inventory-product-field {
+    display: block;
+    min-width: 0;
+}
+
+.ai-pantry-inventory-name-input,
+.ai-pantry-inventory-product-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    font-family: inherit;
+    line-height: 1.18;
+    outline: none;
+    padding: 1px 2px;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ai-pantry-inventory-name-input {
+    margin: 0 0 4px;
     color: #f8fafc;
     font-size: 18px;
     font-weight: 850;
-    line-height: 1.18;
-    overflow-wrap: anywhere;
 }
 
-.ai-pantry-inventory-name > span {
-    display: block;
-    margin-bottom: 8px;
+.ai-pantry-inventory-product-input {
+    margin: 0 0 6px;
+    color: #dbeafe;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.ai-pantry-inventory-product-input::placeholder {
+    color: #7f8ea3;
+}
+
+.ai-pantry-inventory-name-input:hover,
+.ai-pantry-inventory-product-input:hover {
+    border-color: rgba(96, 165, 250, 0.36);
+    background: rgba(15, 23, 42, 0.42);
+}
+
+.ai-pantry-inventory-name-input:focus,
+.ai-pantry-inventory-product-input:focus {
+    border-color: #5b8cff;
+    background: rgba(7, 17, 29, 0.84);
+    box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.18);
 }
 
 .ai-pantry-inventory-row .ai-pantry-item-meta {
