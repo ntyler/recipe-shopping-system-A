@@ -31025,7 +31025,7 @@ function closeRecipeImageLightbox() {
 }
 
 function recipeLightboxImageSelector() {
-    return ".recipe-cover-image, .recipe-step-image[src]:not([hidden])";
+    return ".recipe-cover-image, .recipe-step-image[src]:not([hidden]), .ai-pantry-inventory-thumbnail-image[src]:not([hidden])";
 }
 
 function handleRecipeCoverImageClick(event) {

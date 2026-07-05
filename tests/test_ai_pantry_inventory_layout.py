@@ -150,6 +150,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-handle {\n    grid-column: 1 / 2;\n    grid-row: 1;\n    align-self: start;" in css
     assert ".ai-pantry-inventory-number {\n    grid-column: 2 / 3;\n    grid-row: 1;\n    align-self: start;" in css
     assert ".ai-pantry-inventory-thumbnail {\n    grid-column: 3 / 4;\n    grid-row: 1;" in css
+    assert ".ai-pantry-inventory-thumbnail-image[src]:not([hidden])" in css
     assert ".ai-pantry-inventory-name {\n    grid-column: 4 / 5;\n    grid-row: 1;" in css
     assert ".ai-pantry-inventory-menu-wrap {\n    grid-column: 6 / 7;\n    grid-row: 1;\n    align-self: start;" in css
     assert "grid-column: 1 / -1;" in css
@@ -174,6 +175,7 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert 'row.dataset.pantryItemImageSource = "1";' in js
     assert "function updatePantryInventoryThumbnail" in js
     assert 'setRecipeImageElementSource(image, nextUrl, "thumb", "58px");' in js
+    assert ".ai-pantry-inventory-thumbnail-image[src]:not([hidden])" in js
     assert 'image.removeAttribute("hidden");' in js
     assert 'download.hidden = !imageUrl;' in js
     assert "status.hidden = Boolean(imageUrl);" in js
