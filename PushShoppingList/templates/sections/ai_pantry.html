@@ -1,5 +1,8 @@
 {% set ai_pantry_account_panel = ai_pantry_account_panel|default(false) %}
 {% set pantry_store_sections = pantry_store_sections|default([]) %}
+{% set pantry_storage_locations = pantry_storage_locations|default([]) %}
+{% set pantry_has_removable_storage_locations = pantry_has_removable_storage_locations|default(false) %}
+{% set pantry_storage_location_values = pantry_storage_location_values|default([]) %}
 <section id="aiPantrySection"
          class="{% if not ai_pantry_account_panel %}app-card {% endif %}ai-pantry-card{% if ai_pantry_account_panel %} user-ai-pantry-panel{% endif %}"
          {% if ai_pantry_account_panel %}data-ai-pantry-panel hidden{% endif %}>
@@ -65,6 +68,44 @@
                         </button>
                     </div>
                 {% endif %}
+            </div>
+
+            <div class="ai-pantry-location-manager" id="aiPantryLocations">
+                <form method="POST"
+                      action="{{ url_for('pantry_bp.delete_pantry_storage_locations_route') }}"
+                      class="ai-pantry-location-list"
+                      aria-label="Pantry locations">
+                    {% for location in pantry_storage_locations %}
+                        {% if location.removable %}
+                            <label class="ai-pantry-location-choice">
+                                <input type="checkbox"
+                                       name="storage_location"
+                                       value="{{ location.value }}"
+                                       aria-label="Select {{ location.label }} for removal">
+                                <span>{{ location.label }}</span>
+                            </label>
+                        {% else %}
+                            <span class="ai-pantry-location-pill">{{ location.label }}</span>
+                        {% endif %}
+                    {% endfor %}
+                    <button type="submit"
+                            class="ai-pantry-location-remove-btn"
+                            {% if not pantry_has_removable_storage_locations %}disabled{% endif %}>
+                        Remove Selected
+                    </button>
+                </form>
+                <form method="POST"
+                      action="{{ url_for('pantry_bp.add_pantry_storage_location_route') }}"
+                      class="ai-pantry-location-form">
+                    <label>
+                        <span>Location</span>
+                        <input name="storage_location"
+                               placeholder="New location"
+                               autocomplete="off"
+                               required>
+                    </label>
+                    <button type="submit" class="ai-pantry-action-btn">Add Location</button>
+                </form>
             </div>
 
             <div class="ai-pantry-search">
@@ -239,14 +280,13 @@
                                 </label>
                                 <label class="ai-pantry-inventory-location-label">
                                     <span>Location</span>
-                                    {% set storage_options = ["pantry", "fridge", "freezer", "counter"] %}
                                     {% set item_storage = item.storage_location or "" %}
                                     <select name="storage_location" aria-label="Storage location for {{ item.ingredient_name }}">
                                         <option value="">Unset</option>
-                                        {% for location in storage_options %}
-                                            <option value="{{ location }}" {% if item.storage_location == location %}selected{% endif %}>{{ location|title }}</option>
+                                        {% for location in pantry_storage_locations %}
+                                            <option value="{{ location.value }}" {% if item_storage == location.value %}selected{% endif %}>{{ location.label }}</option>
                                         {% endfor %}
-                                        {% if item_storage and item_storage not in storage_options %}
+                                        {% if item_storage and item_storage not in pantry_storage_location_values %}
                                             <option value="{{ item_storage }}" selected>{{ item.storage_location_label }}</option>
                                         {% endif %}
                                     </select>
@@ -433,10 +473,9 @@
                     <span>Storage</span>
                     <select name="storage_location" aria-label="Storage location">
                         <option value="">Storage location</option>
-                        <option value="pantry">Pantry</option>
-                        <option value="fridge">Fridge</option>
-                        <option value="freezer">Freezer</option>
-                        <option value="counter">Counter</option>
+                        {% for location in pantry_storage_locations %}
+                            <option value="{{ location.value }}">{{ location.label }}</option>
+                        {% endfor %}
                     </select>
                 </label>
                 <label class="ai-pantry-form-field">
@@ -537,9 +576,8 @@
                             {% set use_by_status = date_statuses.expiration_date if date_statuses.expiration_date else {} %}
                             {% set freeze_by_status = date_statuses.freeze_by_date if date_statuses.freeze_by_date else {} %}
                             {% set frozen_status = date_statuses.frozen_date if date_statuses.frozen_date else {} %}
-                            {% set storage_options = ["pantry", "fridge", "freezer", "counter"] %}
                             {% set candidate_storage = candidate.storage_location or "" %}
-                            {% set candidate_storage_is_custom = candidate_storage and candidate_storage not in storage_options %}
+                            {% set candidate_storage_is_custom = candidate_storage and candidate_storage not in pantry_storage_location_values %}
                             <article class="ai-pantry-review-row ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}"
                                      data-pantry-review-freezer-days="{{ candidate.frozen_best_by_days or '' }}"
                                      data-pantry-review-storage="{{ candidate.storage_location or '' }}"
@@ -639,8 +677,8 @@
                                                 data-pantry-review-storage-select
                                                 aria-label="Storage location for {{ candidate.product_name }}">
                                             <option value="" {% if not candidate_storage %}selected{% endif %}>Review</option>
-                                            {% for location in storage_options %}
-                                                <option value="{{ location }}" {% if candidate_storage == location %}selected{% endif %}>{{ location|title }}</option>
+                                            {% for location in pantry_storage_locations %}
+                                                <option value="{{ location.value }}" {% if candidate_storage == location.value %}selected{% endif %}>{{ location.label }}</option>
                                             {% endfor %}
                                             <option value="__custom__" {% if candidate_storage_is_custom %}selected{% endif %}>Custom...</option>
                                         </select>

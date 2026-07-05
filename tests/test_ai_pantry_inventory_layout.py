@@ -23,6 +23,15 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "Delete Selected" in template
     assert "data-pantry-inventory-select-visible" in template
     assert "data-pantry-store-section" in template
+    assert "pantry_storage_locations" in template
+    assert "pantry_storage_location_values" in template
+    assert "pantry_has_removable_storage_locations" in template
+    assert "ai-pantry-location-manager" in template
+    assert "aiPantryLocations" in template
+    assert "add_pantry_storage_location_route" in template
+    assert "delete_pantry_storage_locations_route" in template
+    assert "ai-pantry-location-choice" in template
+    assert "ai-pantry-location-remove-btn" in template
     assert "ai-pantry-meta-store-section" in template
     assert 'form="pantryUpdate{{ loop.index }}"' in template
     assert 'name="store_section"' in template
@@ -61,6 +70,10 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert ".ai-pantry-inventory-details-icon" in css
     assert ".ai-pantry-inventory-row-collapsed .ai-pantry-inventory-notes-preview" in css
     assert ".ai-pantry-inventory-bulk-actions" in css
+    assert ".ai-pantry-location-manager" in css
+    assert ".ai-pantry-location-form" in css
+    assert ".ai-pantry-location-choice" in css
+    assert ".ai-pantry-location-remove-btn" in css
     assert ".ai-pantry-inventory-select" in css
     assert ".ai-pantry-inventory-select:hover" in css
     assert "min-width: 44px;" in css
@@ -119,3 +132,8 @@ def test_ai_pantry_inventory_renders_inventory_heading():
     assert 'href="#aiPantryInventory">Inventory</a>' in html
     assert "ai-pantry-inventory-section" in html
     assert "ai-pantry-inventory-count" in html
+    assert "ai-pantry-location-manager" in html
+    assert "Pantry" in html
+    assert "Fridge" in html
+    assert "Freezer" in html
+    assert "Counter" in html

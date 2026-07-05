@@ -99,6 +99,94 @@ def test_mark_frozen_records_frozen_date(monkeypatch, tmp_path):
     assert updated["item"]["frozen_date"] == "2026-07-03"
 
 
+def test_pantry_storage_locations_are_account_specific(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user-a"
+        result = pantry_service.add_pantry_storage_location("Garage shelf")
+        options = pantry_service.pantry_storage_location_options_for_view()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user-b"
+        other_options = pantry_service.pantry_storage_location_options_for_view()
+
+    assert result["ok"] is True
+    assert result["created"] is True
+    assert result["location"] == "garage-shelf"
+    assert "garage-shelf" in [option["value"] for option in options]
+    assert next(option for option in options if option["value"] == "garage-shelf")["removable"] is True
+    assert next(option for option in options if option["value"] == "fridge")["removable"] is False
+    assert "garage-shelf" not in [option["value"] for option in other_options]
+    assert [option["value"] for option in other_options][:4] == [
+        "pantry",
+        "fridge",
+        "freezer",
+        "counter",
+    ]
+
+
+def test_remove_pantry_storage_location_keeps_defaults(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user-a"
+        pantry_service.add_pantry_storage_location("Garage shelf")
+        result = pantry_service.remove_pantry_storage_locations(["garage-shelf", "fridge"])
+        options = pantry_service.pantry_storage_location_options_for_view()
+
+    values = [option["value"] for option in options]
+
+    assert result["ok"] is True
+    assert result["deleted_count"] == 1
+    assert result["locations"] == ["garage-shelf"]
+    assert "garage-shelf" not in values
+    assert "fridge" in values
+
+
+def test_add_pantry_storage_location_route_persists_for_account(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_client() as client:
+        sign_in(client, "pantry-route-user")
+        response = client.post(
+            "/pantry/locations/add",
+            data={"storage_location": "Basement freezer"},
+        )
+
+    inventory = pantry_service.load_pantry_inventory(user_id="pantry-route-user")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/#aiPantryLocations")
+    assert "basement-freezer" in inventory["storage_locations"]
+
+
+def test_delete_pantry_storage_location_route_removes_selected_custom(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_client() as client:
+        sign_in(client, "pantry-route-user")
+        client.post(
+            "/pantry/locations/add",
+            data={"storage_location": "Basement freezer"},
+        )
+        response = client.post(
+            "/pantry/locations/delete",
+            data={"storage_location": "basement-freezer"},
+        )
+
+    inventory = pantry_service.load_pantry_inventory(user_id="pantry-route-user")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/#aiPantryLocations")
+    assert "basement-freezer" not in inventory["storage_locations"]
+    assert "fridge" in inventory["storage_locations"]
+
+
 def test_pantry_item_image_upload_persists_image_fields(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     monkeypatch.setattr(pantry_service, "PANTRY_IMAGE_FOLDER", tmp_path / "pantry_images")

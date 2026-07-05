@@ -39,6 +39,7 @@ PANTRY_DATE_FIELDS = (
     "reminder_dismissed_until",
 )
 PANTRY_STATUS_VALUES = {"available", "opened", "frozen", "used"}
+DEFAULT_PANTRY_STORAGE_LOCATIONS = ("pantry", "fridge", "freezer", "counter")
 PANTRY_STORAGE_LOCATION_VALUES = {"pantry", "fridge", "freezer", "counter", "unknown"}
 PANTRY_STORAGE_LOCATION_LABELS = {
     "pantry": "Pantry",
@@ -269,6 +270,10 @@ def load_pantry_inventory(user_id=None, guest_session_id=None):
             for item in payload.get("items", [])
             if isinstance(item, dict)
         ],
+        "storage_locations": normalize_pantry_storage_locations(
+            payload.get("storage_locations"),
+            include_defaults=True,
+        ),
     }
 
 
@@ -280,6 +285,10 @@ def save_pantry_inventory(payload, user_id=None, guest_session_id=None):
             for item in payload.get("items", [])
             if isinstance(item, dict)
         ],
+        "storage_locations": normalize_pantry_storage_locations(
+            payload.get("storage_locations"),
+            include_defaults=True,
+        ),
     }
     inventory_path.write_text(
         json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
@@ -375,6 +384,139 @@ def storage_location_label(value):
     if cleaned:
         return " ".join(part.capitalize() for part in re.split(r"[-_]+", cleaned) if part)
     return "Review"
+
+
+def normalize_pantry_storage_locations(values, include_defaults=True):
+    raw_values = []
+    if include_defaults:
+        raw_values.extend(DEFAULT_PANTRY_STORAGE_LOCATIONS)
+
+    if isinstance(values, str):
+        raw_values.extend(re.split(r"[\n,;]+", values))
+    elif isinstance(values, (list, tuple, set)):
+        for value in values:
+            if isinstance(value, dict):
+                raw_values.append(value.get("value") or value.get("location") or value.get("label"))
+            else:
+                raw_values.append(value)
+    elif values:
+        raw_values.append(values)
+
+    locations = []
+    for value in raw_values:
+        location = clean_storage_location(value)
+        if not location or location == "unknown" or location in locations:
+            continue
+        locations.append(location)
+
+    return locations
+
+
+def pantry_storage_locations(user_id=None, guest_session_id=None, include_item_locations=True):
+    payload = load_pantry_inventory(user_id=user_id, guest_session_id=guest_session_id)
+    locations = normalize_pantry_storage_locations(
+        payload.get("storage_locations"),
+        include_defaults=True,
+    )
+
+    if include_item_locations:
+        for item in payload.get("items", []):
+            location = clean_storage_location(item.get("storage_location"))
+            if location and location != "unknown" and location not in locations:
+                locations.append(location)
+
+    return locations
+
+
+def pantry_storage_location_options_for_view(user_id=None, guest_session_id=None):
+    default_locations = set(DEFAULT_PANTRY_STORAGE_LOCATIONS)
+    return [
+        {
+            "value": location,
+            "label": storage_location_label(location),
+            "removable": location not in default_locations,
+        }
+        for location in pantry_storage_locations(
+            user_id=user_id,
+            guest_session_id=guest_session_id,
+        )
+    ]
+
+
+def add_pantry_storage_location(location, user_id=None, guest_session_id=None):
+    cleaned = clean_storage_location(location)
+    if not cleaned or cleaned == "unknown":
+        return {"ok": False, "error": "Enter a storage location."}
+
+    payload = load_pantry_inventory(user_id=user_id, guest_session_id=guest_session_id)
+    locations = normalize_pantry_storage_locations(
+        payload.get("storage_locations"),
+        include_defaults=True,
+    )
+
+    if cleaned in locations:
+        return {
+            "ok": True,
+            "created": False,
+            "location": cleaned,
+            "label": storage_location_label(cleaned),
+        }
+
+    locations.append(cleaned)
+    payload["storage_locations"] = locations
+    save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+
+    return {
+        "ok": True,
+        "created": True,
+        "location": cleaned,
+        "label": storage_location_label(cleaned),
+    }
+
+
+def remove_pantry_storage_locations(locations, user_id=None, guest_session_id=None):
+    selected_locations = normalize_pantry_storage_locations(
+        locations,
+        include_defaults=False,
+    )
+    if not selected_locations:
+        return {"ok": False, "error": "Select at least one pantry location to remove."}
+
+    default_locations = set(DEFAULT_PANTRY_STORAGE_LOCATIONS)
+    removable_locations = [
+        location for location in selected_locations
+        if location not in default_locations
+    ]
+    if not removable_locations:
+        return {"ok": False, "error": "Default pantry locations stay available."}
+
+    payload = load_pantry_inventory(user_id=user_id, guest_session_id=guest_session_id)
+    current_locations = normalize_pantry_storage_locations(
+        payload.get("storage_locations"),
+        include_defaults=True,
+    )
+    removable_set = set(removable_locations)
+    next_locations = [
+        location for location in current_locations
+        if location not in removable_set
+    ]
+    removed_locations = [
+        location for location in current_locations
+        if location in removable_set
+    ]
+
+    if not removed_locations:
+        return {"ok": False, "error": "No matching pantry locations were found."}
+
+    payload["storage_locations"] = next_locations
+    save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+
+    return {
+        "ok": True,
+        "deleted_count": len(removed_locations),
+        "locations": removed_locations,
+        "labels": [storage_location_label(location) for location in removed_locations],
+    }
 
 
 def clean_pantry_store_section(value, fallback_text=""):

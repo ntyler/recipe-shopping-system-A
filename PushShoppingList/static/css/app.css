@@ -20759,6 +20759,108 @@ body {
     color: #8ff5a1;
 }
 
+.ai-pantry-location-manager {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    margin: 10px 0;
+    padding: 10px;
+    border: 1px solid #233044;
+    border-radius: 8px;
+    background: rgba(11, 17, 26, 0.62);
+}
+
+.ai-pantry-location-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+}
+
+.ai-pantry-location-pill,
+.ai-pantry-location-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding: 3px 8px;
+    border: 1px solid #334155;
+    border-radius: 999px;
+    background: #101722;
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1.2;
+}
+
+.ai-pantry-location-choice {
+    cursor: pointer;
+}
+
+.ai-pantry-location-choice input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: #38bdf8;
+    cursor: pointer;
+}
+
+.ai-pantry-location-remove-btn {
+    min-height: 30px;
+    border: 1px solid #7f1d1d;
+    border-radius: 7px;
+    background: rgba(127, 29, 29, 0.68);
+    color: #fecaca;
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.ai-pantry-location-remove-btn:disabled {
+    border-color: #344154;
+    background: rgba(31, 41, 55, 0.64);
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
+.ai-pantry-location-form {
+    display: flex;
+    gap: 8px;
+    align-items: end;
+    justify-content: flex-end;
+    min-width: min(100%, 330px);
+}
+
+.ai-pantry-location-form label {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    color: #aab5c3;
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+}
+
+.ai-pantry-location-form input {
+    width: min(210px, 42vw);
+    min-height: 34px;
+    box-sizing: border-box;
+    border: 1px solid #344154;
+    border-radius: 7px;
+    background: #0b111a;
+    color: #f8fafc;
+    font-size: 14px;
+}
+
+.ai-pantry-location-form input:focus {
+    border-color: #5b8cff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.18);
+}
+
 .ai-pantry-inventory-bulk-actions {
     display: flex;
     align-items: center;
@@ -22031,6 +22133,21 @@ body {
     .ai-pantry-inventory-header {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .ai-pantry-location-manager,
+    .ai-pantry-location-form {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .ai-pantry-location-form {
+        flex-direction: column;
+    }
+
+    .ai-pantry-location-form input,
+    .ai-pantry-location-form .ai-pantry-action-btn {
+        width: 100%;
     }
 
     .ai-pantry-inventory-actions {

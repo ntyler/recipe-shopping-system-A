@@ -6,6 +6,7 @@ from flask import session
 from flask import url_for
 
 from PushShoppingList.services.pantry_service import DEFAULT_CONFIDENCE_BY_SOURCE
+from PushShoppingList.services.pantry_service import add_pantry_storage_location
 from PushShoppingList.services.pantry_service import add_or_increment_pantry_item
 from PushShoppingList.services.pantry_service import apply_pantry_item_name_suggestion
 from PushShoppingList.services.pantry_service import clean_storage_location
@@ -15,6 +16,7 @@ from PushShoppingList.services.pantry_service import generate_pantry_item_image
 from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
 from PushShoppingList.services.pantry_service import pantry_name_suggestion
 from PushShoppingList.services.pantry_service import receipt_candidate_display_storage_location
+from PushShoppingList.services.pantry_service import remove_pantry_storage_locations
 from PushShoppingList.services.pantry_service import save_receipt_upload
 from PushShoppingList.services.pantry_service import save_pantry_item_image_upload
 from PushShoppingList.services.pantry_service import storage_location_label
@@ -100,6 +102,32 @@ def update_pantry_item_route(item_id):
     )
     pantry_message("success" if result.get("ok") else "error", "Pantry item updated." if result.get("ok") else result.get("error", "Unable to update pantry item."))
     return redirect(url_for("main_bp.index", _anchor="aiPantryInventory"))
+
+
+@pantry_bp.route("/pantry/locations/add", methods=["POST"])
+def add_pantry_storage_location_route():
+    result = add_pantry_storage_location(request.form.get("storage_location", ""))
+    if result.get("ok") and result.get("created"):
+        pantry_message("success", f"Added pantry location {result.get('label')}.")
+    elif result.get("ok"):
+        pantry_message("success", f"Pantry location {result.get('label')} already exists.")
+    else:
+        pantry_message("error", result.get("error", "Unable to add pantry location."))
+    return redirect(url_for("main_bp.index", _anchor="aiPantryLocations"))
+
+
+@pantry_bp.route("/pantry/locations/delete", methods=["POST"])
+def delete_pantry_storage_locations_route():
+    result = remove_pantry_storage_locations(request.form.getlist("storage_location"))
+    deleted_count = int(result.get("deleted_count") or 0)
+
+    if result.get("ok") and deleted_count:
+        location_label = "location" if deleted_count == 1 else "locations"
+        pantry_message("success", f"Removed {deleted_count} pantry {location_label}.")
+    else:
+        pantry_message("error", result.get("error", "Unable to remove pantry locations."))
+
+    return redirect(url_for("main_bp.index", _anchor="aiPantryLocations"))
 
 
 @pantry_bp.route("/pantry/items/<item_id>/lifecycle", methods=["POST"])

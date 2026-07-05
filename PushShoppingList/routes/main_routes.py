@@ -68,6 +68,7 @@ from PushShoppingList.services.item_state_service import save_item_manual_qty
 from PushShoppingList.services.item_state_service import save_item_purchase_mapping
 from PushShoppingList.services.pantry_service import pantry_items_for_view
 from PushShoppingList.services.pantry_service import pantry_recipe_matches_for_view
+from PushShoppingList.services.pantry_service import pantry_storage_location_options_for_view
 from PushShoppingList.services.pantry_service import pantry_store_sections_for_view
 from PushShoppingList.services.pantry_service import pantry_use_soon_items_for_view
 from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
@@ -405,6 +406,7 @@ def pantry_context():
         include_detail_images=False,
     )
     pantry_items = pantry_items_for_view()
+    pantry_storage_locations = pantry_storage_location_options_for_view()
     pantry_receipt_review = hydrate_receipt_review_dates(session.get("pantry_receipt_review", {}))
     if pantry_receipt_review.get("candidates"):
         session["pantry_receipt_review"] = pantry_receipt_review
@@ -412,6 +414,13 @@ def pantry_context():
     return {
         **recipe_context,
         "pantry_items": pantry_items,
+        "pantry_storage_locations": pantry_storage_locations,
+        "pantry_has_removable_storage_locations": any(
+            option.get("removable") for option in pantry_storage_locations
+        ),
+        "pantry_storage_location_values": [
+            option["value"] for option in pantry_storage_locations
+        ],
         "pantry_store_sections": pantry_store_sections_for_view(),
         "pantry_use_soon_items": pantry_use_soon_items_for_view(),
         "pantry_recipe_matches": pantry_recipe_matches_for_view(
