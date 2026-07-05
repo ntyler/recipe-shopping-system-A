@@ -16222,18 +16222,17 @@ function pantryInventoryGroupByLocationIsEnabled() {
 
 function syncPantryInventoryGroupingToggles() {
     const locationEnabled = pantryInventoryGroupByLocationIsEnabled();
-    const sectionEnabled = pantryInventoryGroupBySectionIsEnabled() || locationEnabled;
-    const forcedSectionTitle = "Section grouping is included because Location grouping uses section as level 2.";
+    const sectionEnabled = pantryInventoryGroupBySectionIsEnabled();
 
     document.querySelectorAll("[data-pantry-inventory-section-toggle]").forEach(toggle => {
         const label = toggle.closest(".ai-pantry-inventory-group-toggle");
 
         toggle.checked = sectionEnabled;
-        toggle.disabled = locationEnabled;
-        toggle.setAttribute("aria-disabled", locationEnabled ? "true" : "false");
+        toggle.disabled = false;
+        toggle.setAttribute("aria-disabled", "false");
 
         if (label) {
-            label.title = locationEnabled ? forcedSectionTitle : "";
+            label.title = "";
         }
     });
 
@@ -16403,11 +16402,13 @@ function pantryInventoryLocationGroups(rows) {
                 firstIndex: pantryInventoryRowOriginalIndex(row),
                 sectionByKey: new Map(),
                 sections: [],
+                rows: [],
             };
             groupByLocation.set(location.key, group);
             groups.push(group);
         }
 
+        group.rows.push(row);
         const section = pantryInventorySectionValue(row);
         let sectionGroup = group.sectionByKey.get(section);
         if (!sectionGroup) {
@@ -16520,29 +16521,36 @@ function updatePantryInventorySectionGrouping() {
                 locationHeader.hidden = locationVisibleCount === 0;
                 list.appendChild(locationHeader);
 
-                locationGroup.sections.forEach(sectionGroup => {
-                    const sectionVisibleCount = sectionGroup.rows.filter(row => pantryInventoryRowFilterVisible(row)).length;
-                    const sectionCollapsed = pantryInventorySectionIsCollapsed(sectionGroup.section, locationGroup.key);
-                    const sectionHeader = createPantryInventorySectionHeader(
-                        sectionGroup.section,
-                        sectionVisibleCount,
-                        sectionCollapsed,
-                        {
-                            key: `${locationGroup.key}:${sectionGroup.section}`,
-                            sectionKey: sectionGroup.section,
-                            locationKey: locationGroup.key,
-                            type: "section",
-                            level: 2,
-                        }
-                    );
-                    sectionHeader.hidden = locationCollapsed || sectionVisibleCount === 0;
-                    list.appendChild(sectionHeader);
+                if (shouldGroupBySection) {
+                    locationGroup.sections.forEach(sectionGroup => {
+                        const sectionVisibleCount = sectionGroup.rows.filter(row => pantryInventoryRowFilterVisible(row)).length;
+                        const sectionCollapsed = pantryInventorySectionIsCollapsed(sectionGroup.section, locationGroup.key);
+                        const sectionHeader = createPantryInventorySectionHeader(
+                            sectionGroup.section,
+                            sectionVisibleCount,
+                            sectionCollapsed,
+                            {
+                                key: `${locationGroup.key}:${sectionGroup.section}`,
+                                sectionKey: sectionGroup.section,
+                                locationKey: locationGroup.key,
+                                type: "section",
+                                level: 2,
+                            }
+                        );
+                        sectionHeader.hidden = locationCollapsed || sectionVisibleCount === 0;
+                        list.appendChild(sectionHeader);
 
-                    sectionGroup.rows.forEach(row => {
-                        row.hidden = !pantryInventoryRowFilterVisible(row) || locationCollapsed || sectionCollapsed;
+                        sectionGroup.rows.forEach(row => {
+                            row.hidden = !pantryInventoryRowFilterVisible(row) || locationCollapsed || sectionCollapsed;
+                            list.appendChild(row);
+                        });
+                    });
+                } else {
+                    locationGroup.rows.forEach(row => {
+                        row.hidden = !pantryInventoryRowFilterVisible(row) || locationCollapsed;
                         list.appendChild(row);
                     });
-                });
+                }
             });
             return;
         }
@@ -16658,7 +16666,7 @@ function expandPantryInventorySectionForRow(row) {
             changed = true;
         }
 
-        if (pantryInventorySectionIsCollapsed(section, location.key)) {
+        if (pantryInventoryGroupBySectionIsEnabled() && pantryInventorySectionIsCollapsed(section, location.key)) {
             setPantryInventorySectionCollapsed(section, false, location.key, { update: false });
             changed = true;
         }
