@@ -21181,6 +21181,11 @@ function closeRecipeEditor() {
 
 function populateRecipeEditor(recipe, originalUrl) {
     const coverImage = normalizeRecipeEditorCoverImage(recipe.cover_image || {});
+    const coverImagePrompt = String(recipe.cover_image_prompt || "").trim();
+    if (coverImagePrompt) {
+        coverImage.prompt = coverImagePrompt;
+        coverImage.image_prompt = coverImagePrompt;
+    }
 
     recipeEditOriginalSnapshot = normalizeRecipeEditorSnapshot({
         display_name: recipe.display_name || "",
@@ -22625,6 +22630,7 @@ function normalizeRecipeEditorCoverImage(value = {}) {
     const detailUrl = String(value.detail_url || value.detailUrl || "").trim();
     const srcset = String(value.srcset || "").trim();
     const fullUrl = String(value.full_url || value.fullUrl || "").trim();
+    const imagePrompt = String(value.prompt || value.image_prompt || value.cover_image_prompt || "").trim();
     const normalized = {};
 
     if (path) {
@@ -22673,7 +22679,27 @@ function normalizeRecipeEditorCoverImage(value = {}) {
         normalized.full_url = fullUrl;
     }
 
+    if (imagePrompt) {
+        normalized.prompt = imagePrompt;
+        normalized.image_prompt = imagePrompt;
+    }
+
     return normalized.path || normalized.url || normalized.src ? normalized : {};
+}
+
+function setRecipeEditorCoverPrompt(imagePrompt, hasImage = false) {
+    const promptPanel = document.getElementById("recipeEditCoverPrompt");
+    const promptText = document.getElementById("recipeEditCoverPromptText");
+    const promptValue = String(imagePrompt || "").trim();
+    const shouldShow = Boolean(hasImage && promptValue);
+
+    if (!promptPanel || !promptText) {
+        return;
+    }
+
+    promptText.textContent = promptValue;
+    promptPanel.hidden = !shouldShow;
+    setRecipeImagePromptCollapsed(promptPanel, true);
 }
 
 function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
@@ -22755,6 +22781,7 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
     setValue("recipeEditCoverAlt", alt);
     setValue("recipeEditCoverMimeType", normalized.mime_type || "");
     setValue("recipeEditCoverSource", normalized.source || "");
+    setRecipeEditorCoverPrompt(normalized.prompt || normalized.image_prompt || "", hasImage);
 }
 
 function collectRecipeEditorCoverImage() {
@@ -23073,6 +23100,16 @@ async function generateRecipeCoverImage(button) {
         }
 
         const coverImage = normalizeRecipeEditorCoverImage(data.cover_image || {});
+        const imagePrompt = String(
+            data.cover_image_prompt
+            || data.image_prompt
+            || (data.recipe && data.recipe.cover_image_prompt)
+            || ""
+        ).trim();
+        if (imagePrompt) {
+            coverImage.prompt = imagePrompt;
+            coverImage.image_prompt = imagePrompt;
+        }
         if (coverImage.src) {
             coverImage.src = cacheBustRecipeCoverSrc(coverImage.src);
         }
@@ -29111,8 +29148,12 @@ function recipeImagePanelPromptText(panel) {
 }
 
 function setRecipeImagePromptCollapsed(promptPanel, collapsed = true) {
-    const promptText = promptPanel ? promptPanel.querySelector("[data-equipment-image-prompt-text]") : null;
-    const toggle = promptPanel ? promptPanel.querySelector("[data-equipment-image-prompt-toggle]") : null;
+    const promptText = promptPanel
+        ? promptPanel.querySelector("[data-equipment-image-prompt-text], [data-title-image-prompt-text]")
+        : null;
+    const toggle = promptPanel
+        ? promptPanel.querySelector("[data-equipment-image-prompt-toggle], [data-title-image-prompt-toggle]")
+        : null;
     const isCollapsed = collapsed !== false;
 
     if (!promptPanel) {
@@ -29131,7 +29172,9 @@ function setRecipeImagePromptCollapsed(promptPanel, collapsed = true) {
 }
 
 function toggleRecipeImagePrompt(button) {
-    const promptPanel = button ? button.closest("[data-equipment-image-prompt]") : null;
+    const promptPanel = button
+        ? button.closest("[data-equipment-image-prompt], [data-title-image-prompt]")
+        : null;
 
     if (!promptPanel) {
         return false;

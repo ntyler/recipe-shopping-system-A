@@ -561,7 +561,16 @@ def test_generate_recipe_cover_image_saves_ai_cover(monkeypatch, tmp_path):
     monkeypatch.setattr(
         recipe_edit_service,
         "load_editable_recipe",
-        lambda recipe_url: {"recipe": {"cover_image": saved["data"]["cover_image"]}},
+        lambda recipe_url: {
+            "recipe": {
+                "cover_image": {
+                    **saved["data"]["cover_image"],
+                    "prompt": saved["data"]["cover_image_prompt"],
+                    "image_prompt": saved["data"]["cover_image_prompt"],
+                },
+                "cover_image_prompt": saved["data"]["cover_image_prompt"],
+            },
+        },
     )
 
     result = recipe_edit_service.generate_recipe_cover_image({"url": url})
@@ -570,9 +579,12 @@ def test_generate_recipe_cover_image_saves_ai_cover(monkeypatch, tmp_path):
     assert saved["url"] == url
     assert saved["data"]["cover_image"]["source"] == "ai_generated_image"
     assert saved["data"]["cover_image_generated_at"]
+    assert "Spicy Noodles" in saved["data"]["cover_image_prompt"]
     assert updated["url"] == url
     assert updated["cover_image"]["source"] == "ai_generated_image"
     assert result["cover_image"]["path"] == "data/uploads/recipe_covers/generated.png"
+    assert result["cover_image"]["prompt"] == saved["data"]["cover_image_prompt"]
+    assert result["cover_image_prompt"] == saved["data"]["cover_image_prompt"]
 
 
 def test_generate_recipe_cover_image_comfyui_saves_local_cover_without_openai(monkeypatch, tmp_path):
@@ -640,7 +652,16 @@ def test_generate_recipe_cover_image_comfyui_saves_local_cover_without_openai(mo
     monkeypatch.setattr(
         recipe_edit_service,
         "load_editable_recipe",
-        lambda recipe_url: {"recipe": {"cover_image": saved["data"]["cover_image"]}},
+        lambda recipe_url: {
+            "recipe": {
+                "cover_image": {
+                    **saved["data"]["cover_image"],
+                    "prompt": saved["data"]["cover_image_prompt"],
+                    "image_prompt": saved["data"]["cover_image_prompt"],
+                },
+                "cover_image_prompt": saved["data"]["cover_image_prompt"],
+            },
+        },
     )
 
     result = recipe_edit_service.generate_recipe_cover_image({"url": url})
@@ -653,9 +674,12 @@ def test_generate_recipe_cover_image_comfyui_saves_local_cover_without_openai(mo
     assert saved["data"]["cover_image"]["source"] == "local_comfyui_image"
     assert saved["data"]["cover_image"]["provider"] == "comfyui"
     assert saved["data"]["cover_image_provider"] == "comfyui"
+    assert saved["data"]["cover_image_prompt"] == "polished Local Tomato Soup"
     assert updated["url"] == url
     assert updated["cover_image"]["source"] == "local_comfyui_image"
     assert result["cover_image"]["path"] == "data/uploads/recipe_covers/local.png"
+    assert result["cover_image"]["prompt"] == "polished Local Tomato Soup"
+    assert result["cover_image_prompt"] == "polished Local Tomato Soup"
 
 
 def test_generate_recipe_cover_image_payload_provider_can_choose_openai(monkeypatch):
@@ -681,13 +705,23 @@ def test_generate_recipe_cover_image_payload_provider_can_choose_openai(monkeypa
         calls["openai_prompt"] = prompt
         return b"openai-png"
 
-    def fake_save(recipe_source_url, data, image_bytes, fallback_alt, image_source, provider, fallback_used=False):
+    def fake_save(
+        recipe_source_url,
+        data,
+        image_bytes,
+        fallback_alt,
+        image_source,
+        provider,
+        fallback_used=False,
+        image_prompt="",
+    ):
         calls["saved"] = {
             "url": recipe_source_url,
             "image_bytes": image_bytes,
             "image_source": image_source,
             "provider": provider,
             "fallback_used": fallback_used,
+            "image_prompt": image_prompt,
         }
         return {
             "ok": True,
@@ -716,6 +750,7 @@ def test_generate_recipe_cover_image_payload_provider_can_choose_openai(monkeypa
     assert calls["saved"]["image_bytes"] == b"openai-png"
     assert calls["saved"]["image_source"] == "ai_generated_image"
     assert calls["saved"]["provider"] == "openai"
+    assert calls["saved"]["image_prompt"] == calls["openai_prompt"]
 
 
 def test_remove_recipe_cover_image_clears_saved_cover_and_summary(monkeypatch, tmp_path):
@@ -738,6 +773,7 @@ def test_remove_recipe_cover_image_clears_saved_cover_and_summary(monkeypatch, t
         "cover_image_generated_at": "2026-07-06T18:30:00Z",
         "cover_image_provider": "openai",
         "cover_image_fallback_used": False,
+        "cover_image_prompt": "old title image prompt",
         "ingredients": [{"ingredient": "cassava"}],
     }
     recipe_key = recipe_url_service.normalize_recipe_url_key(url)
@@ -769,6 +805,7 @@ def test_remove_recipe_cover_image_clears_saved_cover_and_summary(monkeypatch, t
     assert "cover_image_generated_at" not in saved["data"]
     assert "cover_image_provider" not in saved["data"]
     assert "cover_image_fallback_used" not in saved["data"]
+    assert "cover_image_prompt" not in saved["data"]
     assert "cover_image" not in saved_ingredients[recipe_key]
     assert not cover_file.exists()
     assert not cover_file.with_name("title__thumb.webp").exists()

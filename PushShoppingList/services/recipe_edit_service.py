@@ -2849,6 +2849,11 @@ def load_editable_recipe(url):
     if servings and not scaling.get("base_servings"):
         scaling["base_servings"] = servings
     cover_image = editable_recipe_cover_image(url, recipe_data, meta)
+    cover_image_prompt = str(
+        recipe_data.get("cover_image_prompt")
+        or (cover_image.get("prompt") if isinstance(cover_image, dict) else "")
+        or ""
+    ).strip()
     category_metadata = recipe_category_metadata_for_editor(url, recipe_data, meta)
 
     return {
@@ -2865,6 +2870,7 @@ def load_editable_recipe(url):
             "recipe_title": recipe_data.get("recipe_title") or "",
             "servings": servings,
             "cover_image": cover_image,
+            "cover_image_prompt": cover_image_prompt,
             **recipe_info,
             "scaling": scaling,
             "ingredients": annotate_ingredients_for_food_review(
@@ -2939,6 +2945,13 @@ def editable_recipe_cover_image(url, recipe_data, recipe_meta=None):
         return {}
 
     source_url = str(recipe_data.get("source_url") or url or "").strip()
+    image_prompt = str(
+        recipe_data.get("cover_image_prompt")
+        or cover_image.get("prompt")
+        or cover_image.get("image_prompt")
+        or recipe_meta.get("cover_image_prompt")
+        or ""
+    ).strip()
     fallback_alt = (
         str(cover_image.get("alt") or "").strip()
         or str(recipe_data.get("recipe_title") or recipe_meta.get("name") or "Recipe title image").strip()
@@ -2971,12 +2984,17 @@ def editable_recipe_cover_image(url, recipe_data, recipe_meta=None):
 
         variants = cover_image_variant_payload(src, image_path, build_variant_url)
 
-    return {
+    result = {
         **normalized,
         "alt": normalized.get("alt") or fallback_alt,
         "src": src,
         **variants,
     }
+    if image_prompt:
+        result["prompt"] = image_prompt
+        result["image_prompt"] = image_prompt
+
+    return result
 
 
 def normalize_pdf_kind(pdf_kind):
@@ -4378,6 +4396,13 @@ def save_recipe_cover_image_upload(original_url, uploaded_file, source_url="", f
 
     existing_data["source_url"] = recipe_source_url
     existing_data["cover_image"] = cover_image
+    for field in (
+        "cover_image_generated_at",
+        "cover_image_provider",
+        "cover_image_fallback_used",
+        "cover_image_prompt",
+    ):
+        existing_data.pop(field, None)
     save_recipe_output(recipe_source_url, existing_data)
 
     recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_source_url), {})
@@ -4407,8 +4432,10 @@ def save_generated_recipe_cover_image(
     image_source,
     provider,
     fallback_used=False,
+    image_prompt="",
 ):
     generated_at = datetime.now(timezone.utc).isoformat()
+    image_prompt = str(image_prompt or "").strip()
     COVER_IMAGE_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
     filename_provider = "local" if provider == TITLE_IMAGE_PROVIDER_COMFYUI else "ai"
     image_filename = f"{safe_filename(recipe_source_url)}_title_{filename_provider}_{uuid.uuid4().hex[:12]}.png"
@@ -4440,6 +4467,10 @@ def save_generated_recipe_cover_image(
     recipe_data["cover_image_generated_at"] = generated_at
     recipe_data["cover_image_provider"] = provider
     recipe_data["cover_image_fallback_used"] = bool(fallback_used)
+    if image_prompt:
+        recipe_data["cover_image_prompt"] = image_prompt
+    else:
+        recipe_data.pop("cover_image_prompt", None)
     save_recipe_output(recipe_source_url, recipe_data)
 
     recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_source_url), {})
@@ -4460,6 +4491,7 @@ def save_generated_recipe_cover_image(
         "cover_image": response_cover_image,
         "recipe": response_recipe,
         "cover_image_generated_at": generated_at,
+        "cover_image_prompt": image_prompt,
         "provider": provider,
         "fallback_used": bool(fallback_used),
     }
@@ -4507,6 +4539,7 @@ def remove_recipe_cover_image(original_url):
         "cover_image_generated_at",
         "cover_image_provider",
         "cover_image_fallback_used",
+        "cover_image_prompt",
     ):
         recipe_data.pop(field, None)
 
@@ -4552,6 +4585,7 @@ def generate_recipe_cover_image_bytes_for_provider(provider, recipe_data, recipe
             TITLE_IMAGE_PROVIDER_OPENAI,
             "ai_generated_image",
             False,
+            base_prompt,
         )
 
     if provider == TITLE_IMAGE_PROVIDER_OLLAMA_PROMPT_ONLY:
@@ -4573,6 +4607,7 @@ def generate_recipe_cover_image_bytes_for_provider(provider, recipe_data, recipe
             TITLE_IMAGE_PROVIDER_OPENAI,
             "ai_generated_image",
             False,
+            enhanced_prompt,
         )
 
     if provider == TITLE_IMAGE_PROVIDER_COMFYUI:
@@ -4588,6 +4623,7 @@ def generate_recipe_cover_image_bytes_for_provider(provider, recipe_data, recipe
             TITLE_IMAGE_PROVIDER_COMFYUI,
             "local_comfyui_image",
             False,
+            enhanced_prompt,
         )
 
     raise TitleImageGenerationError(
@@ -4788,7 +4824,7 @@ def generate_recipe_cover_image(payload):
     prompt = build_recipe_cover_image_prompt(recipe_data, recipe_title)
 
     try:
-        image_bytes, used_provider, image_source, fallback_used = generate_recipe_cover_image_bytes_for_provider(
+        image_bytes, used_provider, image_source, fallback_used, image_prompt = generate_recipe_cover_image_bytes_for_provider(
             provider,
             recipe_data,
             recipe_title,
@@ -4803,6 +4839,7 @@ def generate_recipe_cover_image(payload):
                 used_provider = TITLE_IMAGE_PROVIDER_OPENAI
                 image_source = "ai_generated_image"
                 fallback_used = True
+                image_prompt = prompt
             except TimeoutError:
                 title_image_log_failure("fallback_openai_timeout")
                 return {
@@ -4863,6 +4900,7 @@ def generate_recipe_cover_image(payload):
         image_source,
         used_provider,
         fallback_used=fallback_used,
+        image_prompt=image_prompt,
     )
     if result.get("ok") and used_provider == TITLE_IMAGE_PROVIDER_COMFYUI:
         generated_path = str((result.get("cover_image") or {}).get("path") or "").strip()

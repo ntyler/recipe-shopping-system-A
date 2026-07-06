@@ -806,6 +806,22 @@
                                        accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
                                        onchange="return uploadRecipeCoverImage(this)">
                             </div>
+                            <div class="recipe-image-prompt recipe-image-prompt-collapsed recipe-edit-cover-prompt"
+                                 id="recipeEditCoverPrompt"
+                                 data-title-image-prompt
+                                 hidden>
+                                <button type="button"
+                                        class="recipe-image-prompt-toggle"
+                                        id="recipeEditCoverPromptToggle"
+                                        data-title-image-prompt-toggle
+                                        aria-expanded="false"
+                                        aria-label="Toggle title image prompt"
+                                        onclick="return toggleRecipeImagePrompt(this)">
+                                    <span class="recipe-image-prompt-label">Image Prompt</span>
+                                    <span class="recipe-image-prompt-chevron" aria-hidden="true"></span>
+                                </button>
+                                <pre id="recipeEditCoverPromptText" data-title-image-prompt-text hidden></pre>
+                            </div>
                         </div>
                         <input type="hidden" id="recipeEditCoverPath">
                         <input type="hidden" id="recipeEditCoverUrl">

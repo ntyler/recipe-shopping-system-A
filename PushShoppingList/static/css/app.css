@@ -15688,6 +15688,11 @@ body {
     text-transform: none;
 }
 
+.recipe-edit-cover-prompt {
+    width: min(100%, 520px);
+    max-width: min(100%, 520px);
+}
+
 .recipe-edit-image-provider-field {
     display: flex;
     flex-direction: column;
