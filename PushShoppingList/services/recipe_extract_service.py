@@ -65,6 +65,8 @@ from PushShoppingList.services.menu_mega_json_service import build_mega_menu_jso
 from PushShoppingList.services.menu_mega_json_service import default_nutrition_inference
 from PushShoppingList.services.menu_mega_json_service import default_pdf_generation
 from PushShoppingList.services.menu_mega_json_service import default_recipe_inference
+from PushShoppingList.services.menu_mega_json_service import load_menu_mega_json_snapshot
+from PushShoppingList.services.menu_mega_json_service import load_snapshot_index
 from PushShoppingList.services.menu_mega_json_service import normalize_equipment_prediction_records
 from PushShoppingList.services.menu_mega_json_service import save_menu_mega_json_snapshot
 from PushShoppingList.services.menu_mega_json_service import unpack_mega_menu_json_to_sections
@@ -11257,6 +11259,10 @@ def menu_image_partial_import_allowed():
     return env_flag("OPENAI_MENU_IMAGE_ALLOW_PARTIAL_IMPORT", False)
 
 
+def menu_image_cache_fallback_enabled():
+    return env_flag("OPENAI_MENU_IMAGE_USE_CACHE_ON_FAILURE", True)
+
+
 def menu_image_debug_is_partial_failure(image_debug):
     image_debug = image_debug if isinstance(image_debug, dict) else {}
     if menu_image_partial_import_allowed():
@@ -11314,6 +11320,150 @@ def menu_image_partial_error_message(diagnostics, failures=None):
     )
 
 
+def cached_menu_image_sections_from_raw_response(menu_url, image_url, image_index):
+    raw_response_path = RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_IMAGE_{image_index:02d}_VISION_RESPONSE.txt"
+    if not raw_response_path.is_file():
+        return [], {}
+    try:
+        payload = json.loads(clean_json_response(raw_response_path.read_text(encoding="utf-8")))
+        sections = menu_sections_from_vision_payload(payload, menu_url, image_url=image_url)
+    except Exception as exc:
+        return [], {
+            "source": "raw_response",
+            "path": str(raw_response_path),
+            "error": str(exc),
+            "error_code": type(exc).__name__,
+        }
+    if not sections:
+        return [], {}
+    return sections, {
+        "source": "raw_response",
+        "path": str(raw_response_path),
+        "sections_found": len(sections),
+        "items_found": len(flatten_menu_sections(sections)),
+    }
+
+
+def cached_menu_image_sections_from_snapshots(menu_url, image_url, image_index=None, max_snapshots=25):
+    source_url = canonical_menu_source_url(menu_url)
+    target_image_url = clean_recipe_text(image_url)
+    if not source_url or not target_image_url:
+        return [], {}
+    try:
+        index_payload = load_snapshot_index()
+    except Exception as exc:
+        return [], {
+            "source": "menu_mega_snapshot",
+            "error": str(exc),
+            "error_code": type(exc).__name__,
+        }
+
+    checked = 0
+    for summary in index_payload.get("snapshots") or []:
+        if not isinstance(summary, dict):
+            continue
+        snapshot_source_url = canonical_menu_source_url(
+            summary.get("source_url")
+            or summary.get("final_url")
+            or ""
+        )
+        if snapshot_source_url != source_url:
+            continue
+        snapshot_id = clean_recipe_text(summary.get("id") or summary.get("snapshot_id") or "")
+        if not snapshot_id:
+            continue
+        checked += 1
+        if checked > max_snapshots:
+            break
+        record = load_menu_mega_json_snapshot(snapshot_id)
+        if not isinstance(record, dict):
+            continue
+        snapshot_sections = unpack_mega_menu_json_to_sections(
+            record.get("menu_mega_json") or {},
+            snapshot_id=snapshot_id,
+        )
+        matched_sections = []
+        for section in snapshot_sections:
+            if not isinstance(section, dict):
+                continue
+            matched_items = [
+                item
+                for item in (section.get("items") or [])
+                if isinstance(item, dict)
+                and clean_recipe_text(item.get("image_url") or "") == target_image_url
+            ]
+            if matched_items:
+                matched_sections.append({
+                    **section,
+                    "image_url": target_image_url,
+                    "items": matched_items,
+                })
+        if matched_sections:
+            return matched_sections, {
+                "source": "menu_mega_snapshot",
+                "snapshot_id": snapshot_id,
+                "sections_found": len(matched_sections),
+                "items_found": len(flatten_menu_sections(matched_sections)),
+            }
+    return [], {}
+
+
+def cached_menu_image_section_options_for_candidate(menu_url, image_url, image_index):
+    if not menu_image_cache_fallback_enabled():
+        return []
+    options = []
+    for loader in (
+        cached_menu_image_sections_from_raw_response,
+        cached_menu_image_sections_from_snapshots,
+    ):
+        sections, cache_debug = loader(menu_url, image_url, image_index)
+        if sections:
+            cache_debug = {
+                **cache_debug,
+                "sections_found": len(sections),
+                "items_found": len(flatten_menu_sections(sections)),
+            }
+            options.append((sections, cache_debug))
+    return options
+
+
+def cached_menu_image_sections_for_candidate(menu_url, image_url, image_index):
+    options = cached_menu_image_section_options_for_candidate(menu_url, image_url, image_index)
+    if not options:
+        return [], {}
+    return max(
+        options,
+        key=lambda option: (
+            int(option[1].get("items_found") or 0),
+            int(option[1].get("sections_found") or 0),
+        ),
+    )
+
+
+def richer_cached_menu_image_sections_for_candidate(menu_url, image_url, image_index, current_sections):
+    current_sections = current_sections if isinstance(current_sections, list) else []
+    current_section_count = len(current_sections)
+    current_item_count = len(flatten_menu_sections(current_sections))
+    richer_options = []
+    for sections, cache_debug in cached_menu_image_section_options_for_candidate(menu_url, image_url, image_index):
+        cached_section_count = len(sections)
+        cached_item_count = len(flatten_menu_sections(sections))
+        if cached_item_count > current_item_count or (
+            cached_item_count >= current_item_count
+            and cached_section_count > current_section_count
+        ):
+            richer_options.append((sections, cache_debug))
+    if not richer_options:
+        return [], {}
+    return max(
+        richer_options,
+        key=lambda option: (
+            int(option[1].get("items_found") or 0),
+            int(option[1].get("sections_found") or 0),
+        ),
+    )
+
+
 def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_callback=None, cancellation_check=None):
     debug = {
         "enabled": menu_image_vision_enabled(),
@@ -11321,6 +11471,7 @@ def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_ca
         "candidates": [],
         "images_attempted": 0,
         "images_succeeded": 0,
+        "images_cached": 0,
         "items_found": 0,
         "status": "disabled" if not menu_image_vision_enabled() else "not_attempted",
         "errors": [],
@@ -11417,6 +11568,34 @@ def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_ca
                     time.sleep(retry_delay)
 
             if not vision_result.ok:
+                cached_sections, cache_debug = cached_menu_image_sections_for_candidate(
+                    menu_url,
+                    image_url,
+                    index,
+                )
+                if cached_sections:
+                    section_count = len(cached_sections)
+                    item_count = len(flatten_menu_sections(cached_sections))
+                    image_debug["cache"] = cache_debug
+                    image_debug["sections_found"] = section_count
+                    image_debug["items_found"] = item_count
+                    image_debug["cached_response_used"] = True
+                    if isinstance(candidate_debug, dict):
+                        candidate_debug["cache"] = cache_debug
+                        candidate_debug["sections_found"] = section_count
+                        candidate_debug["items_found"] = item_count
+                        candidate_debug["cached_response_used"] = True
+                    sections.extend(cached_sections)
+                    debug["images_succeeded"] += 1
+                    debug["images_cached"] += 1
+                    debug["items_found"] += item_count
+                    debug["status"] = "ok"
+                    print(
+                        "[Import Menu URL] stage=menu_image_cache_used "
+                        f"image_index={index} source={cache_debug.get('source', '')} "
+                        f"sections={section_count} items={item_count}"
+                    )
+                    continue
                 debug["errors"].append({
                     "image_index": index,
                     "image_url": image_url,
@@ -11434,6 +11613,31 @@ def extract_menu_sections_from_image_candidates(menu_url, html_text, progress_ca
             raw_response_path.write_text(vision_result.text, encoding="utf-8")
             payload = json.loads(clean_json_response(vision_result.text))
             image_sections = menu_sections_from_vision_payload(payload, menu_url, image_url=image_url)
+            richer_cached_sections, richer_cache_debug = richer_cached_menu_image_sections_for_candidate(
+                menu_url,
+                image_url,
+                index,
+                image_sections,
+            )
+            if richer_cached_sections:
+                image_debug["live_sections_found"] = len(image_sections)
+                image_debug["live_items_found"] = len(flatten_menu_sections(image_sections))
+                image_debug["cache"] = richer_cache_debug
+                image_debug["cached_response_used"] = True
+                image_debug["cache_replaced_live_response"] = True
+                if isinstance(candidate_debug, dict):
+                    candidate_debug["live_sections_found"] = image_debug["live_sections_found"]
+                    candidate_debug["live_items_found"] = image_debug["live_items_found"]
+                    candidate_debug["cache"] = richer_cache_debug
+                    candidate_debug["cached_response_used"] = True
+                    candidate_debug["cache_replaced_live_response"] = True
+                image_sections = richer_cached_sections
+                debug["images_cached"] += 1
+                print(
+                    "[Import Menu URL] stage=menu_image_richer_cache_used "
+                    f"image_index={index} source={richer_cache_debug.get('source', '')} "
+                    f"sections={len(image_sections)} items={len(flatten_menu_sections(image_sections))}"
+                )
             section_count = len(image_sections)
             item_count = len(flatten_menu_sections(image_sections))
             image_debug["sections_found"] = section_count
@@ -14657,6 +14861,7 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
             diagnostics["menu_image_vision_status"] = image_debug.get("status") or ""
             diagnostics["menu_image_pages_attempted"] = int(image_debug.get("images_attempted") or 0)
             diagnostics["menu_image_pages_succeeded"] = int(image_debug.get("images_succeeded") or 0)
+            diagnostics["menu_image_pages_cached"] = int(image_debug.get("images_cached") or 0)
             if image_sections:
                 sections = image_sections
                 diagnostics["menu_extraction_source"] = "menu_image_vision"
