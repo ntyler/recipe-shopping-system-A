@@ -82,6 +82,15 @@ $env:COMFYUI_URL="http://127.0.0.1:8188"
 
 In `comfyui` mode, Ollama only improves the image prompt. ComfyUI/Stable Diffusion generates the image locally, and OpenAI image generation is not used unless you explicitly set `TITLE_IMAGE_FALLBACK_PROVIDER=openai`.
 
+To use a specific ComfyUI graph from the ComfyUI UI, export it as API JSON and point the app at it:
+
+```powershell
+$env:COMFYUI_URL="http://127.0.0.1:8189"
+$env:COMFYUI_WORKFLOW_PATH="D:\GitHub\ComfyUI\workflows\recipe_image_api.json"
+```
+
+Use `COMFYUI_EQUIPMENT_WORKFLOW_PATH`, `COMFYUI_STEP_WORKFLOW_PATH`, or `COMFYUI_TITLE_WORKFLOW_PATH` when those image types need different graphs. The app patches the exported graph at request time: positive prompt, negative prompt, seed, optional `COMFYUI_IMAGE_WIDTH` / `COMFYUI_IMAGE_HEIGHT`, optional `COMFYUI_CHECKPOINT`, and the SaveImage filename prefix. If auto-detection picks the wrong nodes, set `COMFYUI_POSITIVE_PROMPT_NODE_ID`, `COMFYUI_NEGATIVE_PROMPT_NODE_ID`, `COMFYUI_SEED_NODE_ID`, `COMFYUI_SIZE_NODE_ID`, or `COMFYUI_SAVE_IMAGE_NODE_ID`.
+
 Tyler's local Windows setup:
 
 - ComfyUI is installed at `D:\GitHub\ComfyUI`.

@@ -140,6 +140,7 @@ def image_progress_record(kind, url, target, state, **values):
         "message": values.get("message") or default_image_progress_message(normalized_kind, state),
         "image_url": values.get("image_url") or "",
         "generated_at": values.get("generated_at") or "",
+        "image_prompt": values.get("image_prompt") or "",
         "started_at": values.get("started_at") or now,
         "updated_at": now,
     }
@@ -184,7 +185,7 @@ def upsert_recipe_image_progress_item(progress, item):
     return progress
 
 
-def start_recipe_image_progress(kind, url, target, message=None):
+def start_recipe_image_progress(kind, url, target, message=None, image_prompt=""):
     with PROGRESS_LOCK:
         progress = compact_recipe_image_progress(load_recipe_image_progress_file())
         item = image_progress_record(
@@ -193,12 +194,22 @@ def start_recipe_image_progress(kind, url, target, message=None):
             target,
             "running",
             message=message,
+            image_prompt=image_prompt,
         )
         upsert_recipe_image_progress_item(progress, item)
         return save_recipe_image_progress(progress)
 
 
-def finish_recipe_image_progress(kind, url, target, ok=True, image_url="", generated_at="", error=""):
+def finish_recipe_image_progress(
+    kind,
+    url,
+    target,
+    ok=True,
+    image_url="",
+    generated_at="",
+    error="",
+    image_prompt="",
+):
     state = "done" if ok else "failed"
     message = "" if ok else (error or "Image generation failed. Please try again.")
 
@@ -217,6 +228,7 @@ def finish_recipe_image_progress(kind, url, target, ok=True, image_url="", gener
             message=message,
             image_url=image_url,
             generated_at=generated_at,
+            image_prompt=image_prompt or existing.get("image_prompt") or "",
             started_at=existing.get("started_at"),
         )
         upsert_recipe_image_progress_item(progress, item)

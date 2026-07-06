@@ -1,4 +1,5 @@
 import io
+import json
 from pathlib import Path
 
 from flask import session
@@ -221,6 +222,91 @@ def test_comfyui_equipment_workflow_uses_food_negative_prompt(monkeypatch):
     assert "cabinets" in negative_prompt
     assert "real estate photo" in negative_prompt
     assert "collage" in negative_prompt
+
+
+def test_custom_comfyui_workflow_patches_recipe_prompts(monkeypatch, tmp_path):
+    workflow_path = tmp_path / "equipment_api_workflow.json"
+    workflow_path.write_text(
+        json.dumps({
+            "3": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "seed": 42,
+                    "steps": 8,
+                    "cfg": 1,
+                    "sampler_name": "res_multistep",
+                    "scheduler": "simple",
+                    "denoise": 1,
+                    "model": ["4", 0],
+                    "positive": ["6", 0],
+                    "negative": ["7", 0],
+                    "latent_image": ["5", 0],
+                },
+            },
+            "5": {
+                "class_type": "EmptySD3LatentImage",
+                "inputs": {
+                    "width": 512,
+                    "height": 512,
+                    "batch_size": 1,
+                },
+            },
+            "6": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {
+                    "text": "placeholder positive prompt",
+                    "clip": ["4", 1],
+                },
+            },
+            "7": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {
+                    "text": "low quality, bad anatomy",
+                    "clip": ["4", 1],
+                },
+            },
+            "8": {
+                "class_type": "VAEDecode",
+                "inputs": {
+                    "samples": ["3", 0],
+                    "vae": ["9", 0],
+                },
+            },
+            "9": {
+                "class_type": "VAELoader",
+                "inputs": {
+                    "vae_name": "ae.safetensors",
+                },
+            },
+            "10": {
+                "class_type": "SaveImage",
+                "inputs": {
+                    "filename_prefix": "ComfyUI",
+                    "images": ["8", 0],
+                },
+            },
+        }),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("COMFYUI_WORKFLOW_PATH", str(workflow_path))
+    monkeypatch.setenv("COMFYUI_IMAGE_WIDTH", "768")
+    monkeypatch.setenv("COMFYUI_IMAGE_HEIGHT", "768")
+
+    workflow = recipe_edit_service.build_comfyui_workflow(
+        "single isolated product reference photo of one clean empty blender",
+        "recipe equipment item image",
+        "http://127.0.0.1:8189",
+        1,
+    )
+
+    assert workflow["6"]["inputs"]["text"] == "single isolated product reference photo of one clean empty blender"
+    assert workflow["3"]["inputs"]["seed"] != 42
+    assert workflow["5"]["inputs"]["width"] == 768
+    assert workflow["5"]["inputs"]["height"] == 768
+    assert workflow["10"]["inputs"]["filename_prefix"] == "recipe_equipment"
+    negative_prompt = workflow["7"]["inputs"]["text"].lower()
+    assert "food" in negative_prompt
+    assert "kitchen interior" in negative_prompt
 
 
 def write_uploaded_image(user_data_dir, user_id, filename="meal.png", data=None):
@@ -728,8 +814,10 @@ def test_generate_recipe_equipment_image_comfyui_uses_local_provider_without_ope
     assert prompt_calls["image_purpose"] == "recipe equipment item image"
     assert prompt_calls["comfyui_prompt"] == "polished recipe equipment item image"
     assert prompt_calls["comfyui_image_purpose"] == "recipe equipment item image"
+    assert result["image_prompt"] == "polished recipe equipment item image"
     assert saved["url"] == url
     assert saved["data"]["equipment"][0]["equipment_image_url"] == result["equipment_image_url"]
+    assert saved["data"]["equipment"][0]["equipment_image_prompt"] == result["image_prompt"]
     image_filename = result["equipment_image_url"].rsplit("/", 1)[-1]
     assert (tmp_path / "recipe_steps" / image_filename).read_bytes() == b"local-equipment-png"
 
@@ -782,7 +870,9 @@ def test_generate_recipe_equipment_image_payload_provider_can_choose_openai(monk
     assert "kitchen" not in openai_prompt
     assert "cabinet" not in openai_prompt
     assert "countertop" not in openai_prompt
+    assert result["image_prompt"] == calls["openai_prompt"]
     assert calls["saved"]["equipment"][0]["equipment_image_url"] == result["equipment_image_url"]
+    assert calls["saved"]["equipment"][0]["equipment_image_prompt"] == result["image_prompt"]
     image_filename = result["equipment_image_url"].rsplit("/", 1)[-1]
     assert (tmp_path / "recipe_steps" / image_filename).read_bytes() == b"openai-equipment-png"
 
@@ -796,6 +886,7 @@ def test_remove_recipe_equipment_image_clears_saved_fields(monkeypatch):
             "equipment": "blender or food processor",
             "equipment_image_url": "/static/generated/recipe_steps/old-equipment.png",
             "equipment_image_generated_at": "2026-07-06T12:00:00+00:00",
+            "equipment_image_prompt": "old prompt",
         }],
     }
     saved = {}
@@ -819,6 +910,7 @@ def test_remove_recipe_equipment_image_clears_saved_fields(monkeypatch):
     assert saved["data"]["equipment"][0]["equipment"] == "blender or food processor"
     assert saved["data"]["equipment"][0]["equipment_image_url"] == ""
     assert saved["data"]["equipment"][0]["equipment_image_generated_at"] == ""
+    assert saved["data"]["equipment"][0]["equipment_image_prompt"] == ""
 
 
 def test_remove_recipe_step_image_clears_saved_fields(monkeypatch):
@@ -935,12 +1027,13 @@ def test_generate_recipe_step_image_comfyui_failure_does_not_fallback_without_op
     )
     monkeypatch.setattr(recipe_edit_service, "start_recipe_image_progress", lambda *args, **kwargs: None)
 
-    def fake_finish(kind, recipe_url, target, ok=True, image_url="", generated_at="", error=""):
+    def fake_finish(kind, recipe_url, target, ok=True, image_url="", generated_at="", error="", image_prompt=""):
         finished["kind"] = kind
         finished["url"] = recipe_url
         finished["target"] = target
         finished["ok"] = ok
         finished["error"] = error
+        finished["image_prompt"] = image_prompt
 
     monkeypatch.setattr(recipe_edit_service, "finish_recipe_image_progress", fake_finish)
 
@@ -955,9 +1048,18 @@ def test_generate_recipe_step_image_comfyui_failure_does_not_fallback_without_op
         "error_code": "COMFYUI_UNAVAILABLE",
         "provider": "comfyui",
         "local_generation_unavailable": True,
+        "image_prompt": recipe_edit_service.build_recipe_step_image_prompt(
+            recipe_title="Offline Step Soup",
+            servings="",
+            ingredients="- tomatoes",
+            equipment="",
+            step_number=1,
+            instruction_step="Simmer the soup.",
+        ),
     }
     assert finished["ok"] is False
     assert finished["error"] == "Local image generation is unavailable. Start ComfyUI and try again."
+    assert finished["image_prompt"] == result["image_prompt"]
 
 
 def test_generate_recipe_step_image_ollama_prompt_only_uses_existing_image_provider(monkeypatch, tmp_path):

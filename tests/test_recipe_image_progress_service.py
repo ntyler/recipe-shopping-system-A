@@ -56,10 +56,43 @@ class RecipeImageProgressServiceTests(unittest.TestCase):
         self.assertEqual(progress["items"][0]["kind"], "equipment")
         self.assertEqual(progress["items"][0]["equipment_index"], "2")
 
+    def test_tracks_image_prompt_while_running_and_finished(self):
+        service.start_recipe_image_progress(
+            "equipment",
+            "manual://recipe/prompt",
+            "2",
+            image_prompt="single isolated product photo of a blender",
+        )
+
+        running = service.load_recipe_image_progress("manual://recipe/prompt")
+
+        self.assertEqual(
+            running["items"][0]["image_prompt"],
+            "single isolated product photo of a blender",
+        )
+
+        service.finish_recipe_image_progress(
+            "equipment",
+            "manual://recipe/prompt",
+            "2",
+            ok=True,
+            image_url="/static/generated/recipe_steps/blender.png",
+            image_prompt="single isolated product photo of a blender",
+        )
+
+        finished = service.load_recipe_image_progress("manual://recipe/prompt")
+
+        self.assertEqual(
+            finished["items"][0]["image_prompt"],
+            "single isolated product photo of a blender",
+        )
+
     def test_idle_endpoint_does_not_create_progress_file(self):
         app = create_app()
 
         with app.test_client() as client:
+            with client.session_transaction() as test_session:
+                test_session["user_id"] = "image-progress-user"
             response = client.get("/api/recipe_image_progress")
 
         self.assertEqual(response.status_code, 200)

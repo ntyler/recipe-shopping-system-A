@@ -25545,6 +25545,9 @@ function addRecipeEquipmentRow(value = "") {
     const equipmentImageGeneratedAt = typeof value === "object" && value !== null
         ? (value.equipment_image_generated_at || value.image_generated_at || "")
         : "";
+    const equipmentImagePrompt = typeof value === "object" && value !== null
+        ? (value.equipment_image_prompt || value.image_prompt || "")
+        : "";
     const recipeUrl = recipeEditorCurrentUrl();
     const row = document.createElement("div");
     row.className = "recipe-edit-text-row recipe-edit-equipment-row";
@@ -25562,6 +25565,12 @@ function addRecipeEquipmentRow(value = "") {
             <div class="recipe-step-image-status${equipmentImageUrl ? " empty" : ""}"
                  data-equipment-image-status>
                 ${equipmentImageUrl ? "" : "No image generated for this equipment."}
+            </div>
+            <div class="recipe-image-prompt"
+                 data-equipment-image-prompt
+                 ${equipmentImagePrompt ? "" : "hidden"}>
+                <div class="recipe-image-prompt-label">Image prompt</div>
+                <pre data-equipment-image-prompt-text>${escapeHtml(equipmentImagePrompt)}</pre>
             </div>
             <img class="recipe-step-image recipe-equipment-image"
                  ${equipmentImageUrl ? `src="${DEFERRED_IMAGE_PLACEHOLDER}"` : ""}
@@ -25609,6 +25618,7 @@ function addRecipeEquipmentRow(value = "") {
             </div>
             <input type="hidden" data-field="equipment_image_url" value="${escapeAttribute(equipmentImageUrl)}">
             <input type="hidden" data-field="equipment_image_generated_at" value="${escapeAttribute(equipmentImageGeneratedAt)}">
+            <input type="hidden" data-field="equipment_image_prompt" value="${escapeAttribute(equipmentImagePrompt)}">
         </div>
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
@@ -27636,6 +27646,7 @@ function collectRecipeEquipmentRows() {
                 text,
                 equipment_image_url: values.equipment_image_url || "",
                 equipment_image_generated_at: values.equipment_image_generated_at || "",
+                equipment_image_prompt: values.equipment_image_prompt || "",
             };
         })
         .filter(item => item.equipment);
@@ -28713,6 +28724,7 @@ function recipeImageProgressItemFromPanel(panel, kind, state, values = {}) {
         message: values.message || defaultRecipeImageProgressMessage(normalizedKind, state),
         image_url: values.image_url || values.step_image_url || values.equipment_image_url || "",
         generated_at: values.generated_at || values.step_image_generated_at || values.equipment_image_generated_at || "",
+        image_prompt: values.image_prompt || "",
         updated_at: Date.now() / 1000,
     };
 
@@ -28886,7 +28898,11 @@ function applyRecipeImageProgressItem(rawItem) {
 
     recipeImageProgressPanelsForItem(item).forEach(panel => {
         if (item.state === "running") {
-            setRecipeImagePanelGenerating(panel, item.message || defaultRecipeImageProgressMessage(kind, "running"));
+            setRecipeImagePanelGenerating(
+                panel,
+                item.message || defaultRecipeImageProgressMessage(kind, "running"),
+                item.image_prompt || "",
+            );
             return;
         }
 
@@ -28946,6 +28962,14 @@ function recipeImagePanelRemoveButton(panel) {
     return panel ? panel.querySelector("[data-equipment-image-remove], [data-step-image-remove]") : null;
 }
 
+function recipeImagePanelPrompt(panel) {
+    return panel ? panel.querySelector("[data-equipment-image-prompt]") : null;
+}
+
+function recipeImagePanelPromptText(panel) {
+    return panel ? panel.querySelector("[data-equipment-image-prompt-text]") : null;
+}
+
 function recipeImagePanelKind(panel) {
     return panel && panel.matches("[data-equipment-image-panel]") ? "equipment" : "step";
 }
@@ -28974,6 +28998,20 @@ function recipeImagePanelUploadInput(panel) {
     return panel ? panel.querySelector("[data-recipe-image-upload]") : null;
 }
 
+function setRecipeImagePanelPrompt(panel, imagePrompt) {
+    const promptPanel = recipeImagePanelPrompt(panel);
+    const promptText = recipeImagePanelPromptText(panel);
+    const promptValue = String(imagePrompt || "").trim();
+
+    if (!promptPanel || !promptText) {
+        return;
+    }
+
+    promptText.textContent = promptValue;
+    promptPanel.hidden = !promptValue;
+    setRecipeImagePanelHiddenValue(panel, "equipment_image_prompt", promptValue);
+}
+
 function updateRecipeImagePanelUploadButton(panel, kind = null) {
     const uploadButton = recipeImagePanelUploadButton(panel);
     const uploadInput = recipeImagePanelUploadInput(panel);
@@ -28997,7 +29035,7 @@ function updateRecipeImagePanelUploadButton(panel, kind = null) {
     }
 }
 
-function setRecipeImagePanelGenerating(panel, message) {
+function setRecipeImagePanelGenerating(panel, message, imagePrompt = "") {
     const status = recipeImagePanelStatus(panel);
     const button = recipeImagePanelGenerateButton(panel);
     const uploadButton = recipeImagePanelUploadButton(panel);
@@ -29011,6 +29049,8 @@ function setRecipeImagePanelGenerating(panel, message) {
         status.textContent = message;
         status.classList.remove("empty");
     }
+
+    setRecipeImagePanelPrompt(panel, imagePrompt);
 
     if (button) {
         button.disabled = true;
@@ -29041,6 +29081,7 @@ function setRecipeImagePanelComplete(panel, item) {
     const image = recipeImagePanelImage(panel, kind);
     const download = recipeImagePanelDownload(panel);
     const button = recipeImagePanelGenerateButton(panel);
+    const imagePrompt = item.image_prompt || "";
 
     panel.classList.remove("generating");
     panel.classList.remove("recipe-image-visibility-hidden");
@@ -29058,6 +29099,7 @@ function setRecipeImagePanelComplete(panel, item) {
     if (kind === "equipment") {
         setRecipeImagePanelHiddenValue(panel, "equipment_image_url", imageUrl);
         setRecipeImagePanelHiddenValue(panel, "equipment_image_generated_at", generatedAt);
+        setRecipeImagePanelPrompt(panel, imagePrompt);
     } else {
         setRecipeImagePanelHiddenValue(panel, "step_image_url", imageUrl);
         setRecipeImagePanelHiddenValue(panel, "step_image_generated_at", generatedAt);
@@ -29106,6 +29148,7 @@ function setRecipeImagePanelRemoved(panel, kind) {
     if (normalizedKind === "equipment") {
         setRecipeImagePanelHiddenValue(panel, "equipment_image_url", "");
         setRecipeImagePanelHiddenValue(panel, "equipment_image_generated_at", "");
+        setRecipeImagePanelPrompt(panel, "");
     } else {
         setRecipeImagePanelHiddenValue(panel, "step_image_url", "");
         setRecipeImagePanelHiddenValue(panel, "step_image_generated_at", "");
@@ -29243,6 +29286,7 @@ async function uploadRecipeDetailImage(input) {
         const doneItem = recipeImageProgressItemFromPanel(panel, kind, "done", {
             image_url: imageUrl,
             generated_at: generatedAt,
+            image_prompt: "",
             equipment_image_url: kind === "equipment" ? imageUrl : "",
             equipment_image_generated_at: kind === "equipment" ? generatedAt : "",
             step_image_url: kind === "step" ? imageUrl : "",
@@ -29445,6 +29489,7 @@ async function generateRecipeEquipmentImage(button) {
             equipment_image_generated_at: data.equipment_image_generated_at || "",
             image_url: data.equipment_image_url,
             generated_at: data.equipment_image_generated_at || "",
+            image_prompt: data.image_prompt || "",
         });
         applyRecipeImageProgressItem(doneItem);
         publishRecipeImageProgressItem(doneItem);

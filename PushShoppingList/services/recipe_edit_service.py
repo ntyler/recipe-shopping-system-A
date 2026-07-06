@@ -187,6 +187,10 @@ OLLAMA_URL_DEFAULT = "http://localhost:11434"
 COMFYUI_URL_ENV_VAR = "COMFYUI_URL"
 COMFYUI_URL_DEFAULT = "http://127.0.0.1:8188"
 COMFYUI_START_COMMAND_ENV_VAR = "COMFYUI_START_COMMAND"
+COMFYUI_WORKFLOW_PATH_ENV_VAR = "COMFYUI_WORKFLOW_PATH"
+COMFYUI_TITLE_WORKFLOW_PATH_ENV_VAR = "COMFYUI_TITLE_WORKFLOW_PATH"
+COMFYUI_STEP_WORKFLOW_PATH_ENV_VAR = "COMFYUI_STEP_WORKFLOW_PATH"
+COMFYUI_EQUIPMENT_WORKFLOW_PATH_ENV_VAR = "COMFYUI_EQUIPMENT_WORKFLOW_PATH"
 LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE = "Local image generation is unavailable. Start ComfyUI and try again."
 TITLE_IMAGE_OPENAI_SETUP_MESSAGE = "Image generation is not set up yet."
 COMFYUI_START_LOCK = threading.Lock()
@@ -230,6 +234,19 @@ def title_image_env_float(name, default, minimum=0.1, maximum=60.0):
     except (TypeError, ValueError):
         value = float(default)
     return max(float(minimum), min(float(maximum), value))
+
+
+def title_image_configured_env_int(name, minimum=1, maximum=2048):
+    raw_value = os.getenv(name)
+    if raw_value is None or not str(raw_value).strip():
+        return None
+
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+    return max(int(minimum), min(int(maximum), value))
 
 
 def normalize_title_image_provider(value, default=TITLE_IMAGE_PROVIDER_OPENAI):
@@ -709,6 +726,237 @@ def comfyui_negative_prompt_for_purpose(image_purpose="recipe title image"):
     return f"deformed food, {base_negative}"
 
 
+def comfyui_workflow_path(image_purpose="recipe title image"):
+    purpose = title_image_clean_text(image_purpose)
+    env_names = []
+
+    if purpose == "recipe equipment item image":
+        env_names.append(COMFYUI_EQUIPMENT_WORKFLOW_PATH_ENV_VAR)
+    elif purpose == "recipe instruction step image":
+        env_names.append(COMFYUI_STEP_WORKFLOW_PATH_ENV_VAR)
+    elif purpose == "recipe title image":
+        env_names.append(COMFYUI_TITLE_WORKFLOW_PATH_ENV_VAR)
+
+    env_names.append(COMFYUI_WORKFLOW_PATH_ENV_VAR)
+
+    for name in env_names:
+        configured = title_image_clean_text(os.getenv(name))
+        if configured:
+            return configured
+
+    return ""
+
+
+def comfyui_filename_prefix_for_purpose(image_purpose="recipe title image"):
+    purpose = title_image_clean_text(image_purpose)
+    if purpose == "recipe equipment item image":
+        return "recipe_equipment"
+    if purpose == "recipe instruction step image":
+        return "recipe_step"
+    return "recipe_title"
+
+
+def load_custom_comfyui_workflow(image_purpose="recipe title image"):
+    workflow_path = comfyui_workflow_path(image_purpose)
+    if not workflow_path:
+        return None
+
+    path = Path(os.path.expandvars(workflow_path)).expanduser()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise TitleImageGenerationError(
+            f"comfyui_workflow_not_found:{path}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_WORKFLOW_NOT_FOUND",
+            local_unavailable=True,
+        ) from exc
+    except Exception as exc:
+        raise TitleImageGenerationError(
+            f"comfyui_workflow_load_failed:{type(exc).__name__}:{exc}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_INVALID_WORKFLOW",
+            local_unavailable=True,
+        ) from exc
+
+    if isinstance(data, dict) and isinstance(data.get("prompt"), dict):
+        data = data["prompt"]
+
+    if not isinstance(data, dict) or not data:
+        raise TitleImageGenerationError(
+            "comfyui_workflow_not_api_format",
+            "ComfyUI workflow must be exported in API format.",
+            error_code="COMFYUI_INVALID_WORKFLOW",
+            local_unavailable=True,
+        )
+
+    workflow = deepcopy(data)
+    for node_id, node in workflow.items():
+        if not isinstance(node, dict) or not isinstance(node.get("inputs"), dict):
+            raise TitleImageGenerationError(
+                f"comfyui_workflow_invalid_node:{node_id}",
+                "ComfyUI workflow must be exported in API format.",
+                error_code="COMFYUI_INVALID_WORKFLOW",
+                local_unavailable=True,
+            )
+
+    return workflow
+
+
+def comfyui_workflow_inputs(workflow, node_id):
+    node = workflow.get(str(node_id)) if isinstance(workflow, dict) else None
+    inputs = node.get("inputs") if isinstance(node, dict) else None
+    return inputs if isinstance(inputs, dict) else None
+
+
+def comfyui_text_encode_node_ids(workflow):
+    node_ids = []
+    for node_id, node in workflow.items():
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict) or "text" not in inputs:
+            continue
+        class_type = title_image_clean_text(node.get("class_type")).lower()
+        if "textencode" in class_type or "cliptextencode" in class_type or "text encode" in class_type:
+            node_ids.append(str(node_id))
+    return node_ids
+
+
+def comfyui_prompt_looks_negative(text):
+    lower_text = title_image_clean_text(text).lower()
+    negative_markers = (
+        "low quality",
+        "bad anatomy",
+        "extra digits",
+        "missing digits",
+        "missing limbs",
+        "watermark",
+        "logo",
+        "text",
+        "blurry",
+    )
+    return any(marker in lower_text for marker in negative_markers)
+
+
+def comfyui_configured_node_id(name):
+    node_id = title_image_clean_text(os.getenv(name))
+    return node_id or ""
+
+
+def comfyui_custom_prompt_node_ids(workflow):
+    text_node_ids = comfyui_text_encode_node_ids(workflow)
+    configured_positive = comfyui_configured_node_id("COMFYUI_POSITIVE_PROMPT_NODE_ID")
+    configured_negative = comfyui_configured_node_id("COMFYUI_NEGATIVE_PROMPT_NODE_ID")
+
+    negative_node_id = ""
+    if configured_negative and comfyui_workflow_inputs(workflow, configured_negative):
+        negative_node_id = configured_negative
+    if not negative_node_id:
+        for node_id in text_node_ids:
+            inputs = comfyui_workflow_inputs(workflow, node_id) or {}
+            if comfyui_prompt_looks_negative(inputs.get("text")):
+                negative_node_id = node_id
+                break
+    if not negative_node_id and len(text_node_ids) > 1:
+        negative_node_id = text_node_ids[1]
+
+    positive_node_id = ""
+    if configured_positive and comfyui_workflow_inputs(workflow, configured_positive):
+        positive_node_id = configured_positive
+    if not positive_node_id:
+        for node_id in text_node_ids:
+            if node_id != negative_node_id:
+                positive_node_id = node_id
+                break
+
+    return positive_node_id, negative_node_id
+
+
+def patch_custom_comfyui_workflow(prompt, workflow, image_purpose="recipe title image"):
+    positive_node_id, negative_node_id = comfyui_custom_prompt_node_ids(workflow)
+    positive_inputs = comfyui_workflow_inputs(workflow, positive_node_id)
+    if not positive_inputs:
+        raise TitleImageGenerationError(
+            "comfyui_positive_prompt_node_not_found",
+            "ComfyUI workflow is missing a positive prompt text node.",
+            error_code="COMFYUI_INVALID_WORKFLOW",
+            local_unavailable=True,
+        )
+
+    positive_inputs["text"] = prompt
+
+    negative_inputs = comfyui_workflow_inputs(workflow, negative_node_id)
+    if negative_inputs is not None:
+        negative_inputs["text"] = comfyui_negative_prompt_for_purpose(image_purpose)
+
+    seed = uuid.uuid4().int % 1_000_000_000_000
+    configured_seed_node_id = comfyui_configured_node_id("COMFYUI_SEED_NODE_ID")
+    seed_node_ids = [configured_seed_node_id] if configured_seed_node_id else [
+        node_id
+        for node_id, node in workflow.items()
+        if isinstance(node, dict)
+        and isinstance(node.get("inputs"), dict)
+        and "seed" in node["inputs"]
+    ]
+    for node_id in seed_node_ids:
+        inputs = comfyui_workflow_inputs(workflow, node_id)
+        if inputs is not None and "seed" in inputs:
+            inputs["seed"] = seed
+
+    width = title_image_configured_env_int("COMFYUI_IMAGE_WIDTH", minimum=256, maximum=2048)
+    height = title_image_configured_env_int("COMFYUI_IMAGE_HEIGHT", minimum=256, maximum=2048)
+    if width is not None or height is not None:
+        configured_size_node_id = (
+            comfyui_configured_node_id("COMFYUI_SIZE_NODE_ID")
+            or comfyui_configured_node_id("COMFYUI_LATENT_NODE_ID")
+        )
+        size_node_ids = [configured_size_node_id] if configured_size_node_id else [
+            node_id
+            for node_id, node in workflow.items()
+            if isinstance(node, dict)
+            and isinstance(node.get("inputs"), dict)
+            and ("width" in node["inputs"] or "height" in node["inputs"])
+        ]
+        for node_id in size_node_ids:
+            inputs = comfyui_workflow_inputs(workflow, node_id)
+            if not inputs:
+                continue
+            if width is not None and "width" in inputs:
+                inputs["width"] = width
+            if height is not None and "height" in inputs:
+                inputs["height"] = height
+
+    configured_checkpoint = title_image_clean_text(os.getenv("COMFYUI_CHECKPOINT"))
+    if configured_checkpoint:
+        configured_checkpoint_node_id = comfyui_configured_node_id("COMFYUI_CHECKPOINT_NODE_ID")
+        checkpoint_node_ids = [configured_checkpoint_node_id] if configured_checkpoint_node_id else [
+            node_id
+            for node_id, node in workflow.items()
+            if isinstance(node, dict)
+            and isinstance(node.get("inputs"), dict)
+            and "ckpt_name" in node["inputs"]
+        ]
+        for node_id in checkpoint_node_ids:
+            inputs = comfyui_workflow_inputs(workflow, node_id)
+            if inputs is not None and "ckpt_name" in inputs:
+                inputs["ckpt_name"] = configured_checkpoint
+
+    configured_save_node_id = comfyui_configured_node_id("COMFYUI_SAVE_IMAGE_NODE_ID")
+    save_node_ids = [configured_save_node_id] if configured_save_node_id else [
+        node_id
+        for node_id, node in workflow.items()
+        if isinstance(node, dict)
+        and title_image_clean_text(node.get("class_type")).lower() == "saveimage"
+    ]
+    for node_id in save_node_ids:
+        inputs = comfyui_workflow_inputs(workflow, node_id)
+        if inputs is not None and "filename_prefix" in inputs:
+            inputs["filename_prefix"] = comfyui_filename_prefix_for_purpose(image_purpose)
+
+    return workflow
+
+
 def build_default_comfyui_title_workflow(prompt, checkpoint_name, image_purpose="recipe title image"):
     width = title_image_env_int("COMFYUI_IMAGE_WIDTH", 1024, minimum=256, maximum=2048)
     height = title_image_env_int("COMFYUI_IMAGE_HEIGHT", 1024, minimum=256, maximum=2048)
@@ -780,6 +1028,23 @@ def build_default_comfyui_title_workflow(prompt, checkpoint_name, image_purpose=
     }
 
 
+def build_comfyui_workflow(prompt, image_purpose, base_url, request_timeout):
+    custom_workflow = load_custom_comfyui_workflow(image_purpose)
+    if custom_workflow is not None:
+        return patch_custom_comfyui_workflow(
+            prompt,
+            custom_workflow,
+            image_purpose=image_purpose,
+        )
+
+    checkpoint_name = comfyui_checkpoint_name(base_url, request_timeout)
+    return build_default_comfyui_title_workflow(
+        prompt,
+        checkpoint_name,
+        image_purpose=image_purpose,
+    )
+
+
 def comfyui_history_record(history_payload, prompt_id):
     if not isinstance(history_payload, dict):
         return {}
@@ -839,11 +1104,11 @@ def request_comfyui_image_bytes(prompt, image_purpose="recipe title image"):
     print(f"[TitleImage] comfyui_url={base_url}")
 
     try:
-        checkpoint_name = comfyui_checkpoint_name(base_url, request_timeout)
-        workflow = build_default_comfyui_title_workflow(
+        workflow = build_comfyui_workflow(
             prompt,
-            checkpoint_name,
-            image_purpose=image_purpose,
+            image_purpose,
+            base_url,
+            request_timeout,
         )
         response = requests.post(
             f"{base_url}/prompt",
@@ -4073,14 +4338,29 @@ def openai_recipe_detail_image_prompt(base_prompt, image_purpose):
     return base_prompt
 
 
-def generate_recipe_detail_image_bytes_for_provider(provider, recipe_data, recipe_title, base_prompt, image_purpose):
+def notify_recipe_detail_image_prompt(prompt_callback, image_prompt, provider):
+    if not prompt_callback:
+        return
+
+    prompt_callback(image_prompt, provider)
+
+
+def generate_recipe_detail_image_bytes_for_provider(
+    provider,
+    recipe_data,
+    recipe_title,
+    base_prompt,
+    image_purpose,
+    prompt_callback=None,
+):
     if provider == TITLE_IMAGE_PROVIDER_OPENAI:
+        image_prompt = openai_recipe_detail_image_prompt(base_prompt, image_purpose)
+        notify_recipe_detail_image_prompt(prompt_callback, image_prompt, TITLE_IMAGE_PROVIDER_OPENAI)
         return (
-            generate_recipe_detail_image_with_openai(
-                openai_recipe_detail_image_prompt(base_prompt, image_purpose)
-            ),
+            generate_recipe_detail_image_with_openai(image_prompt),
             TITLE_IMAGE_PROVIDER_OPENAI,
             False,
+            image_prompt,
         )
 
     if provider == TITLE_IMAGE_PROVIDER_OLLAMA_PROMPT_ONLY:
@@ -4098,10 +4378,12 @@ def generate_recipe_detail_image_bytes_for_provider(provider, recipe_data, recip
             image_purpose=image_purpose,
         )
         print("[TitleImage] Ollama only created the prompt; image_provider=openai")
+        notify_recipe_detail_image_prompt(prompt_callback, enhanced_prompt, TITLE_IMAGE_PROVIDER_OPENAI)
         return (
             request_recipe_step_image_bytes(enhanced_prompt),
             TITLE_IMAGE_PROVIDER_OPENAI,
             False,
+            enhanced_prompt,
         )
 
     if provider == TITLE_IMAGE_PROVIDER_COMFYUI:
@@ -4112,10 +4394,12 @@ def generate_recipe_detail_image_bytes_for_provider(provider, recipe_data, recip
             required=False,
             image_purpose=image_purpose,
         )
+        notify_recipe_detail_image_prompt(prompt_callback, enhanced_prompt, TITLE_IMAGE_PROVIDER_COMFYUI)
         return (
             request_comfyui_image_bytes(enhanced_prompt, image_purpose=image_purpose),
             TITLE_IMAGE_PROVIDER_COMFYUI,
             False,
+            enhanced_prompt,
         )
 
     raise TitleImageGenerationError(
@@ -4125,7 +4409,14 @@ def generate_recipe_detail_image_bytes_for_provider(provider, recipe_data, recip
     )
 
 
-def generate_recipe_detail_image_bytes(recipe_data, recipe_title, base_prompt, image_purpose, provider=None):
+def generate_recipe_detail_image_bytes(
+    recipe_data,
+    recipe_title,
+    base_prompt,
+    image_purpose,
+    provider=None,
+    prompt_callback=None,
+):
     provider = title_image_provider(provider)
     print(f"[TitleImage] provider={provider}")
 
@@ -4136,18 +4427,20 @@ def generate_recipe_detail_image_bytes(recipe_data, recipe_title, base_prompt, i
             recipe_title,
             base_prompt,
             image_purpose,
+            prompt_callback=prompt_callback,
         )
     except TitleImageGenerationError as exc:
         title_image_log_failure(exc.reason)
         fallback_provider = title_image_fallback_provider()
         if provider == TITLE_IMAGE_PROVIDER_COMFYUI and fallback_provider == TITLE_IMAGE_PROVIDER_OPENAI:
             try:
+                image_prompt = openai_recipe_detail_image_prompt(base_prompt, image_purpose)
+                notify_recipe_detail_image_prompt(prompt_callback, image_prompt, TITLE_IMAGE_PROVIDER_OPENAI)
                 return (
-                    generate_recipe_detail_image_with_openai(
-                        openai_recipe_detail_image_prompt(base_prompt, image_purpose)
-                    ),
+                    generate_recipe_detail_image_with_openai(image_prompt),
                     TITLE_IMAGE_PROVIDER_OPENAI,
                     True,
+                    image_prompt,
                 )
             except TimeoutError:
                 title_image_log_failure("fallback_openai_timeout")
@@ -4352,6 +4645,7 @@ def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
         ).strip()
         target_equipment["equipment_image_url"] = image_url
         target_equipment["equipment_image_generated_at"] = generated_at
+        target_equipment["equipment_image_prompt"] = ""
         equipment_items[target_index] = {
             **target_equipment,
             "equipment": equipment_text,
@@ -4458,6 +4752,7 @@ def remove_recipe_detail_image(original_url, kind, target):
         target_equipment.pop("image_generated_at", None)
         target_equipment["equipment_image_url"] = ""
         target_equipment["equipment_image_generated_at"] = ""
+        target_equipment["equipment_image_prompt"] = ""
         equipment_items[target_index] = {
             **target_equipment,
             "equipment": equipment_text,
@@ -5091,46 +5386,64 @@ def generate_recipe_step_image(payload):
 
     progress_target = target_instruction.get("step_number")
     start_recipe_image_progress("step", url, progress_target, "Generating step image...")
+    image_prompt = ""
+
+    def record_step_image_prompt(resolved_prompt, prompt_provider):
+        del prompt_provider
+        nonlocal image_prompt
+        image_prompt = resolved_prompt
+        start_recipe_image_progress(
+            "step",
+            url,
+            progress_target,
+            "Generating step image...",
+            image_prompt=image_prompt,
+        )
 
     try:
-        image_bytes, used_provider, fallback_used = generate_recipe_detail_image_bytes(
+        image_bytes, used_provider, fallback_used, image_prompt = generate_recipe_detail_image_bytes(
             recipe_data,
             recipe_title,
             prompt,
             "recipe instruction step image",
             provider=provider,
+            prompt_callback=record_step_image_prompt,
         )
     except TimeoutError:
         error = "Image generation timed out. Please try again."
-        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error)
+        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
         return {
             "ok": False,
             "error": error,
+            "image_prompt": image_prompt,
         }
     except TitleImageGenerationError as exc:
         error = exc.user_message
-        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error)
+        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
         return {
             "ok": False,
             "error": error,
             "error_code": exc.error_code,
             "provider": provider,
             "local_generation_unavailable": exc.local_unavailable,
+            "image_prompt": image_prompt,
         }
     except Exception:
         error = "Image generation failed. Please try again."
-        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error)
+        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
         return {
             "ok": False,
             "error": error,
+            "image_prompt": image_prompt,
         }
 
     if not image_bytes:
         error = "Image generation did not return an image. Please try again."
-        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error)
+        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
         return {
             "ok": False,
             "error": error,
+            "image_prompt": image_prompt,
         }
 
     step_image_url = save_recipe_step_image_file(url, target_instruction.get("step_number"), image_bytes)
@@ -5154,6 +5467,7 @@ def generate_recipe_step_image(payload):
         ok=True,
         image_url=step_image_url,
         generated_at=generated_at,
+        image_prompt=image_prompt,
     )
 
     return {
@@ -5164,6 +5478,7 @@ def generate_recipe_step_image(payload):
         "step_image_generated_at": generated_at,
         "provider": used_provider,
         "fallback_used": bool(fallback_used),
+        "image_prompt": image_prompt,
     }
 
 
@@ -5209,46 +5524,64 @@ def generate_recipe_equipment_image(payload):
 
     progress_target = target_index + 1
     start_recipe_image_progress("equipment", url, progress_target, "Generating equipment image...")
+    image_prompt = ""
+
+    def record_equipment_image_prompt(resolved_prompt, prompt_provider):
+        del prompt_provider
+        nonlocal image_prompt
+        image_prompt = resolved_prompt
+        start_recipe_image_progress(
+            "equipment",
+            url,
+            progress_target,
+            "Generating equipment image...",
+            image_prompt=image_prompt,
+        )
 
     try:
-        image_bytes, used_provider, fallback_used = generate_recipe_detail_image_bytes(
+        image_bytes, used_provider, fallback_used, image_prompt = generate_recipe_detail_image_bytes(
             recipe_data,
             recipe_title,
             prompt,
             "recipe equipment item image",
             provider=provider,
+            prompt_callback=record_equipment_image_prompt,
         )
     except TimeoutError:
         error = "Image generation timed out. Please try again."
-        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error)
+        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
         return {
             "ok": False,
             "error": error,
+            "image_prompt": image_prompt,
         }
     except TitleImageGenerationError as exc:
         error = exc.user_message
-        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error)
+        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
         return {
             "ok": False,
             "error": error,
             "error_code": exc.error_code,
             "provider": provider,
             "local_generation_unavailable": exc.local_unavailable,
+            "image_prompt": image_prompt,
         }
     except Exception:
         error = "Image generation failed. Please try again."
-        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error)
+        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
         return {
             "ok": False,
             "error": error,
+            "image_prompt": image_prompt,
         }
 
     if not image_bytes:
         error = "Image generation did not return an image. Please try again."
-        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error)
+        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
         return {
             "ok": False,
             "error": error,
+            "image_prompt": image_prompt,
         }
 
     equipment_image_url = save_recipe_equipment_image_file(url, target_index + 1, image_bytes)
@@ -5257,6 +5590,7 @@ def generate_recipe_equipment_image(payload):
     generated_at = datetime.now(timezone.utc).isoformat()
     target_equipment["equipment_image_url"] = equipment_image_url
     target_equipment["equipment_image_generated_at"] = generated_at
+    target_equipment["equipment_image_prompt"] = image_prompt
 
     equipment_items[target_index] = {
         **target_equipment,
@@ -5272,6 +5606,7 @@ def generate_recipe_equipment_image(payload):
         ok=True,
         image_url=equipment_image_url,
         generated_at=generated_at,
+        image_prompt=image_prompt,
     )
 
     return {
@@ -5282,6 +5617,7 @@ def generate_recipe_equipment_image(payload):
         "equipment_image_generated_at": generated_at,
         "provider": used_provider,
         "fallback_used": bool(fallback_used),
+        "image_prompt": image_prompt,
     }
 
 
@@ -5976,10 +6312,12 @@ def normalize_equipment_records(value):
             equipment_image_generated_at = str(
                 item.get("equipment_image_generated_at") or item.get("image_generated_at") or ""
             ).strip()
+            equipment_image_prompt = str(item.get("equipment_image_prompt") or item.get("image_prompt") or "").strip()
         else:
             text = str(item or "").strip()
             equipment_image_url = ""
             equipment_image_generated_at = ""
+            equipment_image_prompt = ""
 
         if not text:
             continue
@@ -5989,6 +6327,7 @@ def normalize_equipment_records(value):
             "text": text,
             "equipment_image_url": equipment_image_url,
             "equipment_image_generated_at": equipment_image_generated_at,
+            "equipment_image_prompt": equipment_image_prompt,
         })
         records.append(record)
 
@@ -6110,16 +6449,22 @@ def sanitize_equipment_list(value, existing_value=None):
     equipment = []
 
     for index, item in enumerate(value):
+        prompt_supplied = isinstance(item, dict) and (
+            "equipment_image_prompt" in item
+            or "image_prompt" in item
+        )
         if isinstance(item, dict):
             text = str(item.get("equipment") or item.get("text") or item.get("name") or "").strip()
             equipment_image_url = nullable_string(item.get("equipment_image_url") or item.get("image_url"))
             equipment_image_generated_at = nullable_string(
                 item.get("equipment_image_generated_at") or item.get("image_generated_at")
             )
+            equipment_image_prompt = nullable_string(item.get("equipment_image_prompt") or item.get("image_prompt"))
         else:
             text = str(item or "").strip()
             equipment_image_url = ""
             equipment_image_generated_at = ""
+            equipment_image_prompt = ""
 
         if not text:
             continue
@@ -6134,12 +6479,19 @@ def sanitize_equipment_list(value, existing_value=None):
             or nullable_string(existing.get("equipment_image_generated_at"))
             or ""
         )
+        if not prompt_supplied:
+            equipment_image_prompt = (
+                equipment_image_prompt
+                or nullable_string(existing.get("equipment_image_prompt"))
+                or ""
+            )
 
         equipment.append({
             "equipment": text,
             "text": text,
             "equipment_image_url": equipment_image_url,
             "equipment_image_generated_at": equipment_image_generated_at,
+            "equipment_image_prompt": equipment_image_prompt,
         })
 
     return equipment
