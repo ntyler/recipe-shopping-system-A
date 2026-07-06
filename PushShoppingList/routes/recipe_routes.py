@@ -90,13 +90,17 @@ from PushShoppingList.services.cookbook_service import is_unclassified_cookbook
 from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import load_cookbooks
 from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
+from PushShoppingList.services.cookbook_service import category_metadata_has_values
 from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_ALL_FIELDS
 from PushShoppingList.services.cookbook_service import CATEGORY_SOURCE_AI_INFERRED
+from PushShoppingList.services.cookbook_service import CookbookCategoryOverwriteConflict
+from PushShoppingList.services.cookbook_service import cookbook_recipe_record_for_url
 from PushShoppingList.services.cookbook_service import MISCELLANEOUS_MENU_SECTION
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import purge_recipe_from_all_cookbooks
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.cookbook_service import resolve_cookbook_destination
+from PushShoppingList.services.cookbook_service import stored_category_metadata
 from PushShoppingList.services.cookbook_service import update_cookbook_recipe_categories
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
@@ -1231,6 +1235,7 @@ def apply_imported_recipe_category_routine(
     recipe_metadata,
     assignment,
     trigger_source="recipe_import:all",
+    overwrite_existing_categories=False,
 ):
     url = str(url or "").strip()
     recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
@@ -1255,6 +1260,25 @@ def apply_imported_recipe_category_routine(
     category_input.setdefault("source_url", url)
     category_input.setdefault("source_display_url", url)
     category_input.setdefault("url", url)
+
+    stored_record = cookbook_recipe_record_for_url(url)
+    stored_metadata = stored_category_metadata(stored_record)
+    if (
+        not overwrite_existing_categories
+        and category_metadata_has_values(stored_metadata)
+    ):
+        print(
+            "[recipe_import_category] action=skipped "
+            f"title={title} url={url} reason=existing_cookbook_categories"
+        )
+        return {
+            "ok": True,
+            "title": title,
+            "status": "skipped_existing_categories",
+            "skipped": True,
+            "reason": "existing_cookbook_categories",
+            "message": "Saved cookbook categories already exist; kept existing categories.",
+        }
 
     print(
         "[recipe_import_category] action=started "
@@ -1298,6 +1322,7 @@ def apply_imported_recipe_category_routine(
             cookbook_id,
             url,
             categories,
+            confirm_overwrite=overwrite_existing_categories,
             category_sources=category_sources,
         )
         print(
@@ -1310,6 +1335,19 @@ def apply_imported_recipe_category_routine(
             "title": title,
             "categories": categories,
             "status": "updated",
+        }
+    except CookbookCategoryOverwriteConflict:
+        print(
+            "[recipe_import_category] action=skipped "
+            f"title={title} url={url} reason=existing_cookbook_categories"
+        )
+        return {
+            "ok": True,
+            "title": title,
+            "status": "skipped_existing_categories",
+            "skipped": True,
+            "reason": "existing_cookbook_categories",
+            "message": "Saved cookbook categories already exist; kept existing categories.",
         }
     except Exception as exc:
         error = str(exc)

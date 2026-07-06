@@ -1087,3 +1087,46 @@ def test_cookbook_category_update_requires_confirmation_before_overwriting_manua
         assert saved_recipe["custom_categories"] == ["🧪 Things We Want To Try"]
         assert saved_recipe["category_metadata_sources"]["cuisine"] == "user_selected"
         assert saved_recipe["category_metadata_sources"]["custom_categories"] == "user_selected"
+
+
+def test_cookbook_category_update_can_fill_blank_categories_when_menu_section_exists():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.create_cookbook("Dinner")
+        cookbook_service.move_recipes_to_cookbook(
+            "dinner",
+            ["https://example.com/huancaina"],
+            [{"name": "Papa a la Huancaina", "url": "https://example.com/huancaina"}],
+        )
+        cookbook_service.update_cookbook_recipe_categories(
+            "dinner",
+            "https://example.com/huancaina",
+            {"menu_section": "Appetizers"},
+        )
+
+        cookbook_service.update_cookbook_recipe_categories(
+            "dinner",
+            "https://example.com/huancaina",
+            {
+                "meal_type": "🍽️ Appetizer / Snack",
+                "cuisine": "🇵🇪 Peruvian",
+                "custom_categories": "Restaurant Favorites",
+            },
+            category_sources={
+                "meal_type": cookbook_service.CATEGORY_SOURCE_AI_INFERRED,
+                "cuisine": cookbook_service.CATEGORY_SOURCE_AI_INFERRED,
+                "custom_categories": cookbook_service.CATEGORY_SOURCE_AI_INFERRED,
+            },
+        )
+
+        saved_recipe = cookbook_service.load_cookbooks()["cookbooks"][0]["recipes"][0]
+        assert saved_recipe["menu_section"] == "Appetizers"
+        assert saved_recipe["meal_type"] == "🍽️ Appetizer / Snack"
+        assert saved_recipe["cuisine"] == "🇵🇪 Peruvian"
+        assert saved_recipe["custom_categories"] == ["Restaurant Favorites"]
+        assert saved_recipe["category_metadata_sources"]["meal_type"] == "ai_inferred"
+        assert saved_recipe["category_metadata_sources"]["cuisine"] == "ai_inferred"
+        assert saved_recipe["category_metadata_sources"]["custom_categories"] == "ai_inferred"

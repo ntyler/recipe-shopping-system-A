@@ -936,6 +936,64 @@ def test_menu_deferred_enrichment_runs_all_nutrition_before_categories(monkeypat
     assert finished["result_payload"]["pdfs_completed"] == 0
 
 
+def test_menu_deferred_enrichment_treats_existing_categories_as_skipped(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=papa-huancaina"
+    recipe = {
+        "source_url": recipe_url,
+        "recipe_title": "Papa a la Huancaina",
+        "ingredients": [{"ingredient": "potato"}],
+    }
+    activity_records = []
+
+    monkeypatch.setattr(cookbook_service, "COOKBOOKS_FILE", tmp_path / "cookbooks.json")
+    cookbook_service.create_cookbook("Pisco Mar")
+    cookbook_service.move_recipes_to_cookbook(
+        "pisco-mar",
+        [recipe_url],
+        [{"name": "Papa a la Huancaina", "url": recipe_url}],
+    )
+    cookbook_service.update_cookbook_recipe_categories(
+        "pisco-mar",
+        recipe_url,
+        {
+            "meal_type": "🍽️ Appetizer / Snack",
+            "cuisine": "🇵🇪 Peruvian",
+        },
+    )
+
+    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": recipe})
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: activity_records.append(args))
+    monkeypatch.setattr(recipe_extract_service, "mark_menu_recipe_import_failure", lambda *args, **kwargs: None)
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("existing saved categories should skip before ChatGPT category decisions")
+
+    monkeypatch.setattr(recipe_routes, "decide_recipe_categories_with_chatgpt", fail_if_called)
+
+    job = job_service.create_job(
+        "menu-deferred-heavy-tasks",
+        input_payload={
+            "recipe_urls": [recipe_url],
+            "run_nutrition": False,
+            "run_generated_pdfs": False,
+        },
+        user_id="owner",
+        total_items=1,
+    )
+
+    finished = job_tasks.run_menu_deferred_enrichment_job(job["id"], job["input_payload"])
+
+    assert finished["status"] == "completed"
+    assert finished["result_payload"]["categories_completed"] == 1
+    assert finished["result_payload"]["categories_failed"] == 0
+    assert finished["result_payload"]["failed_items"] == 0
+    assert finished["result_payload"]["failed_recipe_items"] == []
+    assert finished["result_payload"]["category_statuses"][0]["status"] == "skipped_existing_categories"
+    assert finished["warning_messages"] == []
+    assert activity_records
+
+
 def test_menu_deferred_enrichment_failure_uses_menu_item_name(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-251-Drinks"

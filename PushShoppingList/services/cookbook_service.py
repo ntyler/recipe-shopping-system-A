@@ -2422,16 +2422,17 @@ def update_cookbook_recipe_categories(
         existing_menu_section = clean_text(recipe.get("menu_section"))
         existing_metadata = stored_category_metadata(recipe)
         menu_section_changed = menu_section_provided and existing_menu_section != cleaned_menu_section
-        has_manual_metadata = (
-            bool(recipe.get("category_metadata_user_set"))
-            or category_metadata_has_values(existing_metadata)
-            or bool(existing_menu_section)
-        )
+        has_saved_category_metadata = category_metadata_has_values(existing_metadata)
 
         if (
-            has_manual_metadata
-            and (category_metadata_changed(existing_metadata, cleaned_categories) or menu_section_changed)
-            and not confirm_overwrite
+            not confirm_overwrite
+            and (
+                (
+                    has_saved_category_metadata
+                    and category_metadata_changed(existing_metadata, cleaned_categories)
+                )
+                or (bool(existing_menu_section) and menu_section_changed)
+            )
         ):
             raise CookbookCategoryOverwriteConflict(recipe.get("name") or recipe_url)
 
