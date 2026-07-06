@@ -436,6 +436,59 @@ def test_generate_recipe_cover_image_comfyui_failure_does_not_fallback_without_o
     }
 
 
+def test_comfyui_checkpoint_lookup_autostarts_local_service(monkeypatch):
+    calls = []
+    launched = {}
+
+    class FakeResponse:
+        def __init__(self, payload=None):
+            self.payload = payload or {}
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    def fake_get(url, timeout):
+        calls.append(url)
+        if url.endswith("/object_info/CheckpointLoaderSimple") and calls.count(url) == 1:
+            raise recipe_edit_service.requests.ConnectionError("refused")
+        if url.endswith("/system_stats"):
+            if "command" not in launched:
+                raise recipe_edit_service.requests.ConnectionError("refused")
+            return FakeResponse({"ok": True})
+        if url.endswith("/object_info/CheckpointLoaderSimple"):
+            return FakeResponse({
+                "CheckpointLoaderSimple": {
+                    "input": {
+                        "required": {
+                            "ckpt_name": [["local-model.safetensors"]],
+                        },
+                    },
+                },
+            })
+        raise AssertionError(f"Unexpected URL: {url}")
+
+    def fake_popen(command, **kwargs):
+        launched["command"] = command
+        launched["kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setenv("COMFYUI_START_COMMAND", r"D:\GitHub\ComfyUI\start_comfyui_local.bat")
+    monkeypatch.setenv("COMFYUI_START_WAIT_SECONDS", "1")
+    monkeypatch.setattr(recipe_edit_service, "COMFYUI_START_ATTEMPTED", False)
+    monkeypatch.setattr(recipe_edit_service.requests, "get", fake_get)
+    monkeypatch.setattr(recipe_edit_service.subprocess, "Popen", fake_popen)
+
+    checkpoint = recipe_edit_service.comfyui_checkpoint_name("http://127.0.0.1:8188", 1)
+
+    assert checkpoint == "local-model.safetensors"
+    assert launched["command"] == r"D:\GitHub\ComfyUI\start_comfyui_local.bat"
+    assert launched["kwargs"]["shell"] is True
+    assert calls.count("http://127.0.0.1:8188/object_info/CheckpointLoaderSimple") == 2
+
+
 def test_generate_recipe_equipment_image_comfyui_uses_local_provider_without_openai(monkeypatch, tmp_path):
     url = "https://example.com/local-equipment-image"
     recipe_data = {

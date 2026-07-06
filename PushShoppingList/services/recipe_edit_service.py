@@ -4,6 +4,8 @@ import json
 import mimetypes
 import os
 import re
+import subprocess
+import threading
 import uuid
 from datetime import datetime
 from datetime import timezone
@@ -184,8 +186,11 @@ OLLAMA_PROMPT_MODEL_DEFAULT = "qwen2.5:7b"
 OLLAMA_URL_DEFAULT = "http://localhost:11434"
 COMFYUI_URL_ENV_VAR = "COMFYUI_URL"
 COMFYUI_URL_DEFAULT = "http://127.0.0.1:8188"
+COMFYUI_START_COMMAND_ENV_VAR = "COMFYUI_START_COMMAND"
 LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE = "Local image generation is unavailable. Start ComfyUI and try again."
 TITLE_IMAGE_OPENAI_SETUP_MESSAGE = "Image generation is not set up yet."
+COMFYUI_START_LOCK = threading.Lock()
+COMFYUI_START_ATTEMPTED = False
 
 
 class TitleImageGenerationError(RuntimeError):
@@ -260,6 +265,26 @@ def ollama_prompt_base_url():
 
 def comfyui_base_url():
     return (title_image_clean_text(os.getenv(COMFYUI_URL_ENV_VAR)) or COMFYUI_URL_DEFAULT).rstrip("/")
+
+
+def comfyui_start_command():
+    return title_image_clean_text(os.getenv(COMFYUI_START_COMMAND_ENV_VAR))
+
+
+def comfyui_autostart_enabled():
+    value = title_image_clean_text(os.getenv("COMFYUI_AUTOSTART")).lower()
+    if value:
+        return value not in {"0", "false", "no", "off"}
+    return bool(comfyui_start_command())
+
+
+def comfyui_start_wait_seconds():
+    return title_image_env_float("COMFYUI_START_WAIT_SECONDS", 45.0, minimum=1.0, maximum=180.0)
+
+
+def comfyui_url_is_local(base_url):
+    host = title_image_clean_text(urlparse(base_url).hostname).lower()
+    return host in {"127.0.0.1", "localhost", "::1"}
 
 
 def title_image_ollama_timeout_seconds():
@@ -417,28 +442,104 @@ def enhance_recipe_title_image_prompt_with_ollama(recipe_data, recipe_title, bas
     )
 
 
+def comfyui_object_info_checkpoint_names(base_url, request_timeout):
+    response = requests.get(
+        f"{base_url}/object_info/CheckpointLoaderSimple",
+        timeout=request_timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+    checkpoint_info = (
+        data.get("CheckpointLoaderSimple", {})
+        .get("input", {})
+        .get("required", {})
+        .get("ckpt_name", [])
+    )
+    return checkpoint_info[0] if checkpoint_info and isinstance(checkpoint_info[0], list) else []
+
+
+def comfyui_service_ready(base_url, request_timeout):
+    try:
+        response = requests.get(f"{base_url}/system_stats", timeout=request_timeout)
+        response.raise_for_status()
+        return True
+    except Exception:
+        return False
+
+
+def maybe_start_local_comfyui(base_url, request_timeout, reason=""):
+    global COMFYUI_START_ATTEMPTED
+
+    command = comfyui_start_command()
+    if not command or not comfyui_autostart_enabled() or not comfyui_url_is_local(base_url):
+        return False
+
+    with COMFYUI_START_LOCK:
+        if comfyui_service_ready(base_url, request_timeout):
+            return True
+
+        if not COMFYUI_START_ATTEMPTED:
+            COMFYUI_START_ATTEMPTED = True
+            print(
+                "[TitleImage] comfyui_autostart=starting "
+                f"reason={title_image_clean_text(reason) or 'not_running'}"
+            )
+            try:
+                subprocess.Popen(
+                    command,
+                    shell=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except Exception as exc:
+                print(f"[TitleImage] comfyui_autostart_failed reason={title_image_clean_text(exc)}")
+                return False
+        else:
+            print("[TitleImage] comfyui_autostart=waiting_for_existing_attempt")
+
+        deadline = perf_counter() + comfyui_start_wait_seconds()
+        while perf_counter() < deadline:
+            if comfyui_service_ready(base_url, request_timeout):
+                print("[TitleImage] comfyui_autostart=ready")
+                return True
+            sleep(1)
+
+    print("[TitleImage] comfyui_autostart=timeout")
+    return False
+
+
 def comfyui_checkpoint_name(base_url, request_timeout):
     configured_checkpoint = title_image_clean_text(os.getenv("COMFYUI_CHECKPOINT"))
     if configured_checkpoint:
         return configured_checkpoint
 
     try:
-        response = requests.get(
-            f"{base_url}/object_info/CheckpointLoaderSimple",
-            timeout=request_timeout,
-        )
-        response.raise_for_status()
-        data = response.json()
-        checkpoint_info = (
-            data.get("CheckpointLoaderSimple", {})
-            .get("input", {})
-            .get("required", {})
-            .get("ckpt_name", [])
-        )
-        checkpoint_names = checkpoint_info[0] if checkpoint_info and isinstance(checkpoint_info[0], list) else []
+        checkpoint_names = comfyui_object_info_checkpoint_names(base_url, request_timeout)
         checkpoint_name = title_image_clean_text(checkpoint_names[0] if checkpoint_names else "")
         if checkpoint_name:
             return checkpoint_name
+    except requests.ConnectionError as exc:
+        if maybe_start_local_comfyui(base_url, request_timeout, reason=f"checkpoint_lookup_connection_failed:{exc}"):
+            try:
+                checkpoint_names = comfyui_object_info_checkpoint_names(base_url, request_timeout)
+                checkpoint_name = title_image_clean_text(checkpoint_names[0] if checkpoint_names else "")
+                if checkpoint_name:
+                    return checkpoint_name
+            except Exception as retry_exc:
+                raise TitleImageGenerationError(
+                    f"comfyui_checkpoint_lookup_failed_after_autostart:{type(retry_exc).__name__}:{retry_exc}",
+                    LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+                    error_code="COMFYUI_UNAVAILABLE",
+                    local_unavailable=True,
+                ) from retry_exc
+
+        raise TitleImageGenerationError(
+            f"comfyui_checkpoint_lookup_failed:{type(exc).__name__}:{exc}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_UNAVAILABLE",
+            local_unavailable=True,
+        ) from exc
     except Exception as exc:
         raise TitleImageGenerationError(
             f"comfyui_checkpoint_lookup_failed:{type(exc).__name__}:{exc}",
