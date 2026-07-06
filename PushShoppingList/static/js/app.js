@@ -25510,6 +25510,9 @@ function setRecipeImageElementSource(image, originalUrl, displayVariant = "card"
         image.removeAttribute("src");
         image.removeAttribute("srcset");
         image.removeAttribute("data-full-src");
+        image.removeAttribute("data-deferred-src");
+        image.removeAttribute("data-deferred-srcset");
+        image.removeAttribute("data-deferred-loaded");
     }
 }
 
@@ -25585,6 +25588,13 @@ function addRecipeEquipmentRow(value = "") {
                    ${equipmentImageUrl ? "" : "hidden"}>
                     Download
                 </a>
+                <button type="button"
+                        class="recipe-step-image-remove"
+                        data-equipment-image-remove
+                        onclick="return removeRecipeDetailImage(this)"
+                        ${equipmentImageUrl ? "" : "hidden"}>
+                    Remove
+                </button>
                 <button type="button"
                         class="recipe-step-image-upload"
                         data-recipe-image-upload-button
@@ -25755,6 +25765,13 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
                    ${stepImageUrl ? "" : "hidden"}>
                     Download
                 </a>
+                <button type="button"
+                        class="recipe-step-image-remove"
+                        data-step-image-remove
+                        onclick="return removeRecipeDetailImage(this)"
+                        ${stepImageUrl ? "" : "hidden"}>
+                    Remove
+                </button>
                 <button type="button"
                         class="recipe-step-image-upload"
                         data-recipe-image-upload-button
@@ -28925,6 +28942,10 @@ function recipeImagePanelDownload(panel) {
     return panel ? panel.querySelector("[data-equipment-image-download], [data-step-image-download]") : null;
 }
 
+function recipeImagePanelRemoveButton(panel) {
+    return panel ? panel.querySelector("[data-equipment-image-remove], [data-step-image-remove]") : null;
+}
+
 function recipeImagePanelKind(panel) {
     return panel && panel.matches("[data-equipment-image-panel]") ? "equipment" : "step";
 }
@@ -28956,6 +28977,7 @@ function recipeImagePanelUploadInput(panel) {
 function updateRecipeImagePanelUploadButton(panel, kind = null) {
     const uploadButton = recipeImagePanelUploadButton(panel);
     const uploadInput = recipeImagePanelUploadInput(panel);
+    const removeButton = recipeImagePanelRemoveButton(panel);
     const image = recipeImagePanelImage(panel, kind || recipeImagePanelKind(panel));
     const hasImage = Boolean(image && String(image.getAttribute("src") || "").trim());
     const isGenerating = Boolean(panel && panel.classList.contains("generating"));
@@ -28968,6 +28990,11 @@ function updateRecipeImagePanelUploadButton(panel, kind = null) {
     if (uploadInput) {
         uploadInput.disabled = isGenerating;
     }
+
+    if (removeButton) {
+        removeButton.hidden = !hasImage;
+        removeButton.disabled = isGenerating || !hasImage;
+    }
 }
 
 function setRecipeImagePanelGenerating(panel, message) {
@@ -28975,6 +29002,7 @@ function setRecipeImagePanelGenerating(panel, message) {
     const button = recipeImagePanelGenerateButton(panel);
     const uploadButton = recipeImagePanelUploadButton(panel);
     const uploadInput = recipeImagePanelUploadInput(panel);
+    const removeButton = recipeImagePanelRemoveButton(panel);
 
     panel.classList.remove("recipe-image-visibility-hidden");
     panel.classList.add("generating");
@@ -28994,6 +29022,10 @@ function setRecipeImagePanelGenerating(panel, message) {
 
     if (uploadInput) {
         uploadInput.disabled = true;
+    }
+
+    if (removeButton) {
+        removeButton.disabled = true;
     }
 }
 
@@ -29045,11 +29077,62 @@ function setRecipeImagePanelComplete(panel, item) {
     updateRecipeImagePanelRowMenu(panel);
 }
 
+function recipeDetailImageEmptyMessage(kind) {
+    return kind === "equipment"
+        ? "No image generated for this equipment."
+        : "No image generated for this step.";
+}
+
+function setRecipeImagePanelRemoved(panel, kind) {
+    const normalizedKind = normalizeRecipeImageProgressKind(kind);
+    const status = recipeImagePanelStatus(panel);
+    const image = recipeImagePanelImage(panel, normalizedKind);
+    const download = recipeImagePanelDownload(panel);
+    const button = recipeImagePanelGenerateButton(panel);
+
+    panel.classList.remove("generating");
+    panel.classList.remove("recipe-image-visibility-hidden");
+
+    if (image) {
+        setRecipeImageElementSource(image, "");
+        image.hidden = true;
+    }
+
+    if (download) {
+        download.href = "#";
+        download.hidden = true;
+    }
+
+    if (normalizedKind === "equipment") {
+        setRecipeImagePanelHiddenValue(panel, "equipment_image_url", "");
+        setRecipeImagePanelHiddenValue(panel, "equipment_image_generated_at", "");
+    } else {
+        setRecipeImagePanelHiddenValue(panel, "step_image_url", "");
+        setRecipeImagePanelHiddenValue(panel, "step_image_generated_at", "");
+    }
+
+    if (status) {
+        status.textContent = recipeDetailImageEmptyMessage(normalizedKind);
+        status.classList.remove("empty");
+    }
+
+    if (button) {
+        button.disabled = false;
+        button.textContent = normalizedKind === "equipment"
+            ? "Generate equipment image"
+            : "Generate step image";
+    }
+
+    updateRecipeImagePanelUploadButton(panel, normalizedKind);
+    updateRecipeImagePanelRowMenu(panel);
+}
+
 function setRecipeImagePanelFailed(panel, message) {
     const status = recipeImagePanelStatus(panel);
     const button = recipeImagePanelGenerateButton(panel);
     const uploadButton = recipeImagePanelUploadButton(panel);
     const uploadInput = recipeImagePanelUploadInput(panel);
+    const removeButton = recipeImagePanelRemoveButton(panel);
 
     panel.classList.remove("generating");
     panel.classList.remove("recipe-image-visibility-hidden");
@@ -29069,6 +29152,10 @@ function setRecipeImagePanelFailed(panel, message) {
 
     if (uploadInput) {
         uploadInput.disabled = false;
+    }
+
+    if (removeButton) {
+        removeButton.disabled = false;
     }
 
     updateRecipeImagePanelUploadButton(panel);
@@ -29174,6 +29261,61 @@ async function uploadRecipeDetailImage(input) {
         if (input) {
             input.value = "";
         }
+    }
+
+    return false;
+}
+
+async function removeRecipeDetailImage(button) {
+    const panel = button ? button.closest("[data-equipment-image-panel], [data-step-image-panel]") : null;
+    const kind = recipeImagePanelKind(panel);
+    const recipeUrl = panel ? panel.dataset.recipeUrl || "" : "";
+    const target = recipeImagePanelTarget(panel, kind);
+    const status = recipeImagePanelStatus(panel);
+
+    if (!panel || !recipeUrl || !target) {
+        if (status) {
+            status.textContent = "This image location could not be found.";
+            status.classList.remove("empty");
+        }
+        return false;
+    }
+
+    const label = kind === "equipment" ? "equipment image" : "step image";
+    if (!window.confirm(`Remove this ${label} from the recipe?`)) {
+        return false;
+    }
+
+    setRecipeImagePanelGenerating(panel, "Removing image...");
+
+    try {
+        const response = await fetch("/api/recipe_detail_image", {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                url: recipeUrl,
+                kind,
+                target,
+                [kind === "equipment" ? "equipment_index" : "step_number"]: target,
+            }),
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to remove this image.");
+        }
+
+        setRecipeImagePanelRemoved(panel, kind);
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe image removed.");
+    } catch (err) {
+        setRecipeImagePanelFailed(panel, err.message || "Unable to remove this image.");
     }
 
     return false;

@@ -344,23 +344,32 @@ def build_ollama_recipe_image_prompt_request(recipe_data, recipe_title, base_pro
         context = {
             "image_subject": "equipment item named in the base prompt",
         }
-        purpose_rules = """- The equipment item named in the base prompt must be the single obvious main subject.
-- Do not feature recipe ingredients, food prep, finished food, garnish, liquids, or a plated dish.
-- Use an empty, clean equipment object on a neutral kitchen counter.
-- If the equipment title contains alternatives like "or", show one clear matching appliance, not unrelated food."""
+        prompt_domain = "local Stable Diffusion product photography"
+        context_label = "Image context"
+        purpose_rules = """- Return a product-photo prompt, not a room, renovation, real-estate, or interior-design prompt.
+- The equipment item named in the base prompt must be the single obvious main subject.
+- Preserve the exact equipment subject from the base prompt.
+- Use an isolated, empty, clean equipment object on a plain seamless studio background.
+- If the equipment title contains alternatives like "or", show exactly one clear matching appliance or tool."""
+        style_rules = """- Include soft product-photography lighting, sharp focus, material texture, and camera style.
+- Do not include text, logos, watermarks, branded packaging, labels, menus, rooms, cabinets, or appliances not named in the equipment subject."""
     else:
         context = title_image_recipe_context(recipe_data, recipe_title)
+        prompt_domain = "local Stable Diffusion food photography"
+        context_label = "Recipe context"
         purpose_rules = (
             "- Describe a realistic finished dish with appetizing plating."
             if purpose == "recipe title image"
             else f"- Preserve the requested {purpose}; do not turn it into a finished dish unless the base prompt asks for that."
         )
-    return f"""You improve prompts for local Stable Diffusion food photography.
+        style_rules = """- Include natural light, texture, camera style, and food styling cues.
+- Do not include text, logos, watermarks, branded packaging, labels, or menus."""
+    return f"""You improve prompts for {prompt_domain}.
 
 Return only one polished image prompt. Do not return JSON. Do not add commentary.
 You are not generating an image; you are only improving the prompt for an image model.
 
-Recipe context:
+{context_label}:
 {json.dumps(context, ensure_ascii=False)}
 
 Base prompt:
@@ -369,8 +378,7 @@ Base prompt:
 Prompt rules:
 {purpose_rules}
 - Keep it suitable for Stable Diffusion or ComfyUI.
-- Include natural light, texture, camera style, and food styling cues.
-- Do not include text, logos, watermarks, branded packaging, labels, or menus.
+{style_rules}
 """
 
 
@@ -382,6 +390,97 @@ def strip_ollama_prompt_response(value):
     return text
 
 
+def equipment_item_from_image_prompt(base_prompt):
+    lines = str(base_prompt or "").splitlines()
+    for index, line in enumerate(lines):
+        if title_image_clean_text(line).lower() != "equipment item:":
+            continue
+        for next_line in lines[index + 1:]:
+            item = title_image_clean_text(next_line)
+            if item:
+                return item
+    return ""
+
+
+def equipment_image_subject_phrase(equipment_item):
+    equipment_item = title_image_clean_text(equipment_item)
+    if not equipment_item:
+        return "one clean empty cooking tool"
+
+    if re.search(r"\b(or|and/or)\b|/", equipment_item, flags=re.IGNORECASE):
+        return f"one clean empty appliance or tool matching {equipment_item}, choose exactly one option"
+
+    return f"one clean empty {equipment_item}"
+
+
+def safe_equipment_prompt_style_notes(polished_prompt):
+    text = title_image_clean_text(polished_prompt)
+    if not text:
+        return ""
+
+    forbidden_terms = (
+        "food",
+        "ingredient",
+        "dish",
+        "meal",
+        "plated",
+        "potato",
+        "vegetable",
+        "garnish",
+        "sauce",
+        "soup",
+        "liquid",
+        "kitchen",
+        "cabinet",
+        "cupboard",
+        "island",
+        "sink",
+        "stove",
+        "oven",
+        "refrigerator",
+        "fridge",
+        "window",
+        "room",
+        "interior",
+        "renovation",
+        "real estate",
+        "countertop",
+        "counter",
+        "collage",
+        "split",
+    )
+    sentences = [
+        title_image_clean_text(part)
+        for part in re.split(r"(?<=[.!?])\s+|[;\n]+", text)
+    ]
+    safe_sentences = []
+    for sentence in sentences:
+        lower_sentence = sentence.lower()
+        if not sentence or any(term in lower_sentence for term in forbidden_terms):
+            continue
+        safe_sentences.append(sentence)
+
+    return title_image_clean_text(" ".join(safe_sentences))[:360]
+
+
+def finalize_equipment_image_prompt(base_prompt, polished_prompt=""):
+    equipment_item = equipment_item_from_image_prompt(base_prompt)
+    subject = equipment_image_subject_phrase(equipment_item)
+    style_notes = safe_equipment_prompt_style_notes(polished_prompt)
+    if not style_notes:
+        style_notes = "soft natural studio light, sharp focus, realistic material texture, 50mm lens, product catalog composition"
+
+    exact_subject = equipment_item or "the named equipment item"
+    return title_image_clean_text(
+        f"single isolated product reference photo of {subject}. "
+        f"Exact equipment subject: {exact_subject}. "
+        "Centered, fully visible, empty, unused, clean, and easy to identify. "
+        "Plain seamless light gray studio background, neutral matte surface. "
+        "Realistic product photography, high-detail homeware catalog image. "
+        f"Style details: {style_notes}."
+    )
+
+
 def enhance_recipe_image_prompt_with_ollama(
     recipe_data,
     recipe_title,
@@ -389,6 +488,7 @@ def enhance_recipe_image_prompt_with_ollama(
     required=False,
     image_purpose="recipe title image",
 ):
+    purpose = title_image_clean_text(image_purpose)
     model = ollama_prompt_model()
     base_url = ollama_prompt_base_url()
     print(f"[TitleImage] ollama_prompt_model={model}")
@@ -425,6 +525,8 @@ def enhance_recipe_image_prompt_with_ollama(
                 "Title image prompt enhancement failed. Please try again.",
                 error_code="OLLAMA_PROMPT_FAILED",
             )
+        if purpose == "recipe equipment item image":
+            return finalize_equipment_image_prompt(base_prompt, polished_prompt)
         return polished_prompt
     except TitleImageGenerationError:
         if required:
@@ -438,6 +540,9 @@ def enhance_recipe_image_prompt_with_ollama(
                 "Title image prompt enhancement failed. Please try again.",
                 error_code="OLLAMA_PROMPT_FAILED",
             ) from exc
+
+    if purpose == "recipe equipment item image":
+        return finalize_equipment_image_prompt(base_prompt)
 
     return base_prompt
 
@@ -595,6 +700,9 @@ def comfyui_negative_prompt_for_purpose(image_purpose="recipe title image"):
         return (
             "food, ingredients, chopped food, cooked food, prepared food, plated meal, "
             "potatoes, vegetables, garnish, sauce, soup, liquid, bowl of food, cooking action, hands, "
+            "kitchen interior, room interior, cabinets, cupboards, kitchen island, countertop, sink, "
+            "stove, oven, refrigerator, window, renovation, real estate photo, empty kitchen, "
+            "collage, split image, multiple panels, unrelated appliances, background appliance, "
             f"{base_negative}"
         )
 
@@ -3958,10 +4066,19 @@ def generate_recipe_detail_image_with_openai(prompt):
     return request_recipe_step_image_bytes(prompt)
 
 
+def openai_recipe_detail_image_prompt(base_prompt, image_purpose):
+    if title_image_clean_text(image_purpose) == "recipe equipment item image":
+        return finalize_equipment_image_prompt(base_prompt)
+
+    return base_prompt
+
+
 def generate_recipe_detail_image_bytes_for_provider(provider, recipe_data, recipe_title, base_prompt, image_purpose):
     if provider == TITLE_IMAGE_PROVIDER_OPENAI:
         return (
-            generate_recipe_detail_image_with_openai(base_prompt),
+            generate_recipe_detail_image_with_openai(
+                openai_recipe_detail_image_prompt(base_prompt, image_purpose)
+            ),
             TITLE_IMAGE_PROVIDER_OPENAI,
             False,
         )
@@ -4026,7 +4143,9 @@ def generate_recipe_detail_image_bytes(recipe_data, recipe_title, base_prompt, i
         if provider == TITLE_IMAGE_PROVIDER_COMFYUI and fallback_provider == TITLE_IMAGE_PROVIDER_OPENAI:
             try:
                 return (
-                    generate_recipe_detail_image_with_openai(base_prompt),
+                    generate_recipe_detail_image_with_openai(
+                        openai_recipe_detail_image_prompt(base_prompt, image_purpose)
+                    ),
                     TITLE_IMAGE_PROVIDER_OPENAI,
                     True,
                 )
@@ -4305,6 +4424,91 @@ def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
         "step_image_generated_at": generated_at,
         "image_url": image_url,
         "generated_at": generated_at,
+    }
+
+
+def remove_recipe_detail_image(original_url, kind, target):
+    original_url = str(original_url or "").strip()
+    image_kind = "equipment" if str(kind or "").strip().lower() == "equipment" else "step"
+
+    if not original_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    recipe_data = load_recipe_output(original_url)
+    if not recipe_data:
+        return {"ok": False, "error": "Recipe data was not found."}
+
+    recipe_source_url = str(recipe_data.get("source_url") or original_url).strip() or original_url
+    recipe_data["source_url"] = recipe_source_url
+
+    if image_kind == "equipment":
+        equipment_items = normalize_equipment_records(recipe_data.get("equipment", []))
+        target_index, target_equipment = find_equipment_for_index(equipment_items, target)
+
+        if target_equipment is None:
+            return {"ok": False, "error": "Equipment item was not found."}
+
+        equipment_text = str(
+            target_equipment.get("equipment")
+            or target_equipment.get("text")
+            or target_equipment.get("name")
+            or ""
+        ).strip()
+        target_equipment.pop("image_url", None)
+        target_equipment.pop("image_generated_at", None)
+        target_equipment["equipment_image_url"] = ""
+        target_equipment["equipment_image_generated_at"] = ""
+        equipment_items[target_index] = {
+            **target_equipment,
+            "equipment": equipment_text,
+            "text": equipment_text,
+        }
+        recipe_data["equipment"] = equipment_items
+        save_recipe_output(recipe_source_url, recipe_data)
+
+        return {
+            "ok": True,
+            "url": recipe_source_url,
+            "kind": "equipment",
+            "equipment_index": target_index + 1,
+            "equipment_image_url": "",
+            "equipment_image_generated_at": "",
+            "image_url": "",
+            "generated_at": "",
+        }
+
+    instructions = sorted(
+        normalize_instruction_records(recipe_data.get("instructions", [])),
+        key=lambda item: item["step_number"],
+    )
+    target_index, target_instruction = find_instruction_for_step(instructions, target)
+
+    if target_instruction is None:
+        return {"ok": False, "error": "Instruction step was not found."}
+
+    step_number = target_instruction.get("step_number")
+    instruction_text = str(target_instruction.get("instruction") or target_instruction.get("text") or "").strip()
+    target_instruction.pop("image_url", None)
+    target_instruction.pop("image_generated_at", None)
+    target_instruction["step_image_url"] = ""
+    target_instruction["step_image_generated_at"] = ""
+    instructions[target_index] = {
+        **target_instruction,
+        "instruction": instruction_text,
+        "text": instruction_text,
+    }
+    recipe_data["instructions"] = instructions
+    save_recipe_output(recipe_source_url, recipe_data)
+
+    return {
+        "ok": True,
+        "url": recipe_source_url,
+        "kind": "step",
+        "step_number": step_number,
+        "step_image_url": "",
+        "step_image_generated_at": "",
+        "image_url": "",
+        "generated_at": "",
     }
 
 
@@ -5162,7 +5366,7 @@ def build_recipe_equipment_image_prompt(
     equipment_item,
 ):
     del recipe_title, servings, ingredients
-    return f"""Generate a realistic kitchen equipment reference image.
+    return f"""Generate a realistic product reference image for one cooking equipment item.
 
 Equipment item number:
 {equipment_item_number}
@@ -5173,12 +5377,13 @@ Equipment item:
 Visual requirements:
 - The equipment item text is the subject; match it literally
 - Show one clean, empty {equipment_item} as the single obvious main subject
-- Use a neutral kitchen counter or plain studio background
+- Use a plain seamless studio background, not a kitchen, room, or countertop scene
 - Make the equipment visually clear, centered, and easy to identify
-- Bright natural kitchen lighting
-- Realistic product-style cookbook photography
-- High-end kitchen reference style
+- Bright soft product photography lighting
+- Realistic product catalog photography
+- High-end cookware or appliance reference style
 - Plain unlabeled object surface
+- No food, ingredients, liquids, hands, room interiors, cabinets, sinks, stoves, or windows
 """
 
 

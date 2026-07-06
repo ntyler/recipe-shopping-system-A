@@ -4226,6 +4226,7 @@ body {
 
         .recipe-step-image-btn,
         .recipe-step-image-download,
+        .recipe-step-image-remove,
         .recipe-step-image-upload {
             display: inline-flex;
             align-items: center;
@@ -4258,13 +4259,21 @@ body {
             background: #0f615d;
         }
 
+        .recipe-step-image-remove {
+            min-width: 92px;
+            border-color: #8f3535;
+            background: #6f1f2a;
+        }
+
         .recipe-step-image-actions [hidden] {
             display: none !important;
         }
 
         .recipe-step-image-btn:disabled,
+        .recipe-step-image-remove:disabled,
         .recipe-step-image-upload:disabled,
         .recipe-step-image-panel.generating .recipe-step-image-download,
+        .recipe-step-image-panel.generating .recipe-step-image-remove,
         .recipe-step-image-panel.generating .recipe-step-image-upload {
             opacity: 0.65;
             pointer-events: none;
@@ -14695,6 +14704,7 @@ body {
 
             .recipe-step-image-btn,
             .recipe-step-image-download,
+            .recipe-step-image-remove,
             .recipe-step-image-upload {
                 flex: 1 1 120px;
                 min-width: 0;
@@ -16438,6 +16448,7 @@ body {
 
 .recipe-edit-row-image-panel .recipe-step-image-btn,
 .recipe-edit-row-image-panel .recipe-step-image-download,
+.recipe-edit-row-image-panel .recipe-step-image-remove,
 .recipe-edit-row-image-panel .recipe-step-image-upload {
     min-height: 30px;
     min-width: 102px;

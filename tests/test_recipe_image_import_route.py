@@ -114,7 +114,10 @@ def test_equipment_image_prompt_uses_equipment_title_not_recipe_ingredients():
     assert "blender or food processor" in lower_prompt
     assert "single obvious main subject" in lower_prompt
     assert "match it literally" in lower_prompt
+    assert "plain seamless studio background" in lower_prompt
     assert "plain unlabeled object surface" in lower_prompt
+    assert "not a kitchen" in lower_prompt
+    assert "room interiors" in lower_prompt
     assert "recipe ingredients" not in lower_prompt
     assert "chopped food" not in lower_prompt
     assert "prepared food" not in lower_prompt
@@ -148,8 +151,12 @@ def test_ollama_equipment_prompt_request_omits_recipe_ingredient_context():
     lower_request = request.lower()
 
     assert "medium saucepan" in lower_request
+    assert "image context" in lower_request
     assert "single obvious main subject" in lower_request
-    assert "empty, clean equipment object" in lower_request
+    assert "isolated, empty, clean equipment object" in lower_request
+    assert "not a room" in lower_request
+    assert "real-estate" in lower_request
+    assert "recipe context" not in lower_request
     assert "preserve the specific recipe" not in lower_request
     assert "papa" not in lower_request
     assert "potato" not in lower_request
@@ -157,12 +164,46 @@ def test_ollama_equipment_prompt_request_omits_recipe_ingredient_context():
     assert "lime" not in lower_request
 
 
+def test_equipment_prompt_finalizer_blocks_kitchen_interior_drift():
+    base_prompt = recipe_edit_service.build_recipe_equipment_image_prompt(
+        recipe_title="Papa Potatoe a la Huancaina",
+        servings="2",
+        ingredients="- potato\n- crema\n- lime",
+        equipment_item_number=2,
+        equipment_item="blender or food processor",
+    )
+    polished_prompt = (
+        "A bright modern kitchen interior with white cabinets, a sink, windows, "
+        "and a large island countertop. Soft product lighting and sharp focus."
+    )
+
+    final_prompt = recipe_edit_service.finalize_equipment_image_prompt(
+        base_prompt,
+        polished_prompt,
+    ).lower()
+
+    assert "blender or food processor" in final_prompt
+    assert "single isolated product reference photo" in final_prompt
+    assert "choose exactly one option" in final_prompt
+    assert "plain seamless light gray studio background" in final_prompt
+    assert "soft product lighting" in final_prompt
+    assert "kitchen interior" not in final_prompt
+    assert "cabinets" not in final_prompt
+    assert "sink" not in final_prompt
+    assert "window" not in final_prompt
+    assert "island" not in final_prompt
+    assert "countertop" not in final_prompt
+    assert "potato" not in final_prompt
+    assert "crema" not in final_prompt
+    assert "lime" not in final_prompt
+
+
 def test_comfyui_equipment_workflow_uses_food_negative_prompt(monkeypatch):
     monkeypatch.delenv("COMFYUI_NEGATIVE_PROMPT", raising=False)
     monkeypatch.delenv("COMFYUI_EQUIPMENT_NEGATIVE_PROMPT", raising=False)
 
     workflow = recipe_edit_service.build_default_comfyui_title_workflow(
-        "one clean empty medium saucepan centered on a neutral kitchen counter",
+        "single isolated product reference photo of one clean empty medium saucepan on a plain studio background",
         "local-model.safetensors",
         image_purpose="recipe equipment item image",
     )
@@ -170,11 +211,16 @@ def test_comfyui_equipment_workflow_uses_food_negative_prompt(monkeypatch):
     negative_prompt = workflow["7"]["inputs"]["text"].lower()
 
     assert "medium saucepan" in positive_prompt
+    assert "kitchen" not in positive_prompt
     assert "potatoes" not in positive_prompt
     assert "food" in negative_prompt
     assert "potatoes" in negative_prompt
     assert "prepared food" in negative_prompt
     assert "liquid" in negative_prompt
+    assert "kitchen interior" in negative_prompt
+    assert "cabinets" in negative_prompt
+    assert "real estate photo" in negative_prompt
+    assert "collage" in negative_prompt
 
 
 def write_uploaded_image(user_data_dir, user_id, filename="meal.png", data=None):
@@ -694,7 +740,7 @@ def test_generate_recipe_equipment_image_payload_provider_can_choose_openai(monk
         "source_url": url,
         "recipe_title": "Chosen Equipment Soup",
         "ingredients": [{"ingredient": "tomatoes"}],
-        "equipment": [{"equipment": "medium saucepan"}],
+        "equipment": [{"equipment": "blender or food processor"}],
     }
     calls = {}
 
@@ -728,10 +774,127 @@ def test_generate_recipe_equipment_image_payload_provider_can_choose_openai(monk
     assert result["ok"] is True
     assert result["provider"] == "openai"
     assert result["fallback_used"] is False
-    assert calls["openai_prompt"]
+    openai_prompt = calls["openai_prompt"].lower()
+    assert "single isolated product reference photo" in openai_prompt
+    assert "blender or food processor" in openai_prompt
+    assert "choose exactly one option" in openai_prompt
+    assert "plain seamless light gray studio background" in openai_prompt
+    assert "kitchen" not in openai_prompt
+    assert "cabinet" not in openai_prompt
+    assert "countertop" not in openai_prompt
     assert calls["saved"]["equipment"][0]["equipment_image_url"] == result["equipment_image_url"]
     image_filename = result["equipment_image_url"].rsplit("/", 1)[-1]
     assert (tmp_path / "recipe_steps" / image_filename).read_bytes() == b"openai-equipment-png"
+
+
+def test_remove_recipe_equipment_image_clears_saved_fields(monkeypatch):
+    url = "https://example.com/remove-equipment-image"
+    recipe_data = {
+        "source_url": url,
+        "recipe_title": "Remove Equipment Image",
+        "equipment": [{
+            "equipment": "blender or food processor",
+            "equipment_image_url": "/static/generated/recipe_steps/old-equipment.png",
+            "equipment_image_generated_at": "2026-07-06T12:00:00+00:00",
+        }],
+    }
+    saved = {}
+
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_output", lambda recipe_url, data: saved.update({"url": recipe_url, "data": data.copy()}))
+
+    result = recipe_edit_service.remove_recipe_detail_image(url, "equipment", 1)
+
+    assert result == {
+        "ok": True,
+        "url": url,
+        "kind": "equipment",
+        "equipment_index": 1,
+        "equipment_image_url": "",
+        "equipment_image_generated_at": "",
+        "image_url": "",
+        "generated_at": "",
+    }
+    assert saved["url"] == url
+    assert saved["data"]["equipment"][0]["equipment"] == "blender or food processor"
+    assert saved["data"]["equipment"][0]["equipment_image_url"] == ""
+    assert saved["data"]["equipment"][0]["equipment_image_generated_at"] == ""
+
+
+def test_remove_recipe_step_image_clears_saved_fields(monkeypatch):
+    url = "https://example.com/remove-step-image"
+    recipe_data = {
+        "source_url": url,
+        "recipe_title": "Remove Step Image",
+        "instructions": [{
+            "step_number": 2,
+            "instruction": "Blend until smooth.",
+            "step_image_url": "/static/generated/recipe_steps/old-step.png",
+            "step_image_generated_at": "2026-07-06T12:00:00+00:00",
+        }],
+    }
+    saved = {}
+
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_output", lambda recipe_url, data: saved.update({"url": recipe_url, "data": data.copy()}))
+
+    result = recipe_edit_service.remove_recipe_detail_image(url, "step", 2)
+
+    assert result == {
+        "ok": True,
+        "url": url,
+        "kind": "step",
+        "step_number": 2,
+        "step_image_url": "",
+        "step_image_generated_at": "",
+        "image_url": "",
+        "generated_at": "",
+    }
+    assert saved["url"] == url
+    assert saved["data"]["instructions"][0]["instruction"] == "Blend until smooth."
+    assert saved["data"]["instructions"][0]["step_image_url"] == ""
+    assert saved["data"]["instructions"][0]["step_image_generated_at"] == ""
+
+
+def test_remove_recipe_detail_image_route_calls_service(monkeypatch):
+    app = create_app()
+    captured = {}
+
+    def fake_remove(url, kind, target):
+        captured["url"] = url
+        captured["kind"] = kind
+        captured["target"] = target
+        return {
+            "ok": True,
+            "url": url,
+            "kind": kind,
+            "equipment_index": 2,
+            "equipment_image_url": "",
+            "image_url": "",
+        }
+
+    monkeypatch.setattr(recipe_routes, "remove_recipe_detail_image", fake_remove)
+
+    with app.test_client() as client:
+        seed_signed_in_user(client)
+        response = client.delete(
+            "/api/recipe_detail_image",
+            json={
+                "url": "https://example.com/remove-route",
+                "kind": "equipment",
+                "equipment_index": 2,
+            },
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["equipment_image_url"] == ""
+    assert captured == {
+        "url": "https://example.com/remove-route",
+        "kind": "equipment",
+        "target": 2,
+    }
 
 
 def test_generate_recipe_step_image_comfyui_failure_does_not_fallback_without_opt_in(monkeypatch):
