@@ -772,6 +772,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.services.ollama_service import ollama_full_recipe_provider
     from PushShoppingList.services.ollama_service import ollama_full_recipe_workers
     from PushShoppingList.services.ollama_service import ollama_provider_label
+    from PushShoppingList.services.ollama_service import ollama_readiness
     from PushShoppingList.services.storage_service import active_user_id
     from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
 
@@ -835,6 +836,30 @@ def run_menu_generate_recipes_job(job_id, payload):
             recipe_model_resolution.source,
             recipe_model_env_var,
         ))
+
+    if ollama_support:
+        readiness = ollama_readiness(base_url=provider_static_payload.get("ollama_base_url", ""))
+        if not readiness.get("ok"):
+            message = readiness.get("error") or "Ollama is not reachable."
+            result_payload = {
+                **model_info,
+                "stage": "Ollama readiness check",
+                "failed_items": 0,
+                "completed_items": 0,
+                "ollama_ready": False,
+                "ollama_error_code": readiness.get("error_code", ""),
+                "ollama_error": message,
+                "ollama_technical_message": readiness.get("technical_message", ""),
+                "ollama_base_url": readiness.get("base_url") or provider_static_payload.get("ollama_base_url", ""),
+            }
+            append_job_warning(job_id, message)
+            return fail_job(job_id, message, result_payload=result_payload)
+        model_info = {
+            **model_info,
+            "ollama_ready": True,
+            "ollama_models_available": readiness.get("models") or [],
+            "ollama_model_available": readiness.get("model_available"),
+        }
     created_urls = []
     skipped_urls = []
     failed_items = 0

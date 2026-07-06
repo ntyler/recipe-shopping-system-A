@@ -1234,6 +1234,15 @@ def test_menu_generate_ollama_job_uses_local_batch_defaults(monkeypatch, tmp_pat
     monkeypatch.delenv("OLLAMA_FULL_RECIPE_PROVIDER", raising=False)
     monkeypatch.setenv("MENU_RECIPE_FULL_BATCH_SIZE", "8")
     monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_WORKERS", "8")
+    monkeypatch.setattr(
+        "PushShoppingList.services.ollama_service.ollama_readiness",
+        lambda base_url="", timeout_seconds=3: {
+            "ok": True,
+            "base_url": "http://localhost:11434",
+            "models": ["qwen2.5:7b"],
+            "model_available": True,
+        },
+    )
     recipe_urls = [
         "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll",
         "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=pad-thai",
@@ -1384,6 +1393,49 @@ def test_menu_generate_ollama_job_uses_local_batch_defaults(monkeypatch, tmp_pat
     assert finished["result_payload"]["batch_rate_limited_processor"] is False
     assert finished["result_payload"]["completed_items"] == 2
     assert finished["result_payload"]["saving_items"] == 2
+
+
+def test_menu_generate_ollama_job_fails_fast_when_ollama_is_offline(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+
+    monkeypatch.setattr(
+        "PushShoppingList.services.ollama_service.ollama_readiness",
+        lambda base_url="", timeout_seconds=3: {
+            "ok": False,
+            "base_url": "http://localhost:11434",
+            "error_code": "OLLAMA_CONNECTION_FAILED",
+            "error": "Ollama is not reachable at http://localhost:11434. Start Ollama or change OLLAMA_BASE_URL.",
+            "technical_message": "connection refused",
+        },
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "load_editable_recipe",
+        lambda url: (_ for _ in ()).throw(AssertionError("Ollama readiness should run before loading stubs")),
+    )
+
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": [
+                "https://example.com/menu?menu_item=1",
+                "https://example.com/menu?menu_item=2",
+            ],
+            "menu_enrichment_mode": "full",
+            "ollama_support": True,
+        },
+        user_id="owner",
+        total_items=2,
+    )
+
+    finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
+
+    assert finished["status"] == "failed"
+    assert "Ollama is not reachable at http://localhost:11434" in finished["error_message"]
+    assert finished["result_payload"]["ollama_ready"] is False
+    assert finished["result_payload"]["ollama_error_code"] == "OLLAMA_CONNECTION_FAILED"
+    assert finished["result_payload"]["failed_items"] == 0
+    assert finished["result_payload"]["completed_items"] == 0
 
 
 def test_menu_recipe_batch_dispatch_limiter_waits_for_request_capacity():

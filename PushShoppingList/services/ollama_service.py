@@ -147,6 +147,57 @@ def ollama_base_url():
     return (_clean_text(os.getenv(OLLAMA_BASE_URL_ENV_VAR)) or OLLAMA_BASE_URL_DEFAULT).rstrip("/")
 
 
+def ollama_readiness(base_url="", timeout_seconds=3):
+    base_url = (_clean_text(base_url) or ollama_base_url()).rstrip("/")
+    model = ollama_full_recipe_model()
+    url = f"{base_url}/api/tags"
+    try:
+        response = requests.get(url, timeout=max(0.5, min(float(timeout_seconds or 3), 10.0)))
+        response.raise_for_status()
+        data = response.json()
+    except requests.ConnectionError as exc:
+        return {
+            "ok": False,
+            "base_url": base_url,
+            "model": model,
+            "error_code": "OLLAMA_CONNECTION_FAILED",
+            "error": f"Ollama is not reachable at {base_url}. Start Ollama or change {OLLAMA_BASE_URL_ENV_VAR}.",
+            "technical_message": str(exc),
+        }
+    except requests.Timeout as exc:
+        return {
+            "ok": False,
+            "base_url": base_url,
+            "model": model,
+            "error_code": "OLLAMA_CONNECTION_TIMEOUT",
+            "error": f"Ollama did not respond at {base_url}. Start Ollama or change {OLLAMA_BASE_URL_ENV_VAR}.",
+            "technical_message": str(exc),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "base_url": base_url,
+            "model": model,
+            "error_code": "OLLAMA_READINESS_FAILED",
+            "error": f"Ollama readiness check failed at {base_url}.",
+            "technical_message": str(exc),
+        }
+
+    models = data.get("models") if isinstance(data, dict) else []
+    model_names = [
+        _clean_text(item.get("name") or item.get("model"))
+        for item in (models if isinstance(models, list) else [])
+        if isinstance(item, dict)
+    ]
+    return {
+        "ok": True,
+        "base_url": base_url,
+        "model": model,
+        "models": model_names,
+        "model_available": model in model_names,
+    }
+
+
 def ollama_timeout_seconds():
     try:
         value = float(os.getenv(OLLAMA_FULL_RECIPE_TIMEOUT_ENV_VAR) or "120")

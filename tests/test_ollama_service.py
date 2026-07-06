@@ -129,6 +129,19 @@ def test_ollama_defaults_to_local_model_and_conservative_concurrency(monkeypatch
     assert ollama_service.ollama_full_recipe_workers(batch_total=8, model="qwen2.5:14b") == 3
 
 
+def test_ollama_readiness_reports_connection_failure(monkeypatch):
+    def fail_get(url, timeout):
+        raise ollama_service.requests.ConnectionError("connection refused")
+
+    monkeypatch.setattr(ollama_service.requests, "get", fail_get)
+
+    result = ollama_service.ollama_readiness(base_url="http://localhost:11434", timeout_seconds=1)
+
+    assert result["ok"] is False
+    assert result["error_code"] == "OLLAMA_CONNECTION_FAILED"
+    assert "Ollama is not reachable at http://localhost:11434" in result["error"]
+
+
 def test_ollama_only_keeps_low_confidence_result_without_openai_fallback(monkeypatch):
     monkeypatch.setattr(
         ollama_service,
