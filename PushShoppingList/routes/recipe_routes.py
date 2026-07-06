@@ -116,6 +116,7 @@ from PushShoppingList.services.recipe_edit_service import generate_recipe_step_i
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
 from PushShoppingList.services.recipe_edit_service import log_recipe_pdf_timing
 from PushShoppingList.services.recipe_edit_service import recipe_note_feedback
+from PushShoppingList.services.recipe_edit_service import remove_recipe_cover_image
 from PushShoppingList.services.recipe_edit_service import remove_recipe_detail_image
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
@@ -3822,6 +3823,16 @@ def api_generate_recipe_cover_image_route():
     status = 200 if result.get("ok") else 400
 
     return jsonify(with_openai_usage_dashboard(result)), status
+
+
+@recipe_bp.route("/api/recipe_cover_image/remove", methods=["POST"])
+def api_remove_recipe_cover_image_route():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or data.get("recipe_url") or "").strip()
+    result = remove_recipe_cover_image(url)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
 
 
 @recipe_bp.route("/api/recipe_cover_image/test-local", methods=["POST"])

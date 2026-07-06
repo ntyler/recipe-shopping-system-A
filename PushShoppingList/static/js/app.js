@@ -22685,6 +22685,7 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
     const uploadLabel = document.getElementById("recipeEditCoverUploadLabel");
     const generateLabel = document.getElementById("recipeEditCoverGenerateLabel");
     const generateButton = document.getElementById("recipeEditCoverGenerate");
+    const removeButton = document.getElementById("recipeEditCoverRemove");
     const alt = normalized.alt || fallbackAlt || "Recipe title image";
     const src = normalized.src || normalized.url || "";
     const displaySrc = normalized.card_url || normalized.thumb_url || src;
@@ -22742,6 +22743,11 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
 
     if (generateButton) {
         generateButton.dataset.hasCoverImage = hasImage ? "true" : "false";
+    }
+
+    if (removeButton) {
+        removeButton.hidden = !hasImage;
+        removeButton.disabled = !hasImage;
     }
 
     setValue("recipeEditCoverPath", normalized.path || "");
@@ -23090,6 +23096,71 @@ async function generateRecipeCoverImage(button) {
             } else {
                 button.textContent = originalText || (hasCoverImage ? "Regenerate title image" : "Generate title image");
             }
+        }
+    }
+
+    return false;
+}
+
+async function removeRecipeCoverImage(button) {
+    const originalUrl = recipeEditorCurrentUrl();
+    const currentCoverImage = collectRecipeEditorCoverImage();
+    const hasCoverImage = Boolean(currentCoverImage.path || currentCoverImage.url);
+
+    if (!originalUrl) {
+        setRecipeEditStatus("Unable to remove title image: missing recipe URL.", true);
+        return false;
+    }
+
+    if (!hasCoverImage) {
+        setRecipeEditorCoverImage({});
+        return false;
+    }
+
+    if (!window.confirm("Remove this recipe title image?")) {
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    try {
+        setRecipeEditStatus("Removing title image...");
+        const response = await fetch("/api/recipe_cover_image/remove", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                url: originalUrl,
+            }),
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to remove title image.");
+        }
+
+        setRecipeEditorCoverImage({});
+        if (data.recipe && typeof data.recipe === "object") {
+            recipeEditOriginalSnapshot = normalizeRecipeEditorSnapshot(data.recipe);
+        } else if (recipeEditOriginalSnapshot) {
+            recipeEditOriginalSnapshot.cover_image = normalizeRecipeCoverImageSnapshot({});
+        }
+        setRecipeEditStatus("Title image removed.");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe title image removed.");
+    } catch (err) {
+        console.warn("Unable to remove recipe title image.", err);
+        setRecipeEditStatus(err.message || "Unable to remove title image.", true);
+    } finally {
+        if (button && !button.hidden) {
+            button.disabled = false;
         }
     }
 

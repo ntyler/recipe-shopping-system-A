@@ -718,6 +718,64 @@ def test_generate_recipe_cover_image_payload_provider_can_choose_openai(monkeypa
     assert calls["saved"]["provider"] == "openai"
 
 
+def test_remove_recipe_cover_image_clears_saved_cover_and_summary(monkeypatch, tmp_path):
+    url = "https://example.com/remove-title-image"
+    cover_file = tmp_path / "title.png"
+    cover_file.write_bytes(b"png")
+    for variant in ("thumb", "card", "detail"):
+        cover_file.with_name(f"title__{variant}.webp").write_bytes(b"webp")
+
+    cover_image = {
+        "path": "data/uploads/recipe_covers/title.png",
+        "mime_type": "image/png",
+        "alt": "Old title image",
+        "source": "ai_generated_image",
+    }
+    recipe_data = {
+        "source_url": url,
+        "recipe_title": "Remove Title Image",
+        "cover_image": cover_image.copy(),
+        "cover_image_generated_at": "2026-07-06T18:30:00Z",
+        "cover_image_provider": "openai",
+        "cover_image_fallback_used": False,
+        "ingredients": [{"ingredient": "cassava"}],
+    }
+    recipe_key = recipe_url_service.normalize_recipe_url_key(url)
+    ingredient_records = {
+        recipe_key: {
+            "url": url,
+            "quantity": 2,
+            "cover_image": cover_image.copy(),
+            "ingredients": ["cassava"],
+        },
+    }
+    saved = {}
+    saved_ingredients = {}
+
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
+    monkeypatch.setattr(recipe_edit_service, "recipe_cover_image_file_path", lambda value: cover_file)
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: ingredient_records.copy())
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_output", lambda recipe_url, data: saved.update({"url": recipe_url, "data": data.copy()}))
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_ingredients", lambda data: saved_ingredients.update(data))
+    monkeypatch.setattr(recipe_edit_service, "load_editable_recipe", lambda recipe_url: {"recipe": saved["data"]})
+
+    result = recipe_edit_service.remove_recipe_cover_image(url)
+
+    assert result["ok"] is True
+    assert result["cover_image"] == {}
+    assert result["deleted_file_count"] == 4
+    assert saved["url"] == url
+    assert "cover_image" not in saved["data"]
+    assert "cover_image_generated_at" not in saved["data"]
+    assert "cover_image_provider" not in saved["data"]
+    assert "cover_image_fallback_used" not in saved["data"]
+    assert "cover_image" not in saved_ingredients[recipe_key]
+    assert not cover_file.exists()
+    assert not cover_file.with_name("title__thumb.webp").exists()
+    assert not cover_file.with_name("title__card.webp").exists()
+    assert not cover_file.with_name("title__detail.webp").exists()
+
+
 def test_generate_recipe_cover_image_comfyui_failure_does_not_fallback_without_opt_in(monkeypatch):
     url = "https://example.com/offline-comfyui"
     recipe_data = {

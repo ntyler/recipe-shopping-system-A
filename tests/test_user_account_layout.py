@@ -643,13 +643,19 @@ def test_recipe_editor_has_generate_title_image_action():
     assert 'id="recipeEditCoverGenerate"' in template
     assert 'id="recipeEditCoverGenerateLabel">Generate title image' in template
     assert "generateRecipeCoverImage(this)" in template
+    assert 'id="recipeEditCoverRemove"' in template
+    assert "Remove title image" in template
+    assert "removeRecipeCoverImage(this)" in template
     assert "function selectedRecipeImageProvider()" in script
     assert "function recipeImageProviderPayload()" in script
+    assert "function removeRecipeCoverImage(button)" in script
     assert "...recipeImageProviderPayload()" in script
     assert '["initRecipeImageProviderSelector", initRecipeImageProviderSelector]' in script
     assert "function generateRecipeCoverImage(button)" in script
     assert 'fetch("/api/recipe_cover_image/generate"' in script
+    assert 'fetch("/api/recipe_cover_image/remove"' in script
     assert '@recipe_bp.route("/api/recipe_cover_image/generate", methods=["POST"])' in routes
+    assert '@recipe_bp.route("/api/recipe_cover_image/remove", methods=["POST"])' in routes
 
 
 def test_recipe_image_provider_selector_is_available_for_detail_images():

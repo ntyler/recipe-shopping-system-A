@@ -792,6 +792,14 @@
                                     <span class="recipe-edit-button-icon" aria-hidden="true">AI</span>
                                     <span id="recipeEditCoverGenerateLabel">Generate title image</span>
                                 </button>
+                                <button type="button"
+                                        id="recipeEditCoverRemove"
+                                        class="recipe-edit-cover-upload-button recipe-edit-cover-remove-button"
+                                        onclick="return removeRecipeCoverImage(this)"
+                                        hidden>
+                                    <span class="recipe-edit-button-icon" aria-hidden="true">x</span>
+                                    <span>Remove title image</span>
+                                </button>
                                 <input id="recipeEditCoverUpload"
                                        class="recipe-edit-cover-file-input"
                                        type="file"

@@ -40,8 +40,10 @@ from PushShoppingList.services.cookbook_service import recipe_category_metadata_
 from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
+from PushShoppingList.services.image_variant_service import IMAGE_VARIANTS
 from PushShoppingList.services.image_variant_service import cover_image_variant_payload
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
+from PushShoppingList.services.image_variant_service import webp_variant_path
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import RAW_FOLDER
@@ -4463,6 +4465,75 @@ def save_generated_recipe_cover_image(
     }
 
 
+def remove_recipe_cover_image_files(cover_image):
+    image_path = recipe_cover_image_file_path(cover_image)
+    deleted_files = []
+
+    if not image_path:
+        return deleted_files
+
+    paths = [image_path]
+    for variant in IMAGE_VARIANTS:
+        variant_path = webp_variant_path(image_path, variant)
+        if variant_path:
+            paths.append(variant_path)
+
+    for path in paths:
+        try:
+            if path.is_file():
+                path.unlink()
+                deleted_files.append(str(path))
+        except OSError:
+            pass
+
+    return deleted_files
+
+
+def remove_recipe_cover_image(original_url):
+    original_url = str(original_url or "").strip()
+
+    if not original_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    recipe_data = load_recipe_output(original_url)
+    if not recipe_data:
+        return {"ok": False, "error": "Recipe data was not found."}
+
+    recipe_source_url = str(recipe_data.get("source_url") or original_url).strip() or original_url
+    deleted_files = remove_recipe_cover_image_files(recipe_data.get("cover_image"))
+
+    for field in (
+        "cover_image",
+        "cover_image_generated_at",
+        "cover_image_provider",
+        "cover_image_fallback_used",
+    ):
+        recipe_data.pop(field, None)
+
+    recipe_data["source_url"] = recipe_source_url
+    save_recipe_output(recipe_source_url, recipe_data)
+
+    recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_source_url), {})
+    quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
+    update_recipe_ingredient_record(
+        recipe_source_url,
+        quantity,
+        recipe_data,
+        preserve_existing_cover=False,
+    )
+
+    loaded = load_editable_recipe(recipe_source_url)
+    response_recipe = loaded.get("recipe", {})
+
+    return {
+        "ok": True,
+        "url": recipe_source_url,
+        "cover_image": {},
+        "recipe": response_recipe,
+        "deleted_file_count": len(deleted_files),
+    }
+
+
 def generate_recipe_cover_image_with_openai(prompt):
     if not os.getenv("OPENAI_API_KEY"):
         raise TitleImageGenerationError(
@@ -6435,11 +6506,13 @@ def move_recipe_meta(original_url, source_url):
     save_recipe_ingredients(data)
 
 
-def update_recipe_ingredient_record(url, quantity, recipe_data):
+def update_recipe_ingredient_record(url, quantity, recipe_data, preserve_existing_cover=True):
     data = load_recipe_ingredients()
     key = normalize_recipe_url_key(url)
     existing = data.get(key, {})
-    cover_image = recipe_data.get("cover_image") or existing.get("cover_image")
+    cover_image = recipe_data.get("cover_image")
+    if not cover_image and preserve_existing_cover:
+        cover_image = existing.get("cover_image")
     record = {
         "url": url,
         "quantity": quantity,

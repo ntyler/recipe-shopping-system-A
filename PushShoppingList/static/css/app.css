@@ -15785,6 +15785,23 @@ body {
     color: #e0f2fe;
 }
 
+.recipe-edit-cover-remove-button {
+    border-color: #8f3535;
+    background: rgba(91, 22, 31, 0.62);
+    color: #fecaca;
+}
+
+.recipe-edit-cover-remove-button:hover,
+.recipe-edit-cover-remove-button:focus-visible {
+    border-color: #f87171;
+    background: rgba(127, 29, 29, 0.78);
+    color: #fee2e2;
+}
+
+.recipe-edit-cover-remove-button[hidden] {
+    display: none;
+}
+
 .recipe-edit-cover-upload-button:disabled {
     cursor: wait;
     opacity: 0.7;
