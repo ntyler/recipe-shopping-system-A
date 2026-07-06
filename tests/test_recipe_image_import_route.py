@@ -631,6 +631,7 @@ def test_generate_recipe_cover_image_comfyui_saves_local_cover_without_openai(mo
         updated["cover_image"] = data.get("cover_image", {}).copy()
 
     monkeypatch.setattr(recipe_edit_service, "enhance_recipe_title_image_prompt_with_ollama", fake_enhance)
+    monkeypatch.setattr(recipe_edit_service, "ensure_comfyui_available", lambda *args, **kwargs: None)
     monkeypatch.setattr(recipe_edit_service, "request_comfyui_title_image_bytes", fake_comfyui)
     monkeypatch.setattr(recipe_edit_service, "extract_recipe_cover_image_from_upload", fake_extract)
     monkeypatch.setattr(recipe_edit_service, "save_recipe_output", fake_save)
@@ -746,6 +747,7 @@ def test_generate_recipe_cover_image_comfyui_failure_does_not_fallback_without_o
             )
         ),
     )
+    monkeypatch.setattr(recipe_edit_service, "ensure_comfyui_available", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         recipe_edit_service,
         "request_recipe_title_image_bytes",
@@ -816,6 +818,119 @@ def test_comfyui_checkpoint_lookup_autostarts_local_service(monkeypatch):
     assert calls.count("http://127.0.0.1:8188/object_info/CheckpointLoaderSimple") == 2
 
 
+def test_comfyui_preflight_uses_short_timeout(monkeypatch):
+    calls = {}
+
+    def fake_get(url, timeout):
+        calls["url"] = url
+        calls["timeout"] = timeout
+        raise recipe_edit_service.requests.Timeout("slow local check")
+
+    monkeypatch.setenv("COMFYUI_PREFLIGHT_TIMEOUT_SECONDS", "2.5")
+    monkeypatch.setattr(recipe_edit_service.requests, "get", fake_get)
+
+    try:
+        recipe_edit_service.ensure_comfyui_available("http://127.0.0.1:8188")
+    except recipe_edit_service.TitleImageGenerationError as exc:
+        error = exc
+    else:
+        raise AssertionError("Expected unavailable ComfyUI preflight to raise")
+
+    assert error.error_code == "COMFYUI_TIMEOUT"
+    assert error.local_unavailable is True
+    assert calls["url"] == "http://127.0.0.1:8188/system_stats"
+    assert calls["timeout"] == 2.5
+
+
+def test_generate_recipe_equipment_image_comfyui_unavailable_skips_ollama_polish(monkeypatch):
+    url = "https://example.com/offline-equipment-image"
+    recipe_data = {
+        "source_url": url,
+        "recipe_title": "Offline Equipment Soup",
+        "ingredients": [{"ingredient": "tomatoes"}],
+        "equipment": [{"equipment": "blender and food processor"}],
+    }
+    progress = {}
+
+    monkeypatch.setenv("TITLE_IMAGE_PROVIDER", "comfyui")
+    monkeypatch.setenv("TITLE_IMAGE_FALLBACK_PROVIDER", "none")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
+
+    def fake_start(kind, recipe_url, target, message=None, image_prompt=""):
+        progress["started"] = {
+            "kind": kind,
+            "url": recipe_url,
+            "target": target,
+            "message": message,
+            "image_prompt": image_prompt,
+        }
+
+    def fake_finish(kind, recipe_url, target, ok=True, image_url="", generated_at="", error="", image_prompt=""):
+        progress["finished"] = {
+            "kind": kind,
+            "url": recipe_url,
+            "target": target,
+            "ok": ok,
+            "error": error,
+            "image_prompt": image_prompt,
+        }
+
+    def fake_unavailable(*args, **kwargs):
+        raise recipe_edit_service.TitleImageGenerationError(
+            "comfyui_preflight_connection_failed",
+            recipe_edit_service.LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_UNAVAILABLE",
+            local_unavailable=True,
+        )
+
+    monkeypatch.setattr(recipe_edit_service, "start_recipe_image_progress", fake_start)
+    monkeypatch.setattr(recipe_edit_service, "finish_recipe_image_progress", fake_finish)
+    monkeypatch.setattr(recipe_edit_service, "ensure_comfyui_available", fake_unavailable)
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "enhance_recipe_image_prompt_with_ollama",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Ollama should not run when ComfyUI is unavailable")),
+    )
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "request_comfyui_image_bytes",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("ComfyUI image request should not run after failed preflight")),
+    )
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "request_recipe_step_image_bytes",
+        lambda prompt: (_ for _ in ()).throw(AssertionError("OpenAI image generation should not run")),
+    )
+
+    result = recipe_edit_service.generate_recipe_equipment_image({
+        "url": url,
+        "equipment_index": 1,
+    })
+
+    expected_prompt = recipe_edit_service.finalize_equipment_image_prompt(
+        recipe_edit_service.build_recipe_equipment_image_prompt(
+            recipe_title="Offline Equipment Soup",
+            servings="",
+            ingredients="- tomatoes",
+            equipment_item_number=1,
+            equipment_item="blender and food processor",
+        )
+    )
+
+    assert result == {
+        "ok": False,
+        "error": recipe_edit_service.LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+        "error_code": "COMFYUI_UNAVAILABLE",
+        "provider": "comfyui",
+        "local_generation_unavailable": True,
+        "image_prompt": expected_prompt,
+    }
+    assert progress["started"]["image_prompt"] == expected_prompt
+    assert progress["finished"]["ok"] is False
+    assert progress["finished"]["image_prompt"] == expected_prompt
+
+
 def test_generate_recipe_equipment_image_comfyui_uses_local_provider_without_openai(monkeypatch, tmp_path):
     url = "https://example.com/local-equipment-image"
     recipe_data = {
@@ -857,6 +972,7 @@ def test_generate_recipe_equipment_image_comfyui_uses_local_provider_without_ope
         saved["data"] = data.copy()
 
     monkeypatch.setattr(recipe_edit_service, "enhance_recipe_image_prompt_with_ollama", fake_enhance)
+    monkeypatch.setattr(recipe_edit_service, "ensure_comfyui_available", lambda *args, **kwargs: None)
     monkeypatch.setattr(recipe_edit_service, "request_comfyui_image_bytes", fake_comfyui)
     monkeypatch.setattr(recipe_edit_service, "save_recipe_output", fake_save)
 
@@ -1081,6 +1197,7 @@ def test_generate_recipe_step_image_comfyui_failure_does_not_fallback_without_op
             )
         ),
     )
+    monkeypatch.setattr(recipe_edit_service, "ensure_comfyui_available", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         recipe_edit_service,
         "request_recipe_step_image_bytes",

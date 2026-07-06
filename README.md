@@ -82,6 +82,8 @@ $env:COMFYUI_URL="http://127.0.0.1:8188"
 
 In `comfyui` mode, Ollama only improves the image prompt. ComfyUI/Stable Diffusion generates the image locally, and OpenAI image generation is not used unless you explicitly set `TITLE_IMAGE_FALLBACK_PROVIDER=openai`.
 
+The app checks ComfyUI before asking Ollama to polish the prompt. `COMFYUI_PREFLIGHT_TIMEOUT_SECONDS` controls that local availability check and defaults to `3`. Actual image generation can still take longer than 3 seconds; the default graph is `1024x1024` with `24` sampling steps. Use `COMFYUI_EQUIPMENT_IMAGE_WIDTH`, `COMFYUI_EQUIPMENT_IMAGE_HEIGHT`, and `COMFYUI_EQUIPMENT_STEPS` when you want faster equipment images with a quality tradeoff.
+
 To use a specific ComfyUI graph from the ComfyUI UI, export it as API JSON and point the app at it:
 
 ```powershell

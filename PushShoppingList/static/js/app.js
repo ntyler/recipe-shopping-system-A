@@ -28916,7 +28916,11 @@ function applyRecipeImageProgressItem(rawItem) {
         }
 
         if (item.state === "failed") {
-            setRecipeImagePanelFailed(panel, item.message || defaultRecipeImageProgressMessage(kind, "failed"));
+            setRecipeImagePanelFailed(
+                panel,
+                item.message || defaultRecipeImageProgressMessage(kind, "failed"),
+                item.image_prompt || "",
+            );
         }
     });
 }
@@ -29170,7 +29174,7 @@ function setRecipeImagePanelRemoved(panel, kind) {
     updateRecipeImagePanelRowMenu(panel);
 }
 
-function setRecipeImagePanelFailed(panel, message) {
+function setRecipeImagePanelFailed(panel, message, imagePrompt = "") {
     const status = recipeImagePanelStatus(panel);
     const button = recipeImagePanelGenerateButton(panel);
     const uploadButton = recipeImagePanelUploadButton(panel);
@@ -29183,6 +29187,10 @@ function setRecipeImagePanelFailed(panel, message) {
     if (status) {
         status.textContent = message;
         status.classList.remove("empty");
+    }
+
+    if (imagePrompt) {
+        setRecipeImagePanelPrompt(panel, imagePrompt);
     }
 
     if (button) {
@@ -29372,6 +29380,7 @@ async function generateRecipeStepImage(button) {
     const stepNumber = panel ? panel.dataset.stepNumber || "" : "";
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 180000);
+    let responseData = {};
 
     if (!panel || !button || !recipeUrl || !stepNumber) {
         if (status) {
@@ -29400,23 +29409,22 @@ async function generateRecipeStepImage(button) {
             }),
             signal: controller.signal,
         });
-        let data = {};
         try {
-            data = await response.json();
+            responseData = await response.json();
         } catch (err) {
-            data = {};
+            responseData = {};
         }
-        syncOpenAiUsageDashboardFromResponse(data);
+        syncOpenAiUsageDashboardFromResponse(responseData);
 
-        if (!response.ok || !data.ok || !data.step_image_url) {
-            throw new Error((data && data.error) || "Unable to generate this step image.");
+        if (!response.ok || !responseData.ok || !responseData.step_image_url) {
+            throw new Error((responseData && responseData.error) || "Unable to generate this step image.");
         }
 
         const doneItem = recipeImageProgressItemFromPanel(panel, "step", "done", {
-            step_image_url: data.step_image_url,
-            step_image_generated_at: data.step_image_generated_at || "",
-            image_url: data.step_image_url,
-            generated_at: data.step_image_generated_at || "",
+            step_image_url: responseData.step_image_url,
+            step_image_generated_at: responseData.step_image_generated_at || "",
+            image_url: responseData.step_image_url,
+            generated_at: responseData.step_image_generated_at || "",
         });
         applyRecipeImageProgressItem(doneItem);
         publishRecipeImageProgressItem(doneItem);
@@ -29425,7 +29433,10 @@ async function generateRecipeStepImage(button) {
         const message = timedOut
             ? "Image generation timed out. Please try again."
             : (err.message || "Image generation failed. Please try again.");
-        const failedItem = recipeImageProgressItemFromPanel(panel, "step", "failed", { message });
+        const failedItem = recipeImageProgressItemFromPanel(panel, "step", "failed", {
+            message,
+            image_prompt: responseData.image_prompt || "",
+        });
         applyRecipeImageProgressItem(failedItem);
         publishRecipeImageProgressItem(failedItem);
     } finally {
@@ -29444,6 +29455,7 @@ async function generateRecipeEquipmentImage(button) {
     const equipmentIndex = panel ? panel.dataset.equipmentIndex || "" : "";
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 180000);
+    let responseData = {};
 
     if (!panel || !button || !recipeUrl || !equipmentIndex) {
         if (status) {
@@ -29472,24 +29484,23 @@ async function generateRecipeEquipmentImage(button) {
             }),
             signal: controller.signal,
         });
-        let data = {};
         try {
-            data = await response.json();
+            responseData = await response.json();
         } catch (err) {
-            data = {};
+            responseData = {};
         }
-        syncOpenAiUsageDashboardFromResponse(data);
+        syncOpenAiUsageDashboardFromResponse(responseData);
 
-        if (!response.ok || !data.ok || !data.equipment_image_url) {
-            throw new Error((data && data.error) || "Unable to generate this equipment image.");
+        if (!response.ok || !responseData.ok || !responseData.equipment_image_url) {
+            throw new Error((responseData && responseData.error) || "Unable to generate this equipment image.");
         }
 
         const doneItem = recipeImageProgressItemFromPanel(panel, "equipment", "done", {
-            equipment_image_url: data.equipment_image_url,
-            equipment_image_generated_at: data.equipment_image_generated_at || "",
-            image_url: data.equipment_image_url,
-            generated_at: data.equipment_image_generated_at || "",
-            image_prompt: data.image_prompt || "",
+            equipment_image_url: responseData.equipment_image_url,
+            equipment_image_generated_at: responseData.equipment_image_generated_at || "",
+            image_url: responseData.equipment_image_url,
+            generated_at: responseData.equipment_image_generated_at || "",
+            image_prompt: responseData.image_prompt || "",
         });
         applyRecipeImageProgressItem(doneItem);
         publishRecipeImageProgressItem(doneItem);
@@ -29498,7 +29509,10 @@ async function generateRecipeEquipmentImage(button) {
         const message = timedOut
             ? "Image generation timed out. Please try again."
             : (err.message || "Image generation failed. Please try again.");
-        const failedItem = recipeImageProgressItemFromPanel(panel, "equipment", "failed", { message });
+        const failedItem = recipeImageProgressItemFromPanel(panel, "equipment", "failed", {
+            message,
+            image_prompt: responseData.image_prompt || "",
+        });
         applyRecipeImageProgressItem(failedItem);
         publishRecipeImageProgressItem(failedItem);
     } finally {

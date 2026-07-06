@@ -398,6 +398,15 @@ def comfyui_request_timeout_seconds():
     return title_image_env_float("COMFYUI_REQUEST_TIMEOUT_SECONDS", 15.0, minimum=1.0, maximum=120.0)
 
 
+def comfyui_preflight_timeout_seconds():
+    return title_image_env_float(
+        "COMFYUI_PREFLIGHT_TIMEOUT_SECONDS",
+        min(3.0, comfyui_request_timeout_seconds()),
+        minimum=0.25,
+        maximum=30.0,
+    )
+
+
 def comfyui_poll_timeout_seconds():
     return title_image_env_float("COMFYUI_POLL_TIMEOUT_SECONDS", 140.0, minimum=5.0, maximum=600.0)
 
@@ -704,6 +713,44 @@ def comfyui_service_ready(base_url, request_timeout):
         return True
     except Exception:
         return False
+
+
+def ensure_comfyui_available(base_url=None, request_timeout=None):
+    base_url = (title_image_clean_text(base_url) or comfyui_base_url()).rstrip("/")
+    request_timeout = request_timeout if request_timeout is not None else comfyui_preflight_timeout_seconds()
+
+    try:
+        response = requests.get(f"{base_url}/system_stats", timeout=request_timeout)
+        response.raise_for_status()
+        return
+    except requests.Timeout as exc:
+        raise TitleImageGenerationError(
+            f"comfyui_preflight_timeout:{exc}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_TIMEOUT",
+            local_unavailable=True,
+        ) from exc
+    except requests.ConnectionError as exc:
+        if maybe_start_local_comfyui(
+            base_url,
+            request_timeout,
+            reason=f"preflight_connection_failed:{exc}",
+        ):
+            return
+
+        raise TitleImageGenerationError(
+            f"comfyui_preflight_connection_failed:{exc}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_UNAVAILABLE",
+            local_unavailable=True,
+        ) from exc
+    except Exception as exc:
+        raise TitleImageGenerationError(
+            f"comfyui_preflight_failed:{type(exc).__name__}:{exc}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_UNAVAILABLE",
+            local_unavailable=True,
+        ) from exc
 
 
 def maybe_start_local_comfyui(base_url, request_timeout, reason=""):
@@ -4458,6 +4505,7 @@ def generate_recipe_cover_image_bytes_for_provider(provider, recipe_data, recipe
         )
 
     if provider == TITLE_IMAGE_PROVIDER_COMFYUI:
+        ensure_comfyui_available()
         enhanced_prompt = enhance_recipe_title_image_prompt_with_ollama(
             recipe_data,
             recipe_title,
@@ -4545,6 +4593,7 @@ def generate_recipe_detail_image_bytes_for_provider(
         )
 
     if provider == TITLE_IMAGE_PROVIDER_COMFYUI:
+        ensure_comfyui_available()
         enhanced_prompt = enhance_recipe_image_prompt_with_ollama(
             recipe_data,
             recipe_title,
@@ -5543,8 +5592,8 @@ def generate_recipe_step_image(payload):
     )
 
     progress_target = target_instruction.get("step_number")
-    start_recipe_image_progress("step", url, progress_target, "Generating step image...")
-    image_prompt = ""
+    start_recipe_image_progress("step", url, progress_target, "Generating step image...", image_prompt=prompt)
+    image_prompt = prompt
 
     def record_step_image_prompt(resolved_prompt, prompt_provider):
         del prompt_provider
@@ -5681,8 +5730,14 @@ def generate_recipe_equipment_image(payload):
     )
 
     progress_target = target_index + 1
-    start_recipe_image_progress("equipment", url, progress_target, "Generating equipment image...")
-    image_prompt = ""
+    image_prompt = finalize_equipment_image_prompt(prompt)
+    start_recipe_image_progress(
+        "equipment",
+        url,
+        progress_target,
+        "Generating equipment image...",
+        image_prompt=image_prompt,
+    )
 
     def record_equipment_image_prompt(resolved_prompt, prompt_provider):
         del prompt_provider
