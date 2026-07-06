@@ -652,6 +652,22 @@ def test_recipe_editor_has_generate_title_image_action():
     assert '@recipe_bp.route("/api/recipe_cover_image/generate", methods=["POST"])' in routes
 
 
+def test_recipe_image_provider_selector_is_available_for_detail_images():
+    editor_template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")
+    recipe_template = (ROOT / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
+    view_behavior_template = (ROOT / "PushShoppingList/templates/sections/view_behavior.html").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    combined_templates = "\n".join([editor_template, recipe_template, view_behavior_template])
+
+    assert combined_templates.count('data-recipe-image-provider-select') >= 8
+    assert '<option value="openai">ChatGPT / OpenAI</option>' in combined_templates
+    assert "function rememberRecipeImageProvider(provider)" in script
+    assert "function refreshRecipeImageProviderSelectors(root = document)" in script
+    assert "${recipeImageProviderFieldHtml()}" in script
+    assert "...recipeImageProviderPayload()" in script
+
+
 def test_admin_support_has_local_title_image_generation_test_action():
     template = (ROOT / "PushShoppingList/templates/sections/admin_support.html").read_text(encoding="utf-8")
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")

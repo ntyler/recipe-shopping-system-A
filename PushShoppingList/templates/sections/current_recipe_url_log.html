@@ -595,6 +595,13 @@
                         <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-image-generation-menu recipe-edit-header-image-menu" hidden>
                             <div class="overflow-menu-section">
                                 <div class="overflow-menu-section-title">Generate Images</div>
+                                <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
+                                    <span>Image Source</span>
+                                    <select data-recipe-image-provider-select>
+                                        <option value="comfyui" selected>ComfyUI local</option>
+                                        <option value="openai">ChatGPT / OpenAI</option>
+                                    </select>
+                                </label>
                                 <div class="recipe-view-generate-submenu-row">
                                     <button type="button"
                                             class="recipe-view-generate-submenu-toggle"
@@ -1489,6 +1496,13 @@
                             <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-ingredients-image-menu" hidden>
                                 <div class="overflow-menu-section">
                                     <div class="overflow-menu-section-title">Generate Images</div>
+                                    <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
+                                        <span>Image Source</span>
+                                        <select data-recipe-image-provider-select>
+                                            <option value="comfyui" selected>ComfyUI local</option>
+                                            <option value="openai">ChatGPT / OpenAI</option>
+                                        </select>
+                                    </label>
                                     <button type="button"
                                             data-recipe-editor-image-global-btn
                                             onclick="return generateRecipeImagesFromEditor(this)">
@@ -1563,6 +1577,13 @@
                             <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-equipment-image-menu" hidden>
                                 <div class="overflow-menu-section">
                                     <div class="overflow-menu-section-title">Generate Images</div>
+                                    <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
+                                        <span>Image Source</span>
+                                        <select data-recipe-image-provider-select>
+                                            <option value="comfyui" selected>ComfyUI local</option>
+                                            <option value="openai">ChatGPT / OpenAI</option>
+                                        </select>
+                                    </label>
                                     <button type="button"
                                             data-recipe-editor-image-global-btn
                                             onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'equipment' })">
@@ -1626,6 +1647,13 @@
                             <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-instructions-image-menu" hidden>
                                 <div class="overflow-menu-section">
                                     <div class="overflow-menu-section-title">Generate Images</div>
+                                    <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
+                                        <span>Image Source</span>
+                                        <select data-recipe-image-provider-select>
+                                            <option value="comfyui" selected>ComfyUI local</option>
+                                            <option value="openai">ChatGPT / OpenAI</option>
+                                        </select>
+                                    </label>
                                     <button type="button"
                                             data-recipe-editor-image-global-btn
                                             onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'instructions' })">

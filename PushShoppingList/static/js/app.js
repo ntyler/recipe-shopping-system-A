@@ -22825,7 +22825,8 @@ function selectedRecipeImageProvider() {
     const select = document.querySelector("[data-recipe-image-provider-select]")
         || document.getElementById("recipeEditImageProvider");
 
-    return normalizeRecipeImageProvider(select ? select.value : "");
+    return rememberedRecipeImageProvider()
+        || normalizeRecipeImageProvider(select ? select.value : "");
 }
 
 function recipeImageProviderPayload() {
@@ -25906,6 +25907,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
     bindRecipeEditDragAndDrop(row);
     updateRecipeInstructionStepNumbers();
     initDeferredImages(row);
+    refreshRecipeImageProviderSelectors(row);
     return row;
 }
 
