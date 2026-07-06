@@ -570,6 +570,113 @@ def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkey
     assert saved[0][1]["pdf_generation"]["status"] == "not_generated"
 
 
+FROM_THE_RESTAURANT_HTML = """
+<html>
+  <head><title>Pisco Mar | Online Ordering</title></head>
+  <body>
+    <div class="menu-wrap">
+      <div class="menu-item menu_toggle adaTrigger" id="cat_1" data-toggle="toggle_0">
+        <h3>APPETIZERS <span class="items-in-category-qty">10</span></h3>
+      </div>
+      <div class="menu-expand" id="toggle_0">
+        <form class="fire_submit" action="https://fromtherestaurant.com/pisco-mar/item/9546-Allisonville-Rd/" method="GET">
+          <input name="iid" type="hidden" value="1">
+          <div class="sub-item">
+            <div class="col-md-9">
+              <h4>
+                <div>Papa (Potatoe) a la Huancaina</div>
+                <div class="price">$10.40</div>
+              </h4>
+              <p>Classic peruvian dish, topped with inca pepper.</p>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="menu-item menu_toggle adaTrigger" id="cat_2" data-toggle="toggle_1">
+        <h3>SALTADOS <span class="items-in-category-qty">5</span></h3>
+      </div>
+      <div class="menu-expand" id="toggle_1">
+        <form class="fire_submit" action="/pisco-mar/item/9546-Allisonville-Rd/" method="GET">
+          <input name="iid" type="hidden" value="42">
+          <div class="sub-item">
+            <div class="col-md-9">
+              <h4>
+                <div>Tallarin Saltado</div>
+                <div class="price">$18.80</div>
+              </h4>
+              <p>Fettucinne noodles peruvian style and veggies with your choice.</p>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
+"""
+
+
+def test_fromtherestaurant_menu_html_parser_keeps_sections_items_and_order_urls():
+    source_url = "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd/?category=1"
+
+    sections, source = recipe_extract_service.extract_structured_menu_items_from_html(
+        FROM_THE_RESTAURANT_HTML,
+        source_url,
+    )
+
+    assert source == "fromtherestaurant_html"
+    assert [section["section_name"] for section in sections] == ["APPETIZERS", "SALTADOS"]
+    assert sections[0]["items"][0]["item_name"] == "Papa (Potatoe) a la Huancaina"
+    assert sections[0]["items"][0]["price"] == "$10.40"
+    assert sections[0]["items"][0]["description"] == "Classic peruvian dish, topped with inca pepper."
+    assert sections[0]["items"][0]["menu_order_url"] == (
+        "https://fromtherestaurant.com/pisco-mar/item/9546-Allisonville-Rd/?iid=1"
+    )
+    assert sections[1]["items"][0]["item_name"] == "Tallarin Saltado"
+    assert sections[1]["items"][0]["menu_section"] == "SALTADOS"
+    assert sections[1]["items"][0]["menu_order_url"] == (
+        "https://fromtherestaurant.com/pisco-mar/item/9546-Allisonville-Rd/?iid=42"
+    )
+
+
+def test_fromtherestaurant_menu_url_import_uses_precise_html_parser(monkeypatch, tmp_path):
+    source_url = "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd/?category=1"
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "fetch_menu_page_html",
+        lambda url, cancellation_check=None, return_metadata=False: (
+            (
+                FROM_THE_RESTAURANT_HTML,
+                {
+                    "final_url": url,
+                    "http_status": 200,
+                    "content_type": "text/html",
+                    "fetched_at": "2026-07-05T00:00:00Z",
+                },
+            )
+            if return_metadata
+            else FROM_THE_RESTAURANT_HTML
+        ),
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "fetch_cartana_menu_payload",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("not a Cartana page")),
+    )
+
+    result = recipe_extract_service.extract_menu_sections_from_url(source_url)
+    items = recipe_extract_service.flatten_menu_sections(result["sections"])
+
+    assert result["ok"] is True
+    assert result["diagnostics"]["menu_extraction_source"] == "fromtherestaurant_html"
+    assert result["diagnostics"]["menu_sections_found"] == 2
+    assert result["diagnostics"]["menu_items_found"] == 2
+    assert [item["item_name"] for item in items] == [
+        "Papa (Potatoe) a la Huancaina",
+        "Tallarin Saltado",
+    ]
+
+
 def test_menu_stub_url_import_reads_image_only_menu_page_with_vision(monkeypatch, tmp_path):
     monkeypatch.delenv("OPENAI_MENU_CLEANUP_ENABLED", raising=False)
     monkeypatch.setenv("DISABLE_BROWSER_RECIPE_FETCH", "1")

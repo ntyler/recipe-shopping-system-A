@@ -10914,9 +10914,123 @@ def flatten_menu_sections(sections):
     ]
 
 
+def fromtherestaurant_item_order_url(source_url, form, item_id=""):
+    form = form if form is not None else {}
+    action = clean_recipe_text(form.get("action") if hasattr(form, "get") else "")
+    if not action:
+        return ""
+
+    order_url = urljoin(source_url, action)
+    item_id = clean_recipe_text(item_id)
+    if not item_id:
+        return order_url
+
+    parsed = urlparse(order_url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query["iid"] = item_id
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path,
+        parsed.params,
+        urlencode(query),
+        parsed.fragment,
+    ))
+
+
+def fromtherestaurant_text_without(selector_root, remove_selector):
+    if selector_root is None:
+        return ""
+
+    clone = BeautifulSoup(str(selector_root), "html.parser")
+    for element in clone.select(remove_selector):
+        element.decompose()
+    return clean_recipe_text(clone.get_text(" ", strip=True))
+
+
+def extract_fromtherestaurant_menu_sections_from_html(html_text, source_url):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+    menu_wrap = soup.select_one(".menu-wrap")
+    if not menu_wrap:
+        return []
+
+    sections = []
+    category_nodes = menu_wrap.select(":scope > .menu-item.menu_toggle")
+    if not category_nodes:
+        category_nodes = menu_wrap.select(".menu-item.menu_toggle")
+
+    for section_index, category in enumerate(category_nodes):
+        heading = category.find(["h2", "h3", "h4"])
+        section_name = fromtherestaurant_text_without(heading, ".items-in-category-qty")
+        if not section_name:
+            continue
+
+        toggle_id = clean_recipe_text(category.get("data-toggle") or category.get("aria-controls") or "")
+        expand = soup.find(id=toggle_id) if toggle_id else None
+        if expand is None:
+            expand = category.find_next_sibling(class_="menu-expand")
+        if expand is None:
+            continue
+
+        items = []
+        for item_index, form in enumerate(expand.select("form.fire_submit"), start=1):
+            sub_item = form.select_one(".sub-item") or form
+            heading = sub_item.find(["h4", "h3", "h2"])
+            item_name = fromtherestaurant_text_without(heading, ".price")
+            if not item_name:
+                continue
+
+            price_el = sub_item.select_one(".price")
+            description_el = sub_item.find("p")
+            item_id_input = form.find("input", attrs={"name": "iid"})
+            item_id = clean_recipe_text(item_id_input.get("value") if item_id_input else "")
+            price = clean_menu_price(price_el.get_text(" ", strip=True) if price_el else "")
+            description = clean_recipe_text(description_el.get_text(" ", strip=True) if description_el else "")
+            order_url = fromtherestaurant_item_order_url(source_url, form, item_id)
+            raw_text = " | ".join(
+                part
+                for part in [section_name, item_name, description, price]
+                if part
+            )
+
+            items.append({
+                "item_name": item_name,
+                "menu_section": section_name,
+                "section_name": section_name,
+                "description": description,
+                "item_description": description,
+                "price": price,
+                "price_text": price,
+                "source_url": source_url,
+                "menu_order_url": order_url,
+                "deep_link_url": order_url,
+                "menu_item_id": item_id,
+                "item_id": item_id,
+                "section_id": clean_recipe_text(category.get("id") or toggle_id or f"section-{section_index + 1}"),
+                "menu_section_id": clean_recipe_text(category.get("id") or toggle_id or f"section-{section_index + 1}"),
+                "raw_text": raw_text,
+                "display_order": item_index,
+                "item_display_order": item_index,
+            })
+
+        if items:
+            sections.append({
+                "section_name": section_name,
+                "description": "",
+                "items": items,
+                "display_order": section_index + 1,
+            })
+
+    return sections
+
+
 def extract_structured_menu_items_from_html(html_text, source_url):
     soup = BeautifulSoup(html_text or "", "html.parser")
     sections = []
+
+    fromtherestaurant_sections = extract_fromtherestaurant_menu_sections_from_html(html_text, source_url)
+    if fromtherestaurant_sections:
+        return fromtherestaurant_sections, "fromtherestaurant_html"
 
     for script in soup.find_all("script"):
         script_text = script.get_text("\n", strip=True)
