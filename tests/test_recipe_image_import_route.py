@@ -101,6 +101,82 @@ def test_default_models_use_menu_and_vision_gpt55_only(monkeypatch, tmp_path):
     assert vision_model.source == "default:gpt-5.5"
 
 
+def test_equipment_image_prompt_uses_equipment_title_not_recipe_ingredients():
+    prompt = recipe_edit_service.build_recipe_equipment_image_prompt(
+        recipe_title="Papa Potatoe a la Huancaina",
+        servings="2",
+        ingredients="- potato\n- crema\n- lime",
+        equipment_item_number=2,
+        equipment_item="blender or food processor",
+    )
+    lower_prompt = prompt.lower()
+
+    assert "blender or food processor" in lower_prompt
+    assert "single obvious main subject" in lower_prompt
+    assert "match it literally" in lower_prompt
+    assert "plain unlabeled object surface" in lower_prompt
+    assert "recipe ingredients" not in lower_prompt
+    assert "chopped food" not in lower_prompt
+    assert "prepared food" not in lower_prompt
+    assert "papa" not in lower_prompt
+    assert "potato" not in lower_prompt
+    assert "crema" not in lower_prompt
+    assert "lime" not in lower_prompt
+
+
+def test_ollama_equipment_prompt_request_omits_recipe_ingredient_context():
+    base_prompt = recipe_edit_service.build_recipe_equipment_image_prompt(
+        recipe_title="Papa Potatoe a la Huancaina",
+        servings="2",
+        ingredients="- potato\n- crema\n- lime",
+        equipment_item_number=3,
+        equipment_item="medium saucepan",
+    )
+    request = recipe_edit_service.build_ollama_recipe_image_prompt_request(
+        {
+            "recipe_title": "Papa Potatoe a la Huancaina",
+            "ingredients": [
+                {"ingredient": "potato"},
+                {"ingredient": "crema"},
+                {"ingredient": "lime"},
+            ],
+        },
+        "Papa Potatoe a la Huancaina",
+        base_prompt,
+        image_purpose="recipe equipment item image",
+    )
+    lower_request = request.lower()
+
+    assert "medium saucepan" in lower_request
+    assert "single obvious main subject" in lower_request
+    assert "empty, clean equipment object" in lower_request
+    assert "preserve the specific recipe" not in lower_request
+    assert "papa" not in lower_request
+    assert "potato" not in lower_request
+    assert "crema" not in lower_request
+    assert "lime" not in lower_request
+
+
+def test_comfyui_equipment_workflow_uses_food_negative_prompt(monkeypatch):
+    monkeypatch.delenv("COMFYUI_NEGATIVE_PROMPT", raising=False)
+    monkeypatch.delenv("COMFYUI_EQUIPMENT_NEGATIVE_PROMPT", raising=False)
+
+    workflow = recipe_edit_service.build_default_comfyui_title_workflow(
+        "one clean empty medium saucepan centered on a neutral kitchen counter",
+        "local-model.safetensors",
+        image_purpose="recipe equipment item image",
+    )
+    positive_prompt = workflow["6"]["inputs"]["text"].lower()
+    negative_prompt = workflow["7"]["inputs"]["text"].lower()
+
+    assert "medium saucepan" in positive_prompt
+    assert "potatoes" not in positive_prompt
+    assert "food" in negative_prompt
+    assert "potatoes" in negative_prompt
+    assert "prepared food" in negative_prompt
+    assert "liquid" in negative_prompt
+
+
 def write_uploaded_image(user_data_dir, user_id, filename="meal.png", data=None):
     upload_dir = user_data_dir / user_id / "recipe-extractor" / "data" / "uploads"
     upload_dir.mkdir(parents=True)
@@ -520,8 +596,9 @@ def test_generate_recipe_equipment_image_comfyui_uses_local_provider_without_ope
         prompt_calls["image_purpose"] = image_purpose
         return f"polished {image_purpose}"
 
-    def fake_comfyui(prompt):
+    def fake_comfyui(prompt, image_purpose=""):
         prompt_calls["comfyui_prompt"] = prompt
+        prompt_calls["comfyui_image_purpose"] = image_purpose
         return b"local-equipment-png"
 
     def fake_save(recipe_url, data):
@@ -529,7 +606,7 @@ def test_generate_recipe_equipment_image_comfyui_uses_local_provider_without_ope
         saved["data"] = data.copy()
 
     monkeypatch.setattr(recipe_edit_service, "enhance_recipe_image_prompt_with_ollama", fake_enhance)
-    monkeypatch.setattr(recipe_edit_service, "request_comfyui_title_image_bytes", fake_comfyui)
+    monkeypatch.setattr(recipe_edit_service, "request_comfyui_image_bytes", fake_comfyui)
     monkeypatch.setattr(recipe_edit_service, "save_recipe_output", fake_save)
 
     result = recipe_edit_service.generate_recipe_equipment_image({
@@ -544,6 +621,7 @@ def test_generate_recipe_equipment_image_comfyui_uses_local_provider_without_ope
     assert prompt_calls["title"] == "Local Tomato Soup"
     assert prompt_calls["image_purpose"] == "recipe equipment item image"
     assert prompt_calls["comfyui_prompt"] == "polished recipe equipment item image"
+    assert prompt_calls["comfyui_image_purpose"] == "recipe equipment item image"
     assert saved["url"] == url
     assert saved["data"]["equipment"][0]["equipment_image_url"] == result["equipment_image_url"]
     image_filename = result["equipment_image_url"].rsplit("/", 1)[-1]
@@ -571,8 +649,8 @@ def test_generate_recipe_step_image_comfyui_failure_does_not_fallback_without_op
     )
     monkeypatch.setattr(
         recipe_edit_service,
-        "request_comfyui_title_image_bytes",
-        lambda prompt: (_ for _ in ()).throw(
+        "request_comfyui_image_bytes",
+        lambda prompt, image_purpose="": (_ for _ in ()).throw(
             recipe_edit_service.TitleImageGenerationError(
                 "comfyui_connection_failed",
                 recipe_edit_service.LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,

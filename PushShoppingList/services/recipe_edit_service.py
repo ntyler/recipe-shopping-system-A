@@ -328,13 +328,22 @@ def title_image_recipe_context(recipe_data, recipe_title):
 
 
 def build_ollama_recipe_image_prompt_request(recipe_data, recipe_title, base_prompt, image_purpose="recipe title image"):
-    context = title_image_recipe_context(recipe_data, recipe_title)
     purpose = title_image_clean_text(image_purpose) or "recipe image"
-    title_rule = (
-        "- Describe a realistic finished dish with appetizing plating."
-        if purpose == "recipe title image"
-        else f"- Preserve the requested {purpose}; do not turn it into a finished dish unless the base prompt asks for that."
-    )
+    if purpose == "recipe equipment item image":
+        context = {
+            "image_subject": "equipment item named in the base prompt",
+        }
+        purpose_rules = """- The equipment item named in the base prompt must be the single obvious main subject.
+- Do not feature recipe ingredients, food prep, finished food, garnish, liquids, or a plated dish.
+- Use an empty, clean equipment object on a neutral kitchen counter.
+- If the equipment title contains alternatives like "or", show one clear matching appliance, not unrelated food."""
+    else:
+        context = title_image_recipe_context(recipe_data, recipe_title)
+        purpose_rules = (
+            "- Describe a realistic finished dish with appetizing plating."
+            if purpose == "recipe title image"
+            else f"- Preserve the requested {purpose}; do not turn it into a finished dish unless the base prompt asks for that."
+        )
     return f"""You improve prompts for local Stable Diffusion food photography.
 
 Return only one polished image prompt. Do not return JSON. Do not add commentary.
@@ -347,8 +356,7 @@ Base prompt:
 {base_prompt}
 
 Prompt rules:
-- Preserve the specific recipe, cuisine, and likely ingredients.
-{title_rule}
+{purpose_rules}
 - Keep it suitable for Stable Diffusion or ComfyUI.
 - Include natural light, texture, camera style, and food styling cues.
 - Do not include text, logos, watermarks, branded packaging, labels, or menus.
@@ -556,17 +564,40 @@ def comfyui_checkpoint_name(base_url, request_timeout):
     )
 
 
-def build_default_comfyui_title_workflow(prompt, checkpoint_name):
+def comfyui_negative_prompt_for_purpose(image_purpose="recipe title image"):
+    purpose = title_image_clean_text(image_purpose)
+    if purpose == "recipe equipment item image":
+        equipment_negative = title_image_clean_text(os.getenv("COMFYUI_EQUIPMENT_NEGATIVE_PROMPT"))
+        if equipment_negative:
+            return equipment_negative
+
+    configured_negative = title_image_clean_text(os.getenv("COMFYUI_NEGATIVE_PROMPT"))
+    if configured_negative:
+        return configured_negative
+
+    base_negative = (
+        "text, labels, captions, logos, watermarks, branded packaging, extra fingers, "
+        "low quality, blurry, overexposed"
+    )
+
+    if purpose == "recipe equipment item image":
+        return (
+            "food, ingredients, chopped food, cooked food, prepared food, plated meal, "
+            "potatoes, vegetables, garnish, sauce, soup, liquid, bowl of food, cooking action, hands, "
+            f"{base_negative}"
+        )
+
+    return f"deformed food, {base_negative}"
+
+
+def build_default_comfyui_title_workflow(prompt, checkpoint_name, image_purpose="recipe title image"):
     width = title_image_env_int("COMFYUI_IMAGE_WIDTH", 1024, minimum=256, maximum=2048)
     height = title_image_env_int("COMFYUI_IMAGE_HEIGHT", 1024, minimum=256, maximum=2048)
     steps = title_image_env_int("COMFYUI_STEPS", 24, minimum=1, maximum=100)
     cfg = title_image_env_float("COMFYUI_CFG", 7.0, minimum=1.0, maximum=30.0)
     sampler_name = title_image_clean_text(os.getenv("COMFYUI_SAMPLER")) or "euler"
     scheduler = title_image_clean_text(os.getenv("COMFYUI_SCHEDULER")) or "normal"
-    negative_prompt = title_image_clean_text(os.getenv("COMFYUI_NEGATIVE_PROMPT")) or (
-        "text, labels, captions, logos, watermarks, branded packaging, extra fingers, "
-        "deformed food, low quality, blurry, overexposed"
-    )
+    negative_prompt = comfyui_negative_prompt_for_purpose(image_purpose)
     seed = uuid.uuid4().int % 1_000_000_000_000
 
     return {
@@ -681,7 +712,7 @@ def first_comfyui_history_image(record):
     return {}
 
 
-def request_comfyui_title_image_bytes(prompt):
+def request_comfyui_image_bytes(prompt, image_purpose="recipe title image"):
     base_url = comfyui_base_url()
     request_timeout = comfyui_request_timeout_seconds()
     poll_timeout = comfyui_poll_timeout_seconds()
@@ -690,7 +721,11 @@ def request_comfyui_title_image_bytes(prompt):
 
     try:
         checkpoint_name = comfyui_checkpoint_name(base_url, request_timeout)
-        workflow = build_default_comfyui_title_workflow(prompt, checkpoint_name)
+        workflow = build_default_comfyui_title_workflow(
+            prompt,
+            checkpoint_name,
+            image_purpose=image_purpose,
+        )
         response = requests.post(
             f"{base_url}/prompt",
             json={
@@ -819,6 +854,10 @@ def request_comfyui_title_image_bytes(prompt):
         error_code="COMFYUI_TIMEOUT",
         local_unavailable=True,
     )
+
+
+def request_comfyui_title_image_bytes(prompt):
+    return request_comfyui_image_bytes(prompt, image_purpose="recipe title image")
 
 
 def test_local_title_image_generation(prompt=""):
@@ -3946,7 +3985,7 @@ def generate_recipe_detail_image_bytes_for_provider(provider, recipe_data, recip
             image_purpose=image_purpose,
         )
         return (
-            request_comfyui_title_image_bytes(enhanced_prompt),
+            request_comfyui_image_bytes(enhanced_prompt, image_purpose=image_purpose),
             TITLE_IMAGE_PROVIDER_COMFYUI,
             False,
         )
@@ -5107,16 +5146,8 @@ def build_recipe_equipment_image_prompt(
     equipment_item_number,
     equipment_item,
 ):
-    return f"""Generate a realistic cookbook-style image for one recipe equipment item.
-
-Recipe title:
-{recipe_title}
-
-Servings:
-{servings or "Not specified"}
-
-Ingredients:
-{ingredients or "Not specified"}
+    del recipe_title, servings, ingredients
+    return f"""Generate a realistic kitchen equipment reference image.
 
 Equipment item number:
 {equipment_item_number}
@@ -5125,17 +5156,14 @@ Equipment item:
 {equipment_item}
 
 Visual requirements:
-- Show only this specific equipment item
-- Make the equipment visually clear and easy to identify
-- It should look ready to use for this recipe
-- Include actual recipe ingredients nearby only if they help communicate scale or use
+- The equipment item text is the subject; match it literally
+- Show one clean, empty {equipment_item} as the single obvious main subject
+- Use a neutral kitchen counter or plain studio background
+- Make the equipment visually clear, centered, and easy to identify
 - Bright natural kitchen lighting
-- Realistic food photography
-- Clean kitchen counter background
-- High-end cookbook style
-- No text inside the image
-- No numbered badges
-- No labels
+- Realistic product-style cookbook photography
+- High-end kitchen reference style
+- Plain unlabeled object surface
 """
 
 
