@@ -466,6 +466,66 @@ def test_generate_recipe_cover_image_comfyui_saves_local_cover_without_openai(mo
     assert result["cover_image"]["path"] == "data/uploads/recipe_covers/local.png"
 
 
+def test_generate_recipe_cover_image_payload_provider_can_choose_openai(monkeypatch):
+    url = "https://example.com/chosen-openai-title-image"
+    recipe_data = {
+        "source_url": url,
+        "recipe_title": "Chosen OpenAI Soup",
+        "ingredients": [{"ingredient": "tomatoes"}],
+    }
+    calls = {}
+
+    monkeypatch.setenv("TITLE_IMAGE_PROVIDER", "comfyui")
+    monkeypatch.setenv("TITLE_IMAGE_FALLBACK_PROVIDER", "none")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "request_comfyui_title_image_bytes",
+        lambda prompt: (_ for _ in ()).throw(AssertionError("ComfyUI should not run when the payload chooses OpenAI")),
+    )
+
+    def fake_openai_title_image(prompt):
+        calls["openai_prompt"] = prompt
+        return b"openai-png"
+
+    def fake_save(recipe_source_url, data, image_bytes, fallback_alt, image_source, provider, fallback_used=False):
+        calls["saved"] = {
+            "url": recipe_source_url,
+            "image_bytes": image_bytes,
+            "image_source": image_source,
+            "provider": provider,
+            "fallback_used": fallback_used,
+        }
+        return {
+            "ok": True,
+            "url": recipe_source_url,
+            "cover_image": {
+                "path": "data/uploads/recipe_covers/chosen-openai.png",
+                "source": image_source,
+                "provider": provider,
+            },
+            "provider": provider,
+            "fallback_used": bool(fallback_used),
+        }
+
+    monkeypatch.setattr(recipe_edit_service, "request_recipe_title_image_bytes", fake_openai_title_image)
+    monkeypatch.setattr(recipe_edit_service, "save_generated_recipe_cover_image", fake_save)
+
+    result = recipe_edit_service.generate_recipe_cover_image({
+        "url": url,
+        "image_provider": "chatgpt",
+    })
+
+    assert result["ok"] is True
+    assert result["provider"] == "openai"
+    assert result["fallback_used"] is False
+    assert calls["openai_prompt"]
+    assert calls["saved"]["image_bytes"] == b"openai-png"
+    assert calls["saved"]["image_source"] == "ai_generated_image"
+    assert calls["saved"]["provider"] == "openai"
+
+
 def test_generate_recipe_cover_image_comfyui_failure_does_not_fallback_without_opt_in(monkeypatch):
     url = "https://example.com/offline-comfyui"
     recipe_data = {
@@ -626,6 +686,52 @@ def test_generate_recipe_equipment_image_comfyui_uses_local_provider_without_ope
     assert saved["data"]["equipment"][0]["equipment_image_url"] == result["equipment_image_url"]
     image_filename = result["equipment_image_url"].rsplit("/", 1)[-1]
     assert (tmp_path / "recipe_steps" / image_filename).read_bytes() == b"local-equipment-png"
+
+
+def test_generate_recipe_equipment_image_payload_provider_can_choose_openai(monkeypatch, tmp_path):
+    url = "https://example.com/chosen-openai-equipment-image"
+    recipe_data = {
+        "source_url": url,
+        "recipe_title": "Chosen Equipment Soup",
+        "ingredients": [{"ingredient": "tomatoes"}],
+        "equipment": [{"equipment": "medium saucepan"}],
+    }
+    calls = {}
+
+    monkeypatch.setenv("TITLE_IMAGE_PROVIDER", "comfyui")
+    monkeypatch.setenv("TITLE_IMAGE_FALLBACK_PROVIDER", "none")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(recipe_edit_service, "STEP_IMAGE_FOLDER", tmp_path / "recipe_steps")
+    monkeypatch.setattr(recipe_edit_service, "ensure_webp_variants", lambda image_path: None)
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_output", lambda recipe_url, data: calls.setdefault("saved", data.copy()))
+    monkeypatch.setattr(recipe_edit_service, "start_recipe_image_progress", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "finish_recipe_image_progress", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "request_comfyui_image_bytes",
+        lambda prompt, image_purpose="": (_ for _ in ()).throw(AssertionError("ComfyUI should not run when the payload chooses OpenAI")),
+    )
+
+    def fake_openai_detail_image(prompt):
+        calls["openai_prompt"] = prompt
+        return b"openai-equipment-png"
+
+    monkeypatch.setattr(recipe_edit_service, "request_recipe_step_image_bytes", fake_openai_detail_image)
+
+    result = recipe_edit_service.generate_recipe_equipment_image({
+        "url": url,
+        "equipment_index": 1,
+        "image_provider": "openai",
+    })
+
+    assert result["ok"] is True
+    assert result["provider"] == "openai"
+    assert result["fallback_used"] is False
+    assert calls["openai_prompt"]
+    assert calls["saved"]["equipment"][0]["equipment_image_url"] == result["equipment_image_url"]
+    image_filename = result["equipment_image_url"].rsplit("/", 1)[-1]
+    assert (tmp_path / "recipe_steps" / image_filename).read_bytes() == b"openai-equipment-png"
 
 
 def test_generate_recipe_step_image_comfyui_failure_does_not_fallback_without_opt_in(monkeypatch):

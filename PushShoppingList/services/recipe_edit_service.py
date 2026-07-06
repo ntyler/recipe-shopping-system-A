@@ -235,6 +235,8 @@ def title_image_env_float(name, default, minimum=0.1, maximum=60.0):
 def normalize_title_image_provider(value, default=TITLE_IMAGE_PROVIDER_OPENAI):
     provider = title_image_clean_text(value).lower()
     provider = provider.replace("-", "_")
+    if provider in {"chatgpt", "chat_gpt", "gpt"}:
+        provider = TITLE_IMAGE_PROVIDER_OPENAI
     return provider if provider in TITLE_IMAGE_ALLOWED_PROVIDERS else default
 
 
@@ -242,6 +244,15 @@ def title_image_provider(value=None):
     if value is not None and title_image_clean_text(value):
         return normalize_title_image_provider(value)
     return normalize_title_image_provider(os.getenv(TITLE_IMAGE_PROVIDER_ENV_VAR))
+
+
+def title_image_provider_from_payload(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    return title_image_provider(
+        payload.get("image_provider")
+        or payload.get("title_image_provider")
+        or payload.get("provider")
+    )
 
 
 def title_image_fallback_provider(value=None):
@@ -3997,8 +4008,8 @@ def generate_recipe_detail_image_bytes_for_provider(provider, recipe_data, recip
     )
 
 
-def generate_recipe_detail_image_bytes(recipe_data, recipe_title, base_prompt, image_purpose):
-    provider = title_image_provider()
+def generate_recipe_detail_image_bytes(recipe_data, recipe_title, base_prompt, image_purpose, provider=None):
+    provider = title_image_provider(provider)
     print(f"[TitleImage] provider={provider}")
 
     try:
@@ -4054,7 +4065,7 @@ def generate_recipe_cover_image(payload):
     payload = payload if isinstance(payload, dict) else {}
     url = str(payload.get("url") or payload.get("recipe_url") or "").strip()
     overwrite = bool(payload.get("overwrite") or payload.get("force"))
-    provider = title_image_provider()
+    provider = title_image_provider_from_payload(payload)
     print(f"[TitleImage] provider={provider}")
 
     if not url:
@@ -4839,6 +4850,7 @@ def generate_recipe_step_image(payload):
     payload = payload if isinstance(payload, dict) else {}
     url = str(payload.get("url") or payload.get("recipe_url") or "").strip()
     requested_step = payload.get("step_number")
+    provider = title_image_provider_from_payload(payload)
 
     if not url:
         return {"ok": False, "error": "Recipe URL is required."}
@@ -4882,6 +4894,7 @@ def generate_recipe_step_image(payload):
             recipe_title,
             prompt,
             "recipe instruction step image",
+            provider=provider,
         )
     except TimeoutError:
         error = "Image generation timed out. Please try again."
@@ -4897,7 +4910,7 @@ def generate_recipe_step_image(payload):
             "ok": False,
             "error": error,
             "error_code": exc.error_code,
-            "provider": title_image_provider(),
+            "provider": provider,
             "local_generation_unavailable": exc.local_unavailable,
         }
     except Exception:
@@ -4954,6 +4967,7 @@ def generate_recipe_equipment_image(payload):
     payload = payload if isinstance(payload, dict) else {}
     url = str(payload.get("url") or payload.get("recipe_url") or "").strip()
     requested_index = payload.get("equipment_index") or payload.get("equipment_number")
+    provider = title_image_provider_from_payload(payload)
 
     if not url:
         return {"ok": False, "error": "Recipe URL is required."}
@@ -4998,6 +5012,7 @@ def generate_recipe_equipment_image(payload):
             recipe_title,
             prompt,
             "recipe equipment item image",
+            provider=provider,
         )
     except TimeoutError:
         error = "Image generation timed out. Please try again."
@@ -5013,7 +5028,7 @@ def generate_recipe_equipment_image(payload):
             "ok": False,
             "error": error,
             "error_code": exc.error_code,
-            "provider": title_image_provider(),
+            "provider": provider,
             "local_generation_unavailable": exc.local_unavailable,
         }
     except Exception:

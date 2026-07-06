@@ -15588,6 +15588,40 @@ body {
     text-transform: none;
 }
 
+.recipe-edit-image-provider-field {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    width: min(100%, 300px);
+    color: #c4ccd8;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.recipe-edit-image-provider-field select {
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 1px solid #416486;
+    border-radius: 7px;
+    background: #09111d;
+    color: #dce8f5;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 750;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.recipe-edit-image-provider-field select:focus-visible {
+    border-color: #60a5fa;
+    outline: 2px solid rgba(96, 165, 250, 0.28);
+    outline-offset: 2px;
+}
+
 .recipe-edit-cover-actions {
     display: flex;
     flex-wrap: wrap;

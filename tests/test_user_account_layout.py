@@ -637,9 +637,16 @@ def test_recipe_editor_has_generate_title_image_action():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
 
+    assert 'id="recipeEditImageProvider"' in template
+    assert '<option value="comfyui" selected>ComfyUI local</option>' in template
+    assert '<option value="openai">ChatGPT / OpenAI</option>' in template
     assert 'id="recipeEditCoverGenerate"' in template
     assert 'id="recipeEditCoverGenerateLabel">Generate title image' in template
     assert "generateRecipeCoverImage(this)" in template
+    assert "function selectedRecipeImageProvider()" in script
+    assert "function recipeImageProviderPayload()" in script
+    assert "...recipeImageProviderPayload()" in script
+    assert '["initRecipeImageProviderSelector", initRecipeImageProviderSelector]' in script
     assert "function generateRecipeCoverImage(button)" in script
     assert 'fetch("/api/recipe_cover_image/generate"' in script
     assert '@recipe_bp.route("/api/recipe_cover_image/generate", methods=["POST"])' in routes

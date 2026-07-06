@@ -764,6 +764,13 @@
                             <span id="recipeEditCoverStatus" class="recipe-edit-cover-status">
                                 Upload or replace the image shown on recipe cards.
                             </span>
+                            <label class="recipe-edit-image-provider-field" for="recipeEditImageProvider">
+                                <span>Image Source</span>
+                                <select id="recipeEditImageProvider">
+                                    <option value="comfyui" selected>ComfyUI local</option>
+                                    <option value="openai">ChatGPT / OpenAI</option>
+                                </select>
+                            </label>
                             <div class="recipe-edit-cover-actions">
                                 <button type="button"
                                         class="recipe-edit-cover-upload-button"

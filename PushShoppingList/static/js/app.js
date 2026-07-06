@@ -22808,6 +22808,66 @@ function cacheBustRecipeCoverSrc(src) {
     return `${src}${separator}_cover=${Date.now()}`;
 }
 
+const RECIPE_IMAGE_PROVIDER_STORAGE_KEY = "recipe-image-provider";
+
+function normalizeRecipeImageProvider(value) {
+    const provider = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+
+    if (provider === "chatgpt" || provider === "chat_gpt" || provider === "gpt") {
+        return "openai";
+    }
+
+    return provider === "openai" || provider === "comfyui" ? provider : "";
+}
+
+function selectedRecipeImageProvider() {
+    const select = document.getElementById("recipeEditImageProvider");
+
+    return normalizeRecipeImageProvider(select ? select.value : "");
+}
+
+function recipeImageProviderPayload() {
+    const provider = selectedRecipeImageProvider();
+
+    return provider ? { image_provider: provider } : {};
+}
+
+function initRecipeImageProviderSelector() {
+    const select = document.getElementById("recipeEditImageProvider");
+
+    if (!select) {
+        return;
+    }
+
+    try {
+        const rememberedProvider = normalizeRecipeImageProvider(
+            window.localStorage
+                ? window.localStorage.getItem(RECIPE_IMAGE_PROVIDER_STORAGE_KEY)
+                : ""
+        );
+        if (rememberedProvider) {
+            select.value = rememberedProvider;
+        }
+    } catch (err) {
+        console.warn("Unable to restore recipe image provider selection.", err);
+    }
+
+    select.addEventListener("change", () => {
+        const provider = selectedRecipeImageProvider();
+        if (!provider) {
+            return;
+        }
+
+        try {
+            if (window.localStorage) {
+                window.localStorage.setItem(RECIPE_IMAGE_PROVIDER_STORAGE_KEY, provider);
+            }
+        } catch (err) {
+            console.warn("Unable to remember recipe image provider selection.", err);
+        }
+    });
+}
+
 function openRecipeCoverUpload() {
     const input = document.getElementById("recipeEditCoverUpload");
 
@@ -22923,6 +22983,7 @@ async function generateRecipeCoverImage(button) {
                 url: originalUrl,
                 alt: fallbackAlt,
                 overwrite: hasCoverImage,
+                ...recipeImageProviderPayload(),
             }),
             signal: controller.signal,
         });
@@ -29149,6 +29210,7 @@ async function generateRecipeStepImage(button) {
             body: JSON.stringify({
                 url: recipeUrl,
                 step_number: stepNumber,
+                ...recipeImageProviderPayload(),
             }),
             signal: controller.signal,
         });
@@ -29220,6 +29282,7 @@ async function generateRecipeEquipmentImage(button) {
             body: JSON.stringify({
                 url: recipeUrl,
                 equipment_index: equipmentIndex,
+                ...recipeImageProviderPayload(),
             }),
             signal: controller.signal,
         });
@@ -32055,6 +32118,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initJobActivityPanel", initJobActivityPanel],
         ["initLazySections", initLazySections],
         ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
+        ["initRecipeImageProviderSelector", initRecipeImageProviderSelector],
     ].forEach(([name, callback]) => runStartupTask(name, callback));
 
     runIdleStartupTasks([
