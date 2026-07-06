@@ -20707,6 +20707,10 @@ function recipeEditorStandalonePageIsActive() {
     return Boolean(document.body && document.body.dataset.recipeEditPage === "true");
 }
 
+function recipeEditorSurfaceIsActive(modal) {
+    return Boolean(modal && (modal.classList.contains("open") || recipeEditorStandalonePageIsActive()));
+}
+
 function recipeEditPageUrl(recipeUrl) {
     const normalizedUrl = String(recipeUrl || "").trim();
 
@@ -29294,7 +29298,7 @@ async function generateRecipeImagesFromEditor(button, options = {}) {
 
     closeRecipeEditRowMenus();
 
-    if (!modal || !modal.classList.contains("open")) {
+    if (!recipeEditorSurfaceIsActive(modal)) {
         return false;
     }
 
@@ -29332,7 +29336,7 @@ function setRecipeEditorImagesVisibleFromMenu(button, visible, options = {}) {
 
     closeRecipeEditRowMenus();
 
-    if (!modal || !modal.classList.contains("open")) {
+    if (!recipeEditorSurfaceIsActive(modal)) {
         return false;
     }
 

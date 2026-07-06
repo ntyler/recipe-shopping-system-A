@@ -56,6 +56,24 @@ def test_recipe_editor_hide_all_images_keeps_title_image_visible():
     assert "keepRecipeCoverImagesVisible(modal);" in function_block
 
 
+def test_recipe_editor_image_menu_allows_standalone_editor_page():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    surface_start = script.index("function recipeEditorSurfaceIsActive")
+    surface_end = script.index("function recipeEditPageUrl", surface_start)
+    surface_block = script[surface_start:surface_end]
+    generate_start = script.index("async function generateRecipeImagesFromEditor")
+    generate_end = script.index("function setRecipeEditorImagesVisibleFromMenu", generate_start)
+    generate_block = script[generate_start:generate_end]
+    toggle_start = script.index("function setRecipeEditorImagesVisibleFromMenu")
+    toggle_end = script.index("function recipeEditorImagePanelSelector", toggle_start)
+    toggle_block = script[toggle_start:toggle_end]
+
+    assert "modal.classList.contains(\"open\")" in surface_block
+    assert "recipeEditorStandalonePageIsActive()" in surface_block
+    assert "if (!recipeEditorSurfaceIsActive(modal))" in generate_block
+    assert "if (!recipeEditorSurfaceIsActive(modal))" in toggle_block
+
+
 def test_recipe_editor_row_delete_uses_portaled_menu_anchor():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     remove_start = script.index("function removeRecipeEditRow")
