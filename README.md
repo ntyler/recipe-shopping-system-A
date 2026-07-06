@@ -82,6 +82,16 @@ $env:COMFYUI_URL="http://127.0.0.1:8188"
 
 In `comfyui` mode, Ollama only improves the image prompt. ComfyUI/Stable Diffusion generates the image locally, and OpenAI image generation is not used unless you explicitly set `TITLE_IMAGE_FALLBACK_PROVIDER=openai`.
 
+Tyler's local Windows setup:
+
+- ComfyUI is installed at `D:\GitHub\ComfyUI`.
+- Start ComfyUI with `D:\GitHub\ComfyUI\start_comfyui_local.bat`.
+- ComfyUI serves the local API at `http://127.0.0.1:8188`.
+- The installed checkpoint is `D:\GitHub\ComfyUI\models\checkpoints\v1-5-pruned-emaonly-fp16.safetensors`.
+- Ollama should keep models only on the E: drive: `E:\Ollama\models`.
+- `C:\Users\Tyler\.ollama\models` should remain a junction to `E:\Ollama\models`, not a second model store.
+- Keep the user-level `OLLAMA_MODELS` value set to `E:\Ollama\models`.
+
 Optional ntfy topic for phone/computer extraction notifications:
 
 ```powershell
