@@ -29124,7 +29124,7 @@ async function generateRecipeStepImage(button) {
     const recipeUrl = panel ? panel.dataset.recipeUrl || "" : "";
     const stepNumber = panel ? panel.dataset.stepNumber || "" : "";
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 120000);
+    const timeout = window.setTimeout(() => controller.abort(), 180000);
 
     if (!panel || !button || !recipeUrl || !stepNumber) {
         if (status) {
@@ -29195,7 +29195,7 @@ async function generateRecipeEquipmentImage(button) {
     const recipeUrl = panel ? panel.dataset.recipeUrl || "" : "";
     const equipmentIndex = panel ? panel.dataset.equipmentIndex || "" : "";
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 120000);
+    const timeout = window.setTimeout(() => controller.abort(), 180000);
 
     if (!panel || !button || !recipeUrl || !equipmentIndex) {
         if (status) {

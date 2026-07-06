@@ -302,8 +302,14 @@ def title_image_recipe_context(recipe_data, recipe_title):
     }
 
 
-def build_ollama_title_image_prompt_request(recipe_data, recipe_title, base_prompt):
+def build_ollama_recipe_image_prompt_request(recipe_data, recipe_title, base_prompt, image_purpose="recipe title image"):
     context = title_image_recipe_context(recipe_data, recipe_title)
+    purpose = title_image_clean_text(image_purpose) or "recipe image"
+    title_rule = (
+        "- Describe a realistic finished dish with appetizing plating."
+        if purpose == "recipe title image"
+        else f"- Preserve the requested {purpose}; do not turn it into a finished dish unless the base prompt asks for that."
+    )
     return f"""You improve prompts for local Stable Diffusion food photography.
 
 Return only one polished image prompt. Do not return JSON. Do not add commentary.
@@ -317,7 +323,7 @@ Base prompt:
 
 Prompt rules:
 - Preserve the specific recipe, cuisine, and likely ingredients.
-- Describe a realistic finished dish with appetizing plating.
+{title_rule}
 - Keep it suitable for Stable Diffusion or ComfyUI.
 - Include natural light, texture, camera style, and food styling cues.
 - Do not include text, logos, watermarks, branded packaging, labels, or menus.
@@ -332,14 +338,25 @@ def strip_ollama_prompt_response(value):
     return text
 
 
-def enhance_recipe_title_image_prompt_with_ollama(recipe_data, recipe_title, base_prompt, required=False):
+def enhance_recipe_image_prompt_with_ollama(
+    recipe_data,
+    recipe_title,
+    base_prompt,
+    required=False,
+    image_purpose="recipe title image",
+):
     model = ollama_prompt_model()
     base_url = ollama_prompt_base_url()
     print(f"[TitleImage] ollama_prompt_model={model}")
 
     payload = {
         "model": model,
-        "prompt": build_ollama_title_image_prompt_request(recipe_data, recipe_title, base_prompt),
+        "prompt": build_ollama_recipe_image_prompt_request(
+            recipe_data,
+            recipe_title,
+            base_prompt,
+            image_purpose=image_purpose,
+        ),
         "stream": False,
         "options": {
             "temperature": 0.4,
@@ -379,6 +396,25 @@ def enhance_recipe_title_image_prompt_with_ollama(recipe_data, recipe_title, bas
             ) from exc
 
     return base_prompt
+
+
+def build_ollama_title_image_prompt_request(recipe_data, recipe_title, base_prompt):
+    return build_ollama_recipe_image_prompt_request(
+        recipe_data,
+        recipe_title,
+        base_prompt,
+        image_purpose="recipe title image",
+    )
+
+
+def enhance_recipe_title_image_prompt_with_ollama(recipe_data, recipe_title, base_prompt, required=False):
+    return enhance_recipe_image_prompt_with_ollama(
+        recipe_data,
+        recipe_title,
+        base_prompt,
+        required=required,
+        image_purpose="recipe title image",
+    )
 
 
 def comfyui_checkpoint_name(base_url, request_timeout):
@@ -3760,6 +3796,120 @@ def generate_recipe_cover_image_bytes_for_provider(provider, recipe_data, recipe
     )
 
 
+def generate_recipe_detail_image_with_openai(prompt):
+    if not os.getenv("OPENAI_API_KEY"):
+        raise TitleImageGenerationError(
+            "openai_api_key_missing",
+            TITLE_IMAGE_OPENAI_SETUP_MESSAGE,
+            error_code="OPENAI_API_KEY_MISSING",
+        )
+
+    return request_recipe_step_image_bytes(prompt)
+
+
+def generate_recipe_detail_image_bytes_for_provider(provider, recipe_data, recipe_title, base_prompt, image_purpose):
+    if provider == TITLE_IMAGE_PROVIDER_OPENAI:
+        return (
+            generate_recipe_detail_image_with_openai(base_prompt),
+            TITLE_IMAGE_PROVIDER_OPENAI,
+            False,
+        )
+
+    if provider == TITLE_IMAGE_PROVIDER_OLLAMA_PROMPT_ONLY:
+        if not os.getenv("OPENAI_API_KEY"):
+            raise TitleImageGenerationError(
+                "openai_api_key_missing",
+                TITLE_IMAGE_OPENAI_SETUP_MESSAGE,
+                error_code="OPENAI_API_KEY_MISSING",
+            )
+        enhanced_prompt = enhance_recipe_image_prompt_with_ollama(
+            recipe_data,
+            recipe_title,
+            base_prompt,
+            required=True,
+            image_purpose=image_purpose,
+        )
+        print("[TitleImage] Ollama only created the prompt; image_provider=openai")
+        return (
+            request_recipe_step_image_bytes(enhanced_prompt),
+            TITLE_IMAGE_PROVIDER_OPENAI,
+            False,
+        )
+
+    if provider == TITLE_IMAGE_PROVIDER_COMFYUI:
+        enhanced_prompt = enhance_recipe_image_prompt_with_ollama(
+            recipe_data,
+            recipe_title,
+            base_prompt,
+            required=False,
+            image_purpose=image_purpose,
+        )
+        return (
+            request_comfyui_title_image_bytes(enhanced_prompt),
+            TITLE_IMAGE_PROVIDER_COMFYUI,
+            False,
+        )
+
+    raise TitleImageGenerationError(
+        f"unsupported_provider:{provider}",
+        "Unsupported image provider.",
+        error_code="UNSUPPORTED_TITLE_IMAGE_PROVIDER",
+    )
+
+
+def generate_recipe_detail_image_bytes(recipe_data, recipe_title, base_prompt, image_purpose):
+    provider = title_image_provider()
+    print(f"[TitleImage] provider={provider}")
+
+    try:
+        return generate_recipe_detail_image_bytes_for_provider(
+            provider,
+            recipe_data,
+            recipe_title,
+            base_prompt,
+            image_purpose,
+        )
+    except TitleImageGenerationError as exc:
+        title_image_log_failure(exc.reason)
+        fallback_provider = title_image_fallback_provider()
+        if provider == TITLE_IMAGE_PROVIDER_COMFYUI and fallback_provider == TITLE_IMAGE_PROVIDER_OPENAI:
+            try:
+                return (
+                    generate_recipe_detail_image_with_openai(base_prompt),
+                    TITLE_IMAGE_PROVIDER_OPENAI,
+                    True,
+                )
+            except TimeoutError:
+                title_image_log_failure("fallback_openai_timeout")
+                raise
+            except TitleImageGenerationError as fallback_exc:
+                title_image_log_failure(f"fallback_{fallback_exc.reason}")
+                raise
+            except Exception as fallback_exc:
+                title_image_log_failure(
+                    f"fallback_openai_failed:{type(fallback_exc).__name__}:{fallback_exc}"
+                )
+                raise TitleImageGenerationError(
+                    f"fallback_openai_failed:{type(fallback_exc).__name__}:{fallback_exc}",
+                    "Image generation failed. Please try again.",
+                    error_code="RECIPE_DETAIL_IMAGE_FAILED",
+                ) from fallback_exc
+        raise
+
+
+def generated_recipe_detail_image_local_path(image_url):
+    image_url = str(image_url or "").strip()
+    prefix = f"{STEP_IMAGE_URL_PREFIX}/"
+    if not image_url.startswith(prefix):
+        return ""
+
+    filename = image_url[len(prefix):].strip().replace("\\", "/").split("/")[-1]
+    if not filename:
+        return ""
+
+    return str(STEP_IMAGE_FOLDER / filename)
+
+
 def generate_recipe_cover_image(payload):
     payload = payload if isinstance(payload, dict) else {}
     url = str(payload.get("url") or payload.get("recipe_url") or "").strip()
@@ -4553,9 +4703,6 @@ def generate_recipe_step_image(payload):
     if not url:
         return {"ok": False, "error": "Recipe URL is required."}
 
-    if not os.getenv("OPENAI_API_KEY"):
-        return {"ok": False, "error": "Image generation is not set up yet."}
-
     recipe_data = load_recipe_output(url)
     if not recipe_data:
         return {"ok": False, "error": "Recipe data was not found."}
@@ -4590,13 +4737,28 @@ def generate_recipe_step_image(payload):
     start_recipe_image_progress("step", url, progress_target, "Generating step image...")
 
     try:
-        image_bytes = request_recipe_step_image_bytes(prompt)
+        image_bytes, used_provider, fallback_used = generate_recipe_detail_image_bytes(
+            recipe_data,
+            recipe_title,
+            prompt,
+            "recipe instruction step image",
+        )
     except TimeoutError:
         error = "Image generation timed out. Please try again."
         finish_recipe_image_progress("step", url, progress_target, ok=False, error=error)
         return {
             "ok": False,
             "error": error,
+        }
+    except TitleImageGenerationError as exc:
+        error = exc.user_message
+        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error)
+        return {
+            "ok": False,
+            "error": error,
+            "error_code": exc.error_code,
+            "provider": title_image_provider(),
+            "local_generation_unavailable": exc.local_unavailable,
         }
     except Exception:
         error = "Image generation failed. Please try again."
@@ -4615,6 +4777,8 @@ def generate_recipe_step_image(payload):
         }
 
     step_image_url = save_recipe_step_image_file(url, target_instruction.get("step_number"), image_bytes)
+    if used_provider == TITLE_IMAGE_PROVIDER_COMFYUI:
+        print(f"[TitleImage] generated_local_image_path={generated_recipe_detail_image_local_path(step_image_url)}")
     generated_at = datetime.now(timezone.utc).isoformat()
     target_instruction["step_image_url"] = step_image_url
     target_instruction["step_image_generated_at"] = generated_at
@@ -4641,6 +4805,8 @@ def generate_recipe_step_image(payload):
         "step_number": target_instruction.get("step_number"),
         "step_image_url": step_image_url,
         "step_image_generated_at": generated_at,
+        "provider": used_provider,
+        "fallback_used": bool(fallback_used),
     }
 
 
@@ -4651,9 +4817,6 @@ def generate_recipe_equipment_image(payload):
 
     if not url:
         return {"ok": False, "error": "Recipe URL is required."}
-
-    if not os.getenv("OPENAI_API_KEY"):
-        return {"ok": False, "error": "Image generation is not set up yet."}
 
     recipe_data = load_recipe_output(url)
     if not recipe_data:
@@ -4690,13 +4853,28 @@ def generate_recipe_equipment_image(payload):
     start_recipe_image_progress("equipment", url, progress_target, "Generating equipment image...")
 
     try:
-        image_bytes = request_recipe_step_image_bytes(prompt)
+        image_bytes, used_provider, fallback_used = generate_recipe_detail_image_bytes(
+            recipe_data,
+            recipe_title,
+            prompt,
+            "recipe equipment item image",
+        )
     except TimeoutError:
         error = "Image generation timed out. Please try again."
         finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error)
         return {
             "ok": False,
             "error": error,
+        }
+    except TitleImageGenerationError as exc:
+        error = exc.user_message
+        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error)
+        return {
+            "ok": False,
+            "error": error,
+            "error_code": exc.error_code,
+            "provider": title_image_provider(),
+            "local_generation_unavailable": exc.local_unavailable,
         }
     except Exception:
         error = "Image generation failed. Please try again."
@@ -4715,6 +4893,8 @@ def generate_recipe_equipment_image(payload):
         }
 
     equipment_image_url = save_recipe_equipment_image_file(url, target_index + 1, image_bytes)
+    if used_provider == TITLE_IMAGE_PROVIDER_COMFYUI:
+        print(f"[TitleImage] generated_local_image_path={generated_recipe_detail_image_local_path(equipment_image_url)}")
     generated_at = datetime.now(timezone.utc).isoformat()
     target_equipment["equipment_image_url"] = equipment_image_url
     target_equipment["equipment_image_generated_at"] = generated_at
@@ -4741,6 +4921,8 @@ def generate_recipe_equipment_image(payload):
         "equipment_index": target_index + 1,
         "equipment_image_url": equipment_image_url,
         "equipment_image_generated_at": generated_at,
+        "provider": used_provider,
+        "fallback_used": bool(fallback_used),
     }
 
 
