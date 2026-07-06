@@ -12163,9 +12163,72 @@ def send_menu_item_recipe_batch_prompt_to_openai(
     return response.choices[0].message.content
 
 
-def _coerce_batch_inference_payload(payload):
+MENU_BATCH_INFERENCE_RESULT_FIELDS = {
+    "predicted_ingredients",
+    "ingredients",
+    "predicted_equipment",
+    "equipment",
+    "predicted_instructions",
+    "instructions",
+    "recipe_category",
+    "recipe_subcategory",
+    "recipe_course",
+    "cuisine",
+    "servings",
+    "prep_time",
+    "cook_time",
+    "total_time",
+    "difficulty",
+    "difficulty_level",
+    "confidence",
+    "notes",
+}
+
+
+def batch_inference_expected_item_ids(entries):
+    ids = []
+    for entry in entries or []:
+        entry = entry if isinstance(entry, dict) else {}
+        menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
+        item_id = clean_recipe_text(menu_item.get("menu_item_id") or entry.get("menu_item_id") or "")
+        if item_id:
+            ids.append(item_id)
+    return ids
+
+
+def batch_inference_value_looks_like_result(value):
+    return isinstance(value, dict) and any(key in value for key in MENU_BATCH_INFERENCE_RESULT_FIELDS)
+
+
+def coerce_single_batch_inference_result(value, expected_ids):
+    if len(expected_ids) != 1 or not isinstance(value, dict):
+        return None
+
+    if batch_inference_value_looks_like_result(value):
+        result = dict(value)
+        result.setdefault("menu_item_id", expected_ids[0])
+        return result
+
+    for key in ("recipe", "result", "inference", "recipe_inference", "menu_item_recipe"):
+        nested = value.get(key)
+        if isinstance(nested, dict) and batch_inference_value_looks_like_result(nested):
+            result = dict(nested)
+            result.setdefault("menu_item_id", expected_ids[0])
+            return result
+
+    dict_values = [nested for nested in value.values() if isinstance(nested, dict)]
+    if len(dict_values) == 1 and batch_inference_value_looks_like_result(dict_values[0]):
+        result = dict(dict_values[0])
+        result.setdefault("menu_item_id", expected_ids[0])
+        return result
+
+    return None
+
+
+def _coerce_batch_inference_payload(payload, entries=None):
     if not isinstance(payload, dict):
         return {}
+    expected_ids = batch_inference_expected_item_ids(entries)
     candidates = payload.get("items") or payload.get("recipes") or payload.get("recipe_inference") or payload
     if isinstance(candidates, list):
         keyed = {}
@@ -12175,8 +12238,16 @@ def _coerce_batch_inference_payload(payload):
             item_id = clean_recipe_text(item.get("menu_item_id") or item.get("id") or "")
             if item_id:
                 keyed[item_id] = item
+        if not keyed and len(candidates) == 1:
+            single = coerce_single_batch_inference_result(candidates[0], expected_ids)
+            if single:
+                keyed[expected_ids[0]] = single
         return keyed
     if isinstance(candidates, dict):
+        single = coerce_single_batch_inference_result(candidates, expected_ids)
+        if single:
+            return {expected_ids[0]: single}
+
         keyed = {}
         for key, value in candidates.items():
             if not isinstance(value, dict):
@@ -12184,6 +12255,11 @@ def _coerce_batch_inference_payload(payload):
             item_id = clean_recipe_text(value.get("menu_item_id") or value.get("id") or key)
             if item_id:
                 keyed[item_id] = value
+        if len(expected_ids) == 1 and expected_ids[0] not in keyed and len(keyed) == 1:
+            only_value = next(iter(keyed.values()))
+            single = coerce_single_batch_inference_result(only_value, expected_ids)
+            if single:
+                return {expected_ids[0]: single}
         return keyed
     return {}
 
@@ -12246,7 +12322,7 @@ def _infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=N
         parse_started = time.perf_counter()
         payload = json.loads(clean_json_response(response_text))
         _run_menu_batch_cancellation_check(cancellation_check)
-        items = _coerce_batch_inference_payload(payload)
+        items = _coerce_batch_inference_payload(payload, entries)
         if not items:
             raise ValueError("Menu batch inference did not return item results.")
         print(

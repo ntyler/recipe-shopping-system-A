@@ -251,8 +251,50 @@ def _normalize_instructions(value):
     return rows
 
 
-def normalize_ollama_full_recipe_payload(payload):
+OLLAMA_RECIPE_PAYLOAD_FIELDS = {
+    "recipe_name",
+    "recipe_title",
+    "name",
+    "servings",
+    "ingredients",
+    "predicted_ingredients",
+    "equipment",
+    "predicted_equipment",
+    "instructions",
+    "predicted_instructions",
+    "prep_time",
+    "cook_time",
+    "total_time",
+    "difficulty",
+    "difficulty_level",
+    "estimated_cost",
+    "cost_estimate",
+}
+
+
+def ollama_payload_has_recipe_fields(payload):
+    return isinstance(payload, dict) and any(key in payload for key in OLLAMA_RECIPE_PAYLOAD_FIELDS)
+
+
+def ollama_full_recipe_payload_body(payload):
     payload = payload if isinstance(payload, dict) else {}
+    if ollama_payload_has_recipe_fields(payload):
+        return payload
+
+    for key in ("recipe", "result", "full_recipe", "menu_item_recipe"):
+        value = payload.get(key)
+        if isinstance(value, dict):
+            return value
+
+    dict_values = [value for value in payload.values() if isinstance(value, dict)]
+    if len(dict_values) == 1:
+        return dict_values[0]
+
+    return payload
+
+
+def normalize_ollama_full_recipe_payload(payload):
+    payload = ollama_full_recipe_payload_body(payload)
     difficulty = _clean_text(payload.get("difficulty") or payload.get("difficulty_level"))
     return {
         "recipe_name": _clean_text(payload.get("recipe_name") or payload.get("recipe_title") or payload.get("name")),
@@ -821,6 +863,13 @@ def infer_menu_item_recipe_batch_with_ollama_support(
             error=error,
         )
 
+    failure_messages = [
+        _clean_text(failure.get("error"))
+        for failure in failures.values()
+        if isinstance(failure, dict) and _clean_text(failure.get("error"))
+    ]
+    error_message = "; ".join(dict.fromkeys(failure_messages))
+
     provider_summary = {
         "ai_provider": provider,
         "provider": provider,
@@ -843,6 +892,8 @@ def infer_menu_item_recipe_batch_with_ollama_support(
         "ok": not failures,
         "items": items,
         "failures": failures,
+        "error_message": error_message,
+        "technical_message": error_message,
         "model": model,
         "model_source": provider,
         "provider_summary": provider_summary,

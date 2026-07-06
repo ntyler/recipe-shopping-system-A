@@ -85,6 +85,32 @@ def test_generate_ollama_full_recipe_repairs_invalid_json_once(monkeypatch):
     assert calls[0]["url"].endswith("/api/generate")
 
 
+def test_ollama_full_recipe_validation_accepts_recipe_wrapper():
+    payload = {
+        "recipe": {
+            "recipe_title": "Papa a la Huancaina",
+            "servings": 4,
+            "ingredients": [
+                {"ingredient": "potatoes"},
+                {"ingredient": "aji amarillo sauce"},
+            ],
+            "equipment": ["saucepan", "blender"],
+            "instructions": ["Boil potatoes.", "Blend sauce.", "Slice potatoes.", "Serve with sauce."],
+            "prep_time": "15 minutes",
+            "cook_time": "25 minutes",
+            "total_time": "40 minutes",
+            "difficulty": "easy",
+            "estimated_cost": "$8-$12",
+        }
+    }
+
+    validation = ollama_service.validate_ollama_full_recipe_payload(payload, menu_entry())
+
+    assert validation["ok"] is True
+    assert validation["normalized"]["recipe_name"] == "Papa a la Huancaina"
+    assert validation["normalized"]["predicted_ingredients"][0]["ingredient"] == "potatoes"
+
+
 def test_ollama_defaults_to_local_model_and_conservative_concurrency(monkeypatch):
     monkeypatch.delenv("OLLAMA_FULL_RECIPE_MODEL", raising=False)
     monkeypatch.delenv("OLLAMA_FULL_RECIPE_BATCH_SIZE", raising=False)
@@ -152,6 +178,33 @@ def test_ollama_only_keeps_low_confidence_result_without_openai_fallback(monkeyp
     assert result["openai_fallback_count"] == 0
     assert result["fallback_used"] is False
     assert fallback_calls == []
+
+
+def test_ollama_only_failure_result_exposes_real_error_message(monkeypatch):
+    monkeypatch.setattr(
+        ollama_service,
+        "generate_ollama_full_recipe_for_entry",
+        lambda *args, **kwargs: {
+            "ok": False,
+            "inference": {},
+            "json_valid": True,
+            "low_confidence": True,
+            "low_confidence_reasons": ["required_fields_blank"],
+            "missing_fields": ["equipment"],
+            "error": "Ollama recipe JSON is missing required fields.",
+            "error_code": "OLLAMA_REQUIRED_FIELDS_MISSING",
+        },
+    )
+
+    result = ollama_service.infer_menu_item_recipe_batch_with_ollama_support(
+        [menu_entry()],
+        provider="ollama_only",
+    )
+
+    assert result["ok"] is False
+    assert result["items"] == {}
+    assert result["failures"]["item-1"]["error"] == "Ollama recipe JSON is missing required fields."
+    assert result["error_message"] == "Ollama recipe JSON is missing required fields."
 
 
 def test_auto_ollama_openai_falls_back_for_required_missing_fields(monkeypatch):

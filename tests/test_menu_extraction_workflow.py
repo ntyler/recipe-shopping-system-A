@@ -1716,6 +1716,30 @@ def test_menu_batch_payload_uses_embedded_menu_item_id_when_outer_key_is_name():
     assert items["item-2"]["predicted_ingredients"][0]["ingredient"] == "rice noodles"
 
 
+def test_single_item_menu_batch_payload_can_use_recipe_wrapper_without_id():
+    payload = {
+        "recipe": {
+            "predicted_ingredients": [{"ingredient": "potatoes"}],
+            "predicted_equipment": [{"name": "saucepan"}],
+            "predicted_instructions": [{"instruction": "Boil the potatoes."}],
+        }
+    }
+    entries = [
+        {
+            "menu_item": {
+                "menu_item_id": "1",
+                "item_name": "Papa a la Huancaina",
+            },
+        }
+    ]
+
+    items = recipe_extract_service._coerce_batch_inference_payload(payload, entries)
+
+    assert list(items) == ["1"]
+    assert items["1"]["menu_item_id"] == "1"
+    assert items["1"]["predicted_ingredients"][0]["ingredient"] == "potatoes"
+
+
 def test_menu_batch_prompt_includes_compact_category_prediction_rules():
     prompt = recipe_extract_service.build_menu_item_recipe_batch_prompt([
         {

@@ -1341,18 +1341,32 @@ def run_menu_generate_recipes_job(job_id, payload):
                 f"failed_count={len(failed_names)} failed_item_names={failed_names_text}"
             )
         if not result_items:
+            failure_messages = [
+                str(failure.get("error") or failure.get("error_message") or "").strip()
+                for failure in failure_items.values()
+                if isinstance(failure, dict)
+                and str(failure.get("error") or failure.get("error_message") or "").strip()
+            ]
             failed_items += len(batch)
             batch_error = (
                 batch_result.get("error_message")
+                or "; ".join(dict.fromkeys(failure_messages[:3]))
                 or ("Missing menu_item_id: " + ", ".join(missing_ids[:3]) if missing_ids else "Unable to predict recipes.")
             )
             for entry in batch:
                 failed_recipe_url = str(entry.get("recipe_url") or "").strip()
+                item_id = str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip()
+                failure = failure_items.get(item_id) if isinstance(failure_items.get(item_id), dict) else {}
+                failure_error = (
+                    failure.get("error")
+                    or failure.get("error_message")
+                    or batch_error
+                )
                 record_failed_recipe_item(
                     failed_recipe_url,
                     menu_batch_entry_item_name(entry),
                     "Recipe generation",
-                    batch_error,
+                    failure_error,
                 )
             append_job_warning(
                 job_id,
