@@ -165,13 +165,13 @@ def test_ollama_equipment_prompt_request_omits_recipe_ingredient_context():
     assert "lime" not in lower_request
 
 
-def test_equipment_prompt_finalizer_blocks_kitchen_interior_drift():
+def test_equipment_prompt_finalizer_blocks_kitchen_interior_drift_for_generic_alternatives():
     base_prompt = recipe_edit_service.build_recipe_equipment_image_prompt(
         recipe_title="Papa Potatoe a la Huancaina",
         servings="2",
         ingredients="- potato\n- crema\n- lime",
         equipment_item_number=2,
-        equipment_item="blender or food processor",
+        equipment_item="blender or immersion blender",
     )
     polished_prompt = (
         "A bright modern kitchen interior with white cabinets, a sink, windows, "
@@ -183,7 +183,7 @@ def test_equipment_prompt_finalizer_blocks_kitchen_interior_drift():
         polished_prompt,
     ).lower()
 
-    assert "blender or food processor" in final_prompt
+    assert "blender or immersion blender" in final_prompt
     assert "single isolated product reference photo" in final_prompt
     assert "choose exactly one option" in final_prompt
     assert "plain seamless light gray studio background" in final_prompt
@@ -199,6 +199,45 @@ def test_equipment_prompt_finalizer_blocks_kitchen_interior_drift():
     assert "lime" not in final_prompt
 
 
+def test_equipment_prompt_finalizer_handles_required_equipment_pair():
+    base_prompt = recipe_edit_service.build_recipe_equipment_image_prompt(
+        recipe_title="Smoothie Prep",
+        servings="2",
+        ingredients="- banana\n- milk",
+        equipment_item_number=1,
+        equipment_item="kitchen equipment: blender and food processor",
+    )
+
+    final_prompt = recipe_edit_service.finalize_equipment_image_prompt(base_prompt).lower()
+
+    assert "blender and food processor" in final_prompt
+    assert "show all named items side by side" in final_prompt
+    assert "choose exactly one option" not in final_prompt
+    assert "kitchen equipment" not in final_prompt
+    assert "kitchen interior" not in final_prompt
+    assert "banana" not in final_prompt
+    assert "milk" not in final_prompt
+
+
+def test_equipment_prompt_finalizer_treats_blender_or_food_processor_as_pair():
+    base_prompt = recipe_edit_service.build_recipe_equipment_image_prompt(
+        recipe_title="Smoothie Prep",
+        servings="2",
+        ingredients="- banana\n- milk",
+        equipment_item_number=1,
+        equipment_item="blender or food processor",
+    )
+
+    final_prompt = recipe_edit_service.finalize_equipment_image_prompt(base_prompt).lower()
+
+    assert "blender and food processor" in final_prompt
+    assert "show all named items side by side" in final_prompt
+    assert "choose exactly one option" not in final_prompt
+    assert "blender or food processor" not in final_prompt
+    assert "banana" not in final_prompt
+    assert "milk" not in final_prompt
+
+
 def test_comfyui_equipment_workflow_uses_food_negative_prompt(monkeypatch):
     monkeypatch.delenv("COMFYUI_NEGATIVE_PROMPT", raising=False)
     monkeypatch.delenv("COMFYUI_EQUIPMENT_NEGATIVE_PROMPT", raising=False)
@@ -211,6 +250,7 @@ def test_comfyui_equipment_workflow_uses_food_negative_prompt(monkeypatch):
     positive_prompt = workflow["6"]["inputs"]["text"].lower()
     negative_prompt = workflow["7"]["inputs"]["text"].lower()
 
+    assert workflow["9"]["inputs"]["filename_prefix"] == "recipe_equipment"
     assert "medium saucepan" in positive_prompt
     assert "kitchen" not in positive_prompt
     assert "potatoes" not in positive_prompt
@@ -291,6 +331,19 @@ def test_custom_comfyui_workflow_patches_recipe_prompts(monkeypatch, tmp_path):
     monkeypatch.setenv("COMFYUI_WORKFLOW_PATH", str(workflow_path))
     monkeypatch.setenv("COMFYUI_IMAGE_WIDTH", "768")
     monkeypatch.setenv("COMFYUI_IMAGE_HEIGHT", "768")
+    monkeypatch.setenv("COMFYUI_EQUIPMENT_IMAGE_WIDTH", "512")
+    monkeypatch.setenv("COMFYUI_EQUIPMENT_IMAGE_HEIGHT", "512")
+    monkeypatch.setenv("COMFYUI_EQUIPMENT_STEPS", "12")
+    monkeypatch.setenv("COMFYUI_EQUIPMENT_CFG", "6")
+    monkeypatch.setenv("COMFYUI_EQUIPMENT_SAMPLER", "euler")
+    monkeypatch.setenv("COMFYUI_EQUIPMENT_SCHEDULER", "normal")
+
+    title_workflow = recipe_edit_service.build_comfyui_workflow(
+        "realistic cookbook photo of tomato soup",
+        "recipe title image",
+        "http://127.0.0.1:8189",
+        1,
+    )
 
     workflow = recipe_edit_service.build_comfyui_workflow(
         "single isolated product reference photo of one clean empty blender",
@@ -299,10 +352,16 @@ def test_custom_comfyui_workflow_patches_recipe_prompts(monkeypatch, tmp_path):
         1,
     )
 
+    assert title_workflow["5"]["inputs"]["width"] == 768
+    assert title_workflow["5"]["inputs"]["height"] == 768
     assert workflow["6"]["inputs"]["text"] == "single isolated product reference photo of one clean empty blender"
     assert workflow["3"]["inputs"]["seed"] != 42
-    assert workflow["5"]["inputs"]["width"] == 768
-    assert workflow["5"]["inputs"]["height"] == 768
+    assert workflow["3"]["inputs"]["steps"] == 12
+    assert workflow["3"]["inputs"]["cfg"] == 6
+    assert workflow["3"]["inputs"]["sampler_name"] == "euler"
+    assert workflow["3"]["inputs"]["scheduler"] == "normal"
+    assert workflow["5"]["inputs"]["width"] == 512
+    assert workflow["5"]["inputs"]["height"] == 512
     assert workflow["10"]["inputs"]["filename_prefix"] == "recipe_equipment"
     negative_prompt = workflow["7"]["inputs"]["text"].lower()
     assert "food" in negative_prompt
@@ -864,8 +923,10 @@ def test_generate_recipe_equipment_image_payload_provider_can_choose_openai(monk
     assert result["fallback_used"] is False
     openai_prompt = calls["openai_prompt"].lower()
     assert "single isolated product reference photo" in openai_prompt
-    assert "blender or food processor" in openai_prompt
-    assert "choose exactly one option" in openai_prompt
+    assert "blender and food processor" in openai_prompt
+    assert "show all named items side by side" in openai_prompt
+    assert "blender or food processor" not in openai_prompt
+    assert "choose exactly one option" not in openai_prompt
     assert "plain seamless light gray studio background" in openai_prompt
     assert "kitchen" not in openai_prompt
     assert "cabinet" not in openai_prompt

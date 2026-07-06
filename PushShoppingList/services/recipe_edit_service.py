@@ -249,6 +249,81 @@ def title_image_configured_env_int(name, minimum=1, maximum=2048):
     return max(int(minimum), min(int(maximum), value))
 
 
+def title_image_configured_env_float(name, minimum=0.1, maximum=60.0):
+    raw_value = os.getenv(name)
+    if raw_value is None or not str(raw_value).strip():
+        return None
+
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+    return max(float(minimum), min(float(maximum), value))
+
+
+def comfyui_purpose_env_name(base_name, image_purpose="recipe title image"):
+    purpose = title_image_clean_text(image_purpose)
+    purpose_prefix = ""
+    if purpose == "recipe equipment item image":
+        purpose_prefix = "COMFYUI_EQUIPMENT"
+    elif purpose == "recipe instruction step image":
+        purpose_prefix = "COMFYUI_STEP"
+    elif purpose == "recipe title image":
+        purpose_prefix = "COMFYUI_TITLE"
+
+    if not purpose_prefix or not str(base_name or "").startswith("COMFYUI_"):
+        return ""
+
+    return f"{purpose_prefix}_{str(base_name)[len('COMFYUI_'):]}"
+
+
+def title_image_env_int_for_purpose(name, image_purpose, default, minimum=1, maximum=600):
+    purpose_name = comfyui_purpose_env_name(name, image_purpose)
+    if purpose_name and os.getenv(purpose_name) is not None and str(os.getenv(purpose_name)).strip():
+        return title_image_env_int(purpose_name, default, minimum=minimum, maximum=maximum)
+
+    return title_image_env_int(name, default, minimum=minimum, maximum=maximum)
+
+
+def title_image_env_float_for_purpose(name, image_purpose, default, minimum=0.1, maximum=60.0):
+    purpose_name = comfyui_purpose_env_name(name, image_purpose)
+    if purpose_name and os.getenv(purpose_name) is not None and str(os.getenv(purpose_name)).strip():
+        return title_image_env_float(purpose_name, default, minimum=minimum, maximum=maximum)
+
+    return title_image_env_float(name, default, minimum=minimum, maximum=maximum)
+
+
+def title_image_env_text_for_purpose(name, image_purpose):
+    purpose_name = comfyui_purpose_env_name(name, image_purpose)
+    if purpose_name:
+        purpose_value = title_image_clean_text(os.getenv(purpose_name))
+        if purpose_value:
+            return purpose_value
+
+    return title_image_clean_text(os.getenv(name))
+
+
+def title_image_configured_env_int_for_purpose(name, image_purpose, minimum=1, maximum=2048):
+    purpose_name = comfyui_purpose_env_name(name, image_purpose)
+    if purpose_name:
+        purpose_value = title_image_configured_env_int(purpose_name, minimum=minimum, maximum=maximum)
+        if purpose_value is not None:
+            return purpose_value
+
+    return title_image_configured_env_int(name, minimum=minimum, maximum=maximum)
+
+
+def title_image_configured_env_float_for_purpose(name, image_purpose, minimum=0.1, maximum=60.0):
+    purpose_name = comfyui_purpose_env_name(name, image_purpose)
+    if purpose_name:
+        purpose_value = title_image_configured_env_float(purpose_name, minimum=minimum, maximum=maximum)
+        if purpose_value is not None:
+            return purpose_value
+
+    return title_image_configured_env_float(name, minimum=minimum, maximum=maximum)
+
+
 def normalize_title_image_provider(value, default=TITLE_IMAGE_PROVIDER_OPENAI):
     provider = title_image_clean_text(value).lower()
     provider = provider.replace("-", "_")
@@ -419,13 +494,36 @@ def equipment_item_from_image_prompt(base_prompt):
     return ""
 
 
+def equipment_image_requested_subject(equipment_item):
+    subject = title_image_clean_text(equipment_item)
+    if not subject:
+        return ""
+
+    subject = title_image_clean_text(
+        re.sub(
+            r"^(?:kitchen\s+)?(?:equipment|tool|tools|appliance|appliances)\s*:\s*",
+            "",
+            subject,
+            flags=re.IGNORECASE,
+        )
+    ) or subject
+
+    required_pair_aliases = {
+        "blender or food processor": "blender and food processor",
+    }
+    return required_pair_aliases.get(subject.lower(), subject)
+
+
 def equipment_image_subject_phrase(equipment_item):
-    equipment_item = title_image_clean_text(equipment_item)
+    equipment_item = equipment_image_requested_subject(equipment_item)
     if not equipment_item:
         return "one clean empty cooking tool"
 
     if re.search(r"\b(or|and/or)\b|/", equipment_item, flags=re.IGNORECASE):
         return f"one clean empty appliance or tool matching {equipment_item}, choose exactly one option"
+
+    if re.search(r"\band\b", equipment_item, flags=re.IGNORECASE):
+        return f"a clean empty equipment set matching {equipment_item}, show all named items side by side"
 
     return f"one clean empty {equipment_item}"
 
@@ -487,7 +585,7 @@ def finalize_equipment_image_prompt(base_prompt, polished_prompt=""):
     if not style_notes:
         style_notes = "soft natural studio light, sharp focus, realistic material texture, 50mm lens, product catalog composition"
 
-    exact_subject = equipment_item or "the named equipment item"
+    exact_subject = equipment_image_requested_subject(equipment_item) or "the named equipment item"
     return title_image_clean_text(
         f"single isolated product reference photo of {subject}. "
         f"Exact equipment subject: {exact_subject}. "
@@ -904,8 +1002,56 @@ def patch_custom_comfyui_workflow(prompt, workflow, image_purpose="recipe title 
         if inputs is not None and "seed" in inputs:
             inputs["seed"] = seed
 
-    width = title_image_configured_env_int("COMFYUI_IMAGE_WIDTH", minimum=256, maximum=2048)
-    height = title_image_configured_env_int("COMFYUI_IMAGE_HEIGHT", minimum=256, maximum=2048)
+    sampler_overrides = {
+        "steps": title_image_configured_env_int_for_purpose(
+            "COMFYUI_STEPS",
+            image_purpose,
+            minimum=1,
+            maximum=100,
+        ),
+        "cfg": title_image_configured_env_float_for_purpose(
+            "COMFYUI_CFG",
+            image_purpose,
+            minimum=1.0,
+            maximum=30.0,
+        ),
+        "sampler_name": title_image_env_text_for_purpose("COMFYUI_SAMPLER", image_purpose),
+        "scheduler": title_image_env_text_for_purpose("COMFYUI_SCHEDULER", image_purpose),
+    }
+    sampler_overrides = {
+        name: value
+        for name, value in sampler_overrides.items()
+        if value is not None and str(value).strip()
+    }
+    if sampler_overrides:
+        configured_sampler_node_id = comfyui_configured_node_id("COMFYUI_SAMPLER_NODE_ID")
+        sampler_node_ids = [configured_sampler_node_id] if configured_sampler_node_id else [
+            node_id
+            for node_id, node in workflow.items()
+            if isinstance(node, dict)
+            and isinstance(node.get("inputs"), dict)
+            and any(name in node["inputs"] for name in sampler_overrides)
+        ]
+        for node_id in sampler_node_ids:
+            inputs = comfyui_workflow_inputs(workflow, node_id)
+            if not inputs:
+                continue
+            for name, value in sampler_overrides.items():
+                if name in inputs:
+                    inputs[name] = value
+
+    width = title_image_configured_env_int_for_purpose(
+        "COMFYUI_IMAGE_WIDTH",
+        image_purpose,
+        minimum=256,
+        maximum=2048,
+    )
+    height = title_image_configured_env_int_for_purpose(
+        "COMFYUI_IMAGE_HEIGHT",
+        image_purpose,
+        minimum=256,
+        maximum=2048,
+    )
     if width is not None or height is not None:
         configured_size_node_id = (
             comfyui_configured_node_id("COMFYUI_SIZE_NODE_ID")
@@ -927,7 +1073,7 @@ def patch_custom_comfyui_workflow(prompt, workflow, image_purpose="recipe title 
             if height is not None and "height" in inputs:
                 inputs["height"] = height
 
-    configured_checkpoint = title_image_clean_text(os.getenv("COMFYUI_CHECKPOINT"))
+    configured_checkpoint = title_image_env_text_for_purpose("COMFYUI_CHECKPOINT", image_purpose)
     if configured_checkpoint:
         configured_checkpoint_node_id = comfyui_configured_node_id("COMFYUI_CHECKPOINT_NODE_ID")
         checkpoint_node_ids = [configured_checkpoint_node_id] if configured_checkpoint_node_id else [
@@ -958,12 +1104,24 @@ def patch_custom_comfyui_workflow(prompt, workflow, image_purpose="recipe title 
 
 
 def build_default_comfyui_title_workflow(prompt, checkpoint_name, image_purpose="recipe title image"):
-    width = title_image_env_int("COMFYUI_IMAGE_WIDTH", 1024, minimum=256, maximum=2048)
-    height = title_image_env_int("COMFYUI_IMAGE_HEIGHT", 1024, minimum=256, maximum=2048)
-    steps = title_image_env_int("COMFYUI_STEPS", 24, minimum=1, maximum=100)
-    cfg = title_image_env_float("COMFYUI_CFG", 7.0, minimum=1.0, maximum=30.0)
-    sampler_name = title_image_clean_text(os.getenv("COMFYUI_SAMPLER")) or "euler"
-    scheduler = title_image_clean_text(os.getenv("COMFYUI_SCHEDULER")) or "normal"
+    width = title_image_env_int_for_purpose(
+        "COMFYUI_IMAGE_WIDTH",
+        image_purpose,
+        1024,
+        minimum=256,
+        maximum=2048,
+    )
+    height = title_image_env_int_for_purpose(
+        "COMFYUI_IMAGE_HEIGHT",
+        image_purpose,
+        1024,
+        minimum=256,
+        maximum=2048,
+    )
+    steps = title_image_env_int_for_purpose("COMFYUI_STEPS", image_purpose, 24, minimum=1, maximum=100)
+    cfg = title_image_env_float_for_purpose("COMFYUI_CFG", image_purpose, 7.0, minimum=1.0, maximum=30.0)
+    sampler_name = title_image_env_text_for_purpose("COMFYUI_SAMPLER", image_purpose) or "euler"
+    scheduler = title_image_env_text_for_purpose("COMFYUI_SCHEDULER", image_purpose) or "normal"
     negative_prompt = comfyui_negative_prompt_for_purpose(image_purpose)
     seed = uuid.uuid4().int % 1_000_000_000_000
 
@@ -1021,7 +1179,7 @@ def build_default_comfyui_title_workflow(prompt, checkpoint_name, image_purpose=
         "9": {
             "class_type": "SaveImage",
             "inputs": {
-                "filename_prefix": "recipe_title",
+                "filename_prefix": comfyui_filename_prefix_for_purpose(image_purpose),
                 "images": ["8", 0],
             },
         },
