@@ -11516,6 +11516,7 @@ function openCookbookNameEditor(button) {
     }
 
     form.setAttribute("action", `/api/cookbooks/${encodeURIComponent(cookbookId)}/rename`);
+    form.dataset.cookbookId = cookbookId;
     input.value = cookbookName;
     setCookbookNameEditorStatus("");
 
@@ -11529,6 +11530,56 @@ function openCookbookNameEditor(button) {
     }, 0);
 
     return false;
+}
+
+function cookbookCardById(cookbookId) {
+    const targetId = String(cookbookId || "").trim();
+
+    return targetId
+        ? document.querySelector(`[data-cookbook-card][data-cookbook-id="${cssEscape(targetId)}"]`)
+        : null;
+}
+
+function returnToCookbookAfterRename(cookbookId) {
+    let card = cookbookCardById(cookbookId);
+
+    if (!card) {
+        return false;
+    }
+
+    if (card.hidden && cookbookFilterSelect()) {
+        setCookbookFilterValue(cookbookId);
+        saveCookbookFilterValue(cookbookId);
+        applyCookbookRecipeSearch();
+        card = cookbookCardById(cookbookId);
+    }
+
+    if (!card || card.hidden) {
+        return false;
+    }
+
+    setCookbookCardCollapsed(card, false);
+
+    const storageKey = cookbookCardCollapseStorageKey(cookbookId);
+    if (storageKey) {
+        localStorage.setItem(storageKey, "expanded");
+    }
+
+    const scrollToCard = () => {
+        card.scrollIntoView({ behavior: "smooth", block: "start" });
+
+        if (typeof card.focus === "function") {
+            try {
+                card.focus({ preventScroll: true });
+            } catch (err) {
+                card.focus();
+            }
+        }
+    };
+
+    window.requestAnimationFrame(scrollToCard);
+    window.setTimeout(scrollToCard, 80);
+    return true;
 }
 
 function closeCookbookNameEditor() {
@@ -11842,6 +11893,7 @@ async function saveCookbookName(event) {
     const form = event.currentTarget;
     const button = form ? form.querySelector(".cookbook-name-save-btn") : null;
     const originalText = button ? button.textContent : "";
+    const cookbookId = form ? form.dataset.cookbookId || "" : "";
 
     try {
         if (button) {
@@ -11855,7 +11907,9 @@ async function saveCookbookName(event) {
         await refreshStoreMarkup({
             cacheBust: true,
             requireRecipeLog: true,
+            restoreScroll: false,
         });
+        returnToCookbookAfterRename(cookbookId);
         showRecipeQuantityUpdatedMessage("", "", "", "Cookbook name saved.");
     } catch (err) {
         console.warn("Unable to rename cookbook.", err);
@@ -31702,7 +31756,10 @@ async function refreshStoreMarkup(options = {}) {
     }
 
     afterDynamicMarkupLoaded();
-    restoreWindowScroll(scrollX, scrollY);
+
+    if (options.restoreScroll !== false) {
+        restoreWindowScroll(scrollX, scrollY);
+    }
 }
 
 function restoreWindowScroll(scrollX, scrollY) {
