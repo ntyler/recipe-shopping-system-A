@@ -9068,6 +9068,8 @@ const COOKBOOK_MENU_MODE_SESSION_KEY = "cookbook-menu-mode";
 const DEFAULT_COOKBOOK_MENU_MODE = "restaurant_menu";
 const COOKBOOK_RECIPE_SORT_KEYS = new Set(["menu_section", "menu_price", "name", "recipe_number"]);
 const COOKBOOK_RECIPE_SORT_DIRECTIONS = new Set(["asc", "desc"]);
+const DEFAULT_COOKBOOK_RECIPE_SORT_STATE = { sortKey: "menu_section", direction: "asc" };
+const DEFAULT_COOKBOOK_MENU_SECTION_LABEL = "Miscellaneous";
 
 function normalizedCookbookSearchText(value) {
     return String(value || "")
@@ -9194,7 +9196,7 @@ function cookbookRecipeSortDirectionLabel(direction) {
 
 function cookbookRecipeMenuSectionLabel(card) {
     const value = String(card && card.dataset ? card.dataset.cookbookMenuSection || "" : "").trim();
-    return value || "Other Recipes";
+    return value || DEFAULT_COOKBOOK_MENU_SECTION_LABEL;
 }
 
 function cookbookRecipeMenuPriceLabel(card) {
@@ -9522,12 +9524,16 @@ function applyCookbookRecipeSort(card, sortKey, options = {}) {
 function restoreCookbookRecipeSortState() {
     document.querySelectorAll("[data-cookbook-card]").forEach(card => {
         const storageKey = cookbookRecipeSortStorageKey(card.dataset.cookbookId || "");
-        let state = { sortKey: "", direction: "" };
+        let state = { ...DEFAULT_COOKBOOK_RECIPE_SORT_STATE };
 
         try {
-            state = normalizeCookbookRecipeSortState(storageKey ? sessionStorage.getItem(storageKey) || "" : "");
+            state = normalizeCookbookRecipeSortState(
+                storageKey
+                    ? sessionStorage.getItem(storageKey) || DEFAULT_COOKBOOK_RECIPE_SORT_STATE
+                    : DEFAULT_COOKBOOK_RECIPE_SORT_STATE,
+            );
         } catch (err) {
-            state = { sortKey: "", direction: "" };
+            state = { ...DEFAULT_COOKBOOK_RECIPE_SORT_STATE };
         }
 
         if (state.sortKey && state.direction) {

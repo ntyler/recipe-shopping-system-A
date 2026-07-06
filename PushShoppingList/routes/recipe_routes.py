@@ -92,6 +92,7 @@ from PushShoppingList.services.cookbook_service import load_cookbooks
 from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
 from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_ALL_FIELDS
 from PushShoppingList.services.cookbook_service import CATEGORY_SOURCE_AI_INFERRED
+from PushShoppingList.services.cookbook_service import MISCELLANEOUS_MENU_SECTION
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import purge_recipe_from_all_cookbooks
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
@@ -1049,9 +1050,26 @@ def import_text_items(values, field_names):
     return items
 
 
+def import_recipe_text_value(recipe_metadata, *field_names):
+    recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
+
+    for field_name in field_names:
+        value = str(recipe_metadata.get(field_name) or "").strip()
+        if value:
+            return value
+
+    return ""
+
+
 def import_recipe_record(url, recipe_metadata=None):
     recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
     title = import_recipe_title(recipe_metadata, url)
+    menu_section = import_recipe_text_value(
+        recipe_metadata,
+        "menu_section",
+        "section_name",
+        "restaurant_menu_category",
+    ) or MISCELLANEOUS_MENU_SECTION
 
     return {
         "url": url,
@@ -1079,6 +1097,42 @@ def import_recipe_record(url, recipe_metadata=None):
         ),
         "sections": ingredient_sections_from_recipe_data(recipe_metadata.get("ingredients", [])),
         "cover_image": recipe_metadata.get("cover_image") or {},
+        "menu_section": menu_section,
+        "section_name": menu_section,
+        "menu_section_id": import_recipe_text_value(recipe_metadata, "menu_section_id", "section_id"),
+        "menu_item_id": import_recipe_text_value(recipe_metadata, "menu_item_id", "item_id"),
+        "restaurant_id": import_recipe_text_value(recipe_metadata, "restaurant_id"),
+        "menu_id": import_recipe_text_value(recipe_metadata, "menu_id"),
+        "menu_item_name": import_recipe_text_value(
+            recipe_metadata,
+            "menu_item_name",
+            "item_name",
+            "display_name",
+            "recipe_title",
+        ),
+        "item_name": import_recipe_text_value(
+            recipe_metadata,
+            "item_name",
+            "menu_item_name",
+            "display_name",
+            "recipe_title",
+        ),
+        "menu_order_url": import_recipe_text_value(recipe_metadata, "menu_order_url", "deep_link_url"),
+        "deep_link_url": import_recipe_text_value(recipe_metadata, "deep_link_url", "menu_order_url"),
+        "menu_description": import_recipe_text_value(
+            recipe_metadata,
+            "menu_description",
+            "item_description",
+            "description",
+            "summary",
+        ),
+        "menu_price": import_recipe_text_value(recipe_metadata, "menu_price", "price", "price_text"),
+        "parent_menu_snapshot_id": import_recipe_text_value(recipe_metadata, "parent_menu_snapshot_id", "menu_mega_snapshot_id"),
+        "menu_mega_snapshot_id": import_recipe_text_value(recipe_metadata, "menu_mega_snapshot_id", "parent_menu_snapshot_id"),
+        "source_type": import_recipe_text_value(recipe_metadata, "source_type"),
+        "source_import_type": import_recipe_text_value(recipe_metadata, "source_import_type"),
+        "ai_inferred": bool(recipe_metadata.get("ai_inferred")),
+        "needs_ai_recipe": bool(recipe_metadata.get("needs_ai_recipe")),
     }
 
 

@@ -29,6 +29,7 @@ COOKBOOK_CATEGORY_FIELDS = (
 COOKBOOK_CATEGORY_ALL_FIELDS = (*COOKBOOK_CATEGORY_FIELDS, "custom_categories")
 COOKBOOK_RECIPE_METADATA_FIELDS = (
     "source_type",
+    "source_import_type",
     "recipe_status",
     "menu_section",
     "section_name",
@@ -77,6 +78,7 @@ CATEGORY_SOURCE_VALUES = {
     CATEGORY_SOURCE_AI_INFERRED,
     CATEGORY_SOURCE_BLANK,
 }
+MISCELLANEOUS_MENU_SECTION = "Miscellaneous"
 
 COOKBOOK_MENU_MODES = (
     {
@@ -103,7 +105,7 @@ COOKBOOK_MENU_MODES = (
         "label": "Menu Section",
         "section_field": "menu_section",
         "sections": (),
-        "fallback": "Other Recipes",
+        "fallback": MISCELLANEOUS_MENU_SECTION,
     },
     {
         "key": "cuisine",

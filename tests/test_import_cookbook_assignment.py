@@ -65,6 +65,52 @@ def test_import_assignment_saves_recipe_to_selected_cookbook():
         assert target["recipes"][0]["inactive_time"] == "0 min"
         assert target["recipes"][0]["cook_time"] == "20 min"
         assert target["recipes"][0]["sections"]["INGREDIENTS"][0]["name"] == "black beans"
+        assert target["recipes"][0]["menu_section"] == "Miscellaneous"
+
+
+def test_import_assignment_preserves_menu_metadata_in_cookbook_row():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook = cookbook_service.find_or_create_cookbook("Menu Import")
+
+        recipe_routes.save_import_cookbook_assignment(
+            "https://example.com/menu?menu_item=lomo",
+            {
+                "display_name": "Lomo Saltado",
+                "menu_section": "SALTADOS",
+                "menu_section_id": "section-006",
+                "menu_item_id": "section-006-item-001",
+                "menu_item_name": "Lomo Saltado",
+                "menu_price": "$18.00",
+                "menu_order_url": "https://example.com/menu?menu_item_id=section-006-item-001",
+                "parent_menu_snapshot_id": "snapshot-1",
+                "source_type": "menu_item_inferred",
+                "source_import_type": "menu_url_import",
+                "ai_inferred": True,
+                "needs_ai_recipe": True,
+            },
+            cookbook,
+        )
+
+        data = cookbook_service.load_cookbooks()
+        target = next(item for item in data["cookbooks"] if item["id"] == cookbook["id"])
+        row = target["recipes"][0]
+
+        assert row["menu_section"] == "SALTADOS"
+        assert row["section_name"] == "SALTADOS"
+        assert row["menu_section_id"] == "section-006"
+        assert row["menu_item_id"] == "section-006-item-001"
+        assert row["menu_item_name"] == "Lomo Saltado"
+        assert row["menu_price"] == "$18.00"
+        assert row["menu_order_url"] == "https://example.com/menu?menu_item_id=section-006-item-001"
+        assert row["parent_menu_snapshot_id"] == "snapshot-1"
+        assert row["source_type"] == "menu_item_inferred"
+        assert row["source_import_type"] == "menu_url_import"
+        assert row["ai_inferred"] is True
+        assert row["needs_ai_recipe"] is True
 
 
 def test_import_cookbook_selector_static_hooks_are_present():

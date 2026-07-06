@@ -130,6 +130,8 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     assert 'data-cookbook-recipe-number="{{ recipe.number or loop.index }}"' in template
     assert "const COOKBOOK_RECIPE_SORT_KEYS" in script
     assert "const COOKBOOK_RECIPE_SORT_DIRECTIONS" in script
+    assert 'const DEFAULT_COOKBOOK_RECIPE_SORT_STATE = { sortKey: "menu_section", direction: "asc" };' in script
+    assert 'const DEFAULT_COOKBOOK_MENU_SECTION_LABEL = "Miscellaneous";' in script
     assert "function cookbookCardFromControl(control)" in script
     assert 'menu.recipeEditAnchorButton.closest("[data-cookbook-card]")' in script
     assert "function normalizeCookbookRecipeSortState(value)" in script
@@ -149,6 +151,7 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     assert "Menu Price:" in script
     assert "updateCookbookRecipeSortDecorationVisibility(card);" in script
     assert "restoreCookbookRecipeSortState();" in script
+    assert "DEFAULT_COOKBOOK_RECIPE_SORT_STATE" in script
     assert ".cookbook-sort-menu-section [data-cookbook-sort-option][aria-pressed=\"true\"]" in css
     assert ".cookbook-recipe-sort-section-heading" in css
     assert ".cookbook-recipe-menu-price-badge" in css
@@ -159,6 +162,7 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     assert "currentState.direction === \"asc\"" in script
     assert "currentState.direction === \"desc\"" in script
     assert '"menu_section_id"' in read_text("PushShoppingList/services/cookbook_service.py")
+    assert 'MISCELLANEOUS_MENU_SECTION = "Miscellaneous"' in read_text("PushShoppingList/services/cookbook_service.py")
     assert "returned to default order" in script
 
 
@@ -1012,6 +1016,24 @@ def test_cookbook_menu_section_order_can_be_saved_and_rendered():
     assert recipes_by_name["Ramen"]["menu_section_order"] == 0
     assert recipes_by_name["Dumpling"]["menu_section_order"] == 1
     assert recipes_by_name["Mochi"]["menu_section_order"] == 2
+
+
+def test_cookbook_menu_section_blank_falls_back_to_miscellaneous():
+    sections = cookbook_service.cookbook_menu_sections([
+        {
+            "url": "https://example.com/chicken-alfredo",
+            "name": "Chicken Alfredo",
+            "menu_section": "",
+        }
+    ])
+
+    menu_section = next(
+        section
+        for section in sections["menu_section"]
+        if section["label"] == "Miscellaneous"
+    )
+
+    assert menu_section["recipes"][0]["name"] == "Chicken Alfredo"
 
 
 def test_cookbook_category_update_requires_confirmation_before_overwriting_manual_values():
