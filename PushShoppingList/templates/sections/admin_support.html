@@ -66,6 +66,23 @@
         <div class="pdf-orphan-list" data-cloudflare-orphan-pdf-list hidden></div>
     </div>
 
+    <div class="admin-support-audit local-title-image-admin" data-local-title-image-admin>
+        <div class="pdf-orphan-admin-main">
+            <h3>Local Title Images</h3>
+            <div class="pdf-share-meta">
+                <span>ComfyUI local generation check</span>
+            </div>
+        </div>
+        <div class="pdf-orphan-actions">
+            <button type="button"
+                    class="pdf-share-action-btn"
+                    onclick="return testLocalTitleImageGeneration(this)">
+                Test Local Image Generation
+            </button>
+        </div>
+        <div class="pdf-share-status" data-local-title-image-status aria-live="polite"></div>
+    </div>
+
     {% set selected_user = admin_support.selected_user %}
     {% if admin_support.can_manage_admin_access %}
         <div class="admin-support-audit admin-access-manager">

@@ -70,6 +70,18 @@ For user pass-through billing, the app stores an app-owned billing ledger in eac
 
 Set these pricing variables in the same PowerShell session that starts the Flask app, or set them permanently with Windows environment-variable tooling and restart the app. If the dashboard shows `Pricing not configured`, usage is being recorded but the running app has not loaded usable API pricing rates.
 
+Optional free local recipe title image generation with ComfyUI:
+
+```powershell
+$env:TITLE_IMAGE_PROVIDER="comfyui"
+$env:TITLE_IMAGE_FALLBACK_PROVIDER="none"
+$env:OLLAMA_URL="http://localhost:11434"
+$env:OLLAMA_PROMPT_MODEL="qwen2.5:7b"
+$env:COMFYUI_URL="http://127.0.0.1:8188"
+```
+
+In `comfyui` mode, Ollama only improves the image prompt. ComfyUI/Stable Diffusion generates the image locally, and OpenAI image generation is not used unless you explicitly set `TITLE_IMAGE_FALLBACK_PROVIDER=openai`.
+
 Optional ntfy topic for phone/computer extraction notifications:
 
 ```powershell

@@ -645,6 +645,18 @@ def test_recipe_editor_has_generate_title_image_action():
     assert '@recipe_bp.route("/api/recipe_cover_image/generate", methods=["POST"])' in routes
 
 
+def test_admin_support_has_local_title_image_generation_test_action():
+    template = (ROOT / "PushShoppingList/templates/sections/admin_support.html").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
+
+    assert "Test Local Image Generation" in template
+    assert "data-local-title-image-status" in template
+    assert "function testLocalTitleImageGeneration(button)" in script
+    assert 'fetch("/api/recipe_cover_image/test-local"' in script
+    assert '@recipe_bp.route("/api/recipe_cover_image/test-local", methods=["POST"])' in routes
+
+
 def test_mobile_account_dates_stack_left_aligned():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 

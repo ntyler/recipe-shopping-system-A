@@ -3,6 +3,7 @@ from copy import deepcopy
 import json
 import mimetypes
 import os
+import re
 import uuid
 from datetime import datetime
 from datetime import timezone
@@ -10,6 +11,7 @@ from pathlib import Path
 from urllib.parse import parse_qs
 from urllib.parse import parse_qsl
 from time import perf_counter
+from time import sleep
 from urllib.parse import quote
 from urllib.parse import urlencode
 from urllib.parse import urlparse
@@ -161,6 +163,554 @@ COVER_IMAGE_MIME_EXTENSIONS = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
+TITLE_IMAGE_PROVIDER_ENV_VAR = "TITLE_IMAGE_PROVIDER"
+TITLE_IMAGE_FALLBACK_PROVIDER_ENV_VAR = "TITLE_IMAGE_FALLBACK_PROVIDER"
+TITLE_IMAGE_PROVIDER_OPENAI = "openai"
+TITLE_IMAGE_PROVIDER_OLLAMA_PROMPT_ONLY = "ollama_prompt_only"
+TITLE_IMAGE_PROVIDER_COMFYUI = "comfyui"
+TITLE_IMAGE_PROVIDER_NONE = "none"
+TITLE_IMAGE_ALLOWED_PROVIDERS = {
+    TITLE_IMAGE_PROVIDER_OPENAI,
+    TITLE_IMAGE_PROVIDER_OLLAMA_PROMPT_ONLY,
+    TITLE_IMAGE_PROVIDER_COMFYUI,
+}
+TITLE_IMAGE_ALLOWED_FALLBACK_PROVIDERS = {
+    TITLE_IMAGE_PROVIDER_OPENAI,
+    TITLE_IMAGE_PROVIDER_NONE,
+}
+OLLAMA_URL_ENV_VAR = "OLLAMA_URL"
+OLLAMA_PROMPT_MODEL_ENV_VAR = "OLLAMA_PROMPT_MODEL"
+OLLAMA_PROMPT_MODEL_DEFAULT = "qwen2.5:7b"
+OLLAMA_URL_DEFAULT = "http://localhost:11434"
+COMFYUI_URL_ENV_VAR = "COMFYUI_URL"
+COMFYUI_URL_DEFAULT = "http://127.0.0.1:8188"
+LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE = "Local image generation is unavailable. Start ComfyUI and try again."
+TITLE_IMAGE_OPENAI_SETUP_MESSAGE = "Image generation is not set up yet."
+
+
+class TitleImageGenerationError(RuntimeError):
+    def __init__(
+        self,
+        reason,
+        user_message="",
+        error_code="TITLE_IMAGE_GENERATION_FAILED",
+        local_unavailable=False,
+    ):
+        super().__init__(reason)
+        self.reason = str(reason or "unknown_error")
+        self.user_message = str(user_message or "Unable to generate title image.")
+        self.error_code = str(error_code or "TITLE_IMAGE_GENERATION_FAILED")
+        self.local_unavailable = bool(local_unavailable)
+
+
+def title_image_clean_text(value):
+    return " ".join(str(value or "").strip().split())
+
+
+def title_image_log_failure(reason):
+    print(f"[TitleImage] failed reason={title_image_clean_text(reason) or 'unknown_error'}")
+
+
+def title_image_env_int(name, default, minimum=1, maximum=600):
+    try:
+        value = int(os.getenv(name, str(default)) or default)
+    except (TypeError, ValueError):
+        value = int(default)
+    return max(int(minimum), min(int(maximum), value))
+
+
+def title_image_env_float(name, default, minimum=0.1, maximum=60.0):
+    try:
+        value = float(os.getenv(name, str(default)) or default)
+    except (TypeError, ValueError):
+        value = float(default)
+    return max(float(minimum), min(float(maximum), value))
+
+
+def normalize_title_image_provider(value, default=TITLE_IMAGE_PROVIDER_OPENAI):
+    provider = title_image_clean_text(value).lower()
+    provider = provider.replace("-", "_")
+    return provider if provider in TITLE_IMAGE_ALLOWED_PROVIDERS else default
+
+
+def title_image_provider(value=None):
+    if value is not None and title_image_clean_text(value):
+        return normalize_title_image_provider(value)
+    return normalize_title_image_provider(os.getenv(TITLE_IMAGE_PROVIDER_ENV_VAR))
+
+
+def title_image_fallback_provider(value=None):
+    fallback = title_image_clean_text(
+        value if value is not None else os.getenv(TITLE_IMAGE_FALLBACK_PROVIDER_ENV_VAR)
+    ).lower().replace("-", "_")
+    return fallback if fallback in TITLE_IMAGE_ALLOWED_FALLBACK_PROVIDERS else TITLE_IMAGE_PROVIDER_NONE
+
+
+def ollama_prompt_model():
+    return title_image_clean_text(os.getenv(OLLAMA_PROMPT_MODEL_ENV_VAR)) or OLLAMA_PROMPT_MODEL_DEFAULT
+
+
+def ollama_prompt_base_url():
+    return (
+        title_image_clean_text(os.getenv(OLLAMA_URL_ENV_VAR))
+        or title_image_clean_text(os.getenv("OLLAMA_BASE_URL"))
+        or OLLAMA_URL_DEFAULT
+    ).rstrip("/")
+
+
+def comfyui_base_url():
+    return (title_image_clean_text(os.getenv(COMFYUI_URL_ENV_VAR)) or COMFYUI_URL_DEFAULT).rstrip("/")
+
+
+def title_image_ollama_timeout_seconds():
+    return title_image_env_float("OLLAMA_PROMPT_TIMEOUT_SECONDS", 30.0, minimum=1.0, maximum=180.0)
+
+
+def comfyui_request_timeout_seconds():
+    return title_image_env_float("COMFYUI_REQUEST_TIMEOUT_SECONDS", 15.0, minimum=1.0, maximum=120.0)
+
+
+def comfyui_poll_timeout_seconds():
+    return title_image_env_float("COMFYUI_POLL_TIMEOUT_SECONDS", 140.0, minimum=5.0, maximum=600.0)
+
+
+def comfyui_poll_interval_seconds():
+    return title_image_env_float("COMFYUI_POLL_INTERVAL_SECONDS", 1.0, minimum=0.25, maximum=10.0)
+
+
+def title_image_recipe_context(recipe_data, recipe_title):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    cuisine = ", ".join(normalize_text_rows(recipe_data.get("cuisine_tags") or recipe_data.get("cuisine")))
+    ingredients = recipe_step_image_prompt_ingredients(recipe_data.get("ingredients", []))
+
+    return {
+        "recipe_name": title_image_clean_text(
+            recipe_title
+            or recipe_data.get("recipe_title")
+            or recipe_data.get("display_name")
+            or recipe_data.get("menu_item_name")
+        ),
+        "description": title_image_clean_text(
+            recipe_data.get("description")
+            or recipe_data.get("summary")
+            or recipe_data.get("notes")
+            or recipe_data.get("menu_description")
+        ),
+        "cuisine": cuisine,
+        "menu_section": title_image_clean_text(recipe_data.get("menu_section") or recipe_data.get("section")),
+        "ingredients": ingredients,
+    }
+
+
+def build_ollama_title_image_prompt_request(recipe_data, recipe_title, base_prompt):
+    context = title_image_recipe_context(recipe_data, recipe_title)
+    return f"""You improve prompts for local Stable Diffusion food photography.
+
+Return only one polished image prompt. Do not return JSON. Do not add commentary.
+You are not generating an image; you are only improving the prompt for an image model.
+
+Recipe context:
+{json.dumps(context, ensure_ascii=False)}
+
+Base prompt:
+{base_prompt}
+
+Prompt rules:
+- Preserve the specific recipe, cuisine, and likely ingredients.
+- Describe a realistic finished dish with appetizing plating.
+- Keep it suitable for Stable Diffusion or ComfyUI.
+- Include natural light, texture, camera style, and food styling cues.
+- Do not include text, logos, watermarks, branded packaging, labels, or menus.
+"""
+
+
+def strip_ollama_prompt_response(value):
+    text = str(value or "").strip()
+    text = re.sub(r"^```(?:text|prompt)?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*```$", "", text)
+    text = text.strip().strip('"').strip("'").strip()
+    return text
+
+
+def enhance_recipe_title_image_prompt_with_ollama(recipe_data, recipe_title, base_prompt, required=False):
+    model = ollama_prompt_model()
+    base_url = ollama_prompt_base_url()
+    print(f"[TitleImage] ollama_prompt_model={model}")
+
+    payload = {
+        "model": model,
+        "prompt": build_ollama_title_image_prompt_request(recipe_data, recipe_title, base_prompt),
+        "stream": False,
+        "options": {
+            "temperature": 0.4,
+        },
+    }
+
+    try:
+        response = requests.post(
+            f"{base_url}/api/generate",
+            json=payload,
+            timeout=title_image_ollama_timeout_seconds(),
+        )
+        response.raise_for_status()
+        data = response.json()
+        text = data.get("response")
+        if text is None and isinstance(data.get("message"), dict):
+            text = data["message"].get("content")
+        polished_prompt = strip_ollama_prompt_response(text)
+        if len(polished_prompt) < 20:
+            raise TitleImageGenerationError(
+                "ollama_prompt_empty",
+                "Title image prompt enhancement failed. Please try again.",
+                error_code="OLLAMA_PROMPT_FAILED",
+            )
+        return polished_prompt
+    except TitleImageGenerationError:
+        if required:
+            raise
+    except Exception as exc:
+        reason = f"ollama_prompt_failed:{type(exc).__name__}:{exc}"
+        print(f"[TitleImage] ollama_prompt_failed reason={title_image_clean_text(reason)}")
+        if required:
+            raise TitleImageGenerationError(
+                reason,
+                "Title image prompt enhancement failed. Please try again.",
+                error_code="OLLAMA_PROMPT_FAILED",
+            ) from exc
+
+    return base_prompt
+
+
+def comfyui_checkpoint_name(base_url, request_timeout):
+    configured_checkpoint = title_image_clean_text(os.getenv("COMFYUI_CHECKPOINT"))
+    if configured_checkpoint:
+        return configured_checkpoint
+
+    try:
+        response = requests.get(
+            f"{base_url}/object_info/CheckpointLoaderSimple",
+            timeout=request_timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+        checkpoint_info = (
+            data.get("CheckpointLoaderSimple", {})
+            .get("input", {})
+            .get("required", {})
+            .get("ckpt_name", [])
+        )
+        checkpoint_names = checkpoint_info[0] if checkpoint_info and isinstance(checkpoint_info[0], list) else []
+        checkpoint_name = title_image_clean_text(checkpoint_names[0] if checkpoint_names else "")
+        if checkpoint_name:
+            return checkpoint_name
+    except Exception as exc:
+        raise TitleImageGenerationError(
+            f"comfyui_checkpoint_lookup_failed:{type(exc).__name__}:{exc}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_UNAVAILABLE",
+            local_unavailable=True,
+        ) from exc
+
+    raise TitleImageGenerationError(
+        "comfyui_checkpoint_not_found",
+        LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+        error_code="COMFYUI_CHECKPOINT_NOT_FOUND",
+        local_unavailable=True,
+    )
+
+
+def build_default_comfyui_title_workflow(prompt, checkpoint_name):
+    width = title_image_env_int("COMFYUI_IMAGE_WIDTH", 1024, minimum=256, maximum=2048)
+    height = title_image_env_int("COMFYUI_IMAGE_HEIGHT", 1024, minimum=256, maximum=2048)
+    steps = title_image_env_int("COMFYUI_STEPS", 24, minimum=1, maximum=100)
+    cfg = title_image_env_float("COMFYUI_CFG", 7.0, minimum=1.0, maximum=30.0)
+    sampler_name = title_image_clean_text(os.getenv("COMFYUI_SAMPLER")) or "euler"
+    scheduler = title_image_clean_text(os.getenv("COMFYUI_SCHEDULER")) or "normal"
+    negative_prompt = title_image_clean_text(os.getenv("COMFYUI_NEGATIVE_PROMPT")) or (
+        "text, labels, captions, logos, watermarks, branded packaging, extra fingers, "
+        "deformed food, low quality, blurry, overexposed"
+    )
+    seed = uuid.uuid4().int % 1_000_000_000_000
+
+    return {
+        "3": {
+            "class_type": "KSampler",
+            "inputs": {
+                "seed": seed,
+                "steps": steps,
+                "cfg": cfg,
+                "sampler_name": sampler_name,
+                "scheduler": scheduler,
+                "denoise": 1,
+                "model": ["4", 0],
+                "positive": ["6", 0],
+                "negative": ["7", 0],
+                "latent_image": ["5", 0],
+            },
+        },
+        "4": {
+            "class_type": "CheckpointLoaderSimple",
+            "inputs": {
+                "ckpt_name": checkpoint_name,
+            },
+        },
+        "5": {
+            "class_type": "EmptyLatentImage",
+            "inputs": {
+                "width": width,
+                "height": height,
+                "batch_size": 1,
+            },
+        },
+        "6": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {
+                "text": prompt,
+                "clip": ["4", 1],
+            },
+        },
+        "7": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {
+                "text": negative_prompt,
+                "clip": ["4", 1],
+            },
+        },
+        "8": {
+            "class_type": "VAEDecode",
+            "inputs": {
+                "samples": ["3", 0],
+                "vae": ["4", 2],
+            },
+        },
+        "9": {
+            "class_type": "SaveImage",
+            "inputs": {
+                "filename_prefix": "recipe_title",
+                "images": ["8", 0],
+            },
+        },
+    }
+
+
+def comfyui_history_record(history_payload, prompt_id):
+    if not isinstance(history_payload, dict):
+        return {}
+
+    record = history_payload.get(prompt_id)
+    if isinstance(record, dict):
+        return record
+
+    if "outputs" in history_payload:
+        return history_payload
+
+    return {}
+
+
+def comfyui_history_error_reason(record):
+    if not isinstance(record, dict):
+        return ""
+
+    status = record.get("status")
+    if not isinstance(status, dict):
+        return ""
+
+    status_text = title_image_clean_text(status.get("status_str") or status.get("status"))
+    if status_text.lower() not in {"error", "failed"}:
+        return ""
+
+    messages = status.get("messages")
+    if isinstance(messages, list):
+        return title_image_clean_text(json.dumps(messages, ensure_ascii=False))[:500]
+
+    return status_text or "comfyui_generation_failed"
+
+
+def first_comfyui_history_image(record):
+    outputs = record.get("outputs") if isinstance(record, dict) else {}
+    if not isinstance(outputs, dict):
+        return {}
+
+    for output in outputs.values():
+        if not isinstance(output, dict):
+            continue
+        images = output.get("images")
+        if not isinstance(images, list):
+            continue
+        for image in images:
+            if isinstance(image, dict) and image.get("filename"):
+                return image
+
+    return {}
+
+
+def request_comfyui_title_image_bytes(prompt):
+    base_url = comfyui_base_url()
+    request_timeout = comfyui_request_timeout_seconds()
+    poll_timeout = comfyui_poll_timeout_seconds()
+    poll_interval = comfyui_poll_interval_seconds()
+    print(f"[TitleImage] comfyui_url={base_url}")
+
+    try:
+        checkpoint_name = comfyui_checkpoint_name(base_url, request_timeout)
+        workflow = build_default_comfyui_title_workflow(prompt, checkpoint_name)
+        response = requests.post(
+            f"{base_url}/prompt",
+            json={
+                "prompt": workflow,
+                "client_id": uuid.uuid4().hex,
+            },
+            timeout=request_timeout,
+        )
+        response.raise_for_status()
+        prompt_id = title_image_clean_text(response.json().get("prompt_id"))
+    except requests.ConnectionError as exc:
+        raise TitleImageGenerationError(
+            f"comfyui_connection_failed:{exc}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_UNAVAILABLE",
+            local_unavailable=True,
+        ) from exc
+    except requests.Timeout as exc:
+        raise TitleImageGenerationError(
+            f"comfyui_request_timeout:{exc}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_TIMEOUT",
+            local_unavailable=True,
+        ) from exc
+    except TitleImageGenerationError:
+        raise
+    except Exception as exc:
+        raise TitleImageGenerationError(
+            f"comfyui_prompt_submit_failed:{type(exc).__name__}:{exc}",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_UNAVAILABLE",
+            local_unavailable=True,
+        ) from exc
+
+    if not prompt_id:
+        raise TitleImageGenerationError(
+            "comfyui_prompt_id_missing",
+            LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+            error_code="COMFYUI_INVALID_RESPONSE",
+            local_unavailable=True,
+        )
+
+    deadline = perf_counter() + poll_timeout
+    while perf_counter() < deadline:
+        try:
+            history_response = requests.get(
+                f"{base_url}/history/{prompt_id}",
+                timeout=request_timeout,
+            )
+            history_response.raise_for_status()
+            record = comfyui_history_record(history_response.json(), prompt_id)
+        except requests.ConnectionError as exc:
+            raise TitleImageGenerationError(
+                f"comfyui_history_connection_failed:{exc}",
+                LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+                error_code="COMFYUI_UNAVAILABLE",
+                local_unavailable=True,
+            ) from exc
+        except requests.Timeout as exc:
+            raise TitleImageGenerationError(
+                f"comfyui_history_timeout:{exc}",
+                LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+                error_code="COMFYUI_TIMEOUT",
+                local_unavailable=True,
+            ) from exc
+        except Exception as exc:
+            raise TitleImageGenerationError(
+                f"comfyui_history_failed:{type(exc).__name__}:{exc}",
+                LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+                error_code="COMFYUI_UNAVAILABLE",
+                local_unavailable=True,
+            ) from exc
+
+        error_reason = comfyui_history_error_reason(record)
+        if error_reason:
+            raise TitleImageGenerationError(
+                f"comfyui_generation_failed:{error_reason}",
+                LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+                error_code="COMFYUI_GENERATION_FAILED",
+                local_unavailable=True,
+            )
+
+        image_info = first_comfyui_history_image(record)
+        if image_info:
+            try:
+                image_response = requests.get(
+                    f"{base_url}/view",
+                    params={
+                        "filename": image_info.get("filename"),
+                        "subfolder": image_info.get("subfolder", ""),
+                        "type": image_info.get("type", "output"),
+                    },
+                    timeout=request_timeout,
+                )
+                image_response.raise_for_status()
+            except requests.Timeout as exc:
+                raise TitleImageGenerationError(
+                    f"comfyui_image_download_timeout:{exc}",
+                    LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+                    error_code="COMFYUI_TIMEOUT",
+                    local_unavailable=True,
+                ) from exc
+            except Exception as exc:
+                raise TitleImageGenerationError(
+                    f"comfyui_image_download_failed:{type(exc).__name__}:{exc}",
+                    LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+                    error_code="COMFYUI_UNAVAILABLE",
+                    local_unavailable=True,
+                ) from exc
+
+            if image_response.content:
+                return image_response.content
+
+            raise TitleImageGenerationError(
+                "comfyui_image_empty",
+                LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+                error_code="COMFYUI_EMPTY_IMAGE",
+                local_unavailable=True,
+            )
+
+        sleep(poll_interval)
+
+    raise TitleImageGenerationError(
+        f"comfyui_poll_timeout:{poll_timeout:g}s",
+        LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+        error_code="COMFYUI_TIMEOUT",
+        local_unavailable=True,
+    )
+
+
+def test_local_title_image_generation(prompt=""):
+    prompt = title_image_clean_text(prompt) or (
+        "A realistic cookbook photo of a bowl of tomato soup with basil, "
+        "natural window light, shallow depth of field, no text or logos."
+    )
+    print(f"[TitleImage] provider={TITLE_IMAGE_PROVIDER_COMFYUI}")
+
+    try:
+        image_bytes = request_comfyui_title_image_bytes(prompt)
+    except TitleImageGenerationError as exc:
+        title_image_log_failure(exc.reason)
+        return {
+            "ok": False,
+            "provider": TITLE_IMAGE_PROVIDER_COMFYUI,
+            "comfyui_url": comfyui_base_url(),
+            "error": exc.user_message,
+            "error_code": exc.error_code,
+            "local_generation_unavailable": exc.local_unavailable,
+        }
+
+    return {
+        "ok": True,
+        "provider": TITLE_IMAGE_PROVIDER_COMFYUI,
+        "comfyui_url": comfyui_base_url(),
+        "message": "Local image generation succeeded.",
+        "byte_count": len(image_bytes),
+    }
 
 RECIPE_PDF_ASSET_FIELDS = (
     "source_pdf_path",
@@ -3082,10 +3632,140 @@ def save_recipe_cover_image_upload(original_url, uploaded_file, source_url="", f
     }
 
 
+def save_generated_recipe_cover_image(
+    recipe_source_url,
+    recipe_data,
+    image_bytes,
+    fallback_alt,
+    image_source,
+    provider,
+    fallback_used=False,
+):
+    generated_at = datetime.now(timezone.utc).isoformat()
+    COVER_IMAGE_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+    filename_provider = "local" if provider == TITLE_IMAGE_PROVIDER_COMFYUI else "ai"
+    image_filename = f"{safe_filename(recipe_source_url)}_title_{filename_provider}_{uuid.uuid4().hex[:12]}.png"
+    image_path = COVER_IMAGE_UPLOAD_FOLDER / image_filename
+    image_path.write_bytes(image_bytes)
+
+    cover_image = extract_recipe_cover_image_from_upload(
+        image_path,
+        "image/png",
+        image_filename,
+        recipe_source_url,
+        fallback_alt=fallback_alt,
+    )
+
+    if not cover_image:
+        try:
+            image_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return {"ok": False, "error": "Unable to save the generated title image."}
+
+    cover_image["source"] = image_source
+    cover_image["provider"] = provider
+    if fallback_used:
+        cover_image["fallback_used"] = True
+
+    recipe_data["source_url"] = recipe_source_url
+    recipe_data["cover_image"] = cover_image
+    recipe_data["cover_image_generated_at"] = generated_at
+    recipe_data["cover_image_provider"] = provider
+    recipe_data["cover_image_fallback_used"] = bool(fallback_used)
+    save_recipe_output(recipe_source_url, recipe_data)
+
+    recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_source_url), {})
+    quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
+    update_recipe_ingredient_record(recipe_source_url, quantity, recipe_data)
+
+    loaded = load_editable_recipe(recipe_source_url)
+    response_recipe = loaded.get("recipe", {})
+    response_cover_image = response_recipe.get("cover_image") or editable_recipe_cover_image(
+        recipe_source_url,
+        recipe_data,
+        recipe_meta,
+    )
+
+    return {
+        "ok": True,
+        "url": recipe_source_url,
+        "cover_image": response_cover_image,
+        "recipe": response_recipe,
+        "cover_image_generated_at": generated_at,
+        "provider": provider,
+        "fallback_used": bool(fallback_used),
+    }
+
+
+def generate_recipe_cover_image_with_openai(prompt):
+    if not os.getenv("OPENAI_API_KEY"):
+        raise TitleImageGenerationError(
+            "openai_api_key_missing",
+            TITLE_IMAGE_OPENAI_SETUP_MESSAGE,
+            error_code="OPENAI_API_KEY_MISSING",
+        )
+
+    return request_recipe_title_image_bytes(prompt)
+
+
+def generate_recipe_cover_image_bytes_for_provider(provider, recipe_data, recipe_title, base_prompt):
+    if provider == TITLE_IMAGE_PROVIDER_OPENAI:
+        return (
+            generate_recipe_cover_image_with_openai(base_prompt),
+            TITLE_IMAGE_PROVIDER_OPENAI,
+            "ai_generated_image",
+            False,
+        )
+
+    if provider == TITLE_IMAGE_PROVIDER_OLLAMA_PROMPT_ONLY:
+        if not os.getenv("OPENAI_API_KEY"):
+            raise TitleImageGenerationError(
+                "openai_api_key_missing",
+                TITLE_IMAGE_OPENAI_SETUP_MESSAGE,
+                error_code="OPENAI_API_KEY_MISSING",
+            )
+        enhanced_prompt = enhance_recipe_title_image_prompt_with_ollama(
+            recipe_data,
+            recipe_title,
+            base_prompt,
+            required=True,
+        )
+        print("[TitleImage] Ollama only created the prompt; image_provider=openai")
+        return (
+            request_recipe_title_image_bytes(enhanced_prompt),
+            TITLE_IMAGE_PROVIDER_OPENAI,
+            "ai_generated_image",
+            False,
+        )
+
+    if provider == TITLE_IMAGE_PROVIDER_COMFYUI:
+        enhanced_prompt = enhance_recipe_title_image_prompt_with_ollama(
+            recipe_data,
+            recipe_title,
+            base_prompt,
+            required=False,
+        )
+        return (
+            request_comfyui_title_image_bytes(enhanced_prompt),
+            TITLE_IMAGE_PROVIDER_COMFYUI,
+            "local_comfyui_image",
+            False,
+        )
+
+    raise TitleImageGenerationError(
+        f"unsupported_provider:{provider}",
+        "Unsupported title image provider.",
+        error_code="UNSUPPORTED_TITLE_IMAGE_PROVIDER",
+    )
+
+
 def generate_recipe_cover_image(payload):
     payload = payload if isinstance(payload, dict) else {}
     url = str(payload.get("url") or payload.get("recipe_url") or "").strip()
     overwrite = bool(payload.get("overwrite") or payload.get("force"))
+    provider = title_image_provider()
+    print(f"[TitleImage] provider={provider}")
 
     if not url:
         return {"ok": False, "error": "Recipe URL is required."}
@@ -3110,9 +3790,6 @@ def generate_recipe_cover_image(payload):
             "cover_image": existing_cover_image,
         }
 
-    if not os.getenv("OPENAI_API_KEY"):
-        return {"ok": False, "error": "Image generation is not set up yet."}
-
     recipe_title = str(recipe_data.get("recipe_title") or recipe_data.get("display_name") or "").strip()
     if not recipe_title:
         return {"ok": False, "error": "Add a recipe title before generating a title image."}
@@ -3120,70 +3797,86 @@ def generate_recipe_cover_image(payload):
     prompt = build_recipe_cover_image_prompt(recipe_data, recipe_title)
 
     try:
-        image_bytes = request_recipe_title_image_bytes(prompt)
+        image_bytes, used_provider, image_source, fallback_used = generate_recipe_cover_image_bytes_for_provider(
+            provider,
+            recipe_data,
+            recipe_title,
+            prompt,
+        )
+    except TitleImageGenerationError as exc:
+        title_image_log_failure(exc.reason)
+        fallback_provider = title_image_fallback_provider()
+        if provider == TITLE_IMAGE_PROVIDER_COMFYUI and fallback_provider == TITLE_IMAGE_PROVIDER_OPENAI:
+            try:
+                image_bytes = generate_recipe_cover_image_with_openai(prompt)
+                used_provider = TITLE_IMAGE_PROVIDER_OPENAI
+                image_source = "ai_generated_image"
+                fallback_used = True
+            except TimeoutError:
+                title_image_log_failure("fallback_openai_timeout")
+                return {
+                    "ok": False,
+                    "error": "Title image generation timed out. Please try again.",
+                    "error_code": "OPENAI_TIMEOUT",
+                }
+            except TitleImageGenerationError as fallback_exc:
+                title_image_log_failure(f"fallback_{fallback_exc.reason}")
+                return {
+                    "ok": False,
+                    "error": fallback_exc.user_message,
+                    "error_code": fallback_exc.error_code,
+                }
+            except Exception as fallback_exc:
+                title_image_log_failure(f"fallback_openai_failed:{type(fallback_exc).__name__}:{fallback_exc}")
+                return {
+                    "ok": False,
+                    "error": "Title image generation failed. Please try again.",
+                    "error_code": "RECIPE_TITLE_IMAGE_FAILED",
+                }
+        else:
+            return {
+                "ok": False,
+                "error": exc.user_message,
+                "error_code": exc.error_code,
+                "provider": provider,
+                "local_generation_unavailable": exc.local_unavailable,
+            }
     except TimeoutError:
+        title_image_log_failure("openai_timeout")
         return {
             "ok": False,
             "error": "Title image generation timed out. Please try again.",
+            "error_code": "OPENAI_TIMEOUT",
         }
-    except Exception:
+    except Exception as exc:
+        title_image_log_failure(f"title_image_failed:{type(exc).__name__}:{exc}")
         return {
             "ok": False,
             "error": "Title image generation failed. Please try again.",
+            "error_code": "RECIPE_TITLE_IMAGE_FAILED",
         }
 
     if not image_bytes:
+        title_image_log_failure("empty_image_response")
         return {
             "ok": False,
             "error": "Title image generation did not return an image. Please try again.",
+            "error_code": "RECIPE_TITLE_IMAGE_EMPTY",
         }
 
-    generated_at = datetime.now(timezone.utc).isoformat()
-    COVER_IMAGE_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-    image_filename = f"{safe_filename(recipe_source_url)}_title_ai_{uuid.uuid4().hex[:12]}.png"
-    image_path = COVER_IMAGE_UPLOAD_FOLDER / image_filename
-    image_path.write_bytes(image_bytes)
-
-    cover_image = extract_recipe_cover_image_from_upload(
-        image_path,
-        "image/png",
-        image_filename,
-        recipe_source_url,
-        fallback_alt=fallback_alt,
-    )
-
-    if not cover_image:
-        try:
-            image_path.unlink(missing_ok=True)
-        except OSError:
-            pass
-        return {"ok": False, "error": "Unable to save the generated title image."}
-
-    cover_image["source"] = "ai_generated_image"
-    recipe_data["source_url"] = recipe_source_url
-    recipe_data["cover_image"] = cover_image
-    recipe_data["cover_image_generated_at"] = generated_at
-    save_recipe_output(recipe_source_url, recipe_data)
-
-    recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_source_url), {})
-    quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
-    update_recipe_ingredient_record(recipe_source_url, quantity, recipe_data)
-
-    loaded = load_editable_recipe(recipe_source_url)
-    response_recipe = loaded.get("recipe", {})
-    response_cover_image = response_recipe.get("cover_image") or editable_recipe_cover_image(
+    result = save_generated_recipe_cover_image(
         recipe_source_url,
         recipe_data,
-        recipe_meta,
+        image_bytes,
+        fallback_alt,
+        image_source,
+        used_provider,
+        fallback_used=fallback_used,
     )
-
-    return {
-        "ok": True,
-        "url": recipe_source_url,
-        "cover_image": response_cover_image,
-        "recipe": response_recipe,
-        "cover_image_generated_at": generated_at,
-    }
+    if result.get("ok") and used_provider == TITLE_IMAGE_PROVIDER_COMFYUI:
+        generated_path = str((result.get("cover_image") or {}).get("path") or "").strip()
+        print(f"[TitleImage] generated_local_image_path={generated_path}")
+    return result
 
 
 def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):

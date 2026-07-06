@@ -262,6 +262,7 @@ def test_generate_recipe_cover_image_saves_ai_cover(monkeypatch, tmp_path):
     updated = {}
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("TITLE_IMAGE_PROVIDER", "openai")
     monkeypatch.setattr(recipe_edit_service, "COVER_IMAGE_UPLOAD_FOLDER", tmp_path / "recipe_covers")
     monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
     monkeypatch.setattr(recipe_edit_service, "request_recipe_title_image_bytes", lambda prompt: b"generated-png")
@@ -305,6 +306,172 @@ def test_generate_recipe_cover_image_saves_ai_cover(monkeypatch, tmp_path):
     assert updated["url"] == url
     assert updated["cover_image"]["source"] == "ai_generated_image"
     assert result["cover_image"]["path"] == "data/uploads/recipe_covers/generated.png"
+
+
+def test_generate_recipe_cover_image_comfyui_saves_local_cover_without_openai(monkeypatch, tmp_path):
+    url = "https://example.com/local-title-image"
+    recipe_data = {
+        "source_url": url,
+        "recipe_title": "Local Tomato Soup",
+        "description": "A bright tomato soup with basil.",
+        "cuisine_tags": ["Italian"],
+        "ingredients": [
+            {"quantity": "2", "unit": "cups", "ingredient": "tomatoes"},
+            {"quantity": "4", "unit": "leaves", "ingredient": "basil"},
+        ],
+    }
+    saved = {}
+    updated = {}
+    prompt_calls = {}
+
+    monkeypatch.setenv("TITLE_IMAGE_PROVIDER", "comfyui")
+    monkeypatch.setenv("TITLE_IMAGE_FALLBACK_PROVIDER", "none")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(recipe_edit_service, "COVER_IMAGE_UPLOAD_FOLDER", tmp_path / "recipe_covers")
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "request_recipe_title_image_bytes",
+        lambda prompt: (_ for _ in ()).throw(AssertionError("OpenAI image generation should not run")),
+    )
+
+    def fake_enhance(data, title, prompt, required=False):
+        prompt_calls["required"] = required
+        prompt_calls["title"] = title
+        return f"polished {title}"
+
+    def fake_comfyui(prompt):
+        prompt_calls["comfyui_prompt"] = prompt
+        return b"local-png"
+
+    def fake_extract(upload_path, mime_type, filename, recipe_url, fallback_alt=""):
+        assert upload_path.read_bytes() == b"local-png"
+        assert mime_type == "image/png"
+        assert recipe_url == url
+        return {
+            "path": "data/uploads/recipe_covers/local.png",
+            "mime_type": mime_type,
+            "alt": fallback_alt,
+            "source": "uploaded_image",
+        }
+
+    def fake_save(recipe_url, data):
+        saved["url"] = recipe_url
+        saved["data"] = data.copy()
+
+    def fake_update(recipe_url, quantity, data):
+        updated["url"] = recipe_url
+        updated["cover_image"] = data.get("cover_image", {}).copy()
+
+    monkeypatch.setattr(recipe_edit_service, "enhance_recipe_title_image_prompt_with_ollama", fake_enhance)
+    monkeypatch.setattr(recipe_edit_service, "request_comfyui_title_image_bytes", fake_comfyui)
+    monkeypatch.setattr(recipe_edit_service, "extract_recipe_cover_image_from_upload", fake_extract)
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_output", fake_save)
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: {})
+    monkeypatch.setattr(recipe_edit_service, "update_recipe_ingredient_record", fake_update)
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "load_editable_recipe",
+        lambda recipe_url: {"recipe": {"cover_image": saved["data"]["cover_image"]}},
+    )
+
+    result = recipe_edit_service.generate_recipe_cover_image({"url": url})
+
+    assert result["ok"] is True
+    assert prompt_calls["required"] is False
+    assert prompt_calls["title"] == "Local Tomato Soup"
+    assert prompt_calls["comfyui_prompt"] == "polished Local Tomato Soup"
+    assert saved["url"] == url
+    assert saved["data"]["cover_image"]["source"] == "local_comfyui_image"
+    assert saved["data"]["cover_image"]["provider"] == "comfyui"
+    assert saved["data"]["cover_image_provider"] == "comfyui"
+    assert updated["url"] == url
+    assert updated["cover_image"]["source"] == "local_comfyui_image"
+    assert result["cover_image"]["path"] == "data/uploads/recipe_covers/local.png"
+
+
+def test_generate_recipe_cover_image_comfyui_failure_does_not_fallback_without_opt_in(monkeypatch):
+    url = "https://example.com/offline-comfyui"
+    recipe_data = {
+        "source_url": url,
+        "recipe_title": "Offline ComfyUI Soup",
+        "ingredients": [{"ingredient": "tomatoes"}],
+    }
+
+    monkeypatch.setenv("TITLE_IMAGE_PROVIDER", "comfyui")
+    monkeypatch.setenv("TITLE_IMAGE_FALLBACK_PROVIDER", "none")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "enhance_recipe_title_image_prompt_with_ollama",
+        lambda data, title, prompt, required=False: prompt,
+    )
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "request_comfyui_title_image_bytes",
+        lambda prompt: (_ for _ in ()).throw(
+            recipe_edit_service.TitleImageGenerationError(
+                "comfyui_connection_failed",
+                recipe_edit_service.LOCAL_TITLE_IMAGE_UNAVAILABLE_MESSAGE,
+                error_code="COMFYUI_UNAVAILABLE",
+                local_unavailable=True,
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "request_recipe_title_image_bytes",
+        lambda prompt: (_ for _ in ()).throw(AssertionError("OpenAI image generation should not run")),
+    )
+
+    result = recipe_edit_service.generate_recipe_cover_image({"url": url})
+
+    assert result == {
+        "ok": False,
+        "error": "Local image generation is unavailable. Start ComfyUI and try again.",
+        "error_code": "COMFYUI_UNAVAILABLE",
+        "provider": "comfyui",
+        "local_generation_unavailable": True,
+    }
+
+
+def test_admin_can_test_local_title_image_generation_route(monkeypatch, tmp_path):
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    monkeypatch.setattr(user_account_service, "ADMIN_EMAIL", "admin@example.com")
+    user_account_service.save_users({
+        "users": [{
+            "user_id": "admin",
+            "email": "admin@example.com",
+            "username": "admin@example.com",
+            "account_status": "active",
+        }],
+    })
+    monkeypatch.setattr(
+        recipe_routes,
+        "test_local_title_image_generation",
+        lambda prompt="": {
+            "ok": True,
+            "provider": "comfyui",
+            "comfyui_url": "http://127.0.0.1:8188",
+            "message": "Local image generation succeeded.",
+            "byte_count": 123,
+        },
+    )
+    app = create_app()
+
+    with app.test_client() as client:
+        seed_signed_in_user(client, "admin")
+        response = client.post(
+            "/api/recipe_cover_image/test-local",
+            json={"prompt": "test prompt"},
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["provider"] == "comfyui"
+    assert payload["byte_count"] == 123
 
 
 def test_generate_recipe_cover_image_route_uses_openai_usage_wrapper(monkeypatch):

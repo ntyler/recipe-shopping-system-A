@@ -119,6 +119,7 @@ from PushShoppingList.services.recipe_edit_service import recipe_note_feedback
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
 from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
+from PushShoppingList.services.recipe_edit_service import test_local_title_image_generation
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
 from PushShoppingList.services.recipe_edit_service import ensure_recipe_pdf_cloudflare_link
 from PushShoppingList.services.recipe_edit_service import normalize_pdf_kind
@@ -3820,6 +3821,19 @@ def api_generate_recipe_cover_image_route():
     status = 200 if result.get("ok") else 400
 
     return jsonify(with_openai_usage_dashboard(result)), status
+
+
+@recipe_bp.route("/api/recipe_cover_image/test-local", methods=["POST"])
+def api_test_local_recipe_cover_image_route():
+    if not is_admin_user(current_user()):
+        return jsonify({"ok": False, "error": "Admin access required."}), 403
+
+    data = request.get_json(silent=True) or {}
+    prompt = str(data.get("prompt") or "").strip()
+    result = test_local_title_image_generation(prompt=prompt)
+    status = 200 if result.get("ok") else 503
+
+    return jsonify(result), status
 
 
 @recipe_bp.route("/api/recipe_detail_image", methods=["POST"])

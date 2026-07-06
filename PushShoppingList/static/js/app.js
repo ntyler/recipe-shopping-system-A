@@ -17544,6 +17544,69 @@ function setCloudflareOrphanPdfStatus(message, isError = false) {
     status.classList.toggle("error", Boolean(isError));
 }
 
+function localTitleImagePanel() {
+    return document.querySelector("[data-local-title-image-admin]");
+}
+
+function setLocalTitleImageStatus(message, isError = false) {
+    const panel = localTitleImagePanel();
+    const status = panel ? panel.querySelector("[data-local-title-image-status]") : null;
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("error", Boolean(isError));
+}
+
+async function testLocalTitleImageGeneration(button) {
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Testing...";
+    }
+    setLocalTitleImageStatus("Testing local ComfyUI image generation...");
+
+    try {
+        const response = await fetch("/api/recipe_cover_image/test-local", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                prompt: "A realistic cookbook photo of tomato soup with basil, natural window light, no text.",
+            }),
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (_err) {
+            data = {};
+        }
+
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || "Local image generation failed.");
+        }
+
+        const byteCount = Number(data.byte_count || 0);
+        const suffix = byteCount > 0 ? ` ${byteCount.toLocaleString()} bytes returned.` : "";
+        setLocalTitleImageStatus(`${data.message || "Local image generation succeeded."}${suffix}`);
+    } catch (err) {
+        console.warn("Unable to test local title image generation.", err);
+        setLocalTitleImageStatus(err.message || "Local image generation failed.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Test Local Image Generation";
+        }
+    }
+
+    return false;
+}
+
 function cloudflareOrphanPdfLabel(count) {
     return `Unlinked PDFs found: ${count}`;
 }
@@ -22868,7 +22931,21 @@ async function generateRecipeCoverImage(button) {
         syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to generate title image.");
+            const localUnavailable = Boolean(
+                data && (
+                    data.local_generation_unavailable
+                    || data.error_code === "COMFYUI_UNAVAILABLE"
+                    || data.error_code === "COMFYUI_TIMEOUT"
+                    || data.error_code === "COMFYUI_GENERATION_FAILED"
+                    || data.error_code === "COMFYUI_CHECKPOINT_NOT_FOUND"
+                    || data.error_code === "LOCAL_IMAGE_GENERATION_UNAVAILABLE"
+                )
+            );
+            throw new Error(
+                localUnavailable
+                    ? "Local image generation is unavailable. Start ComfyUI and try again."
+                    : ((data && data.error) || "Unable to generate title image.")
+            );
         }
 
         const coverImage = normalizeRecipeEditorCoverImage(data.cover_image || {});
