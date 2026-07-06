@@ -2,14 +2,17 @@ from datetime import timedelta
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import guest_session_service
+from PushShoppingList.services import job_service
 from PushShoppingList.services import storage_service
 
 
 def configure_guest_demo_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(guest_session_service, "GUEST_SESSIONS_FILE", tmp_path / "guest_sessions.json")
     monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guests")
+    monkeypatch.setattr(job_service, "JOBS_DB_PATH", tmp_path / "jobs.sqlite3")
     monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setenv("JOB_QUEUE_MODE", "inline")
 
 
 def guest_sessions_payload():
@@ -207,6 +210,7 @@ def test_guest_session_can_run_recipe_url_import_api(monkeypatch, tmp_path):
 
     from PushShoppingList.routes import recipe_routes
 
+    recipe_url = "https://example.com/demo-recipe"
     monkeypatch.setattr(
         recipe_routes,
         "extract_recipe_from_url",
@@ -233,15 +237,15 @@ def test_guest_session_can_run_recipe_url_import_api(monkeypatch, tmp_path):
         client.get("/guest/start")
         client.post(
             "/api/start_extract_progress",
-            json={"urls": ["https://example.com/demo-recipe"], "job_id": "guest-import-job"},
+            json={"urls": [recipe_url], "job_id": "guest-import-job"},
             headers={"X-Requested-With": "fetch"},
         )
 
         response = client.post(
             "/api/extract_recipe",
             json={
-                "url": "https://example.com/demo-recipe",
-                "urls": ["https://example.com/demo-recipe"],
+                "url": recipe_url,
+                "urls": [recipe_url],
                 "job_id": "guest-import-job",
                 "index": 0,
             },
@@ -250,10 +254,16 @@ def test_guest_session_can_run_recipe_url_import_api(monkeypatch, tmp_path):
 
     data = response.get_json()
     guest_files = list((tmp_path / "guests").glob("*/recipe-extractor/data/output/*.json"))
+    job = data["job"]
+    result = job["result_payload"]
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     assert data["ok"] is True
-    assert data["display_name"] == "Guest Demo Pretzels"
+    assert data["queued"] is True
+    assert job["status"] == "completed"
+    assert result["ok"] is True
+    assert result["created_count"] == 1
+    assert result["recipe_urls"] == [recipe_url]
     assert guest_files
 
 
@@ -263,6 +273,7 @@ def test_session_scoped_demo_account_can_run_recipe_url_import_api(monkeypatch, 
     from PushShoppingList.routes import recipe_routes
 
     demo_user_id = "demo-session-account"
+    recipe_url = "https://example.com/demo-session-recipe"
     monkeypatch.setattr(
         recipe_routes,
         "extract_recipe_from_url",
@@ -292,14 +303,14 @@ def test_session_scoped_demo_account_can_run_recipe_url_import_api(monkeypatch, 
         page = client.get("/")
         progress = client.post(
             "/api/start_extract_progress",
-            json={"urls": ["https://example.com/demo-session-recipe"], "job_id": "demo-session-import-job"},
+            json={"urls": [recipe_url], "job_id": "demo-session-import-job"},
             headers={"X-Requested-With": "fetch"},
         )
         response = client.post(
             "/api/extract_recipe",
             json={
-                "url": "https://example.com/demo-session-recipe",
-                "urls": ["https://example.com/demo-session-recipe"],
+                "url": recipe_url,
+                "urls": [recipe_url],
                 "job_id": "demo-session-import-job",
                 "index": 0,
             },
@@ -308,12 +319,18 @@ def test_session_scoped_demo_account_can_run_recipe_url_import_api(monkeypatch, 
 
     data = response.get_json()
     user_files = list((tmp_path / "users" / demo_user_id).glob("recipe-extractor/data/output/*.json"))
+    job = data["job"]
+    result = job["result_payload"]
 
     assert page.status_code == 200
     assert progress.status_code == 200
-    assert response.status_code == 200
+    assert response.status_code == 202
     assert data["ok"] is True
-    assert data["display_name"] == "Demo Session Pretzels"
+    assert data["queued"] is True
+    assert job["status"] == "completed"
+    assert result["ok"] is True
+    assert result["created_count"] == 1
+    assert result["recipe_urls"] == [recipe_url]
     assert user_files
 
 
