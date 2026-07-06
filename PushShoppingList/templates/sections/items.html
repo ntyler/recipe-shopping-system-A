@@ -630,6 +630,13 @@
                                              fetchpriority="low"
                                              {% if not equipment_item.equipment_image_url %}hidden{% endif %}>
                                         <div class="recipe-step-image-actions">
+                                            <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
+                                                <span>Image Source</span>
+                                                <select data-recipe-image-provider-select>
+                                                    <option value="comfyui" selected>ComfyUI local</option>
+                                                    <option value="openai">ChatGPT / OpenAI</option>
+                                                </select>
+                                            </label>
                                             <button type="button"
                                                     class="recipe-step-image-btn"
                                                     data-equipment-image-generate
@@ -752,6 +759,13 @@
                                              fetchpriority="low"
                                              {% if not instruction.step_image_url %}hidden{% endif %}>
                                         <div class="recipe-step-image-actions">
+                                            <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
+                                                <span>Image Source</span>
+                                                <select data-recipe-image-provider-select>
+                                                    <option value="comfyui" selected>ComfyUI local</option>
+                                                    <option value="openai">ChatGPT / OpenAI</option>
+                                                </select>
+                                            </label>
                                             <button type="button"
                                                     class="recipe-step-image-btn"
                                                     data-step-image-generate

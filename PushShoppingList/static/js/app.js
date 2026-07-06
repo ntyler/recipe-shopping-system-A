@@ -22809,6 +22809,7 @@ function cacheBustRecipeCoverSrc(src) {
 }
 
 const RECIPE_IMAGE_PROVIDER_STORAGE_KEY = "recipe-image-provider";
+let recipeImageProviderSelectorEventsBound = false;
 
 function normalizeRecipeImageProvider(value) {
     const provider = String(value || "").trim().toLowerCase().replace(/-/g, "_");
@@ -22821,7 +22822,8 @@ function normalizeRecipeImageProvider(value) {
 }
 
 function selectedRecipeImageProvider() {
-    const select = document.getElementById("recipeEditImageProvider");
+    const select = document.querySelector("[data-recipe-image-provider-select]")
+        || document.getElementById("recipeEditImageProvider");
 
     return normalizeRecipeImageProvider(select ? select.value : "");
 }
@@ -22832,40 +22834,90 @@ function recipeImageProviderPayload() {
     return provider ? { image_provider: provider } : {};
 }
 
-function initRecipeImageProviderSelector() {
-    const select = document.getElementById("recipeEditImageProvider");
-
-    if (!select) {
-        return;
-    }
-
+function rememberedRecipeImageProvider() {
     try {
-        const rememberedProvider = normalizeRecipeImageProvider(
+        return normalizeRecipeImageProvider(
             window.localStorage
                 ? window.localStorage.getItem(RECIPE_IMAGE_PROVIDER_STORAGE_KEY)
                 : ""
         );
-        if (rememberedProvider) {
-            select.value = rememberedProvider;
-        }
     } catch (err) {
         console.warn("Unable to restore recipe image provider selection.", err);
+        return "";
+    }
+}
+
+function setAllRecipeImageProviderSelectors(provider) {
+    const normalizedProvider = normalizeRecipeImageProvider(provider);
+
+    if (!normalizedProvider) {
+        return;
     }
 
-    select.addEventListener("change", () => {
-        const provider = selectedRecipeImageProvider();
-        if (!provider) {
-            return;
-        }
-
-        try {
-            if (window.localStorage) {
-                window.localStorage.setItem(RECIPE_IMAGE_PROVIDER_STORAGE_KEY, provider);
-            }
-        } catch (err) {
-            console.warn("Unable to remember recipe image provider selection.", err);
+    document.querySelectorAll("[data-recipe-image-provider-select]").forEach(select => {
+        if (select && normalizeRecipeImageProvider(select.value) !== normalizedProvider) {
+            select.value = normalizedProvider;
         }
     });
+}
+
+function rememberRecipeImageProvider(provider) {
+    const normalizedProvider = normalizeRecipeImageProvider(provider);
+
+    if (!normalizedProvider) {
+        return;
+    }
+
+    setAllRecipeImageProviderSelectors(normalizedProvider);
+    try {
+        if (window.localStorage) {
+            window.localStorage.setItem(RECIPE_IMAGE_PROVIDER_STORAGE_KEY, normalizedProvider);
+        }
+    } catch (err) {
+        console.warn("Unable to remember recipe image provider selection.", err);
+    }
+}
+
+function refreshRecipeImageProviderSelectors(root = document) {
+    const provider = rememberedRecipeImageProvider() || selectedRecipeImageProvider() || "comfyui";
+    const scope = root && typeof root.querySelectorAll === "function" ? root : document;
+
+    scope.querySelectorAll("[data-recipe-image-provider-select]").forEach(select => {
+        select.value = provider;
+    });
+}
+
+function initRecipeImageProviderSelector() {
+    refreshRecipeImageProviderSelectors(document);
+
+    if (recipeImageProviderSelectorEventsBound) {
+        return;
+    }
+
+    recipeImageProviderSelectorEventsBound = true;
+    document.addEventListener("change", event => {
+        const select = event.target && event.target.closest
+            ? event.target.closest("[data-recipe-image-provider-select]")
+            : null;
+        if (select) {
+            rememberRecipeImageProvider(select.value);
+        }
+    });
+}
+
+function recipeImageProviderFieldHtml(selectId = "") {
+    const idAttribute = selectId ? ` id="${escapeAttribute(selectId)}"` : "";
+    const forAttribute = selectId ? ` for="${escapeAttribute(selectId)}"` : "";
+
+    return `
+        <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field"${forAttribute}>
+            <span>Image Source</span>
+            <select${idAttribute} data-recipe-image-provider-select>
+                <option value="comfyui" selected>ComfyUI local</option>
+                <option value="openai">ChatGPT / OpenAI</option>
+            </select>
+        </label>
+    `;
 }
 
 function openRecipeCoverUpload() {
@@ -25584,6 +25636,7 @@ function addRecipeEquipmentRow(value = "") {
                  fetchpriority="low"
                  ${equipmentImageUrl ? "" : "hidden"}>
             <div class="recipe-step-image-actions">
+                ${recipeImageProviderFieldHtml()}
                 <button type="button"
                         class="recipe-step-image-btn"
                         data-equipment-image-generate
@@ -25674,6 +25727,7 @@ function addRecipeEquipmentRow(value = "") {
     bindRecipeEditDragAndDrop(row);
     updateRecipeEquipmentRowNumbers();
     initDeferredImages(row);
+    refreshRecipeImageProviderSelectors(row);
     return row;
 }
 
@@ -25762,6 +25816,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
                  fetchpriority="low"
                  ${stepImageUrl ? "" : "hidden"}>
             <div class="recipe-step-image-actions">
+                ${recipeImageProviderFieldHtml()}
                 <button type="button"
                         class="recipe-step-image-btn"
                         data-step-image-generate
