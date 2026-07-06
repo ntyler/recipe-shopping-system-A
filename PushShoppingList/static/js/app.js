@@ -25619,11 +25619,19 @@ function addRecipeEquipmentRow(value = "") {
                  data-equipment-image-status>
                 ${equipmentImageUrl ? "" : "No image generated for this equipment."}
             </div>
-            <div class="recipe-image-prompt"
+            <div class="recipe-image-prompt recipe-image-prompt-collapsed"
                  data-equipment-image-prompt
                  ${equipmentImagePrompt ? "" : "hidden"}>
-                <div class="recipe-image-prompt-label">Image prompt</div>
-                <pre data-equipment-image-prompt-text>${escapeHtml(equipmentImagePrompt)}</pre>
+                <button type="button"
+                        class="recipe-image-prompt-toggle"
+                        data-equipment-image-prompt-toggle
+                        aria-expanded="false"
+                        aria-label="Toggle image prompt"
+                        onclick="return toggleRecipeImagePrompt(this)">
+                    <span class="recipe-image-prompt-label">Image prompt</span>
+                    <span class="recipe-image-prompt-chevron" aria-hidden="true"></span>
+                </button>
+                <pre data-equipment-image-prompt-text hidden>${escapeHtml(equipmentImagePrompt)}</pre>
             </div>
             <img class="recipe-step-image recipe-equipment-image"
                  ${equipmentImageUrl ? `src="${DEFERRED_IMAGE_PLACEHOLDER}"` : ""}
@@ -29031,6 +29039,41 @@ function recipeImagePanelPromptText(panel) {
     return panel ? panel.querySelector("[data-equipment-image-prompt-text]") : null;
 }
 
+function setRecipeImagePromptCollapsed(promptPanel, collapsed = true) {
+    const promptText = promptPanel ? promptPanel.querySelector("[data-equipment-image-prompt-text]") : null;
+    const toggle = promptPanel ? promptPanel.querySelector("[data-equipment-image-prompt-toggle]") : null;
+    const isCollapsed = collapsed !== false;
+
+    if (!promptPanel) {
+        return;
+    }
+
+    promptPanel.classList.toggle("recipe-image-prompt-collapsed", isCollapsed);
+
+    if (promptText) {
+        promptText.hidden = isCollapsed;
+    }
+
+    if (toggle) {
+        toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+    }
+}
+
+function toggleRecipeImagePrompt(button) {
+    const promptPanel = button ? button.closest("[data-equipment-image-prompt]") : null;
+
+    if (!promptPanel) {
+        return false;
+    }
+
+    setRecipeImagePromptCollapsed(
+        promptPanel,
+        !promptPanel.classList.contains("recipe-image-prompt-collapsed")
+    );
+
+    return false;
+}
+
 function recipeImagePanelKind(panel) {
     return panel && panel.matches("[data-equipment-image-panel]") ? "equipment" : "step";
 }
@@ -29070,6 +29113,7 @@ function setRecipeImagePanelPrompt(panel, imagePrompt) {
 
     promptText.textContent = promptValue;
     promptPanel.hidden = !promptValue;
+    setRecipeImagePromptCollapsed(promptPanel, true);
     setRecipeImagePanelHiddenValue(panel, "equipment_image_prompt", promptValue);
 }
 

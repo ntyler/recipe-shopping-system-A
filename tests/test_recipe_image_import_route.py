@@ -1547,6 +1547,29 @@ def test_image_import_preflight_estimates_before_creating_pdf():
     assert block.index("await submitRecipeMediaEstimatePerServing()") < block.index("await createRecipePdfFromMediaImport()")
 
 
+def test_equipment_image_prompt_starts_collapsed_in_editor_ui():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    start = script.index("function addRecipeEquipmentRow")
+    end = script.index("function updateRecipeEquipmentRowNumbers", start)
+    equipment_block = script[start:end]
+    prompt_start = equipment_block.index("recipe-image-prompt recipe-image-prompt-collapsed")
+    prompt_end = equipment_block.index("data-equipment-image-prompt-text", prompt_start)
+    prompt_markup = equipment_block[prompt_start:prompt_end]
+    setter_start = script.index("function setRecipeImagePanelPrompt")
+    setter_end = script.index("function updateRecipeImagePanelUploadButton", setter_start)
+    setter_block = script[setter_start:setter_end]
+
+    assert "recipe-image-prompt recipe-image-prompt-collapsed" in prompt_markup
+    assert "data-equipment-image-prompt-toggle" in prompt_markup
+    assert 'aria-expanded="false"' in prompt_markup
+    assert "toggleRecipeImagePrompt(this)" in prompt_markup
+    assert "<pre data-equipment-image-prompt-text hidden>" in equipment_block
+    assert "setRecipeImagePromptCollapsed(promptPanel, true);" in setter_block
+    assert ".recipe-image-prompt-collapsed" in css
+    assert ".recipe-image-prompt pre[hidden]" in css
+
+
 def test_create_recipe_pdf_auto_estimates_uploaded_recipe(monkeypatch, tmp_path):
     user_id, _user_data_dir = configure_image_user(monkeypatch, tmp_path)
     app = create_app()

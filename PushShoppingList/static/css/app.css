@@ -4219,31 +4219,91 @@ body {
         .recipe-image-prompt {
             max-width: min(460px, 100%);
             margin: 8px 0 10px;
-            padding: 9px 10px;
+            padding: 0;
             border: 1px solid #2d4968;
             border-radius: 7px;
             background: #07111d;
             color: #cbd8e7;
             box-sizing: border-box;
+            overflow: hidden;
         }
 
         .recipe-image-prompt[hidden] {
             display: none;
         }
 
+        .recipe-image-prompt-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            width: 100%;
+            min-height: 34px;
+            margin: 0;
+            padding: 9px 10px;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            text-align: left;
+            box-sizing: border-box;
+        }
+
+        .recipe-image-prompt-toggle:hover,
+        .recipe-image-prompt-toggle:focus-visible {
+            background: #0c1a2a;
+        }
+
+        .recipe-image-prompt-toggle:focus-visible {
+            outline: 2px solid #5b8cff;
+            outline-offset: -2px;
+        }
+
         .recipe-image-prompt-label {
-            margin-bottom: 5px;
             color: #8fb2df;
             font-size: 11px;
             font-weight: 800;
             text-transform: uppercase;
         }
 
+        .recipe-image-prompt-chevron {
+            position: relative;
+            flex: 0 0 auto;
+            width: 18px;
+            height: 18px;
+            border: 1px solid #2d4968;
+            border-radius: 50%;
+            background: #0b1726;
+        }
+
+        .recipe-image-prompt-chevron::before {
+            content: "";
+            position: absolute;
+            left: 5px;
+            top: 4px;
+            width: 6px;
+            height: 6px;
+            border-right: 2px solid #8fb2df;
+            border-bottom: 2px solid #8fb2df;
+            transform: rotate(45deg);
+            transition: transform 140ms ease, top 140ms ease;
+        }
+
+        .recipe-image-prompt:not(.recipe-image-prompt-collapsed) .recipe-image-prompt-chevron::before {
+            top: 7px;
+            transform: rotate(225deg);
+        }
+
         .recipe-image-prompt pre {
             margin: 0;
+            padding: 0 10px 10px;
             white-space: pre-wrap;
             overflow-wrap: anywhere;
             font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+        }
+
+        .recipe-image-prompt pre[hidden] {
+            display: none;
         }
 
         .recipe-step-image-actions {
