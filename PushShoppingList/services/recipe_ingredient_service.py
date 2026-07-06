@@ -7,6 +7,8 @@ from PushShoppingList.services.recipe_extract_service import (
     normalize_ingredient_for_shopping_list,
 )
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
+from PushShoppingList.services.recipe_master_data_service import remove_recipe_master_records_for_recipe
+from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
@@ -85,6 +87,7 @@ def save_ingredients_for_recipe(url, ingredients, recipe_metadata=None):
         user=current_public_user(),
     )
     save_recipe_ingredients(data)
+    sync_recipe_master_records(url, ingredients=ingredients, recipe_data=recipe_metadata)
 
 
 def save_ingredients_for_recipes(records):
@@ -114,6 +117,8 @@ def save_ingredients_for_recipes(records):
             user=user,
         )
     save_recipe_ingredients(data)
+    for url, ingredients, recipe_metadata in cleaned_records:
+        sync_recipe_master_records(url, ingredients=ingredients, recipe_data=recipe_metadata)
 
 
 def remove_recipe_and_unused_ingredients(url):
@@ -125,6 +130,7 @@ def remove_recipe_and_unused_ingredients(url):
     if target_key in data:
         del data[target_key]
         save_recipe_ingredients(data)
+        remove_recipe_master_records_for_recipe(url)
 
     if removed_ingredients:
         remove_unused_ingredients_from_shopping_list(removed_ingredients, data)

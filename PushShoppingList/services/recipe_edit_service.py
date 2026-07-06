@@ -82,6 +82,8 @@ from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingr
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
 from PushShoppingList.services.recipe_ingredient_service import remove_unused_ingredients_from_shopping_list
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
+from PushShoppingList.services.recipe_master_data_service import remove_recipe_master_records_for_recipe
+from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.recipe_url_service import load_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
@@ -4969,6 +4971,7 @@ def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
         }
         recipe_data["equipment"] = equipment_items
         save_recipe_output(recipe_source_url, recipe_data)
+        sync_recipe_master_records(recipe_source_url, recipe_data=recipe_data)
         finish_recipe_image_progress(
             "equipment",
             recipe_source_url,
@@ -5076,6 +5079,7 @@ def remove_recipe_detail_image(original_url, kind, target):
         }
         recipe_data["equipment"] = equipment_items
         save_recipe_output(recipe_source_url, recipe_data)
+        sync_recipe_master_records(recipe_source_url, recipe_data=recipe_data)
 
         return {
             "ok": True,
@@ -5921,6 +5925,7 @@ def generate_recipe_equipment_image(payload):
     }
     recipe_data["equipment"] = equipment_items
     save_recipe_output(url, recipe_data)
+    sync_recipe_master_records(url, recipe_data=recipe_data)
     finish_recipe_image_progress(
         "equipment",
         url,
@@ -6542,6 +6547,7 @@ def move_recipe_meta(original_url, source_url):
     destination["url"] = source_url
     data[source_key] = destination
     save_recipe_ingredients(data)
+    remove_recipe_master_records_for_recipe(original_url)
 
 
 def update_recipe_ingredient_record(url, quantity, recipe_data, preserve_existing_cover=True):
@@ -6572,6 +6578,7 @@ def update_recipe_ingredient_record(url, quantity, recipe_data, preserve_existin
 
     data[key] = record
     save_recipe_ingredients(data)
+    sync_recipe_master_records(url, ingredients=record.get("ingredients", []), recipe_data=recipe_data)
 
 
 def normalize_edit_ingredients(ingredients):

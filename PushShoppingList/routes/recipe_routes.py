@@ -132,6 +132,7 @@ from PushShoppingList.services.recipe_image_progress_service import load_recipe_
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
+from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
 from PushShoppingList.services.recipe_url_service import load_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
@@ -1948,6 +1949,8 @@ def commit_menu_import_result(
         else:
             add_items(ingredients)
             save_ingredients_for_recipe(recipe_url, ingredients, recipe_result)
+        if is_stub:
+            sync_recipe_master_records(recipe_url, recipe_data=recipe_result)
 
         if recipe_result.get("display_name") or recipe_result.get("recipe_title"):
             save_recipe_url_name(
