@@ -22945,7 +22945,7 @@ function recipeImageProviderFieldHtml(selectId = "") {
 
     return `
         <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field"${forAttribute}>
-            <span>Image Source</span>
+            <span>Image Generator</span>
             <select${idAttribute} data-recipe-image-provider-select>
                 <option value="comfyui" selected>ComfyUI local</option>
                 <option value="openai">ChatGPT / OpenAI</option>
