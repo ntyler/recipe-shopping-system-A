@@ -30,6 +30,14 @@ def configure_master_data_app(monkeypatch, tmp_path):
                     "last_name": "User",
                     "account_status": "active",
                 },
+                {
+                    "user_id": "user-b",
+                    "username": "user-b",
+                    "email": "user-b@example.com",
+                    "first_name": "User",
+                    "last_name": "B",
+                    "account_status": "active",
+                },
             ]
         }),
         encoding="utf-8",
@@ -125,9 +133,13 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Tomato" in all_html
     assert "Garlic" in all_html
     assert "Run Backfill" in all_html
+    assert "User A" in all_html
+    assert "user-a@example.com" in all_html
     assert filtered_response.status_code == 200
     assert "Garlic" in filtered_html
     assert "Tomato" not in filtered_html
+    assert "User B" in filtered_html
+    assert "user-b@example.com" in filtered_html
 
 
 def test_admin_backfill_route_uses_existing_service(monkeypatch, tmp_path):

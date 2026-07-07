@@ -24143,6 +24143,15 @@ img[data-deferred-src] {
             font-size: 15px;
         }
 
+        .master-data-filter-form label span.master-data-user-field-note {
+            color: #9fb3c8;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.25;
+            text-transform: none;
+            overflow-wrap: anywhere;
+        }
+
         .master-data-backfill-form button,
         .master-data-filter-form button {
             min-height: 42px;
@@ -24221,6 +24230,31 @@ img[data-deferred-src] {
 
         .master-data-table code {
             color: #bfdbfe;
+        }
+
+        .master-data-user-cell {
+            display: grid;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .master-data-user-cell strong {
+            color: #f8fafc;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+
+        .master-data-user-cell span {
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-user-cell code {
+            font-size: 12px;
+            line-height: 1.25;
         }
 
         .master-data-thumbnail {

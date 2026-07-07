@@ -128,7 +128,9 @@ from PushShoppingList.services.user_account_service import SUPPORT_ADMIN_EMAILS
 from PushShoppingList.services.user_account_service import SUPPORT_EMAIL
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import is_admin_user
+from PushShoppingList.services.user_account_service import load_users
 from PushShoppingList.services.user_account_service import public_two_factor_recovery_user
+from PushShoppingList.services.user_account_service import user_display_name
 from PushShoppingList.services.admin_support_service import admin_support_dashboard_for_user
 from PushShoppingList.services.admin_support_service import support_access_notices_for_user
 from PushShoppingList.services.device_status_service import device_status_summary
@@ -511,6 +513,68 @@ def int_query_arg(name, default, minimum=None, maximum=None):
     return value
 
 
+def master_data_short_user_id(user_id):
+    user_id = str(user_id or "").strip()
+    if len(user_id) <= 18:
+        return user_id
+    return f"{user_id[:10]}...{user_id[-6:]}"
+
+
+def master_data_user_identity(user_id, user=None):
+    user_id = str(user_id or "").strip()
+    short_id = master_data_short_user_id(user_id)
+    email = str((user or {}).get("email") or "").strip()
+
+    if user:
+        display_name = user_display_name(user) or email or str(user.get("username") or "").strip() or user_id
+    elif user_id == recipe_master_data.LOCAL_USER_ID:
+        display_name = "Local recipe data"
+    elif user_id.startswith("guest:"):
+        display_name = "Guest session"
+    elif user_id:
+        display_name = "Unknown user"
+    else:
+        display_name = "Unknown user"
+
+    email_detail = email if email.lower() != display_name.lower() else ""
+    label_parts = [part for part in (display_name, email_detail, short_id) if part]
+    return {
+        "user_id": user_id,
+        "short_id": short_id,
+        "display_name": display_name,
+        "email": email,
+        "email_detail": email_detail,
+        "label": " - ".join(label_parts),
+    }
+
+
+def master_data_user_identity_lookup(user_ids):
+    normalized_ids = {
+        str(user_id or "").strip()
+        for user_id in user_ids
+        if str(user_id or "").strip()
+    }
+    users_by_id = {
+        str(user.get("user_id") or ""): user
+        for user in load_users().get("users", [])
+        if isinstance(user, dict) and str(user.get("user_id") or "")
+    }
+    return {
+        user_id: master_data_user_identity(user_id, users_by_id.get(user_id))
+        for user_id in sorted(normalized_ids)
+    }
+
+
+def enrich_master_data_rows_with_users(rows, user_identities):
+    enriched = []
+    for row in rows:
+        row_data = dict(row)
+        user_id = str(row_data.get("user_id") or "").strip()
+        row_data["user_identity"] = user_identities.get(user_id) or master_data_user_identity(user_id)
+        enriched.append(row_data)
+    return enriched
+
+
 def master_data_scope(is_admin):
     current_scope_user_id = recipe_master_data.scoped_recipe_user_id()
     requested_user_id = str(request.args.get("user_id") or "").strip()
@@ -608,6 +672,26 @@ def master_data_context(record_type):
                 include_all_users=scope_info["include_all_users"],
             )
 
+    user_ids_for_labels = set(available_user_ids)
+    user_ids_for_labels.update(str(row.get("user_id") or "").strip() for row in rows)
+    user_ids_for_labels.add(scope_info["current_scope_user_id"])
+    if scope_info["user_id"]:
+        user_ids_for_labels.add(scope_info["user_id"])
+    user_identities = master_data_user_identity_lookup(user_ids_for_labels)
+    rows = enrich_master_data_rows_with_users(rows, user_identities)
+    available_users = [
+        user_identities.get(str(user_id or "").strip()) or master_data_user_identity(user_id)
+        for user_id in available_user_ids
+    ]
+    current_scope_user = (
+        user_identities.get(scope_info["current_scope_user_id"])
+        or master_data_user_identity(scope_info["current_scope_user_id"])
+    )
+    scope_user = (
+        user_identities.get(scope_info["user_id"])
+        or master_data_user_identity(scope_info["user_id"])
+    )
+
     endpoint = config["route_endpoint"]
     prev_url = None
     next_url = None
@@ -648,6 +732,9 @@ def master_data_context(record_type):
         "scope_user_id": scope_info["user_id"],
         "current_scope_user_id": scope_info["current_scope_user_id"],
         "available_user_ids": available_user_ids,
+        "available_users": available_users,
+        "current_scope_user": current_scope_user,
+        "scope_user": scope_user,
         "messages": session.pop("recipe_master_data_messages", []),
         "ingredient_url": url_for("main_bp.master_data_ingredients_route"),
         "equipment_url": url_for("main_bp.master_data_equipment_route"),

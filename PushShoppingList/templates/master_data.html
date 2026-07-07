@@ -92,17 +92,25 @@
                     </select>
                 </label>
                 <label>
-                    <span>User ID</span>
+                    <span>User</span>
                     <input type="text"
                            name="user_id"
                            value="{% if master_data.scope == 'user' %}{{ master_data.scope_user_id }}{% endif %}"
                            list="masterDataUserIds"
-                           placeholder="{{ master_data.current_scope_user_id }}">
+                           placeholder="{{ master_data.current_scope_user.label }}"
+                           aria-describedby="masterDataUserHint">
                     <datalist id="masterDataUserIds">
-                        {% for user_id in master_data.available_user_ids %}
-                            <option value="{{ user_id }}"></option>
+                        {% for user in master_data.available_users %}
+                            <option value="{{ user.user_id }}" label="{{ user.label }}">{{ user.label }}</option>
                         {% endfor %}
                     </datalist>
+                    <span id="masterDataUserHint" class="master-data-user-field-note">
+                        {% if master_data.scope == 'user' and master_data.scope_user.user_id %}
+                            {{ master_data.scope_user.label }}
+                        {% else %}
+                            {{ master_data.current_scope_user.label }}
+                        {% endif %}
+                    </span>
                 </label>
             {% endif %}
             <label>
@@ -144,7 +152,7 @@
                             <th scope="col">Name</th>
                             <th scope="col">Normalized Name</th>
                             <th scope="col">Image</th>
-                            <th scope="col">User ID</th>
+                            <th scope="col">User</th>
                             <th scope="col">Usage Count</th>
                             <th scope="col">Updated At</th>
                             <th scope="col">Created At</th>
@@ -164,7 +172,15 @@
                                         <span class="master-data-no-image">No image</span>
                                     {% endif %}
                                 </td>
-                                <td><code>{{ row.user_id }}</code></td>
+                                <td>
+                                    <div class="master-data-user-cell">
+                                        <strong>{{ row.user_identity.display_name }}</strong>
+                                        {% if row.user_identity.email_detail %}
+                                            <span>{{ row.user_identity.email_detail }}</span>
+                                        {% endif %}
+                                        <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
+                                    </div>
+                                </td>
                                 <td>{{ row.usage_count }}</td>
                                 <td>{{ row.updated_at }}</td>
                                 <td>{{ row.created_at }}</td>
