@@ -103,6 +103,40 @@ def test_cookbook_infer_controls_live_inside_cookbook_submenu():
     assert "menu.recipeEditAnchorButton" in script
 
 
+def test_cookbook_submenu_has_bulk_recipe_image_generation_controls():
+    template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>')
+    browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
+    cookbook_menu_block = template[menu_start:browser_start]
+
+    assert '<div class="overflow-menu-section cookbook-image-menu-section">' in cookbook_menu_block
+    assert cookbook_menu_block.index("Food Rules") < cookbook_menu_block.index("Generate Images")
+    assert cookbook_menu_block.index("Generate Images") < cookbook_menu_block.index("Regenerate images...")
+    assert cookbook_menu_block.index("Regenerate images...") < cookbook_menu_block.index("Generate missing images...")
+    assert cookbook_menu_block.index("Generate missing images...") < cookbook_menu_block.index("Selection")
+    assert cookbook_menu_block.count("data-cookbook-image-global-btn") == 8
+    assert "generateCookbookRecipeImagesFromMenu(this, { imageScope: 'all' })" in cookbook_menu_block
+    assert "generateCookbookRecipeImagesFromMenu(this, { imageScope: 'ingredients' })" in cookbook_menu_block
+    assert "generateCookbookRecipeImagesFromMenu(this, { imageScope: 'equipment' })" in cookbook_menu_block
+    assert "generateCookbookRecipeImagesFromMenu(this, { imageScope: 'instructions' })" in cookbook_menu_block
+    assert "generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'all' })" in cookbook_menu_block
+    assert "generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'ingredients' })" in cookbook_menu_block
+    assert "generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'equipment' })" in cookbook_menu_block
+    assert "generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'instructions' })" in cookbook_menu_block
+
+    assert "function cookbookRecipeUrlsForImageGeneration" in script
+    assert "function cookbookRecipeImageTargetsForRecipe" in script
+    assert "async function generateCookbookRecipeImageTarget" in script
+    assert "async function generateCookbookRecipeImagesFromMenu" in script
+    assert "cookbookCardFromControl(button)" in script
+    assert 'fetchRecipeEditorData(recipeUrl, { useCache: false })' in script
+    assert '"/api/recipe_ingredient_image"' in script
+    assert '"/api/recipe_equipment_image"' in script
+    assert '"/api/recipe_step_image"' in script
+
+
 def test_cookbook_submenu_has_recipe_sort_controls():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
     script = read_text("PushShoppingList/static/js/app.js")

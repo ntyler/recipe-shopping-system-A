@@ -201,6 +201,73 @@
                                                             Re-apply Food Rules to Cookbook
                                                         </button>
                                                     </div>
+                                                    <div class="overflow-menu-section cookbook-image-menu-section">
+                                                        <div class="overflow-menu-section-title">Generate Images</div>
+                                                        <div class="recipe-view-generate-submenu-row">
+                                                            <button type="button"
+                                                                    class="recipe-view-generate-submenu-toggle"
+                                                                    aria-haspopup="true"
+                                                                    aria-expanded="false"
+                                                                    onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                                                                Regenerate images...
+                                                            </button>
+                                                            <div class="overflow-submenu recipe-view-generate-submenu" hidden>
+                                                                <div class="overflow-menu-section-title recipe-view-menu-section-title">Choose image scope</div>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { imageScope: 'all' })">
+                                                                    All sections
+                                                                </button>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { imageScope: 'ingredients' })">
+                                                                    Ingredients only
+                                                                </button>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { imageScope: 'equipment' })">
+                                                                    Equipment only
+                                                                </button>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { imageScope: 'instructions' })">
+                                                                    Instruction steps only
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="recipe-view-generate-submenu-row">
+                                                            <button type="button"
+                                                                    class="recipe-view-generate-submenu-toggle"
+                                                                    aria-haspopup="true"
+                                                                    aria-expanded="false"
+                                                                    onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                                                                Generate missing images...
+                                                            </button>
+                                                            <div class="overflow-submenu recipe-view-generate-submenu" hidden>
+                                                                <div class="overflow-menu-section-title recipe-view-menu-section-title">Choose image scope</div>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'all' })">
+                                                                    All sections
+                                                                </button>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'ingredients' })">
+                                                                    Ingredients only
+                                                                </button>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'equipment' })">
+                                                                    Equipment only
+                                                                </button>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'instructions' })">
+                                                                    Instruction steps only
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 {% endif %}
                                                 {% if cookbook.recipes %}
                                                     <div class="overflow-menu-section cookbook-selection-menu-section">

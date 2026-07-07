@@ -30685,6 +30685,297 @@ async function generateAllRecipeImagesFromViewBehavior(button, options = {}) {
     return false;
 }
 
+function cookbookRecipeUrlsForImageGeneration(card) {
+    const urls = [];
+    const seen = new Set();
+
+    if (!card) {
+        return urls;
+    }
+
+    card.querySelectorAll("[data-cookbook-recipe-card][data-recipe-url]").forEach(recipeCard => {
+        const recipeUrl = String(recipeCard.dataset.recipeUrl || "").trim();
+
+        if (!recipeUrl || seen.has(recipeUrl)) {
+            return;
+        }
+
+        seen.add(recipeUrl);
+        urls.push(recipeUrl);
+    });
+
+    return urls;
+}
+
+function cookbookRecipeImageButtonsForMenu(button, card) {
+    const menu = button && typeof button.closest === "function"
+        ? button.closest(".recipe-edit-row-menu")
+        : null;
+    const scope = menu || card || document;
+
+    return [...scope.querySelectorAll("[data-cookbook-image-global-btn]")];
+}
+
+function cookbookRecipeImageTextFromRecord(record, fields = []) {
+    if (!record || typeof record !== "object") {
+        return "";
+    }
+
+    for (const field of fields) {
+        const value = String(record[field] || "").trim();
+        if (value) {
+            return value;
+        }
+    }
+
+    return "";
+}
+
+function cookbookRecipeImageUrlFromRecord(record, fields = []) {
+    return cookbookRecipeImageTextFromRecord(record, fields);
+}
+
+function cookbookRecipeImageTargetsForRecipe(recipe, options = {}) {
+    const scope = options.imageScope || options.scope || "all";
+    const missingOnly = Boolean(options.missingOnly);
+    const targets = [];
+
+    if (scope === "all" || scope === "ingredients") {
+        (Array.isArray(recipe.ingredients) ? recipe.ingredients : []).forEach((ingredient, index) => {
+            const text = cookbookRecipeImageTextFromRecord(
+                ingredient,
+                ["ingredient", "name", "purchasable_item", "original_text"]
+            );
+            const imageUrl = cookbookRecipeImageUrlFromRecord(ingredient, ["ingredient_image_url", "image_url"]);
+
+            if (!text || (missingOnly && imageUrl)) {
+                return;
+            }
+
+            targets.push({
+                kind: "ingredient",
+                index: index + 1,
+            });
+        });
+    }
+
+    if (scope === "all" || scope === "equipment") {
+        (Array.isArray(recipe.equipment) ? recipe.equipment : []).forEach((equipment, index) => {
+            const text = cookbookRecipeImageTextFromRecord(equipment, ["equipment", "text", "name", "item"]);
+            const imageUrl = cookbookRecipeImageUrlFromRecord(equipment, ["equipment_image_url", "image_url"]);
+
+            if (!text || (missingOnly && imageUrl)) {
+                return;
+            }
+
+            targets.push({
+                kind: "equipment",
+                index: index + 1,
+            });
+        });
+    }
+
+    if (scope === "all" || scope === "instructions") {
+        (Array.isArray(recipe.instructions) ? recipe.instructions : []).forEach((instruction, index) => {
+            const text = cookbookRecipeImageTextFromRecord(instruction, ["instruction", "text", "step", "description"]);
+            const imageUrl = cookbookRecipeImageUrlFromRecord(instruction, ["step_image_url", "image_url"]);
+            const stepNumber = String(instruction.step_number || instruction.stepNumber || index + 1).trim();
+
+            if (!text || !stepNumber || (missingOnly && imageUrl)) {
+                return;
+            }
+
+            targets.push({
+                kind: "step",
+                index: stepNumber,
+            });
+        });
+    }
+
+    return targets;
+}
+
+function cookbookRecipeImageEndpointForTarget(target) {
+    if (target.kind === "ingredient") {
+        return "/api/recipe_ingredient_image";
+    }
+
+    if (target.kind === "equipment") {
+        return "/api/recipe_equipment_image";
+    }
+
+    return "/api/recipe_step_image";
+}
+
+function cookbookRecipeImagePayloadForTarget(recipeUrl, target) {
+    const payload = {
+        url: recipeUrl,
+        ...recipeImageProviderPayload(),
+    };
+
+    if (target.kind === "ingredient") {
+        payload.ingredient_index = target.index;
+    } else if (target.kind === "equipment") {
+        payload.equipment_index = target.index;
+    } else {
+        payload.step_number = target.index;
+    }
+
+    return payload;
+}
+
+async function generateCookbookRecipeImageTarget(recipeUrl, target) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 180000);
+    let data = {};
+
+    try {
+        const response = await fetch(cookbookRecipeImageEndpointForTarget(target), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(cookbookRecipeImagePayloadForTarget(recipeUrl, target)),
+            signal: controller.signal,
+        });
+
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+        syncOpenAiUsageDashboardFromResponse(data);
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to generate this image.");
+        }
+
+        return data;
+    } finally {
+        window.clearTimeout(timeout);
+    }
+}
+
+function cookbookImageScopeLabel(options = {}) {
+    const scope = options.imageScope || options.scope || "all";
+
+    if (scope === "ingredients") {
+        return "ingredient";
+    }
+
+    if (scope === "equipment") {
+        return "equipment";
+    }
+
+    if (scope === "instructions") {
+        return "instruction";
+    }
+
+    return "recipe";
+}
+
+async function generateCookbookRecipeImagesFromMenu(button, options = {}) {
+    const card = cookbookCardFromControl(button);
+    const allButtons = cookbookRecipeImageButtonsForMenu(button, card);
+    const originalLabel = button ? button.textContent : "";
+    const cookbookName = card
+        ? String((card.querySelector(".cookbook-card-title h3") || {}).textContent || "").trim()
+        : "";
+    const recipeUrls = cookbookRecipeUrlsForImageGeneration(card);
+    const scopeLabel = cookbookImageScopeLabel(options);
+    let generatedCount = 0;
+    let targetCount = 0;
+    let failureCount = 0;
+
+    closeRecipeEditRowMenus();
+
+    if (!card || !recipeUrls.length) {
+        showRecipeQuantityUpdatedMessage("", "", "", "No cookbook recipes were found for image generation.");
+        return false;
+    }
+
+    allButtons.forEach(globalButton => {
+        globalButton.disabled = true;
+    });
+
+    if (button) {
+        button.textContent = options.missingOnly ? "Generating Missing..." : "Generating Images...";
+    }
+
+    showRecipeQuantityUpdatedMessage(
+        "",
+        "",
+        "",
+        `${options.missingOnly ? "Generating missing" : "Regenerating"} ${scopeLabel} images for ${cookbookName || "cookbook"}...`
+    );
+
+    try {
+        for (const recipeUrl of recipeUrls) {
+            let recipe = null;
+            try {
+                recipe = await fetchRecipeEditorData(recipeUrl, { useCache: false });
+            } catch (err) {
+                console.warn("Unable to load recipe for cookbook image generation.", err);
+                failureCount += 1;
+                continue;
+            }
+
+            const targets = cookbookRecipeImageTargetsForRecipe(recipe || {}, options);
+            targetCount += targets.length;
+
+            for (const target of targets) {
+                try {
+                    await generateCookbookRecipeImageTarget(recipeUrl, target);
+                    generatedCount += 1;
+                    invalidateRecipeEditorCache(recipeUrl);
+                } catch (err) {
+                    const timedOut = err && err.name === "AbortError";
+                    console.warn("Unable to generate cookbook recipe image.", err);
+                    failureCount += 1;
+                    if (timedOut) {
+                        showRecipeQuantityUpdatedMessage("", "", "", "One image generation request timed out. Continuing with the next image.");
+                    }
+                }
+            }
+        }
+    } finally {
+        allButtons.forEach(globalButton => {
+            globalButton.disabled = false;
+        });
+
+        if (button) {
+            button.textContent = originalLabel;
+        }
+    }
+
+    if (!targetCount) {
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            options.missingOnly
+                ? `No missing ${scopeLabel} images were found.`
+                : `No ${scopeLabel} image targets were found.`
+        );
+    } else if (failureCount) {
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            `Generated ${generatedCount} image${generatedCount === 1 ? "" : "s"}; ${failureCount} failed or were skipped.`
+        );
+    } else {
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            `Generated ${generatedCount} image${generatedCount === 1 ? "" : "s"} for ${cookbookName || "cookbook"}.`
+        );
+    }
+
+    return false;
+}
+
 async function generateRecipeImagesInCard(card, options = {}) {
     if (!card) {
         return false;
