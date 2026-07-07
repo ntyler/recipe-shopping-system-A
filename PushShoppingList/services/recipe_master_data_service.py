@@ -35,10 +35,235 @@ MASTER_RECORD_SORTS = {
     "usage_count_desc": "usage_count DESC, m.updated_at DESC, m.id DESC",
     "name_asc": "m.normalized_name ASC, m.name ASC, m.id ASC",
 }
+RECIPE_MASTER_BACKFILL_PROGRESS_LOCK = threading.RLock()
+RECIPE_MASTER_BACKFILL_PROGRESS_RUNS = {}
+MAX_RECIPE_MASTER_BACKFILL_RUNS = 8
+MAX_RECIPE_MASTER_BACKFILL_ITEMS = 500
 
 
 def utc_now_iso():
     return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+def _new_backfill_progress(job_id, include_legacy=True, force=False):
+    now = utc_now_iso()
+    return {
+        "job_id": str(job_id or "").strip(),
+        "status": "starting",
+        "summary": "Preparing recipe master backfill.",
+        "include_legacy": bool(include_legacy),
+        "force": bool(force),
+        "started_at": now,
+        "updated_at": now,
+        "users_total": 0,
+        "users_completed": 0,
+        "recipes_total": 0,
+        "recipes_completed": 0,
+        "ingredient_rows": 0,
+        "equipment_rows": 0,
+        "current_user_id": "",
+        "current_item_key": "",
+        "items": [],
+    }
+
+
+def _prune_backfill_progress_runs():
+    if len(RECIPE_MASTER_BACKFILL_PROGRESS_RUNS) <= MAX_RECIPE_MASTER_BACKFILL_RUNS:
+        return
+
+    removable = sorted(
+        (
+            progress
+            for progress in RECIPE_MASTER_BACKFILL_PROGRESS_RUNS.values()
+            if progress.get("status") not in {"starting", "running"}
+        ),
+        key=lambda progress: str(progress.get("updated_at") or ""),
+    )
+    for progress in removable:
+        if len(RECIPE_MASTER_BACKFILL_PROGRESS_RUNS) <= MAX_RECIPE_MASTER_BACKFILL_RUNS:
+            break
+        RECIPE_MASTER_BACKFILL_PROGRESS_RUNS.pop(progress.get("job_id"), None)
+
+
+def start_recipe_master_backfill_progress(job_id, include_legacy=True, force=False):
+    job_id = str(job_id or "").strip()
+    if not job_id:
+        return None
+
+    with RECIPE_MASTER_BACKFILL_PROGRESS_LOCK:
+        progress = _new_backfill_progress(job_id, include_legacy=include_legacy, force=force)
+        RECIPE_MASTER_BACKFILL_PROGRESS_RUNS[job_id] = progress
+        _prune_backfill_progress_runs()
+        return dict(progress)
+
+
+def recipe_master_backfill_progress(job_id=None):
+    with RECIPE_MASTER_BACKFILL_PROGRESS_LOCK:
+        if job_id:
+            progress = RECIPE_MASTER_BACKFILL_PROGRESS_RUNS.get(str(job_id or "").strip())
+        else:
+            progress = None
+            for candidate in RECIPE_MASTER_BACKFILL_PROGRESS_RUNS.values():
+                if progress is None or str(candidate.get("updated_at") or "") > str(progress.get("updated_at") or ""):
+                    progress = candidate
+        if not progress:
+            return None
+        return json.loads(json.dumps(progress))
+
+
+def _backfill_item_key(user_id, recipe_url, recipe_key):
+    user_id = clean_text(user_id) or LOCAL_USER_ID
+    recipe_key = clean_text(recipe_key) or recipe_id_for_url(recipe_url) or clean_text(recipe_url)
+    return f"{user_id}:{recipe_key}"
+
+
+def _backfill_recipe_label(record, output_record, recipe_url, recipe_key):
+    for source in (output_record, record):
+        if not isinstance(source, dict):
+            continue
+        for field in ("name", "title", "recipe_name"):
+            label = clean_text(source.get(field))
+            if label:
+                return label
+    return clean_text(recipe_url) or clean_text(recipe_key) or "Recipe"
+
+
+def _progress_items(progress):
+    items = progress.setdefault("items", [])
+    if len(items) > MAX_RECIPE_MASTER_BACKFILL_ITEMS:
+        progress["items"] = items[-MAX_RECIPE_MASTER_BACKFILL_ITEMS:]
+    return progress["items"]
+
+
+def _find_progress_item(progress, item_key):
+    for item in _progress_items(progress):
+        if item.get("key") == item_key:
+            return item
+    return None
+
+
+def _upsert_progress_item(progress, payload, state):
+    item_key = clean_text(payload.get("item_key"))
+    if not item_key:
+        return None
+
+    item = _find_progress_item(progress, item_key)
+    if item is None:
+        item = {
+            "key": item_key,
+            "user_id": clean_text(payload.get("user_id")),
+            "recipe_url": clean_text(payload.get("recipe_url")),
+            "label": clean_text(payload.get("label")) or clean_text(payload.get("recipe_url")) or "Recipe",
+            "state": state,
+            "ingredient_count": 0,
+            "equipment_count": 0,
+            "error": "",
+            "updated_at": utc_now_iso(),
+        }
+        _progress_items(progress).append(item)
+
+    item.update({
+        "user_id": clean_text(payload.get("user_id")) or item.get("user_id", ""),
+        "recipe_url": clean_text(payload.get("recipe_url")) or item.get("recipe_url", ""),
+        "label": clean_text(payload.get("label")) or item.get("label", "Recipe"),
+        "state": state,
+        "updated_at": utc_now_iso(),
+    })
+
+    if "ingredient_count" in payload:
+        item["ingredient_count"] = int(payload.get("ingredient_count") or 0)
+    if "equipment_count" in payload:
+        item["equipment_count"] = int(payload.get("equipment_count") or 0)
+    if payload.get("error"):
+        item["error"] = clean_text(payload.get("error"))
+
+    _progress_items(progress)
+    return item
+
+
+def update_recipe_master_backfill_progress(job_id, event, payload=None):
+    job_id = str(job_id or "").strip()
+    if not job_id:
+        return None
+    payload = payload if isinstance(payload, dict) else {}
+
+    with RECIPE_MASTER_BACKFILL_PROGRESS_LOCK:
+        progress = RECIPE_MASTER_BACKFILL_PROGRESS_RUNS.get(job_id)
+        if progress is None:
+            progress = _new_backfill_progress(job_id)
+            RECIPE_MASTER_BACKFILL_PROGRESS_RUNS[job_id] = progress
+
+        now = utc_now_iso()
+        progress["updated_at"] = now
+
+        if event == "started":
+            progress.update({
+                "status": "running",
+                "summary": "Backfill is running.",
+                "users_total": int(payload.get("users_total") or 0),
+                "recipes_total": int(payload.get("recipes_total") or 0),
+            })
+        elif event == "skipped":
+            progress.update({
+                "status": "skipped",
+                "summary": "Backfill was skipped because the migration marker already exists.",
+            })
+        elif event == "user_start":
+            progress.update({
+                "status": "running",
+                "current_user_id": clean_text(payload.get("user_id")),
+                "summary": f"Scanning {clean_text(payload.get('user_id')) or 'user'} recipes.",
+            })
+        elif event == "recipe_start":
+            item = _upsert_progress_item(progress, payload, "running")
+            progress.update({
+                "status": "running",
+                "current_item_key": item.get("key") if item else "",
+                "summary": f"Running {item.get('label') if item else 'recipe'}.",
+            })
+        elif event == "recipe_done":
+            item = _upsert_progress_item(progress, payload, "done")
+            progress["recipes_completed"] = int(progress.get("recipes_completed") or 0) + 1
+            progress["ingredient_rows"] = int(progress.get("ingredient_rows") or 0) + int(payload.get("ingredient_count") or 0)
+            progress["equipment_rows"] = int(progress.get("equipment_rows") or 0) + int(payload.get("equipment_count") or 0)
+            progress["summary"] = f"Finished {item.get('label') if item else 'recipe'}."
+        elif event == "recipe_failed":
+            item = _upsert_progress_item(progress, payload, "failed")
+            progress.update({
+                "status": "failed",
+                "summary": f"Failed {item.get('label') if item else 'recipe'}.",
+            })
+        elif event == "user_done":
+            progress["users_completed"] = int(progress.get("users_completed") or 0) + 1
+            progress["current_user_id"] = ""
+        elif event == "complete":
+            progress.update({
+                "status": "complete",
+                "summary": "Backfill finished.",
+                "users_total": int(payload.get("users") or progress.get("users_total") or 0),
+                "recipes_total": int(payload.get("recipes") or progress.get("recipes_total") or 0),
+                "recipes_completed": int(payload.get("recipes") or progress.get("recipes_completed") or 0),
+                "ingredient_rows": int(payload.get("ingredient_rows") or progress.get("ingredient_rows") or 0),
+                "equipment_rows": int(payload.get("equipment_rows") or progress.get("equipment_rows") or 0),
+                "current_item_key": "",
+                "current_user_id": "",
+            })
+        elif event == "failed":
+            progress.update({
+                "status": "failed",
+                "summary": clean_text(payload.get("error")) or "Backfill failed.",
+            })
+
+        return recipe_master_backfill_progress(job_id)
+
+
+def _emit_backfill_progress(progress_callback, event, payload=None):
+    if not callable(progress_callback):
+        return
+    try:
+        progress_callback(event, payload or {})
+    except Exception:
+        return
 
 
 def recipe_master_db_path():
@@ -766,25 +991,50 @@ def recipe_outputs_by_key(output_folder):
     return outputs
 
 
-def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None):
+def count_backfill_recipes_for_root(extractor_data_root):
+    metadata = load_json_file(Path(extractor_data_root) / "recipe_ingredients.json")
+    return len(metadata) if isinstance(metadata, dict) else 0
+
+
+def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, progress_callback=None):
     user_id = scoped_recipe_user_id(user_id)
     if extractor_data_root is None:
         extractor_data_root = storage_service.extractor_root(user_id) / "data"
     extractor_data_root = Path(extractor_data_root)
     metadata = load_json_file(extractor_data_root / "recipe_ingredients.json")
     if not isinstance(metadata, dict) or not metadata:
+        _emit_backfill_progress(progress_callback, "user_start", {
+            "user_id": user_id,
+            "recipe_count": 0,
+        })
+        _emit_backfill_progress(progress_callback, "user_done", {
+            "user_id": user_id,
+            "recipes": 0,
+            "ingredient_rows": 0,
+            "equipment_rows": 0,
+        })
         return {"ok": True, "user_id": user_id, "recipes": 0, "ingredient_rows": 0, "equipment_rows": 0}
 
     outputs = recipe_outputs_by_key(extractor_data_root / "output")
     recipes = 0
     ingredient_rows = 0
     equipment_rows = 0
+    _emit_backfill_progress(progress_callback, "user_start", {
+        "user_id": user_id,
+        "recipe_count": len(metadata),
+    })
 
     for recipe_key, record in metadata.items():
         record = record if isinstance(record, dict) else {}
         recipe_url = clean_text(record.get("url")) or clean_text(recipe_key)
         recipe_id = recipe_id_for_url(recipe_url)
         output_record = outputs.get(recipe_id, {})
+        item_payload = {
+            "item_key": _backfill_item_key(user_id, recipe_url, recipe_key),
+            "user_id": user_id,
+            "recipe_url": recipe_url,
+            "label": _backfill_recipe_label(record, output_record, recipe_url, recipe_key),
+        }
         recipe_data = {
             **record,
             **(output_record if isinstance(output_record, dict) else {}),
@@ -795,24 +1045,41 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None):
             ),
             "equipment": output_record.get("equipment") if isinstance(output_record.get("equipment"), list) else [],
         }
-        result = sync_recipe_master_records(
-            recipe_url,
-            ingredients=record.get("ingredients") if isinstance(record.get("ingredients"), list) else [],
-            recipe_data=recipe_data,
-            user_id=user_id,
-        )
+        _emit_backfill_progress(progress_callback, "recipe_start", item_payload)
+        try:
+            result = sync_recipe_master_records(
+                recipe_url,
+                ingredients=record.get("ingredients") if isinstance(record.get("ingredients"), list) else [],
+                recipe_data=recipe_data,
+                user_id=user_id,
+            )
+        except Exception as exc:
+            _emit_backfill_progress(progress_callback, "recipe_failed", {
+                **item_payload,
+                "error": str(exc),
+            })
+            raise
         if result.get("ok"):
             recipes += 1
-            ingredient_rows += int(result.get("ingredient_count") or 0)
-            equipment_rows += int(result.get("equipment_count") or 0)
+            ingredient_count = int(result.get("ingredient_count") or 0)
+            equipment_count = int(result.get("equipment_count") or 0)
+            ingredient_rows += ingredient_count
+            equipment_rows += equipment_count
+            _emit_backfill_progress(progress_callback, "recipe_done", {
+                **item_payload,
+                "ingredient_count": ingredient_count,
+                "equipment_count": equipment_count,
+            })
 
-    return {
+    summary = {
         "ok": True,
         "user_id": user_id,
         "recipes": recipes,
         "ingredient_rows": ingredient_rows,
         "equipment_rows": equipment_rows,
     }
+    _emit_backfill_progress(progress_callback, "user_done", summary)
+    return summary
 
 
 def iter_user_data_roots(include_legacy=True):
@@ -850,24 +1117,33 @@ def mark_migration_applied(connection, name):
     )
 
 
-def backfill_all_recipe_master_records(include_legacy=True, force=False):
+def backfill_all_recipe_master_records(include_legacy=True, force=False, progress_callback=None):
     with recipe_master_connection() as connection:
         if not force and migration_already_applied(connection, BACKFILL_MIGRATION_NAME):
-            return {"ok": True, "skipped": True, "users": 0, "recipes": 0}
+            result = {"ok": True, "skipped": True, "users": 0, "recipes": 0}
+            _emit_backfill_progress(progress_callback, "skipped", result)
+            return result
 
+    user_roots = list(iter_user_data_roots(include_legacy=include_legacy))
+    total_recipes = sum(count_backfill_recipes_for_root(root) for _user_id, root in user_roots)
+    _emit_backfill_progress(progress_callback, "started", {
+        "users_total": len(user_roots),
+        "recipes_total": total_recipes,
+    })
     summaries = []
-    for user_id, extractor_data_root in iter_user_data_roots(include_legacy=include_legacy):
+    for user_id, extractor_data_root in user_roots:
         summaries.append(
             backfill_recipe_master_records_for_user(
                 user_id,
                 extractor_data_root=extractor_data_root,
+                progress_callback=progress_callback,
             )
         )
 
     with recipe_master_connection() as connection:
         mark_migration_applied(connection, BACKFILL_MIGRATION_NAME)
 
-    return {
+    result = {
         "ok": True,
         "skipped": False,
         "users": len(summaries),
@@ -876,6 +1152,8 @@ def backfill_all_recipe_master_records(include_legacy=True, force=False):
         "equipment_rows": sum(int(item.get("equipment_rows") or 0) for item in summaries),
         "summaries": summaries,
     }
+    _emit_backfill_progress(progress_callback, "complete", result)
+    return result
 
 
 def master_record_for_name(table_name, user_id, name):

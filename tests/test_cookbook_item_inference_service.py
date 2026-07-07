@@ -204,6 +204,11 @@ def test_regenerate_ingredients_preview_uses_current_editor_context_without_savi
     assert "current editor yuca" in calls[0]["prompt"]
     assert "Fry the yuca until crisp." in calls[0]["prompt"]
     assert "Regenerate only the Ingredients section" in calls[0]["prompt"]
+    assert "stale rows to replace" in calls[0]["prompt"]
+    assert "replace the entire current Ingredients section" in calls[0]["prompt"]
+    assert '"current_ingredients_role": "stale_rows_to_replace"' in calls[0]["prompt"]
+    assert '"preserve_current_ingredients_by_default": false' in calls[0]["prompt"]
+    assert "Preserve clearly useful current ingredient details" not in calls[0]["prompt"]
 
 
 def test_regenerate_ingredients_saves_only_ingredients_and_preserves_recipe_type(monkeypatch, tmp_path):

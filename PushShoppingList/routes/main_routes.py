@@ -2,6 +2,7 @@ import html
 import json
 import os
 import re
+import uuid
 from datetime import datetime
 from datetime import timezone
 from fractions import Fraction
@@ -738,6 +739,7 @@ def master_data_context(record_type):
         "messages": session.pop("recipe_master_data_messages", []),
         "ingredient_url": url_for("main_bp.master_data_ingredients_route"),
         "equipment_url": url_for("main_bp.master_data_equipment_route"),
+        "backfill_status_url": url_for("main_bp.recipe_master_data_backfill_status_route"),
         "prev_url": prev_url,
         "next_url": next_url,
     }
@@ -748,7 +750,7 @@ def render_master_data_page(record_type):
         "master_data.html",
         master_data=master_data_context(record_type),
         app_css_version=static_asset_version("css/app.css"),
-        app_js_version=static_asset_version("js/app.js"),
+        master_data_js_version=static_asset_version("js/master-data.js"),
     )
 
 
@@ -778,11 +780,26 @@ def recipe_master_data_backfill_route():
 
     include_legacy = str(request.form.get("include_legacy") or "").strip().lower() in {"1", "true", "yes", "on"}
     force = str(request.form.get("force") or "").strip().lower() in {"1", "true", "yes", "on"}
+    job_id = recipe_master_data.clean_text(request.form.get("job_id")) or uuid.uuid4().hex
+    wants_json = (
+        request.headers.get("X-Requested-With") == "fetch"
+        or request.accept_mimetypes.best == "application/json"
+    )
+    recipe_master_data.start_recipe_master_backfill_progress(
+        job_id,
+        include_legacy=include_legacy,
+        force=force,
+    )
 
     try:
         result = recipe_master_data.backfill_all_recipe_master_records(
             include_legacy=include_legacy,
             force=force,
+            progress_callback=lambda event, payload: recipe_master_data.update_recipe_master_backfill_progress(
+                job_id,
+                event,
+                payload,
+            ),
         )
         if result.get("skipped"):
             message = (
@@ -802,13 +819,58 @@ def recipe_master_data_backfill_route():
     except Exception as exc:
         message = f"Backfill failed: {exc}"
         category = "error"
+        recipe_master_data.update_recipe_master_backfill_progress(
+            job_id,
+            "failed",
+            {"error": message},
+        )
+
+    redirect_url = url_for(MASTER_DATA_PAGE_CONFIG[record_type]["route_endpoint"])
+    progress = recipe_master_data.recipe_master_backfill_progress(job_id)
 
     session["recipe_master_data_messages"] = [{
         "category": category,
         "text": message,
     }]
 
-    return redirect(url_for(MASTER_DATA_PAGE_CONFIG[record_type]["route_endpoint"]))
+    if wants_json:
+        return jsonify({
+            "ok": category != "error",
+            "success": category != "error",
+            "job_id": job_id,
+            "category": category,
+            "message": message,
+            "progress": progress,
+            "redirect_url": redirect_url,
+        }), 200 if category != "error" else 500
+
+    return redirect(redirect_url)
+
+
+@main_bp.route("/api/master-data/backfill-status")
+def recipe_master_data_backfill_status_route():
+    active_public_user = current_public_user()
+    if not is_admin_user(active_public_user):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Admin access is required.",
+        }), 403
+
+    job_id = recipe_master_data.clean_text(request.args.get("job_id"))
+    progress = recipe_master_data.recipe_master_backfill_progress(job_id)
+    if not progress:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "No backfill progress was found.",
+        }), 404
+
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "progress": progress,
+    })
 
 
 @main_bp.route("/api/device-stale", methods=["POST"])

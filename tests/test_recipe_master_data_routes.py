@@ -133,6 +133,10 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Tomato" in all_html
     assert "Garlic" in all_html
     assert "Run Backfill" in all_html
+    assert "Backfill progress" in all_html
+    assert "data-master-backfill-form" in all_html
+    assert "/api/master-data/backfill-status" in all_html
+    assert "js/master-data.js" in all_html
     assert "User A" in all_html
     assert "user-a@example.com" in all_html
     assert filtered_response.status_code == 200
@@ -179,6 +183,57 @@ def test_admin_backfill_route_uses_existing_service(monkeypatch, tmp_path):
     assert "Backfill finished" in html
     assert db_path.exists()
     assert master_data.list_equipment(user_id="user-a")[0]["name"] == "Sheet pan"
+
+
+def test_admin_backfill_fetch_response_exposes_progress(monkeypatch, tmp_path):
+    app, _db_path, users_root = configure_master_data_app(monkeypatch, tmp_path)
+    data_root = users_root / "user-a" / "recipe-extractor" / "data"
+    output_root = data_root / "output"
+    output_root.mkdir(parents=True)
+    recipe_url = "https://example.com/fetch-master-data"
+    (data_root / "recipe_ingredients.json").write_text(
+        json.dumps({
+            recipe_url: {
+                "url": recipe_url,
+                "name": "Fetch Soup",
+                "ingredients": ["Carrot"],
+            }
+        }),
+        encoding="utf-8",
+    )
+    (output_root / "fetch-master-data.json").write_text(
+        json.dumps({
+            "source_url": recipe_url,
+            "ingredients": [{"ingredient": "Carrot"}],
+            "equipment": [{"equipment": "Sheet pan"}],
+        }),
+        encoding="utf-8",
+    )
+
+    with app.test_client() as client:
+        sign_in(client, "admin-user")
+        response = client.post(
+            "/admin/master-data/backfill",
+            data={"record_type": "ingredients", "job_id": "test-master-progress"},
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+        status_response = client.get(
+            "/api/master-data/backfill-status?job_id=test-master-progress",
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+
+    payload = response.get_json()
+    status_payload = status_response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["job_id"] == "test-master-progress"
+    assert payload["progress"]["status"] == "complete"
+    assert payload["progress"]["recipes_completed"] == 1
+    assert payload["progress"]["items"][0]["label"] == "Fetch Soup"
+    assert payload["progress"]["items"][0]["state"] == "done"
+    assert status_response.status_code == 200
+    assert status_payload["progress"]["job_id"] == "test-master-progress"
+    assert status_payload["progress"]["ingredient_rows"] == 1
 
 
 def test_account_menu_links_to_master_data_pages(monkeypatch, tmp_path):

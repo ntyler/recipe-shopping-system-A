@@ -24137,6 +24137,15 @@ img[data-deferred-src] {
             align-items: center;
         }
 
+        .master-data-backfill-form[aria-busy="true"] {
+            cursor: progress;
+        }
+
+        .master-data-backfill-form[aria-busy="true"] button {
+            cursor: progress;
+            opacity: 0.78;
+        }
+
         .master-data-backfill-form div,
         .master-data-backfill-form label,
         .master-data-filter-form label {
@@ -24165,6 +24174,214 @@ img[data-deferred-src] {
             height: 18px;
             margin: 0;
             accent-color: #2d8f70;
+        }
+
+        .master-data-backfill-progress {
+            display: grid;
+            gap: 12px;
+            padding: 12px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1420;
+        }
+
+        .master-data-backfill-progress[hidden] {
+            display: none;
+        }
+
+        .master-data-backfill-progress-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .master-data-backfill-progress-header div {
+            display: grid;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .master-data-backfill-progress-header strong {
+            color: #f8fafc;
+            font-weight: 900;
+        }
+
+        .master-data-backfill-progress-header div span {
+            color: #cbd5e1;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-backfill-state {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            padding: 0 10px;
+            border-radius: 999px;
+            background: #1f2937;
+            color: #dbeafe;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .master-data-backfill-state.running::before,
+        .master-data-backfill-item-state.running::before {
+            content: "";
+            width: 12px;
+            height: 12px;
+            margin-right: 6px;
+            border: 2px solid rgba(191, 219, 254, 0.35);
+            border-top-color: #bfdbfe;
+            border-radius: 999px;
+            animation: spin 0.85s linear infinite;
+        }
+
+        .master-data-backfill-state.complete,
+        .master-data-backfill-item-state.done {
+            background: #064e3b;
+            color: #bbf7d0;
+        }
+
+        .master-data-backfill-state.failed,
+        .master-data-backfill-item-state.failed {
+            background: #3b1111;
+            color: #fecaca;
+        }
+
+        .master-data-backfill-state.skipped {
+            background: #351c05;
+            color: #fde68a;
+        }
+
+        .master-data-progress-bar-wrap {
+            height: 10px;
+            overflow: hidden;
+            border: 1px solid #2f5172;
+            border-radius: 999px;
+            background: #07111c;
+        }
+
+        .master-data-progress-bar-wrap span {
+            display: block;
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #2d8f70, #38bdf8);
+            transition: width 180ms ease;
+        }
+
+        .master-data-backfill-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .master-data-backfill-metrics div {
+            display: grid;
+            gap: 3px;
+            min-width: 0;
+            padding: 8px 10px;
+            border: 1px solid #243a50;
+            border-radius: 7px;
+            background: #07111c;
+        }
+
+        .master-data-backfill-metrics span,
+        .master-data-current-backfill-item span {
+            color: #d4d0c8;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .master-data-backfill-metrics strong,
+        .master-data-current-backfill-item strong {
+            color: #f8fafc;
+            font-weight: 900;
+            line-height: 1.25;
+        }
+
+        .master-data-current-backfill-item {
+            display: grid;
+            gap: 4px;
+            padding: 10px 12px;
+            border: 1px solid #1e80c9;
+            border-radius: 8px;
+            background: #0a2740;
+        }
+
+        .master-data-current-backfill-item[hidden] {
+            display: none;
+        }
+
+        .master-data-current-backfill-item code {
+            color: #bfdbfe;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-backfill-item-list {
+            display: grid;
+            gap: 6px;
+            max-height: 310px;
+            margin: 0;
+            padding: 0;
+            overflow: auto;
+            list-style: none;
+        }
+
+        .master-data-backfill-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+            min-width: 0;
+            padding: 8px 10px;
+            border: 1px solid #243a50;
+            border-radius: 7px;
+            background: #07111c;
+        }
+
+        .master-data-backfill-item-main {
+            display: grid;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .master-data-backfill-item-title {
+            color: #e5edf5;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-backfill-item-meta {
+            color: #9fb3c8;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-backfill-item-state {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 26px;
+            padding: 0 9px;
+            border-radius: 999px;
+            background: #1f2937;
+            color: #dbeafe;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+            white-space: nowrap;
         }
 
         .master-data-filter-form .master-data-search-field {
@@ -24348,9 +24565,28 @@ img[data-deferred-src] {
                 grid-template-columns: 1fr;
             }
 
+            .master-data-backfill-progress-header,
+            .master-data-backfill-item {
+                grid-template-columns: 1fr;
+            }
+
+            .master-data-backfill-progress-header {
+                display: grid;
+            }
+
+            .master-data-backfill-metrics {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
             .master-data-backfill-form button,
             .master-data-filter-form button {
                 width: 100%;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .master-data-backfill-metrics {
+                grid-template-columns: 1fr;
             }
         }
 

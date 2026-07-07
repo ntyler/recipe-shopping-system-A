@@ -181,6 +181,52 @@ def test_backfill_recipe_master_records_for_user_scopes_existing_data(monkeypatc
     assert user_b_equipment["image_url"] == "/static/generated/backfill-b-pot.png"
 
 
+def test_backfill_recipe_master_records_reports_recipe_progress(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    user_root = tmp_path / "users" / "user-a" / "recipe-extractor" / "data"
+    (user_root / "output").mkdir(parents=True)
+    recipe_url = "https://example.com/progress-soup"
+    (user_root / "recipe_ingredients.json").write_text(
+        json.dumps({
+            recipe_url: {
+                "url": recipe_url,
+                "name": "Progress Soup",
+                "ingredients": ["Carrot"],
+            }
+        }),
+        encoding="utf-8",
+    )
+    (user_root / "output" / "progress-soup.json").write_text(
+        json.dumps({
+            "source_url": recipe_url,
+            "ingredients": [{"ingredient": "Carrot"}],
+            "equipment": [{"equipment": "Sheet pan"}],
+        }),
+        encoding="utf-8",
+    )
+    events = []
+
+    result = master_data.backfill_recipe_master_records_for_user(
+        "user-a",
+        extractor_data_root=user_root,
+        progress_callback=lambda event, payload: events.append((event, payload)),
+    )
+
+    assert result["recipes"] == 1
+    assert [event for event, _payload in events] == [
+        "user_start",
+        "recipe_start",
+        "recipe_done",
+        "user_done",
+    ]
+    recipe_start = events[1][1]
+    recipe_done = events[2][1]
+    assert recipe_start["label"] == "Progress Soup"
+    assert recipe_start["recipe_url"] == recipe_url
+    assert recipe_done["ingredient_count"] == 1
+    assert recipe_done["equipment_count"] == 1
+
+
 def test_list_master_records_searches_sorts_and_counts_usage(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
 

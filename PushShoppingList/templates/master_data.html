@@ -53,6 +53,8 @@
 
         {% if master_data.is_admin %}
             <form class="master-data-backfill-form"
+                  data-master-backfill-form
+                  data-backfill-status-url="{{ master_data.backfill_status_url }}"
                   method="POST"
                   action="{{ url_for('main_bp.recipe_master_data_backfill_route') }}">
                 <input type="hidden" name="record_type" value="{{ master_data.record_type }}">
@@ -68,8 +70,36 @@
                     <input type="checkbox" name="force" value="1">
                     <span>Force rerun</span>
                 </label>
-                <button type="submit">Run Backfill</button>
+                <button type="submit" data-master-backfill-submit>Run Backfill</button>
             </form>
+            <section class="master-data-backfill-progress"
+                     data-master-backfill-progress
+                     aria-live="polite"
+                     aria-busy="false"
+                     hidden>
+                <div class="master-data-backfill-progress-header">
+                    <div>
+                        <strong>Backfill progress</strong>
+                        <span data-master-backfill-summary>Preparing recipe list.</span>
+                    </div>
+                    <span class="master-data-backfill-state starting" data-master-backfill-state>Starting</span>
+                </div>
+                <div class="master-data-progress-bar-wrap" aria-hidden="true">
+                    <span data-master-backfill-bar></span>
+                </div>
+                <div class="master-data-backfill-metrics">
+                    <div><span>Users</span><strong data-master-backfill-users>0 / 0</strong></div>
+                    <div><span>Recipes</span><strong data-master-backfill-recipes>0 / 0</strong></div>
+                    <div><span>Ingredient links</span><strong data-master-backfill-ingredients>0</strong></div>
+                    <div><span>Equipment links</span><strong data-master-backfill-equipment>0</strong></div>
+                </div>
+                <div class="master-data-current-backfill-item" data-master-backfill-current hidden>
+                    <span>Running now</span>
+                    <strong data-master-backfill-current-title></strong>
+                    <code data-master-backfill-current-url></code>
+                </div>
+                <ol class="master-data-backfill-item-list" data-master-backfill-items></ol>
+            </section>
         {% endif %}
 
         <form class="master-data-filter-form"
@@ -210,5 +240,8 @@
         </div>
     </section>
 </main>
+{% if master_data.is_admin %}
+    <script src="{{ url_for('static', filename='js/master-data.js', v=master_data_js_version) }}" defer></script>
+{% endif %}
 </body>
 </html>

@@ -124,6 +124,7 @@ ADMIN_ENDPOINTS = {
     "pdf_bp.delete_cloudflare_orphan_pdfs_route",
     "main_bp.update_chatgpt_models_route",
     "main_bp.recipe_master_data_backfill_route",
+    "main_bp.recipe_master_data_backfill_status_route",
     "feedback_bp.update_feedback_admin_route",
 }
 
