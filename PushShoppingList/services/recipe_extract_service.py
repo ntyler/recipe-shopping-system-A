@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import time
+import unicodedata
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
@@ -3257,7 +3258,7 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
             prefer_openai=False,
             progress_callback=progress_callback,
         )
-        save_extracted_recipe_json(recipe_url, result_json_data)
+        save_extracted_recipe_json(recipe_url, result_json_data, source_text=page_text)
 
         if progress_callback:
             if extraction_method == "social_video_text_openai_estimates":
@@ -3299,7 +3300,7 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
     raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_API_RESPONSE.txt"
     raw_api_path.write_text(response_text, encoding="utf-8")
 
-    success, json_data = save_json_response(recipe_url, response_text)
+    success, json_data = save_json_response(recipe_url, response_text, source_text=page_text)
 
     if not success or not json_data:
         fallback_result = extract_recipe_from_social_video_audio_images(
@@ -3364,7 +3365,7 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
             "extraction_method": "social_video",
         }
 
-    save_extracted_recipe_json(recipe_url, json_data)
+    save_extracted_recipe_json(recipe_url, json_data, source_text=page_text)
     return result
 
 
@@ -3732,7 +3733,7 @@ def extract_recipe_from_social_video_audio_images(recipe_url, page_text="", cove
     except Exception:
         pass
 
-    success, json_data = save_json_response(recipe_url, response_text)
+    success, json_data = save_json_response(recipe_url, response_text, source_text=combined_text)
 
     if not success or not isinstance(json_data, dict):
         return None
@@ -4900,13 +4901,13 @@ def complete_social_video_recipe_with_openai_if_needed(
         repaired_data["cover_image"] = cover_image
 
     normalize_extracted_recipe_identity(repaired_data)
-    normalize_extracted_ingredient_fields(repaired_data)
+    normalize_extracted_ingredient_fields(repaired_data, source_text=page_text)
     normalize_extracted_equipment_fields(repaired_data)
     apply_recipe_info_metadata(repaired_data)
     apply_recipe_scaling_metadata(repaired_data)
     apply_recipe_cover_image_metadata(repaired_data, recipe_url=recipe_url)
     apply_recipe_owner_metadata(repaired_data)
-    save_extracted_recipe_json(recipe_url, repaired_data)
+    save_extracted_recipe_json(recipe_url, repaired_data, source_text=page_text)
     return repaired_data
 
 
@@ -6041,7 +6042,7 @@ def build_video_pdf_recipe_data(
             return api_data
 
     if recipe_data_has_pdf_content(structured_recipe_data):
-        normalize_extracted_ingredient_fields(structured_recipe_data)
+        normalize_extracted_ingredient_fields(structured_recipe_data, source_text=page_text)
         normalize_extracted_equipment_fields(structured_recipe_data)
         return structured_recipe_data
 
@@ -6083,7 +6084,7 @@ def extract_video_recipe_pdf_data_with_openai(recipe_url, page_text, progress_ca
         json_data = json.loads(clean_json_response(response_text))
         json_data["source_url"] = recipe_url
         normalize_extracted_recipe_identity(json_data)
-        normalize_extracted_ingredient_fields(json_data)
+        normalize_extracted_ingredient_fields(json_data, source_text=page_text)
         normalize_extracted_equipment_fields(json_data)
         return json_data
     except Exception as exc:
@@ -6991,6 +6992,11 @@ INGREDIENT CONFIDENCE RULES:
 - Do NOT infer missing ingredients from general cooking knowledge.
 - Do NOT add water, oil, salt, or pepper unless explicitly mentioned.
 - If uncertain whether something is an ingredient or instruction text, exclude it.
+- Do not invent ingredient names. If an ingredient name is not present in the source text, set inferred = true and lower confidence instead of treating it as source-confirmed.
+- For each ingredient object include original_text, parsed_name, normalized_name, quantity, unit, confidence, inferred, and warning.
+- original_text must preserve the source line. parsed_name is the grocery item parsed from original_text. normalized_name is the grocery-safe name used for shopping/master ingredient matching.
+- Flag unusual generated ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, and pepper milk unless that exact phrase appears in the source text.
+- For Huancaina-style recipes, prefer evaporated milk or milk over potato milk unless the source explicitly says potato milk.
 
 IMPORTANT QUANTITY EXTRACTION RULES:
 - ALWAYS attempt to extract quantity and unit.
@@ -7312,7 +7318,12 @@ FINAL OUTPUT FORMAT
       "base_quantity": null,
       "base_unit": null,
       "ingredient": null,
+      "parsed_name": null,
+      "normalized_name": null,
       "preparation": null,
+      "confidence": null,
+      "inferred": false,
+      "warning": null,
       "optional": false,
       "store_section": null,
       "store_section_order": null
@@ -8030,7 +8041,7 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
     return response.choices[0].message.content
 
 
-def save_json_response(recipe_url, response_text, html_text=None):
+def save_json_response(recipe_url, response_text, html_text=None, source_text=None):
     cleaned = clean_json_response(response_text)
 
     base_name = safe_filename(recipe_url)
@@ -8041,7 +8052,7 @@ def save_json_response(recipe_url, response_text, html_text=None):
         json_data = json.loads(cleaned)
         json_data["source_url"] = json_data.get("source_url") or recipe_url
         normalize_extracted_recipe_identity(json_data)
-        normalize_extracted_ingredient_fields(json_data)
+        normalize_extracted_ingredient_fields(json_data, source_text=source_text or html_text or "")
         normalize_extracted_equipment_fields(json_data)
         apply_recipe_info_metadata(json_data, html_text)
         apply_recipe_scaling_metadata(json_data, html_text)
@@ -8510,8 +8521,12 @@ Return JSON with exactly this shape:
       "quantity": "1",
       "unit": "cup",
       "ingredient": "rice",
+      "parsed_name": "rice",
+      "normalized_name": "rice",
       "estimated_from_image": true,
       "confidence": "medium",
+      "inferred": true,
+      "warning": "",
       "preparation": "",
       "optional": false,
       "section": "",
@@ -8543,6 +8558,9 @@ Rules:
 - Include reasonable likely pantry staples in inferred_ingredients and ingredients only when needed for a plausible recipe.
 - If a user description is provided, treat it as a high-priority hint for ingredient selection and method flow.
 - Do not claim the result is exact; treat all inferred items as estimated.
+- Do not invent unusual ingredient names. Mark non-visible or uncertain ingredients with inferred=true instead of source-confirmed confidence.
+- Flag potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, and pepper milk with a warning unless that exact phrase appears in the user description.
+- For Huancaina-style recipes, use evaporated milk or milk instead of potato milk unless the user description explicitly says potato milk.
 - Do not claim ingredient amounts are exact; they should be treated as estimates.
 - Include a confidence score between 0 and 1 in extraction_confidence.
 - Return `confidence` per ingredient as one of: "high", "medium", or "low".
@@ -8791,12 +8809,250 @@ def generateRecipeFromImage(uploaded_file_path, user_description="", recipe_url=
     )
 
 
-def normalize_extracted_ingredient_fields(json_data):
+SUSPICIOUS_INGREDIENT_PHRASES = (
+    "potato milk",
+    "chicken milk",
+    "beef milk",
+    "pork milk",
+    "onion milk",
+    "garlic milk",
+    "pepper milk",
+)
+SUSPICIOUS_INGREDIENT_WARNING_TEMPLATE = (
+    "Possible extraction issue: '{ingredient}' may have been incorrectly generated. "
+    "Check the source recipe."
+)
+INGREDIENT_CONFIDENCE_VALUES = {"low", "medium", "high"}
+
+
+def source_match_text(value):
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.casefold()
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+
+
+def source_contains_exact_phrase(source_text, phrase):
+    source = source_match_text(source_text)
+    phrase = source_match_text(phrase)
+
+    if not source or not phrase:
+        return False
+
+    return re.search(rf"(?<![a-z0-9]){re.escape(phrase)}(?![a-z0-9])", source) is not None
+
+
+def ingredient_name_variants_for_source_match(name):
+    normalized = source_match_text(name)
+    if not normalized:
+        return []
+
+    variants = {normalized}
+    if normalized.endswith("ies") and len(normalized) > 3:
+        variants.add(f"{normalized[:-3]}y")
+    if normalized.endswith("es") and len(normalized) > 2:
+        variants.add(normalized[:-2])
+    if normalized.endswith("s") and len(normalized) > 1:
+        variants.add(normalized[:-1])
+    else:
+        variants.add(f"{normalized}s")
+    return [variant for variant in variants if variant]
+
+
+def ingredient_name_present_in_source(name, source_text):
+    normalized = source_match_text(name)
+    source = source_match_text(source_text)
+
+    if not normalized or not source:
+        return False
+
+    alternatives = re.split(r"\s+(?:or|and or|and)\s+", normalized)
+    if len(alternatives) > 1:
+        meaningful = [part for part in alternatives if part]
+        return bool(meaningful) and all(
+            ingredient_name_present_in_source(part, source)
+            for part in meaningful
+        )
+
+    return any(
+        source_contains_exact_phrase(source, variant)
+        for variant in ingredient_name_variants_for_source_match(normalized)
+    )
+
+
+def _append_ingredient_source_part(parts, value):
+    if isinstance(value, str):
+        text = clean_recipe_text(value)
+        if text:
+            parts.append(text)
+    elif isinstance(value, dict):
+        for nested in value.values():
+            _append_ingredient_source_part(parts, nested)
+    elif isinstance(value, list):
+        for nested in value:
+            _append_ingredient_source_part(parts, nested)
+
+
+def _ingredient_source_value_has_text(value):
+    if isinstance(value, str):
+        return bool(clean_recipe_text(value))
+    if isinstance(value, dict):
+        return any(_ingredient_source_value_has_text(nested) for nested in value.values())
+    if isinstance(value, list):
+        return any(_ingredient_source_value_has_text(nested) for nested in value)
+    return bool(clean_recipe_text(value))
+
+
+def ingredient_validation_source_text(json_data, source_text=""):
+    json_data = json_data if isinstance(json_data, dict) else {}
+    parts = []
+    for value in (
+        source_text,
+        json_data.get("source_text"),
+        json_data.get("page_text"),
+        json_data.get("extracted_text"),
+        json_data.get("html_text"),
+        json_data.get("menu_description"),
+        json_data.get("manual_description"),
+        json_data.get("user_description"),
+        json_data.get("menu_item_name"),
+        json_data.get("menu_section"),
+        json_data.get("recipe_title"),
+        json_data.get("display_name"),
+        json_data.get("visible_ingredients"),
+    ):
+        _append_ingredient_source_part(parts, value)
+    return "\n".join(parts)
+
+
+def ingredient_validation_has_source_body(json_data, source_text=""):
+    json_data = json_data if isinstance(json_data, dict) else {}
+    for value in (
+        source_text,
+        json_data.get("source_text"),
+        json_data.get("page_text"),
+        json_data.get("extracted_text"),
+        json_data.get("html_text"),
+        json_data.get("menu_description"),
+        json_data.get("manual_description"),
+        json_data.get("user_description"),
+        json_data.get("visible_ingredients"),
+    ):
+        if _ingredient_source_value_has_text(value):
+            return True
+    return False
+
+
+def ingredient_item_source_text(json_data, item, trusted_source_text, has_source_body=False):
+    if clean_recipe_text(trusted_source_text) and has_source_body:
+        return trusted_source_text
+
+    json_data = json_data if isinstance(json_data, dict) else {}
+    if bool(json_data.get("ai_inferred")):
+        return trusted_source_text
+
+    return "\n".join(
+        part
+        for part in (
+            trusted_source_text,
+            clean_recipe_text(item.get("original_text") or ""),
+        )
+        if clean_recipe_text(part)
+    )
+
+
+def recipe_is_huancaina_style(json_data):
+    json_data = json_data if isinstance(json_data, dict) else {}
+    context = " ".join(
+        clean_recipe_text(json_data.get(field) or "")
+        for field in (
+            "recipe_title",
+            "display_name",
+            "menu_item_name",
+            "menu_description",
+            "source_name",
+        )
+    )
+    return "huancaina" in source_match_text(context)
+
+
+def suspicious_ingredient_phrase_for_values(*values):
+    for value in values:
+        for phrase in SUSPICIOUS_INGREDIENT_PHRASES:
+            if source_contains_exact_phrase(value, phrase):
+                return phrase
+    return ""
+
+
+def preferred_huancaina_milk_name(source_text):
+    if ingredient_name_present_in_source("evaporated milk", source_text):
+        return "evaporated milk"
+    if ingredient_name_present_in_source("milk", source_text):
+        return "milk"
+    return "evaporated milk"
+
+
+def suspicious_ingredient_replacement(phrase, json_data, source_text):
+    phrase = source_match_text(phrase)
+
+    if phrase == "potato milk" and recipe_is_huancaina_style(json_data):
+        return preferred_huancaina_milk_name(source_text)
+
+    if phrase.endswith(" milk"):
+        return "milk"
+
+    return ""
+
+
+def suspicious_ingredient_warning(phrase):
+    return SUSPICIOUS_INGREDIENT_WARNING_TEMPLATE.format(ingredient=phrase)
+
+
+def normalize_ingredient_confidence(value, inferred=False, suspicious=False):
+    if suspicious:
+        return "low"
+
+    text = clean_recipe_text(value).lower()
+    if text in INGREDIENT_CONFIDENCE_VALUES:
+        return text
+
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        score = None
+
+    if score is not None:
+        if score >= 0.8:
+            return "high"
+        if score >= 0.5:
+            return "medium"
+        return "low"
+
+    return "medium" if inferred else "high"
+
+
+def normalize_extracted_ingredient_fields(json_data, source_text=""):
+    json_data = json_data if isinstance(json_data, dict) else {}
+    trusted_source_text = ingredient_validation_source_text(json_data, source_text)
+    has_source_body = ingredient_validation_has_source_body(json_data, source_text)
+
     for item in json_data.get("ingredients", []):
         if not isinstance(item, dict):
             continue
 
-        original_text = item.get("original_text") or ""
+        original_text = clean_recipe_text(item.get("original_text") or "")
+        raw_ingredient = clean_recipe_text(
+            item.get("ingredient")
+            or item.get("name")
+            or item.get("parsed_name")
+            or ""
+        )
+        parsed = {
+            "quantity": None,
+            "unit": None,
+            "ingredient": "",
+            "preparation": "",
+        }
 
         if not original_text:
             if item.get("base_quantity") in (None, "") and item.get("quantity") not in (None, ""):
@@ -8804,28 +9060,94 @@ def normalize_extracted_ingredient_fields(json_data):
 
             if item.get("base_unit") in (None, "") and item.get("unit") not in (None, ""):
                 item["base_unit"] = item.get("unit")
+        else:
+            parsed = parse_structured_ingredient_line(original_text)
 
-            apply_purchase_mapping_to_ingredient(item)
-            continue
+            if parsed["quantity"] and not item.get("quantity"):
+                item["quantity"] = parsed["quantity"]
 
-        parsed = parse_structured_ingredient_line(original_text)
+            if parsed["unit"] and not item.get("unit"):
+                item["unit"] = parsed["unit"]
 
-        if parsed["quantity"] and not item.get("quantity"):
-            item["quantity"] = parsed["quantity"]
+            if parsed["preparation"] and not item.get("preparation"):
+                item["preparation"] = parsed["preparation"]
 
-        if parsed["unit"] and not item.get("unit"):
-            item["unit"] = parsed["unit"]
+            if parsed["ingredient"]:
+                current_ingredient = normalize_ingredient_for_shopping_list(
+                    item.get("ingredient") or original_text
+                )
 
-        if parsed["preparation"] and not item.get("preparation"):
-            item["preparation"] = parsed["preparation"]
+                if not current_ingredient or current_ingredient == normalize_ingredient_for_shopping_list(original_text):
+                    item["ingredient"] = parsed["ingredient"]
 
-        if parsed["ingredient"]:
-            current_ingredient = normalize_ingredient_for_shopping_list(
-                item.get("ingredient") or original_text
+        parsed_name = clean_recipe_text(item.get("parsed_name") or parsed["ingredient"] or raw_ingredient or original_text)
+        if parsed_name:
+            item["parsed_name"] = parsed_name
+
+        normalized_name = normalize_ingredient_for_shopping_list(
+            item.get("ingredient") or parsed_name or original_text
+        )
+        suspicious_phrase = suspicious_ingredient_phrase_for_values(
+            raw_ingredient,
+            item.get("ingredient"),
+            item.get("normalized_name"),
+            item.get("purchasable_item"),
+            item.get("buy_as"),
+            parsed_name,
+            original_text,
+        )
+        exact_suspicious_source = (
+            bool(suspicious_phrase)
+            and source_contains_exact_phrase(
+                ingredient_item_source_text(
+                    json_data,
+                    item,
+                    trusted_source_text,
+                    has_source_body=has_source_body,
+                ),
+                suspicious_phrase,
             )
+        )
+        is_suspicious = bool(suspicious_phrase and not exact_suspicious_source)
 
-            if not current_ingredient or current_ingredient == normalize_ingredient_for_shopping_list(original_text):
-                item["ingredient"] = parsed["ingredient"]
+        if is_suspicious:
+            replacement = suspicious_ingredient_replacement(
+                suspicious_phrase,
+                json_data,
+                trusted_source_text,
+            )
+            if replacement:
+                normalized_name = normalize_ingredient_for_shopping_list(replacement)
+                item["ingredient"] = normalized_name
+                for field in ("purchasable_item", "buy_as", "purchase_group"):
+                    if source_contains_exact_phrase(item.get(field), suspicious_phrase):
+                        item[field] = normalized_name
+            item["warning"] = suspicious_ingredient_warning(suspicious_phrase)
+        elif clean_recipe_text(item.get("warning") or "").startswith("Possible extraction issue:"):
+            item["warning"] = ""
+        else:
+            item["warning"] = clean_recipe_text(item.get("warning") or "")
+
+        if normalized_name:
+            item["normalized_name"] = normalized_name
+            item["ingredient"] = item.get("ingredient") or normalized_name
+
+        source_for_item = ingredient_item_source_text(
+            json_data,
+            item,
+            trusted_source_text,
+            has_source_body=has_source_body,
+        )
+        source_confirmed = ingredient_name_present_in_source(
+            item.get("normalized_name") or item.get("ingredient") or parsed_name,
+            source_for_item,
+        )
+        item["inferred"] = not source_confirmed
+        item["confidence"] = normalize_ingredient_confidence(
+            item.get("confidence"),
+            inferred=item["inferred"],
+            suspicious=is_suspicious,
+        )
 
         if item.get("base_quantity") in (None, "") and item.get("quantity") not in (None, ""):
             item["base_quantity"] = item.get("quantity")
@@ -8892,10 +9214,10 @@ def structured_recipe_data_is_usable(json_data):
     return bool(json_data.get("ingredients")) and bool(json_data.get("instructions"))
 
 
-def save_extracted_recipe_json(recipe_url, json_data):
+def save_extracted_recipe_json(recipe_url, json_data, source_text=""):
     json_data["source_url"] = json_data.get("source_url") or recipe_url
     normalize_extracted_recipe_identity(json_data)
-    normalize_extracted_ingredient_fields(json_data)
+    normalize_extracted_ingredient_fields(json_data, source_text=source_text)
     normalize_extracted_equipment_fields(json_data)
     apply_recipe_info_metadata(json_data)
     apply_recipe_scaling_metadata(json_data)
@@ -9677,7 +9999,7 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
             page_text=page_text,
             recipe_title=json_data.get("recipe_title") or "",
         )
-        save_extracted_recipe_json(recipe_url, json_data)
+        save_extracted_recipe_json(recipe_url, json_data, source_text=page_text)
 
         result = build_extract_result(recipe_url, json_data, extraction_method)
         result["recipe_json"] = json_data
@@ -11825,6 +12147,9 @@ Infer:
 - nutrition estimate if reasonable
 - confidence notes when uncertain
 - Use the predicted equipment hint only when it fits the inferred home-cooking recipe; revise or omit it when better equipment is implied.
+- Mark each ingredient inferred=true unless the menu item title or description explicitly contains that ingredient name.
+- Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the menu source text.
+- For Huancaina-style dishes, use evaporated milk or milk instead of potato milk unless the menu source text explicitly says potato milk.
 
 Return ONLY valid JSON using this shape:
 {{
@@ -11845,8 +12170,13 @@ Return ONLY valid JSON using this shape:
         "quantity": "1",
         "unit": "pound",
         "ingredient": "example ingredient",
+        "parsed_name": "example ingredient",
+        "normalized_name": "example ingredient",
         "preparation": "prepared",
-        "original_text": "1 pound example ingredient, prepared"
+        "original_text": "1 pound example ingredient, prepared",
+        "confidence": "medium",
+        "inferred": true,
+        "warning": ""
       }}
     ],
     "equipment": [
@@ -12086,7 +12416,7 @@ This is not the restaurant's exact recipe. Mark each result as AI-inferred.
 Return ONLY valid JSON. The top-level object must be keyed by menu_item_id.
 
 For each menu_item_id return:
-- predicted_ingredients: array of ingredient objects with quantity, unit, ingredient, preparation, original_text
+- predicted_ingredients: array of ingredient objects with quantity, unit, ingredient, parsed_name, normalized_name, preparation, original_text, confidence, inferred, warning
 - predicted_equipment: array of equipment objects with name
 - predicted_instructions: array of instruction objects with step and instruction
 - recipe_category: category enum string
@@ -12112,6 +12442,9 @@ Rules:
 - Keep instructions brief and practical.
 - Skip no items in the response; every provided menu_item_id must have one result.
 - If an item is vague, return conservative plausible ingredients/instructions with lower confidence.
+- Mark ingredients inferred=true unless the menu title or description explicitly contains that ingredient name.
+- Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the menu item source text.
+- For Huancaina-style dishes, use evaporated milk or milk instead of potato milk unless the menu item source text explicitly says potato milk.
 
 {MENU_RECIPE_CATEGORY_PREDICTION_RULES}
 
@@ -15546,9 +15879,9 @@ def extract_recipe_from_url(recipe_url, progress_callback=None):
         force_openai = os.getenv("FORCE_OPENAI_RECIPE_EXTRACTION") == "1"
 
         if structured_recipe_data_is_usable(structured_json_data) and not force_openai:
-            normalize_extracted_ingredient_fields(structured_json_data)
+            normalize_extracted_ingredient_fields(structured_json_data, source_text=page_text)
             normalize_extracted_equipment_fields(structured_json_data)
-            save_extracted_recipe_json(recipe_url, structured_json_data)
+            save_extracted_recipe_json(recipe_url, structured_json_data, source_text=page_text)
             print("Structured recipe data found; using recipe card for fast extraction.")
             report(
                 "recipe card found - extracted without OpenAI API fallback.",
@@ -15585,7 +15918,12 @@ def extract_recipe_from_url(recipe_url, progress_callback=None):
         raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_API_RESPONSE.txt"
         raw_api_path.write_text(response_text, encoding="utf-8")
 
-        success, json_data = save_json_response(recipe_url, response_text, html_text=html_text)
+        success, json_data = save_json_response(
+            recipe_url,
+            response_text,
+            html_text=html_text,
+            source_text=page_text,
+        )
 
         if not success or not json_data:
             return {

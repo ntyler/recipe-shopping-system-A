@@ -95,6 +95,12 @@ def clean_text(value):
     return " ".join(str(value or "").strip().split())
 
 
+def truthy(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def missing_text(value):
     if value is None:
         return True
@@ -654,6 +660,9 @@ Conservative rules:
 - Equipment should be practical home-kitchen equipment.
 - Instructions should be short, useful, and recipe-like.
 - Preserve any strong current details from the context and focus on these missing fields: {", ".join(missing_fields)}.
+- Mark ingredient rows inferred=true unless the source/menu description or current recipe text explicitly contains the ingredient name.
+- Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the source text.
+- For Huancaina-style recipes, use evaporated milk or milk instead of potato milk unless the source text explicitly says potato milk.
 
 Context JSON:
 {json.dumps(context, ensure_ascii=False, indent=2)}
@@ -673,7 +682,12 @@ Required response shape:
       "name": "",
       "quantity": "",
       "unit": "",
-      "notes": ""
+      "notes": "",
+      "parsed_name": "",
+      "normalized_name": "",
+      "confidence": "medium",
+      "inferred": true,
+      "warning": ""
     }}
   ],
   "equipment": [
@@ -705,6 +719,9 @@ Conservative rules:
 - Quantities and units must be strings.
 - If exact quantities are uncertain, use realistic estimates based on the servings and instructions.
 - Preserve clearly useful current ingredient details, but fix incomplete, duplicated, or poorly parsed rows.
+- Mark ingredient rows inferred=true unless the source/menu description or current recipe text explicitly contains the ingredient name.
+- Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the source text.
+- For Huancaina-style recipes, use evaporated milk or milk instead of potato milk unless the source text explicitly says potato milk.
 
 Context JSON:
 {json.dumps(context, ensure_ascii=False, indent=2)}
@@ -720,7 +737,12 @@ Required response shape:
       "optional": false,
       "purchasable_item": "",
       "purchase_group": "",
-      "store_section": ""
+      "store_section": "",
+      "parsed_name": "",
+      "normalized_name": "",
+      "confidence": "medium",
+      "inferred": true,
+      "warning": ""
     }}
   ],
   "confidence": "low | medium | high",
@@ -836,7 +858,7 @@ def build_original_ingredient_text(row):
     return clean_text(" ".join(part for part in parts if part))
 
 
-def normalize_ai_ingredients(value):
+def normalize_ai_ingredients(value, recipe_context=None):
     if isinstance(value, str):
         value = value.splitlines()
     if not isinstance(value, list):
@@ -872,7 +894,12 @@ def normalize_ai_ingredients(value):
             "base_quantity": clean_text(item.get("base_quantity") or item.get("quantity")),
             "base_unit": clean_text(item.get("base_unit") or item.get("unit")),
             "ingredient": name or original_text,
+            "parsed_name": clean_text(item.get("parsed_name")),
+            "normalized_name": clean_text(item.get("normalized_name")),
             "preparation": clean_text(item.get("notes") or item.get("preparation")),
+            "confidence": clean_text(item.get("confidence")),
+            "inferred": truthy(item.get("inferred")),
+            "warning": clean_text(item.get("warning")),
             "optional": bool(item.get("optional")),
             "store_section": store_section,
             "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),
@@ -882,7 +909,10 @@ def normalize_ai_ingredients(value):
         }
         ingredients.append(row)
 
-    normalized = {"ingredients": ingredients}
+    normalized = {
+        **(recipe_context if isinstance(recipe_context, dict) else {}),
+        "ingredients": ingredients,
+    }
     normalize_extracted_ingredient_fields(normalized)
     return recipe_edit_service.sanitize_ingredients(normalized.get("ingredients", []))
 
@@ -895,7 +925,7 @@ def normalize_ai_instructions(value):
     return recipe_edit_service.sanitize_instruction_list(value)
 
 
-def normalize_ai_payload(parsed):
+def normalize_ai_payload(parsed, recipe_context=None):
     parsed = parsed if isinstance(parsed, dict) else {}
     confidence = clean_text(parsed.get("confidence")).lower()
     if confidence not in {"low", "medium", "high"}:
@@ -909,7 +939,7 @@ def normalize_ai_payload(parsed):
         "prep_time": clean_text(parsed.get("prep_time")),
         "inactive_time": clean_text(parsed.get("inactive_time")),
         "cook_time": clean_text(parsed.get("cook_time")),
-        "ingredients": normalize_ai_ingredients(parsed.get("ingredients")),
+        "ingredients": normalize_ai_ingredients(parsed.get("ingredients"), recipe_context=recipe_context),
         "equipment": normalize_ai_equipment(parsed.get("equipment")),
         "instructions": normalize_ai_instructions(parsed.get("instructions")),
         "confidence": confidence,
@@ -1092,7 +1122,8 @@ def regenerate_ingredients_for_recipe(
     generated_ingredients = normalize_ai_ingredients(
         parsed.get("ingredients")
         or parsed.get("regenerated_ingredients")
-        or parsed.get("recipe_ingredients")
+        or parsed.get("recipe_ingredients"),
+        recipe_context=recipe_data,
     )
     if not generated_ingredients:
         return {
@@ -1466,7 +1497,7 @@ def infer_missing_details_for_recipe(
             "model_source": model_source,
         }
 
-    normalized = normalize_ai_payload(parsed)
+    normalized = normalize_ai_payload(parsed, recipe_context=recipe_data)
     fields_to_fill = [
         field
         for field in missing_fields

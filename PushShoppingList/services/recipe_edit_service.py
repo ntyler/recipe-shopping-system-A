@@ -79,6 +79,7 @@ from PushShoppingList.services.openai_throttle_service import throttled_chat_com
 from PushShoppingList.services.openai_throttle_service import throttled_image_generation
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
+from PushShoppingList.services.recipe_ingredient_service import ingredient_detail_records
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
 from PushShoppingList.services.recipe_ingredient_service import remove_unused_ingredients_from_shopping_list
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
@@ -6890,6 +6891,7 @@ def update_recipe_ingredient_record(url, quantity, recipe_data, preserve_existin
         "scaled_servings": existing.get("scaled_servings"),
         "scaled_ingredients": existing.get("scaled_ingredients", {}),
         "ingredients": extract_ingredients_from_result(recipe_data),
+        "ingredient_details": ingredient_detail_records(recipe_metadata=recipe_data),
     }
 
     if cover_image:
@@ -6914,7 +6916,12 @@ def normalize_edit_ingredients(ingredients):
             "base_quantity": item.get("base_quantity") or item.get("quantity") or "",
             "base_unit": item.get("base_unit") or item.get("unit") or "",
             "ingredient": item.get("ingredient") or "",
+            "parsed_name": item.get("parsed_name") or "",
+            "normalized_name": item.get("normalized_name") or "",
             "preparation": item.get("preparation") or "",
+            "confidence": item.get("confidence") or "",
+            "inferred": truthy(item.get("inferred")),
+            "warning": item.get("warning") or "",
             "optional": bool(item.get("optional")),
             "store_section": item.get("store_section") or classify_store_section(item.get("ingredient") or ""),
             "purchasable_item": item.get("purchasable_item") or item.get("buy_as") or "",
@@ -7092,7 +7099,12 @@ def sanitize_ingredients(value, existing_value=None):
             "base_quantity": base_quantity or nullable_string(item.get("quantity")),
             "base_unit": base_unit or nullable_string(item.get("unit")),
             "ingredient": name or original_text,
+            "parsed_name": nullable_string(item.get("parsed_name")),
+            "normalized_name": nullable_string(item.get("normalized_name")),
             "preparation": nullable_string(item.get("preparation")),
+            "confidence": nullable_string(item.get("confidence")),
+            "inferred": truthy(item.get("inferred")),
+            "warning": nullable_string(item.get("warning")),
             "optional": bool(item.get("optional")),
             "store_section": store_section,
             "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),
@@ -7431,3 +7443,9 @@ def sanitize_reflection_notes(value, existing_value=None):
 def nullable_string(value):
     text = str(value or "").strip()
     return text or None
+
+
+def truthy(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}

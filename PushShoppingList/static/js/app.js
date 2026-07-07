@@ -23895,6 +23895,19 @@ function recipeIngredientBadgesHtml(item = {}) {
     )).join("");
 }
 
+function recipeIngredientExtractionWarning(item = {}) {
+    return String(item.warning || item.extraction_warning || "").trim();
+}
+
+function recipeIngredientInferredValue(item = {}) {
+    if (item.inferred === true) {
+        return "true";
+    }
+
+    const text = String(item.inferred || "").trim().toLowerCase();
+    return ["1", "true", "yes", "on"].includes(text) ? "true" : "false";
+}
+
 function resizeRecipeIngredientNameField(field) {
     if (!field || field.tagName !== "TEXTAREA") {
         return;
@@ -23935,6 +23948,7 @@ function addRecipeIngredientRow(item = {}) {
     const ingredientImageSrcSet = recipeImageVariantSrcSet(ingredientImageUrl);
     const ingredientImageGeneratedAt = item.ingredient_image_generated_at || item.image_generated_at || "";
     const ingredientImagePrompt = item.ingredient_image_prompt || item.image_prompt || "";
+    const extractionWarning = recipeIngredientExtractionWarning(item);
     const recipeUrl = recipeEditorCurrentUrl();
     row.className = "recipe-edit-ingredient-row";
     row.innerHTML = `
@@ -23965,6 +23979,9 @@ function addRecipeIngredientRow(item = {}) {
             <span class="recipe-edit-choice-review" data-ingredient-choice-review hidden>
                 <span class="recipe-edit-choice-prompt">Pick one option</span>
                 <span class="recipe-edit-choice-options" data-ingredient-choice-options></span>
+            </span>
+            <span class="recipe-edit-extraction-warning" data-ingredient-warning-message ${extractionWarning ? "" : "hidden"}>
+                ${escapeHtml(extractionWarning)}
             </span>
         </div>
         <label class="recipe-edit-qty-label">
@@ -24103,6 +24120,11 @@ function addRecipeIngredientRow(item = {}) {
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
         <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
         <input type="hidden" data-field="purchase_group" value="${escapeAttribute(item.purchase_group || "")}">
+        <input type="hidden" data-field="parsed_name" value="${escapeAttribute(item.parsed_name || "")}">
+        <input type="hidden" data-field="normalized_name" value="${escapeAttribute(item.normalized_name || "")}">
+        <input type="hidden" data-field="confidence" value="${escapeAttribute(item.confidence || "")}">
+        <input type="hidden" data-field="inferred" value="${escapeAttribute(recipeIngredientInferredValue(item))}">
+        <input type="hidden" data-field="warning" value="${escapeAttribute(extractionWarning)}">
     `;
     const ingredientTextReview = normalizeIngredientTextReview(item.food_review || null);
     if (ingredientTextReview) {
@@ -27548,10 +27570,15 @@ function normalizeRecipeEditorSnapshot(recipe) {
             quantity: String(item.quantity || "").trim(),
             unit: String(item.unit || "").trim(),
             original_text: String(item.original_text || "").trim(),
+            parsed_name: String(item.parsed_name || "").trim(),
+            normalized_name: String(item.normalized_name || "").trim(),
             purchasable_item: String(item.purchasable_item || item.buy_as || "").trim(),
             preparation: String(item.preparation || "").trim(),
             section: String(item.section || "").trim(),
             store_section: String(item.store_section || "").trim(),
+            confidence: String(item.confidence || "").trim(),
+            inferred: String(item.inferred || "").trim(),
+            warning: String(item.warning || "").trim(),
             optional: Boolean(item.optional),
         })),
         equipment: (recipe.equipment || [])
@@ -27730,8 +27757,13 @@ function changedRecipeIngredientLines(previousIngredients, nextIngredients) {
         const buyAsChanged = previous.purchasable_item !== item.purchasable_item;
         const detailsChanged = [
             "original_text",
+            "parsed_name",
+            "normalized_name",
             "preparation",
             "section",
+            "confidence",
+            "inferred",
+            "warning",
             "optional",
         ].some(key => previous[key] !== item[key]);
 

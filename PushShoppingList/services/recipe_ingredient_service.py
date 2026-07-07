@@ -58,6 +58,7 @@ def recipe_ingredients_record(url, ingredients, recipe_metadata=None, existing=N
         "scaled_servings": existing.get("scaled_servings"),
         "scaled_ingredients": existing.get("scaled_ingredients", {}),
         "ingredients": unique_ingredients(ingredients),
+        "ingredient_details": ingredient_detail_records(ingredients, recipe_metadata),
     }
 
     if cover_image:
@@ -69,6 +70,43 @@ def recipe_ingredients_record(url, ingredients, recipe_metadata=None, existing=N
         record["owner_username"] = user.get("username", "")
 
     return record
+
+
+def ingredient_detail_records(ingredients=None, recipe_metadata=None):
+    recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
+    raw_metadata = recipe_metadata.get("raw") if isinstance(recipe_metadata.get("raw"), dict) else {}
+    candidates = None
+
+    if isinstance(raw_metadata.get("ingredients"), list):
+        candidates = raw_metadata.get("ingredients")
+    elif isinstance(recipe_metadata.get("ingredients"), list):
+        candidates = recipe_metadata.get("ingredients")
+    elif isinstance(ingredients, list):
+        candidates = ingredients
+    else:
+        candidates = []
+
+    rows = []
+    for item in candidates:
+        if not isinstance(item, dict):
+            continue
+        rows.append({
+            "original_text": str(item.get("original_text") or "").strip(),
+            "parsed_name": str(item.get("parsed_name") or "").strip(),
+            "normalized_name": str(item.get("normalized_name") or item.get("ingredient") or "").strip(),
+            "quantity": str(item.get("quantity") or "").strip(),
+            "unit": str(item.get("unit") or "").strip(),
+            "confidence": str(item.get("confidence") or "").strip(),
+            "inferred": truthy(item.get("inferred")),
+            "warning": str(item.get("warning") or "").strip(),
+        })
+    return rows
+
+
+def truthy(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def save_ingredients_for_recipe(url, ingredients, recipe_metadata=None):

@@ -50,6 +50,13 @@ def test_ingredients_header_has_image_overflow_menu():
     assert "const sortMode = mode === \"store_section\" ? \"store_section\" : \"ingredient\";" in script
     assert "function recipeIngredientSortKey(value)" in script
     assert "closeRecipeEditRowMenus();" in script
+    assert "recipe-edit-extraction-warning" in script
+    assert 'data-field="parsed_name"' in script
+    assert 'data-field="normalized_name"' in script
+    assert 'data-field="confidence"' in script
+    assert 'data-field="inferred"' in script
+    assert 'data-field="warning"' in script
+    assert "data-ingredient-warning-message" in script
 
 
 def test_recipe_editor_hide_all_images_keeps_title_image_visible():

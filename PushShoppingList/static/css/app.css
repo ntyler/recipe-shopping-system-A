@@ -17495,6 +17495,24 @@ body {
     color: #9ec5ff;
 }
 
+.recipe-edit-extraction-warning {
+    display: inline-flex;
+    align-items: flex-start;
+    max-width: 100%;
+    padding: 6px 8px;
+    border: 1px solid rgba(245, 158, 11, 0.42);
+    border-radius: 5px;
+    background: rgba(120, 53, 15, 0.35);
+    color: #fcd58a;
+    font-size: 12px;
+    font-weight: 750;
+    line-height: 1.25;
+}
+
+.recipe-edit-extraction-warning[hidden] {
+    display: none;
+}
+
 .recipe-edit-preparation-inline input {
     min-height: 24px;
     border: 0;
