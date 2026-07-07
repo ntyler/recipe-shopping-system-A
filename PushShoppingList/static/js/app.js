@@ -21281,6 +21281,22 @@ function populateRecipeEditor(recipe, originalUrl) {
     }, 0);
 }
 
+function replaceRecipeEditorIngredients(ingredients = []) {
+    const ingredientWrap = document.getElementById("recipeEditIngredients");
+
+    if (!ingredientWrap) {
+        return false;
+    }
+
+    ingredientWrap.innerHTML = "";
+    (Array.isArray(ingredients) ? ingredients : []).forEach(item => addRecipeIngredientRow(item));
+    if (!ingredientWrap.querySelector(".recipe-edit-ingredient-row")) {
+        addRecipeIngredientRow();
+    }
+    updateRecipeIngredientRowIndexes();
+    return true;
+}
+
 function recipeEditorCurrentUrl() {
     const input = document.getElementById("recipeEditOriginalUrl");
     return input ? String(input.value || "").trim() : "";
@@ -26843,6 +26859,101 @@ function recipeInferenceSummary(data = {}) {
     }
     const action = data.preview_only ? "Would infer" : "Inferred";
     return `${action} ${fields.length} field${fields.length === 1 ? "" : "s"}: ${fields.join(", ")}.`;
+}
+
+function recipeIngredientsRegenerationSummary(data = {}) {
+    const ingredients = Array.isArray(data.ingredients)
+        ? data.ingredients
+        : (data.recipe && Array.isArray(data.recipe.ingredients) ? data.recipe.ingredients : []);
+    const count = ingredients.length;
+    const action = data.preview_only ? "Previewed" : "Regenerated";
+
+    return `${action} ${count} ingredient${count === 1 ? "" : "s"}.`;
+}
+
+async function regenerateRecipeIngredientsSection(button) {
+    const recipeUrl = recipeEditorCurrentUrl();
+    const originalText = button ? button.textContent : "";
+    const previewOnly = recipeInferPreviewEnabled();
+
+    closeRecipeEditRowMenus();
+
+    if (!recipeUrl) {
+        setRecipeEditStatus("Recipe URL is required before regenerating ingredients.", true);
+        return false;
+    }
+
+    if (!previewOnly) {
+        const shouldContinue = window.confirm(
+            "Regenerate and save the Ingredients section? Current ingredient rows will be replaced."
+        );
+        if (!shouldContinue) {
+            return false;
+        }
+    }
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = previewOnly ? "Previewing..." : "Regenerating...";
+        }
+        setRecipeEditStatus(`${previewOnly ? "Previewing" : "Regenerating"} ingredients...`);
+
+        const payload = collectRecipeEditorPayload();
+        const response = await fetch("/api/recipe/regenerate_ingredients", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                url: recipeUrl,
+                original_url: payload.original_url,
+                recipe: payload.recipe,
+                cookbook_id: recipeEditInferenceContext.cookbook_id || "",
+                cookbook_name: recipeEditInferenceContext.cookbook_name || "",
+                preview_only: previewOnly,
+            }),
+        });
+        const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to regenerate ingredients.");
+        }
+
+        if (previewOnly) {
+            replaceRecipeEditorIngredients(data.ingredients || (data.recipe ? data.recipe.ingredients : []));
+        } else {
+            invalidateRecipeEditorCache(recipeUrl);
+            if (data.recipe) {
+                rememberRecipeEditorData(data.recipe.source_url || data.recipe_url || recipeUrl, {
+                    recipe: data.recipe,
+                    store_sections: recipeEditStoreSections,
+                    food_rules: recipeEditFoodRules,
+                });
+                populateRecipeEditor(data.recipe, data.recipe.source_url || data.recipe_url || recipeUrl);
+            } else {
+                const refreshed = await fetchRecipeEditorData(data.recipe_url || recipeUrl, { useCache: false });
+                populateRecipeEditor(refreshed, refreshed.source_url || data.recipe_url || recipeUrl);
+            }
+            await refreshStoreMarkup({ cacheBust: true });
+        }
+
+        const message = `${recipeIngredientsRegenerationSummary(data)} ${previewOnly ? "Review and Save Recipe to keep changes." : "Ingredients saved."}`;
+        setRecipeEditStatus(message);
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+    } catch (err) {
+        console.warn("Unable to regenerate recipe ingredients.", err);
+        setRecipeEditStatus(err.message || "Unable to regenerate ingredients.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Regenerate Ingredients";
+        }
+    }
+
+    return false;
 }
 
 function recipeEditorFollowupErrorMessage(err, fallback) {

@@ -689,6 +689,46 @@ Required response shape:
 """
 
 
+def build_recipe_ingredients_regeneration_prompt(recipe_url, recipe_data, cookbook_id="", cookbook_name=""):
+    context = build_prompt_context(recipe_url, recipe_data, cookbook_id, cookbook_name)
+    return f"""
+Regenerate only the Ingredients section for this recipe.
+
+Use the recipe title, serving/yield details, menu/source description, current ingredients, equipment, and instructions.
+Return strict JSON only. Do not include markdown.
+
+Conservative rules:
+- Replace the ingredient list with a complete practical home-cooking ingredient list.
+- Do not regenerate recipe title, equipment, instructions, nutrition, categories, or PDFs.
+- Do not claim this is an exact restaurant recipe.
+- Prefer grocery-friendly ingredient names and put prep details in notes.
+- Quantities and units must be strings.
+- If exact quantities are uncertain, use realistic estimates based on the servings and instructions.
+- Preserve clearly useful current ingredient details, but fix incomplete, duplicated, or poorly parsed rows.
+
+Context JSON:
+{json.dumps(context, ensure_ascii=False, indent=2)}
+
+Required response shape:
+{{
+  "ingredients": [
+    {{
+      "name": "",
+      "quantity": "",
+      "unit": "",
+      "notes": "",
+      "optional": false,
+      "purchasable_item": "",
+      "purchase_group": "",
+      "store_section": ""
+    }}
+  ],
+  "confidence": "low | medium | high",
+  "regeneration_notes": ""
+}}
+"""
+
+
 def openai_chat_content(response):
     return response.choices[0].message.content
 
@@ -728,6 +768,47 @@ def request_cookbook_item_details_from_openai(prompt_text, model, model_source, 
     record_openai_usage(
         response,
         "cookbook-item-detail-inference",
+        model=resolved_model,
+        user_id=user_id,
+    )
+    return openai_chat_content(response)
+
+
+def request_recipe_ingredients_regeneration_from_openai(prompt_text, model, model_source, user_id=None):
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
+        model,
+        "recipe-ingredients-regeneration",
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You regenerate only the ingredients section of an existing recipe. "
+                    "Return only strict JSON matching the requested shape."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    print(
+        "[OpenAI] action=recipe-ingredients-regeneration "
+        f"model={resolved_model} model_source={model_source} "
+        f"temperature_included={temperature_included}"
+    )
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name="recipe-ingredients-regeneration",
+        model=resolved_model,
+        kind="menu",
+    )
+    record_openai_usage(
+        response,
+        "recipe-ingredients-regeneration",
         model=resolved_model,
         user_id=user_id,
     )
@@ -897,6 +978,191 @@ def apply_ai_payload_to_recipe(recipe_data, ai_payload, fields_to_fill, model, c
     recipe_data[INFERRED_FIELD_SOURCE_KEY] = sources
 
     return recipe_data, updated_fields
+
+
+def mark_recipe_ingredients_regenerated(recipe_data, model, confidence):
+    recipe_data = dict(recipe_data) if isinstance(recipe_data, dict) else {}
+    previous_fields = inferred_fields_for_recipe(recipe_data)
+    recipe_data[INFERRED_FIELD_METADATA_KEY] = sorted(previous_fields | {"ingredients"})
+    sources = recipe_data.get(INFERRED_FIELD_SOURCE_KEY)
+    if not isinstance(sources, dict):
+        sources = {}
+    sources["ingredients"] = "ai_regenerated"
+    recipe_data[INFERRED_FIELD_SOURCE_KEY] = sources
+    recipe_data["ingredients_regenerated_by_model"] = model
+    recipe_data["ingredients_regenerated_at"] = utc_now_iso()
+    recipe_data["ingredients_inference_confidence"] = confidence
+    return recipe_data
+
+
+def recipe_data_for_ingredient_regeneration(recipe_url, current_recipe=None):
+    recipe_url = clean_text(recipe_url)
+    existing_data = recipe_edit_service.load_recipe_output(recipe_url) or {"source_url": recipe_url}
+    current_recipe = current_recipe if isinstance(current_recipe, dict) else {}
+    recipe_data = {
+        **existing_data,
+        **current_recipe,
+    }
+    recipe_data["source_url"] = clean_text(recipe_data.get("source_url")) or recipe_url
+    recipe_data["ingredients"] = recipe_edit_service.sanitize_ingredients(
+        recipe_data.get("ingredients", []),
+        existing_data.get("ingredients", []),
+    )
+    recipe_data["equipment"] = recipe_edit_service.sanitize_equipment_list(
+        recipe_data.get("equipment", []),
+        existing_data.get("equipment", []),
+    )
+    recipe_data["instructions"] = recipe_edit_service.sanitize_instruction_list(
+        recipe_data.get("instructions", []),
+        existing_data.get("instructions", []),
+    )
+    recipe_data["scaling"] = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
+    return recipe_data
+
+
+def regenerate_ingredients_for_recipe(
+    recipe_url,
+    current_recipe=None,
+    cookbook_id="",
+    cookbook_name="",
+    preview_only=False,
+    user_id=None,
+):
+    recipe_url = clean_text(recipe_url)
+    if not recipe_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    recipe_data = recipe_data_for_ingredient_regeneration(recipe_url, current_recipe)
+    cookbook_context = cookbook_context_for_recipe(recipe_url, cookbook_id, cookbook_name)
+    item_name = first_clean_text(
+        recipe_data.get("menu_item_name"),
+        recipe_data.get("recipe_title"),
+        recipe_data.get("display_name"),
+        recipe_url,
+    )
+    model, model_source = resolve_cookbook_item_model()
+    prompt = build_recipe_ingredients_regeneration_prompt(
+        recipe_url,
+        recipe_data,
+        cookbook_context.get("cookbook_id", ""),
+        cookbook_context.get("cookbook_name", ""),
+    )
+
+    raw_json = ""
+    parsed = {}
+    last_error = None
+    for attempt in range(COOKBOOK_ITEM_INFERENCE_MAX_RETRIES + 1):
+        try:
+            raw_json = request_recipe_ingredients_regeneration_from_openai(
+                prompt,
+                model,
+                model_source,
+                user_id=user_id,
+            )
+            parsed = parse_ai_json_response(raw_json)
+            break
+        except Exception as exc:
+            last_error = exc
+            openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+            log_inference_event(
+                "ingredients_regeneration_openai_failed",
+                recipe_id=recipe_url,
+                recipe_name=item_name,
+                model=model,
+                attempt=attempt + 1,
+                exception_type=type(exc).__name__,
+                error=str(exc),
+                openai_error_code=openai_error_code or "",
+                openai_error_param=openai_error_param or "",
+            )
+            if attempt >= COOKBOOK_ITEM_INFERENCE_MAX_RETRIES:
+                break
+            time.sleep(0.5 * (attempt + 1))
+
+    if last_error is not None and not parsed:
+        return {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "recipe_name": item_name,
+            "error": str(last_error) or "Unable to regenerate recipe ingredients.",
+            "model": model,
+            "model_source": model_source,
+        }
+
+    generated_ingredients = normalize_ai_ingredients(
+        parsed.get("ingredients")
+        or parsed.get("regenerated_ingredients")
+        or parsed.get("recipe_ingredients")
+    )
+    if not generated_ingredients:
+        return {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "recipe_name": item_name,
+            "error": "Ingredient regeneration did not return any usable ingredients.",
+            "model": model,
+            "model_source": model_source,
+            "raw_ai_json": raw_json,
+            "parsed_ai_json": parsed,
+        }
+
+    confidence = clean_text(parsed.get("confidence")).lower()
+    if confidence not in {"low", "medium", "high"}:
+        confidence = "medium"
+    next_recipe_data = mark_recipe_ingredients_regenerated(recipe_data, model, confidence)
+    next_recipe_data["ingredients"] = generated_ingredients
+
+    saved_url = recipe_url
+    loaded_recipe = {
+        **next_recipe_data,
+        "ingredients": generated_ingredients,
+    }
+    if not preview_only:
+        saved = recipe_edit_service.save_editable_recipe(recipe_url, next_recipe_data)
+        saved_recipe = saved.get("recipe") if isinstance(saved, dict) else {}
+        if isinstance(saved_recipe, dict):
+            saved_url = clean_text(saved_recipe.get("source_url")) or saved_url
+        saved_output = recipe_edit_service.load_recipe_output(saved_url) or next_recipe_data
+        saved_output = mark_recipe_ingredients_regenerated(saved_output, model, confidence)
+        recipe_edit_service.save_recipe_output(saved_url, saved_output)
+        recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(saved_url), {})
+        quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
+        recipe_edit_service.update_recipe_ingredient_record(saved_url, quantity, saved_output)
+        recipe_edit_service.update_recipe_quantity(saved_url, quantity)
+        update_cookbook_recipe_snapshot(cookbook_context.get("cookbook_id", ""), saved_url, saved_output)
+        loaded = recipe_edit_service.load_editable_recipe(saved_url)
+        loaded_recipe = loaded.get("recipe", {}) if isinstance(loaded, dict) else saved_recipe
+
+    log_inference_event(
+        "ingredients_regenerated_preview" if preview_only else "ingredients_regenerated",
+        recipe_id=saved_url,
+        recipe_name=item_name,
+        model=model,
+        preview_only=preview_only,
+        raw_ai_json=raw_json,
+        parsed_ai_json=parsed,
+        ingredient_count=len(generated_ingredients),
+    )
+
+    return {
+        "ok": True,
+        "skipped": False,
+        "recipe_url": saved_url,
+        "recipe_name": item_name,
+        "preview_only": bool(preview_only),
+        "updated_fields": ["ingredients"],
+        "would_update_fields": ["ingredients"] if preview_only else [],
+        "model": model,
+        "model_source": model_source,
+        "confidence": confidence,
+        "ingredients": generated_ingredients,
+        "recipe": loaded_recipe,
+        "raw_ai_json": raw_json,
+        "parsed_ai_json": parsed,
+        "saved_counts": {
+            "ingredients": len(generated_ingredients),
+        },
+    }
 
 
 def recipe_context_from_cookbook(cookbook_id):

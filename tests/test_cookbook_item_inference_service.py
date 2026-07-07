@@ -132,6 +132,117 @@ def patch_openai_response(monkeypatch, calls=None, payload=None):
     return calls
 
 
+def patch_ingredient_regeneration_response(monkeypatch, calls=None, payload=None):
+    calls = calls if isinstance(calls, list) else []
+
+    def fake_request(prompt, model, model_source, user_id=None):
+        calls.append({
+            "prompt": prompt,
+            "model": model,
+            "model_source": model_source,
+            "user_id": user_id,
+        })
+        return payload or json.dumps({
+            "ingredients": [
+                {
+                    "name": "yuca root",
+                    "quantity": "2",
+                    "unit": "large",
+                    "notes": "peeled and cut into sticks",
+                    "purchasable_item": "yuca root",
+                    "store_section": "MISC",
+                },
+                {
+                    "name": "vegetable oil",
+                    "quantity": "2",
+                    "unit": "cups",
+                    "notes": "for frying",
+                    "purchasable_item": "vegetable oil",
+                    "store_section": "OIL",
+                },
+            ],
+            "confidence": "high",
+            "regeneration_notes": "Built from current editor context.",
+        })
+
+    monkeypatch.setattr(inference, "request_recipe_ingredients_regeneration_from_openai", fake_request)
+    return calls
+
+
+def test_regenerate_ingredients_preview_uses_current_editor_context_without_saving(monkeypatch, tmp_path):
+    configure_inference_storage(monkeypatch, tmp_path)
+    original = seed_cookbook_and_recipe(recipe_overrides={
+        "recipe_title": "Fried Yuca",
+        "ingredients": [{"ingredient": "old parsed yuca", "quantity": "1"}],
+        "equipment": [{"equipment": "Dutch oven"}],
+        "instructions": [{"instruction": "Boil the yuca until tender."}],
+    })
+    calls = patch_ingredient_regeneration_response(monkeypatch)
+
+    result = inference.regenerate_ingredients_for_recipe(
+        SPRING_ROLL_URL,
+        current_recipe={
+            "recipe_title": "Garlic Fried Yuca",
+            "ingredients": [{"ingredient": "current editor yuca", "quantity": "2"}],
+            "equipment": [{"equipment": "Heavy pot"}],
+            "instructions": [{"text": "Fry the yuca until crisp."}],
+        },
+        preview_only=True,
+        user_id="editor",
+    )
+    saved = recipe_edit_service.load_recipe_output(SPRING_ROLL_URL)
+
+    assert result["ok"] is True
+    assert result["preview_only"] is True
+    assert result["would_update_fields"] == ["ingredients"]
+    assert result["ingredients"][0]["ingredient"] == "yuca root"
+    assert result["ingredients"][0]["preparation"] == "peeled and cut into sticks"
+    assert saved == original
+    assert len(calls) == 1
+    assert calls[0]["user_id"] == "editor"
+    assert "Garlic Fried Yuca" in calls[0]["prompt"]
+    assert "current editor yuca" in calls[0]["prompt"]
+    assert "Fry the yuca until crisp." in calls[0]["prompt"]
+    assert "Regenerate only the Ingredients section" in calls[0]["prompt"]
+
+
+def test_regenerate_ingredients_saves_only_ingredients_and_preserves_recipe_type(monkeypatch, tmp_path):
+    configure_inference_storage(monkeypatch, tmp_path)
+    seed_cookbook_and_recipe(recipe_overrides={
+        "source_type": "scraped_recipe",
+        "ai_inferred": False,
+        "recipe_title": "Fried Yuca",
+        "ingredients": [{"ingredient": "old parsed yuca", "quantity": "1"}],
+        "equipment": [{"equipment": "Dutch oven"}],
+        "instructions": [{"instruction": "Boil the yuca until tender."}],
+    })
+    patch_ingredient_regeneration_response(monkeypatch)
+
+    result = inference.regenerate_ingredients_for_recipe(
+        SPRING_ROLL_URL,
+        current_recipe={
+            "recipe_title": "Fried Yuca",
+            "ingredients": [{"ingredient": "old parsed yuca", "quantity": "1"}],
+            "equipment": [{"equipment": "Dutch oven"}],
+            "instructions": [{"text": "Boil the yuca until tender."}],
+        },
+        preview_only=False,
+    )
+    saved = recipe_edit_service.load_recipe_output(SPRING_ROLL_URL)
+
+    assert result["ok"] is True
+    assert result["updated_fields"] == ["ingredients"]
+    assert saved["source_type"] == "scraped_recipe"
+    assert saved["ai_inferred"] is False
+    assert saved["equipment"][0]["equipment"] == "Dutch oven"
+    assert saved["instructions"][0]["instruction"] == "Boil the yuca until tender."
+    assert [item["ingredient"] for item in saved["ingredients"]] == ["yuca root", "vegetable oil"]
+    assert saved[inference.INFERRED_FIELD_METADATA_KEY] == ["ingredients"]
+    assert saved[inference.INFERRED_FIELD_SOURCE_KEY]["ingredients"] == "ai_regenerated"
+    assert saved["ingredients_regenerated_by_model"] == "gpt-test-mini"
+    assert saved["ingredients_inference_confidence"] == "high"
+
+
 def test_infer_missing_details_fills_placeholder_menu_item_rows(monkeypatch, tmp_path):
     configure_inference_storage(monkeypatch, tmp_path)
     seed_cookbook_and_recipe()

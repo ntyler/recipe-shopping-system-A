@@ -25,20 +25,28 @@ def test_ingredients_header_has_image_overflow_menu():
     assert "recipe-edit-ingredients-menu-wrap" in ingredient_section
     assert "recipe-edit-ingredients-image-menu" in ingredient_section
     assert "Generate Images" in ingredient_section
+    assert "Regenerate Ingredients" in ingredient_section
     assert "Sort Ingredients" in ingredient_section
     assert "By Ingredient Name" in ingredient_section
     assert "By Store Section" in ingredient_section
     assert "Show or Hide Images" in ingredient_section
     assert ingredient_section.index("Generate Images") < ingredient_section.index("Sort Ingredients")
+    assert ingredient_section.index("Regenerate Ingredients") < ingredient_section.index("Food Rules")
+    assert ingredient_section.index("Food Rules") < ingredient_section.index("Sort Ingredients")
     assert ingredient_section.index("Sort Ingredients") < ingredient_section.index("Show or Hide Images")
-    assert "generateRecipeImagesFromEditor(this)" in ingredient_section
+    assert "generateRecipeImagesFromEditor(this, { imageScope: 'ingredients' })" in ingredient_section
+    assert "generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'ingredients' })" in ingredient_section
+    assert "regenerateRecipeIngredientsSection(this)" in ingredient_section
     assert "autoSortRecipeIngredients('ingredient')" in ingredient_section
     assert "autoSortRecipeIngredients('store_section')" in ingredient_section
-    assert "setRecipeEditorImagesVisibleFromMenu(this, true)" in ingredient_section
-    assert "setRecipeEditorImagesVisibleFromMenu(this, false)" in ingredient_section
+    assert "setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'ingredients' })" in ingredient_section
+    assert "setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'ingredients' })" in ingredient_section
     assert "Auto Sort" not in toolbar_markup
     assert ".recipe-edit-ingredients-image-menu" in css
     assert "function autoSortRecipeIngredients(mode = \"ingredient\")" in script
+    assert "async function regenerateRecipeIngredientsSection(button)" in script
+    assert "\"/api/recipe/regenerate_ingredients\"" in script
+    assert "replaceRecipeEditorIngredients(data.ingredients" in script
     assert "const sortMode = mode === \"store_section\" ? \"store_section\" : \"ingredient\";" in script
     assert "function recipeIngredientSortKey(value)" in script
     assert "closeRecipeEditRowMenus();" in script
