@@ -397,6 +397,10 @@
                                                     All sections
                                                 </button>
                                                 <button type="button"
+                                                        onclick="return generateCurrentRecipeImagesFromMenu(this, { imageScope: 'ingredients' })">
+                                                    Ingredients only
+                                                </button>
+                                                <button type="button"
                                                         onclick="return generateCurrentRecipeImagesFromMenu(this, { imageScope: 'equipment' })">
                                                     Equipment only
                                                 </button>
@@ -419,6 +423,10 @@
                                                 <button type="button"
                                                         onclick="return generateCurrentRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'all' })">
                                                     All sections
+                                                </button>
+                                                <button type="button"
+                                                        onclick="return generateCurrentRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'ingredients' })">
+                                                    Ingredients only
                                                 </button>
                                                 <button type="button"
                                                         onclick="return generateCurrentRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'equipment' })">
@@ -619,6 +627,11 @@
                                         </button>
                                         <button type="button"
                                                 data-recipe-editor-image-global-btn
+                                                onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'ingredients' })">
+                                            Ingredients only
+                                        </button>
+                                        <button type="button"
+                                                data-recipe-editor-image-global-btn
                                                 onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'equipment' })">
                                             Equipment only
                                         </button>
@@ -643,6 +656,11 @@
                                                 data-recipe-editor-image-global-btn
                                                 onclick="return generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'all' })">
                                             All sections
+                                        </button>
+                                        <button type="button"
+                                                data-recipe-editor-image-global-btn
+                                                onclick="return generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'ingredients' })">
+                                            Ingredients only
                                         </button>
                                         <button type="button"
                                                 data-recipe-editor-image-global-btn
@@ -1529,13 +1547,13 @@
                                     </label>
                                     <button type="button"
                                             data-recipe-editor-image-global-btn
-                                            onclick="return generateRecipeImagesFromEditor(this)">
-                                        Regenerate recipe detail images
+                                            onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'ingredients' })">
+                                        Regenerate ingredient images
                                     </button>
                                     <button type="button"
                                             data-recipe-editor-image-global-btn
-                                            onclick="return generateRecipeImagesFromEditor(this, { missingOnly: true })">
-                                        Generate missing recipe detail images
+                                            onclick="return generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'ingredients' })">
+                                        Generate missing ingredient images
                                     </button>
                                 </div>
                                 <div class="overflow-menu-section">
@@ -1559,12 +1577,12 @@
                                 <div class="overflow-menu-section">
                                     <div class="overflow-menu-section-title">Show or Hide Images</div>
                                     <button type="button"
-                                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, true)">
-                                        Show recipe detail images
+                                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'ingredients' })">
+                                        Show ingredient images
                                     </button>
                                     <button type="button"
-                                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, false)">
-                                        Hide recipe detail images
+                                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'ingredients' })">
+                                        Hide ingredient images
                                     </button>
                                 </div>
                             </div>

@@ -112,6 +112,7 @@ from PushShoppingList.services.recipe_edit_service import decide_recipe_categori
 from PushShoppingList.services.recipe_edit_service import estimate_recipe_nutrition
 from PushShoppingList.services.recipe_edit_service import generate_recipe_cover_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_equipment_image
+from PushShoppingList.services.recipe_edit_service import generate_recipe_ingredient_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_step_image
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
 from PushShoppingList.services.recipe_edit_service import log_recipe_pdf_timing
@@ -3807,6 +3808,15 @@ def api_recipe_equipment_image_route():
     return jsonify(with_openai_usage_dashboard(result)), status
 
 
+@recipe_bp.route("/api/recipe_ingredient_image", methods=["POST"])
+def api_recipe_ingredient_image_route():
+    data = request.get_json(silent=True) or {}
+    result = generate_recipe_ingredient_image(data)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(with_openai_usage_dashboard(result)), status
+
+
 @recipe_bp.route("/api/recipe_cover_image", methods=["POST"])
 def api_recipe_cover_image_route():
     url = str(request.form.get("url", "") or "").strip()
@@ -3857,6 +3867,8 @@ def api_recipe_detail_image_route():
     kind = str(request.form.get("kind", "") or "").strip()
     target = (
         request.form.get("target")
+        or request.form.get("ingredient_index")
+        or request.form.get("ingredient_number")
         or request.form.get("equipment_index")
         or request.form.get("equipment_number")
         or request.form.get("step_number")
@@ -3880,6 +3892,8 @@ def api_remove_recipe_detail_image_route():
     kind = str(data.get("kind") or "").strip()
     target = (
         data.get("target")
+        or data.get("ingredient_index")
+        or data.get("ingredient_number")
         or data.get("equipment_index")
         or data.get("equipment_number")
         or data.get("step_number")

@@ -4292,7 +4292,10 @@ def save_editable_recipe(original_url, payload):
         "scaling": normalize_recipe_scaling_metadata(
             payload.get("scaling") or existing_data.get("scaling")
         ),
-        "ingredients": sanitize_ingredients(payload.get("ingredients", [])),
+        "ingredients": sanitize_ingredients(
+            payload.get("ingredients", []),
+            existing_data.get("ingredients", []),
+        ),
         "equipment": sanitize_equipment_list(
             payload.get("equipment", []),
             existing_data.get("equipment", []),
@@ -4912,7 +4915,8 @@ def generate_recipe_cover_image(payload):
 
 def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
     original_url = str(original_url or "").strip()
-    image_kind = "equipment" if str(kind or "").strip().lower() == "equipment" else "step"
+    requested_kind = str(kind or "").strip().lower()
+    image_kind = requested_kind if requested_kind in {"equipment", "ingredient"} else "step"
 
     if not original_url:
         return {"ok": False, "error": "Recipe URL is required."}
@@ -4992,6 +4996,61 @@ def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
             "generated_at": generated_at,
         }
 
+    if image_kind == "ingredient":
+        ingredients = [
+            dict(item)
+            for item in recipe_data.get("ingredients", [])
+            if isinstance(item, dict)
+        ]
+        target_index, target_ingredient = find_ingredient_for_index(ingredients, target)
+
+        if target_ingredient is None:
+            return {"ok": False, "error": "Ingredient was not found."}
+
+        image_url = save_uploaded_recipe_detail_image_file(
+            recipe_source_url,
+            image_kind,
+            target_index + 1,
+            uploaded_file,
+            extension,
+        )
+        ingredient_text = str(
+            target_ingredient.get("ingredient")
+            or target_ingredient.get("name")
+            or target_ingredient.get("purchasable_item")
+            or target_ingredient.get("original_text")
+            or ""
+        ).strip()
+        target_ingredient["ingredient_image_url"] = image_url
+        target_ingredient["ingredient_image_generated_at"] = generated_at
+        target_ingredient["ingredient_image_prompt"] = ""
+        ingredients[target_index] = {
+            **target_ingredient,
+            "ingredient": ingredient_text,
+        }
+        recipe_data["ingredients"] = ingredients
+        save_recipe_output(recipe_source_url, recipe_data)
+        sync_recipe_master_records(recipe_source_url, recipe_data=recipe_data)
+        finish_recipe_image_progress(
+            "ingredient",
+            recipe_source_url,
+            target_index + 1,
+            ok=True,
+            image_url=image_url,
+            generated_at=generated_at,
+        )
+
+        return {
+            "ok": True,
+            "url": recipe_source_url,
+            "kind": "ingredient",
+            "ingredient_index": target_index + 1,
+            "ingredient_image_url": image_url,
+            "ingredient_image_generated_at": generated_at,
+            "image_url": image_url,
+            "generated_at": generated_at,
+        }
+
     instructions = sorted(
         normalize_instruction_records(recipe_data.get("instructions", [])),
         key=lambda item: item["step_number"],
@@ -5042,7 +5101,8 @@ def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
 
 def remove_recipe_detail_image(original_url, kind, target):
     original_url = str(original_url or "").strip()
-    image_kind = "equipment" if str(kind or "").strip().lower() == "equipment" else "step"
+    requested_kind = str(kind or "").strip().lower()
+    image_kind = requested_kind if requested_kind in {"equipment", "ingredient"} else "step"
 
     if not original_url:
         return {"ok": False, "error": "Recipe URL is required."}
@@ -5088,6 +5148,48 @@ def remove_recipe_detail_image(original_url, kind, target):
             "equipment_index": target_index + 1,
             "equipment_image_url": "",
             "equipment_image_generated_at": "",
+            "image_url": "",
+            "generated_at": "",
+        }
+
+    if image_kind == "ingredient":
+        ingredients = [
+            dict(item)
+            for item in recipe_data.get("ingredients", [])
+            if isinstance(item, dict)
+        ]
+        target_index, target_ingredient = find_ingredient_for_index(ingredients, target)
+
+        if target_ingredient is None:
+            return {"ok": False, "error": "Ingredient was not found."}
+
+        ingredient_text = str(
+            target_ingredient.get("ingredient")
+            or target_ingredient.get("name")
+            or target_ingredient.get("purchasable_item")
+            or target_ingredient.get("original_text")
+            or ""
+        ).strip()
+        target_ingredient.pop("image_url", None)
+        target_ingredient.pop("image_generated_at", None)
+        target_ingredient["ingredient_image_url"] = ""
+        target_ingredient["ingredient_image_generated_at"] = ""
+        target_ingredient["ingredient_image_prompt"] = ""
+        ingredients[target_index] = {
+            **target_ingredient,
+            "ingredient": ingredient_text,
+        }
+        recipe_data["ingredients"] = ingredients
+        save_recipe_output(recipe_source_url, recipe_data)
+        sync_recipe_master_records(recipe_source_url, recipe_data=recipe_data)
+
+        return {
+            "ok": True,
+            "url": recipe_source_url,
+            "kind": "ingredient",
+            "ingredient_index": target_index + 1,
+            "ingredient_image_url": "",
+            "ingredient_image_generated_at": "",
             "image_url": "",
             "generated_at": "",
         }
@@ -5948,6 +6050,164 @@ def generate_recipe_equipment_image(payload):
     }
 
 
+def generate_recipe_ingredient_image(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    url = str(payload.get("url") or payload.get("recipe_url") or "").strip()
+    requested_index = payload.get("ingredient_index") or payload.get("ingredient_number")
+    provider = title_image_provider_from_payload(payload)
+
+    if not url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    recipe_data = load_recipe_output(url)
+    if not recipe_data:
+        return {"ok": False, "error": "Recipe data was not found."}
+
+    recipe_title = str(recipe_data.get("recipe_title") or recipe_data.get("display_name") or "").strip()
+    ingredients = [
+        dict(item)
+        for item in recipe_data.get("ingredients", [])
+        if isinstance(item, dict)
+    ]
+    target_index, target_ingredient = find_ingredient_for_index(ingredients, requested_index)
+
+    if target_ingredient is None:
+        return {"ok": False, "error": "Ingredient was not found."}
+
+    ingredient_text = str(
+        target_ingredient.get("ingredient")
+        or target_ingredient.get("name")
+        or target_ingredient.get("purchasable_item")
+        or target_ingredient.get("original_text")
+        or ""
+    ).strip()
+    if not ingredient_text:
+        return {"ok": False, "error": "Add ingredient text before generating an image."}
+
+    prompt = build_recipe_ingredient_image_prompt(
+        recipe_title=recipe_title,
+        servings=str(recipe_data.get("servings") or "").strip(),
+        ingredient_number=target_index + 1,
+        ingredient=target_ingredient,
+    )
+
+    progress_target = target_index + 1
+    image_prompt = prompt
+    start_recipe_image_progress(
+        "ingredient",
+        url,
+        progress_target,
+        "Generating ingredient image...",
+        image_prompt=image_prompt,
+    )
+
+    def record_ingredient_image_prompt(resolved_prompt, prompt_provider):
+        del prompt_provider
+        nonlocal image_prompt
+        image_prompt = resolved_prompt
+        start_recipe_image_progress(
+            "ingredient",
+            url,
+            progress_target,
+            "Generating ingredient image...",
+            image_prompt=image_prompt,
+        )
+
+    try:
+        image_bytes, used_provider, fallback_used, image_prompt = generate_recipe_detail_image_bytes(
+            recipe_data,
+            recipe_title or ingredient_text,
+            prompt,
+            "recipe ingredient image",
+            provider=provider,
+            prompt_callback=record_ingredient_image_prompt,
+        )
+    except TimeoutError:
+        error = "Image generation timed out. Please try again."
+        finish_recipe_image_progress("ingredient", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
+        return {
+            "ok": False,
+            "error": error,
+            "image_prompt": image_prompt,
+        }
+    except TitleImageGenerationError as exc:
+        error = exc.user_message
+        finish_recipe_image_progress("ingredient", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
+        return {
+            "ok": False,
+            "error": error,
+            "error_code": exc.error_code,
+            "provider": provider,
+            "local_generation_unavailable": exc.local_unavailable,
+            "image_prompt": image_prompt,
+        }
+    except Exception:
+        error = "Image generation failed. Please try again."
+        finish_recipe_image_progress("ingredient", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
+        return {
+            "ok": False,
+            "error": error,
+            "image_prompt": image_prompt,
+        }
+
+    if not image_bytes:
+        error = "Image generation did not return an image. Please try again."
+        finish_recipe_image_progress("ingredient", url, progress_target, ok=False, error=error, image_prompt=image_prompt)
+        return {
+            "ok": False,
+            "error": error,
+            "image_prompt": image_prompt,
+        }
+
+    ingredient_image_url = save_recipe_ingredient_image_file(url, target_index + 1, image_bytes)
+    if used_provider == TITLE_IMAGE_PROVIDER_COMFYUI:
+        print(f"[TitleImage] generated_local_image_path={generated_recipe_detail_image_local_path(ingredient_image_url)}")
+    generated_at = datetime.now(timezone.utc).isoformat()
+    target_ingredient["ingredient_image_url"] = ingredient_image_url
+    target_ingredient["ingredient_image_generated_at"] = generated_at
+    target_ingredient["ingredient_image_prompt"] = image_prompt
+
+    ingredients[target_index] = {
+        **target_ingredient,
+        "ingredient": ingredient_text,
+    }
+    recipe_data["ingredients"] = ingredients
+    save_recipe_output(url, recipe_data)
+    sync_recipe_master_records(url, recipe_data=recipe_data)
+    finish_recipe_image_progress(
+        "ingredient",
+        url,
+        progress_target,
+        ok=True,
+        image_url=ingredient_image_url,
+        generated_at=generated_at,
+        image_prompt=image_prompt,
+    )
+
+    return {
+        "ok": True,
+        "url": url,
+        "ingredient_index": target_index + 1,
+        "ingredient_image_url": ingredient_image_url,
+        "ingredient_image_generated_at": generated_at,
+        "provider": used_provider,
+        "fallback_used": bool(fallback_used),
+        "image_prompt": image_prompt,
+    }
+
+
+def find_ingredient_for_index(ingredients, requested_index):
+    try:
+        index = int(float(requested_index)) - 1
+    except (TypeError, ValueError):
+        index = -1
+
+    if 0 <= index < len(ingredients):
+        return index, ingredients[index]
+
+    return -1, None
+
+
 def find_equipment_for_index(equipment_items, requested_index):
     try:
         index = int(float(requested_index)) - 1
@@ -6047,6 +6307,55 @@ Visual requirements:
 - High-end cookware or appliance reference style
 - Plain unlabeled object surface
 - No food, ingredients, liquids, hands, room interiors, cabinets, sinks, stoves, or windows
+"""
+
+
+def build_recipe_ingredient_image_prompt(recipe_title, servings, ingredient_number, ingredient):
+    ingredient = ingredient if isinstance(ingredient, dict) else {}
+    ingredient_name = str(
+        ingredient.get("ingredient")
+        or ingredient.get("name")
+        or ingredient.get("purchasable_item")
+        or ingredient.get("original_text")
+        or ""
+    ).strip()
+    quantity = str(ingredient.get("quantity") or ingredient.get("recipe_qty") or "").strip()
+    unit = str(ingredient.get("unit") or "").strip()
+    preparation = str(ingredient.get("preparation") or "").strip()
+    purchasable_item = str(ingredient.get("purchasable_item") or ingredient.get("buy_as") or "").strip()
+
+    return f"""Generate a realistic product reference image for one recipe ingredient.
+
+Recipe title:
+{recipe_title or "Not specified"}
+
+Servings:
+{servings or "Not specified"}
+
+Ingredient number:
+{ingredient_number}
+
+Ingredient:
+{ingredient_name}
+
+Quantity:
+{" ".join(part for part in [quantity, unit] if part).strip() or "Not specified"}
+
+Preparation:
+{preparation or "Not specified"}
+
+Shopping form:
+{purchasable_item or ingredient_name}
+
+Visual requirements:
+- The ingredient is the single obvious main subject; match it literally
+- Show the ingredient as a clean food reference image, not as a finished dish
+- Use a plain seamless studio background or simple neutral surface
+- Make the ingredient visually clear, centered, and easy to identify
+- Bright soft product photography lighting
+- Realistic grocery or cookbook ingredient photography
+- No text, labels, logos, brand packaging, price tags, hands, utensils, or recipe cards
+- Do not show unrelated ingredients, cooked steps, plated meals, or restaurant scenes
 """
 
 
@@ -6293,6 +6602,16 @@ def save_recipe_equipment_image_file(recipe_url, equipment_index, image_bytes):
     STEP_IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
     equipment_key = safe_filename(str(equipment_index or "equipment"))
     filename = f"{safe_filename(recipe_url)}_equipment_{equipment_key}_{uuid.uuid4().hex[:12]}.png"
+    image_path = STEP_IMAGE_FOLDER / filename
+    image_path.write_bytes(image_bytes)
+    ensure_webp_variants(image_path)
+    return f"{STEP_IMAGE_URL_PREFIX}/{filename}"
+
+
+def save_recipe_ingredient_image_file(recipe_url, ingredient_index, image_bytes):
+    STEP_IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
+    ingredient_key = safe_filename(str(ingredient_index or "ingredient"))
+    filename = f"{safe_filename(recipe_url)}_ingredient_{ingredient_key}_{uuid.uuid4().hex[:12]}.png"
     image_path = STEP_IMAGE_FOLDER / filename
     image_path.write_bytes(image_bytes)
     ensure_webp_variants(image_path)
@@ -6600,6 +6919,11 @@ def normalize_edit_ingredients(ingredients):
             "store_section": item.get("store_section") or classify_store_section(item.get("ingredient") or ""),
             "purchasable_item": item.get("purchasable_item") or item.get("buy_as") or "",
             "purchase_group": item.get("purchase_group") or "",
+            "ingredient_image_url": item.get("ingredient_image_url") or item.get("image_url") or "",
+            "ingredient_image_generated_at": (
+                item.get("ingredient_image_generated_at") or item.get("image_generated_at") or ""
+            ),
+            "ingredient_image_prompt": item.get("ingredient_image_prompt") or item.get("image_prompt") or "",
         })
         for item in ingredients
         if isinstance(item, dict)
@@ -6704,12 +7028,29 @@ def normalize_nutrition_rows(nutrition, include_defaults=False):
     return rows
 
 
-def sanitize_ingredients(value):
+def sanitize_ingredients(value, existing_value=None):
     if not isinstance(value, list):
         return []
 
+    existing_rows = [
+        dict(item)
+        for item in (existing_value or [])
+        if isinstance(item, dict)
+    ]
+    existing_by_text = {}
+    for existing in existing_rows:
+        for text in (
+            existing.get("ingredient"),
+            existing.get("name"),
+            existing.get("purchasable_item"),
+            existing.get("original_text"),
+        ):
+            key = instruction_match_text_key(text)
+            if key:
+                existing_by_text.setdefault(key, existing)
+
     ingredients = []
-    for item in value:
+    for index, item in enumerate(value):
         if not isinstance(item, dict):
             continue
 
@@ -6722,6 +7063,25 @@ def sanitize_ingredients(value):
         store_section = classify_store_section(name or original_text)
         base_quantity = nullable_string(item.get("base_quantity"))
         base_unit = nullable_string(item.get("base_unit"))
+        existing = (
+            existing_by_text.get(instruction_match_text_key(name))
+            or existing_by_text.get(instruction_match_text_key(item.get("purchasable_item") or item.get("buy_as")))
+            or existing_by_text.get(instruction_match_text_key(original_text))
+            or (existing_rows[index] if index < len(existing_rows) else {})
+            or {}
+        )
+        ingredient_image_url = (
+            nullable_string(item.get("ingredient_image_url") or item.get("image_url"))
+            or nullable_string(existing.get("ingredient_image_url") or existing.get("image_url"))
+        )
+        ingredient_image_generated_at = (
+            nullable_string(item.get("ingredient_image_generated_at") or item.get("image_generated_at"))
+            or nullable_string(existing.get("ingredient_image_generated_at") or existing.get("image_generated_at"))
+        )
+        ingredient_image_prompt = (
+            nullable_string(item.get("ingredient_image_prompt") or item.get("image_prompt"))
+            or nullable_string(existing.get("ingredient_image_prompt") or existing.get("image_prompt"))
+        )
 
         row = {
             "section": nullable_string(item.get("section")),
@@ -6738,6 +7098,9 @@ def sanitize_ingredients(value):
             "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),
             "purchasable_item": nullable_string(item.get("purchasable_item") or item.get("buy_as")),
             "purchase_group": nullable_string(item.get("purchase_group")),
+            "ingredient_image_url": ingredient_image_url,
+            "ingredient_image_generated_at": ingredient_image_generated_at,
+            "ingredient_image_prompt": ingredient_image_prompt,
         }
         ingredients.append(apply_purchase_mapping_to_ingredient(row))
 

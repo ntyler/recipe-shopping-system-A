@@ -24277,3 +24277,44 @@ img[data-deferred-src] {
                 width: 100%;
             }
         }
+
+.recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
+    grid-column: 3 / 8;
+    grid-row: 3;
+    justify-self: start;
+    width: min(340px, 100%);
+    max-width: 100%;
+    margin: 0;
+}
+
+.recipe-ingredient-row .recipe-ingredient-image-panel {
+    margin: 10px 0 4px 30px;
+    max-width: min(340px, calc(100% - 30px));
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-ingredient-image-panel,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-ingredient-image-panel {
+    display: none;
+}
+
+@media (max-width: 1180px) {
+    .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
+        grid-column: 2 / 6;
+        grid-row: 4;
+    }
+}
+
+@media (max-width: 760px) {
+    .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
+        grid-column: 1 / -1;
+        grid-row: auto;
+        justify-self: stretch;
+        width: 100%;
+        max-width: none;
+    }
+
+    .recipe-ingredient-row .recipe-ingredient-image-panel {
+        margin-left: 0;
+        max-width: 100%;
+    }
+}

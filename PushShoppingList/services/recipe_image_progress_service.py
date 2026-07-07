@@ -16,7 +16,10 @@ RECENT_RESULT_SECONDS = 2 * 60
 
 
 def normalize_image_progress_kind(kind):
-    return "equipment" if str(kind or "").strip().lower() == "equipment" else "step"
+    normalized = str(kind or "").strip().lower()
+    if normalized in {"equipment", "ingredient"}:
+        return normalized
+    return "step"
 
 
 def normalize_image_progress_target(target):
@@ -147,6 +150,8 @@ def image_progress_record(kind, url, target, state, **values):
 
     if normalized_kind == "equipment":
         record["equipment_index"] = normalized_target
+    elif normalized_kind == "ingredient":
+        record["ingredient_index"] = normalized_target
     else:
         record["step_number"] = normalized_target
 
@@ -155,11 +160,11 @@ def image_progress_record(kind, url, target, state, **values):
 
 def default_image_progress_message(kind, state):
     if state == "running":
-        return (
-            "Generating equipment image..."
-            if kind == "equipment"
-            else "Generating step image..."
-        )
+        if kind == "equipment":
+            return "Generating equipment image..."
+        if kind == "ingredient":
+            return "Generating ingredient image..."
+        return "Generating step image..."
 
     if state == "done":
         return "Image generated."

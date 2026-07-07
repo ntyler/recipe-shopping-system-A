@@ -991,7 +991,12 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
         use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
         scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
         scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
-        sections = build_recipe_sections(recipe_data, recipe_quantity, scaled_ingredients)
+        sections = build_recipe_sections(
+            recipe_data,
+            recipe_quantity,
+            scaled_ingredients,
+            image_variants=image_variants,
+        )
 
         rows.append({
             "number": index,
@@ -1840,11 +1845,11 @@ def load_saved_recipe_output(recipe_url):
     return saved_recipe_output_index().get(recipe_key, {})
 
 
-def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=None):
+def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=None, image_variants=None):
     sections = {section: [] for section in STORE_SECTION_ORDER.keys()}
     scaled_ingredients = scaled_ingredients or {}
 
-    for ingredient in recipe_data.get("ingredients", []) or []:
+    for ingredient_index, ingredient in enumerate(recipe_data.get("ingredients", []) or [], start=1):
         if not isinstance(ingredient, dict):
             continue
 
@@ -1879,8 +1884,19 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
 
         purchase_mapping = purchase_mapping_for_recipe_ingredient(ingredient)
         food_review = recipe_view_ingredient_food_review(ingredient)
+        ingredient_image_url = clean_display_text(
+            ingredient.get("ingredient_image_url") or ingredient.get("image_url") or ""
+        )
+        ingredient_image_generated_at = clean_display_text(
+            ingredient.get("ingredient_image_generated_at") or ingredient.get("image_generated_at") or ""
+        )
+        image_variant_payload = local_static_image_variants(
+            ingredient_image_url,
+            variants=image_variants,
+        )
 
         sections[section].append({
+            "ingredient_index": ingredient_index,
             "name": name,
             "display_name": display_name,
             "purchasable_item": purchase_mapping["purchasable_item"],
@@ -1896,6 +1912,11 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
             "quantity_display": quantity_display,
             "url": recipe_data.get("source_url"),
             "food_review": food_review,
+            "ingredient_image_url": ingredient_image_url,
+            "ingredient_image_display_url": image_variant_payload.get("display_url") or ingredient_image_url,
+            "ingredient_image_srcset": image_variant_payload.get("srcset", ""),
+            "ingredient_image_full_url": image_variant_payload.get("full_url") or ingredient_image_url,
+            "ingredient_image_generated_at": ingredient_image_generated_at,
         })
 
     return {

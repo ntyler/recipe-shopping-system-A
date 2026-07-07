@@ -321,6 +321,10 @@
                                                 All sections
                                             </button>
                                             <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'ingredients' })">
+                                                Ingredients only
+                                            </button>
+                                            <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'equipment' })">
                                                 Equipment only
                                             </button>
@@ -343,6 +347,10 @@
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'all' })">
                                                 All sections
+                                            </button>
+                                            <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'ingredients' })">
+                                                Ingredients only
                                             </button>
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'equipment' })">
@@ -883,6 +891,28 @@
                                         Edit ingredients
                                     </button>
                                 </div>
+                                <div class="overflow-menu-section">
+                                    <div class="overflow-menu-section-title">Generate Images</div>
+                                    <button type="button"
+                                            onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'ingredients' })">
+                                        Regenerate ingredient images
+                                    </button>
+                                    <button type="button"
+                                            onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'ingredients' })">
+                                        Generate missing ingredient images
+                                    </button>
+                                </div>
+                                <div class="overflow-menu-section">
+                                    <div class="overflow-menu-section-title">Show or Hide Images</div>
+                                    <button type="button"
+                                            onclick="return setRecipeDetailImagesVisibleFromMenu(this, true)">
+                                        Show ingredient images
+                                    </button>
+                                    <button type="button"
+                                            onclick="return setRecipeDetailImagesVisibleFromMenu(this, false)">
+                                        Hide ingredient images
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -961,6 +991,68 @@
 
                                         {% set product_choice_key = purchase_key %}
                                         {% include "sections/product_choice_line.html" %}
+                                        <div class="recipe-step-image-panel recipe-ingredient-image-panel"
+                                             data-ingredient-image-panel
+                                             data-recipe-url="{{ recipe.url }}"
+                                             data-ingredient-index="{{ recipe_item.ingredient_index }}">
+                                            <div class="recipe-step-image-status{% if recipe_item.ingredient_image_url %} empty{% endif %}"
+                                                 data-ingredient-image-status>
+                                                {% if not recipe_item.ingredient_image_url %}
+                                                    No image generated for this ingredient.
+                                                {% endif %}
+                                            </div>
+                                            <img class="recipe-step-image recipe-ingredient-image"
+                                                 {% if recipe_item.ingredient_image_url %}src="data:image/gif;base64,R0lGODlhAQABAAAAACw="{% endif %}
+                                                 {% if recipe_item.ingredient_image_url %}data-deferred-src="{{ recipe_item.ingredient_image_display_url or recipe_item.ingredient_image_url }}"{% endif %}
+                                                 {% if recipe_item.ingredient_image_srcset %}data-deferred-srcset="{{ recipe_item.ingredient_image_srcset }}"{% endif %}
+                                                 sizes="(max-width: 900px) 92vw, 720px"
+                                                 data-full-src="{{ recipe_item.ingredient_image_full_url or recipe_item.ingredient_image_url }}"
+                                                 alt="Recipe {{ recipe.number }} ingredient {{ display_name }} image"
+                                                 loading="lazy"
+                                                 decoding="async"
+                                                 fetchpriority="low"
+                                                 {% if not recipe_item.ingredient_image_url %}hidden{% endif %}>
+                                            <div class="recipe-step-image-actions">
+                                                <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
+                                                    <span>Image Generator</span>
+                                                    <select data-recipe-image-provider-select>
+                                                        <option value="comfyui" selected>ComfyUI local</option>
+                                                        <option value="openai">ChatGPT / OpenAI</option>
+                                                    </select>
+                                                </label>
+                                                <button type="button"
+                                                        class="recipe-step-image-btn"
+                                                        data-ingredient-image-generate
+                                                        onclick="return generateRecipeIngredientImage(this)">
+                                                    {% if recipe_item.ingredient_image_url %}Regenerate{% else %}Generate Image{% endif %}
+                                                </button>
+                                                <a class="recipe-step-image-download"
+                                                   data-ingredient-image-download
+                                                   href="{{ recipe_item.ingredient_image_url or '#' }}"
+                                                   download
+                                                   {% if not recipe_item.ingredient_image_url %}hidden{% endif %}>
+                                                    Download
+                                                </a>
+                                                <button type="button"
+                                                        class="recipe-step-image-remove"
+                                                        data-ingredient-image-remove
+                                                        onclick="return removeRecipeDetailImage(this)"
+                                                        {% if not recipe_item.ingredient_image_url %}hidden{% endif %}>
+                                                    Remove
+                                                </button>
+                                                <button type="button"
+                                                        class="recipe-step-image-upload"
+                                                        data-recipe-image-upload-button
+                                                        onclick="return openRecipeDetailImageUpload(this)">
+                                                    {% if recipe_item.ingredient_image_url %}Replace{% else %}Upload{% endif %}
+                                                </button>
+                                                <input type="file"
+                                                       class="recipe-step-image-file-input"
+                                                       data-recipe-image-upload
+                                                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                                                       onchange="return uploadRecipeDetailImage(this)">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             {% endfor %}
