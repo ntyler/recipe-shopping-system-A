@@ -321,6 +321,10 @@
                                                 All sections
                                             </button>
                                             <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'title' })">
+                                                Title image only
+                                            </button>
+                                            <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'ingredients' })">
                                                 Ingredients only
                                             </button>
@@ -347,6 +351,10 @@
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'all' })">
                                                 All sections
+                                            </button>
+                                            <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'title' })">
+                                                Title image only
                                             </button>
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'ingredients' })">

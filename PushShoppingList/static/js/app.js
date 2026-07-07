@@ -23039,6 +23039,50 @@ async function uploadRecipeCoverImage(input) {
     return false;
 }
 
+function recipeCoverImageGenerationErrorMessage(data, fallbackMessage = "Unable to generate title image.") {
+    const localUnavailable = Boolean(
+        data && (
+            data.local_generation_unavailable
+            || data.error_code === "COMFYUI_UNAVAILABLE"
+            || data.error_code === "COMFYUI_TIMEOUT"
+            || data.error_code === "COMFYUI_GENERATION_FAILED"
+            || data.error_code === "COMFYUI_CHECKPOINT_NOT_FOUND"
+            || data.error_code === "LOCAL_IMAGE_GENERATION_UNAVAILABLE"
+        )
+    );
+
+    return localUnavailable
+        ? "Local image generation is unavailable. Start ComfyUI and try again."
+        : ((data && data.error) || fallbackMessage);
+}
+
+async function requestRecipeCoverImageGeneration(payload = {}, signal = null) {
+    const response = await fetch("/api/recipe_cover_image/generate", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            ...payload,
+            ...recipeImageProviderPayload(),
+        }),
+        signal,
+    });
+    let data = {};
+    try {
+        data = await response.json();
+    } catch (err) {
+        data = {};
+    }
+    syncOpenAiUsageDashboardFromResponse(data);
+
+    if (!response.ok || !data.ok) {
+        throw new Error(recipeCoverImageGenerationErrorMessage(data));
+    }
+
+    return data;
+}
+
 async function generateRecipeCoverImage(button) {
     const originalUrl = recipeEditorCurrentUrl();
     const titleInput = document.getElementById("recipeEditTitleInput");
@@ -23076,44 +23120,11 @@ async function generateRecipeCoverImage(button) {
         }
         setRecipeEditStatus(hasCoverImage ? "Regenerating title image..." : "Generating title image...");
 
-        const response = await fetch("/api/recipe_cover_image/generate", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                url: originalUrl,
-                alt: fallbackAlt,
-                overwrite: hasCoverImage,
-                ...recipeImageProviderPayload(),
-            }),
-            signal: controller.signal,
-        });
-        let data = {};
-        try {
-            data = await response.json();
-        } catch (err) {
-            data = {};
-        }
-        syncOpenAiUsageDashboardFromResponse(data);
-
-        if (!response.ok || !data.ok) {
-            const localUnavailable = Boolean(
-                data && (
-                    data.local_generation_unavailable
-                    || data.error_code === "COMFYUI_UNAVAILABLE"
-                    || data.error_code === "COMFYUI_TIMEOUT"
-                    || data.error_code === "COMFYUI_GENERATION_FAILED"
-                    || data.error_code === "COMFYUI_CHECKPOINT_NOT_FOUND"
-                    || data.error_code === "LOCAL_IMAGE_GENERATION_UNAVAILABLE"
-                )
-            );
-            throw new Error(
-                localUnavailable
-                    ? "Local image generation is unavailable. Start ComfyUI and try again."
-                    : ((data && data.error) || "Unable to generate title image.")
-            );
-        }
+        const data = await requestRecipeCoverImageGeneration({
+            url: originalUrl,
+            alt: fallbackAlt,
+            overwrite: hasCoverImage,
+        }, controller.signal);
 
         const coverImage = normalizeRecipeEditorCoverImage(data.cover_image || {});
         const imagePrompt = String(
@@ -30449,6 +30460,10 @@ function setRecipeEditorImagesVisibleFromMenu(button, visible, options = {}) {
 function recipeEditorImagePanelSelector(options = {}) {
     const scope = options.imageScope || options.scope || "all";
 
+    if (scope === "title") {
+        return "[data-recipe-edit-title-image-panel]";
+    }
+
     if (scope === "equipment") {
         return "[data-equipment-image-panel]";
     }
@@ -30635,6 +30650,168 @@ function recipeIngredientImageIsMissing(button) {
     return !src || image.hidden;
 }
 
+function recipeImageScope(options = {}) {
+    return options.imageScope || options.scope || "all";
+}
+
+function recipeTitleImageScopeSelected(options = {}) {
+    return recipeImageScope(options) === "title";
+}
+
+function recipeImageGenerationCardIsEditor(card) {
+    return Boolean(card && card.id === "recipeEditModal" && recipeEditorSurfaceIsActive(card));
+}
+
+function recipeTitleImageUrlFromCard(card) {
+    if (recipeImageGenerationCardIsEditor(card)) {
+        return recipeEditorCurrentUrl();
+    }
+
+    if (!card || !card.dataset) {
+        return "";
+    }
+
+    return String(
+        card.dataset.recipeViewUrl
+        || card.dataset.recipeUrl
+        || card.dataset.recipeCardKey
+        || ""
+    ).trim();
+}
+
+function recipeTitleImageAltFromCard(card) {
+    if (recipeImageGenerationCardIsEditor(card)) {
+        const titleInput = document.getElementById("recipeEditTitleInput");
+        const displayInput = document.getElementById("recipeEditDisplayName");
+
+        return (titleInput ? titleInput.value.trim() : "")
+            || (displayInput ? displayInput.value.trim() : "")
+            || "Recipe title image";
+    }
+
+    const datasetName = card && card.dataset
+        ? String(card.dataset.cookbookRecipeName || card.dataset.recipeName || "").trim()
+        : "";
+    const titleElement = card
+        ? card.querySelector(".recipe-view-name, .recipe-url-summary-name, .cookbook-menu-recipe-main h4")
+        : null;
+
+    return datasetName
+        || (titleElement ? titleElement.textContent.trim() : "")
+        || "Recipe title image";
+}
+
+function recipeTitleImageIsMissing(card) {
+    if (recipeImageGenerationCardIsEditor(card)) {
+        const coverImage = collectRecipeEditorCoverImage();
+
+        return !Boolean(coverImage.path || coverImage.url || coverImage.src);
+    }
+
+    const image = card ? card.querySelector(".recipe-cover-image") : null;
+    const src = image
+        ? String(
+            image.dataset.fullSrc
+            || image.dataset.deferredSrc
+            || image.getAttribute("src")
+            || ""
+        ).trim()
+        : "";
+    const isPlaceholder = src.startsWith("data:image/gif;base64,R0lGODlhAQAB");
+
+    return !src || isPlaceholder || Boolean(image && image.hidden);
+}
+
+function normalizeGeneratedRecipeCoverImage(data, fallbackAlt) {
+    const coverImage = normalizeRecipeEditorCoverImage(data.cover_image || {});
+    const imagePrompt = String(
+        data.cover_image_prompt
+        || data.image_prompt
+        || (data.recipe && data.recipe.cover_image_prompt)
+        || ""
+    ).trim();
+
+    if (imagePrompt) {
+        coverImage.prompt = imagePrompt;
+        coverImage.image_prompt = imagePrompt;
+    }
+
+    if (!coverImage.alt && fallbackAlt) {
+        coverImage.alt = fallbackAlt;
+    }
+
+    if (coverImage.src) {
+        coverImage.src = cacheBustRecipeCoverSrc(coverImage.src);
+    }
+
+    return coverImage;
+}
+
+async function generateRecipeTitleImageForCard(card, options = {}) {
+    if (!recipeTitleImageScopeSelected(options)) {
+        return false;
+    }
+
+    const recipeUrl = recipeTitleImageUrlFromCard(card);
+    const fallbackAlt = recipeTitleImageAltFromCard(card);
+    const isEditor = recipeImageGenerationCardIsEditor(card);
+
+    if (!recipeUrl) {
+        const message = "Unable to generate title image: missing recipe URL.";
+        if (isEditor) {
+            setRecipeEditStatus(message, true);
+        }
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+        return false;
+    }
+
+    if (options.missingOnly && !recipeTitleImageIsMissing(card)) {
+        return false;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 180000);
+    const actionLabel = options.missingOnly ? "Generating missing title image..." : "Regenerating title image...";
+
+    try {
+        if (isEditor) {
+            setRecipeEditStatus(actionLabel);
+        } else {
+            showRecipeQuantityUpdatedMessage("", "", "", actionLabel);
+        }
+
+        const data = await requestRecipeCoverImageGeneration({
+            url: recipeUrl,
+            alt: fallbackAlt,
+            overwrite: !options.missingOnly,
+        }, controller.signal);
+        const coverImage = normalizeGeneratedRecipeCoverImage(data, fallbackAlt);
+
+        if (isEditor) {
+            setRecipeEditorCoverImage(coverImage, fallbackAlt);
+            setRecipeEditStatus("Title image generated. Save Recipe to keep any other edits.");
+        }
+
+        invalidateRecipeEditorCache(recipeUrl);
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe title image generated.");
+        return true;
+    } catch (err) {
+        const timedOut = err && err.name === "AbortError";
+        const message = timedOut
+            ? "Title image generation timed out. Please try again."
+            : (err.message || "Unable to generate title image.");
+
+        console.warn("Unable to generate recipe title image.", err);
+        if (isEditor) {
+            setRecipeEditStatus(message, true);
+        }
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+        return false;
+    } finally {
+        window.clearTimeout(timeout);
+    }
+}
+
 async function generateRecipeImagesFromMenu(button, options = {}) {
     const card = recipeEditActionRowFromButton(button);
 
@@ -30740,6 +30917,25 @@ function cookbookRecipeImageTargetsForRecipe(recipe, options = {}) {
     const missingOnly = Boolean(options.missingOnly);
     const targets = [];
 
+    if (scope === "title") {
+        const coverImage = recipe && typeof recipe.cover_image === "object" ? recipe.cover_image : {};
+        const imageUrl = cookbookRecipeImageUrlFromRecord(
+            coverImage,
+            ["src", "url", "path", "card_url", "thumb_url"]
+        );
+
+        if (!missingOnly || !imageUrl) {
+            targets.push({
+                kind: "title",
+                alt: cookbookRecipeImageTextFromRecord(
+                    recipe,
+                    ["recipe_title", "display_name", "name", "title"]
+                ) || "Recipe title image",
+                overwrite: !missingOnly,
+            });
+        }
+    }
+
     if (scope === "all" || scope === "ingredients") {
         (Array.isArray(recipe.ingredients) ? recipe.ingredients : []).forEach((ingredient, index) => {
             const text = cookbookRecipeImageTextFromRecord(
@@ -30796,6 +30992,10 @@ function cookbookRecipeImageTargetsForRecipe(recipe, options = {}) {
 }
 
 function cookbookRecipeImageEndpointForTarget(target) {
+    if (target.kind === "title") {
+        return "/api/recipe_cover_image/generate";
+    }
+
     if (target.kind === "ingredient") {
         return "/api/recipe_ingredient_image";
     }
@@ -30813,7 +31013,10 @@ function cookbookRecipeImagePayloadForTarget(recipeUrl, target) {
         ...recipeImageProviderPayload(),
     };
 
-    if (target.kind === "ingredient") {
+    if (target.kind === "title") {
+        payload.alt = target.alt || "Recipe title image";
+        payload.overwrite = Boolean(target.overwrite);
+    } else if (target.kind === "ingredient") {
         payload.ingredient_index = target.index;
     } else if (target.kind === "equipment") {
         payload.equipment_index = target.index;
@@ -30858,6 +31061,10 @@ async function generateCookbookRecipeImageTarget(recipeUrl, target) {
 
 function cookbookImageScopeLabel(options = {}) {
     const scope = options.imageScope || options.scope || "all";
+
+    if (scope === "title") {
+        return "title";
+    }
 
     if (scope === "ingredients") {
         return "ingredient";
@@ -30981,6 +31188,13 @@ async function generateRecipeImagesInCard(card, options = {}) {
         return false;
     }
 
+    const scope = recipeImageScope(options);
+
+    if (scope === "title") {
+        await generateRecipeTitleImageForCard(card, options);
+        return false;
+    }
+
     expandRecipeCardForImageGeneration(card);
 
     const buttons = recipeImageGenerateButtons(card, options);
@@ -31017,6 +31231,10 @@ async function generateRecipeImagesInCard(card, options = {}) {
 
 function recipeImageGenerateButtons(card, options = {}) {
     const scope = options.imageScope || options.scope || "all";
+
+    if (scope === "title") {
+        return [];
+    }
 
     return [...card.querySelectorAll("[data-equipment-image-generate], [data-ingredient-image-generate], [data-step-image-generate]")]
         .filter(imageButton => {

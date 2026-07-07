@@ -75,6 +75,27 @@ def test_recipe_editor_hide_all_images_keeps_title_image_visible():
     assert "keepRecipeCoverImagesVisible(modal);" in function_block
 
 
+def test_bulk_image_generation_menus_include_title_image_scope():
+    recipe_view = (ROOT / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
+    current_log = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")
+    view_behavior = (ROOT / "PushShoppingList/templates/sections/view_behavior.html").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    assert "generateRecipeImagesFromMenu(this, { imageScope: 'title' })" in recipe_view
+    assert "generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'title' })" in recipe_view
+    assert "generateCurrentRecipeImagesFromMenu(this, { imageScope: 'title' })" in current_log
+    assert "generateCurrentRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'title' })" in current_log
+    assert "generateRecipeImagesFromEditor(this, { imageScope: 'title' })" in current_log
+    assert "generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'title' })" in current_log
+    assert "generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'title' })" in view_behavior
+    assert "generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'title' })" in view_behavior
+    assert 'return "[data-recipe-edit-title-image-panel]";' in script
+    assert "async function generateRecipeTitleImageForCard" in script
+    assert "requestRecipeCoverImageGeneration" in script
+    assert "await generateRecipeTitleImageForCard(card, options);" in script
+    assert 'if (scope === "title") {' in script
+
+
 def test_recipe_editor_image_menu_allows_standalone_editor_page():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     surface_start = script.index("function recipeEditorSurfaceIsActive")

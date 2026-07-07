@@ -220,6 +220,11 @@
                                                                 </button>
                                                                 <button type="button"
                                                                         data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { imageScope: 'title' })">
+                                                                    Title image only
+                                                                </button>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
                                                                         onclick="return generateCookbookRecipeImagesFromMenu(this, { imageScope: 'ingredients' })">
                                                                     Ingredients only
                                                                 </button>
@@ -249,6 +254,11 @@
                                                                         data-cookbook-image-global-btn
                                                                         onclick="return generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'all' })">
                                                                     All sections
+                                                                </button>
+                                                                <button type="button"
+                                                                        data-cookbook-image-global-btn
+                                                                        onclick="return generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'title' })">
+                                                                    Title image only
                                                                 </button>
                                                                 <button type="button"
                                                                         data-cookbook-image-global-btn

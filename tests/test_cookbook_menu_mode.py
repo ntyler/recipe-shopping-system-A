@@ -117,12 +117,14 @@ def test_cookbook_submenu_has_bulk_recipe_image_generation_controls():
     assert cookbook_menu_block.index("Generate Images") < cookbook_menu_block.index("Regenerate images...")
     assert cookbook_menu_block.index("Regenerate images...") < cookbook_menu_block.index("Generate missing images...")
     assert cookbook_menu_block.index("Generate missing images...") < cookbook_menu_block.index("Selection")
-    assert cookbook_menu_block.count("data-cookbook-image-global-btn") == 8
+    assert cookbook_menu_block.count("data-cookbook-image-global-btn") == 10
     assert "generateCookbookRecipeImagesFromMenu(this, { imageScope: 'all' })" in cookbook_menu_block
+    assert "generateCookbookRecipeImagesFromMenu(this, { imageScope: 'title' })" in cookbook_menu_block
     assert "generateCookbookRecipeImagesFromMenu(this, { imageScope: 'ingredients' })" in cookbook_menu_block
     assert "generateCookbookRecipeImagesFromMenu(this, { imageScope: 'equipment' })" in cookbook_menu_block
     assert "generateCookbookRecipeImagesFromMenu(this, { imageScope: 'instructions' })" in cookbook_menu_block
     assert "generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'all' })" in cookbook_menu_block
+    assert "generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'title' })" in cookbook_menu_block
     assert "generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'ingredients' })" in cookbook_menu_block
     assert "generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'equipment' })" in cookbook_menu_block
     assert "generateCookbookRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'instructions' })" in cookbook_menu_block
@@ -133,6 +135,9 @@ def test_cookbook_submenu_has_bulk_recipe_image_generation_controls():
     assert "async function generateCookbookRecipeImagesFromMenu" in script
     assert "cookbookCardFromControl(button)" in script
     assert 'fetchRecipeEditorData(recipeUrl, { useCache: false })' in script
+    assert 'if (scope === "title")' in script
+    assert 'kind: "title"' in script
+    assert '"/api/recipe_cover_image/generate"' in script
     assert '"/api/recipe_ingredient_image"' in script
     assert '"/api/recipe_equipment_image"' in script
     assert '"/api/recipe_step_image"' in script
