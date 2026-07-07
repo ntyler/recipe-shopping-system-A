@@ -20,6 +20,7 @@ from flask import session
 from flask import url_for
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+from PushShoppingList.services import recipe_master_data_service as recipe_master_data
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
@@ -137,6 +138,24 @@ from PushShoppingList.services.device_status_service import record_device_status
 
 main_bp = Blueprint("main_bp", __name__)
 address_openai_client = None
+MASTER_DATA_PAGE_CONFIG = {
+    "ingredients": {
+        "title": "Ingredient Master Data",
+        "nav_label": "Ingredients",
+        "empty_label": "ingredients",
+        "route_endpoint": "main_bp.master_data_ingredients_route",
+        "list_func": recipe_master_data.list_ingredients,
+        "count_func": recipe_master_data.count_ingredients,
+    },
+    "equipment": {
+        "title": "Equipment Master Data",
+        "nav_label": "Equipment",
+        "empty_label": "equipment",
+        "route_endpoint": "main_bp.master_data_equipment_route",
+        "list_func": recipe_master_data.list_equipment,
+        "count_func": recipe_master_data.count_equipment,
+    },
+}
 
 
 def static_asset_version(filename):
@@ -476,6 +495,233 @@ def admin_support_context(active_public_user=None):
         **shared_page_context(active_public_user),
         "admin_support_dashboard": dashboard,
     }
+
+
+def int_query_arg(name, default, minimum=None, maximum=None):
+    try:
+        value = int(request.args.get(name, default))
+    except (TypeError, ValueError):
+        value = default
+
+    if minimum is not None:
+        value = max(minimum, value)
+    if maximum is not None:
+        value = min(maximum, value)
+
+    return value
+
+
+def master_data_scope(is_admin):
+    current_scope_user_id = recipe_master_data.scoped_recipe_user_id()
+    requested_user_id = str(request.args.get("user_id") or "").strip()
+    requested_scope = str(request.args.get("scope") or "mine").strip().lower()
+
+    if is_admin and requested_user_id:
+        return {
+            "user_id": requested_user_id,
+            "include_all_users": False,
+            "scope": "user",
+            "current_scope_user_id": current_scope_user_id,
+        }
+
+    if is_admin and requested_scope == "all":
+        return {
+            "user_id": "",
+            "include_all_users": True,
+            "scope": "all",
+            "current_scope_user_id": current_scope_user_id,
+        }
+
+    return {
+        "user_id": current_scope_user_id,
+        "include_all_users": False,
+        "scope": "mine",
+        "current_scope_user_id": current_scope_user_id,
+    }
+
+
+def master_data_query_args(search, sort, limit, scope_info, page=None):
+    query_args = {
+        "sort": sort,
+        "limit": limit,
+    }
+
+    if search:
+        query_args["search"] = search
+
+    if scope_info["scope"] == "all":
+        query_args["scope"] = "all"
+    elif scope_info["scope"] == "user" and scope_info["user_id"]:
+        query_args["user_id"] = scope_info["user_id"]
+
+    if page and page > 1:
+        query_args["page"] = page
+
+    return query_args
+
+
+def master_data_context(record_type):
+    config = MASTER_DATA_PAGE_CONFIG[record_type]
+    active_public_user = current_public_user()
+    is_admin = is_admin_user(active_public_user)
+    status = recipe_master_data.recipe_master_db_status()
+    search = recipe_master_data.clean_text(request.args.get("search"))
+    sort = str(request.args.get("sort") or "updated_at_desc").strip()
+    if sort not in recipe_master_data.MASTER_RECORD_SORTS:
+        sort = "updated_at_desc"
+    limit = int_query_arg("limit", 100, minimum=1, maximum=500)
+    page = int_query_arg("page", 1, minimum=1)
+    offset = (page - 1) * limit
+    scope_info = master_data_scope(is_admin)
+
+    rows = []
+    total_count = 0
+    available_user_ids = []
+    if status["exists"]:
+        rows = config["list_func"](
+            user_id=scope_info["user_id"],
+            search=search,
+            limit=limit,
+            offset=offset,
+            sort=sort,
+            include_all_users=scope_info["include_all_users"],
+        )
+        total_count = config["count_func"](
+            user_id=scope_info["user_id"],
+            search=search,
+            include_all_users=scope_info["include_all_users"],
+        )
+        if is_admin:
+            available_user_ids = recipe_master_data.recipe_master_user_ids()
+
+    total_pages = max(1, (total_count + limit - 1) // limit)
+    if page > total_pages:
+        page = total_pages
+        offset = (page - 1) * limit
+        if total_count:
+            rows = config["list_func"](
+                user_id=scope_info["user_id"],
+                search=search,
+                limit=limit,
+                offset=offset,
+                sort=sort,
+                include_all_users=scope_info["include_all_users"],
+            )
+
+    endpoint = config["route_endpoint"]
+    prev_url = None
+    next_url = None
+    if page > 1:
+        prev_url = url_for(
+            endpoint,
+            **master_data_query_args(search, sort, limit, scope_info, page=page - 1),
+        )
+    if page < total_pages:
+        next_url = url_for(
+            endpoint,
+            **master_data_query_args(search, sort, limit, scope_info, page=page + 1),
+        )
+
+    return {
+        "record_type": record_type,
+        "title": config["title"],
+        "nav_label": config["nav_label"],
+        "empty_label": config["empty_label"],
+        "route_endpoint": endpoint,
+        "rows": rows,
+        "total_count": total_count,
+        "page": page,
+        "total_pages": total_pages,
+        "limit": limit,
+        "offset": offset,
+        "search": search,
+        "sort": sort,
+        "sort_options": [
+            {"value": "updated_at_desc", "label": "Updated At"},
+            {"value": "usage_count_desc", "label": "Usage Count"},
+            {"value": "name_asc", "label": "Name"},
+        ],
+        "limit_options": [50, 100, 250, 500],
+        "db_status": status,
+        "is_admin": is_admin,
+        "scope": scope_info["scope"],
+        "scope_user_id": scope_info["user_id"],
+        "current_scope_user_id": scope_info["current_scope_user_id"],
+        "available_user_ids": available_user_ids,
+        "messages": session.pop("recipe_master_data_messages", []),
+        "ingredient_url": url_for("main_bp.master_data_ingredients_route"),
+        "equipment_url": url_for("main_bp.master_data_equipment_route"),
+        "prev_url": prev_url,
+        "next_url": next_url,
+    }
+
+
+def render_master_data_page(record_type):
+    return render_template(
+        "master_data.html",
+        master_data=master_data_context(record_type),
+        app_css_version=static_asset_version("css/app.css"),
+        app_js_version=static_asset_version("js/app.js"),
+    )
+
+
+@main_bp.route("/admin/master-data/ingredients")
+def master_data_ingredients_route():
+    return render_master_data_page("ingredients")
+
+
+@main_bp.route("/admin/master-data/equipment")
+def master_data_equipment_route():
+    return render_master_data_page("equipment")
+
+
+@main_bp.route("/admin/master-data/backfill", methods=["POST"])
+def recipe_master_data_backfill_route():
+    active_public_user = current_public_user()
+    if not is_admin_user(active_public_user):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Admin access is required.",
+        }), 403
+
+    record_type = str(request.form.get("record_type") or "ingredients").strip()
+    if record_type not in MASTER_DATA_PAGE_CONFIG:
+        record_type = "ingredients"
+
+    include_legacy = str(request.form.get("include_legacy") or "").strip().lower() in {"1", "true", "yes", "on"}
+    force = str(request.form.get("force") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+    try:
+        result = recipe_master_data.backfill_all_recipe_master_records(
+            include_legacy=include_legacy,
+            force=force,
+        )
+        if result.get("skipped"):
+            message = (
+                "Backfill was skipped because the recipe master migration marker already exists. "
+                "Use Force rerun if you need to rebuild it."
+            )
+            category = "warning"
+        else:
+            message = (
+                "Backfill finished: "
+                f"{int(result.get('users') or 0)} users, "
+                f"{int(result.get('recipes') or 0)} recipes, "
+                f"{int(result.get('ingredient_rows') or 0)} ingredient links, "
+                f"{int(result.get('equipment_rows') or 0)} equipment links."
+            )
+            category = "success"
+    except Exception as exc:
+        message = f"Backfill failed: {exc}"
+        category = "error"
+
+    session["recipe_master_data_messages"] = [{
+        "category": category,
+        "text": message,
+    }]
+
+    return redirect(url_for(MASTER_DATA_PAGE_CONFIG[record_type]["route_endpoint"]))
 
 
 @main_bp.route("/api/device-stale", methods=["POST"])

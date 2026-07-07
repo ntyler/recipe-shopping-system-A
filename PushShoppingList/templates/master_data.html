@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ master_data.title }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+</head>
+<body>
+<main id="appContent" class="app-content master-data-app-content">
+    <section class="master-data-page" aria-labelledby="masterDataTitle">
+        <header class="master-data-header">
+            <div>
+                <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
+                <h1 id="masterDataTitle">{{ master_data.title }}</h1>
+                <p>Browse normalized reusable recipe records for the active workspace.</p>
+            </div>
+            <nav class="master-data-tabs" aria-label="Master data">
+                <a href="{{ master_data.ingredient_url }}"
+                   class="{% if master_data.record_type == 'ingredients' %}active{% endif %}">
+                    Ingredients
+                </a>
+                <a href="{{ master_data.equipment_url }}"
+                   class="{% if master_data.record_type == 'equipment' %}active{% endif %}">
+                    Equipment
+                </a>
+            </nav>
+        </header>
+
+        {% if master_data.messages %}
+            <div class="master-data-messages" aria-live="polite">
+                {% for message in master_data.messages %}
+                    <div class="master-data-message {{ message.category }}">{{ message.text }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="master-data-status">
+            <div>
+                <span>SQLite DB</span>
+                <code>{{ master_data.db_status.path }}</code>
+            </div>
+            <strong class="{% if master_data.db_status.exists %}ready{% else %}missing{% endif %}">
+                {% if master_data.db_status.exists %}Found{% else %}Missing{% endif %}
+            </strong>
+        </div>
+
+        {% if not master_data.db_status.exists %}
+            <div class="master-data-empty-state">
+                Normalized recipe master database has not been created yet. It will appear after ingredients/equipment are normalized or after a backfill is run.
+            </div>
+        {% endif %}
+
+        {% if master_data.is_admin %}
+            <form class="master-data-backfill-form"
+                  method="POST"
+                  action="{{ url_for('main_bp.recipe_master_data_backfill_route') }}">
+                <input type="hidden" name="record_type" value="{{ master_data.record_type }}">
+                <div>
+                    <strong>Backfill normalized data</strong>
+                    <span>Uses existing recipe JSON and the current recipe master service.</span>
+                </div>
+                <label>
+                    <input type="checkbox" name="include_legacy" value="1" checked>
+                    <span>Include legacy local recipe data</span>
+                </label>
+                <label>
+                    <input type="checkbox" name="force" value="1">
+                    <span>Force rerun</span>
+                </label>
+                <button type="submit">Run Backfill</button>
+            </form>
+        {% endif %}
+
+        <form class="master-data-filter-form"
+              method="GET"
+              action="{{ url_for(master_data.route_endpoint) }}">
+            <label class="master-data-search-field">
+                <span>Search</span>
+                <input type="search"
+                       name="search"
+                       value="{{ master_data.search }}"
+                       placeholder="Name or normalized name">
+            </label>
+            {% if master_data.is_admin %}
+                <label>
+                    <span>Scope</span>
+                    <select name="scope">
+                        <option value="mine" {% if master_data.scope == 'mine' %}selected{% endif %}>My data</option>
+                        <option value="all" {% if master_data.scope == 'all' %}selected{% endif %}>All users</option>
+                        <option value="user" {% if master_data.scope == 'user' %}selected{% endif %}>Specific user</option>
+                    </select>
+                </label>
+                <label>
+                    <span>User ID</span>
+                    <input type="text"
+                           name="user_id"
+                           value="{% if master_data.scope == 'user' %}{{ master_data.scope_user_id }}{% endif %}"
+                           list="masterDataUserIds"
+                           placeholder="{{ master_data.current_scope_user_id }}">
+                    <datalist id="masterDataUserIds">
+                        {% for user_id in master_data.available_user_ids %}
+                            <option value="{{ user_id }}"></option>
+                        {% endfor %}
+                    </datalist>
+                </label>
+            {% endif %}
+            <label>
+                <span>Sort</span>
+                <select name="sort">
+                    {% for option in master_data.sort_options %}
+                        <option value="{{ option.value }}" {% if master_data.sort == option.value %}selected{% endif %}>
+                            {{ option.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Limit</span>
+                <select name="limit">
+                    {% for option in master_data.limit_options %}
+                        <option value="{{ option }}" {% if master_data.limit == option %}selected{% endif %}>
+                            {{ option }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit">Apply</button>
+        </form>
+
+        <div class="master-data-results-summary" aria-live="polite">
+            {% if master_data.total_count %}
+                Showing {{ master_data.offset + 1 }}-{{ master_data.offset + (master_data.rows|length) }} of {{ master_data.total_count }} {{ master_data.empty_label }}.
+            {% else %}
+                No {{ master_data.empty_label }} found.
+            {% endif %}
+        </div>
+
+        {% if master_data.rows %}
+            <div class="master-data-table-wrap">
+                <table class="master-data-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Normalized Name</th>
+                            <th scope="col">Image</th>
+                            <th scope="col">User ID</th>
+                            <th scope="col">Usage Count</th>
+                            <th scope="col">Updated At</th>
+                            <th scope="col">Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in master_data.rows %}
+                            <tr>
+                                <td><strong>{{ row.name }}</strong></td>
+                                <td><code>{{ row.normalized_name }}</code></td>
+                                <td>
+                                    {% if row.image_url %}
+                                        <img class="master-data-thumbnail"
+                                             src="{{ row.image_url }}"
+                                             alt="{{ row.name }} image">
+                                    {% else %}
+                                        <span class="master-data-no-image">No image</span>
+                                    {% endif %}
+                                </td>
+                                <td><code>{{ row.user_id }}</code></td>
+                                <td>{{ row.usage_count }}</td>
+                                <td>{{ row.updated_at }}</td>
+                                <td>{{ row.created_at }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% elif master_data.db_status.exists %}
+            <div class="master-data-empty-state">
+                No matching {{ master_data.empty_label }} records were found for this scope.
+            </div>
+        {% endif %}
+
+        <div class="master-data-pagination">
+            {% if master_data.prev_url %}
+                <a href="{{ master_data.prev_url }}">Previous</a>
+            {% else %}
+                <span aria-disabled="true">Previous</span>
+            {% endif %}
+            <strong>Page {{ master_data.page }} of {{ master_data.total_pages }}</strong>
+            {% if master_data.next_url %}
+                <a href="{{ master_data.next_url }}">Next</a>
+            {% else %}
+                <span aria-disabled="true">Next</span>
+            {% endif %}
+        </div>
+    </section>
+</main>
+</body>
+</html>

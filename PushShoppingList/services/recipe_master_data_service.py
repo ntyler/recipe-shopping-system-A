@@ -20,6 +20,21 @@ RECIPE_MASTER_DB_PATH = Path(
 )
 RECIPE_MASTER_DB_LOCK = threading.RLock()
 BACKFILL_MIGRATION_NAME = "recipe_master_user_scoped_backfill_v1"
+MASTER_RECORD_TABLES = {
+    "ingredients": {
+        "usage_table": "recipe_ingredients",
+        "usage_fk": "ingredient_id",
+    },
+    "equipment": {
+        "usage_table": "recipe_equipment",
+        "usage_fk": "equipment_id",
+    },
+}
+MASTER_RECORD_SORTS = {
+    "updated_at_desc": "m.updated_at DESC, m.id DESC",
+    "usage_count_desc": "usage_count DESC, m.updated_at DESC, m.id DESC",
+    "name_asc": "m.normalized_name ASC, m.name ASC, m.id ASC",
+}
 
 
 def utc_now_iso():
@@ -28,6 +43,23 @@ def utc_now_iso():
 
 def recipe_master_db_path():
     return Path(os.getenv("SHOPPING_APP_RECIPE_MASTER_DB") or RECIPE_MASTER_DB_PATH)
+
+
+def get_recipe_master_db_path():
+    return recipe_master_db_path()
+
+
+def recipe_master_db_exists():
+    return recipe_master_db_path().is_file()
+
+
+def recipe_master_db_status():
+    db_path = recipe_master_db_path()
+    return {
+        "path": str(db_path),
+        "exists": db_path.is_file(),
+        "parent_exists": db_path.parent.exists(),
+    }
 
 
 def scoped_recipe_user_id(user_id=None):
@@ -50,6 +82,25 @@ def scoped_recipe_user_id(user_id=None):
 def recipe_master_connection():
     db_path = recipe_master_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
+    with RECIPE_MASTER_DB_LOCK:
+        connection = sqlite3.connect(str(db_path), timeout=30)
+        connection.row_factory = sqlite3.Row
+        try:
+            connection.execute("PRAGMA foreign_keys=ON")
+            ensure_recipe_master_schema(connection)
+            yield connection
+            connection.commit()
+        finally:
+            connection.close()
+
+
+@contextmanager
+def existing_recipe_master_connection():
+    db_path = recipe_master_db_path()
+    if not db_path.is_file():
+        yield None
+        return
+
     with RECIPE_MASTER_DB_LOCK:
         connection = sqlite3.connect(str(db_path), timeout=30)
         connection.row_factory = sqlite3.Row
@@ -143,6 +194,234 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient ON recipe_ingredients(ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_user_recipe ON recipe_equipment(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_equipment ON recipe_equipment(equipment_id)")
+
+
+def master_record_table_config(table_name):
+    table_name = str(table_name or "").strip()
+    config = MASTER_RECORD_TABLES.get(table_name)
+    if not config:
+        raise ValueError("Unsupported master table.")
+    return config
+
+
+def bounded_master_limit(value, default=100, maximum=500):
+    try:
+        limit = int(value)
+    except (TypeError, ValueError):
+        limit = default
+    return max(1, min(limit, maximum))
+
+
+def bounded_master_offset(value):
+    try:
+        offset = int(value)
+    except (TypeError, ValueError):
+        offset = 0
+    return max(0, offset)
+
+
+def master_record_filters(user_id=None, search=None, include_all_users=False):
+    where = []
+    params = []
+
+    user_id = clean_text(user_id)
+    if include_all_users:
+        if user_id:
+            where.append("m.user_id = ?")
+            params.append(user_id)
+    else:
+        where.append("m.user_id = ?")
+        params.append(scoped_recipe_user_id(user_id))
+
+    search = clean_text(search)
+    if search:
+        search_like = f"%{search.lower()}%"
+        where.append("(LOWER(m.name) LIKE ? OR LOWER(m.normalized_name) LIKE ?)")
+        params.extend([search_like, search_like])
+
+    return where, params
+
+
+def list_master_records(
+    table_name,
+    user_id=None,
+    search=None,
+    limit=100,
+    offset=0,
+    sort="updated_at_desc",
+    include_all_users=False,
+):
+    config = master_record_table_config(table_name)
+    limit = bounded_master_limit(limit)
+    offset = bounded_master_offset(offset)
+    order_clause = MASTER_RECORD_SORTS.get(sort, MASTER_RECORD_SORTS["updated_at_desc"])
+    where, params = master_record_filters(
+        user_id=user_id,
+        search=search,
+        include_all_users=include_all_users,
+    )
+    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
+    usage_table = config["usage_table"]
+    usage_fk = config["usage_fk"]
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return []
+
+        rows = connection.execute(
+            f"""
+            SELECT
+                m.id,
+                m.user_id,
+                m.name,
+                m.normalized_name,
+                m.image_url,
+                m.image_path,
+                m.created_at,
+                m.updated_at,
+                COUNT(u.id) AS usage_count
+              FROM {table_name} m
+              LEFT JOIN {usage_table} u
+                ON u.{usage_fk} = m.id
+               AND u.user_id = m.user_id
+              {where_clause}
+             GROUP BY m.id
+             ORDER BY {order_clause}
+             LIMIT ?
+            OFFSET ?
+            """,
+            (*params, limit, offset),
+        ).fetchall()
+
+    return [
+        {
+            **dict(row),
+            "usage_count": int(row["usage_count"] or 0),
+        }
+        for row in rows
+    ]
+
+
+def count_master_records(table_name, user_id=None, search=None, include_all_users=False):
+    master_record_table_config(table_name)
+    where, params = master_record_filters(
+        user_id=user_id,
+        search=search,
+        include_all_users=include_all_users,
+    )
+    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return 0
+
+        row = connection.execute(
+            f"""
+            SELECT COUNT(*) AS record_count
+              FROM {table_name} m
+              {where_clause}
+            """,
+            params,
+        ).fetchone()
+
+    return int(row["record_count"] or 0) if row else 0
+
+
+def list_ingredients(user_id=None, search=None, limit=100, offset=0, sort="updated_at_desc", include_all_users=False):
+    return list_master_records(
+        "ingredients",
+        user_id=user_id,
+        search=search,
+        limit=limit,
+        offset=offset,
+        sort=sort,
+        include_all_users=include_all_users,
+    )
+
+
+def list_equipment(user_id=None, search=None, limit=100, offset=0, sort="updated_at_desc", include_all_users=False):
+    return list_master_records(
+        "equipment",
+        user_id=user_id,
+        search=search,
+        limit=limit,
+        offset=offset,
+        sort=sort,
+        include_all_users=include_all_users,
+    )
+
+
+def count_ingredients(user_id=None, search=None, include_all_users=False):
+    return count_master_records(
+        "ingredients",
+        user_id=user_id,
+        search=search,
+        include_all_users=include_all_users,
+    )
+
+
+def count_equipment(user_id=None, search=None, include_all_users=False):
+    return count_master_records(
+        "equipment",
+        user_id=user_id,
+        search=search,
+        include_all_users=include_all_users,
+    )
+
+
+def count_master_usage(table_name, record_id, user_id=None):
+    config = master_record_table_config(table_name)
+    try:
+        record_id = int(record_id or 0)
+    except (TypeError, ValueError):
+        record_id = 0
+    if record_id <= 0:
+        return 0
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return 0
+
+        row = connection.execute(
+            f"""
+            SELECT COUNT(*) AS usage_count
+              FROM {config["usage_table"]}
+             WHERE user_id = ?
+               AND {config["usage_fk"]} = ?
+            """,
+            (scoped_recipe_user_id(user_id), record_id),
+        ).fetchone()
+
+    return int(row["usage_count"] or 0) if row else 0
+
+
+def count_ingredient_usage(record_id, user_id=None):
+    return count_master_usage("ingredients", record_id, user_id=user_id)
+
+
+def count_equipment_usage(record_id, user_id=None):
+    return count_master_usage("equipment", record_id, user_id=user_id)
+
+
+def recipe_master_user_ids():
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return []
+
+        rows = connection.execute(
+            """
+            SELECT user_id
+              FROM ingredients
+             WHERE user_id != ''
+            UNION
+            SELECT user_id
+              FROM equipment
+             WHERE user_id != ''
+             ORDER BY user_id ASC
+            """
+        ).fetchall()
+
+    return [str(row["user_id"]) for row in rows]
 
 
 def clean_text(value):

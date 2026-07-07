@@ -149,3 +149,44 @@ def test_backfill_recipe_master_records_for_user_scopes_existing_data(monkeypatc
     assert user_a_equipment["id"] != user_b_equipment["id"]
     assert user_a_equipment["image_url"] == "/static/generated/backfill-a-pot.png"
     assert user_b_equipment["image_url"] == "/static/generated/backfill-b-pot.png"
+
+
+def test_list_master_records_searches_sorts_and_counts_usage(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+
+    master_data.sync_recipe_master_records(
+        "https://example.com/first",
+        recipe_data={
+            "ingredients": [
+                {"ingredient": "Tomato", "ingredient_image_url": "/static/generated/tomato.png"},
+                {"ingredient": "Basil"},
+            ],
+            "equipment": [{"equipment": "Sheet pan"}],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/second",
+        recipe_data={
+            "ingredients": [{"ingredient": "Tomato"}],
+            "equipment": [{"equipment": "Mixing bowl"}],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/other-user",
+        recipe_data={"ingredients": [{"ingredient": "Tomato"}]},
+        user_id="user-b",
+    )
+
+    rows = master_data.list_ingredients(
+        user_id="user-a",
+        search="tom",
+        sort="usage_count_desc",
+    )
+
+    assert [row["name"] for row in rows] == ["Tomato"]
+    assert rows[0]["usage_count"] == 2
+    assert rows[0]["image_url"] == "/static/generated/tomato.png"
+    assert master_data.count_ingredients(user_id="user-a", search="tom") == 1
+    assert master_data.count_ingredient_usage(rows[0]["id"], user_id="user-a") == 2
