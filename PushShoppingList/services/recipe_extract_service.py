@@ -6993,10 +6993,11 @@ INGREDIENT CONFIDENCE RULES:
 - Do NOT add water, oil, salt, or pepper unless explicitly mentioned.
 - If uncertain whether something is an ingredient or instruction text, exclude it.
 - Do not invent ingredient names. If an ingredient name is not present in the source text, set inferred = true and lower confidence instead of treating it as source-confirmed.
-- For each ingredient object include original_text, parsed_name, normalized_name, quantity, unit, confidence, inferred, and warning.
+- For each ingredient object include original_text, parsed_name, normalized_name, quantity, unit, confidence, inferred, warning, and food_review.
 - original_text must preserve the source line. parsed_name is the grocery item parsed from original_text. normalized_name is the grocery-safe name used for shopping/master ingredient matching.
 - Flag unusual generated ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, and pepper milk unless that exact phrase appears in the source text.
-- For Huancaina-style recipes, prefer evaporated milk or milk over potato milk unless the source explicitly says potato milk.
+- Do not delete or silently replace suspicious ingredients. Keep the original ingredient text and add a food_review object with reason, confidence, and proposed correction options.
+- For Huancaina-style recipes, suggested food_review corrections should prefer evaporated milk or milk over potato milk unless the source explicitly says potato milk.
 
 IMPORTANT QUANTITY EXTRACTION RULES:
 - ALWAYS attempt to extract quantity and unit.
@@ -7324,6 +7325,7 @@ FINAL OUTPUT FORMAT
       "confidence": null,
       "inferred": false,
       "warning": null,
+      "food_review": {{}},
       "optional": false,
       "store_section": null,
       "store_section_order": null
@@ -8527,6 +8529,7 @@ Return JSON with exactly this shape:
       "confidence": "medium",
       "inferred": true,
       "warning": "",
+      "food_review": {{}},
       "preparation": "",
       "optional": false,
       "section": "",
@@ -8559,8 +8562,9 @@ Rules:
 - If a user description is provided, treat it as a high-priority hint for ingredient selection and method flow.
 - Do not claim the result is exact; treat all inferred items as estimated.
 - Do not invent unusual ingredient names. Mark non-visible or uncertain ingredients with inferred=true instead of source-confirmed confidence.
-- Flag potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, and pepper milk with a warning unless that exact phrase appears in the user description.
-- For Huancaina-style recipes, use evaporated milk or milk instead of potato milk unless the user description explicitly says potato milk.
+- Flag potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, and pepper milk with a warning and food_review unless that exact phrase appears in the user description.
+- Do not delete or silently replace suspicious ingredients. Keep the generated ingredient and add proposed food_review correction options.
+- For Huancaina-style recipes, suggested food_review corrections should prefer evaporated milk or milk over potato milk unless the user description explicitly says potato milk.
 - Do not claim ingredient amounts are exact; they should be treated as estimates.
 - Include a confidence score between 0 and 1 in extraction_confidence.
 - Return `confidence` per ingredient as one of: "high", "medium", or "low".
@@ -8992,20 +8996,102 @@ def preferred_huancaina_milk_name(source_text):
     return "evaporated milk"
 
 
-def suspicious_ingredient_replacement(phrase, json_data, source_text):
+def suspicious_ingredient_proposed_names(phrase, json_data, source_text):
     phrase = source_match_text(phrase)
 
     if phrase == "potato milk" and recipe_is_huancaina_style(json_data):
-        return preferred_huancaina_milk_name(source_text)
+        primary = preferred_huancaina_milk_name(source_text)
+        names = [primary]
+        for fallback in ("evaporated milk", "whole milk", "milk"):
+            if fallback not in names:
+                names.append(fallback)
+        return names[:3]
 
     if phrase.endswith(" milk"):
-        return "milk"
+        return ["milk"]
 
-    return ""
+    return []
 
 
 def suspicious_ingredient_warning(phrase):
     return SUSPICIOUS_INGREDIENT_WARNING_TEMPLATE.format(ingredient=phrase)
+
+
+def suspicious_ingredient_review_reason(phrase, json_data):
+    phrase = source_match_text(phrase)
+    if phrase == "potato milk" and recipe_is_huancaina_style(json_data):
+        return (
+            "Potato milk is unusual for a Huancaina-style sauce and may be an "
+            "extraction or normalization issue."
+        )
+
+    return (
+        f"{phrase or 'This ingredient'} is an unusual ingredient name and may "
+        "have been incorrectly generated."
+    )
+
+
+def suspicious_ingredient_review_option(name, item, reason):
+    quantity = clean_recipe_text(item.get("quantity") or "")
+    unit = clean_recipe_text(item.get("unit") or "")
+    ingredient = normalize_ingredient_for_shopping_list(name)
+    original_text = " ".join(part for part in (quantity, unit, ingredient) if part)
+
+    return {
+        "ingredient": ingredient,
+        "purchasable_item": ingredient,
+        "quantity": quantity,
+        "unit": unit,
+        "original_text": original_text or ingredient,
+        "reason": reason,
+        "confidence": "medium",
+    }
+
+
+def suspicious_ingredient_food_review(phrase, json_data, item, source_text):
+    proposed_names = suspicious_ingredient_proposed_names(phrase, json_data, source_text)
+    if recipe_is_huancaina_style(json_data):
+        option_reason = "This is a realistic dairy ingredient for Huancaina-style sauce."
+    else:
+        option_reason = "This is a more common grocery-store ingredient for the same role."
+
+    options = [
+        suspicious_ingredient_review_option(name, item, option_reason)
+        for name in proposed_names
+        if source_match_text(name) != source_match_text(phrase)
+    ]
+
+    return {
+        "needs_review": True,
+        "kind": "suspicious_ingredient",
+        "status": "open",
+        "reason": suspicious_ingredient_review_reason(phrase, json_data),
+        "prompt": "Review possible ingredient correction",
+        "original_ingredient": clean_recipe_text(item.get("original_text") or item.get("ingredient") or phrase),
+        "suspicious_phrase": source_match_text(phrase),
+        "warning": suspicious_ingredient_warning(phrase),
+        "confidence": "medium",
+        "source": "suspicious_ingredient_validator",
+        "options": options,
+    }
+
+
+def clear_suspicious_ingredient_review(item):
+    review = item.get("food_review")
+    if isinstance(review, dict) and review.get("kind") == "suspicious_ingredient":
+        item.pop("food_review", None)
+
+
+def suspicious_ingredient_review_is_resolved(item):
+    review = item.get("food_review") if isinstance(item, dict) else None
+    if not isinstance(review, dict):
+        return False
+
+    status = clean_recipe_text(review.get("status") or "").lower()
+    return (
+        review.get("kind") == "suspicious_ingredient"
+        and status in {"accepted", "ignored", "reviewed"}
+    )
 
 
 def normalize_ingredient_confidence(value, inferred=False, suspicious=False):
@@ -9098,35 +9184,33 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
         )
         exact_suspicious_source = (
             bool(suspicious_phrase)
-            and source_contains_exact_phrase(
-                ingredient_item_source_text(
-                    json_data,
-                    item,
-                    trusted_source_text,
-                    has_source_body=has_source_body,
-                ),
-                suspicious_phrase,
-            )
+            and has_source_body
+            and source_contains_exact_phrase(trusted_source_text, suspicious_phrase)
         )
-        is_suspicious = bool(suspicious_phrase and not exact_suspicious_source)
+        suspicious_review_resolved = suspicious_ingredient_review_is_resolved(item)
+        is_suspicious = bool(
+            suspicious_phrase
+            and not exact_suspicious_source
+            and not suspicious_review_resolved
+        )
 
         if is_suspicious:
-            replacement = suspicious_ingredient_replacement(
+            item["warning"] = suspicious_ingredient_warning(suspicious_phrase)
+            item["food_review"] = suspicious_ingredient_food_review(
                 suspicious_phrase,
                 json_data,
+                item,
                 trusted_source_text,
             )
-            if replacement:
-                normalized_name = normalize_ingredient_for_shopping_list(replacement)
-                item["ingredient"] = normalized_name
-                for field in ("purchasable_item", "buy_as", "purchase_group"):
-                    if source_contains_exact_phrase(item.get(field), suspicious_phrase):
-                        item[field] = normalized_name
-            item["warning"] = suspicious_ingredient_warning(suspicious_phrase)
+        elif suspicious_review_resolved:
+            item["warning"] = ""
         elif clean_recipe_text(item.get("warning") or "").startswith("Possible extraction issue:"):
             item["warning"] = ""
+            clear_suspicious_ingredient_review(item)
         else:
             item["warning"] = clean_recipe_text(item.get("warning") or "")
+            if exact_suspicious_source:
+                clear_suspicious_ingredient_review(item)
 
         if normalized_name:
             item["normalized_name"] = normalized_name
@@ -9138,10 +9222,13 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
             trusted_source_text,
             has_source_body=has_source_body,
         )
-        source_confirmed = ingredient_name_present_in_source(
-            item.get("normalized_name") or item.get("ingredient") or parsed_name,
-            source_for_item,
-        )
+        if suspicious_phrase:
+            source_confirmed = bool(exact_suspicious_source)
+        else:
+            source_confirmed = ingredient_name_present_in_source(
+                item.get("normalized_name") or item.get("ingredient") or parsed_name,
+                source_for_item,
+            )
         item["inferred"] = not source_confirmed
         item["confidence"] = normalize_ingredient_confidence(
             item.get("confidence"),
@@ -12149,7 +12236,8 @@ Infer:
 - Use the predicted equipment hint only when it fits the inferred home-cooking recipe; revise or omit it when better equipment is implied.
 - Mark each ingredient inferred=true unless the menu item title or description explicitly contains that ingredient name.
 - Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the menu source text.
-- For Huancaina-style dishes, use evaporated milk or milk instead of potato milk unless the menu source text explicitly says potato milk.
+- If a suspicious ingredient appears, keep it in the recipe and add warning/food_review metadata rather than deleting or silently replacing it.
+- For Huancaina-style dishes, food_review correction options should prefer evaporated milk or milk over potato milk unless the menu source text explicitly says potato milk.
 
 Return ONLY valid JSON using this shape:
 {{
@@ -12176,7 +12264,8 @@ Return ONLY valid JSON using this shape:
         "original_text": "1 pound example ingredient, prepared",
         "confidence": "medium",
         "inferred": true,
-        "warning": ""
+        "warning": "",
+        "food_review": {{}}
       }}
     ],
     "equipment": [
@@ -12416,7 +12505,7 @@ This is not the restaurant's exact recipe. Mark each result as AI-inferred.
 Return ONLY valid JSON. The top-level object must be keyed by menu_item_id.
 
 For each menu_item_id return:
-- predicted_ingredients: array of ingredient objects with quantity, unit, ingredient, parsed_name, normalized_name, preparation, original_text, confidence, inferred, warning
+- predicted_ingredients: array of ingredient objects with quantity, unit, ingredient, parsed_name, normalized_name, preparation, original_text, confidence, inferred, warning, food_review
 - predicted_equipment: array of equipment objects with name
 - predicted_instructions: array of instruction objects with step and instruction
 - recipe_category: category enum string
@@ -12444,7 +12533,8 @@ Rules:
 - If an item is vague, return conservative plausible ingredients/instructions with lower confidence.
 - Mark ingredients inferred=true unless the menu title or description explicitly contains that ingredient name.
 - Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the menu item source text.
-- For Huancaina-style dishes, use evaporated milk or milk instead of potato milk unless the menu item source text explicitly says potato milk.
+- If a suspicious ingredient appears, keep it in the recipe and add warning/food_review metadata rather than deleting or silently replacing it.
+- For Huancaina-style dishes, food_review correction options should prefer evaporated milk or milk over potato milk unless the menu item source text explicitly says potato milk.
 
 {MENU_RECIPE_CATEGORY_PREDICTION_RULES}
 

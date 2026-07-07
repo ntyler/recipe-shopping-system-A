@@ -467,6 +467,24 @@ def ingredient_name_from_item(item):
     return clean_text(item)
 
 
+def ingredient_has_open_suspicious_review(item):
+    if not isinstance(item, dict):
+        return False
+
+    review = item.get("food_review")
+    if not isinstance(review, dict):
+        return False
+
+    status = clean_text(review.get("status")).lower()
+    if status in {"accepted", "ignored", "reviewed"}:
+        return False
+
+    return (
+        clean_text(review.get("kind")).lower() == "suspicious_ingredient"
+        and truthy(review.get("needs_review"))
+    )
+
+
 def equipment_name_from_item(item):
     if isinstance(item, dict):
         return clean_text(
@@ -494,6 +512,9 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
 
     rows = []
     for index, item in enumerate(candidates, start=1):
+        if ingredient_has_open_suspicious_review(item):
+            continue
+
         name = ingredient_name_from_item(item)
         if not name:
             continue

@@ -107,6 +107,36 @@ def test_sync_recipe_master_records_replaces_only_current_users_recipe_links(mon
     assert [row["name"] for row in user_b_equipment] == ["Large pot"]
 
 
+def test_sync_recipe_master_records_skips_open_suspicious_ingredient_reviews(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    recipe_url = "https://example.com/yuca-huancaina"
+
+    result = master_data.sync_recipe_master_records(
+        recipe_url,
+        recipe_data={
+            "ingredients": [
+                {
+                    "ingredient": "potato milk",
+                    "quantity": "2",
+                    "unit": "cups",
+                    "original_text": "2 cups potato milk",
+                    "food_review": {
+                        "needs_review": True,
+                        "kind": "suspicious_ingredient",
+                        "status": "open",
+                    },
+                },
+                {"ingredient": "yuca", "quantity": "2", "unit": "large"},
+            ],
+        },
+        user_id="user-a",
+    )
+
+    assert result["ingredient_count"] == 1
+    assert master_data.master_record_for_name("ingredients", "user-a", "potato milk") is None
+    assert master_data.master_record_for_name("ingredients", "user-a", "yuca") is not None
+
+
 def test_backfill_recipe_master_records_for_user_scopes_existing_data(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     user_a_root = tmp_path / "users" / "user-a" / "recipe-extractor" / "data"

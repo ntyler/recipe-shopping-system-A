@@ -23663,6 +23663,7 @@ function openFoodReviewAlternativesFromKey(event, marker) {
 function foodReviewPayloadFromRow(row) {
     const payload = fieldValuesFromRow(row);
     const marker = row.querySelector(".recipe-edit-food-warning");
+    const review = recipeIngredientFoodReviewPayload(row);
 
     if (marker && marker.dataset.blockedBy) {
         try {
@@ -23672,7 +23673,74 @@ function foodReviewPayloadFromRow(row) {
         }
     }
 
+    if (review) {
+        payload.food_review = review;
+        payload.review_kind = review.kind || "";
+        payload.review_reason = review.reason || "";
+    }
+
+    payload.recipe_title = document.getElementById("recipeEditTitleInput")
+        ? document.getElementById("recipeEditTitleInput").value.trim()
+        : "";
+    payload.display_name = document.getElementById("recipeEditDisplayName")
+        ? document.getElementById("recipeEditDisplayName").value.trim()
+        : "";
+
     return payload;
+}
+
+function parseRecipeIngredientFoodReview(row) {
+    if (!row || !row.dataset.ingredientTextReview) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(row.dataset.ingredientTextReview);
+        return parsed && typeof parsed === "object" ? parsed : null;
+    } catch (err) {
+        return null;
+    }
+}
+
+function recipeIngredientFoodReviewPayload(row) {
+    const review = parseRecipeIngredientFoodReview(row);
+
+    if (!review) {
+        return null;
+    }
+
+    const status = String(row.dataset.foodReviewState || review.status || "").trim().toLowerCase();
+    const expectedKey = row.dataset.ingredientTextReviewKey || review.text_key || "";
+    const currentKey = ingredientTextReviewKeyFromRow(row);
+    const statusAllowsChangedText = ["accepted", "ignored", "reviewed", "manual_edit"].includes(status);
+
+    if (!statusAllowsChangedText && expectedKey && currentKey && expectedKey !== currentKey) {
+        return null;
+    }
+
+    const normalized = normalizeRecipeIngredientFoodReviewState({
+        ...review,
+        status: status || review.status || "",
+        text_key: statusAllowsChangedText ? (currentKey || expectedKey) : (expectedKey || currentKey),
+    });
+
+    return normalized;
+}
+
+function setRecipeIngredientFoodReviewPayload(row, review) {
+    if (!row || !review || typeof review !== "object") {
+        return;
+    }
+
+    const normalized = normalizeRecipeIngredientFoodReviewState(review);
+
+    if (!normalized) {
+        return;
+    }
+
+    row.dataset.ingredientTextReview = JSON.stringify(normalized);
+    row.dataset.ingredientTextReviewKey = normalized.text_key || ingredientTextReviewKeyFromRow(row);
+    row.dataset.foodReviewState = normalized.status || "";
 }
 
 function showFoodReviewAlternativesModal() {
@@ -23734,6 +23802,7 @@ function renderFoodReviewAlternatives(data) {
     const content = document.getElementById("foodReviewAltContent");
     const review = data.review || {};
     const alternatives = data.alternatives || [];
+    const suspiciousReview = foodReviewIsSuspicious(review);
 
     if (subtitle) {
         const issues = (review.blocked_by || []).join("; ");
@@ -23748,14 +23817,18 @@ function renderFoodReviewAlternatives(data) {
 
     if (!alternatives.length) {
         content.innerHTML = `
+            ${suspiciousReview ? renderSuspiciousFoodReviewIssue(review) : ""}
             <div class="food-review-alt-state">
                 No alternatives came back for this ingredient.
             </div>
+            ${suspiciousReview ? renderSuspiciousFoodReviewActions() : ""}
         `;
         return;
     }
 
-    content.innerHTML = alternatives.map((item, index) => `
+    content.innerHTML = `
+        ${suspiciousReview ? renderSuspiciousFoodReviewIssue(review) : ""}
+        ${alternatives.map((item, index) => `
         <div class="food-review-alt-card">
             <div class="food-review-alt-card-main">
                 <div class="food-review-alt-name">${escapeHtml(item.ingredient)}</div>
@@ -23765,10 +23838,41 @@ function renderFoodReviewAlternatives(data) {
             </div>
             <div class="food-review-alt-card-actions">
                 <span class="food-review-alt-confidence ${escapeAttribute(item.confidence || "medium")}">${escapeHtml(item.confidence || "medium")}</span>
-                <button type="button" onclick="applyFoodReviewAlternative(${index})">Use</button>
+                <button type="button" onclick="applyFoodReviewAlternative(${index})">${suspiciousReview ? "Accept Fix" : "Use"}</button>
             </div>
         </div>
-    `).join("");
+        `).join("")}
+        ${suspiciousReview ? renderSuspiciousFoodReviewActions() : ""}
+    `;
+}
+
+function foodReviewIsSuspicious(review = {}) {
+    return String(review.kind || review.review_kind || "").trim() === "suspicious_ingredient";
+}
+
+function renderSuspiciousFoodReviewIssue(review = {}) {
+    const original = review.original_ingredient || review.original_text || review.ingredient || "Ingredient";
+    const reason = review.reason || review.review_reason || "This ingredient may have been generated incorrectly.";
+    const warning = review.warning || "";
+
+    return `
+        <div class="food-review-alt-card food-review-alt-issue">
+            <div class="food-review-alt-card-main">
+                <div class="food-review-alt-name">Original: ${escapeHtml(original)}</div>
+                <div class="food-review-alt-reason">${escapeHtml(reason)}</div>
+                ${warning ? `<div class="food-review-alt-adjustment">${escapeHtml(warning)}</div>` : ""}
+            </div>
+        </div>
+    `;
+}
+
+function renderSuspiciousFoodReviewActions() {
+    return `
+        <div class="food-review-alt-actions">
+            <button type="button" onclick="ignoreFoodReviewIssue()">Ignore</button>
+            <button type="button" onclick="editFoodReviewManually()">Edit Manually</button>
+        </div>
+    `;
 }
 
 function renderFoodReviewAlternativesError(message) {
@@ -23804,31 +23908,102 @@ function applyFoodReviewAlternative(index) {
     setRowFieldValue(row, "ingredient", alternative.ingredient || "");
     setRowFieldValue(row, "quantity", alternative.quantity || "");
     setRowFieldValue(row, "unit", alternative.unit || "");
+    setRowFieldValue(row, "purchasable_item", alternative.purchasable_item || alternative.ingredient || "");
+    setRowFieldValue(row, "parsed_name", alternative.ingredient || "");
+    setRowFieldValue(row, "normalized_name", alternative.ingredient || "");
+    setRowFieldValue(row, "confidence", alternative.confidence || "medium");
+    setRowFieldValue(row, "warning", "");
     setRowFieldValue(
         row,
         "original_text",
-        `${alternative.quantity || ""} ${alternative.unit || ""} ${alternative.ingredient || ""}`.trim()
+        alternative.original_text
+            || `${alternative.quantity || ""} ${alternative.unit || ""} ${alternative.ingredient || ""}`.trim()
     );
-    updateRecipeIngredientFoodRuleWarning(row);
-    markRecipeIngredientReviewed(row);
+    const purchaseGroupInput = row.querySelector('[data-field="purchase_group"]');
+    if (purchaseGroupInput) {
+        purchaseGroupInput.value = "";
+    }
+    const warningMessage = row.querySelector("[data-ingredient-warning-message]");
+    if (warningMessage) {
+        warningMessage.hidden = true;
+        warningMessage.textContent = "";
+    }
+    markRecipeIngredientReviewStatus(row, "accepted", "Reviewed with an accepted AI fix.");
     closeFoodReviewAlternatives();
-    showRecipeQuantityUpdatedMessage("", "", "", "Alternative filled in. Save Recipe to keep it.");
+    showRecipeQuantityUpdatedMessage("", "", "", "Fix accepted. Save Recipe to keep it.");
 }
 
 function markRecipeIngredientReviewed(row) {
+    markRecipeIngredientReviewStatus(row, "reviewed", "Reviewed with a ChatGPT alternative.");
+}
+
+function markRecipeIngredientReviewStatus(row, status, title) {
     const marker = row ? row.querySelector(".recipe-edit-food-warning") : null;
 
     if (!row || !marker) {
         return;
     }
 
-    row.dataset.foodReviewState = "reviewed";
+    const review = recipeIngredientFoodReviewPayload(row) || parseRecipeIngredientFoodReview(row) || {};
+    const normalizedStatus = String(status || "reviewed").trim().toLowerCase();
+    const resolved = ["accepted", "ignored", "reviewed"].includes(normalizedStatus);
+    setRecipeIngredientFoodReviewPayload(row, {
+        ...review,
+        status: normalizedStatus,
+        needs_review: !resolved,
+        text_key: ingredientTextReviewKeyFromRow(row),
+    });
+    if (resolved) {
+        setRowFieldValue(row, "warning", "");
+        const warningMessage = row.querySelector("[data-ingredient-warning-message]");
+        if (warningMessage) {
+            warningMessage.hidden = true;
+            warningMessage.textContent = "";
+        }
+    }
+
+    row.dataset.foodReviewState = normalizedStatus;
     marker.hidden = false;
-    marker.textContent = "Reviewed";
-    marker.title = "Reviewed with a ChatGPT alternative.";
+    marker.textContent = normalizedStatus === "ignored" ? "Ignored" : "Reviewed";
+    marker.title = title || "Reviewed.";
     marker.dataset.blockedBy = "[]";
     marker.tabIndex = 0;
     marker.classList.add("reviewed");
+    updateRecipeIngredientFoodRuleWarning(row);
+}
+
+function ignoreFoodReviewIssue() {
+    const row = activeFoodReviewRow;
+
+    if (!row) {
+        return false;
+    }
+
+    markRecipeIngredientReviewStatus(row, "ignored", "Ignored after ingredient review.");
+    closeFoodReviewAlternatives();
+    showRecipeQuantityUpdatedMessage("", "", "", "Food Review ignored. Save Recipe to keep it.");
+    return false;
+}
+
+function editFoodReviewManually() {
+    const row = activeFoodReviewRow;
+
+    if (!row) {
+        return false;
+    }
+
+    closeFoodReviewAlternatives();
+    expandRecipeIngredientRow(row);
+    const ingredientInput = row.querySelector('[data-field="ingredient"]');
+    if (ingredientInput) {
+        ingredientInput.focus();
+        if (typeof ingredientInput.select === "function") {
+            ingredientInput.select();
+        }
+    }
+
+    updateRecipeIngredientFoodRuleWarning(row);
+    return false;
 }
 
 function setRowFieldValue(row, field, value) {
@@ -24126,10 +24301,11 @@ function addRecipeIngredientRow(item = {}) {
         <input type="hidden" data-field="inferred" value="${escapeAttribute(recipeIngredientInferredValue(item))}">
         <input type="hidden" data-field="warning" value="${escapeAttribute(extractionWarning)}">
     `;
-    const ingredientTextReview = normalizeIngredientTextReview(item.food_review || null);
+    const ingredientTextReview = normalizeRecipeIngredientFoodReviewState(item.food_review || null);
     if (ingredientTextReview) {
         row.dataset.ingredientTextReview = JSON.stringify(ingredientTextReview);
         row.dataset.ingredientTextReviewKey = ingredientTextReview.text_key || ingredientTextReviewKeyFromItem(item);
+        row.dataset.foodReviewState = ingredientTextReview.status || "";
     }
     wrap.appendChild(row);
     bindRecipeIngredientNameField(row);
@@ -25151,7 +25327,8 @@ function updateRecipeIngredientFoodRuleWarning(row) {
     const blockedBy = recipeFoodRuleIssues(text);
     const ingredientChoiceReview = ingredientChoiceReviewFromRow(row);
     const ingredientTextReview = ingredientTextReviewFromRow(row);
-    const isReviewed = row.dataset.foodReviewState === "reviewed";
+    const reviewState = String(row.dataset.foodReviewState || "").trim().toLowerCase();
+    const isReviewed = ["reviewed", "accepted", "ignored"].includes(reviewState);
 
     row.classList.toggle("has-ingredient-choice-review", Boolean(ingredientChoiceReview));
     renderIngredientChoiceReview(row, ingredientChoiceReview);
@@ -25173,7 +25350,7 @@ function updateRecipeIngredientFoodRuleWarning(row) {
         marker.hidden = false;
         marker.textContent = "Food Review";
         marker.title = ingredientTextReview.reason || "This ingredient may need review before shopping.";
-        marker.dataset.reviewKind = "ingredient_text";
+        marker.dataset.reviewKind = ingredientTextReview.kind || "ingredient_text";
         marker.dataset.blockedBy = JSON.stringify(blockedBy);
         marker.tabIndex = 0;
         return;
@@ -25191,8 +25368,10 @@ function updateRecipeIngredientFoodRuleWarning(row) {
 
     if (isReviewed) {
         marker.hidden = false;
-        marker.textContent = "Reviewed";
-        marker.title = "Reviewed with a ChatGPT alternative.";
+        marker.textContent = reviewState === "ignored" ? "Ignored" : "Reviewed";
+        marker.title = reviewState === "ignored"
+            ? "Ignored after ingredient review."
+            : "Reviewed with an accepted fix.";
         marker.dataset.reviewKind = "reviewed";
         marker.dataset.blockedBy = "[]";
         marker.tabIndex = 0;
@@ -25210,7 +25389,12 @@ function updateRecipeIngredientFoodRuleWarning(row) {
 function ingredientChoiceReviewFromRow(row) {
     const ingredientTextReview = ingredientTextReviewFromRow(row);
 
-    if (ingredientTextReview && Array.isArray(ingredientTextReview.options) && ingredientTextReview.options.length) {
+    if (
+        ingredientTextReview
+        && ingredientTextReview.kind !== "suspicious_ingredient"
+        && Array.isArray(ingredientTextReview.options)
+        && ingredientTextReview.options.length
+    ) {
         return {
             sourceField: "ingredient_text_review",
             prompt: ingredientTextReview.prompt || "Pick grocery item",
@@ -25245,7 +25429,21 @@ function ingredientChoiceReviewFromRow(row) {
 }
 
 function normalizeIngredientTextReview(value) {
-    if (!value || typeof value !== "object" || !value.needs_review) {
+    const normalized = normalizeRecipeIngredientFoodReviewState(value);
+
+    if (!normalized || !normalized.needs_review) {
+        return null;
+    }
+
+    if (["accepted", "ignored", "reviewed"].includes(normalized.status)) {
+        return null;
+    }
+
+    return normalized.options.length ? normalized : null;
+}
+
+function normalizeRecipeIngredientFoodReviewState(value) {
+    if (!value || typeof value !== "object") {
         return null;
     }
 
@@ -25254,19 +25452,22 @@ function normalizeIngredientTextReview(value) {
             .map(normalizeIngredientChoiceOptionData)
             .filter(option => option.ingredient)
         : [];
-
-    if (!options.length) {
-        return null;
-    }
+    const status = String(value.status || (value.needs_review ? "open" : "")).trim().toLowerCase();
+    const activeStatus = ["accepted", "ignored", "reviewed"].includes(status) ? status : (status || "open");
 
     return {
-        needs_review: true,
-        kind: value.kind || "ingredient_text",
+        needs_review: Boolean(value.needs_review) && !["accepted", "ignored", "reviewed"].includes(activeStatus),
+        kind: String(value.kind || "ingredient_text").trim() || "ingredient_text",
+        status: activeStatus,
         reason: String(value.reason || "").trim(),
         prompt: String(value.prompt || "Pick grocery item").trim(),
         options,
         allowCreateIngredient: Boolean(value.allowCreateIngredient || value.allow_create_ingredient),
         source: String(value.source || "chatgpt").trim(),
+        confidence: String(value.confidence || "").trim(),
+        warning: String(value.warning || "").trim(),
+        original_ingredient: String(value.original_ingredient || "").trim(),
+        suspicious_phrase: String(value.suspicious_phrase || "").trim(),
         text_key: String(value.text_key || "").trim(),
     };
 }
@@ -25509,6 +25710,7 @@ function normalizeIngredientChoiceOptionData(option) {
         preparation: String(option.preparation || "").trim(),
         store_section: String(option.store_section || "").trim(),
         reason: String(option.reason || "").trim(),
+        confidence: String(option.confidence || "").trim(),
     };
 }
 
@@ -27579,6 +27781,7 @@ function normalizeRecipeEditorSnapshot(recipe) {
             confidence: String(item.confidence || "").trim(),
             inferred: String(item.inferred || "").trim(),
             warning: String(item.warning || "").trim(),
+            food_review: normalizeRecipeFoodReviewSnapshot(item.food_review || {}),
             optional: Boolean(item.optional),
         })),
         equipment: (recipe.equipment || [])
@@ -27602,6 +27805,11 @@ function normalizeRecipeEditorSnapshot(recipe) {
         chatgpt_feedback_created_at: String(recipe.chatgpt_feedback_created_at || "").trim(),
         menu_metadata: recipeMenuMetadataSnapshot(recipe.menu_metadata || recipe || {}),
     };
+}
+
+function normalizeRecipeFoodReviewSnapshot(review) {
+    const normalized = normalizeRecipeIngredientFoodReviewState(review);
+    return normalized ? JSON.stringify(normalized) : "";
 }
 
 function normalizeRecipeReflectionNotesSnapshot(notes) {
@@ -27764,6 +27972,7 @@ function changedRecipeIngredientLines(previousIngredients, nextIngredients) {
             "confidence",
             "inferred",
             "warning",
+            "food_review",
             "optional",
         ].some(key => previous[key] !== item[key]);
 
@@ -28010,10 +28219,15 @@ function collectRecipeIngredientRows() {
     return [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")]
         .map(row => {
             const item = fieldValuesFromRow(row);
+            const foodReview = recipeIngredientFoodReviewPayload(row);
 
             if (Math.abs(selectedMultiplier - 1) < 0.000001) {
                 item.base_quantity = item.quantity || "";
                 item.base_unit = item.unit || "";
+            }
+
+            if (foodReview) {
+                item.food_review = foodReview;
             }
 
             return item;

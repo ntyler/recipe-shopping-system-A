@@ -57,6 +57,10 @@ def test_ingredients_header_has_image_overflow_menu():
     assert 'data-field="inferred"' in script
     assert 'data-field="warning"' in script
     assert "data-ingredient-warning-message" in script
+    assert "recipeIngredientFoodReviewPayload(row)" in script
+    assert "Accept Fix" in script
+    assert "ignoreFoodReviewIssue" in script
+    assert "editFoodReviewManually" in script
 
 
 def test_recipe_editor_hide_all_images_keeps_title_image_visible():

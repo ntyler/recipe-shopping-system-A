@@ -48,7 +48,8 @@ def suggest_food_review_alternatives(payload):
             {
                 "role": "system",
                 "content": (
-                    "You suggest practical recipe ingredient alternatives that satisfy food rules. "
+                    "You suggest practical recipe ingredient alternatives for review. "
+                    "Do not claim an ingredient was in the source unless the prompt says it was. "
                     "Return only valid JSON."
                 ),
             },
@@ -80,6 +81,8 @@ def suggest_food_review_alternatives(payload):
         }
 
     alternatives = normalize_alternatives(data.get("alternatives", []), review["avoid_rules"])
+    if not alternatives and review["review_options"]:
+        alternatives = review["review_options"]
 
     return {
         "ok": True,
@@ -97,6 +100,11 @@ def build_food_review_context(payload):
     preparation = str(payload.get("preparation") or "").strip()
     section = str(payload.get("section") or "").strip()
     store_section = str(payload.get("store_section") or "").strip()
+    recipe_title = str(payload.get("recipe_title") or payload.get("display_name") or "").strip()
+    food_review = payload.get("food_review") if isinstance(payload.get("food_review"), dict) else {}
+    review_kind = str(payload.get("review_kind") or food_review.get("kind") or "").strip()
+    review_reason = str(payload.get("review_reason") or food_review.get("reason") or "").strip()
+    review_options = normalize_alternatives(food_review.get("options", []), [])
     text = " ".join([ingredient, original_text, preparation]).lower()
     blocked_by = [
         rule["label"]
@@ -112,6 +120,13 @@ def build_food_review_context(payload):
         "preparation": preparation,
         "section": section,
         "store_section": store_section,
+        "recipe_title": recipe_title,
+        "kind": review_kind,
+        "reason": review_reason,
+        "warning": str(food_review.get("warning") or "").strip(),
+        "original_ingredient": str(food_review.get("original_ingredient") or original_text or ingredient).strip(),
+        "suspicious_phrase": str(food_review.get("suspicious_phrase") or "").strip(),
+        "review_options": review_options,
         "blocked_by": blocked_by,
         "avoid_rules": rules["avoid"],
         "require_rules": rules["require"],
@@ -119,6 +134,9 @@ def build_food_review_context(payload):
 
 
 def build_alternative_prompt(review):
+    if review.get("kind") == "suspicious_ingredient":
+        return build_suspicious_ingredient_prompt(review)
+
     return f"""
 Suggest 4 practical alternatives for this recipe ingredient.
 
@@ -167,6 +185,57 @@ Output shape:
 """
 
 
+def build_suspicious_ingredient_prompt(review):
+    return f"""
+Review this suspicious parsed recipe ingredient and suggest realistic corrections.
+
+Recipe:
+{json.dumps({
+    "title": review["recipe_title"],
+}, ensure_ascii=False)}
+
+Ingredient needing review:
+{json.dumps({
+    "ingredient": review["ingredient"],
+    "original_text": review["original_text"],
+    "quantity": review["quantity"],
+    "unit": review["unit"],
+    "preparation": review["preparation"],
+    "section": review["section"],
+    "store_section": review["store_section"],
+    "original_ingredient": review["original_ingredient"],
+    "suspicious_phrase": review["suspicious_phrase"],
+    "reason": review["reason"],
+    "warning": review["warning"],
+}, ensure_ascii=False)}
+
+Seed options from deterministic validation:
+{json.dumps(review["review_options"], ensure_ascii=False)}
+
+Rules:
+- The current ingredient must be reviewed, not deleted.
+- Suggest realistic replacement ingredients for the same recipe role.
+- Preserve the original quantity and unit when reasonable.
+- For Huancaina-style recipes, prefer evaporated milk, whole milk, milk, cream, or another plausible dairy/non-dairy milk over potato milk unless the source explicitly said potato milk.
+- Do not suggest the same suspicious phrase as a correction.
+- Return ONLY valid JSON.
+
+Output shape:
+{{
+  "alternatives": [
+    {{
+      "ingredient": "replacement ingredient name",
+      "quantity": "suggested quantity or original quantity",
+      "unit": "suggested unit or original unit",
+      "reason": "why this is a plausible correction",
+      "adjustment": "brief use note",
+      "confidence": "high, medium, or low"
+    }}
+  ]
+}}
+"""
+
+
 def normalize_alternatives(value, avoid_rules=None):
     if not isinstance(value, list):
         return []
@@ -190,8 +259,10 @@ def normalize_alternatives(value, avoid_rules=None):
 
         alternatives.append({
             "ingredient": ingredient,
+            "purchasable_item": str(item.get("purchasable_item") or item.get("buy_as") or ingredient).strip(),
             "quantity": str(item.get("quantity") or "").strip(),
             "unit": str(item.get("unit") or "").strip(),
+            "original_text": str(item.get("original_text") or "").strip(),
             "reason": str(item.get("reason") or "").strip(),
             "adjustment": str(item.get("adjustment") or "").strip(),
             "confidence": confidence,

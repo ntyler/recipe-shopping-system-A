@@ -70,6 +70,11 @@ def annotate_ingredients_for_food_review(ingredients):
     candidates = []
 
     for index, item in enumerate(rows):
+        existing_review = normalize_ingredient_text_review(item.get("food_review"), item)
+        if existing_review:
+            rows[index]["food_review"] = dict(existing_review)
+            continue
+
         key = ingredient_review_text_key(item)
         if not key or not ingredient_text_review_candidate(item):
             continue
@@ -292,8 +297,16 @@ def normalize_ingredient_text_review(review, item=None):
     if not isinstance(review, dict) or not review.get("needs_review"):
         return None
 
+    status = str(review.get("status") or "open").strip().lower() or "open"
+    if status in {"accepted", "ignored", "reviewed"}:
+        return None
+
     options = normalize_review_options(review.get("options", []), item=item)
     reason = str(review.get("reason") or "").strip()
+    kind = str(review.get("kind") or "ingredient_text").strip() or "ingredient_text"
+    confidence = str(review.get("confidence") or "").strip().lower()
+    if confidence not in {"high", "medium", "low"}:
+        confidence = ""
 
     if not options and item:
         fallback = fallback_ingredient_text_review(item)
@@ -304,11 +317,16 @@ def normalize_ingredient_text_review(review, item=None):
 
     return {
         "needs_review": True,
-        "kind": "ingredient_text",
+        "kind": kind,
+        "status": status,
         "reason": reason or "This ingredient text may need cleanup before shopping.",
         "prompt": str(review.get("prompt") or "Pick grocery item").strip() or "Pick grocery item",
         "options": options,
         "source": str(review.get("source") or "chatgpt").strip() or "chatgpt",
+        "confidence": confidence,
+        "warning": str(review.get("warning") or "").strip(),
+        "original_ingredient": str(review.get("original_ingredient") or "").strip(),
+        "suspicious_phrase": str(review.get("suspicious_phrase") or "").strip(),
         "text_key": ingredient_review_text_key(item) if item else "",
     }
 
@@ -330,6 +348,7 @@ def normalize_review_options(value, item=None):
             original_text = ""
             preparation = ""
             store_section = ""
+            confidence = ""
         elif isinstance(raw_option, dict):
             ingredient = clean_review_option(raw_option.get("ingredient") or raw_option.get("name") or "")
             purchasable = clean_review_option(
@@ -343,6 +362,7 @@ def normalize_review_options(value, item=None):
             original_text = str(raw_option.get("original_text") or "").strip()
             preparation = str(raw_option.get("preparation") or "").strip()
             store_section = str(raw_option.get("store_section") or "").strip()
+            confidence = str(raw_option.get("confidence") or "").strip().lower()
         else:
             continue
 
@@ -356,6 +376,7 @@ def normalize_review_options(value, item=None):
                 "preparation": preparation,
                 "store_section": store_section,
                 "reason": reason,
+                "confidence": confidence if confidence in {"high", "medium", "low"} else "",
             },
             source_item=item,
         )

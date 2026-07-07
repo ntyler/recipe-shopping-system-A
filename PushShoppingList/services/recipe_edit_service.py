@@ -6922,6 +6922,7 @@ def normalize_edit_ingredients(ingredients):
             "confidence": item.get("confidence") or "",
             "inferred": truthy(item.get("inferred")),
             "warning": item.get("warning") or "",
+            "food_review": normalize_food_review_payload(item.get("food_review")),
             "optional": bool(item.get("optional")),
             "store_section": item.get("store_section") or classify_store_section(item.get("ingredient") or ""),
             "purchasable_item": item.get("purchasable_item") or item.get("buy_as") or "",
@@ -6936,6 +6937,68 @@ def normalize_edit_ingredients(ingredients):
         if isinstance(item, dict)
     ]
     return rows
+
+
+def normalize_food_review_payload(value):
+    if not isinstance(value, dict) or not value:
+        return {}
+
+    status = (nullable_string(value.get("status")) or "").lower()
+    if status not in {"open", "accepted", "ignored", "reviewed", "manual_edit"}:
+        status = "open" if truthy(value.get("needs_review")) else ""
+
+    options = []
+    raw_options = value.get("options") if isinstance(value.get("options"), list) else []
+    for option in raw_options[:6]:
+        if not isinstance(option, dict):
+            continue
+        ingredient = nullable_string(option.get("ingredient") or option.get("name"))
+        if not ingredient:
+            continue
+        confidence = (nullable_string(option.get("confidence")) or "").lower()
+        if confidence not in {"high", "medium", "low"}:
+            confidence = ""
+        options.append({
+            "ingredient": ingredient,
+            "purchasable_item": nullable_string(option.get("purchasable_item") or option.get("buy_as") or ingredient),
+            "quantity": nullable_string(option.get("quantity")),
+            "unit": nullable_string(option.get("unit")),
+            "original_text": nullable_string(option.get("original_text")),
+            "preparation": nullable_string(option.get("preparation")),
+            "store_section": nullable_string(option.get("store_section")),
+            "reason": nullable_string(option.get("reason")),
+            "confidence": confidence,
+        })
+
+    needs_review = truthy(value.get("needs_review")) and status not in {"accepted", "ignored", "reviewed"}
+    kind = nullable_string(value.get("kind")) or ("ingredient_text" if needs_review or status or options else "")
+
+    if not any((
+        needs_review,
+        status,
+        kind,
+        options,
+        nullable_string(value.get("reason")),
+        nullable_string(value.get("warning")),
+        nullable_string(value.get("original_ingredient")),
+        nullable_string(value.get("suspicious_phrase")),
+    )):
+        return {}
+
+    return {
+        "needs_review": needs_review,
+        "kind": kind or "ingredient_text",
+        "status": status or ("open" if needs_review else ""),
+        "reason": nullable_string(value.get("reason")),
+        "prompt": nullable_string(value.get("prompt")),
+        "options": options,
+        "source": nullable_string(value.get("source")),
+        "confidence": nullable_string(value.get("confidence")),
+        "warning": nullable_string(value.get("warning")),
+        "original_ingredient": nullable_string(value.get("original_ingredient")),
+        "suspicious_phrase": nullable_string(value.get("suspicious_phrase")),
+        "text_key": nullable_string(value.get("text_key")),
+    }
 
 
 def normalize_text_rows(value):
@@ -7105,6 +7168,7 @@ def sanitize_ingredients(value, existing_value=None):
             "confidence": nullable_string(item.get("confidence")),
             "inferred": truthy(item.get("inferred")),
             "warning": nullable_string(item.get("warning")),
+            "food_review": normalize_food_review_payload(item.get("food_review")),
             "optional": bool(item.get("optional")),
             "store_section": store_section,
             "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),

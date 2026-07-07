@@ -662,7 +662,8 @@ Conservative rules:
 - Preserve any strong current details from the context and focus on these missing fields: {", ".join(missing_fields)}.
 - Mark ingredient rows inferred=true unless the source/menu description or current recipe text explicitly contains the ingredient name.
 - Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the source text.
-- For Huancaina-style recipes, use evaporated milk or milk instead of potato milk unless the source text explicitly says potato milk.
+- If a suspicious ingredient appears, keep it in the recipe and add warning/food_review metadata rather than deleting or silently replacing it.
+- For Huancaina-style recipes, food_review correction options should prefer evaporated milk or milk over potato milk unless the source text explicitly says potato milk.
 
 Context JSON:
 {json.dumps(context, ensure_ascii=False, indent=2)}
@@ -687,7 +688,8 @@ Required response shape:
       "normalized_name": "",
       "confidence": "medium",
       "inferred": true,
-      "warning": ""
+      "warning": "",
+      "food_review": {{}}
     }}
   ],
   "equipment": [
@@ -721,7 +723,8 @@ Conservative rules:
 - Preserve clearly useful current ingredient details, but fix incomplete, duplicated, or poorly parsed rows.
 - Mark ingredient rows inferred=true unless the source/menu description or current recipe text explicitly contains the ingredient name.
 - Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the source text.
-- For Huancaina-style recipes, use evaporated milk or milk instead of potato milk unless the source text explicitly says potato milk.
+- If a suspicious ingredient appears, keep it in the recipe and add warning/food_review metadata rather than deleting or silently replacing it.
+- For Huancaina-style recipes, food_review correction options should prefer evaporated milk or milk over potato milk unless the source text explicitly says potato milk.
 
 Context JSON:
 {json.dumps(context, ensure_ascii=False, indent=2)}
@@ -742,7 +745,8 @@ Required response shape:
       "normalized_name": "",
       "confidence": "medium",
       "inferred": true,
-      "warning": ""
+      "warning": "",
+      "food_review": {{}}
     }}
   ],
   "confidence": "low | medium | high",

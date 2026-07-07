@@ -90,7 +90,7 @@ def ingredient_detail_records(ingredients=None, recipe_metadata=None):
     for item in candidates:
         if not isinstance(item, dict):
             continue
-        rows.append({
+        row = {
             "original_text": str(item.get("original_text") or "").strip(),
             "parsed_name": str(item.get("parsed_name") or "").strip(),
             "normalized_name": str(item.get("normalized_name") or item.get("ingredient") or "").strip(),
@@ -99,7 +99,10 @@ def ingredient_detail_records(ingredients=None, recipe_metadata=None):
             "confidence": str(item.get("confidence") or "").strip(),
             "inferred": truthy(item.get("inferred")),
             "warning": str(item.get("warning") or "").strip(),
-        })
+        }
+        if isinstance(item.get("food_review"), dict) and item.get("food_review"):
+            row["food_review"] = dict(item.get("food_review"))
+        rows.append(row)
     return rows
 
 
