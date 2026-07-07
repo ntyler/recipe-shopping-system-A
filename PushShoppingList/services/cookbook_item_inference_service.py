@@ -707,20 +707,29 @@ Required response shape:
 
 def build_recipe_ingredients_regeneration_prompt(recipe_url, recipe_data, cookbook_id="", cookbook_name=""):
     context = build_prompt_context(recipe_url, recipe_data, cookbook_id, cookbook_name)
+    context["regeneration_mode"] = {
+        "target": "ingredients",
+        "action": "replace_entire_ingredients_section",
+        "current_ingredients_role": "stale_rows_to_replace",
+        "preserve_current_ingredients_by_default": False,
+    }
     return f"""
 Regenerate only the Ingredients section for this recipe.
 
-Use the recipe title, serving/yield details, menu/source description, current ingredients, equipment, and instructions.
+Use the recipe title, serving/yield details, menu/source description, equipment, and instructions to build a fresh ingredient list.
+The current ingredient rows are included only as stale rows to replace and as examples of possible parsing issues.
 Return strict JSON only. Do not include markdown.
 
 Conservative rules:
-- Replace the ingredient list with a complete practical home-cooking ingredient list.
+- Always return a complete replacement ingredient list, even when current ingredients already exist.
+- The app will replace the entire current Ingredients section with your returned array.
+- Treat context.current.ingredients as stale input. Do not copy, keep, or preserve current ingredient rows just because they are present.
+- Reuse a current ingredient only when the recipe title, menu/source description, equipment, or instructions independently support it.
 - Do not regenerate recipe title, equipment, instructions, nutrition, categories, or PDFs.
 - Do not claim this is an exact restaurant recipe.
 - Prefer grocery-friendly ingredient names and put prep details in notes.
 - Quantities and units must be strings.
 - If exact quantities are uncertain, use realistic estimates based on the servings and instructions.
-- Preserve clearly useful current ingredient details, but fix incomplete, duplicated, or poorly parsed rows.
 - Mark ingredient rows inferred=true unless the source/menu description or current recipe text explicitly contains the ingredient name.
 - Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the source text.
 - If a suspicious ingredient appears, keep it in the recipe and add warning/food_review metadata rather than deleting or silently replacing it.
