@@ -81,7 +81,7 @@ def test_cookbook_infer_controls_live_inside_cookbook_submenu():
     menu_wrap_start = template.index('<div class="cookbook-card-menu-wrap', actions_start)
     header_actions_block = template[actions_start:menu_wrap_start]
 
-    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>', menu_wrap_start)
+    menu_start = template.index('<div class="recipe-edit-row-menu overflow-menu cookbook-card-menu" hidden>', menu_wrap_start)
     browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
     cookbook_menu_block = template[menu_start:browser_start]
 
@@ -107,11 +107,12 @@ def test_cookbook_submenu_has_bulk_recipe_image_generation_controls():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
     script = read_text("PushShoppingList/static/js/app.js")
 
-    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>')
+    menu_start = template.index('<div class="recipe-edit-row-menu overflow-menu cookbook-card-menu" hidden>')
     browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
     cookbook_menu_block = template[menu_start:browser_start]
 
     assert '<div class="overflow-menu-section cookbook-image-menu-section">' in cookbook_menu_block
+    assert '<div class="recipe-edit-row-menu overflow-menu cookbook-card-menu" hidden>' in cookbook_menu_block
     assert cookbook_menu_block.index("Food Rules") < cookbook_menu_block.index("Generate Images")
     assert cookbook_menu_block.index("Generate Images") < cookbook_menu_block.index("Regenerate images...")
     assert cookbook_menu_block.index("Regenerate images...") < cookbook_menu_block.index("Generate missing images...")
@@ -142,7 +143,7 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
 
-    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>')
+    menu_start = template.index('<div class="recipe-edit-row-menu overflow-menu cookbook-card-menu" hidden>')
     browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
     cookbook_menu_block = template[menu_start:browser_start]
 
@@ -204,7 +205,7 @@ def test_cookbook_submenu_has_selection_and_bulk_move_controls():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
     script = read_text("PushShoppingList/static/js/app.js")
 
-    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>')
+    menu_start = template.index('<div class="recipe-edit-row-menu overflow-menu cookbook-card-menu" hidden>')
     browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
     cookbook_menu_block = template[menu_start:browser_start]
 
@@ -233,7 +234,7 @@ def test_cookbook_submenus_have_food_rule_reapply_controls():
     script = read_text("PushShoppingList/static/js/app.js")
     routes = read_text("PushShoppingList/routes/main_routes.py")
 
-    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>')
+    menu_start = template.index('<div class="recipe-edit-row-menu overflow-menu cookbook-card-menu" hidden>')
     browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
     cookbook_menu_block = template[menu_start:browser_start]
     current_header_menu_start = editor_template.index(
