@@ -24276,40 +24276,54 @@ function addRecipeIngredientRow(item = {}) {
                     onclick="return toggleRecipeEditRowMenu(this, event)">
                 <span aria-hidden="true"></span>
             </button>
-            <div class="recipe-edit-row-menu" hidden>
-                <button type="button" onclick="return reapplyFoodRulesForIngredient(this)">Re-apply Food Rules</button>
-                <button type="button"
-                        data-recipe-edit-row-image-generate
-                        onclick="return generateRecipeEditRowImageFromMenu(this)">
-                    ${ingredientImageUrl ? "Regenerate ingredient image" : "Generate ingredient image"}
-                </button>
-                <button type="button"
-                        data-recipe-edit-row-image-show
-                        onclick="return setRecipeEditRowImageVisibleFromMenu(this, true)"
-                        hidden>
-                    Show ingredient image
-                </button>
-                <button type="button"
-                        data-recipe-edit-row-image-hide
-                        onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
-                    Hide ingredient image
-                </button>
-                <button type="button"
-                        data-recipe-edit-row-image-tools-show
-                        onclick="return setRecipeEditRowImageToolsVisibleFromMenu(this, true)">
-                    Show image tools
-                </button>
-                <button type="button"
-                        data-recipe-edit-row-image-tools-hide
-                        onclick="return setRecipeEditRowImageToolsVisibleFromMenu(this, false)"
-                        hidden>
-                    Hide image tools
-                </button>
-                <button type="button" onclick="duplicateRecipeIngredientRow(this)">Duplicate ingredient</button>
-                <button type="button" class="recipe-edit-row-collapse-toggle" onclick="toggleRecipeIngredientRowCollapsed(this)">Collapse ingredient</button>
-                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move ingredient up</button>
-                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move ingredient down</button>
-                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete ingredient</button>
+            <div class="recipe-edit-row-menu recipe-edit-ingredient-row-menu" hidden>
+                <div class="recipe-edit-menu-group">
+                    <div class="recipe-edit-menu-group-label">Review</div>
+                    <button type="button" onclick="return reapplyFoodRulesForIngredient(this)">Re-apply Food Rules</button>
+                </div>
+                <div class="recipe-edit-menu-group">
+                    <div class="recipe-edit-menu-group-label">Images</div>
+                    <button type="button"
+                            data-recipe-edit-row-image-generate
+                            onclick="return generateRecipeEditRowImageFromMenu(this)">
+                        ${ingredientImageUrl ? "Regenerate ingredient image" : "Generate ingredient image"}
+                    </button>
+                    <button type="button"
+                            data-recipe-edit-row-image-show
+                            onclick="return setRecipeEditRowImageVisibleFromMenu(this, true)"
+                            hidden>
+                        Show ingredient image
+                    </button>
+                    <button type="button"
+                            data-recipe-edit-row-image-hide
+                            onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
+                        Hide ingredient image
+                    </button>
+                    <button type="button"
+                            data-recipe-edit-row-image-tools-show
+                            onclick="return setRecipeEditRowImageToolsVisibleFromMenu(this, true)">
+                        Show image tools
+                    </button>
+                    <button type="button"
+                            data-recipe-edit-row-image-tools-hide
+                            onclick="return setRecipeEditRowImageToolsVisibleFromMenu(this, false)"
+                            hidden>
+                        Hide image tools
+                    </button>
+                </div>
+                <div class="recipe-edit-menu-group">
+                    <div class="recipe-edit-menu-group-label">Row</div>
+                    <button type="button" onclick="duplicateRecipeIngredientRow(this)">Duplicate ingredient</button>
+                    <button type="button" class="recipe-edit-row-collapse-toggle" onclick="toggleRecipeIngredientRowCollapsed(this)">Collapse ingredient</button>
+                </div>
+                <div class="recipe-edit-menu-group">
+                    <div class="recipe-edit-menu-group-label">Move</div>
+                    <button type="button" onclick="moveRecipeEditRow(this, -1)">Move ingredient up</button>
+                    <button type="button" onclick="moveRecipeEditRow(this, 1)">Move ingredient down</button>
+                </div>
+                <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
+                    <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete ingredient</button>
+                </div>
             </div>
         </div>
         <input type="hidden" data-field="section" value="${escapeAttribute(item.section || "")}">

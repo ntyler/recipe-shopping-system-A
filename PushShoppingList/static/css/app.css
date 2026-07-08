@@ -17938,6 +17938,62 @@ body {
     box-sizing: border-box;
 }
 
+.recipe-edit-row-menu.recipe-edit-ingredient-row-menu {
+    min-width: 248px;
+    padding: 6px;
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-group {
+    display: grid;
+    gap: 2px;
+    padding: 6px 0;
+    border-top: 1px solid var(--submenu-divider);
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-group:first-child {
+    padding-top: 2px;
+    border-top: 0;
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-group:last-child {
+    padding-bottom: 2px;
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-group-label {
+    padding: 0 10px 3px;
+    color: #8fa3bb;
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-group button {
+    min-height: 32px;
+    padding: 7px 10px;
+    border-radius: 6px;
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-group button:hover,
+.recipe-edit-row-menu .recipe-edit-menu-group button:focus {
+    background: rgba(91, 140, 255, 0.14);
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-group-danger {
+    margin-top: 2px;
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-group-danger button.delete {
+    color: #fecaca;
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-group-danger button.delete:hover,
+.recipe-edit-row-menu .recipe-edit-menu-group-danger button.delete:focus {
+    background: rgba(127, 29, 29, 0.46);
+    color: #fff1f2;
+}
+
 .recipe-edit-row-menu .recipe-menu-check-toggle {
     display: flex;
     align-items: center;
@@ -24680,12 +24736,13 @@ img[data-deferred-src] {
         }
 
 .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
-    grid-column: 3 / 8;
+    grid-column: 3 / 4;
     grid-row: 3;
     justify-self: start;
     width: min(220px, 100%);
     max-width: 100%;
-    margin: 0;
+    margin: 8px 0 0;
+    align-self: start;
 }
 
 .recipe-edit-ingredient-row .recipe-ingredient-image-panel .recipe-ingredient-image {
@@ -24723,18 +24780,18 @@ img[data-deferred-src] {
 
 @media (max-width: 1180px) {
     .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
-        grid-column: 2 / 6;
+        grid-column: 3 / 5;
         grid-row: 4;
     }
 }
 
 @media (max-width: 760px) {
     .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
-        grid-column: 1 / -1;
+        grid-column: 2 / 4;
         grid-row: auto;
-        justify-self: stretch;
-        width: 100%;
-        max-width: none;
+        justify-self: start;
+        width: min(220px, 100%);
+        max-width: 100%;
     }
 
     .recipe-edit-ingredient-row .recipe-ingredient-image-panel,

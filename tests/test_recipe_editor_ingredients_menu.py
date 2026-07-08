@@ -95,6 +95,25 @@ def test_recipe_editor_ingredient_images_use_thumbnail_previews():
     assert ".recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-image-empty:not(.recipe-image-tools-visible)" in css
 
 
+def test_recipe_editor_ingredient_thumbnail_sits_below_text_fields():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    rule_start = css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel")
+    rule_end = css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel .recipe-ingredient-image", rule_start)
+    rule = css[rule_start:rule_end]
+    tablet_start = css.index("@media (max-width: 1180px)", rule_end)
+    tablet_end = css.index("@media (max-width: 760px)", tablet_start)
+    tablet_rule = css[tablet_start:tablet_end]
+    mobile_rule = css[tablet_end:css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel,", tablet_end)]
+
+    assert "grid-column: 3 / 4;" in rule
+    assert "grid-row: 3;" in rule
+    assert "margin: 8px 0 0;" in rule
+    assert "grid-column: 3 / 5;" in tablet_rule
+    assert "grid-row: 4;" in tablet_rule
+    assert "grid-column: 2 / 4;" in mobile_rule
+    assert "justify-self: start;" in mobile_rule
+
+
 def test_recipe_editor_row_image_tools_toggle_is_wired():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     menu_start = script.index("function updateRecipeEditRowImageMenu")
@@ -112,6 +131,24 @@ def test_recipe_editor_row_image_tools_toggle_is_wired():
     assert "showToolsButton.hidden = !panel || isHidden || toolsVisible;" in menu_block
     assert "hideToolsButton.hidden = !panel || isHidden || !toolsVisible;" in menu_block
     assert "setRecipeEditRowImageToolsVisible(row, true);" in generate_block
+
+
+def test_recipe_editor_ingredient_row_menu_is_grouped():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    row_start = script.index("function addRecipeIngredientRow")
+    row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
+    row_block = script[row_start:row_end]
+
+    assert 'class="recipe-edit-row-menu recipe-edit-ingredient-row-menu"' in row_block
+    assert row_block.count('class="recipe-edit-menu-group"') == 4
+    assert 'class="recipe-edit-menu-group recipe-edit-menu-group-danger"' in row_block
+    for label in ("Review", "Images", "Row", "Move"):
+        assert f'<div class="recipe-edit-menu-group-label">{label}</div>' in row_block
+    assert ".recipe-edit-row-menu.recipe-edit-ingredient-row-menu" in css
+    assert ".recipe-edit-row-menu .recipe-edit-menu-group" in css
+    assert ".recipe-edit-row-menu .recipe-edit-menu-group-label" in css
+    assert ".recipe-edit-row-menu .recipe-edit-menu-group-danger button.delete" in css
 
 
 def test_bulk_image_generation_menus_include_title_image_scope():
