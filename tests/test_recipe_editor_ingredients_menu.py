@@ -95,7 +95,7 @@ def test_recipe_editor_ingredient_images_use_thumbnail_previews():
     assert ".recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-image-empty:not(.recipe-image-tools-visible)" in css
 
 
-def test_recipe_editor_ingredient_thumbnail_sits_below_text_fields():
+def test_recipe_editor_ingredient_thumbnail_uses_consistent_inline_slot():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     row_start = script.index("function addRecipeIngredientRow")
@@ -108,8 +108,10 @@ def test_recipe_editor_ingredient_thumbnail_sits_below_text_fields():
     rule_start = css.index(f"\n{base_selector} {{\n    flex: 0 0 auto;") + 1
     rule_end = css.index("\n}", rule_start)
     rule = css[rule_start:rule_end]
-    desktop_start = css.index("@media (min-width: 1181px)")
-    desktop_end = css.index(":root {", desktop_start)
+    desktop_start = css.index(
+        ".recipe-edit-ingredient-row:has(.recipe-ingredient-image-panel:not(.recipe-image-tools-visible)"
+    )
+    desktop_end = css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel,", desktop_start)
     desktop_rule = css[desktop_start:desktop_end]
 
     assert "recipe-ingredient-image-panel" in row_block[:name_column_start]
@@ -120,7 +122,10 @@ def test_recipe_editor_ingredient_thumbnail_sits_below_text_fields():
     assert "grid-row:" not in rule
     assert ".recipe-ingredient-image-panel.recipe-edit-row-image-panel" in desktop_rule
     assert "grid-column: 3 / 4;" in desktop_rule
-    assert "grid-row: 5;" in desktop_rule
+    assert "grid-row: 1;" in desktop_rule
+    assert "width: 40px;" in desktop_rule
+    assert "height: 40px;" in desktop_rule
+    assert "grid-column: 4 / 10;" in desktop_rule
 
 
 def test_recipe_editor_row_image_tools_toggle_is_wired():
