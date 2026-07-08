@@ -626,6 +626,35 @@ def master_data_query_args(search, sort, limit, scope_info, page=None):
     return query_args
 
 
+def master_data_form_scope():
+    requested_scope = recipe_master_data.clean_text(request.form.get("scope")).lower() or "mine"
+    requested_user_id = recipe_master_data.clean_text(request.form.get("user_id"))
+    current_scope_user_id = recipe_master_data.scoped_recipe_user_id()
+
+    if requested_scope == "all":
+        return {
+            "scope": "all",
+            "user_id": "",
+            "include_all_users": True,
+            "current_scope_user_id": current_scope_user_id,
+        }
+
+    if requested_scope == "user" and requested_user_id:
+        return {
+            "scope": "user",
+            "user_id": requested_user_id,
+            "include_all_users": False,
+            "current_scope_user_id": current_scope_user_id,
+        }
+
+    return {
+        "scope": "mine",
+        "user_id": current_scope_user_id,
+        "include_all_users": False,
+        "current_scope_user_id": current_scope_user_id,
+    }
+
+
 def master_data_context(record_type):
     config = MASTER_DATA_PAGE_CONFIG[record_type]
     active_public_user = current_public_user()
@@ -895,24 +924,15 @@ def recipe_master_data_generate_missing_images_route():
             "error": "Missing-image generation is currently available for ingredients only.",
         }), 400
 
-    requested_scope = recipe_master_data.clean_text(request.form.get("scope")).lower() or "mine"
-    requested_user_id = recipe_master_data.clean_text(request.form.get("user_id"))
-    current_scope_user_id = recipe_master_data.scoped_recipe_user_id()
-    include_all_users = requested_scope == "all"
-    if include_all_users:
-        user_id = ""
-    elif requested_scope == "user" and requested_user_id:
-        user_id = requested_user_id
-    else:
-        user_id = current_scope_user_id
+    scope_info = master_data_form_scope()
 
     job_id = recipe_master_data.clean_text(request.form.get("job_id")) or uuid.uuid4().hex
     search = recipe_master_data.clean_text(request.form.get("search"))
     progress = recipe_master_images.start_master_image_generation_job(
         job_id,
         record_type=record_type,
-        user_id=user_id,
-        include_all_users=include_all_users,
+        user_id=scope_info["user_id"],
+        include_all_users=scope_info["include_all_users"],
         search=search,
     )
 
@@ -921,6 +941,9 @@ def recipe_master_data_generate_missing_images_route():
         "success": True,
         "job_id": job_id,
         "progress": progress,
+        "scope": scope_info["scope"],
+        "user_id": scope_info["user_id"],
+        "include_all_users": scope_info["include_all_users"],
         "redirect_url": recipe_master_data.clean_text(request.form.get("redirect_url"))
         or url_for(MASTER_DATA_PAGE_CONFIG[record_type]["route_endpoint"]),
     })

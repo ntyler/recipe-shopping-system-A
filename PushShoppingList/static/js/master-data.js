@@ -54,6 +54,55 @@
         return root.querySelector(selector);
     }
 
+    function filterFormFor(form) {
+        const root = form.closest(".master-data-page") || document;
+        return root.querySelector(".master-data-filter-form");
+    }
+
+    function setNamedFormValue(form, name, value) {
+        let field = form.querySelector(`[name="${name}"]`);
+        if (!field) {
+            field = document.createElement("input");
+            field.type = "hidden";
+            field.name = name;
+            form.appendChild(field);
+        }
+        field.value = value;
+    }
+
+    function filterRedirectUrl(filterForm) {
+        const url = new URL(filterForm.getAttribute("action") || window.location.href, window.location.href);
+        const formData = new FormData(filterForm);
+        for (const [name, rawValue] of formData.entries()) {
+            const value = text(rawValue).trim();
+            if (value) {
+                url.searchParams.set(name, value);
+            } else {
+                url.searchParams.delete(name);
+            }
+        }
+        return `${url.pathname}${url.search}${url.hash}`;
+    }
+
+    function syncImageFormFromFilters(form) {
+        const filterForm = filterFormFor(form);
+        if (!filterForm || !window.FormData) {
+            return;
+        }
+
+        const formData = new FormData(filterForm);
+        const scope = text(formData.get("scope") || "mine").trim() || "mine";
+        const userId = scope === "user" ? text(formData.get("user_id")).trim() : "";
+        const search = text(formData.get("search")).trim();
+        const redirectUrl = filterRedirectUrl(filterForm);
+
+        setNamedFormValue(form, "scope", scope);
+        setNamedFormValue(form, "user_id", userId);
+        setNamedFormValue(form, "search", search);
+        setNamedFormValue(form, "redirect_url", redirectUrl);
+        form.dataset.imageRedirectUrl = redirectUrl;
+    }
+
     function elementsFor(form) {
         const panel = query(form, "[data-master-backfill-progress]");
         return {
@@ -568,6 +617,7 @@
 
         const jobId = makeJobId("master-images");
         activeImageJobId = jobId;
+        syncImageFormFromFilters(form);
         const formData = new FormData(form);
         formData.set("job_id", jobId);
 

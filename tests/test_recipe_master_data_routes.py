@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import recipe_master_data_service as master_data
@@ -289,6 +290,111 @@ def test_admin_generate_missing_images_route_starts_scoped_job(monkeypatch, tmp_
         "include_all_users": False,
         "search": "tom",
     }
+
+
+def test_admin_generate_missing_images_route_respects_selected_scope(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    calls = []
+
+    def fake_start_job(job_id, record_type, user_id, include_all_users=False, search=None):
+        calls.append({
+            "job_id": job_id,
+            "record_type": record_type,
+            "user_id": user_id,
+            "include_all_users": include_all_users,
+            "search": search,
+        })
+        return {
+            "job_id": job_id,
+            "status": "running",
+            "total": 0,
+            "completed": 0,
+        }
+
+    monkeypatch.setattr(
+        "PushShoppingList.routes.main_routes.recipe_master_images.start_master_image_generation_job",
+        fake_start_job,
+    )
+
+    with app.test_client() as client:
+        sign_in(client, "admin-user")
+        mine_response = client.post(
+            "/api/master-data/generate-missing-images",
+            data={
+                "record_type": "ingredients",
+                "scope": "mine",
+                "user_id": "user-b",
+                "search": "mine-search",
+                "job_id": "image-job-mine",
+            },
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+        all_response = client.post(
+            "/api/master-data/generate-missing-images",
+            data={
+                "record_type": "ingredients",
+                "scope": "all",
+                "user_id": "user-b",
+                "search": "all-search",
+                "job_id": "image-job-all",
+            },
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+        user_response = client.post(
+            "/api/master-data/generate-missing-images",
+            data={
+                "record_type": "ingredients",
+                "scope": "user",
+                "user_id": "user-b",
+                "search": "user-search",
+                "job_id": "image-job-user",
+            },
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+
+    assert mine_response.status_code == 200
+    assert all_response.status_code == 200
+    assert user_response.status_code == 200
+    assert [response.get_json()["scope"] for response in (mine_response, all_response, user_response)] == [
+        "mine",
+        "all",
+        "user",
+    ]
+    assert calls == [
+        {
+            "job_id": "image-job-mine",
+            "record_type": "ingredients",
+            "user_id": "admin-user",
+            "include_all_users": False,
+            "search": "mine-search",
+        },
+        {
+            "job_id": "image-job-all",
+            "record_type": "ingredients",
+            "user_id": "",
+            "include_all_users": True,
+            "search": "all-search",
+        },
+        {
+            "job_id": "image-job-user",
+            "record_type": "ingredients",
+            "user_id": "user-b",
+            "include_all_users": False,
+            "search": "user-search",
+        },
+    ]
+
+
+def test_master_data_image_generation_syncs_visible_filter_scope():
+    script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
+
+    assert "function syncImageFormFromFilters(form)" in script
+    assert 'const scope = text(formData.get("scope") || "mine").trim() || "mine";' in script
+    assert 'const userId = scope === "user" ? text(formData.get("user_id")).trim() : "";' in script
+    assert 'setNamedFormValue(form, "scope", scope);' in script
+    assert 'setNamedFormValue(form, "user_id", userId);' in script
+    assert 'setNamedFormValue(form, "redirect_url", redirectUrl);' in script
+    assert "syncImageFormFromFilters(form);" in script
 
 
 def test_admin_image_generation_status_route_returns_progress(monkeypatch, tmp_path):
