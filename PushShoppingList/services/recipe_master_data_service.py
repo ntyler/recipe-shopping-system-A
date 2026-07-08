@@ -19,7 +19,37 @@ RECIPE_MASTER_DB_PATH = Path(
     )
 )
 RECIPE_MASTER_DB_LOCK = threading.RLock()
-BACKFILL_MIGRATION_NAME = "recipe_master_user_scoped_backfill_v1"
+BACKFILL_MIGRATION_NAME = "recipe_master_user_scoped_store_section_backfill_v2"
+INGREDIENT_STORE_SECTION_ORDER = {
+    "PRODUCE": 1,
+    "MEAT & SEAFOOD": 2,
+    "DAIRY & EGGS": 3,
+    "FROZEN": 4,
+    "DRY GOODS": 5,
+    "PASTA, RICE & GRAINS": 6,
+    "BAKING": 7,
+    "CANNED": 8,
+    "SAUCES & CONDIMENTS": 9,
+    "SNACKS": 10,
+    "BEVERAGES": 11,
+    "SPICES & SEASONINGS": 12,
+    "OILS & VINEGARS": 13,
+    "BAKERY": 14,
+    "DELI": 15,
+    "HOUSEHOLD": 16,
+    "PERSONAL CARE": 17,
+    "PET SUPPLIES": 18,
+    "MISC": 19,
+}
+INGREDIENT_STORE_SECTION_ALIASES = {
+    "MEAT AND SEAFOOD": "MEAT & SEAFOOD",
+    "DAIRY AND EGGS": "DAIRY & EGGS",
+    "PASTA RICE AND GRAINS": "PASTA, RICE & GRAINS",
+    "PASTA, RICE AND GRAINS": "PASTA, RICE & GRAINS",
+    "SAUCES AND CONDIMENTS": "SAUCES & CONDIMENTS",
+    "SPICES AND SEASONINGS": "SPICES & SEASONINGS",
+    "OILS AND VINEGARS": "OILS & VINEGARS",
+}
 MASTER_RECORD_TABLES = {
     "ingredients": {
         "usage_table": "recipe_ingredients",
@@ -350,6 +380,7 @@ def ensure_recipe_master_schema(connection=None):
             user_id TEXT NOT NULL,
             name TEXT NOT NULL,
             normalized_name TEXT NOT NULL,
+            store_section TEXT NOT NULL DEFAULT 'MISC',
             image_url TEXT NOT NULL DEFAULT '',
             image_path TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
@@ -413,12 +444,66 @@ def ensure_recipe_master_schema(connection=None):
         )
         """
     )
+    ingredient_columns = recipe_master_column_names(connection, "ingredients")
+    if "store_section" not in ingredient_columns:
+        connection.execute(
+            "ALTER TABLE ingredients ADD COLUMN store_section TEXT NOT NULL DEFAULT 'MISC'"
+        )
+    normalize_existing_ingredient_store_sections(connection)
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_name ON ingredients(user_id, normalized_name)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_section ON ingredients(user_id, store_section)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_name ON equipment(user_id, normalized_name)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_user_recipe ON recipe_ingredients(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient ON recipe_ingredients(ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_user_recipe ON recipe_equipment(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_equipment ON recipe_equipment(equipment_id)")
+
+
+def recipe_master_column_names(connection, table_name):
+    rows = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {
+        str(row["name"] if isinstance(row, sqlite3.Row) else row[1])
+        for row in rows
+    }
+
+
+def ingredient_store_section_options():
+    return list(INGREDIENT_STORE_SECTION_ORDER.keys())
+
+
+def ingredient_store_section_from_source(value):
+    section = re.sub(r"\s+", " ", str(value or "").strip().upper())
+    if not section:
+        return ""
+    section = INGREDIENT_STORE_SECTION_ALIASES.get(section, section)
+    return section if section in INGREDIENT_STORE_SECTION_ORDER else ""
+
+
+def clean_ingredient_store_section(value, default="MISC"):
+    return ingredient_store_section_from_source(value) or default
+
+
+def ingredient_store_section_sort_key(section):
+    return INGREDIENT_STORE_SECTION_ORDER.get(
+        clean_ingredient_store_section(section),
+        INGREDIENT_STORE_SECTION_ORDER["MISC"],
+    )
+
+
+def normalize_existing_ingredient_store_sections(connection):
+    try:
+        rows = connection.execute("SELECT id, store_section FROM ingredients").fetchall()
+    except sqlite3.OperationalError:
+        return
+
+    for row in rows:
+        raw_section = str(row["store_section"] or "")
+        section = clean_ingredient_store_section(raw_section)
+        if section != raw_section:
+            connection.execute(
+                "UPDATE ingredients SET store_section = ? WHERE id = ?",
+                (section, int(row["id"])),
+            )
 
 
 def master_record_table_config(table_name):
@@ -445,7 +530,13 @@ def bounded_master_offset(value):
     return max(0, offset)
 
 
-def master_record_filters(user_id=None, search=None, include_all_users=False):
+def master_record_filters(
+    table_name,
+    user_id=None,
+    search=None,
+    include_all_users=False,
+    store_section=None,
+):
     where = []
     params = []
 
@@ -464,6 +555,12 @@ def master_record_filters(user_id=None, search=None, include_all_users=False):
         where.append("(LOWER(m.name) LIKE ? OR LOWER(m.normalized_name) LIKE ?)")
         params.extend([search_like, search_like])
 
+    if table_name == "ingredients":
+        section = ingredient_store_section_from_source(store_section)
+        if section:
+            where.append("m.store_section = ?")
+            params.append(section)
+
     return where, params
 
 
@@ -475,19 +572,23 @@ def list_master_records(
     offset=0,
     sort="updated_at_desc",
     include_all_users=False,
+    store_section=None,
 ):
     config = master_record_table_config(table_name)
     limit = bounded_master_limit(limit)
     offset = bounded_master_offset(offset)
     order_clause = MASTER_RECORD_SORTS.get(sort, MASTER_RECORD_SORTS["updated_at_desc"])
     where, params = master_record_filters(
+        table_name,
         user_id=user_id,
         search=search,
         include_all_users=include_all_users,
+        store_section=store_section,
     )
     where_clause = f"WHERE {' AND '.join(where)}" if where else ""
     usage_table = config["usage_table"]
     usage_fk = config["usage_fk"]
+    store_section_select = ",\n                m.store_section" if table_name == "ingredients" else ""
 
     with existing_recipe_master_connection() as connection:
         if connection is None:
@@ -499,7 +600,7 @@ def list_master_records(
                 m.id,
                 m.user_id,
                 m.name,
-                m.normalized_name,
+                m.normalized_name{store_section_select},
                 m.image_url,
                 m.image_path,
                 m.created_at,
@@ -518,21 +619,31 @@ def list_master_records(
             (*params, limit, offset),
         ).fetchall()
 
-    return [
-        {
-            **dict(row),
-            "usage_count": int(row["usage_count"] or 0),
-        }
-        for row in rows
-    ]
+    results = []
+    for row in rows:
+        row_data = dict(row)
+        if table_name == "ingredients":
+            row_data["store_section"] = clean_ingredient_store_section(row_data.get("store_section"))
+            row_data["store_section_order"] = ingredient_store_section_sort_key(row_data["store_section"])
+        row_data["usage_count"] = int(row["usage_count"] or 0)
+        results.append(row_data)
+    return results
 
 
-def count_master_records(table_name, user_id=None, search=None, include_all_users=False):
+def count_master_records(
+    table_name,
+    user_id=None,
+    search=None,
+    include_all_users=False,
+    store_section=None,
+):
     master_record_table_config(table_name)
     where, params = master_record_filters(
+        table_name,
         user_id=user_id,
         search=search,
         include_all_users=include_all_users,
+        store_section=store_section,
     )
     where_clause = f"WHERE {' AND '.join(where)}" if where else ""
 
@@ -552,7 +663,15 @@ def count_master_records(table_name, user_id=None, search=None, include_all_user
     return int(row["record_count"] or 0) if row else 0
 
 
-def list_ingredients(user_id=None, search=None, limit=100, offset=0, sort="updated_at_desc", include_all_users=False):
+def list_ingredients(
+    user_id=None,
+    search=None,
+    limit=100,
+    offset=0,
+    sort="updated_at_desc",
+    include_all_users=False,
+    store_section=None,
+):
     return list_master_records(
         "ingredients",
         user_id=user_id,
@@ -561,10 +680,19 @@ def list_ingredients(user_id=None, search=None, limit=100, offset=0, sort="updat
         offset=offset,
         sort=sort,
         include_all_users=include_all_users,
+        store_section=store_section,
     )
 
 
-def list_equipment(user_id=None, search=None, limit=100, offset=0, sort="updated_at_desc", include_all_users=False):
+def list_equipment(
+    user_id=None,
+    search=None,
+    limit=100,
+    offset=0,
+    sort="updated_at_desc",
+    include_all_users=False,
+    store_section=None,
+):
     return list_master_records(
         "equipment",
         user_id=user_id,
@@ -576,16 +704,17 @@ def list_equipment(user_id=None, search=None, limit=100, offset=0, sort="updated
     )
 
 
-def count_ingredients(user_id=None, search=None, include_all_users=False):
+def count_ingredients(user_id=None, search=None, include_all_users=False, store_section=None):
     return count_master_records(
         "ingredients",
         user_id=user_id,
         search=search,
         include_all_users=include_all_users,
+        store_section=store_section,
     )
 
 
-def count_equipment(user_id=None, search=None, include_all_users=False):
+def count_equipment(user_id=None, search=None, include_all_users=False, store_section=None):
     return count_master_records(
         "equipment",
         user_id=user_id,
@@ -626,6 +755,64 @@ def count_ingredient_usage(record_id, user_id=None):
 
 def count_equipment_usage(record_id, user_id=None):
     return count_master_usage("equipment", record_id, user_id=user_id)
+
+
+def update_ingredient_store_section(ingredient_id, store_section, user_id=None, allow_other_users=False):
+    try:
+        ingredient_id = int(ingredient_id or 0)
+    except (TypeError, ValueError):
+        ingredient_id = 0
+    if ingredient_id <= 0:
+        return {"ok": False, "error": "Ingredient record is required."}
+
+    section = clean_ingredient_store_section(store_section)
+    scoped_user_id = scoped_recipe_user_id(user_id)
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {"ok": False, "error": "Recipe master database was not found."}
+
+        params = [ingredient_id]
+        user_clause = ""
+        if not allow_other_users:
+            user_clause = "AND user_id = ?"
+            params.append(scoped_user_id)
+
+        row = connection.execute(
+            f"""
+            SELECT id, user_id, normalized_name, store_section
+              FROM ingredients
+             WHERE id = ?
+               {user_clause}
+            """,
+            params,
+        ).fetchone()
+        if not row:
+            return {"ok": False, "error": "Ingredient record was not found."}
+
+        previous_section = clean_ingredient_store_section(row["store_section"])
+        changed = previous_section != section
+        if changed:
+            connection.execute(
+                """
+                UPDATE ingredients
+                   SET store_section = ?,
+                       updated_at = ?
+                 WHERE id = ?
+                   AND user_id = ?
+                """,
+                (section, utc_now_iso(), int(row["id"]), row["user_id"]),
+            )
+
+        return {
+            "ok": True,
+            "changed": changed,
+            "ingredient_id": int(row["id"]),
+            "user_id": row["user_id"],
+            "normalized_name": row["normalized_name"],
+            "store_section": section,
+            "previous_store_section": previous_section,
+        }
 
 
 def recipe_master_user_ids():
@@ -749,7 +936,7 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             quantity = clean_text(item.get("quantity") or item.get("recipe_qty"))
             unit = clean_text(item.get("unit"))
             buy_as = clean_text(item.get("buy_as") or item.get("purchasable_item") or item.get("purchase_group"))
-            store_section = clean_text(item.get("store_section") or item.get("section"))
+            store_section = ingredient_store_section_from_source(item.get("store_section") or item.get("section"))
             optional = truthy(item.get("optional"))
             image_url, image_path = compact_image_fields(item, "ingredient_image_url", "image_url")
         else:
@@ -814,7 +1001,15 @@ def equipment_rows_from_recipe_data(recipe_data=None):
     return rows
 
 
-def upsert_master_record(connection, table_name, user_id, name, image_url="", image_path=""):
+def upsert_master_record(
+    connection,
+    table_name,
+    user_id,
+    name,
+    image_url="",
+    image_path="",
+    store_section=None,
+):
     if table_name not in {"ingredients", "equipment"}:
         raise ValueError("Unsupported master table.")
 
@@ -824,20 +1019,51 @@ def upsert_master_record(connection, table_name, user_id, name, image_url="", im
         return None
 
     now = utc_now_iso()
-    connection.execute(
-        f"""
-        INSERT INTO {table_name} (
-            user_id, name, normalized_name, image_url, image_path, created_at, updated_at
+    if table_name == "ingredients":
+        store_section = clean_ingredient_store_section(store_section)
+        connection.execute(
+            """
+            INSERT INTO ingredients (
+                user_id, name, normalized_name, store_section, image_url, image_path, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, normalized_name) DO UPDATE SET
+                name = CASE WHEN excluded.name != '' THEN excluded.name ELSE ingredients.name END,
+                store_section = CASE
+                    WHEN COALESCE(NULLIF(TRIM(ingredients.store_section), ''), 'MISC') = 'MISC'
+                        THEN excluded.store_section
+                    ELSE ingredients.store_section
+                END,
+                image_url = CASE WHEN excluded.image_url != '' THEN excluded.image_url ELSE ingredients.image_url END,
+                image_path = CASE WHEN excluded.image_path != '' THEN excluded.image_path ELSE ingredients.image_path END,
+                updated_at = excluded.updated_at
+            """,
+            (
+                user_id,
+                name,
+                normalized_name,
+                store_section,
+                clean_text(image_url),
+                clean_text(image_path),
+                now,
+                now,
+            ),
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(user_id, normalized_name) DO UPDATE SET
-            name = CASE WHEN excluded.name != '' THEN excluded.name ELSE {table_name}.name END,
-            image_url = CASE WHEN excluded.image_url != '' THEN excluded.image_url ELSE {table_name}.image_url END,
-            image_path = CASE WHEN excluded.image_path != '' THEN excluded.image_path ELSE {table_name}.image_path END,
-            updated_at = excluded.updated_at
-        """,
-        (user_id, name, normalized_name, clean_text(image_url), clean_text(image_path), now, now),
-    )
+    else:
+        connection.execute(
+            """
+            INSERT INTO equipment (
+                user_id, name, normalized_name, image_url, image_path, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, normalized_name) DO UPDATE SET
+                name = CASE WHEN excluded.name != '' THEN excluded.name ELSE equipment.name END,
+                image_url = CASE WHEN excluded.image_url != '' THEN excluded.image_url ELSE equipment.image_url END,
+                image_path = CASE WHEN excluded.image_path != '' THEN excluded.image_path ELSE equipment.image_path END,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, name, normalized_name, clean_text(image_url), clean_text(image_path), now, now),
+        )
     row = connection.execute(
         f"""
         SELECT id
@@ -882,6 +1108,7 @@ def sync_recipe_master_records(recipe_url, ingredients=None, recipe_data=None, u
                 row["name"],
                 image_url=row.get("image_url", ""),
                 image_path=row.get("image_path", ""),
+                store_section=row.get("store_section", ""),
             )
             if not ingredient_id:
                 continue
@@ -996,6 +1223,98 @@ def count_backfill_recipes_for_root(extractor_data_root):
     return len(metadata) if isinstance(metadata, dict) else 0
 
 
+def recipe_master_log_value(value):
+    return str(value or "").replace("\\", "\\\\").replace('"', '\\"')
+
+
+def backfill_ingredient_store_sections_for_user(user_id):
+    user_id = scoped_recipe_user_id(user_id)
+    print(f"[IngredientMaster] action=store_section_backfill_start user_id={user_id}")
+    updated = 0
+    defaulted = 0
+
+    with recipe_master_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                m.id,
+                m.normalized_name,
+                m.store_section AS master_store_section,
+                r.store_section AS recipe_store_section
+              FROM ingredients m
+              LEFT JOIN recipe_ingredients r
+                ON r.ingredient_id = m.id
+               AND r.user_id = m.user_id
+             WHERE m.user_id = ?
+             ORDER BY m.id ASC, r.id ASC
+            """,
+            (user_id,),
+        ).fetchall()
+
+        ingredients = {}
+        for row in rows:
+            ingredient_id = int(row["id"])
+            ingredient = ingredients.setdefault(
+                ingredient_id,
+                {
+                    "id": ingredient_id,
+                    "normalized_name": row["normalized_name"],
+                    "current_section": clean_ingredient_store_section(row["master_store_section"]),
+                    "section_counts": {},
+                },
+            )
+            section = ingredient_store_section_from_source(row["recipe_store_section"])
+            if section:
+                ingredient["section_counts"][section] = ingredient["section_counts"].get(section, 0) + 1
+
+        now = utc_now_iso()
+        for ingredient in ingredients.values():
+            section_counts = ingredient["section_counts"]
+            if section_counts:
+                section = sorted(
+                    section_counts,
+                    key=lambda candidate: (
+                        -section_counts[candidate],
+                        INGREDIENT_STORE_SECTION_ORDER.get(candidate, INGREDIENT_STORE_SECTION_ORDER["MISC"]),
+                        candidate,
+                    ),
+                )[0]
+                print(
+                    "[IngredientMaster] "
+                    f"action=store_section_set ingredient_id={ingredient['id']} "
+                    f"normalized_name=\"{recipe_master_log_value(ingredient['normalized_name'])}\" "
+                    f"section=\"{section}\" source=\"recipe_ingredients_most_common\""
+                )
+            else:
+                section = "MISC"
+                defaulted += 1
+                print(
+                    "[IngredientMaster] "
+                    f"action=store_section_defaulted ingredient_id={ingredient['id']} "
+                    f"normalized_name=\"{recipe_master_log_value(ingredient['normalized_name'])}\" "
+                    'section="MISC"'
+                )
+
+            if ingredient["current_section"] != section:
+                cursor = connection.execute(
+                    """
+                    UPDATE ingredients
+                       SET store_section = ?,
+                           updated_at = ?
+                     WHERE id = ?
+                       AND user_id = ?
+                    """,
+                    (section, now, ingredient["id"], user_id),
+                )
+                updated += int(cursor.rowcount or 0)
+
+    print(
+        "[IngredientMaster] "
+        f"action=store_section_backfill_complete updated={updated} defaulted={defaulted}"
+    )
+    return {"updated": updated, "defaulted": defaulted}
+
+
 def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, progress_callback=None):
     user_id = scoped_recipe_user_id(user_id)
     if extractor_data_root is None:
@@ -1003,6 +1322,7 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, p
     extractor_data_root = Path(extractor_data_root)
     metadata = load_json_file(extractor_data_root / "recipe_ingredients.json")
     if not isinstance(metadata, dict) or not metadata:
+        store_section_result = backfill_ingredient_store_sections_for_user(user_id)
         _emit_backfill_progress(progress_callback, "user_start", {
             "user_id": user_id,
             "recipe_count": 0,
@@ -1012,8 +1332,18 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, p
             "recipes": 0,
             "ingredient_rows": 0,
             "equipment_rows": 0,
+            "store_section_updated": store_section_result["updated"],
+            "store_section_defaulted": store_section_result["defaulted"],
         })
-        return {"ok": True, "user_id": user_id, "recipes": 0, "ingredient_rows": 0, "equipment_rows": 0}
+        return {
+            "ok": True,
+            "user_id": user_id,
+            "recipes": 0,
+            "ingredient_rows": 0,
+            "equipment_rows": 0,
+            "store_section_updated": store_section_result["updated"],
+            "store_section_defaulted": store_section_result["defaulted"],
+        }
 
     outputs = recipe_outputs_by_key(extractor_data_root / "output")
     recipes = 0
@@ -1071,12 +1401,15 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, p
                 "equipment_count": equipment_count,
             })
 
+    store_section_result = backfill_ingredient_store_sections_for_user(user_id)
     summary = {
         "ok": True,
         "user_id": user_id,
         "recipes": recipes,
         "ingredient_rows": ingredient_rows,
         "equipment_rows": equipment_rows,
+        "store_section_updated": store_section_result["updated"],
+        "store_section_defaulted": store_section_result["defaulted"],
     }
     _emit_backfill_progress(progress_callback, "user_done", summary)
     return summary
@@ -1150,6 +1483,8 @@ def backfill_all_recipe_master_records(include_legacy=True, force=False, progres
         "recipes": sum(int(item.get("recipes") or 0) for item in summaries),
         "ingredient_rows": sum(int(item.get("ingredient_rows") or 0) for item in summaries),
         "equipment_rows": sum(int(item.get("equipment_rows") or 0) for item in summaries),
+        "store_section_updated": sum(int(item.get("store_section_updated") or 0) for item in summaries),
+        "store_section_defaulted": sum(int(item.get("store_section_defaulted") or 0) for item in summaries),
         "summaries": summaries,
     }
     _emit_backfill_progress(progress_callback, "complete", result)

@@ -7,6 +7,50 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
 </head>
 <body>
+{% macro render_master_data_row(row, master_data) -%}
+    <tr>
+        <td><strong>{{ row.name }}</strong></td>
+        <td><code>{{ row.normalized_name }}</code></td>
+        {% if master_data.record_type == 'ingredients' %}
+            <td>
+                <form class="master-data-store-section-form"
+                      method="POST"
+                      action="{{ url_for('main_bp.update_ingredient_master_store_section_route', ingredient_id=row.id) }}">
+                    <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
+                    <select name="store_section" aria-label="Store section for {{ row.name }}">
+                        {% for section in master_data.store_section_options %}
+                            <option value="{{ section }}" {% if row.store_section == section %}selected{% endif %}>
+                                {{ section }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit">Save</button>
+                </form>
+            </td>
+        {% endif %}
+        <td>
+            {% if row.image_url %}
+                <img class="master-data-thumbnail"
+                     src="{{ row.image_url }}"
+                     alt="{{ row.name }} image">
+            {% else %}
+                <span class="master-data-no-image">No image</span>
+            {% endif %}
+        </td>
+        <td>
+            <div class="master-data-user-cell">
+                <strong>{{ row.user_identity.display_name }}</strong>
+                {% if row.user_identity.email_detail %}
+                    <span>{{ row.user_identity.email_detail }}</span>
+                {% endif %}
+                <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
+            </div>
+        </td>
+        <td>{{ row.usage_count }}</td>
+        <td>{{ row.updated_at }}</td>
+        <td>{{ row.created_at }}</td>
+    </tr>
+{%- endmacro %}
 <main id="appContent" class="app-content master-data-app-content">
     <section class="master-data-page" aria-labelledby="masterDataTitle">
         <header class="master-data-header">
@@ -150,7 +194,7 @@
             {% endif %}
         {% endif %}
 
-        <form class="master-data-filter-form"
+        <form class="master-data-filter-form {% if master_data.record_type == 'ingredients' %}master-data-filter-form--ingredients{% endif %}"
               method="GET"
               action="{{ url_for(master_data.route_endpoint) }}">
             <label class="master-data-search-field">
@@ -191,6 +235,19 @@
                     </span>
                 </label>
             {% endif %}
+            {% if master_data.record_type == 'ingredients' %}
+                <label>
+                    <span>Store Section</span>
+                    <select name="store_section">
+                        <option value="" {% if not master_data.store_section %}selected{% endif %}>All sections</option>
+                        {% for section in master_data.store_section_options %}
+                            <option value="{{ section }}" {% if master_data.store_section == section %}selected{% endif %}>
+                                {{ section }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+            {% endif %}
             <label>
                 <span>Sort</span>
                 <select name="sort">
@@ -224,11 +281,14 @@
 
         {% if master_data.rows %}
             <div class="master-data-table-wrap">
-                <table class="master-data-table">
+                <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% endif %}">
                     <thead>
                         <tr>
                             <th scope="col">Name</th>
                             <th scope="col">Normalized Name</th>
+                            {% if master_data.record_type == 'ingredients' %}
+                                <th scope="col">Store Section</th>
+                            {% endif %}
                             <th scope="col">Image</th>
                             <th scope="col">User</th>
                             <th scope="col">Usage Count</th>
@@ -237,33 +297,20 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for row in master_data.rows %}
-                            <tr>
-                                <td><strong>{{ row.name }}</strong></td>
-                                <td><code>{{ row.normalized_name }}</code></td>
-                                <td>
-                                    {% if row.image_url %}
-                                        <img class="master-data-thumbnail"
-                                             src="{{ row.image_url }}"
-                                             alt="{{ row.name }} image">
-                                    {% else %}
-                                        <span class="master-data-no-image">No image</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="master-data-user-cell">
-                                        <strong>{{ row.user_identity.display_name }}</strong>
-                                        {% if row.user_identity.email_detail %}
-                                            <span>{{ row.user_identity.email_detail }}</span>
-                                        {% endif %}
-                                        <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
-                                    </div>
-                                </td>
-                                <td>{{ row.usage_count }}</td>
-                                <td>{{ row.updated_at }}</td>
-                                <td>{{ row.created_at }}</td>
-                            </tr>
-                        {% endfor %}
+                        {% if master_data.group_by_store_section and master_data.row_groups %}
+                            {% for group in master_data.row_groups %}
+                                <tr class="master-data-section-row">
+                                    <th scope="rowgroup" colspan="{{ master_data.table_column_count }}">{{ group.section }}</th>
+                                </tr>
+                                {% for row in group.rows %}
+                                    {{ render_master_data_row(row, master_data) }}
+                                {% endfor %}
+                            {% endfor %}
+                        {% else %}
+                            {% for row in master_data.rows %}
+                                {{ render_master_data_row(row, master_data) }}
+                            {% endfor %}
+                        {% endif %}
                     </tbody>
                 </table>
             </div>

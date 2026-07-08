@@ -24399,6 +24399,10 @@ img[data-deferred-src] {
             min-width: 220px;
         }
 
+        .master-data-filter-form--ingredients {
+            grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(130px, 1fr)) auto;
+        }
+
         .master-data-filter-form input,
         .master-data-filter-form select {
             width: 100%;
@@ -24456,6 +24460,10 @@ img[data-deferred-src] {
             table-layout: fixed;
         }
 
+        .master-data-ingredients-table {
+            min-width: 1240px;
+        }
+
         .master-data-table th,
         .master-data-table td {
             min-width: 0;
@@ -24497,6 +24505,73 @@ img[data-deferred-src] {
 
         .master-data-table th:nth-child(5) {
             width: 92px;
+        }
+
+        .master-data-ingredients-table th:nth-child(1) {
+            width: 16%;
+        }
+
+        .master-data-ingredients-table th:nth-child(2) {
+            width: 16%;
+        }
+
+        .master-data-ingredients-table th:nth-child(3) {
+            width: 180px;
+        }
+
+        .master-data-ingredients-table th:nth-child(4) {
+            width: 96px;
+        }
+
+        .master-data-ingredients-table th:nth-child(5) {
+            width: 16%;
+        }
+
+        .master-data-ingredients-table th:nth-child(6) {
+            width: 92px;
+        }
+
+        .master-data-section-row th {
+            padding: 9px 12px;
+            border-top: 1px solid #5d7b96;
+            border-bottom: 1px solid #5d7b96;
+            background: #123026;
+            color: #d6f3e7;
+            font-size: 12px;
+            letter-spacing: 0;
+        }
+
+        .master-data-store-section-form {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .master-data-store-section-form select {
+            width: 100%;
+            min-width: 0;
+            min-height: 36px;
+            padding: 7px 8px;
+            border: 1px solid #655f50;
+            border-radius: 7px;
+            background: #1b1f1f;
+            color: #f5f7f7;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .master-data-store-section-form button {
+            min-height: 36px;
+            padding: 0 10px;
+            border: 1px solid #1e80c9;
+            border-radius: 7px;
+            background: #155a92;
+            color: white;
+            font-size: 13px;
+            font-weight: 900;
+            cursor: pointer;
+            white-space: nowrap;
         }
 
         .master-data-table code {

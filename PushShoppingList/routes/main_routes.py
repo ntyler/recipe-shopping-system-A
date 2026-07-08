@@ -606,7 +606,7 @@ def master_data_scope(is_admin):
     }
 
 
-def master_data_query_args(search, sort, limit, scope_info, page=None):
+def master_data_query_args(search, sort, limit, scope_info, page=None, store_section=None):
     query_args = {
         "sort": sort,
         "limit": limit,
@@ -619,6 +619,9 @@ def master_data_query_args(search, sort, limit, scope_info, page=None):
         query_args["scope"] = "all"
     elif scope_info["scope"] == "user" and scope_info["user_id"]:
         query_args["user_id"] = scope_info["user_id"]
+
+    if store_section:
+        query_args["store_section"] = store_section
 
     if page and page > 1:
         query_args["page"] = page
@@ -668,6 +671,11 @@ def master_data_context(record_type):
     page = int_query_arg("page", 1, minimum=1)
     offset = (page - 1) * limit
     scope_info = master_data_scope(is_admin)
+    store_section = ""
+    if record_type == "ingredients":
+        store_section = recipe_master_data.ingredient_store_section_from_source(
+            request.args.get("store_section")
+        )
 
     rows = []
     total_count = 0
@@ -680,11 +688,13 @@ def master_data_context(record_type):
             offset=offset,
             sort=sort,
             include_all_users=scope_info["include_all_users"],
+            store_section=store_section if record_type == "ingredients" else None,
         )
         total_count = config["count_func"](
             user_id=scope_info["user_id"],
             search=search,
             include_all_users=scope_info["include_all_users"],
+            store_section=store_section if record_type == "ingredients" else None,
         )
         if is_admin:
             available_user_ids = recipe_master_data.recipe_master_user_ids()
@@ -701,6 +711,7 @@ def master_data_context(record_type):
                 offset=offset,
                 sort=sort,
                 include_all_users=scope_info["include_all_users"],
+                store_section=store_section if record_type == "ingredients" else None,
             )
 
     user_ids_for_labels = set(available_user_ids)
@@ -729,13 +740,52 @@ def master_data_context(record_type):
     if page > 1:
         prev_url = url_for(
             endpoint,
-            **master_data_query_args(search, sort, limit, scope_info, page=page - 1),
+            **master_data_query_args(
+                search,
+                sort,
+                limit,
+                scope_info,
+                page=page - 1,
+                store_section=store_section,
+            ),
         )
     if page < total_pages:
         next_url = url_for(
             endpoint,
-            **master_data_query_args(search, sort, limit, scope_info, page=page + 1),
+            **master_data_query_args(
+                search,
+                sort,
+                limit,
+                scope_info,
+                page=page + 1,
+                store_section=store_section,
+            ),
         )
+    current_url = url_for(
+        endpoint,
+        **master_data_query_args(
+            search,
+            sort,
+            limit,
+            scope_info,
+            page=page if page > 1 else None,
+            store_section=store_section,
+        ),
+    )
+
+    row_groups = []
+    if record_type == "ingredients" and rows and not store_section:
+        for section in recipe_master_data.ingredient_store_section_options():
+            section_rows = [
+                row
+                for row in rows
+                if recipe_master_data.clean_ingredient_store_section(row.get("store_section")) == section
+            ]
+            if section_rows:
+                row_groups.append({
+                    "section": section,
+                    "rows": section_rows,
+                })
 
     return {
         "record_type": record_type,
@@ -744,6 +794,7 @@ def master_data_context(record_type):
         "empty_label": config["empty_label"],
         "route_endpoint": endpoint,
         "rows": rows,
+        "row_groups": row_groups,
         "total_count": total_count,
         "page": page,
         "total_pages": total_pages,
@@ -751,6 +802,12 @@ def master_data_context(record_type):
         "offset": offset,
         "search": search,
         "sort": sort,
+        "store_section": store_section,
+        "store_section_options": recipe_master_data.ingredient_store_section_options()
+        if record_type == "ingredients"
+        else [],
+        "group_by_store_section": bool(record_type == "ingredients" and not store_section),
+        "table_column_count": 8 if record_type == "ingredients" else 7,
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},
             {"value": "usage_count_desc", "label": "Usage Count"},
@@ -772,7 +829,7 @@ def master_data_context(record_type):
         "backfill_status_url": url_for("main_bp.recipe_master_data_backfill_status_route"),
         "image_generation_url": url_for("main_bp.recipe_master_data_generate_missing_images_route"),
         "image_generation_status_url": url_for("main_bp.recipe_master_data_image_generation_status_route"),
-        "current_url": request.full_path.rstrip("?"),
+        "current_url": current_url,
         "prev_url": prev_url,
         "next_url": next_url,
     }
@@ -795,6 +852,52 @@ def master_data_ingredients_route():
 @main_bp.route("/admin/master-data/equipment")
 def master_data_equipment_route():
     return render_master_data_page("equipment")
+
+
+@main_bp.route("/admin/master-data/ingredients/<int:ingredient_id>/store-section", methods=["POST"])
+def update_ingredient_master_store_section_route(ingredient_id):
+    active_public_user = current_public_user()
+    allow_other_users = is_admin_user(active_public_user)
+    result = recipe_master_data.update_ingredient_store_section(
+        ingredient_id,
+        request.form.get("store_section"),
+        allow_other_users=allow_other_users,
+    )
+    redirect_url = recipe_master_data.clean_text(request.form.get("redirect_url"))
+    if not redirect_url.startswith("/") or redirect_url.startswith("//"):
+        redirect_url = url_for("main_bp.master_data_ingredients_route")
+
+    if result.get("ok"):
+        section = result.get("store_section") or "MISC"
+        if result.get("changed"):
+            message = f"Store section updated to {section}."
+        else:
+            message = f"Store section was already {section}."
+        category = "success"
+    else:
+        message = result.get("error") or "Store section could not be updated."
+        category = "error"
+
+    session["recipe_master_data_messages"] = [{
+        "category": category,
+        "text": message,
+    }]
+
+    wants_json = (
+        request.headers.get("X-Requested-With") == "fetch"
+        or request.accept_mimetypes.best == "application/json"
+    )
+    if wants_json:
+        return jsonify({
+            "ok": result.get("ok", False),
+            "success": result.get("ok", False),
+            "category": category,
+            "message": message,
+            "result": result,
+            "redirect_url": redirect_url,
+        }), 200 if result.get("ok") else 404
+
+    return redirect(redirect_url)
 
 
 @main_bp.route("/admin/master-data/backfill", methods=["POST"])

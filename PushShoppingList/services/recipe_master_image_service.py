@@ -225,6 +225,7 @@ def missing_master_image_rows(record_type="ingredients", user_id=None, search=No
     usage_fk = config["usage_fk"]
 
     where, params = master_data.master_record_filters(
+        record_type,
         user_id=user_id,
         search=search,
         include_all_users=include_all_users,

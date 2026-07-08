@@ -34,7 +34,7 @@ def test_sync_recipe_master_records_keeps_same_name_separate_per_user(monkeypatc
             "quantity": "2",
             "unit": "tbsp",
             "buy_as": "red onion",
-            "store_section": "Produce",
+            "store_section": "Dairy & Eggs",
             "original_text": "2 tbsp minced onion",
         }],
         "equipment": [{
@@ -52,7 +52,10 @@ def test_sync_recipe_master_records_keeps_same_name_separate_per_user(monkeypatc
     user_b_equipment = master_data.master_record_for_name("equipment", "user-b", "large pot")
 
     assert user_a_ingredient["id"] != user_b_ingredient["id"]
+    assert user_a_ingredient["store_section"] == "PRODUCE"
+    assert user_b_ingredient["store_section"] == "DAIRY & EGGS"
     assert user_a_equipment["id"] != user_b_equipment["id"]
+    assert "store_section" not in user_a_equipment
     assert user_a_equipment["image_url"] == "/static/generated/user-a-pot.png"
     assert user_b_equipment["image_url"] == "/static/generated/user-b-pot.png"
 
@@ -182,6 +185,80 @@ def test_backfill_recipe_master_records_for_user_scopes_existing_data(monkeypatc
     assert user_b_equipment["image_url"] == "/static/generated/backfill-b-pot.png"
 
 
+def test_backfill_ingredient_store_sections_choose_most_common_per_user(monkeypatch, tmp_path, capsys):
+    configure_master_db(monkeypatch, tmp_path)
+    user_a_root = tmp_path / "users" / "user-a" / "recipe-extractor" / "data"
+    user_b_root = tmp_path / "users" / "user-b" / "recipe-extractor" / "data"
+    for root in (user_a_root, user_b_root):
+        (root / "output").mkdir(parents=True)
+
+    user_a_recipes = {
+        "https://example.com/a-one": {
+            "url": "https://example.com/a-one",
+            "ingredients": ["Onion"],
+        },
+        "https://example.com/a-two": {
+            "url": "https://example.com/a-two",
+            "ingredients": ["Onion"],
+        },
+        "https://example.com/a-three": {
+            "url": "https://example.com/a-three",
+            "ingredients": ["Onion", "Mystery salt"],
+        },
+    }
+    user_b_recipes = {
+        "https://example.com/b-one": {
+            "url": "https://example.com/b-one",
+            "ingredients": ["Onion"],
+        },
+    }
+    (user_a_root / "recipe_ingredients.json").write_text(json.dumps(user_a_recipes), encoding="utf-8")
+    (user_b_root / "recipe_ingredients.json").write_text(json.dumps(user_b_recipes), encoding="utf-8")
+
+    for filename, source_url, ingredients in (
+        ("a-one.json", "https://example.com/a-one", [{"ingredient": "Onion", "store_section": "CANNED"}]),
+        ("a-two.json", "https://example.com/a-two", [{"ingredient": "Onion", "store_section": "PRODUCE"}]),
+        (
+            "a-three.json",
+            "https://example.com/a-three",
+            [
+                {"ingredient": "Onion", "store_section": "Produce"},
+                {"ingredient": "Mystery salt"},
+            ],
+        ),
+    ):
+        (user_a_root / "output" / filename).write_text(
+            json.dumps({"source_url": source_url, "ingredients": ingredients}),
+            encoding="utf-8",
+        )
+    (user_b_root / "output" / "b-one.json").write_text(
+        json.dumps({
+            "source_url": "https://example.com/b-one",
+            "ingredients": [{"ingredient": "Onion", "store_section": "Dairy and Eggs"}],
+        }),
+        encoding="utf-8",
+    )
+
+    master_data.backfill_recipe_master_records_for_user("user-a", extractor_data_root=user_a_root)
+    master_data.backfill_recipe_master_records_for_user("user-b", extractor_data_root=user_b_root)
+
+    user_a_onion = master_data.master_record_for_name("ingredients", "user-a", "onion")
+    user_b_onion = master_data.master_record_for_name("ingredients", "user-b", "onion")
+    user_a_mystery = master_data.master_record_for_name("ingredients", "user-a", "mystery salt")
+    output = capsys.readouterr().out
+
+    assert user_a_onion["store_section"] == "PRODUCE"
+    assert user_b_onion["store_section"] == "DAIRY & EGGS"
+    assert user_a_mystery["store_section"] == "MISC"
+    assert "[IngredientMaster] action=store_section_backfill_start user_id=user-a" in output
+    assert 'action=store_section_set' in output
+    assert 'normalized_name="onion"' in output
+    assert 'section="PRODUCE"' in output
+    assert 'action=store_section_defaulted' in output
+    assert 'normalized_name="mystery salt"' in output
+    assert "[IngredientMaster] action=store_section_backfill_complete" in output
+
+
 def test_backfill_recipe_master_records_reports_recipe_progress(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     user_root = tmp_path / "users" / "user-a" / "recipe-extractor" / "data"
@@ -235,8 +312,12 @@ def test_list_master_records_searches_sorts_and_counts_usage(monkeypatch, tmp_pa
         "https://example.com/first",
         recipe_data={
             "ingredients": [
-                {"ingredient": "Tomato", "ingredient_image_url": "/static/generated/tomato.png"},
-                {"ingredient": "Basil"},
+                {
+                    "ingredient": "Tomato",
+                    "ingredient_image_url": "/static/generated/tomato.png",
+                    "store_section": "Produce",
+                },
+                {"ingredient": "Basil", "store_section": "Spices & Seasonings"},
             ],
             "equipment": [{"equipment": "Sheet pan"}],
         },
@@ -265,8 +346,12 @@ def test_list_master_records_searches_sorts_and_counts_usage(monkeypatch, tmp_pa
     assert [row["name"] for row in rows] == ["Tomato"]
     assert rows[0]["usage_count"] == 2
     assert rows[0]["image_url"] == "/static/generated/tomato.png"
+    assert rows[0]["store_section"] == "PRODUCE"
     assert master_data.count_ingredients(user_id="user-a", search="tom") == 1
     assert master_data.count_ingredient_usage(rows[0]["id"], user_id="user-a") == 2
+    produce_rows = master_data.list_ingredients(user_id="user-a", store_section="PRODUCE")
+    assert [row["name"] for row in produce_rows] == ["Tomato"]
+    assert master_data.count_ingredients(user_id="user-a", store_section="PRODUCE") == 1
 
 
 def test_missing_master_image_rows_scope_to_ingredients_without_images(monkeypatch, tmp_path):

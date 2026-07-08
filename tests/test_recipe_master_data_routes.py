@@ -66,6 +66,7 @@ def seed_master_records():
             "ingredients": [{
                 "ingredient": "Tomato",
                 "ingredient_image_url": "/static/generated/tomato.png",
+                "store_section": "Produce",
             }],
             "equipment": [{"equipment": "Large pot"}],
         },
@@ -74,7 +75,7 @@ def seed_master_records():
     master_data.sync_recipe_master_records(
         "https://example.com/user-b-soup",
         recipe_data={
-            "ingredients": [{"ingredient": "Garlic"}],
+            "ingredients": [{"ingredient": "Garlic", "store_section": "Spices & Seasonings"}],
             "equipment": [{"equipment": "Whisk"}],
         },
         user_id="user-b",
@@ -139,6 +140,11 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Backfill progress" in all_html
     assert "data-master-backfill-form" in all_html
     assert "Generate Missing Images" in all_html
+    assert "Store Section" in all_html
+    assert 'name="store_section"' in all_html
+    assert "All sections" in all_html
+    assert "PRODUCE" in all_html
+    assert "SPICES &amp; SEASONINGS" in all_html
     assert "data-master-image-form" in all_html
     assert "/api/master-data/generate-missing-images" in all_html
     assert "/api/master-data/image-generation-status" in all_html
@@ -153,9 +159,69 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "user-b@example.com" in filtered_html
     assert equipment_response.status_code == 200
     assert "Generate Missing Images" in equipment_html
+    assert "Store Section" not in equipment_html
+    assert 'name="store_section"' not in equipment_html
     assert "data-master-image-form" in equipment_html
     assert "Creates equipment thumbnails" in equipment_html
     assert 'name="record_type" value="equipment"' in equipment_html
+
+
+def test_ingredient_master_data_filters_and_groups_by_store_section(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+
+    with app.test_client() as client:
+        sign_in(client, "admin-user")
+        all_response = client.get("/admin/master-data/ingredients?scope=all")
+        produce_response = client.get("/admin/master-data/ingredients?scope=all&store_section=PRODUCE")
+
+    all_html = all_response.get_data(as_text=True)
+    produce_html = produce_response.get_data(as_text=True)
+
+    assert all_response.status_code == 200
+    assert '<tr class="master-data-section-row">' in all_html
+    assert "PRODUCE" in all_html
+    assert "SPICES &amp; SEASONINGS" in all_html
+    assert produce_response.status_code == 200
+    assert 'value="PRODUCE" selected' in produce_html
+    assert "Tomato" in produce_html
+    assert "Garlic" not in produce_html
+    assert '<tr class="master-data-section-row">' not in produce_html
+
+
+def test_ingredient_master_store_section_update_is_user_scoped(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/user-a-tomato",
+        recipe_data={"ingredients": [{"ingredient": "Tomato", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/user-b-tomato",
+        recipe_data={"ingredients": [{"ingredient": "Tomato", "store_section": "Dairy & Eggs"}]},
+        user_id="user-b",
+    )
+    user_a_tomato = master_data.master_record_for_name("ingredients", "user-a", "tomato")
+    user_b_tomato = master_data.master_record_for_name("ingredients", "user-b", "tomato")
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        blocked_response = client.post(
+            f"/admin/master-data/ingredients/{user_b_tomato['id']}/store-section",
+            data={"store_section": "BAKING"},
+        )
+        own_response = client.post(
+            f"/admin/master-data/ingredients/{user_a_tomato['id']}/store-section",
+            data={"store_section": "BAKING"},
+        )
+
+    user_a_tomato = master_data.master_record_for_name("ingredients", "user-a", "tomato")
+    user_b_tomato = master_data.master_record_for_name("ingredients", "user-b", "tomato")
+
+    assert blocked_response.status_code == 302
+    assert own_response.status_code == 302
+    assert user_a_tomato["store_section"] == "BAKING"
+    assert user_b_tomato["store_section"] == "DAIRY & EGGS"
 
 
 def test_admin_backfill_route_uses_existing_service(monkeypatch, tmp_path):
