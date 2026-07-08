@@ -17764,6 +17764,12 @@ body {
         min-width: 0;
     }
 
+    .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
+        grid-column: 3 / 4;
+        grid-row: 5;
+    }
+
     .recipe-edit-ingredient-row label.recipe-edit-qty-label,
     .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-qty-label,
     .recipe-edit-ingredient-row label.recipe-edit-unit-label,
@@ -24736,13 +24742,11 @@ img[data-deferred-src] {
         }
 
 .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
-    grid-column: 3 / 4;
-    grid-row: 3;
-    justify-self: start;
+    flex: 0 0 auto;
     width: min(220px, 100%);
     max-width: 100%;
     margin: 8px 0 0;
-    align-self: start;
+    align-self: flex-start;
 }
 
 .recipe-edit-ingredient-row .recipe-ingredient-image-panel .recipe-ingredient-image {
@@ -24778,18 +24782,8 @@ img[data-deferred-src] {
     display: none;
 }
 
-@media (max-width: 1180px) {
-    .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
-        grid-column: 3 / 5;
-        grid-row: 4;
-    }
-}
-
 @media (max-width: 760px) {
     .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
-        grid-column: 2 / 4;
-        grid-row: auto;
-        justify-self: start;
         width: min(220px, 100%);
         max-width: 100%;
     }

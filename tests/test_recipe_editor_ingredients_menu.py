@@ -96,22 +96,31 @@ def test_recipe_editor_ingredient_images_use_thumbnail_previews():
 
 
 def test_recipe_editor_ingredient_thumbnail_sits_below_text_fields():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    rule_start = css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel")
-    rule_end = css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel .recipe-ingredient-image", rule_start)
+    row_start = script.index("function addRecipeIngredientRow")
+    row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
+    row_block = script[row_start:row_end]
+    name_column_start = row_block.index('<div class="recipe-edit-ingredient-name-label">')
+    name_column_end = row_block.index('<label class="recipe-edit-qty-label">', name_column_start)
+    name_column = row_block[name_column_start:name_column_end]
+    base_selector = ".recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel"
+    rule_start = css.index(f"\n{base_selector} {{\n    flex: 0 0 auto;") + 1
+    rule_end = css.index("\n}", rule_start)
     rule = css[rule_start:rule_end]
-    tablet_start = css.index("@media (max-width: 1180px)", rule_end)
-    tablet_end = css.index("@media (max-width: 760px)", tablet_start)
-    tablet_rule = css[tablet_start:tablet_end]
-    mobile_rule = css[tablet_end:css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel,", tablet_end)]
+    desktop_start = css.index("@media (min-width: 1181px)")
+    desktop_end = css.index(":root {", desktop_start)
+    desktop_rule = css[desktop_start:desktop_end]
 
-    assert "grid-column: 3 / 4;" in rule
-    assert "grid-row: 3;" in rule
+    assert "recipe-ingredient-image-panel" in row_block[:name_column_start]
+    assert name_column.index("recipe-edit-original-text-label") < name_column.index("${ingredientImagePanelHtml}")
+    assert "flex: 0 0 auto;" in rule
     assert "margin: 8px 0 0;" in rule
-    assert "grid-column: 3 / 5;" in tablet_rule
-    assert "grid-row: 4;" in tablet_rule
-    assert "grid-column: 2 / 4;" in mobile_rule
-    assert "justify-self: start;" in mobile_rule
+    assert "grid-column:" not in rule
+    assert "grid-row:" not in rule
+    assert ".recipe-ingredient-image-panel.recipe-edit-row-image-panel" in desktop_rule
+    assert "grid-column: 3 / 4;" in desktop_rule
+    assert "grid-row: 5;" in desktop_rule
 
 
 def test_recipe_editor_row_image_tools_toggle_is_wired():

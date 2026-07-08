@@ -24136,6 +24136,78 @@ function addRecipeIngredientRow(item = {}) {
     const ingredientImagePrompt = item.ingredient_image_prompt || item.image_prompt || "";
     const extractionWarning = recipeIngredientExtractionWarning(item);
     const recipeUrl = recipeEditorCurrentUrl();
+    const ingredientImagePanelHtml = `
+            <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-ingredient-image-panel${ingredientImageUrl ? "" : " recipe-image-empty"}"
+                 data-ingredient-image-panel
+                 data-recipe-url="${escapeAttribute(recipeUrl)}"
+                 data-ingredient-index="">
+                <div class="recipe-step-image-status${ingredientImageUrl ? " empty" : ""}"
+                     data-ingredient-image-status>
+                    ${ingredientImageUrl ? "" : "No image generated for this ingredient."}
+                </div>
+                <div class="recipe-image-prompt recipe-image-prompt-collapsed"
+                     data-ingredient-image-prompt
+                     ${ingredientImagePrompt ? "" : "hidden"}>
+                    <button type="button"
+                            class="recipe-image-prompt-toggle"
+                            data-ingredient-image-prompt-toggle
+                            aria-expanded="false"
+                            aria-label="Toggle image prompt"
+                            onclick="return toggleRecipeImagePrompt(this)">
+                        <span class="recipe-image-prompt-label">Image prompt</span>
+                        <span class="recipe-image-prompt-chevron" aria-hidden="true"></span>
+                    </button>
+                    <pre data-ingredient-image-prompt-text hidden>${escapeHtml(ingredientImagePrompt)}</pre>
+                </div>
+                <img class="recipe-step-image recipe-ingredient-image"
+                     ${ingredientImageUrl ? `src="${DEFERRED_IMAGE_PLACEHOLDER}"` : ""}
+                     ${ingredientImageUrl ? `data-deferred-src="${escapeAttribute(ingredientImageDisplayUrl)}"` : ""}
+                     ${ingredientImageSrcSet ? `data-deferred-srcset="${escapeAttribute(ingredientImageSrcSet)}"` : ""}
+                     sizes="120px"
+                     data-full-src="${escapeAttribute(ingredientImageUrl)}"
+                     alt="Ingredient image"
+                     loading="lazy"
+                     decoding="async"
+                     fetchpriority="low"
+                     ${ingredientImageUrl ? "" : "hidden"}>
+                <div class="recipe-step-image-actions">
+                    ${recipeImageProviderFieldHtml()}
+                    <button type="button"
+                            class="recipe-step-image-btn"
+                            data-ingredient-image-generate
+                            onclick="return generateRecipeIngredientImage(this)">
+                        ${ingredientImageUrl ? "Regenerate ingredient image" : "Generate ingredient image"}
+                    </button>
+                    <a class="recipe-step-image-download"
+                       data-ingredient-image-download
+                       href="${escapeAttribute(ingredientImageUrl || "#")}"
+                       download
+                       ${ingredientImageUrl ? "" : "hidden"}>
+                        Download
+                    </a>
+                    <button type="button"
+                            class="recipe-step-image-remove"
+                            data-ingredient-image-remove
+                            onclick="return removeRecipeDetailImage(this)"
+                            ${ingredientImageUrl ? "" : "hidden"}>
+                        Remove
+                    </button>
+                    <button type="button"
+                            class="recipe-step-image-upload"
+                            data-recipe-image-upload-button
+                            onclick="return openRecipeDetailImageUpload(this)">
+                        ${ingredientImageUrl ? "Replace" : "Upload"}
+                    </button>
+                    <input type="file"
+                           class="recipe-step-image-file-input"
+                           data-recipe-image-upload
+                           accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                           onchange="return uploadRecipeDetailImage(this)">
+                </div>
+                <input type="hidden" data-field="ingredient_image_url" value="${escapeAttribute(ingredientImageUrl)}">
+                <input type="hidden" data-field="ingredient_image_generated_at" value="${escapeAttribute(ingredientImageGeneratedAt)}">
+                <input type="hidden" data-field="ingredient_image_prompt" value="${escapeAttribute(ingredientImagePrompt)}">
+            </div>`;
     row.className = "recipe-edit-ingredient-row";
     row.innerHTML = `
         <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
@@ -24169,6 +24241,7 @@ function addRecipeIngredientRow(item = {}) {
             <span class="recipe-edit-extraction-warning" data-ingredient-warning-message ${extractionWarning ? "" : "hidden"}>
                 ${escapeHtml(extractionWarning)}
             </span>
+            ${ingredientImagePanelHtml}
         </div>
         <label class="recipe-edit-qty-label">
             <span>Qty</span>
@@ -24195,77 +24268,6 @@ function addRecipeIngredientRow(item = {}) {
             <span>Optional</span>
             <input type="checkbox" data-field="optional" ${item.optional ? "checked" : ""}>
         </label>
-        <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-ingredient-image-panel${ingredientImageUrl ? "" : " recipe-image-empty"}"
-             data-ingredient-image-panel
-             data-recipe-url="${escapeAttribute(recipeUrl)}"
-             data-ingredient-index="">
-            <div class="recipe-step-image-status${ingredientImageUrl ? " empty" : ""}"
-                 data-ingredient-image-status>
-                ${ingredientImageUrl ? "" : "No image generated for this ingredient."}
-            </div>
-            <div class="recipe-image-prompt recipe-image-prompt-collapsed"
-                 data-ingredient-image-prompt
-                 ${ingredientImagePrompt ? "" : "hidden"}>
-                <button type="button"
-                        class="recipe-image-prompt-toggle"
-                        data-ingredient-image-prompt-toggle
-                        aria-expanded="false"
-                        aria-label="Toggle image prompt"
-                        onclick="return toggleRecipeImagePrompt(this)">
-                    <span class="recipe-image-prompt-label">Image prompt</span>
-                    <span class="recipe-image-prompt-chevron" aria-hidden="true"></span>
-                </button>
-                <pre data-ingredient-image-prompt-text hidden>${escapeHtml(ingredientImagePrompt)}</pre>
-            </div>
-            <img class="recipe-step-image recipe-ingredient-image"
-                 ${ingredientImageUrl ? `src="${DEFERRED_IMAGE_PLACEHOLDER}"` : ""}
-                 ${ingredientImageUrl ? `data-deferred-src="${escapeAttribute(ingredientImageDisplayUrl)}"` : ""}
-                 ${ingredientImageSrcSet ? `data-deferred-srcset="${escapeAttribute(ingredientImageSrcSet)}"` : ""}
-                 sizes="120px"
-                 data-full-src="${escapeAttribute(ingredientImageUrl)}"
-                 alt="Ingredient image"
-                 loading="lazy"
-                 decoding="async"
-                 fetchpriority="low"
-                 ${ingredientImageUrl ? "" : "hidden"}>
-            <div class="recipe-step-image-actions">
-                ${recipeImageProviderFieldHtml()}
-                <button type="button"
-                        class="recipe-step-image-btn"
-                        data-ingredient-image-generate
-                        onclick="return generateRecipeIngredientImage(this)">
-                    ${ingredientImageUrl ? "Regenerate ingredient image" : "Generate ingredient image"}
-                </button>
-                <a class="recipe-step-image-download"
-                   data-ingredient-image-download
-                   href="${escapeAttribute(ingredientImageUrl || "#")}"
-                   download
-                   ${ingredientImageUrl ? "" : "hidden"}>
-                    Download
-                </a>
-                <button type="button"
-                        class="recipe-step-image-remove"
-                        data-ingredient-image-remove
-                        onclick="return removeRecipeDetailImage(this)"
-                        ${ingredientImageUrl ? "" : "hidden"}>
-                    Remove
-                </button>
-                <button type="button"
-                        class="recipe-step-image-upload"
-                        data-recipe-image-upload-button
-                        onclick="return openRecipeDetailImageUpload(this)">
-                    ${ingredientImageUrl ? "Replace" : "Upload"}
-                </button>
-                <input type="file"
-                       class="recipe-step-image-file-input"
-                       data-recipe-image-upload
-                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
-                       onchange="return uploadRecipeDetailImage(this)">
-            </div>
-            <input type="hidden" data-field="ingredient_image_url" value="${escapeAttribute(ingredientImageUrl)}">
-            <input type="hidden" data-field="ingredient_image_generated_at" value="${escapeAttribute(ingredientImageGeneratedAt)}">
-            <input type="hidden" data-field="ingredient_image_prompt" value="${escapeAttribute(ingredientImagePrompt)}">
-        </div>
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
                     class="recipe-edit-row-menu-btn"
