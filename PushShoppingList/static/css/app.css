@@ -24827,6 +24827,16 @@ img[data-deferred-src] {
 @media (min-width: 761px) {
     .recipe-edit-equipment-row:has(.recipe-equipment-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-empty):not(.recipe-image-visibility-hidden) .recipe-equipment-image:not([hidden])) {
         grid-template-columns: 26px 54px 42px minmax(0, 1fr) 44px;
+        gap: 10px 14px;
+        align-items: center;
+        min-height: 0;
+        padding: 10px 18px;
+    }
+
+    .recipe-edit-equipment-row:has(.recipe-equipment-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-empty):not(.recipe-image-visibility-hidden) .recipe-equipment-image:not([hidden])) > .recipe-edit-row-handle,
+    .recipe-edit-equipment-row:has(.recipe-equipment-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-empty):not(.recipe-image-visibility-hidden) .recipe-equipment-image:not([hidden])) > .recipe-edit-row-number {
+        grid-row: 1;
+        align-self: center;
     }
 
     .recipe-edit-equipment-row:has(.recipe-equipment-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-empty):not(.recipe-image-visibility-hidden) .recipe-equipment-image:not([hidden])) .recipe-equipment-image-panel.recipe-edit-row-image-panel {
@@ -24863,6 +24873,7 @@ img[data-deferred-src] {
     .recipe-edit-equipment-row:has(.recipe-equipment-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-empty):not(.recipe-image-visibility-hidden) .recipe-equipment-image:not([hidden])) > .recipe-edit-row-menu-wrap {
         grid-column: 5 / 6;
         grid-row: 1;
+        align-self: center;
     }
 }
 

@@ -167,7 +167,14 @@ def test_recipe_editor_equipment_thumbnail_uses_ingredient_like_inline_slot():
     assert "height: 120px;" in equipment_css
     assert ".recipe-equipment-image-panel:not(.recipe-image-tools-visible) .recipe-step-image-actions" in equipment_css
     assert "grid-template-columns: 26px 54px 42px minmax(0, 1fr) 44px;" in equipment_css
+    assert "gap: 10px 14px;" in equipment_css
+    assert "min-height: 0;" in equipment_css
+    assert "padding: 10px 18px;" in equipment_css
     assert "grid-template-columns: 28px 54px 42px minmax(260px, 1fr) 40px;" in equipment_css
+    assert "> .recipe-edit-row-handle" in equipment_css
+    assert "> .recipe-edit-row-number" in equipment_css
+    assert "grid-row: 1;" in equipment_css
+    assert "align-self: center;" in equipment_css
     assert "grid-column: 3 / 4;" in equipment_css
     assert "width: 40px;" in equipment_css
     assert "height: 40px;" in equipment_css
