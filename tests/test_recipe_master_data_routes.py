@@ -127,9 +127,11 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
         sign_in(client, "admin-user")
         all_response = client.get("/admin/master-data/ingredients?scope=all")
         filtered_response = client.get("/admin/master-data/ingredients?user_id=user-b")
+        equipment_response = client.get("/admin/master-data/equipment?scope=all")
 
     all_html = all_response.get_data(as_text=True)
     filtered_html = filtered_response.get_data(as_text=True)
+    equipment_html = equipment_response.get_data(as_text=True)
     assert all_response.status_code == 200
     assert "Tomato" in all_html
     assert "Garlic" in all_html
@@ -149,6 +151,11 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Tomato" not in filtered_html
     assert "User B" in filtered_html
     assert "user-b@example.com" in filtered_html
+    assert equipment_response.status_code == 200
+    assert "Generate Missing Images" in equipment_html
+    assert "data-master-image-form" in equipment_html
+    assert "Creates equipment thumbnails" in equipment_html
+    assert 'name="record_type" value="equipment"' in equipment_html
 
 
 def test_admin_backfill_route_uses_existing_service(monkeypatch, tmp_path):
@@ -383,6 +390,57 @@ def test_admin_generate_missing_images_route_respects_selected_scope(monkeypatch
             "search": "user-search",
         },
     ]
+
+
+def test_admin_generate_missing_images_route_starts_equipment_job(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    captured = {}
+
+    def fake_start_job(job_id, record_type, user_id, include_all_users=False, search=None):
+        captured.update({
+            "job_id": job_id,
+            "record_type": record_type,
+            "user_id": user_id,
+            "include_all_users": include_all_users,
+            "search": search,
+        })
+        return {
+            "job_id": job_id,
+            "status": "running",
+            "total": 1,
+            "completed": 0,
+        }
+
+    monkeypatch.setattr(
+        "PushShoppingList.routes.main_routes.recipe_master_images.start_master_image_generation_job",
+        fake_start_job,
+    )
+
+    with app.test_client() as client:
+        sign_in(client, "admin-user")
+        response = client.post(
+            "/api/master-data/generate-missing-images",
+            data={
+                "record_type": "equipment",
+                "scope": "user",
+                "user_id": "user-b",
+                "search": "pin",
+                "job_id": "equipment-image-job-1",
+            },
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["scope"] == "user"
+    assert captured == {
+        "job_id": "equipment-image-job-1",
+        "record_type": "equipment",
+        "user_id": "user-b",
+        "include_all_users": False,
+        "search": "pin",
+    }
 
 
 def test_master_data_image_generation_syncs_visible_filter_scope():

@@ -11,18 +11,31 @@ from PushShoppingList.services.openai_throttle_service import throttled_image_ge
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.recipe_edit_service import STEP_IMAGE_FOLDER
 from PushShoppingList.services.recipe_edit_service import STEP_IMAGE_URL_PREFIX
+from PushShoppingList.services.recipe_edit_service import build_recipe_equipment_image_prompt
 from PushShoppingList.services.recipe_edit_service import build_recipe_ingredient_image_prompt
+from PushShoppingList.services.recipe_edit_service import finalize_equipment_image_prompt
 from PushShoppingList.services.recipe_edit_service import first_openai_image_record
 from PushShoppingList.services.recipe_edit_service import openai_image_field
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import safe_filename
 
 
-SUPPORTED_MASTER_IMAGE_TYPES = {"ingredients"}
+SUPPORTED_MASTER_IMAGE_TYPES = {"ingredients", "equipment"}
+MASTER_IMAGE_LABELS = {
+    "ingredients": "ingredient",
+    "equipment": "equipment",
+}
 MASTER_IMAGE_PROGRESS_LOCK = threading.RLock()
 MASTER_IMAGE_PROGRESS_RUNS = {}
 MAX_MASTER_IMAGE_PROGRESS_RUNS = 8
 MAX_MASTER_IMAGE_PROGRESS_ITEMS = 500
+
+
+def master_image_type_label(record_type, plural=False):
+    label = MASTER_IMAGE_LABELS.get(str(record_type or "").strip(), "record")
+    if plural:
+        return "equipment" if label == "equipment" else f"{label}s"
+    return label
 
 
 def _new_image_progress(job_id, record_type="ingredients", user_id="", include_all_users=False, search=""):
@@ -132,28 +145,38 @@ def update_master_image_progress(job_id, event, payload=None):
     with MASTER_IMAGE_PROGRESS_LOCK:
         progress = MASTER_IMAGE_PROGRESS_RUNS.get(job_id)
         if progress is None:
-            progress = _new_image_progress(job_id)
+            progress = _new_image_progress(
+                job_id,
+                record_type=payload.get("record_type", "ingredients"),
+                user_id=payload.get("user_id", ""),
+                include_all_users=payload.get("include_all_users", False),
+                search=payload.get("search", ""),
+            )
             MASTER_IMAGE_PROGRESS_RUNS[job_id] = progress
 
         progress["updated_at"] = master_data.utc_now_iso()
         if event == "started":
             total = int(payload.get("total") or 0)
+            if payload.get("record_type"):
+                progress["record_type"] = master_data.clean_text(payload.get("record_type"))
+            item_label = master_image_type_label(progress.get("record_type"), plural=True)
             progress.update({
                 "status": "running" if total else "complete",
                 "summary": (
-                    f"Generating {total} missing ingredient images."
+                    f"Generating {total} missing {item_label} images."
                     if total
-                    else "No missing ingredient images were found for this scope."
+                    else f"No missing {item_label} images were found for this scope."
                 ),
                 "total": total,
             })
         elif event == "record_start":
             row = payload.get("row") if isinstance(payload.get("row"), dict) else payload
+            item_label = master_image_type_label(progress.get("record_type"))
             progress.update({
                 "status": "running",
                 "current_record_id": int(row.get("id") or 0),
                 "current_record_name": master_data.clean_text(row.get("name") or row.get("normalized_name")),
-                "summary": f"Generating image for {master_data.clean_text(row.get('name') or row.get('normalized_name')) or 'ingredient'}.",
+                "summary": f"Generating image for {master_data.clean_text(row.get('name') or row.get('normalized_name')) or item_label}.",
             })
         elif event == "record_done":
             row = payload.get("row") if isinstance(payload.get("row"), dict) else payload
@@ -168,10 +191,11 @@ def update_master_image_progress(job_id, event, payload=None):
             progress["skipped"] = int(progress.get("skipped") or 0) + 1
         elif event == "record_failed":
             row = payload.get("row") if isinstance(payload.get("row"), dict) else payload
+            item_label = master_image_type_label(progress.get("record_type"))
             _append_progress_item(progress, row, "failed", error=payload.get("error", "Image generation failed."))
             progress["completed"] = int(progress.get("completed") or 0) + 1
             progress["failed"] = int(progress.get("failed") or 0) + 1
-            progress["summary"] = f"Failed image for {master_data.clean_text(row.get('name') or row.get('normalized_name')) or 'ingredient'}."
+            progress["summary"] = f"Failed image for {master_data.clean_text(row.get('name') or row.get('normalized_name')) or item_label}."
         elif event == "complete":
             progress.update({
                 "status": "complete",
@@ -195,7 +219,10 @@ def update_master_image_progress(job_id, event, payload=None):
 
 def missing_master_image_rows(record_type="ingredients", user_id=None, search=None, include_all_users=False, limit=None):
     if record_type not in SUPPORTED_MASTER_IMAGE_TYPES:
-        raise ValueError("Only ingredient master image generation is supported.")
+        raise ValueError("Unsupported master image record type.")
+    config = master_data.master_record_table_config(record_type)
+    usage_table = config["usage_table"]
+    usage_fk = config["usage_fk"]
 
     where, params = master_data.master_record_filters(
         user_id=user_id,
@@ -225,9 +252,9 @@ def missing_master_image_rows(record_type="ingredients", user_id=None, search=No
                 m.created_at,
                 m.updated_at,
                 COUNT(u.id) AS usage_count
-              FROM ingredients m
-              LEFT JOIN recipe_ingredients u
-                ON u.ingredient_id = m.id
+              FROM {record_type} m
+              LEFT JOIN {usage_table} u
+                ON u.{usage_fk} = m.id
                AND u.user_id = m.user_id
               {where_clause}
              GROUP BY m.id
@@ -238,6 +265,17 @@ def missing_master_image_rows(record_type="ingredients", user_id=None, search=No
         ).fetchall()
 
     return [dict(row) for row in rows]
+
+
+def build_master_equipment_image_prompt(row, index):
+    base_prompt = build_recipe_equipment_image_prompt(
+        recipe_title="Equipment master data",
+        servings="Not specified",
+        ingredients="Not specified",
+        equipment_item_number=index,
+        equipment_item=row.get("name") or row.get("normalized_name") or "",
+    )
+    return finalize_equipment_image_prompt(base_prompt)
 
 
 def build_master_ingredient_image_prompt(row, index):
@@ -253,7 +291,13 @@ def build_master_ingredient_image_prompt(row, index):
     )
 
 
-def request_master_ingredient_image_bytes(prompt, row):
+def build_master_image_prompt(record_type, row, index):
+    if record_type == "equipment":
+        return build_master_equipment_image_prompt(row, index)
+    return build_master_ingredient_image_prompt(row, index)
+
+
+def request_master_image_bytes(prompt, row, record_type="ingredients"):
     timeout_seconds = int(os.getenv("OPENAI_STEP_IMAGE_TIMEOUT_SECONDS", "90"))
     model = os.getenv("OPENAI_STEP_IMAGE_MODEL", "gpt-image-1")
     size = os.getenv("OPENAI_STEP_IMAGE_SIZE", "1024x1024")
@@ -283,7 +327,7 @@ def request_master_ingredient_image_bytes(prompt, row):
             "size": size,
             "quality": quality,
             "source": "recipe-master-data",
-            "record_type": "ingredients",
+            "record_type": record_type,
             "record_id": int(row.get("id") or 0),
             "record_name": master_data.clean_text(row.get("name") or row.get("normalized_name")),
         },
@@ -308,24 +352,36 @@ def request_master_ingredient_image_bytes(prompt, row):
     return b""
 
 
-def save_master_ingredient_image(row, image_bytes):
+def request_master_ingredient_image_bytes(prompt, row):
+    return request_master_image_bytes(prompt, row, record_type="ingredients")
+
+
+def save_master_record_image(row, image_bytes, record_type="ingredients"):
     STEP_IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
     record_id = int(row.get("id") or 0)
-    name_key = safe_filename(row.get("normalized_name") or row.get("name") or "ingredient")[:60]
-    filename = f"master_ingredient_{record_id}_{name_key}_{uuid.uuid4().hex[:12]}.png"
+    label = master_image_type_label(record_type)
+    name_key = safe_filename(row.get("normalized_name") or row.get("name") or label)[:60]
+    filename = f"master_{label}_{record_id}_{name_key}_{uuid.uuid4().hex[:12]}.png"
     image_path = STEP_IMAGE_FOLDER / filename
     image_path.write_bytes(image_bytes)
     ensure_webp_variants(image_path)
     return f"{STEP_IMAGE_URL_PREFIX}/{filename}", str(image_path)
 
 
-def attach_master_ingredient_image(row, image_url, image_path):
+def save_master_ingredient_image(row, image_bytes):
+    return save_master_record_image(row, image_bytes, record_type="ingredients")
+
+
+def attach_master_record_image(row, image_url, image_path, record_type="ingredients"):
+    if record_type not in SUPPORTED_MASTER_IMAGE_TYPES:
+        raise ValueError("Unsupported master image record type.")
+
     now = master_data.utc_now_iso()
     with master_data.recipe_master_connection() as connection:
         existing = connection.execute(
-            """
+            f"""
             SELECT image_url
-              FROM ingredients
+              FROM {record_type}
              WHERE id = ?
                AND user_id = ?
             """,
@@ -336,8 +392,8 @@ def attach_master_ingredient_image(row, image_url, image_path):
         if master_data.clean_text(existing["image_url"]):
             return False
         connection.execute(
-            """
-            UPDATE ingredients
+            f"""
+            UPDATE {record_type}
                SET image_url = ?,
                    image_path = ?,
                    updated_at = ?
@@ -355,6 +411,10 @@ def attach_master_ingredient_image(row, image_url, image_path):
     return True
 
 
+def attach_master_ingredient_image(row, image_url, image_path):
+    return attach_master_record_image(row, image_url, image_path, record_type="ingredients")
+
+
 def generate_missing_master_images(
     job_id,
     record_type="ingredients",
@@ -370,7 +430,13 @@ def generate_missing_master_images(
             search=search,
             include_all_users=include_all_users,
         )
-        update_master_image_progress(job_id, "started", {"total": len(rows)})
+        update_master_image_progress(job_id, "started", {
+            "total": len(rows),
+            "record_type": record_type,
+            "user_id": user_id,
+            "include_all_users": include_all_users,
+            "search": search,
+        })
         if not rows:
             return master_image_progress(job_id)
         if not os.getenv("OPENAI_API_KEY"):
@@ -380,12 +446,12 @@ def generate_missing_master_images(
         for index, row in enumerate(rows, start=1):
             update_master_image_progress(job_id, "record_start", {"row": row})
             try:
-                prompt = build_master_ingredient_image_prompt(row, index)
-                image_bytes = request_master_ingredient_image_bytes(prompt, row)
+                prompt = build_master_image_prompt(record_type, row, index)
+                image_bytes = request_master_image_bytes(prompt, row, record_type=record_type)
                 if not image_bytes:
                     raise RuntimeError("OpenAI returned no image bytes.")
-                image_url, image_path = save_master_ingredient_image(row, image_bytes)
-                if attach_master_ingredient_image(row, image_url, image_path):
+                image_url, image_path = save_master_record_image(row, image_bytes, record_type=record_type)
+                if attach_master_record_image(row, image_url, image_path, record_type=record_type):
                     update_master_image_progress(job_id, "record_done", {
                         "row": row,
                         "image_url": image_url,

@@ -100,7 +100,7 @@
                 </div>
                 <ol class="master-data-backfill-item-list" data-master-backfill-items></ol>
             </section>
-            {% if master_data.record_type == 'ingredients' and master_data.db_status.exists %}
+            {% if master_data.db_status.exists %}
                 <form class="master-data-image-form"
                       data-master-image-form
                       data-image-status-url="{{ master_data.image_generation_status_url }}"
@@ -115,7 +115,7 @@
                     <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
                     <div>
                         <strong>Generate missing images</strong>
-                        <span>Creates ingredient thumbnails for records missing an image in the current scope.</span>
+                        <span>Creates {{ master_data.empty_label }} thumbnails for records missing an image in the current scope.</span>
                     </div>
                     <button type="submit" data-master-image-submit>Generate Missing Images</button>
                 </form>
@@ -127,7 +127,7 @@
                     <div class="master-data-backfill-progress-header">
                         <div>
                             <strong>Image generation progress</strong>
-                            <span data-master-image-summary>Preparing ingredient list.</span>
+                            <span data-master-image-summary>Preparing {{ master_data.empty_label }} list.</span>
                         </div>
                         <span class="master-data-backfill-state starting" data-master-image-state>Starting</span>
                     </div>

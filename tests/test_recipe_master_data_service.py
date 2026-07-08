@@ -295,6 +295,32 @@ def test_missing_master_image_rows_scope_to_ingredients_without_images(monkeypat
     assert [row["name"] for row in all_rows] == ["Garlic", "Basil"]
 
 
+def test_missing_master_image_rows_scope_to_equipment_without_images(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+
+    master_data.sync_recipe_master_records(
+        "https://example.com/user-a-equipment-images",
+        recipe_data={
+            "equipment": [
+                {"equipment": "Baking sheet", "equipment_image_url": "/static/generated/sheet.png"},
+                {"equipment": "Rolling pin"},
+            ],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/user-b-equipment-images",
+        recipe_data={"equipment": [{"equipment": "Whisk"}]},
+        user_id="user-b",
+    )
+
+    user_a_rows = master_images.missing_master_image_rows(record_type="equipment", user_id="user-a")
+    all_rows = master_images.missing_master_image_rows(record_type="equipment", include_all_users=True)
+
+    assert [row["name"] for row in user_a_rows] == ["Rolling pin"]
+    assert [row["name"] for row in all_rows] == ["Whisk", "Rolling pin"]
+
+
 def test_generate_missing_master_images_reports_missing_openai_key(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -312,3 +338,44 @@ def test_generate_missing_master_images_reports_missing_openai_key(monkeypatch, 
     assert progress["total"] == 1
     assert progress["completed"] == 0
     assert "OPENAI_API_KEY" in progress["summary"]
+
+
+def test_generate_missing_master_images_updates_equipment_table(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    captured = {}
+
+    master_data.sync_recipe_master_records(
+        "https://example.com/equipment-image-generation",
+        recipe_data={"equipment": [{"equipment": "Rolling pin"}]},
+        user_id="user-a",
+    )
+
+    def fake_request_image(prompt, row, record_type="ingredients"):
+        captured["prompt"] = prompt
+        captured["row"] = dict(row)
+        captured["record_type"] = record_type
+        return b"image-bytes"
+
+    def fake_save_image(row, image_bytes, record_type="ingredients"):
+        captured["saved"] = {
+            "row": dict(row),
+            "image_bytes": image_bytes,
+            "record_type": record_type,
+        }
+        return "/static/generated/recipe_steps/master_equipment.png", str(tmp_path / "master_equipment.png")
+
+    monkeypatch.setattr(master_images, "request_master_image_bytes", fake_request_image)
+    monkeypatch.setattr(master_images, "save_master_record_image", fake_save_image)
+
+    job_id = "equipment-image-generation-test"
+    progress = master_images.generate_missing_master_images(job_id, record_type="equipment", user_id="user-a")
+    row = master_data.list_equipment(user_id="user-a")[0]
+
+    assert progress["status"] == "complete"
+    assert progress["record_type"] == "equipment"
+    assert progress["generated"] == 1
+    assert captured["record_type"] == "equipment"
+    assert captured["saved"]["record_type"] == "equipment"
+    assert "rolling pin" in captured["prompt"].lower()
+    assert row["image_url"] == "/static/generated/recipe_steps/master_equipment.png"

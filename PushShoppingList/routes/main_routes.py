@@ -917,11 +917,11 @@ def recipe_master_data_generate_missing_images_route():
         }), 403
 
     record_type = recipe_master_data.clean_text(request.form.get("record_type")) or "ingredients"
-    if record_type != "ingredients":
+    if record_type not in MASTER_DATA_PAGE_CONFIG:
         return jsonify({
             "ok": False,
             "success": False,
-            "error": "Missing-image generation is currently available for ingredients only.",
+            "error": "Missing-image generation is not available for this master data type.",
         }), 400
 
     scope_info = master_data_form_scope()
