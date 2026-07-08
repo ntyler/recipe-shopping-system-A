@@ -237,6 +237,26 @@ def test_collapsed_ingredient_rows_use_compact_one_line_layout():
     assert "min-height: 20px;" in compact_css
 
 
+def test_collapsed_ingredient_rows_put_thumbnail_between_number_and_name():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    compact_start = css.index(
+        ".recipe-edit-ingredients.recipe-edit-ingredients-collapsed "
+        ".recipe-edit-ingredient-row:not(.recipe-edit-row-expanded):has("
+        ".recipe-ingredient-image-panel:not(.recipe-image-visibility-hidden) "
+        ".recipe-ingredient-image:not([hidden]))"
+    )
+    compact_end = css.index("@media (max-width: 760px)", compact_start)
+    compact_css = css[compact_start:compact_end]
+
+    assert "grid-template-columns: 22px 40px 42px minmax(0, 1fr) 38px;" in compact_css
+    assert "display: contents;" in compact_css
+    assert "grid-column: 3 / 4;" in compact_css
+    assert "width: 40px;" in compact_css
+    assert "height: 40px;" in compact_css
+    assert "grid-column: 4 / 5;" in compact_css
+    assert "grid-column: 5 / 6;" in compact_css
+
+
 def test_recipe_menu_edit_links_to_standalone_editor_page():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     current_recipes = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
