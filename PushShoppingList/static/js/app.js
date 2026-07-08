@@ -24130,7 +24130,7 @@ function addRecipeIngredientRow(item = {}) {
         ? item.base_unit
         : item.unit || "";
     const ingredientImageUrl = item.ingredient_image_url || item.image_url || "";
-    const ingredientImageDisplayUrl = recipeImageVariantUrl(ingredientImageUrl, "card");
+    const ingredientImageDisplayUrl = recipeImageVariantUrl(ingredientImageUrl, "thumb");
     const ingredientImageSrcSet = recipeImageVariantSrcSet(ingredientImageUrl);
     const ingredientImageGeneratedAt = item.ingredient_image_generated_at || item.image_generated_at || "";
     const ingredientImagePrompt = item.ingredient_image_prompt || item.image_prompt || "";
@@ -24195,7 +24195,7 @@ function addRecipeIngredientRow(item = {}) {
             <span>Optional</span>
             <input type="checkbox" data-field="optional" ${item.optional ? "checked" : ""}>
         </label>
-        <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-ingredient-image-panel"
+        <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-ingredient-image-panel${ingredientImageUrl ? "" : " recipe-image-empty"}"
              data-ingredient-image-panel
              data-recipe-url="${escapeAttribute(recipeUrl)}"
              data-ingredient-index="">
@@ -24221,7 +24221,7 @@ function addRecipeIngredientRow(item = {}) {
                  ${ingredientImageUrl ? `src="${DEFERRED_IMAGE_PLACEHOLDER}"` : ""}
                  ${ingredientImageUrl ? `data-deferred-src="${escapeAttribute(ingredientImageDisplayUrl)}"` : ""}
                  ${ingredientImageSrcSet ? `data-deferred-srcset="${escapeAttribute(ingredientImageSrcSet)}"` : ""}
-                 sizes="(max-width: 900px) 92vw, 720px"
+                 sizes="120px"
                  data-full-src="${escapeAttribute(ingredientImageUrl)}"
                  alt="Ingredient image"
                  loading="lazy"
@@ -24293,6 +24293,17 @@ function addRecipeIngredientRow(item = {}) {
                         data-recipe-edit-row-image-hide
                         onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
                     Hide ingredient image
+                </button>
+                <button type="button"
+                        data-recipe-edit-row-image-tools-show
+                        onclick="return setRecipeEditRowImageToolsVisibleFromMenu(this, true)">
+                    Show image tools
+                </button>
+                <button type="button"
+                        data-recipe-edit-row-image-tools-hide
+                        onclick="return setRecipeEditRowImageToolsVisibleFromMenu(this, false)"
+                        hidden>
+                    Hide image tools
                 </button>
                 <button type="button" onclick="duplicateRecipeIngredientRow(this)">Duplicate ingredient</button>
                 <button type="button" class="recipe-edit-row-collapse-toggle" onclick="toggleRecipeIngredientRowCollapsed(this)">Collapse ingredient</button>
@@ -30386,6 +30397,7 @@ async function generateRecipeEditRowImageFromMenu(button) {
     }
 
     setRecipeEditRowImageVisible(row, true);
+    setRecipeEditRowImageToolsVisible(row, true);
 
     if (imageButton.matches("[data-equipment-image-generate]")) {
         await generateRecipeEquipmentImage(imageButton);
@@ -30489,6 +30501,29 @@ function setRecipeEditRowImageVisibleFromMenu(button, visible) {
     return false;
 }
 
+function setRecipeEditRowImageToolsVisibleFromMenu(button, visible) {
+    const row = recipeEditActionRowFromButton(button);
+
+    closeRecipeEditRowMenus();
+    setRecipeEditRowImageToolsVisible(row, visible);
+    return false;
+}
+
+function setRecipeEditRowImageToolsVisible(row, visible) {
+    const panel = row
+        ? row.querySelector("[data-ingredient-image-panel]")
+        : null;
+
+    if (!panel) {
+        return false;
+    }
+
+    panel.classList.toggle("recipe-image-tools-visible", Boolean(visible));
+    panel.setAttribute("aria-expanded", visible ? "true" : "false");
+    updateRecipeEditRowImageMenu(row);
+    return true;
+}
+
 function setRecipeEditRowImageVisible(row, visible) {
     const panel = row
         ? row.querySelector("[data-equipment-image-panel], [data-ingredient-image-panel], [data-step-image-panel]")
@@ -30510,9 +30545,12 @@ function updateRecipeEditRowImageMenu(row) {
     const generateButton = row ? row.querySelector("[data-recipe-edit-row-image-generate]") : null;
     const showButton = row ? row.querySelector("[data-recipe-edit-row-image-show]") : null;
     const hideButton = row ? row.querySelector("[data-recipe-edit-row-image-hide]") : null;
+    const showToolsButton = row ? row.querySelector("[data-recipe-edit-row-image-tools-show]") : null;
+    const hideToolsButton = row ? row.querySelector("[data-recipe-edit-row-image-tools-hide]") : null;
     const image = panel ? panel.querySelector(".recipe-step-image") : null;
     const hasImage = Boolean(image && !image.hidden && String(image.getAttribute("src") || "").trim());
     const isHidden = Boolean(panel && panel.classList.contains("recipe-image-visibility-hidden"));
+    const toolsVisible = Boolean(panel && panel.classList.contains("recipe-image-tools-visible"));
 
     if (generateButton) {
         if (row && row.classList.contains("recipe-edit-equipment-row")) {
@@ -30537,6 +30575,14 @@ function updateRecipeEditRowImageMenu(row) {
             ? "Hide equipment image"
             : (row && row.classList.contains("recipe-edit-ingredient-row") ? "Hide ingredient image" : "Hide step image");
         hideButton.hidden = !panel || isHidden;
+    }
+
+    if (showToolsButton) {
+        showToolsButton.hidden = !panel || isHidden || toolsVisible;
+    }
+
+    if (hideToolsButton) {
+        hideToolsButton.hidden = !panel || isHidden || !toolsVisible;
     }
 }
 

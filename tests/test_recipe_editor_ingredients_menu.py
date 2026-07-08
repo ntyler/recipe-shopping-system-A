@@ -75,6 +75,45 @@ def test_recipe_editor_hide_all_images_keeps_title_image_visible():
     assert "keepRecipeCoverImagesVisible(modal);" in function_block
 
 
+def test_recipe_editor_ingredient_images_use_thumbnail_previews():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    row_start = script.index("function addRecipeIngredientRow")
+    row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
+    row_block = script[row_start:row_end]
+
+    assert 'recipeImageVariantUrl(ingredientImageUrl, "thumb")' in row_block
+    assert 'sizes="120px"' in row_block
+    assert "data-recipe-edit-row-image-tools-show" in row_block
+    assert "setRecipeEditRowImageToolsVisibleFromMenu(this, true)" in row_block
+    assert "data-recipe-edit-row-image-tools-hide" in row_block
+    assert "setRecipeEditRowImageToolsVisibleFromMenu(this, false)" in row_block
+    assert ".recipe-edit-ingredient-row .recipe-ingredient-image-panel .recipe-ingredient-image" in css
+    assert "width: 120px;" in css
+    assert "height: 120px;" in css
+    assert ".recipe-edit-ingredient-row .recipe-ingredient-image-panel:not(.recipe-image-tools-visible)" in css
+    assert ".recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-image-empty:not(.recipe-image-tools-visible)" in css
+
+
+def test_recipe_editor_row_image_tools_toggle_is_wired():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    menu_start = script.index("function updateRecipeEditRowImageMenu")
+    menu_end = script.index("async function generateAllRecipeInstructionImagesFromMenu", menu_start)
+    menu_block = script[menu_start:menu_end]
+    generate_start = script.index("async function generateRecipeEditRowImageFromMenu")
+    generate_end = script.index("async function generateRecipeImagesFromEditor", generate_start)
+    generate_block = script[generate_start:generate_end]
+
+    assert "function setRecipeEditRowImageToolsVisibleFromMenu" in script
+    assert "function setRecipeEditRowImageToolsVisible" in script
+    assert 'panel.classList.toggle("recipe-image-tools-visible", Boolean(visible));' in script
+    assert "const showToolsButton = row ? row.querySelector(\"[data-recipe-edit-row-image-tools-show]\") : null;" in menu_block
+    assert "const hideToolsButton = row ? row.querySelector(\"[data-recipe-edit-row-image-tools-hide]\") : null;" in menu_block
+    assert "showToolsButton.hidden = !panel || isHidden || toolsVisible;" in menu_block
+    assert "hideToolsButton.hidden = !panel || isHidden || !toolsVisible;" in menu_block
+    assert "setRecipeEditRowImageToolsVisible(row, true);" in generate_block
+
+
 def test_bulk_image_generation_menus_include_title_image_scope():
     recipe_view = (ROOT / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
     current_log = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")
