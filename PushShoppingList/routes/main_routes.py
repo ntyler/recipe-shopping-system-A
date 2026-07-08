@@ -22,6 +22,7 @@ from flask import url_for
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services import recipe_master_data_service as recipe_master_data
+from PushShoppingList.services import recipe_master_image_service as recipe_master_images
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
@@ -740,6 +741,9 @@ def master_data_context(record_type):
         "ingredient_url": url_for("main_bp.master_data_ingredients_route"),
         "equipment_url": url_for("main_bp.master_data_equipment_route"),
         "backfill_status_url": url_for("main_bp.recipe_master_data_backfill_status_route"),
+        "image_generation_url": url_for("main_bp.recipe_master_data_generate_missing_images_route"),
+        "image_generation_status_url": url_for("main_bp.recipe_master_data_image_generation_status_route"),
+        "current_url": request.full_path.rstrip("?"),
         "prev_url": prev_url,
         "next_url": next_url,
     }
@@ -864,6 +868,81 @@ def recipe_master_data_backfill_status_route():
             "ok": False,
             "success": False,
             "error": "No backfill progress was found.",
+        }), 404
+
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "progress": progress,
+    })
+
+
+@main_bp.route("/api/master-data/generate-missing-images", methods=["POST"])
+def recipe_master_data_generate_missing_images_route():
+    active_public_user = current_public_user()
+    if not is_admin_user(active_public_user):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Admin access is required.",
+        }), 403
+
+    record_type = recipe_master_data.clean_text(request.form.get("record_type")) or "ingredients"
+    if record_type != "ingredients":
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Missing-image generation is currently available for ingredients only.",
+        }), 400
+
+    requested_scope = recipe_master_data.clean_text(request.form.get("scope")).lower() or "mine"
+    requested_user_id = recipe_master_data.clean_text(request.form.get("user_id"))
+    current_scope_user_id = recipe_master_data.scoped_recipe_user_id()
+    include_all_users = requested_scope == "all"
+    if include_all_users:
+        user_id = ""
+    elif requested_scope == "user" and requested_user_id:
+        user_id = requested_user_id
+    else:
+        user_id = current_scope_user_id
+
+    job_id = recipe_master_data.clean_text(request.form.get("job_id")) or uuid.uuid4().hex
+    search = recipe_master_data.clean_text(request.form.get("search"))
+    progress = recipe_master_images.start_master_image_generation_job(
+        job_id,
+        record_type=record_type,
+        user_id=user_id,
+        include_all_users=include_all_users,
+        search=search,
+    )
+
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "job_id": job_id,
+        "progress": progress,
+        "redirect_url": recipe_master_data.clean_text(request.form.get("redirect_url"))
+        or url_for(MASTER_DATA_PAGE_CONFIG[record_type]["route_endpoint"]),
+    })
+
+
+@main_bp.route("/api/master-data/image-generation-status")
+def recipe_master_data_image_generation_status_route():
+    active_public_user = current_public_user()
+    if not is_admin_user(active_public_user):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Admin access is required.",
+        }), 403
+
+    job_id = recipe_master_data.clean_text(request.args.get("job_id"))
+    progress = recipe_master_images.master_image_progress(job_id)
+    if not progress:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "No image-generation progress was found.",
         }), 404
 
     return jsonify({

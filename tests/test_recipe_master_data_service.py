@@ -1,6 +1,7 @@
 import json
 
 from PushShoppingList.services import recipe_master_data_service as master_data
+from PushShoppingList.services import recipe_master_image_service as master_images
 
 
 def configure_master_db(monkeypatch, tmp_path):
@@ -266,3 +267,48 @@ def test_list_master_records_searches_sorts_and_counts_usage(monkeypatch, tmp_pa
     assert rows[0]["image_url"] == "/static/generated/tomato.png"
     assert master_data.count_ingredients(user_id="user-a", search="tom") == 1
     assert master_data.count_ingredient_usage(rows[0]["id"], user_id="user-a") == 2
+
+
+def test_missing_master_image_rows_scope_to_ingredients_without_images(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+
+    master_data.sync_recipe_master_records(
+        "https://example.com/user-a-images",
+        recipe_data={
+            "ingredients": [
+                {"ingredient": "Tomato", "ingredient_image_url": "/static/generated/tomato.png"},
+                {"ingredient": "Basil"},
+            ],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/user-b-images",
+        recipe_data={"ingredients": [{"ingredient": "Garlic"}]},
+        user_id="user-b",
+    )
+
+    user_a_rows = master_images.missing_master_image_rows(user_id="user-a")
+    all_rows = master_images.missing_master_image_rows(include_all_users=True)
+
+    assert [row["name"] for row in user_a_rows] == ["Basil"]
+    assert [row["name"] for row in all_rows] == ["Garlic", "Basil"]
+
+
+def test_generate_missing_master_images_reports_missing_openai_key(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    master_data.sync_recipe_master_records(
+        "https://example.com/missing-key-images",
+        recipe_data={"ingredients": [{"ingredient": "Basil"}]},
+        user_id="user-a",
+    )
+
+    job_id = "missing-image-key-test"
+    master_images.start_master_image_progress(job_id, user_id="user-a")
+    progress = master_images.generate_missing_master_images(job_id, user_id="user-a")
+
+    assert progress["status"] == "failed"
+    assert progress["total"] == 1
+    assert progress["completed"] == 0
+    assert "OPENAI_API_KEY" in progress["summary"]

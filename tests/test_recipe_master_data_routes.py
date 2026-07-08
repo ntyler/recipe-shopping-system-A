@@ -135,6 +135,10 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Run Backfill" in all_html
     assert "Backfill progress" in all_html
     assert "data-master-backfill-form" in all_html
+    assert "Generate Missing Images" in all_html
+    assert "data-master-image-form" in all_html
+    assert "/api/master-data/generate-missing-images" in all_html
+    assert "/api/master-data/image-generation-status" in all_html
     assert "/api/master-data/backfill-status" in all_html
     assert "js/master-data.js" in all_html
     assert "User A" in all_html
@@ -234,6 +238,82 @@ def test_admin_backfill_fetch_response_exposes_progress(monkeypatch, tmp_path):
     assert status_response.status_code == 200
     assert status_payload["progress"]["job_id"] == "test-master-progress"
     assert status_payload["progress"]["ingredient_rows"] == 1
+
+
+def test_admin_generate_missing_images_route_starts_scoped_job(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    captured = {}
+
+    def fake_start_job(job_id, record_type, user_id, include_all_users=False, search=None):
+        captured.update({
+            "job_id": job_id,
+            "record_type": record_type,
+            "user_id": user_id,
+            "include_all_users": include_all_users,
+            "search": search,
+        })
+        return {
+            "job_id": job_id,
+            "status": "running",
+            "total": 2,
+            "completed": 0,
+        }
+
+    monkeypatch.setattr(
+        "PushShoppingList.routes.main_routes.recipe_master_images.start_master_image_generation_job",
+        fake_start_job,
+    )
+
+    with app.test_client() as client:
+        sign_in(client, "admin-user")
+        response = client.post(
+            "/api/master-data/generate-missing-images",
+            data={
+                "record_type": "ingredients",
+                "scope": "user",
+                "user_id": "user-a",
+                "search": "tom",
+                "job_id": "image-job-1",
+            },
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["progress"]["status"] == "running"
+    assert captured == {
+        "job_id": "image-job-1",
+        "record_type": "ingredients",
+        "user_id": "user-a",
+        "include_all_users": False,
+        "search": "tom",
+    }
+
+
+def test_admin_image_generation_status_route_returns_progress(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+
+    monkeypatch.setattr(
+        "PushShoppingList.routes.main_routes.recipe_master_images.master_image_progress",
+        lambda job_id: {"job_id": job_id, "status": "complete", "generated": 3},
+    )
+
+    with app.test_client() as client:
+        sign_in(client, "admin-user")
+        response = client.get(
+            "/api/master-data/image-generation-status?job_id=image-job-1",
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["progress"] == {
+        "job_id": "image-job-1",
+        "status": "complete",
+        "generated": 3,
+    }
 
 
 def test_account_menu_links_to_master_data_pages(monkeypatch, tmp_path):

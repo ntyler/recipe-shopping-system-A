@@ -100,6 +100,54 @@
                 </div>
                 <ol class="master-data-backfill-item-list" data-master-backfill-items></ol>
             </section>
+            {% if master_data.record_type == 'ingredients' and master_data.db_status.exists %}
+                <form class="master-data-image-form"
+                      data-master-image-form
+                      data-image-status-url="{{ master_data.image_generation_status_url }}"
+                      data-image-redirect-url="{{ master_data.current_url }}"
+                      method="POST"
+                      action="{{ master_data.image_generation_url }}">
+                    <input type="hidden" name="record_type" value="{{ master_data.record_type }}">
+                    <input type="hidden" name="scope" value="{{ master_data.scope }}">
+                    <input type="hidden" name="user_id"
+                           value="{% if master_data.scope == 'user' %}{{ master_data.scope_user_id }}{% elif master_data.scope == 'mine' %}{{ master_data.current_scope_user_id }}{% endif %}">
+                    <input type="hidden" name="search" value="{{ master_data.search }}">
+                    <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
+                    <div>
+                        <strong>Generate missing images</strong>
+                        <span>Creates ingredient thumbnails for records missing an image in the current scope.</span>
+                    </div>
+                    <button type="submit" data-master-image-submit>Generate Missing Images</button>
+                </form>
+                <section class="master-data-backfill-progress master-data-image-progress"
+                         data-master-image-progress
+                         aria-live="polite"
+                         aria-busy="false"
+                         hidden>
+                    <div class="master-data-backfill-progress-header">
+                        <div>
+                            <strong>Image generation progress</strong>
+                            <span data-master-image-summary>Preparing ingredient list.</span>
+                        </div>
+                        <span class="master-data-backfill-state starting" data-master-image-state>Starting</span>
+                    </div>
+                    <div class="master-data-progress-bar-wrap" aria-hidden="true">
+                        <span data-master-image-bar></span>
+                    </div>
+                    <div class="master-data-backfill-metrics">
+                        <div><span>Total</span><strong data-master-image-total>0</strong></div>
+                        <div><span>Complete</span><strong data-master-image-complete>0</strong></div>
+                        <div><span>Generated</span><strong data-master-image-generated>0</strong></div>
+                        <div><span>Failed</span><strong data-master-image-failed>0</strong></div>
+                    </div>
+                    <div class="master-data-current-backfill-item" data-master-image-current hidden>
+                        <span>Generating now</span>
+                        <strong data-master-image-current-title></strong>
+                        <code data-master-image-current-meta></code>
+                    </div>
+                    <ol class="master-data-backfill-item-list" data-master-image-items></ol>
+                </section>
+            {% endif %}
         {% endif %}
 
         <form class="master-data-filter-form"

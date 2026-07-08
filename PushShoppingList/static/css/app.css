@@ -24121,6 +24121,7 @@ img[data-deferred-src] {
         }
 
         .master-data-backfill-form,
+        .master-data-image-form,
         .master-data-filter-form {
             display: grid;
             grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(140px, 1fr)) auto;
@@ -24137,16 +24138,24 @@ img[data-deferred-src] {
             align-items: center;
         }
 
-        .master-data-backfill-form[aria-busy="true"] {
+        .master-data-image-form {
+            grid-template-columns: minmax(220px, 1fr) auto;
+            align-items: center;
+        }
+
+        .master-data-backfill-form[aria-busy="true"],
+        .master-data-image-form[aria-busy="true"] {
             cursor: progress;
         }
 
-        .master-data-backfill-form[aria-busy="true"] button {
+        .master-data-backfill-form[aria-busy="true"] button,
+        .master-data-image-form[aria-busy="true"] button {
             cursor: progress;
             opacity: 0.78;
         }
 
         .master-data-backfill-form div,
+        .master-data-image-form div,
         .master-data-backfill-form label,
         .master-data-filter-form label {
             display: grid;
@@ -24154,7 +24163,8 @@ img[data-deferred-src] {
             min-width: 0;
         }
 
-        .master-data-backfill-form div span {
+        .master-data-backfill-form div span,
+        .master-data-image-form div span {
             color: #cbd5e1;
             font-size: 12px;
             font-weight: 800;
@@ -24254,7 +24264,8 @@ img[data-deferred-src] {
             color: #fecaca;
         }
 
-        .master-data-backfill-state.skipped {
+        .master-data-backfill-state.skipped,
+        .master-data-backfill-item-state.skipped {
             background: #351c05;
             color: #fde68a;
         }
@@ -24412,6 +24423,7 @@ img[data-deferred-src] {
         }
 
         .master-data-backfill-form button,
+        .master-data-image-form button,
         .master-data-filter-form button {
             min-height: 42px;
             padding: 0 14px;
@@ -24561,6 +24573,7 @@ img[data-deferred-src] {
             }
 
             .master-data-backfill-form,
+            .master-data-image-form,
             .master-data-filter-form {
                 grid-template-columns: 1fr;
             }
@@ -24579,6 +24592,7 @@ img[data-deferred-src] {
             }
 
             .master-data-backfill-form button,
+            .master-data-image-form button,
             .master-data-filter-form button {
                 width: 100%;
             }
