@@ -815,6 +815,77 @@ def update_ingredient_store_section(ingredient_id, store_section, user_id=None, 
         }
 
 
+def ingredient_master_records_for_items(items, user_id=None):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    ingredient_ids = set()
+    normalized_names = set()
+
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+
+        for id_key in ("ingredient_id", "master_ingredient_id"):
+            try:
+                ingredient_id = int(item.get(id_key) or 0)
+            except (TypeError, ValueError):
+                ingredient_id = 0
+            if ingredient_id > 0:
+                ingredient_ids.add(ingredient_id)
+
+        for name_key in (
+            "master_normalized_name",
+            "normalized_name",
+            "ingredient",
+            "name",
+            "parsed_name",
+            "purchasable_item",
+            "buy_as",
+        ):
+            normalized_name = normalized_master_name(item.get(name_key))
+            if normalized_name:
+                normalized_names.add(normalized_name)
+
+    if not ingredient_ids and not normalized_names:
+        return {"by_id": {}, "by_normalized_name": {}}
+
+    where_parts = ["user_id = ?"]
+    params = [scoped_user_id]
+    match_parts = []
+    if ingredient_ids:
+        placeholders = ", ".join("?" for _ in ingredient_ids)
+        match_parts.append(f"id IN ({placeholders})")
+        params.extend(sorted(ingredient_ids))
+    if normalized_names:
+        placeholders = ", ".join("?" for _ in normalized_names)
+        match_parts.append(f"normalized_name IN ({placeholders})")
+        params.extend(sorted(normalized_names))
+
+    where_parts.append("(" + " OR ".join(match_parts) + ")")
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {"by_id": {}, "by_normalized_name": {}}
+
+        rows = connection.execute(
+            f"""
+            SELECT id, user_id, name, normalized_name, store_section
+              FROM ingredients
+             WHERE {' AND '.join(where_parts)}
+            """,
+            params,
+        ).fetchall()
+
+    by_id = {}
+    by_normalized_name = {}
+    for row in rows:
+        row_data = dict(row)
+        row_data["store_section"] = clean_ingredient_store_section(row_data.get("store_section"))
+        by_id[int(row_data["id"])] = row_data
+        by_normalized_name[row_data["normalized_name"]] = row_data
+
+    return {"by_id": by_id, "by_normalized_name": by_normalized_name}
+
+
 def recipe_master_user_ids():
     with existing_recipe_master_connection() as connection:
         if connection is None:
@@ -932,25 +1003,36 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             continue
 
         if isinstance(item, dict):
+            try:
+                ingredient_id = int(item.get("ingredient_id") or item.get("master_ingredient_id") or 0)
+            except (TypeError, ValueError):
+                ingredient_id = 0
             original_text = clean_text(item.get("original_recipe_text") or item.get("original_text") or item.get("text") or name)
             quantity = clean_text(item.get("quantity") or item.get("recipe_qty"))
             unit = clean_text(item.get("unit"))
             buy_as = clean_text(item.get("buy_as") or item.get("purchasable_item") or item.get("purchase_group"))
+            normalized_name = normalized_master_name(
+                item.get("master_normalized_name") or item.get("normalized_name")
+            )
             store_section = ingredient_store_section_from_source(item.get("store_section") or item.get("section"))
             optional = truthy(item.get("optional"))
             image_url, image_path = compact_image_fields(item, "ingredient_image_url", "image_url")
         else:
+            ingredient_id = 0
             original_text = name
             quantity = ""
             unit = ""
             buy_as = ""
+            normalized_name = ""
             store_section = ""
             optional = False
             image_url = ""
             image_path = ""
 
         rows.append({
+            "ingredient_id": ingredient_id,
             "name": name,
+            "normalized_name": normalized_name,
             "quantity": quantity,
             "unit": unit,
             "buy_as": buy_as,
@@ -1009,6 +1091,7 @@ def upsert_master_record(
     image_url="",
     image_path="",
     store_section=None,
+    force_store_section=False,
 ):
     if table_name not in {"ingredients", "equipment"}:
         raise ValueError("Unsupported master table.")
@@ -1021,19 +1104,40 @@ def upsert_master_record(
     now = utc_now_iso()
     if table_name == "ingredients":
         store_section = clean_ingredient_store_section(store_section)
-        connection.execute(
+        previous_row = connection.execute(
             """
+            SELECT id, store_section
+              FROM ingredients
+             WHERE user_id = ?
+               AND normalized_name = ?
+            """,
+            (user_id, normalized_name),
+        ).fetchone()
+        previous_section = (
+            clean_ingredient_store_section(previous_row["store_section"])
+            if previous_row
+            else ""
+        )
+        store_section_update_sql = (
+            "excluded.store_section"
+            if force_store_section
+            else """
+                CASE
+                    WHEN COALESCE(NULLIF(TRIM(ingredients.store_section), ''), 'MISC') = 'MISC'
+                        THEN excluded.store_section
+                    ELSE ingredients.store_section
+                END
+            """
+        )
+        connection.execute(
+            f"""
             INSERT INTO ingredients (
                 user_id, name, normalized_name, store_section, image_url, image_path, created_at, updated_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, normalized_name) DO UPDATE SET
                 name = CASE WHEN excluded.name != '' THEN excluded.name ELSE ingredients.name END,
-                store_section = CASE
-                    WHEN COALESCE(NULLIF(TRIM(ingredients.store_section), ''), 'MISC') = 'MISC'
-                        THEN excluded.store_section
-                    ELSE ingredients.store_section
-                END,
+                store_section = {store_section_update_sql},
                 image_url = CASE WHEN excluded.image_url != '' THEN excluded.image_url ELSE ingredients.image_url END,
                 image_path = CASE WHEN excluded.image_path != '' THEN excluded.image_path ELSE ingredients.image_path END,
                 updated_at = excluded.updated_at
@@ -1064,23 +1168,117 @@ def upsert_master_record(
             """,
             (user_id, name, normalized_name, clean_text(image_url), clean_text(image_path), now, now),
         )
+    select_columns = "id, store_section" if table_name == "ingredients" else "id"
     row = connection.execute(
         f"""
-        SELECT id
+        SELECT {select_columns}
           FROM {table_name}
          WHERE user_id = ?
            AND normalized_name = ?
         """,
         (user_id, normalized_name),
     ).fetchone()
-    return int(row["id"]) if row else None
+    if not row:
+        return None
+
+    result = {"id": int(row["id"])}
+    if table_name == "ingredients":
+        current_section = clean_ingredient_store_section(row["store_section"])
+        result.update({
+            "store_section": current_section,
+            "previous_store_section": previous_section,
+            "store_section_changed": previous_section != current_section,
+            "store_section_inserted": previous_section == "",
+        })
+    return result
 
 
 def recipe_id_for_url(recipe_url):
     return normalize_recipe_url_key(recipe_url)
 
 
-def sync_recipe_master_records(recipe_url, ingredients=None, recipe_data=None, user_id=None):
+def update_ingredient_master_record_from_recipe_row(
+    connection,
+    user_id,
+    row,
+    force_store_section=False,
+):
+    try:
+        ingredient_id = int(row.get("ingredient_id") or 0)
+    except (TypeError, ValueError):
+        ingredient_id = 0
+    normalized_name = normalized_master_name(row.get("normalized_name"))
+    if ingredient_id <= 0 and not normalized_name:
+        return None
+
+    params = [user_id]
+    if ingredient_id > 0:
+        match_clause = "id = ?"
+        params.insert(0, ingredient_id)
+    else:
+        match_clause = "normalized_name = ?"
+        params.insert(0, normalized_name)
+
+    master_row = connection.execute(
+        f"""
+        SELECT id, name, normalized_name, store_section, image_url, image_path
+          FROM ingredients
+         WHERE {match_clause}
+           AND user_id = ?
+        """,
+        params,
+    ).fetchone()
+    if not master_row:
+        return None
+
+    matched_ingredient_id = int(master_row["id"])
+    previous_section = clean_ingredient_store_section(master_row["store_section"])
+    proposed_section = clean_ingredient_store_section(row.get("store_section"))
+    next_section = previous_section
+    if force_store_section or previous_section == "MISC":
+        next_section = proposed_section
+
+    image_url = clean_text(row.get("image_url"))
+    image_path = clean_text(row.get("image_path"))
+    next_image_url = image_url or clean_text(master_row["image_url"])
+    next_image_path = image_path or clean_text(master_row["image_path"])
+    changed = (
+        previous_section != next_section
+        or clean_text(master_row["image_url"]) != next_image_url
+        or clean_text(master_row["image_path"]) != next_image_path
+    )
+    if changed:
+        connection.execute(
+            """
+            UPDATE ingredients
+               SET store_section = ?,
+                   image_url = ?,
+                   image_path = ?,
+                   updated_at = ?
+             WHERE id = ?
+               AND user_id = ?
+            """,
+            (next_section, next_image_url, next_image_path, utc_now_iso(), matched_ingredient_id, user_id),
+        )
+
+    return {
+        "id": matched_ingredient_id,
+        "name": master_row["name"],
+        "normalized_name": master_row["normalized_name"],
+        "store_section": next_section,
+        "previous_store_section": previous_section,
+        "store_section_changed": previous_section != next_section,
+        "store_section_inserted": False,
+    }
+
+
+def sync_recipe_master_records(
+    recipe_url,
+    ingredients=None,
+    recipe_data=None,
+    user_id=None,
+    force_store_sections_from_recipe=False,
+):
     user_id = scoped_recipe_user_id(user_id)
     recipe_id = recipe_id_for_url(recipe_url)
     if not user_id or not recipe_id:
@@ -1101,17 +1299,37 @@ def sync_recipe_master_records(recipe_url, ingredients=None, recipe_data=None, u
 
         ingredient_count = 0
         for row in ingredient_rows:
-            ingredient_id = upsert_master_record(
+            ingredient_result = update_ingredient_master_record_from_recipe_row(
                 connection,
-                "ingredients",
                 user_id,
-                row["name"],
-                image_url=row.get("image_url", ""),
-                image_path=row.get("image_path", ""),
-                store_section=row.get("store_section", ""),
+                row,
+                force_store_section=force_store_sections_from_recipe,
             )
+            if not ingredient_result:
+                ingredient_result = upsert_master_record(
+                    connection,
+                    "ingredients",
+                    user_id,
+                    row["name"],
+                    image_url=row.get("image_url", ""),
+                    image_path=row.get("image_path", ""),
+                    store_section=row.get("store_section", ""),
+                    force_store_section=force_store_sections_from_recipe,
+                )
+            ingredient_id = ingredient_result["id"] if ingredient_result else None
             if not ingredient_id:
                 continue
+            if (
+                force_store_sections_from_recipe
+                and ingredient_result.get("store_section_changed")
+            ):
+                print(
+                    "[IngredientMaster] "
+                    f"action=store_section_updated_from_recipe "
+                    f"ingredient=\"{recipe_master_log_value(row['name'])}\" "
+                    f"section=\"{ingredient_result.get('store_section') or 'MISC'}\" "
+                    f"user_id={user_id}"
+                )
             connection.execute(
                 """
                 INSERT INTO recipe_ingredients (
@@ -1137,7 +1355,7 @@ def sync_recipe_master_records(recipe_url, ingredients=None, recipe_data=None, u
 
         equipment_count = 0
         for row in equipment_rows:
-            equipment_id = upsert_master_record(
+            equipment_result = upsert_master_record(
                 connection,
                 "equipment",
                 user_id,
@@ -1145,6 +1363,7 @@ def sync_recipe_master_records(recipe_url, ingredients=None, recipe_data=None, u
                 image_url=row.get("image_url", ""),
                 image_path=row.get("image_path", ""),
             )
+            equipment_id = equipment_result["id"] if equipment_result else None
             if not equipment_id:
                 continue
             connection.execute(
@@ -1514,19 +1733,24 @@ def recipe_master_rows(table_name, recipe_url, user_id=None):
         join_table = "recipe_ingredients"
         master_table = "ingredients"
         master_fk = "ingredient_id"
+        master_columns = "m.name, m.normalized_name, m.store_section AS master_store_section, m.image_url, m.image_path"
     elif table_name == "recipe_equipment":
         join_table = "recipe_equipment"
         master_table = "equipment"
         master_fk = "equipment_id"
+        master_columns = "m.name, m.normalized_name, m.image_url, m.image_path"
     else:
         raise ValueError("Unsupported recipe row table.")
 
     user_id = scoped_recipe_user_id(user_id)
     recipe_id = recipe_id_for_url(recipe_url)
-    with recipe_master_connection() as connection:
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return []
+
         rows = connection.execute(
             f"""
-            SELECT r.*, m.name, m.normalized_name, m.image_url, m.image_path
+            SELECT r.*, {master_columns}
               FROM {join_table} r
               JOIN {master_table} m
                 ON m.id = r.{master_fk}

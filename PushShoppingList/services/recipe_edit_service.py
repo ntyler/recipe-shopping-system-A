@@ -48,10 +48,8 @@ from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import RAW_FOLDER
 from PushShoppingList.services.recipe_extract_service import supports_custom_temperature
-from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import UPLOAD_FOLDER
 from PushShoppingList.services.recipe_extract_service import build_video_text_pdf_html
-from PushShoppingList.services.recipe_extract_service import classify_store_section
 from PushShoppingList.services.recipe_extract_service import clean_json_response
 from PushShoppingList.services.recipe_extract_service import extract_recipe_cover_image_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_info_from_text
@@ -83,6 +81,12 @@ from PushShoppingList.services.recipe_ingredient_service import ingredient_detai
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
 from PushShoppingList.services.recipe_ingredient_service import remove_unused_ingredients_from_shopping_list
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
+from PushShoppingList.services.recipe_master_data_service import clean_ingredient_store_section
+from PushShoppingList.services.recipe_master_data_service import ingredient_master_records_for_items
+from PushShoppingList.services.recipe_master_data_service import ingredient_store_section_sort_key
+from PushShoppingList.services.recipe_master_data_service import ingredient_store_section_options
+from PushShoppingList.services.recipe_master_data_service import normalized_master_name
+from PushShoppingList.services.recipe_master_data_service import recipe_master_rows
 from PushShoppingList.services.recipe_master_data_service import remove_recipe_master_records_for_recipe
 from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.shopping_list_service import add_items
@@ -2877,7 +2881,7 @@ def load_editable_recipe(url):
             **recipe_info,
             "scaling": scaling,
             "ingredients": annotate_ingredients_for_food_review(
-                normalize_edit_ingredients(recipe_data.get("ingredients", []))
+                normalize_edit_ingredients(recipe_data.get("ingredients", []), recipe_url=source_url)
             ),
             "equipment": normalize_equipment_records(recipe_data.get("equipment", [])),
             "instructions": normalize_instruction_rows(recipe_data.get("instructions", [])),
@@ -2932,7 +2936,7 @@ def load_editable_recipe(url):
             **category_metadata,
         },
         "food_rules": load_food_rules(),
-        "store_sections": list(STORE_SECTION_ORDER.keys()),
+        "store_sections": ingredient_store_section_options(),
     }
 
 
@@ -6899,15 +6903,185 @@ def update_recipe_ingredient_record(url, quantity, recipe_data, preserve_existin
 
     data[key] = record
     save_recipe_ingredients(data)
-    sync_recipe_master_records(url, ingredients=record.get("ingredients", []), recipe_data=recipe_data)
+    sync_recipe_master_records(
+        url,
+        ingredients=record.get("ingredients", []),
+        recipe_data=recipe_data,
+        force_store_sections_from_recipe=True,
+    )
 
 
-def normalize_edit_ingredients(ingredients):
+def recipe_edit_log_value(value):
+    return str(value or "").replace("\\", "\\\\").replace('"', '\\"')
+
+
+def recipe_edit_ingredient_name(item):
+    if not isinstance(item, dict):
+        return ""
+
+    return nullable_string(
+        item.get("ingredient")
+        or item.get("name")
+        or item.get("normalized_name")
+        or item.get("parsed_name")
+        or item.get("purchasable_item")
+        or item.get("original_text")
+    )
+
+
+def recipe_edit_ingredient_master_id(item):
+    if not isinstance(item, dict):
+        return 0
+
+    for key in ("ingredient_id", "master_ingredient_id"):
+        try:
+            ingredient_id = int(item.get(key) or 0)
+        except (TypeError, ValueError):
+            ingredient_id = 0
+        if ingredient_id > 0:
+            return ingredient_id
+
+    return 0
+
+
+def recipe_edit_ingredient_normalized_keys(item):
+    if not isinstance(item, dict):
+        return []
+
+    keys = []
+    for key in (
+        "master_normalized_name",
+        "normalized_name",
+        "ingredient",
+        "name",
+        "parsed_name",
+        "purchasable_item",
+        "buy_as",
+    ):
+        normalized = normalized_master_name(item.get(key))
+        if normalized and normalized not in keys:
+            keys.append(normalized)
+    return keys
+
+
+def recipe_edit_add_master_record_to_lookup(lookup, row):
+    if not isinstance(row, dict):
+        return
+
+    try:
+        ingredient_id = int(row.get("ingredient_id") or row.get("id") or 0)
+    except (TypeError, ValueError):
+        ingredient_id = 0
+
+    section = clean_ingredient_store_section(
+        row.get("master_store_section") or row.get("store_section"),
+        default="",
+    )
+    normalized = normalized_master_name(row.get("normalized_name") or row.get("name"))
+    if not ingredient_id and not normalized:
+        return
+
+    record = {
+        **row,
+        "id": ingredient_id or row.get("id"),
+        "ingredient_id": ingredient_id,
+        "store_section": section,
+        "normalized_name": normalized or row.get("normalized_name") or "",
+    }
+    if ingredient_id:
+        lookup["by_id"][ingredient_id] = record
+    if normalized:
+        lookup["by_normalized_name"][normalized] = record
+
+
+def recipe_edit_ingredient_master_lookup(ingredients, recipe_url=None):
+    lookup = ingredient_master_records_for_items(ingredients)
+    lookup = {
+        "by_id": dict(lookup.get("by_id") or {}),
+        "by_normalized_name": dict(lookup.get("by_normalized_name") or {}),
+    }
+    recipe_url = str(recipe_url or "").strip()
+    if not recipe_url:
+        return lookup
+
+    for row in recipe_master_rows("recipe_ingredients", recipe_url):
+        recipe_edit_add_master_record_to_lookup(lookup, row)
+
+    return lookup
+
+
+def recipe_edit_master_record_for_ingredient(item, master_lookup):
+    ingredient_id = recipe_edit_ingredient_master_id(item)
+    if ingredient_id:
+        record = (master_lookup.get("by_id") or {}).get(ingredient_id)
+        if record:
+            return record
+
+    by_normalized_name = master_lookup.get("by_normalized_name") or {}
+    for normalized in recipe_edit_ingredient_normalized_keys(item):
+        record = by_normalized_name.get(normalized)
+        if record:
+            return record
+
+    return None
+
+
+def recipe_edit_store_section_for_ingredient(item, master_lookup, recipe_id=""):
+    ingredient_name = recipe_edit_ingredient_name(item)
+    master_record = recipe_edit_master_record_for_ingredient(item, master_lookup)
+    if master_record:
+        section = clean_ingredient_store_section(master_record.get("store_section"), default="")
+        if section:
+            print(
+                "[IngredientMaster] "
+                f"action=store_section_loaded_from_master "
+                f"recipe_id={recipe_id} "
+                f"ingredient=\"{recipe_edit_log_value(ingredient_name)}\" "
+                f"section=\"{section}\""
+            )
+            return section, master_record
+
+    row_section = clean_ingredient_store_section(
+        item.get("store_section") or item.get("section"),
+        default="",
+    )
+    if row_section:
+        return row_section, master_record
+
+    print(
+        "[IngredientMaster] "
+        f"action=store_section_missing_default "
+        f"ingredient=\"{recipe_edit_log_value(ingredient_name)}\" "
+        'section="MISC"'
+    )
+    return "MISC", master_record
+
+
+def normalize_edit_ingredients(ingredients, recipe_url=None):
     if not isinstance(ingredients, list):
         return []
 
-    rows = [
-        apply_purchase_mapping_to_ingredient({
+    master_lookup = recipe_edit_ingredient_master_lookup(ingredients, recipe_url=recipe_url)
+    recipe_id = normalize_recipe_url_key(recipe_url) if recipe_url else ""
+    rows = []
+    for item in ingredients:
+        if not isinstance(item, dict):
+            continue
+
+        store_section, master_record = recipe_edit_store_section_for_ingredient(
+            item,
+            master_lookup,
+            recipe_id=recipe_id,
+        )
+        if master_record:
+            try:
+                ingredient_id = int(master_record.get("ingredient_id") or master_record.get("id") or 0)
+            except (TypeError, ValueError):
+                ingredient_id = 0
+        else:
+            ingredient_id = recipe_edit_ingredient_master_id(item)
+        rows.append(apply_purchase_mapping_to_ingredient({
+            "ingredient_id": str(ingredient_id) if ingredient_id else "",
             "section": item.get("section") or "",
             "original_text": item.get("original_text") or "",
             "quantity": item.get("quantity") or "",
@@ -6918,13 +7092,15 @@ def normalize_edit_ingredients(ingredients):
             "ingredient": item.get("ingredient") or "",
             "parsed_name": item.get("parsed_name") or "",
             "normalized_name": item.get("normalized_name") or "",
+            "master_normalized_name": item.get("master_normalized_name") or item.get("normalized_name") or "",
             "preparation": item.get("preparation") or "",
             "confidence": item.get("confidence") or "",
             "inferred": truthy(item.get("inferred")),
             "warning": item.get("warning") or "",
             "food_review": normalize_food_review_payload(item.get("food_review")),
             "optional": bool(item.get("optional")),
-            "store_section": item.get("store_section") or classify_store_section(item.get("ingredient") or ""),
+            "store_section": store_section,
+            "store_section_order": ingredient_store_section_sort_key(store_section),
             "purchasable_item": item.get("purchasable_item") or item.get("buy_as") or "",
             "purchase_group": item.get("purchase_group") or "",
             "ingredient_image_url": item.get("ingredient_image_url") or item.get("image_url") or "",
@@ -6932,10 +7108,7 @@ def normalize_edit_ingredients(ingredients):
                 item.get("ingredient_image_generated_at") or item.get("image_generated_at") or ""
             ),
             "ingredient_image_prompt": item.get("ingredient_image_prompt") or item.get("image_prompt") or "",
-        })
-        for item in ingredients
-        if isinstance(item, dict)
-    ]
+        }))
     return rows
 
 
@@ -7130,7 +7303,6 @@ def sanitize_ingredients(value, existing_value=None):
         if not name and not original_text:
             continue
 
-        store_section = classify_store_section(name or original_text)
         base_quantity = nullable_string(item.get("base_quantity"))
         base_unit = nullable_string(item.get("base_unit"))
         existing = (
@@ -7139,6 +7311,10 @@ def sanitize_ingredients(value, existing_value=None):
             or existing_by_text.get(instruction_match_text_key(original_text))
             or (existing_rows[index] if index < len(existing_rows) else {})
             or {}
+        )
+        store_section = clean_ingredient_store_section(
+            item.get("store_section") or existing.get("store_section"),
+            default="MISC",
         )
         ingredient_image_url = (
             nullable_string(item.get("ingredient_image_url") or item.get("image_url"))
@@ -7154,6 +7330,12 @@ def sanitize_ingredients(value, existing_value=None):
         )
 
         row = {
+            "ingredient_id": nullable_string(
+                item.get("ingredient_id")
+                or item.get("master_ingredient_id")
+                or existing.get("ingredient_id")
+                or existing.get("master_ingredient_id")
+            ),
             "section": nullable_string(item.get("section")),
             "original_text": original_text,
             "quantity": nullable_string(item.get("quantity")),
@@ -7164,6 +7346,12 @@ def sanitize_ingredients(value, existing_value=None):
             "ingredient": name or original_text,
             "parsed_name": nullable_string(item.get("parsed_name")),
             "normalized_name": nullable_string(item.get("normalized_name")),
+            "master_normalized_name": nullable_string(
+                item.get("master_normalized_name")
+                or item.get("normalized_name")
+                or existing.get("master_normalized_name")
+                or existing.get("normalized_name")
+            ),
             "preparation": nullable_string(item.get("preparation")),
             "confidence": nullable_string(item.get("confidence")),
             "inferred": truthy(item.get("inferred")),
@@ -7171,7 +7359,7 @@ def sanitize_ingredients(value, existing_value=None):
             "food_review": normalize_food_review_payload(item.get("food_review")),
             "optional": bool(item.get("optional")),
             "store_section": store_section,
-            "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),
+            "store_section_order": ingredient_store_section_sort_key(store_section),
             "purchasable_item": nullable_string(item.get("purchasable_item") or item.get("buy_as")),
             "purchase_group": nullable_string(item.get("purchase_group")),
             "ingredient_image_url": ingredient_image_url,

@@ -24302,12 +24302,14 @@ function addRecipeIngredientRow(item = {}) {
             </div>
         </div>
         <input type="hidden" data-field="section" value="${escapeAttribute(item.section || "")}">
+        <input type="hidden" data-field="ingredient_id" value="${escapeAttribute(item.ingredient_id || item.master_ingredient_id || "")}">
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
         <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
         <input type="hidden" data-field="purchase_group" value="${escapeAttribute(item.purchase_group || "")}">
         <input type="hidden" data-field="parsed_name" value="${escapeAttribute(item.parsed_name || "")}">
         <input type="hidden" data-field="normalized_name" value="${escapeAttribute(item.normalized_name || "")}">
+        <input type="hidden" data-field="master_normalized_name" value="${escapeAttribute(item.master_normalized_name || item.normalized_name || "")}">
         <input type="hidden" data-field="confidence" value="${escapeAttribute(item.confidence || "")}">
         <input type="hidden" data-field="inferred" value="${escapeAttribute(recipeIngredientInferredValue(item))}">
         <input type="hidden" data-field="warning" value="${escapeAttribute(extractionWarning)}">
