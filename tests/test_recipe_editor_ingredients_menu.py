@@ -191,7 +191,14 @@ def test_recipe_editor_row_image_tools_toggle_is_wired():
     assert "const hideToolsButton = row ? row.querySelector(\"[data-recipe-edit-row-image-tools-hide]\") : null;" in menu_block
     assert "showToolsButton.hidden = !panel || isHidden || toolsVisible;" in menu_block
     assert "hideToolsButton.hidden = !panel || isHidden || !toolsVisible;" in menu_block
-    assert "setRecipeEditRowImageToolsVisible(row, true);" in generate_block
+    tools_call = "setRecipeEditRowImageToolsVisible(row, true);"
+    tools_call_index = generate_block.index(tools_call)
+    ingredient_guard_index = generate_block.rfind(
+        'imageButton.matches("[data-ingredient-image-generate]")',
+        0,
+        tools_call_index,
+    )
+    assert ingredient_guard_index != -1
 
 
 def test_recipe_editor_image_empty_state_tracks_generated_and_removed_images():

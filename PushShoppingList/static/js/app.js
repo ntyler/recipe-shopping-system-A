@@ -30428,7 +30428,9 @@ async function generateRecipeEditRowImageFromMenu(button) {
     }
 
     setRecipeEditRowImageVisible(row, true);
-    setRecipeEditRowImageToolsVisible(row, true);
+    if (imageButton.matches("[data-ingredient-image-generate]")) {
+        setRecipeEditRowImageToolsVisible(row, true);
+    }
 
     if (imageButton.matches("[data-equipment-image-generate]")) {
         await generateRecipeEquipmentImage(imageButton);
