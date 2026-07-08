@@ -868,7 +868,7 @@ def ingredient_master_records_for_items(items, user_id=None):
 
         rows = connection.execute(
             f"""
-            SELECT id, user_id, name, normalized_name, store_section
+            SELECT id, user_id, name, normalized_name, store_section, image_url, image_path
               FROM ingredients
              WHERE {' AND '.join(where_parts)}
             """,

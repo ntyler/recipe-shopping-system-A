@@ -72,7 +72,13 @@ def test_recipe_editor_load_uses_user_master_store_section(monkeypatch, tmp_path
     })
     master_data.sync_recipe_master_records(
         url,
-        recipe_data={"ingredients": [{"ingredient": "Chicken broth", "store_section": "Canned"}]},
+        recipe_data={
+            "ingredients": [{
+                "ingredient": "Chicken broth",
+                "store_section": "Canned",
+                "ingredient_image_url": "/static/generated/master/chicken-broth.png",
+            }]
+        },
         user_id=master_data.LOCAL_USER_ID,
     )
 
@@ -81,6 +87,7 @@ def test_recipe_editor_load_uses_user_master_store_section(monkeypatch, tmp_path
     ingredient = loaded["recipe"]["ingredients"][0]
 
     assert ingredient["store_section"] == "CANNED"
+    assert ingredient["ingredient_image_url"] == "/static/generated/master/chicken-broth.png"
     assert ingredient["ingredient_id"]
     assert loaded["store_sections"] == master_data.ingredient_store_section_options()
     assert (

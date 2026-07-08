@@ -7057,6 +7057,17 @@ def recipe_edit_store_section_for_ingredient(item, master_lookup, recipe_id=""):
     return "MISC", master_record
 
 
+def recipe_edit_master_image_url(item, master_record):
+    item = item if isinstance(item, dict) else {}
+    master_record = master_record if isinstance(master_record, dict) else {}
+    return (
+        item.get("ingredient_image_url")
+        or item.get("image_url")
+        or master_record.get("image_url")
+        or ""
+    )
+
+
 def normalize_edit_ingredients(ingredients, recipe_url=None):
     if not isinstance(ingredients, list):
         return []
@@ -7080,6 +7091,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
                 ingredient_id = 0
         else:
             ingredient_id = recipe_edit_ingredient_master_id(item)
+        ingredient_image_url = recipe_edit_master_image_url(item, master_record)
         rows.append(apply_purchase_mapping_to_ingredient({
             "ingredient_id": str(ingredient_id) if ingredient_id else "",
             "section": item.get("section") or "",
@@ -7103,7 +7115,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "store_section_order": ingredient_store_section_sort_key(store_section),
             "purchasable_item": item.get("purchasable_item") or item.get("buy_as") or "",
             "purchase_group": item.get("purchase_group") or "",
-            "ingredient_image_url": item.get("ingredient_image_url") or item.get("image_url") or "",
+            "ingredient_image_url": ingredient_image_url,
             "ingredient_image_generated_at": (
                 item.get("ingredient_image_generated_at") or item.get("image_generated_at") or ""
             ),
