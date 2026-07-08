@@ -95,6 +95,30 @@ def test_recipe_editor_ingredient_images_use_thumbnail_previews():
     assert ".recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-image-empty:not(.recipe-image-tools-visible)" in css
 
 
+def test_recipe_editor_equipment_images_use_thumbnail_previews():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    row_start = script.index("function addRecipeEquipmentRow")
+    row_end = script.index("function recipeEquipmentHeaderHtml", row_start)
+    row_block = script[row_start:row_end]
+    tools_start = script.index("function setRecipeEditRowImageToolsVisible")
+    tools_end = script.index("function setRecipeEditRowImageVisible", tools_start)
+    tools_block = script[tools_start:tools_end]
+
+    assert 'recipeImageVariantUrl(equipmentImageUrl, "thumb")' in row_block
+    assert 'sizes="120px"' in row_block
+    assert 'recipe-equipment-image-panel${equipmentImageUrl ? "" : " recipe-image-empty"}' in row_block
+    assert "data-recipe-edit-row-image-tools-show" in row_block
+    assert "setRecipeEditRowImageToolsVisibleFromMenu(this, true)" in row_block
+    assert "data-recipe-edit-row-image-tools-hide" in row_block
+    assert "setRecipeEditRowImageToolsVisibleFromMenu(this, false)" in row_block
+    assert 'row.querySelector("[data-equipment-image-panel], [data-ingredient-image-panel]")' in tools_block
+    assert ".recipe-edit-equipment-row .recipe-equipment-image-panel .recipe-equipment-image" in css
+    assert ".recipe-edit-equipment-row .recipe-equipment-image-panel:not(.recipe-image-tools-visible)" in css
+    assert ".recipe-edit-equipment-row .recipe-equipment-image-panel.recipe-image-empty:not(.recipe-image-tools-visible)" in css
+    assert ".recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-empty):not(.recipe-image-visibility-hidden)))" in css
+
+
 def test_recipe_editor_ingredient_thumbnail_uses_consistent_inline_slot():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -128,6 +152,29 @@ def test_recipe_editor_ingredient_thumbnail_uses_consistent_inline_slot():
     assert "grid-column: 4 / 10;" in desktop_rule
 
 
+def test_recipe_editor_equipment_thumbnail_uses_ingredient_like_inline_slot():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    equipment_start = css.index(
+        ".recipe-edit-equipment-row .recipe-equipment-image-panel.recipe-edit-row-image-panel"
+    )
+    equipment_end = css.index(
+        ".recipe-edit-ingredient-row:has(.recipe-ingredient-image-panel:not(.recipe-image-tools-visible)",
+        equipment_start,
+    )
+    equipment_css = css[equipment_start:equipment_end]
+
+    assert "width: 120px;" in equipment_css
+    assert "height: 120px;" in equipment_css
+    assert ".recipe-equipment-image-panel:not(.recipe-image-tools-visible) .recipe-step-image-actions" in equipment_css
+    assert "grid-template-columns: 26px 54px 42px minmax(0, 1fr) 44px;" in equipment_css
+    assert "grid-template-columns: 28px 54px 42px minmax(260px, 1fr) 40px;" in equipment_css
+    assert "grid-column: 3 / 4;" in equipment_css
+    assert "width: 40px;" in equipment_css
+    assert "height: 40px;" in equipment_css
+    assert "grid-column: 4 / 5;" in equipment_css
+    assert "grid-column: 5 / 6;" in equipment_css
+
+
 def test_recipe_editor_row_image_tools_toggle_is_wired():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     menu_start = script.index("function updateRecipeEditRowImageMenu")
@@ -145,6 +192,22 @@ def test_recipe_editor_row_image_tools_toggle_is_wired():
     assert "showToolsButton.hidden = !panel || isHidden || toolsVisible;" in menu_block
     assert "hideToolsButton.hidden = !panel || isHidden || !toolsVisible;" in menu_block
     assert "setRecipeEditRowImageToolsVisible(row, true);" in generate_block
+
+
+def test_recipe_editor_image_empty_state_tracks_generated_and_removed_images():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    generating_start = script.index("function setRecipeImagePanelGenerating")
+    complete_start = script.index("function setRecipeImagePanelComplete")
+    removed_start = script.index("function setRecipeImagePanelRemoved")
+    failed_start = script.index("function setRecipeImagePanelFailed")
+    complete_block = script[complete_start:removed_start]
+    removed_block = script[removed_start:failed_start]
+    image_state_block = script[generating_start:script.index("function setRecipeImagePanelHiddenValue", failed_start)]
+
+    assert 'panel.classList.remove("recipe-image-empty");' in image_state_block
+    assert 'panel.classList.toggle("recipe-image-empty", !imageUrl);' in complete_block
+    assert 'panel.classList.add("recipe-image-empty");' in removed_block
+    assert 'panel.classList.toggle("recipe-image-empty", !imageUrl);' not in removed_block
 
 
 def test_recipe_editor_ingredient_row_menu_is_grouped():
@@ -235,6 +298,13 @@ def test_collapsed_ingredient_rows_use_compact_one_line_layout():
     assert "grid-template-columns: 22px 40px minmax(0, 1fr) 38px;" in compact_css
     assert "min-height: 0;" in compact_css
     assert "padding: 10px 14px;" in compact_css
+    assert "@media (min-width: 761px)" in compact_css
+    assert "grid-template-columns: 28px 54px minmax(0, 1fr) 40px;" in compact_css
+    assert "padding: 10px 18px;" in compact_css
+    assert "width: 44px;" in compact_css
+    assert "height: 44px;" in compact_css
+    assert "@media (min-width: 761px) and (max-width: 1500px)" in compact_css
+    assert "grid-template-columns: 26px 54px minmax(0, 1fr) 44px;" in compact_css
     assert "grid-row: 1;" in compact_css
     assert "display: flex;" in compact_css
     assert "width: 34px;" in compact_css
@@ -260,6 +330,10 @@ def test_collapsed_ingredient_rows_put_thumbnail_between_number_and_name():
     assert "height: 40px;" in compact_css
     assert "grid-column: 4 / 5;" in compact_css
     assert "grid-column: 5 / 6;" in compact_css
+    assert "@media (min-width: 1181px)" in compact_css
+    assert "grid-template-columns: 28px 54px 42px minmax(0, 1fr) 40px;" in compact_css
+    assert "padding-right: 18px;" in compact_css
+    assert "padding-left: 18px;" in compact_css
 
 
 def test_recipe_menu_edit_links_to_standalone_editor_page():

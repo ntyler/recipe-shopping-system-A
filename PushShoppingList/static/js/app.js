@@ -26083,7 +26083,7 @@ function addRecipeEquipmentRow(value = "") {
     const equipmentImageUrl = typeof value === "object" && value !== null
         ? (value.equipment_image_url || value.image_url || "")
         : "";
-    const equipmentImageDisplayUrl = recipeImageVariantUrl(equipmentImageUrl, "card");
+    const equipmentImageDisplayUrl = recipeImageVariantUrl(equipmentImageUrl, "thumb");
     const equipmentImageSrcSet = recipeImageVariantSrcSet(equipmentImageUrl);
     const equipmentImageGeneratedAt = typeof value === "object" && value !== null
         ? (value.equipment_image_generated_at || value.image_generated_at || "")
@@ -26101,7 +26101,7 @@ function addRecipeEquipmentRow(value = "") {
             <span class="sr-only">Equipment</span>
             <input type="text" data-field="text" value="${escapeAttribute(equipmentText || "")}">
         </label>
-        <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-equipment-image-panel"
+        <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-equipment-image-panel${equipmentImageUrl ? "" : " recipe-image-empty"}"
              data-equipment-image-panel
              data-recipe-url="${escapeAttribute(recipeUrl)}"
              data-equipment-index="">
@@ -26127,7 +26127,7 @@ function addRecipeEquipmentRow(value = "") {
                  ${equipmentImageUrl ? `src="${DEFERRED_IMAGE_PLACEHOLDER}"` : ""}
                  ${equipmentImageUrl ? `data-deferred-src="${escapeAttribute(equipmentImageDisplayUrl)}"` : ""}
                  ${equipmentImageSrcSet ? `data-deferred-srcset="${escapeAttribute(equipmentImageSrcSet)}"` : ""}
-                 sizes="(max-width: 900px) 92vw, 720px"
+                 sizes="120px"
                  data-full-src="${escapeAttribute(equipmentImageUrl)}"
                  alt="Equipment image"
                  loading="lazy"
@@ -26209,6 +26209,17 @@ function addRecipeEquipmentRow(value = "") {
                             data-recipe-edit-row-image-hide
                             onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
                         Hide equipment image
+                    </button>
+                    <button type="button"
+                            data-recipe-edit-row-image-tools-show
+                            onclick="return setRecipeEditRowImageToolsVisibleFromMenu(this, true)">
+                        Show image tools
+                    </button>
+                    <button type="button"
+                            data-recipe-edit-row-image-tools-hide
+                            onclick="return setRecipeEditRowImageToolsVisibleFromMenu(this, false)"
+                            hidden>
+                        Hide image tools
                     </button>
                     <button type="button"
                             onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'equipment' })">
@@ -29810,6 +29821,7 @@ function setRecipeImagePanelGenerating(panel, message, imagePrompt = "") {
     const removeButton = recipeImagePanelRemoveButton(panel);
 
     panel.classList.remove("recipe-image-visibility-hidden");
+    panel.classList.remove("recipe-image-empty");
     panel.classList.add("generating");
 
     if (status) {
@@ -29856,6 +29868,7 @@ function setRecipeImagePanelComplete(panel, item) {
 
     panel.classList.remove("generating");
     panel.classList.remove("recipe-image-visibility-hidden");
+    panel.classList.toggle("recipe-image-empty", !imageUrl);
 
     if (imageUrl && image) {
         setRecipeImageElementSource(image, imageUrl, "card");
@@ -29915,6 +29928,7 @@ function setRecipeImagePanelRemoved(panel, kind) {
 
     panel.classList.remove("generating");
     panel.classList.remove("recipe-image-visibility-hidden");
+    panel.classList.add("recipe-image-empty");
 
     if (image) {
         setRecipeImageElementSource(image, "");
@@ -29964,6 +29978,7 @@ function setRecipeImagePanelFailed(panel, message, imagePrompt = "") {
 
     panel.classList.remove("generating");
     panel.classList.remove("recipe-image-visibility-hidden");
+    panel.classList.remove("recipe-image-empty");
 
     if (status) {
         status.textContent = message;
@@ -30527,7 +30542,7 @@ function setRecipeEditRowImageToolsVisibleFromMenu(button, visible) {
 
 function setRecipeEditRowImageToolsVisible(row, visible) {
     const panel = row
-        ? row.querySelector("[data-ingredient-image-panel]")
+        ? row.querySelector("[data-equipment-image-panel], [data-ingredient-image-panel]")
         : null;
 
     if (!panel) {
