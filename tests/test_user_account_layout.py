@@ -638,8 +638,11 @@ def test_recipe_editor_has_generate_title_image_action():
     routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
 
     assert 'id="recipeEditImageProvider"' in template
-    assert '<option value="comfyui" selected>ComfyUI local</option>' in template
-    assert '<option value="openai">ChatGPT / OpenAI</option>' in template
+    assert '<option value="openai" selected>ChatGPT / OpenAI</option>' in template
+    assert '<option value="comfyui">ComfyUI local</option>' in template
+    assert template.index('<option value="openai" selected>ChatGPT / OpenAI</option>') < template.index(
+        '<option value="comfyui">ComfyUI local</option>'
+    )
     assert 'id="recipeEditCoverGenerate"' in template
     assert 'id="recipeEditCoverGenerateLabel">Generate title image' in template
     assert "generateRecipeCoverImage(this)" in template
@@ -667,9 +670,20 @@ def test_recipe_image_provider_selector_is_available_for_detail_images():
     combined_templates = "\n".join([editor_template, recipe_template, view_behavior_template])
 
     assert combined_templates.count('data-recipe-image-provider-select') >= 8
-    assert '<option value="openai">ChatGPT / OpenAI</option>' in combined_templates
+    assert '<option value="openai" selected>ChatGPT / OpenAI</option>' in combined_templates
+    assert '<option value="comfyui">ComfyUI local</option>' in combined_templates
+    assert '<option value="comfyui" selected>ComfyUI local</option>' not in combined_templates
     assert "function rememberRecipeImageProvider(provider)" in script
     assert "function refreshRecipeImageProviderSelectors(root = document)" in script
+    assert 'selectedRecipeImageProvider() || "openai"' in script
+    provider_field_start = script.index("function recipeImageProviderFieldHtml")
+    provider_field_end = script.index("function openRecipeCoverUpload", provider_field_start)
+    provider_field = script[provider_field_start:provider_field_end]
+    assert '<option value="openai" selected>ChatGPT / OpenAI</option>' in provider_field
+    assert '<option value="comfyui">ComfyUI local</option>' in provider_field
+    assert provider_field.index('<option value="openai" selected>ChatGPT / OpenAI</option>') < provider_field.index(
+        '<option value="comfyui">ComfyUI local</option>'
+    )
     assert "${recipeImageProviderFieldHtml()}" in script
     assert "...recipeImageProviderPayload()" in script
 

@@ -22929,7 +22929,7 @@ function rememberRecipeImageProvider(provider) {
 }
 
 function refreshRecipeImageProviderSelectors(root = document) {
-    const provider = rememberedRecipeImageProvider() || selectedRecipeImageProvider() || "comfyui";
+    const provider = rememberedRecipeImageProvider() || selectedRecipeImageProvider() || "openai";
     const scope = root && typeof root.querySelectorAll === "function" ? root : document;
 
     scope.querySelectorAll("[data-recipe-image-provider-select]").forEach(select => {
@@ -22963,8 +22963,8 @@ function recipeImageProviderFieldHtml(selectId = "") {
         <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field"${forAttribute}>
             <span>Image Generator</span>
             <select${idAttribute} data-recipe-image-provider-select>
-                <option value="comfyui" selected>ComfyUI local</option>
-                <option value="openai">ChatGPT / OpenAI</option>
+                <option value="openai" selected>ChatGPT / OpenAI</option>
+                <option value="comfyui">ComfyUI local</option>
             </select>
         </label>
     `;
