@@ -45,6 +45,10 @@
                     </select>
                 </form>
             </td>
+        {% elif master_data.record_type == 'equipment' %}
+            <td class="master-data-equipment-type-cell">
+                {{ row.equipment_section }}
+            </td>
         {% endif %}
         <td>
             <div class="master-data-user-cell">
@@ -285,6 +289,18 @@
                         {% endfor %}
                     </select>
                 </label>
+            {% elif master_data.record_type == 'equipment' %}
+                <label>
+                    <span>Equipment Type</span>
+                    <select name="equipment_section">
+                        <option value="" {% if not master_data.equipment_section %}selected{% endif %}>All types</option>
+                        {% for section in master_data.equipment_section_options %}
+                            <option value="{{ section }}" {% if master_data.equipment_section == section %}selected{% endif %}>
+                                {{ section }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
             {% endif %}
             <label>
                 <span>Sort</span>
@@ -361,12 +377,14 @@
                 </section>
             {% endif %}
             <div class="master-data-table-wrap">
-                <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% endif %}">
+                <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}">
                     <thead>
                         <tr>
                             <th scope="col">Item</th>
                             {% if master_data.record_type == 'ingredients' %}
                                 <th scope="col">Store Section</th>
+                            {% elif master_data.record_type == 'equipment' %}
+                                <th scope="col">Equipment Type</th>
                             {% endif %}
                             <th scope="col">User</th>
                             <th scope="col">Usage Count</th>
@@ -375,7 +393,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% if master_data.group_by_store_section and master_data.row_groups %}
+                        {% if master_data.row_groups %}
                             {% for group in master_data.row_groups %}
                                 <tr class="master-data-section-row">
                                     <th scope="rowgroup" colspan="{{ master_data.table_column_count }}">{{ group.section }}</th>

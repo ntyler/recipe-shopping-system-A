@@ -25082,7 +25082,8 @@ img[data-deferred-src] {
             table-layout: fixed;
         }
 
-        .master-data-ingredients-table {
+        .master-data-ingredients-table,
+        .master-data-equipment-table {
             min-width: 1080px;
         }
 
@@ -25150,6 +25151,30 @@ img[data-deferred-src] {
         }
 
         .master-data-ingredients-table th:nth-child(6) {
+            width: 130px;
+        }
+
+        .master-data-equipment-table th:nth-child(1) {
+            width: 34%;
+        }
+
+        .master-data-equipment-table th:nth-child(2) {
+            width: 180px;
+        }
+
+        .master-data-equipment-table th:nth-child(3) {
+            width: 18%;
+        }
+
+        .master-data-equipment-table th:nth-child(4) {
+            width: 92px;
+        }
+
+        .master-data-equipment-table th:nth-child(5) {
+            width: 130px;
+        }
+
+        .master-data-equipment-table th:nth-child(6) {
             width: 130px;
         }
 
@@ -25334,6 +25359,12 @@ img[data-deferred-src] {
 
         .master-data-store-section-form {
             display: block;
+        }
+
+        .master-data-equipment-type-cell {
+            color: #d6dedb;
+            font-size: 13px;
+            font-weight: 900;
         }
 
         .master-data-store-section-form select {

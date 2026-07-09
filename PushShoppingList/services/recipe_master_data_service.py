@@ -161,6 +161,76 @@ INGREDIENT_STORE_SECTION_CONFLICT_OVERRIDES = (
         PERUVIAN_PEPPER_PLAIN_PATTERN,
     ),
 )
+EQUIPMENT_SECTION_ORDER = {
+    "COOKWARE": 1,
+    "BAKEWARE": 2,
+    "APPLIANCES": 3,
+    "PREP TOOLS": 4,
+    "MEASURING": 5,
+    "MIXING BOWLS": 6,
+    "SERVING & STORAGE": 7,
+    "MISC": 8,
+}
+EQUIPMENT_SECTION_ALIASES = {
+    "COOKWARE & PANS": "COOKWARE",
+    "POTS & PANS": "COOKWARE",
+    "POTS AND PANS": "COOKWARE",
+    "BAKING": "BAKEWARE",
+    "BAKING TOOLS": "BAKEWARE",
+    "SMALL APPLIANCES": "APPLIANCES",
+    "PREP": "PREP TOOLS",
+    "TOOLS": "PREP TOOLS",
+    "UTENSILS": "PREP TOOLS",
+    "MEASURING TOOLS": "MEASURING",
+    "BOWLS": "MIXING BOWLS",
+    "STORAGE": "SERVING & STORAGE",
+    "SERVING": "SERVING & STORAGE",
+    "SERVING AND STORAGE": "SERVING & STORAGE",
+}
+EQUIPMENT_SECTION_KEYWORD_RULES = (
+    (
+        (
+            r"\b(?:baking sheet|baking tray|sheet pan|cookie sheet|muffin tin|cake pan|loaf pan|pie dish|ramekin|casserole dish)\b",
+        ),
+        "BAKEWARE",
+    ),
+    (
+        (
+            r"\b(?:pot|pots|saucepan|saucepans|pan|pans|skillet|skillets|frying pan|dutch oven|stockpot|wok)\b",
+        ),
+        "COOKWARE",
+    ),
+    (
+        (
+            r"\b(?:blender|food processor|processor|mixer|stand mixer|hand mixer|slow cooker|instant pot|pressure cooker|air fryer|microwave|toaster|oven)\b",
+        ),
+        "APPLIANCES",
+    ),
+    (
+        (
+            r"\b(?:measuring cup|measuring cups|measuring spoon|measuring spoons|scale|thermometer|timer)\b",
+        ),
+        "MEASURING",
+    ),
+    (
+        (
+            r"\b(?:mixing bowl|mixing bowls|bowl|bowls)\b",
+        ),
+        "MIXING BOWLS",
+    ),
+    (
+        (
+            r"\b(?:container|containers|storage|jar|jars|platter|plate|plates|serving dish|serving bowl|tray)\b",
+        ),
+        "SERVING & STORAGE",
+    ),
+    (
+        (
+            r"\b(?:knife|knives|cutting board|board|spatula|whisk|tongs|peeler|grater|zester|strainer|sieve|colander|ladle|spoon|fork|masher|press|brush|rolling pin)\b",
+        ),
+        "PREP TOOLS",
+    ),
+)
 MASTER_RECORD_TABLES = {
     "ingredients": {
         "usage_table": "recipe_ingredients",
@@ -507,6 +577,7 @@ def ensure_recipe_master_schema(connection=None):
             user_id TEXT NOT NULL,
             name TEXT NOT NULL,
             normalized_name TEXT NOT NULL,
+            equipment_section TEXT NOT NULL DEFAULT 'MISC',
             image_url TEXT NOT NULL DEFAULT '',
             image_path TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
@@ -560,10 +631,17 @@ def ensure_recipe_master_schema(connection=None):
         connection.execute(
             "ALTER TABLE ingredients ADD COLUMN store_section TEXT NOT NULL DEFAULT 'MISC'"
         )
+    equipment_columns = recipe_master_column_names(connection, "equipment")
+    if "equipment_section" not in equipment_columns:
+        connection.execute(
+            "ALTER TABLE equipment ADD COLUMN equipment_section TEXT NOT NULL DEFAULT 'MISC'"
+        )
     normalize_existing_ingredient_store_sections(connection)
+    normalize_existing_equipment_sections(connection)
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_name ON ingredients(user_id, normalized_name)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_section ON ingredients(user_id, store_section)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_name ON equipment(user_id, normalized_name)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_section ON equipment(user_id, equipment_section)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_user_recipe ON recipe_ingredients(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient ON recipe_ingredients(ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_user_recipe ON recipe_equipment(user_id, recipe_id)")
@@ -605,6 +683,53 @@ def ingredient_store_section_match_text(value):
     normalized = unicodedata.normalize("NFKD", clean_text(value).lower())
     ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
     return re.sub(r"[^a-z0-9&']+", " ", ascii_text).strip()
+
+
+def equipment_section_options():
+    return list(EQUIPMENT_SECTION_ORDER.keys())
+
+
+def equipment_section_from_source(value):
+    section = re.sub(r"\s+", " ", str(value or "").strip().upper())
+    if not section:
+        return ""
+    section = EQUIPMENT_SECTION_ALIASES.get(section, section)
+    return section if section in EQUIPMENT_SECTION_ORDER else ""
+
+
+def clean_equipment_section(value, default="MISC"):
+    return equipment_section_from_source(value) or default
+
+
+def equipment_section_sort_key(section):
+    return EQUIPMENT_SECTION_ORDER.get(
+        clean_equipment_section(section),
+        EQUIPMENT_SECTION_ORDER["MISC"],
+    )
+
+
+def equipment_section_match_text(value):
+    return ingredient_store_section_match_text(value)
+
+
+def classify_equipment_section(value):
+    text = equipment_section_match_text(value)
+    if not text:
+        return ""
+
+    for patterns, section in EQUIPMENT_SECTION_KEYWORD_RULES:
+        if any(re.search(pattern, text) for pattern in patterns):
+            return section
+
+    return ""
+
+
+def resolve_equipment_section(value, source_section=None, default="MISC"):
+    section = clean_equipment_section(source_section, default="")
+    classified = classify_equipment_section(value)
+    if classified and (not section or section == "MISC"):
+        return classified
+    return section or classified or default
 
 
 def classify_ingredient_store_section(value):
@@ -665,6 +790,31 @@ def normalize_existing_ingredient_store_sections(connection):
             )
 
 
+def normalize_existing_equipment_sections(connection):
+    try:
+        rows = connection.execute(
+            "SELECT id, name, normalized_name, equipment_section FROM equipment"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return
+
+    for row in rows:
+        raw_section = str(row["equipment_section"] or "")
+        section = resolve_equipment_section(
+            " ".join(
+                part
+                for part in (row["name"], row["normalized_name"])
+                if part
+            ),
+            raw_section,
+        )
+        if section != raw_section:
+            connection.execute(
+                "UPDATE equipment SET equipment_section = ? WHERE id = ?",
+                (section, int(row["id"])),
+            )
+
+
 def master_record_table_config(table_name):
     table_name = str(table_name or "").strip()
     config = MASTER_RECORD_TABLES.get(table_name)
@@ -695,6 +845,7 @@ def master_record_filters(
     search=None,
     include_all_users=False,
     store_section=None,
+    equipment_section=None,
 ):
     where = []
     params = []
@@ -719,6 +870,11 @@ def master_record_filters(
         if section:
             where.append("m.store_section = ?")
             params.append(section)
+    elif table_name == "equipment":
+        section = equipment_section_from_source(equipment_section)
+        if section:
+            where.append("m.equipment_section = ?")
+            params.append(section)
 
     return where, params
 
@@ -732,6 +888,7 @@ def list_master_records(
     sort="updated_at_desc",
     include_all_users=False,
     store_section=None,
+    equipment_section=None,
 ):
     config = master_record_table_config(table_name)
     limit = bounded_master_limit(limit)
@@ -743,11 +900,17 @@ def list_master_records(
         search=search,
         include_all_users=include_all_users,
         store_section=store_section,
+        equipment_section=equipment_section,
     )
     where_clause = f"WHERE {' AND '.join(where)}" if where else ""
     usage_table = config["usage_table"]
     usage_fk = config["usage_fk"]
-    store_section_select = ",\n                m.store_section" if table_name == "ingredients" else ""
+    if table_name == "ingredients":
+        section_select = ",\n                m.store_section"
+    elif table_name == "equipment":
+        section_select = ",\n                m.equipment_section"
+    else:
+        section_select = ""
 
     with existing_recipe_master_connection() as connection:
         if connection is None:
@@ -759,7 +922,7 @@ def list_master_records(
                 m.id,
                 m.user_id,
                 m.name,
-                m.normalized_name{store_section_select},
+                m.normalized_name{section_select},
                 m.image_url,
                 m.image_path,
                 m.created_at,
@@ -784,6 +947,9 @@ def list_master_records(
         if table_name == "ingredients":
             row_data["store_section"] = clean_ingredient_store_section(row_data.get("store_section"))
             row_data["store_section_order"] = ingredient_store_section_sort_key(row_data["store_section"])
+        elif table_name == "equipment":
+            row_data["equipment_section"] = clean_equipment_section(row_data.get("equipment_section"))
+            row_data["equipment_section_order"] = equipment_section_sort_key(row_data["equipment_section"])
         row_data["usage_count"] = int(row["usage_count"] or 0)
         results.append(row_data)
     return results
@@ -795,6 +961,7 @@ def count_master_records(
     search=None,
     include_all_users=False,
     store_section=None,
+    equipment_section=None,
 ):
     master_record_table_config(table_name)
     where, params = master_record_filters(
@@ -803,6 +970,7 @@ def count_master_records(
         search=search,
         include_all_users=include_all_users,
         store_section=store_section,
+        equipment_section=equipment_section,
     )
     where_clause = f"WHERE {' AND '.join(where)}" if where else ""
 
@@ -830,6 +998,7 @@ def list_ingredients(
     sort="updated_at_desc",
     include_all_users=False,
     store_section=None,
+    equipment_section=None,
 ):
     return list_master_records(
         "ingredients",
@@ -851,6 +1020,7 @@ def list_equipment(
     sort="updated_at_desc",
     include_all_users=False,
     store_section=None,
+    equipment_section=None,
 ):
     return list_master_records(
         "equipment",
@@ -860,10 +1030,11 @@ def list_equipment(
         offset=offset,
         sort=sort,
         include_all_users=include_all_users,
+        equipment_section=equipment_section or store_section,
     )
 
 
-def count_ingredients(user_id=None, search=None, include_all_users=False, store_section=None):
+def count_ingredients(user_id=None, search=None, include_all_users=False, store_section=None, equipment_section=None):
     return count_master_records(
         "ingredients",
         user_id=user_id,
@@ -873,12 +1044,13 @@ def count_ingredients(user_id=None, search=None, include_all_users=False, store_
     )
 
 
-def count_equipment(user_id=None, search=None, include_all_users=False, store_section=None):
+def count_equipment(user_id=None, search=None, include_all_users=False, store_section=None, equipment_section=None):
     return count_master_records(
         "equipment",
         user_id=user_id,
         search=search,
         include_all_users=include_all_users,
+        equipment_section=equipment_section or store_section,
     )
 
 
@@ -937,7 +1109,12 @@ def master_record_for_id(table_name, record_id, user_id=None, include_all_users=
         where.append("user_id = ?")
         params.append(scoped_recipe_user_id(user_id))
 
-    store_section_select = ", store_section" if table_name == "ingredients" else ""
+    if table_name == "ingredients":
+        section_select = ", store_section"
+    elif table_name == "equipment":
+        section_select = ", equipment_section"
+    else:
+        section_select = ""
     with existing_recipe_master_connection() as connection:
         if connection is None:
             return None
@@ -948,7 +1125,7 @@ def master_record_for_id(table_name, record_id, user_id=None, include_all_users=
                 id,
                 user_id,
                 name,
-                normalized_name{store_section_select},
+                normalized_name{section_select},
                 image_url,
                 image_path,
                 created_at,
@@ -965,6 +1142,8 @@ def master_record_for_id(table_name, record_id, user_id=None, include_all_users=
     row_data = dict(row)
     if table_name == "ingredients":
         row_data["store_section"] = clean_ingredient_store_section(row_data.get("store_section"))
+    elif table_name == "equipment":
+        row_data["equipment_section"] = clean_equipment_section(row_data.get("equipment_section"))
     return row_data
 
 
@@ -1420,15 +1599,22 @@ def equipment_rows_from_recipe_data(recipe_data=None):
         if isinstance(item, dict):
             original_text = clean_text(item.get("original_recipe_text") or item.get("original_text") or item.get("text") or name)
             optional = truthy(item.get("optional"))
+            equipment_section = resolve_equipment_section(
+                " ".join(part for part in (name, original_text) if part),
+                item.get("equipment_section") or item.get("section") or item.get("type"),
+                default="",
+            )
             image_url, image_path = compact_image_fields(item, "equipment_image_url", "image_url")
         else:
             original_text = name
             optional = False
+            equipment_section = ""
             image_url = ""
             image_path = ""
 
         rows.append({
             "name": name,
+            "equipment_section": equipment_section,
             "original_recipe_text": original_text,
             "optional": optional,
             "sort_order": index,
@@ -1447,6 +1633,7 @@ def upsert_master_record(
     image_path="",
     store_section=None,
     force_store_section=False,
+    equipment_section=None,
 ):
     if table_name not in {"ingredients", "equipment"}:
         raise ValueError("Unsupported master table.")
@@ -1509,21 +1696,55 @@ def upsert_master_record(
             ),
         )
     else:
+        equipment_section = resolve_equipment_section(name, equipment_section)
+        previous_row = connection.execute(
+            """
+            SELECT id, equipment_section
+              FROM equipment
+             WHERE user_id = ?
+               AND normalized_name = ?
+            """,
+            (user_id, normalized_name),
+        ).fetchone()
+        previous_section = (
+            clean_equipment_section(previous_row["equipment_section"])
+            if previous_row
+            else ""
+        )
         connection.execute(
             """
             INSERT INTO equipment (
-                user_id, name, normalized_name, image_url, image_path, created_at, updated_at
+                user_id, name, normalized_name, equipment_section, image_url, image_path, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, normalized_name) DO UPDATE SET
                 name = CASE WHEN excluded.name != '' THEN excluded.name ELSE equipment.name END,
+                equipment_section = CASE
+                    WHEN COALESCE(NULLIF(TRIM(equipment.equipment_section), ''), 'MISC') = 'MISC'
+                        THEN excluded.equipment_section
+                    ELSE equipment.equipment_section
+                END,
                 image_url = CASE WHEN excluded.image_url != '' THEN excluded.image_url ELSE equipment.image_url END,
                 image_path = CASE WHEN excluded.image_path != '' THEN excluded.image_path ELSE equipment.image_path END,
                 updated_at = excluded.updated_at
             """,
-            (user_id, name, normalized_name, clean_text(image_url), clean_text(image_path), now, now),
+            (
+                user_id,
+                name,
+                normalized_name,
+                equipment_section,
+                clean_text(image_url),
+                clean_text(image_path),
+                now,
+                now,
+            ),
         )
-    select_columns = "id, store_section" if table_name == "ingredients" else "id"
+    if table_name == "ingredients":
+        select_columns = "id, store_section"
+    elif table_name == "equipment":
+        select_columns = "id, equipment_section"
+    else:
+        select_columns = "id"
     row = connection.execute(
         f"""
         SELECT {select_columns}
@@ -1544,6 +1765,14 @@ def upsert_master_record(
             "previous_store_section": previous_section,
             "store_section_changed": previous_section != current_section,
             "store_section_inserted": previous_section == "",
+        })
+    elif table_name == "equipment":
+        current_section = clean_equipment_section(row["equipment_section"])
+        result.update({
+            "equipment_section": current_section,
+            "previous_equipment_section": previous_section,
+            "equipment_section_changed": previous_section != current_section,
+            "equipment_section_inserted": previous_section == "",
         })
     return result
 
@@ -1729,6 +1958,7 @@ def sync_recipe_master_records(
                 row["name"],
                 image_url=row.get("image_url", ""),
                 image_path=row.get("image_path", ""),
+                equipment_section=row.get("equipment_section", ""),
             )
             equipment_id = equipment_result["id"] if equipment_result else None
             if not equipment_id:
@@ -2113,7 +2343,7 @@ def recipe_master_rows(table_name, recipe_url, user_id=None):
         join_table = "recipe_equipment"
         master_table = "equipment"
         master_fk = "equipment_id"
-        master_columns = "m.name, m.normalized_name, m.image_url, m.image_path"
+        master_columns = "m.name, m.normalized_name, m.equipment_section AS master_equipment_section, m.image_url, m.image_path"
     else:
         raise ValueError("Unsupported recipe row table.")
 

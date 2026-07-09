@@ -56,6 +56,8 @@ def test_sync_recipe_master_records_keeps_same_name_separate_per_user(monkeypatc
     assert user_b_ingredient["store_section"] == "DAIRY & EGGS"
     assert user_a_equipment["id"] != user_b_equipment["id"]
     assert "store_section" not in user_a_equipment
+    assert user_a_equipment["equipment_section"] == "COOKWARE"
+    assert user_b_equipment["equipment_section"] == "COOKWARE"
     assert user_a_equipment["image_url"] == "/static/generated/user-a-pot.png"
     assert user_b_equipment["image_url"] == "/static/generated/user-b-pot.png"
 
@@ -273,6 +275,16 @@ def test_resolve_ingredient_store_section_repairs_generic_or_conflicting_values(
     assert master_data.resolve_ingredient_store_section("mystery crunch", "MISC") == "MISC"
 
 
+def test_resolve_equipment_section_classifies_common_equipment():
+    assert master_data.resolve_equipment_section("medium saucepan") == "COOKWARE"
+    assert master_data.resolve_equipment_section("blender and food processor") == "APPLIANCES"
+    assert master_data.resolve_equipment_section("mixing bowl") == "MIXING BOWLS"
+    assert master_data.resolve_equipment_section("sheet pan") == "BAKEWARE"
+    assert master_data.resolve_equipment_section("measuring cups") == "MEASURING"
+    assert master_data.resolve_equipment_section("storage container") == "SERVING & STORAGE"
+    assert master_data.resolve_equipment_section("mystery tool") == "MISC"
+
+
 def test_backfill_recipe_master_records_reports_recipe_progress(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     user_root = tmp_path / "users" / "user-a" / "recipe-extractor" / "data"
@@ -366,6 +378,12 @@ def test_list_master_records_searches_sorts_and_counts_usage(monkeypatch, tmp_pa
     produce_rows = master_data.list_ingredients(user_id="user-a", store_section="PRODUCE")
     assert [row["name"] for row in produce_rows] == ["Tomato"]
     assert master_data.count_ingredients(user_id="user-a", store_section="PRODUCE") == 1
+    bakeware_rows = master_data.list_equipment(user_id="user-a", equipment_section="BAKEWARE")
+    mixing_rows = master_data.list_equipment(user_id="user-a", equipment_section="MIXING BOWLS")
+    assert [row["name"] for row in bakeware_rows] == ["Sheet pan"]
+    assert bakeware_rows[0]["equipment_section"] == "BAKEWARE"
+    assert [row["name"] for row in mixing_rows] == ["Mixing bowl"]
+    assert master_data.count_equipment(user_id="user-a", equipment_section="BAKEWARE") == 1
 
 
 def test_list_master_record_recipe_references_returns_usage_details(monkeypatch, tmp_path):

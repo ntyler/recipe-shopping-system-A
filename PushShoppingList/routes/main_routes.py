@@ -607,7 +607,7 @@ def master_data_scope(is_admin):
     }
 
 
-def master_data_query_args(search, sort, limit, scope_info, page=None, store_section=None):
+def master_data_query_args(search, sort, limit, scope_info, page=None, store_section=None, equipment_section=None):
     query_args = {
         "sort": sort,
         "limit": limit,
@@ -623,6 +623,8 @@ def master_data_query_args(search, sort, limit, scope_info, page=None, store_sec
 
     if store_section:
         query_args["store_section"] = store_section
+    if equipment_section:
+        query_args["equipment_section"] = equipment_section
 
     if page and page > 1:
         query_args["page"] = page
@@ -677,6 +679,11 @@ def master_data_context(record_type):
         store_section = recipe_master_data.ingredient_store_section_from_source(
             request.args.get("store_section")
         )
+    equipment_section = ""
+    if record_type == "equipment":
+        equipment_section = recipe_master_data.equipment_section_from_source(
+            request.args.get("equipment_section")
+        )
 
     rows = []
     total_count = 0
@@ -690,12 +697,14 @@ def master_data_context(record_type):
             sort=sort,
             include_all_users=scope_info["include_all_users"],
             store_section=store_section if record_type == "ingredients" else None,
+            equipment_section=equipment_section if record_type == "equipment" else None,
         )
         total_count = config["count_func"](
             user_id=scope_info["user_id"],
             search=search,
             include_all_users=scope_info["include_all_users"],
             store_section=store_section if record_type == "ingredients" else None,
+            equipment_section=equipment_section if record_type == "equipment" else None,
         )
         if is_admin:
             available_user_ids = recipe_master_data.recipe_master_user_ids()
@@ -713,6 +722,7 @@ def master_data_context(record_type):
                 sort=sort,
                 include_all_users=scope_info["include_all_users"],
                 store_section=store_section if record_type == "ingredients" else None,
+                equipment_section=equipment_section if record_type == "equipment" else None,
             )
 
     user_ids_for_labels = set(available_user_ids)
@@ -748,6 +758,7 @@ def master_data_context(record_type):
                 scope_info,
                 page=page - 1,
                 store_section=store_section,
+                equipment_section=equipment_section,
             ),
         )
     if page < total_pages:
@@ -760,6 +771,7 @@ def master_data_context(record_type):
                 scope_info,
                 page=page + 1,
                 store_section=store_section,
+                equipment_section=equipment_section,
             ),
         )
     current_url = url_for(
@@ -771,6 +783,7 @@ def master_data_context(record_type):
             scope_info,
             page=page if page > 1 else None,
             store_section=store_section,
+            equipment_section=equipment_section,
         ),
     )
 
@@ -781,6 +794,18 @@ def master_data_context(record_type):
                 row
                 for row in rows
                 if recipe_master_data.clean_ingredient_store_section(row.get("store_section")) == section
+            ]
+            if section_rows:
+                row_groups.append({
+                    "section": section,
+                    "rows": section_rows,
+                })
+    elif record_type == "equipment" and rows and not equipment_section:
+        for section in recipe_master_data.equipment_section_options():
+            section_rows = [
+                row
+                for row in rows
+                if recipe_master_data.clean_equipment_section(row.get("equipment_section")) == section
             ]
             if section_rows:
                 row_groups.append({
@@ -807,8 +832,13 @@ def master_data_context(record_type):
         "store_section_options": recipe_master_data.ingredient_store_section_options()
         if record_type == "ingredients"
         else [],
+        "equipment_section": equipment_section,
+        "equipment_section_options": recipe_master_data.equipment_section_options()
+        if record_type == "equipment"
+        else [],
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
-        "table_column_count": 6 if record_type == "ingredients" else 5,
+        "group_by_equipment_section": bool(record_type == "equipment" and not equipment_section),
+        "table_column_count": 6,
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},
             {"value": "usage_count_desc", "label": "Usage Count"},

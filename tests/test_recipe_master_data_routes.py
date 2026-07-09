@@ -178,12 +178,18 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "user-b@example.com" in filtered_html
     assert equipment_response.status_code == 200
     assert '<th scope="col">Item</th>' in equipment_html
+    assert '<th scope="col">Equipment Type</th>' in equipment_html
     assert '<th scope="col">Normalized Name</th>' not in equipment_html
     assert '<th scope="col">Image</th>' not in equipment_html
-    assert 'colspan="5"' in equipment_html
+    assert '<th scope="rowgroup" colspan="6">COOKWARE</th>' in equipment_html
+    assert '<th scope="rowgroup" colspan="6">PREP TOOLS</th>' in equipment_html
     assert "Generate Missing Images" in equipment_html
     assert "Store Section" not in equipment_html
     assert 'name="store_section"' not in equipment_html
+    assert 'name="equipment_section"' in equipment_html
+    assert "All types" in equipment_html
+    assert "COOKWARE" in equipment_html
+    assert "PREP TOOLS" in equipment_html
     assert "data-master-store-section-panel" not in equipment_html
     assert "data-master-image-form" in equipment_html
     assert "Creates equipment thumbnails" in equipment_html
@@ -267,6 +273,29 @@ def test_ingredient_master_data_filters_and_groups_by_store_section(monkeypatch,
     assert "Tomato" in produce_html
     assert "Garlic" not in produce_html
     assert '<tr class="master-data-section-row">' not in produce_html
+
+
+def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+
+    with app.test_client() as client:
+        sign_in(client, "admin-user")
+        all_response = client.get("/admin/master-data/equipment?scope=all")
+        cookware_response = client.get("/admin/master-data/equipment?scope=all&equipment_section=COOKWARE")
+
+    all_html = all_response.get_data(as_text=True)
+    cookware_html = cookware_response.get_data(as_text=True)
+
+    assert all_response.status_code == 200
+    assert '<tr class="master-data-section-row">' in all_html
+    assert "COOKWARE" in all_html
+    assert "PREP TOOLS" in all_html
+    assert cookware_response.status_code == 200
+    assert 'value="COOKWARE" selected' in cookware_html
+    assert "Large pot" in cookware_html
+    assert "Whisk" not in cookware_html
+    assert '<tr class="master-data-section-row">' not in cookware_html
 
 
 def test_ingredient_master_store_section_update_is_user_scoped(monkeypatch, tmp_path):
