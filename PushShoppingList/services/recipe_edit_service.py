@@ -61,6 +61,7 @@ from PushShoppingList.services.recipe_extract_service import get_openai_error_co
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_cover_image
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
+from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_GENERATED_RECIPE
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_WEBPAGE_BACKUP
@@ -1641,6 +1642,7 @@ def create_new_recipe():
         "equipment": [],
         "instructions": [],
         "nutrition": empty_recipe_nutrition(),
+        "recipe_notes": [],
         "rating": 0,
         "reflection_notes": [],
         "chatgpt_feedback": "",
@@ -2892,6 +2894,11 @@ def load_editable_recipe(url):
                 include_defaults=recipe_url_type(url) == "Manual",
             ),
             "rating": normalize_recipe_rating(recipe_data.get("rating")),
+            "recipe_notes": normalize_recipe_note_sections(
+                recipe_data.get("recipe_notes")
+                or recipe_data.get("recipe_note_sections")
+                or recipe_data.get("source_notes")
+            ),
             "reflection_notes": normalize_reflection_notes(recipe_data.get("reflection_notes")),
             "chatgpt_feedback": str(recipe_data.get("chatgpt_feedback") or "").strip(),
             "chatgpt_feedback_created_at": str(recipe_data.get("chatgpt_feedback_created_at") or "").strip(),
@@ -4286,6 +4293,12 @@ def save_editable_recipe(original_url, payload):
         source_url,
         payload.get("recipe_title") or existing_data.get("recipe_title") or "",
     )
+    existing_recipe_notes = (
+        existing_data.get("recipe_notes")
+        or existing_data.get("recipe_note_sections")
+        or existing_data.get("source_notes")
+        or []
+    )
     recipe_data = {
         **existing_data,
         "source_url": source_url,
@@ -4313,6 +4326,10 @@ def save_editable_recipe(original_url, payload):
         ),
         "nutrition": sanitize_nutrition(payload.get("nutrition", [])),
         "rating": normalize_recipe_rating(payload.get("rating")),
+        "recipe_notes": sanitize_recipe_notes(
+            payload.get("recipe_notes", existing_recipe_notes),
+            existing_recipe_notes,
+        ),
         "reflection_notes": sanitize_reflection_notes(
             payload.get("reflection_notes", []),
             existing_data.get("reflection_notes", []),
@@ -7782,6 +7799,13 @@ def normalize_reflection_notes(value):
         })
 
     return notes
+
+
+def sanitize_recipe_notes(value, existing_value=None):
+    if value is None:
+        value = existing_value
+
+    return normalize_recipe_note_sections(value)
 
 
 def sanitize_reflection_notes(value, existing_value=None):

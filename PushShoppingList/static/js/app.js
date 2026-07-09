@@ -21200,6 +21200,7 @@ function populateRecipeEditor(recipe, originalUrl) {
         inactive_time: recipe.inactive_time || "",
         cook_time: recipe.cook_time || "",
         rating: recipe.rating || 0,
+        recipe_notes: recipe.recipe_notes || [],
         reflection_notes: recipe.reflection_notes || [],
         chatgpt_feedback: recipe.chatgpt_feedback || "",
         chatgpt_feedback_created_at: recipe.chatgpt_feedback_created_at || "",
@@ -21234,6 +21235,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     const ingredientWrap = document.getElementById("recipeEditIngredients");
     const equipmentWrap = document.getElementById("recipeEditEquipment");
     const instructionWrap = document.getElementById("recipeEditInstructions");
+    const recipeNotesWrap = document.getElementById("recipeEditRecipeNotes");
     const nutritionWrap = document.getElementById("recipeEditNutrition");
     const reflectionWrap = document.getElementById("recipeEditReflectionNotes");
 
@@ -21267,6 +21269,11 @@ function populateRecipeEditor(recipe, originalUrl) {
         if (!recipe.instructions || !recipe.instructions.length) {
             addRecipeInstructionRow();
         }
+    }
+
+    if (recipeNotesWrap) {
+        recipeNotesWrap.innerHTML = recipeNotesHeaderHtml();
+        (recipe.recipe_notes || []).forEach(item => addRecipeNoteSectionRow(item));
     }
 
     if (nutritionWrap) {
@@ -26881,6 +26888,108 @@ function recipeNutritionHeaderHtml() {
     `;
 }
 
+function normalizeRecipeNoteItemsForEditor(items) {
+    if (Array.isArray(items)) {
+        return items
+            .map(item => String(item || "").trim())
+            .filter(Boolean);
+    }
+
+    return String(items || "")
+        .split(/\r?\n/)
+        .map(item => item.replace(/^[\s\-*\u2022]+/, "").trim())
+        .filter(Boolean);
+}
+
+function normalizeRecipeNoteSectionForEditor(section = {}) {
+    if (typeof section === "string") {
+        return {
+            heading: "Notes",
+            items: normalizeRecipeNoteItemsForEditor(section),
+        };
+    }
+
+    if (!section || typeof section !== "object") {
+        return { heading: "", items: [] };
+    }
+
+    return {
+        heading: String(section.heading || section.title || section.label || "").trim(),
+        items: normalizeRecipeNoteItemsForEditor(section.items || section.notes || section.text || ""),
+    };
+}
+
+function recipeNotesHeaderHtml() {
+    return `
+        <div class="recipe-edit-recipe-notes-header" aria-hidden="true">
+            <span></span>
+            <span>Section</span>
+            <span>Items</span>
+            <span></span>
+        </div>
+    `;
+}
+
+function addRecipeNoteSectionRow(section = {}) {
+    const wrap = document.getElementById("recipeEditRecipeNotes");
+
+    if (!wrap) {
+        return null;
+    }
+
+    const normalized = normalizeRecipeNoteSectionForEditor(section);
+    const row = document.createElement("div");
+    row.className = "recipe-edit-note-section-row";
+    row.innerHTML = `
+        <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
+        <label class="recipe-edit-note-section-heading">
+            <span class="sr-only">Note section heading</span>
+            <input type="text"
+                   data-field="heading"
+                   placeholder="Top Tips"
+                   value="${escapeAttribute(normalized.heading)}">
+        </label>
+        <label class="recipe-edit-note-section-items">
+            <span class="sr-only">Note items</span>
+            <textarea data-field="items"
+                      rows="4"
+                      placeholder="One note per line">${escapeHtml(normalized.items.join("\n"))}</textarea>
+        </label>
+        <div class="recipe-edit-row-menu-wrap">
+            <button type="button"
+                    class="recipe-edit-row-menu-btn"
+                    aria-label="Recipe note actions"
+                    title="Recipe note actions"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                <span aria-hidden="true"></span>
+            </button>
+            <div class="recipe-edit-row-menu" hidden>
+                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move note section up</button>
+                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move note section down</button>
+                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete note section</button>
+            </div>
+        </div>
+    `;
+    wrap.appendChild(row);
+    bindRecipeEditDragAndDrop(row);
+    return row;
+}
+
+function collectRecipeNoteSections() {
+    return [...document.querySelectorAll("#recipeEditRecipeNotes .recipe-edit-note-section-row")]
+        .map(row => {
+            const heading = String(row.querySelector('[data-field="heading"]')?.value || "").trim();
+            const items = normalizeRecipeNoteItemsForEditor(
+                row.querySelector('[data-field="items"]')?.value || ""
+            );
+
+            return { heading, items };
+        })
+        .filter(section => section.heading || section.items.length);
+}
+
 async function estimateRecipeNutrition(button, options = {}) {
     const originalText = button ? button.textContent : "";
     const payload = collectRecipeEditorPayload();
@@ -28221,6 +28330,7 @@ function normalizeRecipeEditorSnapshot(recipe) {
             key: String(item.key || "").trim(),
             value: String(item.value || "").trim(),
         })),
+        recipe_notes: normalizeRecipeNoteSectionsSnapshot(recipe.recipe_notes || []),
         reflection_notes: normalizeRecipeReflectionNotesSnapshot(recipe.reflection_notes || []),
         chatgpt_feedback: String(recipe.chatgpt_feedback || "").trim(),
         chatgpt_feedback_created_at: String(recipe.chatgpt_feedback_created_at || "").trim(),
@@ -28243,6 +28353,16 @@ function normalizeRecipeReflectionNotesSnapshot(notes) {
             chatgpt_feedback_created_at: String(item.chatgpt_feedback_created_at || "").trim(),
         }))
         .filter(item => item.text);
+}
+
+function normalizeRecipeNoteSectionsSnapshot(notes) {
+    return (Array.isArray(notes) ? notes : [])
+        .map(section => normalizeRecipeNoteSectionForEditor(section))
+        .map(section => ({
+            heading: section.heading,
+            items: section.items,
+        }))
+        .filter(section => section.heading || section.items.length);
 }
 
 function normalizeRecipeScalingSnapshot(scaling) {
@@ -28323,6 +28443,7 @@ function buildRecipeSaveProgressItems(recipe) {
     [
         ["Equipment", previous.equipment.length, next.equipment.length],
         ["Instructions", previous.instructions.length, next.instructions.length],
+        ["Recipe notes", previous.recipe_notes.length, next.recipe_notes.length],
         ["Nutrition", previous.nutrition.length, next.nutrition.length],
         ["Reflection notes", previous.reflection_notes.length, next.reflection_notes.length],
     ].forEach(([label, beforeCount, afterCount]) => {
@@ -28330,6 +28451,13 @@ function buildRecipeSaveProgressItems(recipe) {
             detailLines.push(`${label}: ${beforeCount} -> ${afterCount}`);
         }
     });
+
+    if (
+        previous.recipe_notes.length === next.recipe_notes.length
+        && JSON.stringify(previous.recipe_notes) !== JSON.stringify(next.recipe_notes)
+    ) {
+        detailLines.push("Recipe notes updated.");
+    }
 
     if (
         previous.reflection_notes.length === next.reflection_notes.length
@@ -28574,6 +28702,7 @@ function collectRecipeEditorPayload() {
             ingredients: collectRecipeIngredientRows(),
             equipment: collectRecipeEquipmentRows(),
             instructions: collectRecipeInstructionRows(),
+            recipe_notes: collectRecipeNoteSections(),
             nutrition: collectRecipeNutritionRows(),
             reflection_notes: collectRecipeReflectionNotes(),
             ...collectRecipeMenuMetadataPayload(),

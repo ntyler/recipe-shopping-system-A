@@ -158,6 +158,58 @@ def test_recipe_view_notes_render_as_collapsible_detail_section():
     assert ".recipe-note-section li:empty" in css
 
 
+def test_recipe_notes_are_editable_between_instructions_and_nutrition():
+    script = read_text("PushShoppingList/static/js/app.js")
+    current_recipes = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+    service = read_text("PushShoppingList/services/recipe_edit_service.py")
+
+    assert 'id="recipeEditRecipeNotes"' in current_recipes
+    assert "recipe-edit-recipe-notes-section" in current_recipes
+    assert current_recipes.index('id="recipeEditInstructions"') < current_recipes.index('id="recipeEditRecipeNotes"')
+    assert current_recipes.index('id="recipeEditRecipeNotes"') < current_recipes.index('id="recipeEditNutrition"')
+    assert current_recipes.index('id="recipeEditNutrition"') < current_recipes.index('id="recipeEditReflectionNotes"')
+
+    for token in (
+        "recipe.recipe_notes || []",
+        "recipeNotesHeaderHtml",
+        "addRecipeNoteSectionRow",
+        "collectRecipeNoteSections",
+        "normalizeRecipeNoteSectionsSnapshot",
+        "recipe_notes: collectRecipeNoteSections()",
+    ):
+        assert token in script
+
+    assert ".recipe-edit-note-section-row" in css
+    assert ".recipe-edit-panel-icon-notes" in css
+    assert "from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections" in service
+    assert '"recipe_notes": normalize_recipe_note_sections' in service
+    assert '"recipe_notes": sanitize_recipe_notes' in service
+
+
+def test_recipe_notes_sanitize_through_shared_normalizer():
+    notes = recipe_edit_service.sanitize_recipe_notes([
+        {
+            "heading": "Top Tips",
+            "items": ["Keep warm while serving.", " "],
+        },
+        "Use a wide pan.",
+    ])
+
+    assert notes == [
+        {
+            "heading": "Top Tips",
+            "items": ["Keep warm while serving."],
+        },
+        {
+            "heading": "",
+            "items": ["Use a wide pan."],
+        },
+    ]
+
+    assert recipe_edit_service.sanitize_recipe_notes(None, notes) == notes
+
+
 def test_recipe_notes_for_view_drops_empty_items_and_dedupes_sections():
     sections = main_routes.recipe_notes_for_view({
         "recipe_notes": [

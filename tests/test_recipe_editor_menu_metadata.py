@@ -157,6 +157,41 @@ def empty_menu_metadata_payload():
     }
 
 
+def test_recipe_editor_loads_and_saves_recipe_notes(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://example.test/recipe-with-notes"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Recipe With Notes",
+        "source_notes": [{
+            "heading": "Top Tips",
+            "items": ["Keep warm while serving."],
+        }],
+        "ingredients": [{"ingredient": "salt", "quantity": "1", "unit": "tsp"}],
+        "instructions": [{"instruction": "Cook until done."}],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+    assert loaded["recipe_notes"] == [{
+        "heading": "Top Tips",
+        "items": ["Keep warm while serving."],
+    }]
+
+    recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(url, recipe_notes=[{
+            "heading": "Storing & Reheating",
+            "items": ["Reheat gently.", ""],
+        }]),
+    )
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert saved["recipe_notes"] == [{
+        "heading": "Storing & Reheating",
+        "items": ["Reheat gently."],
+    }]
+
+
 def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     js = read_text("PushShoppingList/static/js/app.js")
