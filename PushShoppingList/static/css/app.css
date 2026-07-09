@@ -19180,6 +19180,21 @@ body {
     }
 }
 
+.recipe-edit-equipment.recipe-edit-equipment-collapsed .recipe-edit-equipment-row:not(.recipe-edit-row-expanded),
+.recipe-edit-equipment-row.recipe-edit-row-collapsed {
+    border: 1px solid #263447;
+    border-radius: 8px;
+    background:
+        linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96)),
+        #0d1520;
+    box-shadow: none;
+}
+
+.recipe-edit-equipment.recipe-edit-equipment-collapsed .recipe-edit-equipment-row:not(.recipe-edit-row-expanded):last-child,
+.recipe-edit-equipment-row.recipe-edit-row-collapsed:last-child {
+    border-bottom: 1px solid #263447;
+}
+
 .recipe-edit-equipment.recipe-edit-equipment-collapsed .recipe-edit-equipment-row:not(.recipe-edit-row-expanded):not(:has([data-equipment-image-panel]:not(.recipe-image-empty):not(.recipe-image-visibility-hidden))),
 .recipe-edit-equipment-row.recipe-edit-row-collapsed:not(:has([data-equipment-image-panel]:not(.recipe-image-empty):not(.recipe-image-visibility-hidden))) {
     align-items: center;

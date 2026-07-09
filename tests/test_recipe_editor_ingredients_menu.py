@@ -417,6 +417,17 @@ def test_recipe_editor_equipment_uses_same_compact_expand_controls_as_ingredient
     assert "Collapse equipment" in script
     assert ".recipe-edit-equipment.recipe-edit-equipment-collapsed .recipe-edit-equipment-row:not(.recipe-edit-row-expanded):has(" in css
     assert ".recipe-edit-equipment-row.recipe-edit-row-collapsed:has(" in css
+    compact_equipment_start = css.index(
+        ".recipe-edit-equipment.recipe-edit-equipment-collapsed .recipe-edit-equipment-row:not(.recipe-edit-row-expanded),"
+    )
+    compact_equipment_end = css.index(
+        ".recipe-edit-equipment.recipe-edit-equipment-collapsed .recipe-edit-equipment-row:not(.recipe-edit-row-expanded):not(:has",
+        compact_equipment_start,
+    )
+    compact_equipment_css = css[compact_equipment_start:compact_equipment_end]
+    assert "border: 1px solid #263447;" in compact_equipment_css
+    assert "border-radius: 8px;" in compact_equipment_css
+    assert "linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96))" in compact_equipment_css
 
 
 def test_recipe_menu_edit_links_to_standalone_editor_page():
