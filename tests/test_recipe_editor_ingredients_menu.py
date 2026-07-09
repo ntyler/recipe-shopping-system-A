@@ -155,8 +155,8 @@ def test_recipe_editor_ingredient_thumbnail_uses_consistent_inline_slot():
     assert ".recipe-ingredient-image-panel.recipe-edit-row-image-panel" in desktop_rule
     assert "grid-column: 3 / 4;" in desktop_rule
     assert "grid-row: 1;" in desktop_rule
-    assert "width: var(--recipe-edit-thumbnail-size, 40px);" in desktop_rule
-    assert "height: var(--recipe-edit-thumbnail-size, 40px);" in desktop_rule
+    assert "width: var(--recipe-edit-thumbnail-size, 64px);" in desktop_rule
+    assert "height: var(--recipe-edit-thumbnail-size, 64px);" in desktop_rule
     assert "grid-column: 4 / 10;" in desktop_rule
 
 
@@ -174,18 +174,18 @@ def test_recipe_editor_equipment_thumbnail_uses_ingredient_like_inline_slot():
     assert "width: 120px;" in equipment_css
     assert "height: 120px;" in equipment_css
     assert ".recipe-equipment-image-panel:not(.recipe-image-tools-visible) .recipe-step-image-actions" in equipment_css
-    assert "grid-template-columns: 26px 54px var(--recipe-edit-thumbnail-slot, 42px) minmax(0, 1fr) 44px;" in equipment_css
+    assert "grid-template-columns: 26px 54px var(--recipe-edit-thumbnail-slot, 66px) minmax(0, 1fr) 44px;" in equipment_css
     assert "gap: 10px 14px;" in equipment_css
     assert "min-height: 0;" in equipment_css
     assert "padding: 10px 18px;" in equipment_css
-    assert "grid-template-columns: 28px 54px var(--recipe-edit-thumbnail-slot, 42px) minmax(260px, 1fr) 40px;" in equipment_css
+    assert "grid-template-columns: 28px 54px var(--recipe-edit-thumbnail-slot, 66px) minmax(260px, 1fr) 40px;" in equipment_css
     assert "> .recipe-edit-row-handle" in equipment_css
     assert "> .recipe-edit-row-number" in equipment_css
     assert "grid-row: 1;" in equipment_css
     assert "align-self: center;" in equipment_css
     assert "grid-column: 3 / 4;" in equipment_css
-    assert "width: var(--recipe-edit-thumbnail-size, 40px);" in equipment_css
-    assert "height: var(--recipe-edit-thumbnail-size, 40px);" in equipment_css
+    assert "width: var(--recipe-edit-thumbnail-size, 64px);" in equipment_css
+    assert "height: var(--recipe-edit-thumbnail-size, 64px);" in equipment_css
     assert "grid-column: 4 / 5;" in equipment_css
     assert "grid-column: 5 / 6;" in equipment_css
 
@@ -201,11 +201,13 @@ def test_recipe_editor_thumbnail_size_controls_are_wired():
     assert template.count("data-recipe-thumbnail-size-decrease") >= 3
     assert template.count("data-recipe-thumbnail-size-increase") >= 3
     assert template.count("data-recipe-thumbnail-size-value") >= 3
+    assert template.count("data-recipe-thumbnail-size-value>64px") >= 3
     assert "changeRecipeImageThumbnailSize(this, -1)" in template
     assert "changeRecipeImageThumbnailSize(this, 1)" in template
     assert "resetRecipeImageThumbnailSize(this)" in template
 
     assert 'RECIPE_IMAGE_THUMBNAIL_SIZE_STORAGE_KEY = "recipe-image-thumbnail-size"' in script
+    assert "RECIPE_IMAGE_THUMBNAIL_DEFAULT_SIZE = 64" in script
     assert "RECIPE_IMAGE_THUMBNAIL_MIN_SIZE = 32" in script
     assert "RECIPE_IMAGE_THUMBNAIL_MAX_SIZE = 80" in script
     assert "function normalizeRecipeImageThumbnailSize" in script
@@ -214,10 +216,10 @@ def test_recipe_editor_thumbnail_size_controls_are_wired():
     assert 'document.documentElement.style.setProperty("--recipe-edit-thumbnail-slot"' in script
     assert '["initRecipeImageThumbnailSizeControls", initRecipeImageThumbnailSizeControls]' in script
 
-    assert "--recipe-edit-thumbnail-size: 40px;" in css
-    assert "--recipe-edit-thumbnail-slot: 42px;" in css
-    assert "var(--recipe-edit-thumbnail-size, 40px)" in css
-    assert "var(--recipe-edit-thumbnail-slot, 42px)" in css
+    assert "--recipe-edit-thumbnail-size: 64px;" in css
+    assert "--recipe-edit-thumbnail-slot: 66px;" in css
+    assert "var(--recipe-edit-thumbnail-size, 64px)" in css
+    assert "var(--recipe-edit-thumbnail-slot, 66px)" in css
 
 
 def test_recipe_editor_row_image_tools_toggle_is_wired():
@@ -375,15 +377,15 @@ def test_collapsed_ingredient_rows_put_thumbnail_between_number_and_name():
     compact_end = css.index("@media (max-width: 760px)", compact_start)
     compact_css = css[compact_start:compact_end]
 
-    assert "grid-template-columns: 22px 40px var(--recipe-edit-thumbnail-slot, 42px) minmax(0, 1fr) 38px;" in compact_css
+    assert "grid-template-columns: 22px 40px var(--recipe-edit-thumbnail-slot, 66px) minmax(0, 1fr) 38px;" in compact_css
     assert "display: contents;" in compact_css
     assert "grid-column: 3 / 4;" in compact_css
-    assert "width: var(--recipe-edit-thumbnail-size, 40px);" in compact_css
-    assert "height: var(--recipe-edit-thumbnail-size, 40px);" in compact_css
+    assert "width: var(--recipe-edit-thumbnail-size, 64px);" in compact_css
+    assert "height: var(--recipe-edit-thumbnail-size, 64px);" in compact_css
     assert "grid-column: 4 / 5;" in compact_css
     assert "grid-column: 5 / 6;" in compact_css
     assert "@media (min-width: 1181px)" in compact_css
-    assert "grid-template-columns: 28px 54px var(--recipe-edit-thumbnail-slot, 42px) minmax(0, 1fr) 40px;" in compact_css
+    assert "grid-template-columns: 28px 54px var(--recipe-edit-thumbnail-slot, 66px) minmax(0, 1fr) 40px;" in compact_css
     assert "padding-right: 18px;" in compact_css
     assert "padding-left: 18px;" in compact_css
 
