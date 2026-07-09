@@ -211,6 +211,57 @@ def test_regenerate_ingredients_preview_uses_current_editor_context_without_savi
     assert "Preserve clearly useful current ingredient details" not in calls[0]["prompt"]
 
 
+def test_regenerate_ingredients_reclassifies_plain_inca_pepper_as_produce(monkeypatch, tmp_path):
+    configure_inference_storage(monkeypatch, tmp_path)
+    seed_cookbook_and_recipe(recipe_overrides={
+        "recipe_title": "Papa a la Huancaina",
+        "ingredients": [{"ingredient": "old pepper", "quantity": "1"}],
+        "instructions": [{"instruction": "Blend the sauce and pour over potatoes."}],
+    })
+    patch_ingredient_regeneration_response(
+        monkeypatch,
+        payload=json.dumps({
+            "ingredients": [
+                {
+                    "name": "inca pepper",
+                    "quantity": "2",
+                    "unit": "tablespoons",
+                    "purchasable_item": "inca pepper",
+                    "store_section": "SAUCES & CONDIMENTS",
+                },
+                {
+                    "name": "aji amarillo paste",
+                    "quantity": "1",
+                    "unit": "tablespoon",
+                    "purchasable_item": "aji amarillo paste",
+                    "store_section": "PRODUCE",
+                },
+            ],
+            "confidence": "high",
+        }),
+    )
+
+    result = inference.regenerate_ingredients_for_recipe(
+        SPRING_ROLL_URL,
+        current_recipe={
+            "recipe_title": "Papa a la Huancaina",
+            "ingredients": [{"ingredient": "old pepper", "quantity": "1"}],
+            "instructions": [{"text": "Blend the sauce and pour over potatoes."}],
+        },
+        preview_only=True,
+    )
+
+    assert result["ok"] is True
+    assert [item["ingredient"] for item in result["ingredients"]] == [
+        "inca pepper",
+        "aji amarillo paste",
+    ]
+    assert [item["store_section"] for item in result["ingredients"]] == [
+        "PRODUCE",
+        "SAUCES & CONDIMENTS",
+    ]
+
+
 def test_regenerate_ingredients_saves_only_ingredients_and_preserves_recipe_type(monkeypatch, tmp_path):
     configure_inference_storage(monkeypatch, tmp_path)
     seed_cookbook_and_recipe(recipe_overrides={

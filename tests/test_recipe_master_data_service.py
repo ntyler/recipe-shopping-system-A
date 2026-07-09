@@ -264,8 +264,12 @@ def test_resolve_ingredient_store_section_repairs_generic_or_conflicting_values(
     assert master_data.resolve_ingredient_store_section("1 cup crema", "") == "DAIRY & EGGS"
     assert master_data.resolve_ingredient_store_section("2 cups chicken broth", "MEAT & SEAFOOD") == "CANNED"
     assert master_data.resolve_ingredient_store_section("crema de huancaina sauce", "MISC") == "SAUCES & CONDIMENTS"
-    assert master_data.resolve_ingredient_store_section("inca pepper", "SPICES & SEASONINGS") == "SAUCES & CONDIMENTS"
+    assert master_data.resolve_ingredient_store_section("inca pepper", "SPICES & SEASONINGS") == "PRODUCE"
+    assert master_data.resolve_ingredient_store_section("inca pepper", "SAUCES & CONDIMENTS") == "PRODUCE"
+    assert master_data.resolve_ingredient_store_section("aji amarillo", "SAUCES & CONDIMENTS") == "PRODUCE"
     assert master_data.resolve_ingredient_store_section("aji amarillo paste", "MISC") == "SAUCES & CONDIMENTS"
+    assert master_data.resolve_ingredient_store_section("aji amarillo paste", "SPICES & SEASONINGS") == "SAUCES & CONDIMENTS"
+    assert master_data.resolve_ingredient_store_section("inca pepper sauce", "PRODUCE") == "SAUCES & CONDIMENTS"
     assert master_data.resolve_ingredient_store_section("mystery crunch", "MISC") == "MISC"
 
 

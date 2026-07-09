@@ -272,11 +272,11 @@ def test_review_recipe_store_sections_returns_preview_changes():
     assert [change["proposed_store_section"] for change in result["changes"]] == [
         "PRODUCE",
         "CANNED",
-        "SAUCES & CONDIMENTS",
+        "PRODUCE",
     ]
     assert result["changes"][0]["current_store_section"] == "DAIRY & EGGS"
     assert [item["store_section"] for item in result["recipe"]["ingredients"]] == [
         "PRODUCE",
         "CANNED",
-        "SAUCES & CONDIMENTS",
+        "PRODUCE",
     ]

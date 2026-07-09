@@ -52,6 +52,14 @@ INGREDIENT_STORE_SECTION_ALIASES = {
     "SPICES AND SEASONINGS": "SPICES & SEASONINGS",
     "OILS AND VINEGARS": "OILS & VINEGARS",
 }
+PERUVIAN_PEPPER_PATTERN = r"\b(?:inca pepper|aji amarillo|aji panca)\b"
+PERUVIAN_PEPPER_SAUCE_PATTERN = (
+    rf"{PERUVIAN_PEPPER_PATTERN}.*\b(?:sauce|salsa|paste)\b"
+    rf"|\b(?:sauce|salsa|paste)\b.*{PERUVIAN_PEPPER_PATTERN}"
+)
+PERUVIAN_PEPPER_PLAIN_PATTERN = (
+    rf"{PERUVIAN_PEPPER_PATTERN}(?!\s+(?:sauce|salsa|paste)\b)"
+)
 INGREDIENT_STORE_SECTION_KEYWORD_RULES = (
     (
         (
@@ -67,9 +75,9 @@ INGREDIENT_STORE_SECTION_KEYWORD_RULES = (
     ),
     (
         (
-            r"\b(?:inca pepper|aji amarillo|aji panca)\b",
+            PERUVIAN_PEPPER_PATTERN,
         ),
-        "SAUCES & CONDIMENTS",
+        "PRODUCE",
     ),
     (
         (
@@ -132,7 +140,26 @@ INGREDIENT_STORE_SECTION_CONFLICT_OVERRIDES = (
     ("CANNED", "MEAT & SEAFOOD", r"\b(?:broth|stock|bouillon|consomme)\b"),
     ("SAUCES & CONDIMENTS", "MEAT & SEAFOOD", r"\b(?:sauce|salsa|paste|pesto)\b"),
     ("SAUCES & CONDIMENTS", "DAIRY & EGGS", r"\b(?:sauce|salsa|paste|pesto)\b"),
-    ("SAUCES & CONDIMENTS", "SPICES & SEASONINGS", r"\b(?:inca pepper|aji amarillo|aji panca)\b"),
+    (
+        "SAUCES & CONDIMENTS",
+        "PRODUCE",
+        PERUVIAN_PEPPER_SAUCE_PATTERN,
+    ),
+    (
+        "SAUCES & CONDIMENTS",
+        "SPICES & SEASONINGS",
+        PERUVIAN_PEPPER_SAUCE_PATTERN,
+    ),
+    (
+        "PRODUCE",
+        "SAUCES & CONDIMENTS",
+        PERUVIAN_PEPPER_PLAIN_PATTERN,
+    ),
+    (
+        "PRODUCE",
+        "SPICES & SEASONINGS",
+        PERUVIAN_PEPPER_PLAIN_PATTERN,
+    ),
 )
 MASTER_RECORD_TABLES = {
     "ingredients": {
