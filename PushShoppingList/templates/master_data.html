@@ -55,10 +55,10 @@
                         data-master-reference-toggle
                         data-reference-url="{{ master_data_reference_url(row, master_data) }}"
                         aria-expanded="false"
-                        aria-controls="{{ reference_row_id }}">
-                    <span>{{ row.usage_count }}</span>
-                    <span>View recipes</span>
-                    <span class="master-data-usage-chevron" aria-hidden="true">v</span>
+                        aria-controls="{{ reference_row_id }}"
+                        aria-label="Show {{ row.usage_count }} recipe{% if row.usage_count != 1 %}s{% endif %} referencing {{ row.name }}"
+                        title="Show recipes referencing {{ row.name }}">
+                    <span aria-hidden="true">{{ row.usage_count }}</span>
                 </button>
             {% else %}
                 <span class="master-data-usage-empty">0</span>

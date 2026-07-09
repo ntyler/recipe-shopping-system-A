@@ -141,7 +141,9 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "data-master-backfill-form" in all_html
     assert "data-master-reference-toggle" in all_html
     assert "data-master-reference-row" in all_html
-    assert "View recipes" in all_html
+    assert "Show 1 recipe referencing Tomato" in all_html
+    assert "View recipes" not in all_html
+    assert "master-data-usage-chevron" not in all_html
     assert "/api/master-data/ingredients/" in all_html
     assert "Generate Missing Images" in all_html
     assert "Store Section" in all_html
@@ -572,7 +574,9 @@ def test_master_data_reference_expander_is_wired():
     assert "data-master-reference-row" in template
     assert "master_data_record_references_route" in template
     assert "aria-expanded=\"false\"" in template
-    assert "View recipes" in template
+    assert "aria-label=\"Show {{ row.usage_count }} recipe" in template
+    assert "View recipes" not in template
+    assert "master-data-usage-chevron" not in template
     assert "data-reference-url" in template
     assert "js/master-data.js" in template
 
@@ -583,6 +587,8 @@ def test_master_data_reference_expander_is_wired():
     assert "Open Recipe" in script
 
     assert ".master-data-usage-button" in css
+    assert ".master-data-usage-button span:nth-child" not in css
+    assert ".master-data-usage-chevron" not in css
     assert ".master-data-reference-row[hidden]" in css
     assert ".master-data-reference-panel" in css
     assert ".master-data-reference-item" in css
