@@ -334,9 +334,28 @@
         const main = document.createElement("div");
         main.className = "master-data-reference-main";
 
+        const titleRow = document.createElement("div");
+        titleRow.className = "master-data-reference-title-row";
+
+        const recipeImageUrl = text(reference.recipe_image_url || "");
+        if (recipeImageUrl) {
+            const image = document.createElement("img");
+            image.className = "master-data-reference-title-image";
+            image.src = recipeImageUrl;
+            image.alt = text(reference.recipe_image_alt || reference.recipe_title || "Recipe image");
+            image.loading = "lazy";
+            const srcset = text(reference.recipe_image_srcset || "");
+            if (srcset) {
+                image.srcset = srcset;
+                image.sizes = "42px";
+            }
+            titleRow.appendChild(image);
+        }
+
         const title = document.createElement("strong");
         title.textContent = text(reference.recipe_title || reference.recipe_id || "Recipe");
-        main.appendChild(title);
+        titleRow.appendChild(title);
+        main.appendChild(titleRow);
 
         const detail = document.createElement("div");
         detail.className = "master-data-reference-detail";

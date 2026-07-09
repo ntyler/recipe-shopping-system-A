@@ -24766,6 +24766,24 @@ img[data-deferred-src] {
             min-width: 0;
         }
 
+        .master-data-reference-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .master-data-reference-title-image {
+            display: block;
+            flex: 0 0 42px;
+            width: 42px;
+            height: 42px;
+            border: 1px solid #334155;
+            border-radius: 7px;
+            background: #0f172a;
+            object-fit: cover;
+        }
+
         .master-data-reference-main strong {
             color: #e5edf5;
             font-size: 13px;

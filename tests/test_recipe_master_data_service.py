@@ -402,6 +402,10 @@ def test_list_master_record_recipe_references_returns_usage_details(monkeypatch,
             master_data.recipe_id_for_url(first_url): {
                 "url": first_url,
                 "name": "Onion Soup",
+                "cover_image": {
+                    "path": "data/uploads/recipe_covers/onion_soup.png",
+                    "alt": "Onion Soup title image",
+                },
             },
             master_data.recipe_id_for_url(second_url): {
                 "url": second_url,
@@ -433,6 +437,10 @@ def test_list_master_record_recipe_references_returns_usage_details(monkeypatch,
     assert soup_reference["buy_as"] == "yellow onion"
     assert soup_reference["store_section"] == "PRODUCE"
     assert soup_reference["original_recipe_text"] == "1 large yellow onion, diced"
+    assert soup_reference["cover_image"] == {
+        "path": "data/uploads/recipe_covers/onion_soup.png",
+        "alt": "Onion Soup title image",
+    }
     assert blocked_result["record"] is None
     assert blocked_result["references"] == []
 

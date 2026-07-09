@@ -884,6 +884,27 @@ def master_data_record_references_route(record_type, record_id):
         recipe_url = recipe_master_data.clean_text(reference.get("recipe_url"))
         reference = dict(reference)
         reference["edit_url"] = url_for("recipe_bp.edit_recipe_page_route", url=recipe_url) if recipe_url else ""
+        cover_image = reference.get("cover_image") if isinstance(reference.get("cover_image"), dict) else {}
+        rendered_cover_image = recipe_cover_image_for_view(
+            recipe_url,
+            {
+                "recipe_title": reference.get("recipe_title"),
+                "cover_image": cover_image,
+            },
+            {"cover_image": cover_image},
+            variants=("thumb",),
+        )
+        reference["recipe_image_url"] = (
+            rendered_cover_image.get("thumb_url")
+            or rendered_cover_image.get("display_url")
+            or rendered_cover_image.get("src")
+            or ""
+        )
+        reference["recipe_image_srcset"] = rendered_cover_image.get("srcset") or ""
+        reference["recipe_image_alt"] = (
+            rendered_cover_image.get("alt")
+            or f"{reference.get('recipe_title') or 'Recipe'} image"
+        )
         enriched_references.append(reference)
 
     return jsonify({

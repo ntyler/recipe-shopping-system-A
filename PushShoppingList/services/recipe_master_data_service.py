@@ -923,12 +923,14 @@ def list_master_record_recipe_references(
         metadata_record = metadata.get(recipe_id)
         metadata_record = metadata_record if isinstance(metadata_record, dict) else {}
         recipe_url = clean_text(metadata_record.get("url")) or recipe_id
+        cover_image = metadata_record.get("cover_image")
         references.append({
             "id": int(row_data.get("id") or 0),
             "user_id": clean_text(row_data.get("user_id")),
             "recipe_id": recipe_id,
             "recipe_url": recipe_url,
             "recipe_title": recipe_reference_title(recipe_id, metadata_record),
+            "cover_image": dict(cover_image) if isinstance(cover_image, dict) else {},
             "quantity": clean_text(row_data.get("quantity")),
             "unit": clean_text(row_data.get("unit")),
             "buy_as": clean_text(row_data.get("buy_as")),

@@ -173,10 +173,25 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
 
 
 def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_path):
-    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    app, _db_path, users_root = configure_master_data_app(monkeypatch, tmp_path)
     seed_master_records()
     user_a_tomato = master_data.master_record_for_name("ingredients", "user-a", "tomato")
     user_b_garlic = master_data.master_record_for_name("ingredients", "user-b", "garlic")
+    metadata_path = users_root / "user-a" / "recipe-extractor" / "data" / "recipe_ingredients.json"
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text(
+        json.dumps({
+            master_data.recipe_id_for_url("https://example.com/user-a-soup"): {
+                "url": "https://example.com/user-a-soup",
+                "name": "User A Soup",
+                "cover_image": {
+                    "path": "data/uploads/recipe_covers/user-a-soup.png",
+                    "alt": "User A Soup title image",
+                },
+            },
+        }),
+        encoding="utf-8",
+    )
 
     with app.test_client() as client:
         sign_in(client, "admin-user")
@@ -204,6 +219,8 @@ def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_
     assert admin_payload["references"][0]["recipe_title"] == "User A Soup"
     assert admin_payload["references"][0]["recipe_url"] == "https://example.com/user-a-soup"
     assert "/recipe/edit?url=https://example.com/user-a-soup" in admin_payload["references"][0]["edit_url"]
+    assert "/recipe_cover_image?url=https://example.com/user-a-soup" in admin_payload["references"][0]["recipe_image_url"]
+    assert admin_payload["references"][0]["recipe_image_alt"] == "User A Soup title image"
     assert own_response.status_code == 200
     assert own_payload["record"]["name"] == "Tomato"
     assert blocked_response.status_code == 404
@@ -584,6 +601,9 @@ def test_master_data_reference_expander_is_wired():
     assert "function renderReferences" in script
     assert "[data-master-reference-toggle]" in script
     assert "data-master-reference-panel" in script
+    assert "recipe_image_url" in script
+    assert "recipe_image_srcset" in script
+    assert "master-data-reference-title-image" in script
     assert "Open Recipe" in script
 
     assert ".master-data-usage-button" in css
@@ -591,6 +611,8 @@ def test_master_data_reference_expander_is_wired():
     assert ".master-data-usage-chevron" not in css
     assert ".master-data-reference-row[hidden]" in css
     assert ".master-data-reference-panel" in css
+    assert ".master-data-reference-title-row" in css
+    assert ".master-data-reference-title-image" in css
     assert ".master-data-reference-item" in css
 
 
