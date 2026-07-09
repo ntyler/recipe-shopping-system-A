@@ -131,6 +131,7 @@ from PushShoppingList.services.recipe_edit_service import upload_recipe_pdf_to_c
 from PushShoppingList.services.recipe_edit_service import upload_all_recipe_pdfs_to_cloudflare
 from PushShoppingList.services.cookbook_item_inference_service import infer_missing_details_for_recipe
 from PushShoppingList.services.cookbook_item_inference_service import regenerate_ingredients_for_recipe
+from PushShoppingList.services.cookbook_item_inference_service import regenerate_recipe_notes_for_recipe
 from PushShoppingList.services.recipe_image_progress_service import load_recipe_image_progress
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
@@ -3808,6 +3809,32 @@ def api_recipe_regenerate_ingredients_route():
         return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
 
     result = regenerate_ingredients_for_recipe(
+        recipe_url,
+        current_recipe=data.get("recipe") if isinstance(data.get("recipe"), dict) else None,
+        cookbook_id=str(data.get("cookbook_id") or "").strip(),
+        cookbook_name=str(data.get("cookbook_name") or "").strip(),
+        preview_only=bool(data.get("preview_only")),
+        user_id=active_user_id(),
+    )
+    status = 200 if result.get("ok") else 400
+    return jsonify(with_openai_usage_dashboard(result)), status
+
+
+@recipe_bp.route("/api/recipe/regenerate_notes", methods=["POST"])
+def api_recipe_regenerate_notes_route():
+    data = request.get_json(silent=True) or {}
+    recipe_url = str(
+        data.get("url")
+        or data.get("original_url")
+        or data.get("recipe_url")
+        or data.get("source_url")
+        or ""
+    ).strip()
+
+    if not recipe_url:
+        return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+
+    result = regenerate_recipe_notes_for_recipe(
         recipe_url,
         current_recipe=data.get("recipe") if isinstance(data.get("recipe"), dict) else None,
         cookbook_id=str(data.get("cookbook_id") or "").strip(),

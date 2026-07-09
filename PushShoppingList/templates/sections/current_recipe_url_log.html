@@ -1873,11 +1873,31 @@
                             <p>Source notes such as substitutions, storage, reheating, and tips.</p>
                         </div>
                     </div>
-                    <div class="recipe-edit-section-actions">
+                    <div class="recipe-edit-section-actions recipe-edit-notes-actions">
                         <button type="button" onclick="addRecipeNoteSectionRow()">
                             <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
                             <span>Add Note Section</span>
                         </button>
+                        <div class="recipe-edit-section-menu-wrap recipe-edit-notes-menu-wrap">
+                            <button type="button"
+                                    class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn"
+                                    aria-label="Recipe notes actions"
+                                    title="Recipe notes actions"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditSectionMenu(this, event)">
+                                <span aria-hidden="true"></span>
+                            </button>
+                            <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-notes-menu" hidden>
+                                <div class="overflow-menu-section">
+                                    <div class="overflow-menu-section-title">Recipe Notes</div>
+                                    <button type="button"
+                                            onclick="return regenerateRecipeNotesSection(this)">
+                                        Regenerate Recipe Notes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="recipe-edit-note-presets" aria-label="Common recipe note sections">

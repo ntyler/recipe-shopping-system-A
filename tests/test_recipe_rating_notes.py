@@ -179,6 +179,7 @@ def test_recipe_notes_are_editable_between_instructions_and_nutrition():
         "recipeNotesHeaderHtml",
         "addRecipePresetNoteSection",
         "addRecipeNoteSectionRow",
+        "replaceRecipeEditorRecipeNotes",
         "collectRecipeNoteSections",
         "normalizeRecipeNoteSectionsSnapshot",
         "updateRecipeNoteSectionCount",
@@ -186,10 +187,16 @@ def test_recipe_notes_are_editable_between_instructions_and_nutrition():
         ".recipe-edit-note-section-row, .recipe-edit-reflection-note-row",
         'return ".recipe-edit-note-section-row";',
         "Delete note section",
+        '"/api/recipe/regenerate_notes"',
         "recipe_notes: collectRecipeNoteSections()",
     ):
         assert token in script
 
+    assert "recipe-edit-notes-menu-wrap" in current_recipes
+    assert "recipe-edit-notes-menu" in current_recipes
+    assert "regenerateRecipeNotesSection(this)" in current_recipes
+    assert "Regenerate Recipe Notes" in current_recipes
+    assert "Recipe Notes" in current_recipes
     assert ".recipe-edit-note-presets" in css
     assert ".recipe-edit-note-section-row" in css
     assert ".recipe-edit-note-section-main" in css

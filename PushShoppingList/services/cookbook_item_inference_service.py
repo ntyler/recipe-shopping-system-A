@@ -814,6 +814,62 @@ Required response shape:
 """
 
 
+def build_recipe_notes_regeneration_prompt(recipe_url, recipe_data, cookbook_id="", cookbook_name=""):
+    context = build_prompt_context(recipe_url, recipe_data, cookbook_id, cookbook_name)
+    context["regeneration_mode"] = {
+        "target": "recipe_notes",
+        "action": "replace_entire_recipe_notes_section",
+        "current_recipe_notes_role": "stale_rows_to_replace",
+        "preserve_current_recipe_notes_by_default": False,
+    }
+    return f"""
+Regenerate only the Recipe Notes section for this recipe.
+
+Use the recipe title, menu/source description, ingredients, equipment, instructions, and cookbook context to create practical source-style notes.
+The current recipe_notes are included only as stale rows to replace and as examples of what may already exist.
+Return strict JSON only. Do not include markdown.
+
+Conservative rules:
+- Always return useful note sections when the recipe context supports them.
+- The app will replace the entire current Recipe Notes section with your returned recipe_notes array.
+- Do not regenerate recipe title, ingredients, equipment, instructions, nutrition, categories, or PDFs.
+- Do not claim this is an exact restaurant recipe.
+- Keep bullets short, practical, and specific to this recipe.
+- Do not repeat ingredient rows or instruction steps as notes.
+- Prefer exactly these headings when useful: "Substitutions & Variations", "Storing & Reheating", and "Top Tips".
+- Drop a heading only if there is no useful content for it.
+
+Context JSON:
+{json.dumps(context, ensure_ascii=False, indent=2)}
+
+Required response shape:
+{{
+  "recipe_notes": [
+    {{
+      "heading": "Substitutions & Variations",
+      "items": [
+        ""
+      ]
+    }},
+    {{
+      "heading": "Storing & Reheating",
+      "items": [
+        ""
+      ]
+    }},
+    {{
+      "heading": "Top Tips",
+      "items": [
+        ""
+      ]
+    }}
+  ],
+  "confidence": "low | medium | high",
+  "regeneration_notes": ""
+}}
+"""
+
+
 def openai_chat_content(response):
     return response.choices[0].message.content
 
@@ -894,6 +950,47 @@ def request_recipe_ingredients_regeneration_from_openai(prompt_text, model, mode
     record_openai_usage(
         response,
         "recipe-ingredients-regeneration",
+        model=resolved_model,
+        user_id=user_id,
+    )
+    return openai_chat_content(response)
+
+
+def request_recipe_notes_regeneration_from_openai(prompt_text, model, model_source, user_id=None):
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
+        model,
+        "recipe-notes-regeneration",
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You regenerate only the recipe notes section of an existing recipe. "
+                    "Return only strict JSON matching the requested shape."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    print(
+        "[OpenAI] action=recipe-notes-regeneration "
+        f"model={resolved_model} model_source={model_source} "
+        f"temperature_included={temperature_included}"
+    )
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name="recipe-notes-regeneration",
+        model=resolved_model,
+        kind="menu",
+    )
+    record_openai_usage(
+        response,
+        "recipe-notes-regeneration",
         model=resolved_model,
         user_id=user_id,
     )
@@ -1127,6 +1224,35 @@ def recipe_data_for_ingredient_regeneration(recipe_url, current_recipe=None):
     return recipe_data
 
 
+def recipe_data_for_note_regeneration(recipe_url, current_recipe=None):
+    recipe_url = clean_text(recipe_url)
+    existing_data = recipe_edit_service.load_recipe_output(recipe_url) or {"source_url": recipe_url}
+    current_recipe = current_recipe if isinstance(current_recipe, dict) else {}
+    recipe_data = {
+        **existing_data,
+        **current_recipe,
+    }
+    recipe_data["source_url"] = clean_text(recipe_data.get("source_url")) or recipe_url
+    recipe_data["ingredients"] = recipe_edit_service.sanitize_ingredients(
+        recipe_data.get("ingredients", []),
+        existing_data.get("ingredients", []),
+    )
+    recipe_data["equipment"] = recipe_edit_service.sanitize_equipment_list(
+        recipe_data.get("equipment", []),
+        existing_data.get("equipment", []),
+    )
+    recipe_data["instructions"] = recipe_edit_service.sanitize_instruction_list(
+        recipe_data.get("instructions", []),
+        existing_data.get("instructions", []),
+    )
+    recipe_data["recipe_notes"] = recipe_edit_service.sanitize_recipe_notes(
+        recipe_data.get("recipe_notes", []),
+        existing_data.get("recipe_notes", []),
+    )
+    recipe_data["scaling"] = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
+    return recipe_data
+
+
 def regenerate_ingredients_for_recipe(
     recipe_url,
     current_recipe=None,
@@ -1269,6 +1395,149 @@ def regenerate_ingredients_for_recipe(
         "parsed_ai_json": parsed,
         "saved_counts": {
             "ingredients": len(generated_ingredients),
+        },
+    }
+
+
+def regenerate_recipe_notes_for_recipe(
+    recipe_url,
+    current_recipe=None,
+    cookbook_id="",
+    cookbook_name="",
+    preview_only=False,
+    user_id=None,
+):
+    recipe_url = clean_text(recipe_url)
+    if not recipe_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    recipe_data = recipe_data_for_note_regeneration(recipe_url, current_recipe)
+    cookbook_context = cookbook_context_for_recipe(recipe_url, cookbook_id, cookbook_name)
+    item_name = first_clean_text(
+        recipe_data.get("menu_item_name"),
+        recipe_data.get("recipe_title"),
+        recipe_data.get("display_name"),
+        recipe_url,
+    )
+    model, model_source = resolve_cookbook_item_model()
+    prompt = build_recipe_notes_regeneration_prompt(
+        recipe_url,
+        recipe_data,
+        cookbook_context.get("cookbook_id", ""),
+        cookbook_context.get("cookbook_name", ""),
+    )
+
+    raw_json = ""
+    parsed = {}
+    last_error = None
+    for attempt in range(COOKBOOK_ITEM_INFERENCE_MAX_RETRIES + 1):
+        try:
+            raw_json = request_recipe_notes_regeneration_from_openai(
+                prompt,
+                model,
+                model_source,
+                user_id=user_id,
+            )
+            parsed = parse_ai_json_response(raw_json)
+            break
+        except Exception as exc:
+            last_error = exc
+            openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+            log_inference_event(
+                "recipe_notes_regeneration_openai_failed",
+                recipe_id=recipe_url,
+                recipe_name=item_name,
+                model=model,
+                attempt=attempt + 1,
+                exception_type=type(exc).__name__,
+                error=str(exc),
+                openai_error_code=openai_error_code or "",
+                openai_error_param=openai_error_param or "",
+            )
+            if attempt >= COOKBOOK_ITEM_INFERENCE_MAX_RETRIES:
+                break
+            time.sleep(0.5 * (attempt + 1))
+
+    if last_error is not None and not parsed:
+        return {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "recipe_name": item_name,
+            "error": str(last_error) or "Unable to regenerate recipe notes.",
+            "model": model,
+            "model_source": model_source,
+        }
+
+    generated_notes = normalize_ai_recipe_notes(parsed)
+    if not generated_notes:
+        return {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "recipe_name": item_name,
+            "error": "Recipe notes regeneration did not return any usable notes.",
+            "model": model,
+            "model_source": model_source,
+            "raw_ai_json": raw_json,
+            "parsed_ai_json": parsed,
+        }
+
+    confidence = clean_text(parsed.get("confidence")).lower()
+    if confidence not in {"low", "medium", "high"}:
+        confidence = "medium"
+    next_recipe_data, updated_fields = apply_ai_payload_to_recipe(
+        recipe_data,
+        {
+            "recipe_notes": generated_notes,
+            "confidence": confidence,
+            "source_type": clean_text(parsed.get("source_type")) or COOKBOOK_ITEM_SOURCE_TYPE,
+        },
+        ["recipe_notes"],
+        model,
+        confidence,
+    )
+
+    saved_url = recipe_url
+    loaded_recipe = {
+        **next_recipe_data,
+        "recipe_notes": generated_notes,
+    }
+    if not preview_only:
+        saved_url = save_inferred_recipe(
+            recipe_url,
+            next_recipe_data,
+            cookbook_context.get("cookbook_id", ""),
+        )
+        loaded = recipe_edit_service.load_editable_recipe(saved_url)
+        loaded_recipe = loaded.get("recipe", {}) if isinstance(loaded, dict) else next_recipe_data
+
+    log_inference_event(
+        "recipe_notes_regenerated_preview" if preview_only else "recipe_notes_regenerated",
+        recipe_id=saved_url,
+        recipe_name=item_name,
+        model=model,
+        preview_only=preview_only,
+        raw_ai_json=raw_json,
+        parsed_ai_json=parsed,
+        recipe_note_count=len(generated_notes),
+    )
+
+    return {
+        "ok": True,
+        "skipped": False,
+        "recipe_url": saved_url,
+        "recipe_name": item_name,
+        "preview_only": bool(preview_only),
+        "updated_fields": updated_fields,
+        "would_update_fields": updated_fields if preview_only else [],
+        "model": model,
+        "model_source": model_source,
+        "confidence": confidence,
+        "recipe_notes": generated_notes,
+        "recipe": loaded_recipe,
+        "raw_ai_json": raw_json,
+        "parsed_ai_json": parsed,
+        "saved_counts": {
+            "recipe_notes": len(generated_notes),
         },
     }
 

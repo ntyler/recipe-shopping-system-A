@@ -21316,6 +21316,20 @@ function replaceRecipeEditorIngredients(ingredients = []) {
     return true;
 }
 
+function replaceRecipeEditorRecipeNotes(recipeNotes = []) {
+    const recipeNotesWrap = document.getElementById("recipeEditRecipeNotes");
+
+    if (!recipeNotesWrap) {
+        return false;
+    }
+
+    recipeNotesWrap.innerHTML = recipeNotesHeaderHtml();
+    const notes = Array.isArray(recipeNotes) ? recipeNotes : [];
+    notes.forEach(item => addRecipeNoteSectionRow(item));
+    updateRecipeNotesEmptyState();
+    return true;
+}
+
 function recipeEditorCurrentUrl() {
     const input = document.getElementById("recipeEditOriginalUrl");
     return input ? String(input.value || "").trim() : "";
@@ -27725,6 +27739,20 @@ function recipeIngredientsRegenerationSummary(data = {}) {
     return `${action} ${count} ingredient${count === 1 ? "" : "s"}.`;
 }
 
+function recipeNotesRegenerationSummary(data = {}) {
+    const notes = Array.isArray(data.recipe_notes)
+        ? data.recipe_notes
+        : (data.recipe && Array.isArray(data.recipe.recipe_notes) ? data.recipe.recipe_notes : []);
+    const itemCount = notes.reduce((total, section) => {
+        const items = section && Array.isArray(section.items) ? section.items : [];
+        return total + items.length;
+    }, 0);
+    const sectionCount = notes.length;
+    const action = data.preview_only ? "Previewed" : "Regenerated";
+
+    return `${action} ${sectionCount} note section${sectionCount === 1 ? "" : "s"} with ${itemCount} note${itemCount === 1 ? "" : "s"}.`;
+}
+
 async function regenerateRecipeIngredientsSection(button) {
     const recipeUrl = recipeEditorCurrentUrl();
     const originalText = button ? button.textContent : "";
@@ -27804,6 +27832,91 @@ async function regenerateRecipeIngredientsSection(button) {
         if (button && button.isConnected) {
             button.disabled = false;
             button.textContent = originalText || "Regenerate Ingredients";
+        }
+    }
+
+    return false;
+}
+
+async function regenerateRecipeNotesSection(button) {
+    const recipeUrl = recipeEditorCurrentUrl();
+    const originalText = button ? button.textContent : "";
+    const previewOnly = recipeInferPreviewEnabled();
+
+    closeRecipeEditRowMenus();
+
+    if (!recipeUrl) {
+        setRecipeEditStatus("Recipe URL is required before regenerating recipe notes.", true);
+        return false;
+    }
+
+    if (!previewOnly) {
+        const shouldContinue = window.confirm(
+            "Regenerate and save the Recipe Notes section? Current note sections will be replaced."
+        );
+        if (!shouldContinue) {
+            return false;
+        }
+    }
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = previewOnly ? "Previewing..." : "Regenerating...";
+        }
+        setRecipeEditStatus(`${previewOnly ? "Previewing" : "Regenerating"} recipe notes...`);
+
+        const payload = collectRecipeEditorPayload();
+        const response = await fetch("/api/recipe/regenerate_notes", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                url: recipeUrl,
+                original_url: payload.original_url,
+                recipe: payload.recipe,
+                cookbook_id: recipeEditInferenceContext.cookbook_id || "",
+                cookbook_name: recipeEditInferenceContext.cookbook_name || "",
+                preview_only: previewOnly,
+            }),
+        });
+        const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to regenerate recipe notes.");
+        }
+
+        if (previewOnly) {
+            replaceRecipeEditorRecipeNotes(data.recipe_notes || (data.recipe ? data.recipe.recipe_notes : []));
+        } else {
+            invalidateRecipeEditorCache(recipeUrl);
+            if (data.recipe) {
+                rememberRecipeEditorData(data.recipe.source_url || data.recipe_url || recipeUrl, {
+                    recipe: data.recipe,
+                    store_sections: recipeEditStoreSections,
+                    food_rules: recipeEditFoodRules,
+                });
+                populateRecipeEditor(data.recipe, data.recipe.source_url || data.recipe_url || recipeUrl);
+            } else {
+                const refreshed = await fetchRecipeEditorData(data.recipe_url || recipeUrl, { useCache: false });
+                populateRecipeEditor(refreshed, refreshed.source_url || data.recipe_url || recipeUrl);
+            }
+            await refreshStoreMarkup({ cacheBust: true });
+        }
+
+        const message = `${recipeNotesRegenerationSummary(data)} ${previewOnly ? "Review and Save Recipe to keep changes." : "Recipe notes saved."}`;
+        setRecipeEditStatus(message);
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+    } catch (err) {
+        console.warn("Unable to regenerate recipe notes.", err);
+        setRecipeEditStatus(err.message || "Unable to regenerate recipe notes.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Regenerate Recipe Notes";
         }
     }
 

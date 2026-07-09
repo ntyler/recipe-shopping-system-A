@@ -184,6 +184,39 @@ def patch_ingredient_regeneration_response(monkeypatch, calls=None, payload=None
     return calls
 
 
+def patch_note_regeneration_response(monkeypatch, calls=None, payload=None):
+    calls = calls if isinstance(calls, list) else []
+
+    def fake_request(prompt, model, model_source, user_id=None):
+        calls.append({
+            "prompt": prompt,
+            "model": model,
+            "model_source": model_source,
+            "user_id": user_id,
+        })
+        return payload or json.dumps({
+            "recipe_notes": [
+                {
+                    "heading": "Substitutions & Variations",
+                    "items": ["Swap mushrooms for shredded cabbage."],
+                },
+                {
+                    "heading": "Storing & Reheating",
+                    "items": ["Reheat in a hot oven until crisp."],
+                },
+                {
+                    "heading": "Top Tips",
+                    "items": ["Keep the filling dry before wrapping."],
+                },
+            ],
+            "confidence": "high",
+            "regeneration_notes": "Built from current editor context.",
+        })
+
+    monkeypatch.setattr(inference, "request_recipe_notes_regeneration_from_openai", fake_request)
+    return calls
+
+
 def test_regenerate_ingredients_preview_uses_current_editor_context_without_saving(monkeypatch, tmp_path):
     configure_inference_storage(monkeypatch, tmp_path)
     original = seed_cookbook_and_recipe(recipe_overrides={
@@ -312,6 +345,48 @@ def test_regenerate_ingredients_saves_only_ingredients_and_preserves_recipe_type
     assert saved[inference.INFERRED_FIELD_SOURCE_KEY]["ingredients"] == "ai_regenerated"
     assert saved["ingredients_regenerated_by_model"] == "gpt-test-mini"
     assert saved["ingredients_inference_confidence"] == "high"
+
+
+def test_regenerate_recipe_notes_preview_uses_current_editor_context_without_saving(monkeypatch, tmp_path):
+    configure_inference_storage(monkeypatch, tmp_path)
+    original = seed_cookbook_and_recipe(recipe_overrides={
+        "ingredients": [{"ingredient": "user-entered cabbage", "quantity": "1", "unit": "cup"}],
+        "equipment": [{"equipment": "Dutch oven"}],
+        "instructions": [{"instruction": "Boil the yuca until tender."}],
+        "recipe_notes": [{
+            "heading": "Top Tips",
+            "items": ["Old note."],
+        }],
+    })
+    calls = patch_note_regeneration_response(monkeypatch)
+
+    result = inference.regenerate_recipe_notes_for_recipe(
+        SPRING_ROLL_URL,
+        current_recipe={
+            **original,
+            "recipe_notes": [{
+                "heading": "Top Tips",
+                "items": ["Current editor note."],
+            }],
+        },
+        cookbook_id="vel-asian-cuisine",
+        preview_only=True,
+        user_id="editor",
+    )
+    saved = recipe_edit_service.load_recipe_output(SPRING_ROLL_URL)
+
+    assert result["ok"] is True
+    assert result["preview_only"] is True
+    assert result["updated_fields"] == ["recipe_notes"]
+    assert result["would_update_fields"] == ["recipe_notes"]
+    assert result["recipe_notes"][0]["heading"] == "Substitutions & Variations"
+    assert result["recipe"]["ingredients"][0]["ingredient"] == "user-entered cabbage"
+    assert saved == original
+    assert len(calls) == 1
+    assert calls[0]["user_id"] == "editor"
+    assert "Regenerate only the Recipe Notes section" in calls[0]["prompt"]
+    assert "replace_entire_recipe_notes_section" in calls[0]["prompt"]
+    assert "Current editor note." in calls[0]["prompt"]
 
 
 def test_infer_missing_details_fills_placeholder_menu_item_rows(monkeypatch, tmp_path):
