@@ -101,12 +101,24 @@ def test_recipe_editor_ingredient_substitutions_are_wired():
     assert "const optionRow = input.closest(\"[data-substitution-option-row]\");" in script
     assert ".recipe-edit-ingredient-substitutions" in css
     assert ".recipe-edit-substitution-list" in css
-    assert ".recipe-edit-substitution-option-row.recipe-edit-ingredient-row" not in css
     substitution_grid_start = css.index(".recipe-edit-ingredient-row .recipe-edit-ingredient-substitutions,")
     substitution_grid_end = css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel", substitution_grid_start)
     substitution_grid_css = css[substitution_grid_start:substitution_grid_end]
     assert "grid-column: 1 / -1;" in substitution_grid_css
     assert "padding-left: calc(28px + 14px + 54px + 14px);" in substitution_grid_css
+    parent_thumbnail_option_start = css.index(
+        ".recipe-edit-ingredient-row:has(> .recipe-edit-ingredient-name-label > .recipe-ingredient-image-panel"
+    )
+    parent_thumbnail_option_end = css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel,", parent_thumbnail_option_start)
+    parent_thumbnail_option_css = css[parent_thumbnail_option_start:parent_thumbnail_option_end]
+    assert ".recipe-edit-substitution-option-row.recipe-edit-ingredient-row" in parent_thumbnail_option_css
+    assert "grid-template-columns: 28px 54px var(--recipe-edit-thumbnail-slot, 66px) minmax(260px, 1.5fr) minmax(74px, 0.42fr) minmax(100px, 0.52fr) minmax(160px, 0.8fr) minmax(190px, 0.95fr) 94px 40px;" in parent_thumbnail_option_css
+    assert ".recipe-edit-ingredient-title-line" in parent_thumbnail_option_css
+    assert "grid-column: 4 / 10;" in parent_thumbnail_option_css
+    assert "label.recipe-edit-qty-label" in parent_thumbnail_option_css
+    assert "grid-column: 5 / 6;" in parent_thumbnail_option_css
+    assert "label.recipe-edit-store-section-label" in parent_thumbnail_option_css
+    assert "grid-column: 8 / 9;" in parent_thumbnail_option_css
     assert ".recipe-edit-ingredient-badge.substitution" in css
     assert ".recipe-edit-row-collapsed .recipe-edit-ingredient-substitutions" in css
 
