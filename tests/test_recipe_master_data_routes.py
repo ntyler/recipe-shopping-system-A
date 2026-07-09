@@ -137,7 +137,14 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Tomato" in all_html
     assert "Garlic" in all_html
     assert "Run Backfill" in all_html
+    assert '<th scope="col">Item</th>' in all_html
+    assert '<th scope="col">Normalized Name</th>' not in all_html
+    assert '<th scope="col">Image</th>' not in all_html
+    assert 'class="master-data-item-cell"' in all_html
+    assert 'class="master-data-item-copy"' in all_html
     assert 'data-full-src="/static/generated/tomato.png"' in all_html
+    assert all_html.index('class="master-data-thumbnail"') < all_html.index("<strong>Tomato</strong>")
+    assert '<th scope="rowgroup" colspan="6">PRODUCE</th>' in all_html
     assert "Backfill progress" in all_html
     assert "data-master-backfill-form" in all_html
     assert "data-master-reference-toggle" in all_html
@@ -165,6 +172,10 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "User B" in filtered_html
     assert "user-b@example.com" in filtered_html
     assert equipment_response.status_code == 200
+    assert '<th scope="col">Item</th>' in equipment_html
+    assert '<th scope="col">Normalized Name</th>' not in equipment_html
+    assert '<th scope="col">Image</th>' not in equipment_html
+    assert 'colspan="5"' in equipment_html
     assert "Generate Missing Images" in equipment_html
     assert "Store Section" not in equipment_html
     assert 'name="store_section"' not in equipment_html
@@ -589,6 +600,11 @@ def test_master_data_reference_expander_is_wired():
     script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
+    assert '<th scope="col">Item</th>' in template
+    assert '<th scope="col">Normalized Name</th>' not in template
+    assert '<th scope="col">Image</th>' not in template
+    assert "master-data-item-cell" in template
+    assert "master-data-item-copy" in template
     assert "data-master-reference-toggle" in template
     assert "data-master-reference-row" in template
     assert "master_data_record_references_route" in template
@@ -635,6 +651,9 @@ def test_master_data_reference_expander_is_wired():
     assert ".master-data-reference-title-image" in css
     assert ".master-data-reference-copy" in css
     assert ".master-data-reference-item" in css
+    assert ".master-data-item" in css
+    assert ".master-data-item-copy" in css
+    assert "grid-template-columns: var(--master-data-thumbnail-slot, 66px) minmax(0, 1fr);" in css
     assert ".master-data-thumbnail[src]" in css
     assert "--master-data-thumbnail-size: 64px;" in css
     assert "width: var(--master-data-thumbnail-size, 64px);" in css

@@ -11,8 +11,22 @@
 {% macro render_master_data_row(row, master_data) -%}
     {% set reference_row_id = 'masterDataReferences-' ~ master_data.record_type ~ '-' ~ row.id %}
     <tr class="master-data-record-row" data-master-record-id="{{ row.id }}">
-        <td><strong>{{ row.name }}</strong></td>
-        <td><code>{{ row.normalized_name }}</code></td>
+        <td class="master-data-item-cell">
+            <div class="master-data-item">
+                {% if row.image_url %}
+                    <img class="master-data-thumbnail"
+                         src="{{ row.image_url }}"
+                         data-full-src="{{ row.image_url }}"
+                         alt="{{ row.name }} image">
+                {% else %}
+                    <span class="master-data-no-image">No image</span>
+                {% endif %}
+                <div class="master-data-item-copy">
+                    <strong>{{ row.name }}</strong>
+                    <code>{{ row.normalized_name }}</code>
+                </div>
+            </div>
+        </td>
         {% if master_data.record_type == 'ingredients' %}
             <td>
                 <form class="master-data-store-section-form"
@@ -30,16 +44,6 @@
                 </form>
             </td>
         {% endif %}
-        <td>
-            {% if row.image_url %}
-                <img class="master-data-thumbnail"
-                     src="{{ row.image_url }}"
-                     data-full-src="{{ row.image_url }}"
-                     alt="{{ row.name }} image">
-            {% else %}
-                <span class="master-data-no-image">No image</span>
-            {% endif %}
-        </td>
         <td>
             <div class="master-data-user-cell">
                 <strong>{{ row.user_identity.display_name }}</strong>
@@ -343,12 +347,10 @@
                 <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% endif %}">
                     <thead>
                         <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Normalized Name</th>
+                            <th scope="col">Item</th>
                             {% if master_data.record_type == 'ingredients' %}
                                 <th scope="col">Store Section</th>
                             {% endif %}
-                            <th scope="col">Image</th>
                             <th scope="col">User</th>
                             <th scope="col">Usage Count</th>
                             <th scope="col">Updated At</th>

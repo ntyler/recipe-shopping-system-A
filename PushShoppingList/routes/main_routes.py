@@ -807,7 +807,7 @@ def master_data_context(record_type):
         if record_type == "ingredients"
         else [],
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
-        "table_column_count": 8 if record_type == "ingredients" else 7,
+        "table_column_count": 6 if record_type == "ingredients" else 5,
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},
             {"value": "usage_count_desc", "label": "Usage Count"},
