@@ -81,15 +81,27 @@ def test_recipe_editor_ingredient_substitutions_are_wired():
     collect_end = script.index("function collectRecipeNutritionRows", collect_start)
     collect_block = script[collect_start:collect_end]
 
+    assert "function recipeIngredientSubstitutionRows(item = {})" in script
     assert "function recipeIngredientSubstitutions(item = {})" in script
+    assert "function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0)" in script
     assert "recipe-edit-ingredient-substitutions" in row_block
+    assert "recipe-edit-substitution-option-row recipe-edit-ingredient-row" in script
+    assert "data-ingredient-substitution-list" in row_block
     assert "Substitutions / Options" in row_block
-    assert 'data-field="substitutions_text"' in row_block
+    assert "Add Option" in row_block
+    assert "Add substitution option" in row_block
+    assert 'data-field="substitutions_text"' not in row_block
+    assert "bindRecipeIngredientSubstitutionRows(row);" in row_block
     assert "data-ingredient-substitution-count" in row_block
     assert 'badges.push([`${substitutionCount} Option${substitutionCount === 1 ? "" : "s"}`, "substitution"]);' in script
-    assert "item.substitutions = recipeIngredientSubstitutions(item);" in collect_block
+    assert "function recipeEditIngredientRows()" in script
+    assert "function collectRecipeIngredientSubstitutionRows(row)" in script
+    assert "item.substitutions = collectRecipeIngredientSubstitutionRows(row);" in collect_block
     assert "delete item.substitutions_text;" in collect_block
+    assert "const optionRow = input.closest(\"[data-substitution-option-row]\");" in script
     assert ".recipe-edit-ingredient-substitutions" in css
+    assert ".recipe-edit-substitution-list" in css
+    assert ".recipe-edit-substitution-option-row.recipe-edit-ingredient-row" not in css
     assert ".recipe-edit-ingredient-badge.substitution" in css
     assert ".recipe-edit-row-collapsed .recipe-edit-ingredient-substitutions" in css
 
@@ -369,7 +381,7 @@ def test_collapsed_ingredient_rows_use_compact_one_line_layout():
     shared_surface_end = css.index("@media (min-width: 761px)", final_surface_start)
     shared_surface_css = css[final_surface_start:shared_surface_end]
     compact_start = css.index(
-        ".recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),",
+        ".recipe-edit-ingredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),",
         final_surface_start,
     )
     compact_end = css.index(".recipe-edit-equipment.recipe-edit-equipment-collapsed", compact_start)
@@ -401,7 +413,7 @@ def test_collapsed_ingredient_rows_put_thumbnail_between_number_and_name():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     compact_start = css.index(
         ".recipe-edit-ingredients.recipe-edit-ingredients-collapsed "
-        ".recipe-edit-ingredient-row:not(.recipe-edit-row-expanded):has("
+        "> .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded):has("
         ".recipe-ingredient-image-panel:not(.recipe-image-visibility-hidden) "
         ".recipe-ingredient-image:not([hidden]))"
     )

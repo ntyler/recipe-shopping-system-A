@@ -58,9 +58,11 @@ from PushShoppingList.services.recipe_extract_service import fetch_recipe_page
 from PushShoppingList.services.recipe_extract_service import generated_recipe_pdf_path
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import get_openai_error_code_and_param
+from PushShoppingList.services.recipe_extract_service import apply_recipe_note_substitutions_to_ingredients
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_cover_image
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
+from PushShoppingList.services.recipe_extract_service import normalize_ingredient_substitutions as normalize_ingredient_substitution_options
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_GENERATED_RECIPE
@@ -2866,6 +2868,15 @@ def load_editable_recipe(url):
         or ""
     ).strip()
     category_metadata = recipe_category_metadata_for_editor(url, recipe_data, meta)
+    recipe_notes = normalize_recipe_note_sections(
+        recipe_data.get("recipe_notes")
+        or recipe_data.get("recipe_note_sections")
+        or recipe_data.get("source_notes")
+    )
+    apply_recipe_note_substitutions_to_ingredients(
+        recipe_data.get("ingredients", []),
+        recipe_notes,
+    )
 
     return {
         "ok": True,
@@ -2894,11 +2905,7 @@ def load_editable_recipe(url):
                 include_defaults=recipe_url_type(url) == "Manual",
             ),
             "rating": normalize_recipe_rating(recipe_data.get("rating")),
-            "recipe_notes": normalize_recipe_note_sections(
-                recipe_data.get("recipe_notes")
-                or recipe_data.get("recipe_note_sections")
-                or recipe_data.get("source_notes")
-            ),
+            "recipe_notes": recipe_notes,
             "reflection_notes": normalize_reflection_notes(recipe_data.get("reflection_notes")),
             "chatgpt_feedback": str(recipe_data.get("chatgpt_feedback") or "").strip(),
             "chatgpt_feedback_created_at": str(recipe_data.get("chatgpt_feedback_created_at") or "").strip(),
@@ -7162,7 +7169,8 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "substitutions": normalize_ingredient_substitutions(
                 item.get("substitutions")
                 or item.get("substitution_options")
-                or item.get("alternatives")
+                or item.get("alternatives"),
+                parent_item=item,
             ),
             "ingredient_image_url": ingredient_image_url,
             "ingredient_image_generated_at": (
@@ -7332,46 +7340,12 @@ def normalize_nutrition_rows(nutrition, include_defaults=False):
     return rows
 
 
-def normalize_ingredient_substitutions(value, existing_value=None):
+def normalize_ingredient_substitutions(value, existing_value=None, parent_item=None):
     candidates = value
     if candidates in (None, "", []):
         candidates = existing_value
-    if candidates in (None, "", []):
-        return []
 
-    if isinstance(candidates, str):
-        rows = re.split(r"[\r\n;]+", candidates)
-    elif isinstance(candidates, list):
-        rows = candidates
-    else:
-        rows = [candidates]
-
-    normalized = []
-    seen = set()
-    for option in rows:
-        if isinstance(option, dict):
-            text = (
-                option.get("ingredient")
-                or option.get("name")
-                or option.get("substitute")
-                or option.get("option")
-                or option.get("text")
-                or option.get("label")
-                or ""
-            )
-        else:
-            text = option
-
-        text = str(text or "").strip()
-        if not text:
-            continue
-        key = instruction_match_text_key(text)
-        if key in seen:
-            continue
-        normalized.append(text)
-        seen.add(key)
-
-    return normalized
+    return normalize_ingredient_substitution_options(candidates, parent_item=parent_item)
 
 
 def sanitize_ingredients(value, existing_value=None):
@@ -7450,6 +7424,7 @@ def sanitize_ingredients(value, existing_value=None):
             existing.get("substitutions")
             or existing.get("substitution_options")
             or existing.get("alternatives"),
+            parent_item={**existing, **item},
         )
 
         row = {

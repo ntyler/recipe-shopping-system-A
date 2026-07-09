@@ -208,7 +208,11 @@ def test_recipe_editor_saves_ingredient_substitutions(monkeypatch, tmp_path):
     })
 
     loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
-    assert loaded["ingredients"][0]["substitutions"] == ["sweet potatoes"]
+    assert [
+        item["ingredient"]
+        for item in loaded["ingredients"][0]["substitutions"]
+    ] == ["sweet potatoes"]
+    assert loaded["ingredients"][0]["substitutions"][0]["store_section"] == "PRODUCE"
 
     recipe_edit_service.save_editable_recipe(
         url,
@@ -221,7 +225,11 @@ def test_recipe_editor_saves_ingredient_substitutions(monkeypatch, tmp_path):
     )
     saved = recipe_edit_service.load_recipe_output(url)
 
-    assert saved["ingredients"][0]["substitutions"] == ["vegetable broth", "mushroom broth"]
+    assert [
+        item["ingredient"]
+        for item in saved["ingredients"][0]["substitutions"]
+    ] == ["vegetable broth", "mushroom broth"]
+    assert all(item["store_section"] for item in saved["ingredients"][0]["substitutions"])
 
 
 def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():

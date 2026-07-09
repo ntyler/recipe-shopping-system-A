@@ -23483,8 +23483,12 @@ function applyRecipeScaleMultiplier(select) {
         servingsInput.value = scaleServingsForDisplay(baseServings, multiplier);
     }
 
-    document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")
-        .forEach(row => applyRecipeScaleToIngredientRow(row, multiplier));
+    recipeEditIngredientRows().forEach(row => {
+        applyRecipeScaleToIngredientRow(row, multiplier);
+        row.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => {
+            applyRecipeScaleToIngredientRow(optionRow, multiplier);
+        });
+    });
 }
 
 function applyRecipeScaleToIngredientRow(row, multiplier) {
@@ -23595,7 +23599,7 @@ function recipeEditorIngredientRowForName(ingredientName) {
         return null;
     }
 
-    const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
+    const rows = recipeEditIngredientRows();
     const match = rows.reduce((best, candidate) => {
         const ingredientInput = candidate.querySelector('[data-field="ingredient"]');
         const originalTextInput = candidate.querySelector('[data-field="original_text"]');
@@ -24216,28 +24220,152 @@ function recipeIngredientInferredValue(item = {}) {
 }
 
 function recipeIngredientSubstitutions(item = {}) {
+    return recipeIngredientSubstitutionRows(item).map(option => option.ingredient).filter(Boolean);
+}
+
+function recipeIngredientSubstitutionRows(item = {}) {
     const value = item && typeof item === "object"
         ? (item.substitutions || item.substitution_options || item.alternatives || [])
         : [];
     const rows = Array.isArray(value) ? value : String(value || "").split(/\r?\n|;/);
 
-    return rows.map(option => {
+    return rows.flatMap(option => {
         if (option && typeof option === "object") {
-            return String(
+            const ingredient = String(
                 option.ingredient
                 || option.name
                 || option.substitute
                 || option.option
                 || option.text
+                || option.purchasable_item
+                || option.buy_as
                 || ""
             ).trim();
+            if (!ingredient) {
+                return [];
+            }
+            return [{
+                ...option,
+                ingredient,
+                original_text: option.original_text || option.source_note || option.text || ingredient,
+                preparation: option.preparation || option.notes || option.reason || "",
+                purchasable_item: option.purchasable_item || option.buy_as || ingredient,
+                store_section: option.store_section || item.store_section || "",
+                optional: option.optional !== false,
+                inferred: option.inferred !== false,
+            }];
         }
-        return String(option || "").trim();
+
+        return String(option || "")
+            .split(/\s+or\s+|\/|\r?\n|;/i)
+            .map(name => String(name || "").trim())
+            .filter(Boolean)
+            .map(name => ({
+                ingredient: name,
+                original_text: name,
+                preparation: "",
+                purchasable_item: name,
+                store_section: item.store_section || "",
+                optional: true,
+                inferred: true,
+            }));
     }).filter(Boolean);
 }
 
 function recipeIngredientSubstitutionsText(item = {}) {
     return recipeIngredientSubstitutions(item).join("\n");
+}
+
+function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
+    const baseQuantity = option.base_quantity !== undefined && option.base_quantity !== null
+        ? option.base_quantity
+        : option.quantity || "";
+    const baseUnit = option.base_unit !== undefined && option.base_unit !== null
+        ? option.base_unit
+        : option.unit || "";
+    const optionNumber = String(index + 1);
+
+    return `
+        <div class="recipe-edit-substitution-option-row recipe-edit-ingredient-row" data-substitution-option-row>
+            <span class="recipe-edit-row-handle recipe-edit-substitution-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
+            <span class="recipe-edit-row-number recipe-edit-substitution-row-number" data-substitution-row-number>${escapeHtml(optionNumber)}</span>
+            <div class="recipe-edit-ingredient-name-label">
+                <span class="sr-only">Substitution ingredient</span>
+                <span class="recipe-edit-ingredient-title-line">
+                    <textarea data-field="ingredient" rows="1">${escapeHtml(option.ingredient || "")}</textarea>
+                    <span class="recipe-edit-ingredient-markers">
+                        <span class="recipe-edit-ingredient-badges" data-substitution-badges>${recipeIngredientBadgesHtml(option)}</span>
+                    </span>
+                </span>
+                <label class="recipe-edit-preparation-inline">
+                    <span class="sr-only">Preparation</span>
+                    <input type="text" data-field="preparation" value="${escapeAttribute(option.preparation || "")}" placeholder="-">
+                </label>
+                <label class="recipe-edit-original-text-label">
+                    <span>Original Recipe Text</span>
+                    <input type="text" data-field="original_text" value="${escapeAttribute(option.original_text || option.source_note || "")}">
+                </label>
+            </div>
+            <label class="recipe-edit-qty-label">
+                <span>Qty</span>
+                <input type="text" data-field="quantity" value="${escapeAttribute(option.quantity || "")}">
+            </label>
+            <label class="recipe-edit-unit-label">
+                <span>Unit</span>
+                <input type="text" data-field="unit" value="${escapeAttribute(option.unit || "")}">
+            </label>
+            <label class="recipe-edit-buy-as-label">
+                <span>Buy As</span>
+                <input type="text"
+                       data-field="purchasable_item"
+                       list="itemQtyBuyAsOptions"
+                       placeholder="e.g. sweet potatoes"
+                       value="${escapeAttribute(option.purchasable_item || option.buy_as || option.ingredient || "")}">
+            </label>
+            <label class="recipe-edit-store-section-label">
+                <span>Store Section</span>
+                <select data-field="store_section">${recipeStoreSectionOptions(option.store_section || "")}</select>
+            </label>
+            <label class="recipe-edit-check-label recipe-edit-optional-label">
+                <span>Optional</span>
+                <input type="checkbox" data-field="optional" ${option.optional !== false ? "checked" : ""}>
+            </label>
+            <div class="recipe-edit-row-menu-wrap">
+                <button type="button"
+                        class="recipe-edit-row-menu-btn"
+                        aria-label="Substitution actions"
+                        title="Substitution actions"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="return toggleRecipeEditRowMenu(this, event)">
+                    <span aria-hidden="true"></span>
+                </button>
+                <div class="recipe-edit-row-menu recipe-edit-substitution-row-menu" hidden>
+                    <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
+                        <button type="button" class="delete" onclick="return removeRecipeIngredientSubstitutionRow(this)">Delete substitution option</button>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" data-field="section" value="${escapeAttribute(option.section || "")}">
+            <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
+            <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
+            <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(option.recipe_qty || option.quantity || "")}">
+            <input type="hidden" data-field="purchase_group" value="${escapeAttribute(option.purchase_group || "")}">
+            <input type="hidden" data-field="parsed_name" value="${escapeAttribute(option.parsed_name || option.ingredient || "")}">
+            <input type="hidden" data-field="normalized_name" value="${escapeAttribute(option.normalized_name || option.ingredient || "")}">
+            <input type="hidden" data-field="master_normalized_name" value="${escapeAttribute(option.master_normalized_name || option.normalized_name || option.ingredient || "")}">
+            <input type="hidden" data-field="confidence" value="${escapeAttribute(option.confidence || "medium")}">
+            <input type="hidden" data-field="inferred" value="${escapeAttribute(recipeIngredientInferredValue(option))}">
+            <input type="hidden" data-field="warning" value="${escapeAttribute(option.warning || "")}">
+            <input type="hidden" data-field="source_note" value="${escapeAttribute(option.source_note || "")}">
+        </div>
+    `;
+}
+
+function recipeIngredientSubstitutionOptionsHtml(item = {}) {
+    return recipeIngredientSubstitutionRows(item)
+        .map((option, index) => recipeIngredientSubstitutionOptionRowHtml(option, index))
+        .join("");
 }
 
 function resizeRecipeIngredientNameField(field) {
@@ -24282,8 +24410,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     const ingredientImageGeneratedAt = item.ingredient_image_generated_at || item.image_generated_at || "";
     const ingredientImagePrompt = item.ingredient_image_prompt || item.image_prompt || "";
     const extractionWarning = recipeIngredientExtractionWarning(item);
-    const substitutionOptions = recipeIngredientSubstitutions(item);
-    const substitutionOptionsText = substitutionOptions.join("\n");
+    const substitutionOptions = recipeIngredientSubstitutionRows(item);
     const substitutionCountText = substitutionOptions.length ? `(${substitutionOptions.length})` : "";
     const recipeUrl = recipeEditorCurrentUrl();
     const ingredientImagePanelHtml = `
@@ -24388,15 +24515,16 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                 <span class="recipe-edit-choice-prompt">Pick one option</span>
                 <span class="recipe-edit-choice-options" data-ingredient-choice-options></span>
             </span>
-            <details class="recipe-edit-ingredient-substitutions">
-                <summary>
+            <div class="recipe-edit-ingredient-substitutions" data-ingredient-substitutions ${substitutionOptions.length ? "" : "hidden"}>
+                <div class="recipe-edit-substitution-heading">
                     <span>Substitutions / Options</span>
                     <span data-ingredient-substitution-count>${escapeHtml(substitutionCountText)}</span>
-                </summary>
-                <textarea data-field="substitutions_text"
-                          rows="2"
-                          placeholder="One option per line">${escapeHtml(substitutionOptionsText)}</textarea>
-            </details>
+                    <button type="button" onclick="return addRecipeIngredientSubstitutionRow(this)">Add Option</button>
+                </div>
+                <div class="recipe-edit-substitution-list" data-ingredient-substitution-list>
+                    ${recipeIngredientSubstitutionOptionsHtml(item)}
+                </div>
+            </div>
             <span class="recipe-edit-extraction-warning" data-ingredient-warning-message ${extractionWarning ? "" : "hidden"}>
                 ${escapeHtml(extractionWarning)}
             </span>
@@ -24474,6 +24602,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                 </div>
                 <div class="recipe-edit-menu-group">
                     <div class="recipe-edit-menu-group-label">Row</div>
+                    <button type="button" onclick="return addRecipeIngredientSubstitutionRow(this)">Add substitution option</button>
                     <button type="button" onclick="duplicateRecipeIngredientRow(this)">Duplicate ingredient</button>
                     <button type="button" class="recipe-edit-row-collapse-toggle" onclick="toggleRecipeIngredientRowCollapsed(this)">Collapse ingredient</button>
                 </div>
@@ -24511,8 +24640,10 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
     bindRecipeIngredientSummaryUpdates(row);
+    bindRecipeIngredientSubstitutionRows(row);
     bindRecipeEditDragAndDrop(row);
     updateRecipeIngredientFoodRuleWarning(row);
+    updateRecipeIngredientSubstitutionState(row);
     updateRecipeIngredientRowIndexes();
     initDeferredImages(row);
     refreshRecipeImageProviderSelectors(row);
@@ -24529,10 +24660,122 @@ function addRecipeIngredientRow(item = {}, options = {}) {
 }
 
 function bindRecipeIngredientSummaryUpdates(row) {
-    row.querySelectorAll('[data-field="ingredient"], [data-field="purchasable_item"], [data-field="store_section"], [data-field="optional"], [data-field="substitutions_text"]').forEach(input => {
+    row.querySelectorAll('[data-field="ingredient"], [data-field="purchasable_item"], [data-field="store_section"], [data-field="optional"]').forEach(input => {
         const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => updateRecipeIngredientSummary(row));
     });
+}
+
+function recipeIngredientParentRowFromControl(control) {
+    if (!control) {
+        return null;
+    }
+
+    const optionRow = control.closest("[data-substitution-option-row]");
+    if (optionRow) {
+        return optionRow.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])");
+    }
+
+    return control.closest(".recipe-edit-ingredient-row");
+}
+
+function bindRecipeIngredientSubstitutionRows(row) {
+    row.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => {
+        bindRecipeIngredientSubstitutionRow(optionRow);
+    });
+}
+
+function bindRecipeIngredientSubstitutionRow(optionRow) {
+    if (!optionRow || optionRow.dataset.substitutionBound === "true") {
+        return;
+    }
+
+    optionRow.dataset.substitutionBound = "true";
+    bindRecipeIngredientNameField(optionRow);
+    bindRecipeIngredientBaseTracking(optionRow);
+    optionRow.querySelectorAll("[data-field]").forEach(input => {
+        const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
+        input.addEventListener(eventName, () => {
+            updateRecipeIngredientSubstitutionRowSummary(optionRow);
+            updateRecipeIngredientSummary(recipeIngredientParentRowFromControl(optionRow));
+        });
+    });
+}
+
+function updateRecipeIngredientSubstitutionRowSummary(optionRow) {
+    const badges = optionRow ? optionRow.querySelector("[data-substitution-badges]") : null;
+    if (!badges) {
+        return;
+    }
+
+    badges.innerHTML = recipeIngredientBadgesHtml(fieldValuesFromRow(optionRow));
+}
+
+function updateRecipeIngredientSubstitutionState(row) {
+    const container = row ? row.querySelector("[data-ingredient-substitutions]") : null;
+    const list = row ? row.querySelector("[data-ingredient-substitution-list]") : null;
+    const count = row ? row.querySelector("[data-ingredient-substitution-count]") : null;
+    const optionRows = list ? [...list.querySelectorAll("[data-substitution-option-row]")] : [];
+
+    optionRows.forEach((optionRow, index) => {
+        const number = optionRow.querySelector("[data-substitution-row-number]");
+        if (number) {
+            const parentNumber = row.querySelector("[data-ingredient-row-number]");
+            const prefix = parentNumber ? parentNumber.textContent.trim() : "";
+            number.textContent = prefix ? `${prefix}.${index + 1}` : String(index + 1);
+        }
+    });
+
+    if (container) {
+        container.hidden = optionRows.length === 0;
+    }
+
+    if (count) {
+        count.textContent = optionRows.length ? `(${optionRows.length})` : "";
+    }
+}
+
+function addRecipeIngredientSubstitutionRow(button) {
+    const row = recipeIngredientParentRowFromControl(button);
+    const container = row ? row.querySelector("[data-ingredient-substitutions]") : null;
+    const list = row ? row.querySelector("[data-ingredient-substitution-list]") : null;
+
+    if (!row || !container || !list) {
+        return false;
+    }
+
+    container.hidden = false;
+    list.insertAdjacentHTML("beforeend", recipeIngredientSubstitutionOptionRowHtml({
+        optional: true,
+        inferred: true,
+        store_section: fieldValuesFromRow(row).store_section || "",
+    }, list.querySelectorAll("[data-substitution-option-row]").length));
+    const optionRow = list.querySelector("[data-substitution-option-row]:last-child");
+    bindRecipeIngredientSubstitutionRow(optionRow);
+    updateRecipeIngredientSubstitutionState(row);
+    updateRecipeIngredientSummary(row);
+    closeRecipeEditRowMenus();
+
+    const field = optionRow ? optionRow.querySelector('[data-field="ingredient"]') : null;
+    if (field) {
+        field.focus({ preventScroll: true });
+    }
+
+    return false;
+}
+
+function removeRecipeIngredientSubstitutionRow(button) {
+    const optionRow = button ? button.closest("[data-substitution-option-row]") : null;
+    const row = recipeIngredientParentRowFromControl(optionRow);
+
+    if (optionRow) {
+        optionRow.remove();
+    }
+
+    updateRecipeIngredientSubstitutionState(row);
+    updateRecipeIngredientSummary(row);
+    closeRecipeEditRowMenus();
+    return false;
 }
 
 function updateRecipeIngredientSummary(row) {
@@ -24545,13 +24788,22 @@ function updateRecipeIngredientSummary(row) {
     }
 
     if (substitutionCount) {
-        const count = recipeIngredientSubstitutions(values).length;
+        const count = collectRecipeIngredientSubstitutionRows(row).length;
         substitutionCount.textContent = count ? `(${count})` : "";
     }
+
+    updateRecipeIngredientSubstitutionState(row);
+}
+
+function recipeEditIngredientRows() {
+    const list = document.getElementById("recipeEditIngredients");
+    return list
+        ? [...list.children].filter(row => row.classList && row.classList.contains("recipe-edit-ingredient-row"))
+        : [];
 }
 
 function updateRecipeIngredientRowIndexes() {
-    const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
+    const rows = recipeEditIngredientRows();
     const count = document.getElementById("recipeEditIngredientCount");
 
     rows.forEach((row, index) => {
@@ -24567,6 +24819,8 @@ function updateRecipeIngredientRowIndexes() {
             panel.dataset.ingredientIndex = value;
             panel.dataset.recipeUrl = recipeEditorCurrentUrl();
         }
+
+        updateRecipeIngredientSubstitutionState(row);
     });
 
     if (count) {
@@ -25426,7 +25680,7 @@ function setRecipeIngredientsCollapsed(collapsed) {
 
     list.classList.toggle("recipe-edit-ingredients-collapsed", Boolean(collapsed));
 
-    list.querySelectorAll(".recipe-edit-ingredient-row").forEach(row => {
+    recipeEditIngredientRows().forEach(row => {
         row.classList.remove("recipe-edit-row-collapsed");
         row.classList.remove("recipe-edit-row-expanded");
         updateRecipeIngredientRowCollapseToggle(row);
@@ -25585,7 +25839,7 @@ function autoSortRecipeIngredients(mode = "ingredient") {
         return false;
     }
 
-    [...list.querySelectorAll(".recipe-edit-ingredient-row")]
+    recipeEditIngredientRows()
         .sort((left, right) => {
             const leftValues = fieldValuesFromRow(left);
             const rightValues = fieldValuesFromRow(right);
@@ -26226,7 +26480,7 @@ function recipeIngredientFoodRuleMarkerCount(rows) {
 }
 
 async function reapplyFoodRulesForRecipeIngredients(button) {
-    const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
+    const rows = recipeEditIngredientRows();
     const originalText = button ? button.textContent : "";
 
     try {
@@ -26256,7 +26510,7 @@ async function reapplyFoodRulesForRecipeIngredients(button) {
 }
 
 function applyRecipeStoreSectionReviewToEditor(changes) {
-    const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
+    const rows = recipeEditIngredientRows();
 
     (Array.isArray(changes) ? changes : []).forEach(change => {
         const index = Number(change.index);
@@ -29057,14 +29311,24 @@ function updateRecipeEditSourceUrlLink() {
     sourceLink.setAttribute("aria-label", canOpen ? "Open Source URL" : "No web source URL");
 }
 
+function collectRecipeIngredientSubstitutionRows(row) {
+    return [...(row ? row.querySelectorAll("[data-substitution-option-row]") : [])]
+        .map(optionRow => {
+            const option = fieldValuesFromRow(optionRow);
+            option.inferred = recipeIngredientInferredValue(option) === "true";
+            return option;
+        })
+        .filter(option => option.ingredient || option.original_text || option.purchasable_item);
+}
+
 function collectRecipeIngredientRows() {
     const selectedMultiplier = currentRecipeEditScaleMultiplier();
 
-    return [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")]
+    return recipeEditIngredientRows()
         .map(row => {
             const item = fieldValuesFromRow(row);
             const foodReview = recipeIngredientFoodReviewPayload(row);
-            item.substitutions = recipeIngredientSubstitutions(item);
+            item.substitutions = collectRecipeIngredientSubstitutionRows(row);
             delete item.substitutions_text;
 
             if (Math.abs(selectedMultiplier - 1) < 0.000001) {
@@ -29143,6 +29407,10 @@ function fieldValuesFromRow(row) {
     const item = {};
 
     row.querySelectorAll("[data-field]").forEach(input => {
+        const optionRow = input.closest("[data-substitution-option-row]");
+        if (optionRow && optionRow !== row) {
+            return;
+        }
         item[input.dataset.field] = input.type === "checkbox" ? input.checked : input.value.trim();
     });
 

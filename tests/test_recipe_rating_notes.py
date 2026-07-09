@@ -204,7 +204,8 @@ def test_recipe_notes_are_editable_between_instructions_and_nutrition():
     assert ".recipe-edit-recipe-notes-empty" in css
     assert ".recipe-edit-panel-icon-notes" in css
     assert "from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections" in service
-    assert '"recipe_notes": normalize_recipe_note_sections' in service
+    assert "recipe_notes = normalize_recipe_note_sections" in service
+    assert '"recipe_notes": recipe_notes' in service
     assert '"recipe_notes": sanitize_recipe_notes' in service
 
 
@@ -268,7 +269,8 @@ def test_recipe_extraction_prompt_preserves_notes_separately():
     assert 'Do NOT collapse those sections into one generic "Notes" section.' in prompt
     assert "Do NOT put recipe notes into ingredients, equipment, or cooking instructions." in prompt
     assert "ingredient object's substitutions array" in prompt
-    assert '"substitutions": []' in prompt
+    assert "substitutions must be ingredient-like objects" in prompt
+    assert '"substitutions": [' in prompt
 
 
 def test_ingredient_substitution_normalizer_preserves_unique_options():
@@ -287,7 +289,42 @@ def test_ingredient_substitution_normalizer_preserves_unique_options():
 
     recipe_extract_service.normalize_extracted_ingredient_fields(recipe)
 
-    assert recipe["ingredients"][0]["substitutions"] == ["sweet potatoes", "yuca"]
+    assert [
+        item["ingredient"]
+        for item in recipe["ingredients"][0]["substitutions"]
+    ] == ["sweet potatoes", "yuca"]
+    assert recipe["ingredients"][0]["substitutions"][0]["store_section"] == "PRODUCE"
+
+
+def test_recipe_note_substitutions_attach_to_matching_ingredient_rows():
+    recipe = {
+        "recipe_notes": [{
+            "heading": "Substitutions & Variations",
+            "items": [
+                "Use sweet potatoes for a different flavor profile.",
+                "Replace chicken broth with vegetable broth for a vegetarian option.",
+                "Add diced avocado or hard-boiled eggs as toppings for extra richness.",
+            ],
+        }],
+        "ingredients": [
+            {"ingredient": "potatoes", "quantity": "4", "unit": "medium", "store_section": "PRODUCE"},
+            {"ingredient": "chicken broth", "quantity": "2", "unit": "cups", "store_section": "MEAT & SEAFOOD"},
+        ],
+    }
+
+    recipe_extract_service.normalize_extracted_ingredient_fields(recipe)
+
+    assert [
+        item["ingredient"]
+        for item in recipe["ingredients"][0]["substitutions"]
+    ] == ["sweet potatoes"]
+    assert [
+        item["ingredient"]
+        for item in recipe["ingredients"][1]["substitutions"]
+    ] == ["vegetable broth"]
+    assert recipe["ingredients"][0]["substitutions"][0]["original_text"] == (
+        "Use sweet potatoes for a different flavor profile."
+    )
 
 
 def test_recipe_notes_import_normalizer_splits_common_source_sections():

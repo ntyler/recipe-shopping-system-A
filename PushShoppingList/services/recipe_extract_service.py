@@ -7122,7 +7122,8 @@ ALTERNATIVE INGREDIENT RULES:
 - Preserve the full original line in original_text.
 - Assign the store_section for the best primary grocery placement.
 - If the source notes include a substitution tied to one specific ingredient, put the replacement grocery item in that ingredient object's substitutions array.
-- substitutions must be grocery option names only, one string per option, such as ["sweet potatoes"] or ["vegetable broth"].
+- substitutions must be ingredient-like objects with ingredient, quantity, unit, purchasable_item, store_section, optional, original_text, and preparation when known.
+- Use source "Substitutions & Variations" bullets to populate matching ingredient substitutions, such as potatoes -> sweet potatoes or chicken broth -> vegetable broth.
 - Do NOT put broad technique, serving, or storage notes in ingredient substitutions.
 
 Examples:
@@ -7444,7 +7445,18 @@ FINAL OUTPUT FORMAT
       "inferred": false,
       "warning": null,
       "food_review": {{}},
-      "substitutions": [],
+      "substitutions": [
+        {{
+          "ingredient": null,
+          "quantity": null,
+          "unit": null,
+          "purchasable_item": null,
+          "store_section": null,
+          "optional": true,
+          "original_text": null,
+          "preparation": null
+        }}
+      ],
       "optional": false,
       "store_section": null,
       "store_section_order": null
@@ -9491,7 +9503,104 @@ def normalize_ingredient_confidence(value, inferred=False, suspicious=False):
     return "medium" if inferred else "high"
 
 
-def normalize_ingredient_substitutions(value):
+def substitution_option_name(value):
+    if isinstance(value, dict):
+        return clean_recipe_text(
+            value.get("ingredient")
+            or value.get("name")
+            or value.get("substitute")
+            or value.get("option")
+            or value.get("text")
+            or value.get("label")
+            or value.get("purchasable_item")
+            or value.get("buy_as")
+            or ""
+        )
+
+    return clean_recipe_text(value)
+
+
+def split_substitution_option_names(value):
+    text = clean_recipe_text(value)
+    if not text:
+        return []
+
+    parts = [
+        clean_recipe_text(part)
+        for part in re.split(r"\s+or\s+|/", text, flags=re.IGNORECASE)
+        if clean_recipe_text(part)
+    ]
+    return parts or [text]
+
+
+def normalize_substitution_option_row(option, parent_item=None, source_note=""):
+    parent_item = parent_item if isinstance(parent_item, dict) else {}
+    source_note = clean_recipe_text(source_note)
+    raw_option = option if isinstance(option, dict) else {}
+    name = substitution_option_name(option)
+    if not name:
+        return []
+
+    names = [name] if isinstance(option, dict) else split_substitution_option_names(name)
+    rows = []
+    for item_name in names:
+        review_text = " ".join(
+            clean_recipe_text(part)
+            for part in (
+                item_name,
+                raw_option.get("purchasable_item") or raw_option.get("buy_as"),
+                raw_option.get("original_text"),
+                source_note,
+            )
+            if part
+        )
+        store_section = resolve_ingredient_store_section(
+            review_text,
+            clean_recipe_text(raw_option.get("store_section") or ""),
+            default="",
+        )
+        if store_section not in STORE_SECTION_ORDER:
+            store_section = classify_store_section(review_text)
+        if store_section not in STORE_SECTION_ORDER:
+            store_section = parent_item.get("store_section") or "MISC"
+
+        quantity = clean_recipe_text(raw_option.get("quantity") or "")
+        unit = clean_recipe_text(raw_option.get("unit") or "")
+        row = {
+            "section": clean_recipe_text(raw_option.get("section") or parent_item.get("section") or ""),
+            "original_text": clean_recipe_text(raw_option.get("original_text") or source_note or item_name),
+            "quantity": quantity,
+            "recipe_qty": clean_recipe_text(raw_option.get("recipe_qty") or quantity),
+            "unit": unit,
+            "base_quantity": clean_recipe_text(raw_option.get("base_quantity") or quantity),
+            "base_unit": clean_recipe_text(raw_option.get("base_unit") or unit),
+            "ingredient": item_name,
+            "parsed_name": clean_recipe_text(raw_option.get("parsed_name") or item_name),
+            "normalized_name": clean_recipe_text(raw_option.get("normalized_name") or normalize_ingredient_for_shopping_list(item_name)),
+            "preparation": clean_recipe_text(
+                raw_option.get("preparation")
+                or raw_option.get("notes")
+                or raw_option.get("reason")
+                or ""
+            ),
+            "confidence": clean_recipe_text(raw_option.get("confidence") or "medium"),
+            "inferred": bool(raw_option.get("inferred", True)),
+            "warning": clean_recipe_text(raw_option.get("warning") or ""),
+            "food_review": raw_option.get("food_review") if isinstance(raw_option.get("food_review"), dict) else {},
+            "optional": bool(raw_option.get("optional", True)),
+            "store_section": store_section,
+            "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),
+            "purchasable_item": clean_recipe_text(raw_option.get("purchasable_item") or raw_option.get("buy_as") or item_name),
+            "buy_as": clean_recipe_text(raw_option.get("buy_as") or raw_option.get("purchasable_item") or item_name),
+            "purchase_group": clean_recipe_text(raw_option.get("purchase_group") or ""),
+            "source_note": clean_recipe_text(raw_option.get("source_note") or source_note),
+        }
+        rows.append(row)
+
+    return rows
+
+
+def normalize_ingredient_substitutions(value, parent_item=None):
     if value in (None, "", []):
         return []
 
@@ -9505,28 +9614,188 @@ def normalize_ingredient_substitutions(value):
     normalized = []
     seen = set()
     for option in rows:
-        if isinstance(option, dict):
-            text = (
-                option.get("ingredient")
-                or option.get("name")
-                or option.get("substitute")
-                or option.get("option")
-                or option.get("text")
-                or option.get("label")
-                or ""
-            )
-        else:
-            text = option
-        text = clean_recipe_text(text)
-        if not text:
-            continue
-        key = normalize_ingredient_key(text)
-        if key in seen:
-            continue
-        normalized.append(text)
-        seen.add(key)
+        for row in normalize_substitution_option_row(option, parent_item=parent_item):
+            key = normalize_ingredient_key(row.get("ingredient"))
+            if not key or key in seen:
+                continue
+            normalized.append(row)
+            seen.add(key)
 
     return normalized
+
+
+def substitution_note_sections(recipe_notes):
+    sections = normalize_recipe_note_sections(recipe_notes)
+    rows = []
+    for section in sections:
+        heading_key = recipe_note_heading_key(section.get("heading"))
+        if "substitution" not in heading_key and "variation" not in heading_key:
+            continue
+        rows.extend(
+            clean_recipe_text(item)
+            for item in (section.get("items") or [])
+            if clean_recipe_text(item)
+        )
+    return rows
+
+
+def clean_substitution_note_candidate(value):
+    text = clean_recipe_text(value).strip(" .;")
+    text = re.split(r"\s+(?:for|to|when|if|unless|because|as)\b", text, maxsplit=1, flags=re.IGNORECASE)[0]
+    text = re.sub(r"^(?:a|an|the)\s+", "", text.strip(), flags=re.IGNORECASE)
+    return clean_recipe_text(text).strip(" .;")
+
+
+def substitution_note_candidates(note_text):
+    text = clean_recipe_text(note_text)
+    if not text:
+        return []
+
+    candidates = []
+    prefix_match = re.match(r"^([A-Za-z][A-Za-z0-9 &'()/]+?)\s*[-:]\s*(.+)$", text)
+    prefix_source = ""
+    body = text
+    if prefix_match:
+        maybe_source = clean_substitution_note_candidate(prefix_match.group(1))
+        maybe_body = clean_recipe_text(prefix_match.group(2))
+        if re.match(r"^(use|replace|swap|substitute)\b", maybe_body, flags=re.IGNORECASE):
+            prefix_source = maybe_source
+            body = maybe_body
+
+    replace_match = re.search(r"\breplace\s+(.+?)\s+with\s+(.+?)(?:[.;]|$)", body, flags=re.IGNORECASE)
+    if replace_match:
+        candidates.append({
+            "source": clean_substitution_note_candidate(replace_match.group(1)),
+            "replacement": clean_substitution_note_candidate(replace_match.group(2)),
+            "note": text,
+        })
+
+    use_instead_match = re.search(
+        r"\buse\s+(.+?)\s+(?:instead of|in place of)\s+(.+?)(?:[.;]|$)",
+        body,
+        flags=re.IGNORECASE,
+    )
+    if use_instead_match:
+        candidates.append({
+            "source": clean_substitution_note_candidate(use_instead_match.group(2)),
+            "replacement": clean_substitution_note_candidate(use_instead_match.group(1)),
+            "note": text,
+        })
+
+    swap_match = re.search(r"\bswap\s+(.+?)\s+for\s+(.+?)(?:[.;]|$)", body, flags=re.IGNORECASE)
+    if swap_match:
+        candidates.append({
+            "source": clean_substitution_note_candidate(swap_match.group(1)),
+            "replacement": clean_substitution_note_candidate(swap_match.group(2)),
+            "note": text,
+        })
+
+    use_match = re.search(r"\buse\s+(.+?)(?:\s+instead\b|\s+for\b|[.;]|$)", body, flags=re.IGNORECASE)
+    if use_match:
+        candidates.append({
+            "source": prefix_source,
+            "replacement": clean_substitution_note_candidate(use_match.group(1)),
+            "note": text,
+        })
+
+    return [
+        candidate
+        for candidate in candidates
+        if candidate.get("replacement")
+    ]
+
+
+def ingredient_key_roots(value):
+    roots = set()
+    for word in normalize_ingredient_key(value).split():
+        if not word:
+            continue
+        roots.add(word)
+        if word.endswith("ies") and len(word) > 4:
+            roots.add(f"{word[:-3]}y")
+        if word.endswith("es") and len(word) > 4:
+            roots.add(word[:-2])
+        if word.endswith("s") and len(word) > 3:
+            roots.add(word[:-1])
+    return roots
+
+
+def ingredient_substitution_match_score(item, source="", replacement=""):
+    if not isinstance(item, dict):
+        return 0
+
+    source_key = normalize_ingredient_key(source)
+    replacement_roots = ingredient_key_roots(replacement)
+    best = 0
+    for value in (
+        item.get("ingredient"),
+        item.get("purchasable_item"),
+        item.get("buy_as"),
+        item.get("parsed_name"),
+        item.get("normalized_name"),
+        item.get("original_text"),
+    ):
+        item_key = normalize_ingredient_key(value)
+        if not item_key:
+            continue
+        if source_key:
+            if source_key == item_key:
+                best = max(best, 100)
+            elif source_key in item_key or item_key in source_key:
+                best = max(best, 80)
+        elif replacement_roots and ingredient_key_roots(item_key) & replacement_roots:
+            best = max(best, 55)
+
+    return best
+
+
+def apply_recipe_note_substitutions_to_ingredients(ingredients, recipe_notes):
+    if not isinstance(ingredients, list):
+        return ingredients
+
+    for note in substitution_note_sections(recipe_notes):
+        for candidate in substitution_note_candidates(note):
+            replacement = candidate.get("replacement")
+            if not replacement:
+                continue
+
+            match = max(
+                (
+                    (ingredient_substitution_match_score(item, candidate.get("source"), replacement), item)
+                    for item in ingredients
+                    if isinstance(item, dict)
+                ),
+                default=(0, None),
+                key=lambda pair: pair[0],
+            )
+            if not match[1] or match[0] < 50:
+                continue
+
+            item = match[1]
+            existing = normalize_ingredient_substitutions(item.get("substitutions"), parent_item=item)
+            existing_keys = {
+                normalize_ingredient_key(option.get("ingredient"))
+                for option in existing
+                if isinstance(option, dict)
+            }
+            for option in normalize_ingredient_substitutions(
+                [{
+                    "ingredient": replacement,
+                    "purchasable_item": replacement,
+                    "original_text": note,
+                    "source_note": note,
+                    "optional": True,
+                    "inferred": True,
+                }],
+                parent_item=item,
+            ):
+                key = normalize_ingredient_key(option.get("ingredient"))
+                if key and key not in existing_keys:
+                    existing.append(option)
+                    existing_keys.add(key)
+            item["substitutions"] = existing
+
+    return ingredients
 
 
 def normalize_extracted_ingredient_fields(json_data, source_text=""):
@@ -9658,7 +9927,8 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
         item["substitutions"] = normalize_ingredient_substitutions(
             item.get("substitutions")
             or item.get("substitution_options")
-            or item.get("alternatives")
+            or item.get("alternatives"),
+            parent_item=item,
         )
         store_section_text = " ".join(
             clean_recipe_text(part)
@@ -9677,6 +9947,14 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
         )
         item["store_section"] = store_section
         item["store_section_order"] = STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"])
+
+    apply_recipe_note_substitutions_to_ingredients(
+        json_data.get("ingredients", []),
+        json_data.get("recipe_notes")
+        or json_data.get("recipe_note_sections")
+        or json_data.get("source_notes")
+        or [],
+    )
 
 
 def normalize_extracted_recipe_identity(json_data):
