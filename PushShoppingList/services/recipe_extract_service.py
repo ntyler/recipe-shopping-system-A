@@ -79,6 +79,8 @@ from PushShoppingList.services.openai_throttle_service import throttled_audio_tr
 from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
+from PushShoppingList.services.recipe_master_data_service import classify_ingredient_store_section
+from PushShoppingList.services.recipe_master_data_service import resolve_ingredient_store_section
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.storage_service import scoped_extractor_path
@@ -2781,6 +2783,10 @@ def remove_preparation_text(text, preparation):
 
 
 def classify_store_section(ingredient):
+    classified = classify_ingredient_store_section(ingredient)
+    if classified:
+        return classified
+
     normalized = normalize_ingredient_key(ingredient)
     normalized = normalized.replace("*", "")
 
@@ -9243,6 +9249,23 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
             item["base_unit"] = item.get("unit")
 
         apply_purchase_mapping_to_ingredient(item)
+        store_section_text = " ".join(
+            clean_recipe_text(part)
+            for part in (
+                item.get("ingredient"),
+                item.get("parsed_name"),
+                item.get("normalized_name"),
+                item.get("purchasable_item") or item.get("buy_as"),
+                original_text,
+            )
+            if part
+        )
+        store_section = resolve_ingredient_store_section(
+            store_section_text,
+            item.get("store_section") or item.get("section"),
+        )
+        item["store_section"] = store_section
+        item["store_section_order"] = STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"])
 
 
 def normalize_extracted_recipe_identity(json_data):

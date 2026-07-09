@@ -223,7 +223,7 @@ def test_backfill_ingredient_store_sections_choose_most_common_per_user(monkeypa
             "https://example.com/a-three",
             [
                 {"ingredient": "Onion", "store_section": "Produce"},
-                {"ingredient": "Mystery salt"},
+                {"ingredient": "Mystery crunch"},
             ],
         ),
     ):
@@ -244,7 +244,7 @@ def test_backfill_ingredient_store_sections_choose_most_common_per_user(monkeypa
 
     user_a_onion = master_data.master_record_for_name("ingredients", "user-a", "onion")
     user_b_onion = master_data.master_record_for_name("ingredients", "user-b", "onion")
-    user_a_mystery = master_data.master_record_for_name("ingredients", "user-a", "mystery salt")
+    user_a_mystery = master_data.master_record_for_name("ingredients", "user-a", "mystery crunch")
     output = capsys.readouterr().out
 
     assert user_a_onion["store_section"] == "PRODUCE"
@@ -255,8 +255,16 @@ def test_backfill_ingredient_store_sections_choose_most_common_per_user(monkeypa
     assert 'normalized_name="onion"' in output
     assert 'section="PRODUCE"' in output
     assert 'action=store_section_defaulted' in output
-    assert 'normalized_name="mystery salt"' in output
+    assert 'normalized_name="mystery crunch"' in output
     assert "[IngredientMaster] action=store_section_backfill_complete" in output
+
+
+def test_resolve_ingredient_store_section_repairs_generic_or_conflicting_values():
+    assert master_data.resolve_ingredient_store_section("4 medium potatoes", "MISC") == "PRODUCE"
+    assert master_data.resolve_ingredient_store_section("1 cup crema", "") == "DAIRY & EGGS"
+    assert master_data.resolve_ingredient_store_section("2 cups chicken broth", "MEAT & SEAFOOD") == "CANNED"
+    assert master_data.resolve_ingredient_store_section("crema de huancaina sauce", "MISC") == "SAUCES & CONDIMENTS"
+    assert master_data.resolve_ingredient_store_section("mystery crunch", "MISC") == "MISC"
 
 
 def test_backfill_recipe_master_records_reports_recipe_progress(monkeypatch, tmp_path):

@@ -95,6 +95,32 @@ def test_exact_source_potato_milk_is_preserved_without_warning():
     assert "food_review" not in ingredient
 
 
+def test_normalize_extracted_ingredient_fields_repairs_store_sections():
+    recipe = {
+        "recipe_title": "Papa a la Huancaina",
+        "ingredients": [
+            {
+                "quantity": "4",
+                "unit": "medium",
+                "ingredient": "potatoes",
+                "original_text": "4 medium potatoes",
+                "store_section": "MISC",
+            },
+            {
+                "quantity": "2",
+                "unit": "cups",
+                "ingredient": "chicken broth",
+                "original_text": "2 cups chicken broth",
+                "store_section": "MEAT & SEAFOOD",
+            },
+        ],
+    }
+
+    normalize_extracted_ingredient_fields(recipe)
+
+    assert [item["store_section"] for item in recipe["ingredients"]] == ["PRODUCE", "CANNED"]
+
+
 def test_ingredient_detail_records_preserve_extraction_audit_fields_and_food_review():
     food_review = {
         "needs_review": True,

@@ -3,6 +3,7 @@ import os
 import re
 import sqlite3
 import threading
+import unicodedata
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -51,6 +52,81 @@ INGREDIENT_STORE_SECTION_ALIASES = {
     "SPICES AND SEASONINGS": "SPICES & SEASONINGS",
     "OILS AND VINEGARS": "OILS & VINEGARS",
 }
+INGREDIENT_STORE_SECTION_KEYWORD_RULES = (
+    (
+        (
+            r"\b(?:broth|stock|bouillon|consomme)\b",
+        ),
+        "CANNED",
+    ),
+    (
+        (
+            r"\b(?:sauce|salsa|ketchup|mustard|mayonnaise|mayo|pesto|chutney|paste)\b",
+        ),
+        "SAUCES & CONDIMENTS",
+    ),
+    (
+        (
+            r"\b(?:crema|sour cream|heavy cream|half and half|cream cheese)\b",
+            r"\b(?:milk|butter|yogurt|yoghurt|cheese|ricotta|parmesan|mozzarella|cheddar)\b",
+            r"\b(?:egg|eggs|yolk|yolks)\b",
+        ),
+        "DAIRY & EGGS",
+    ),
+    (
+        (
+            r"\b(?:salt|black pepper|white pepper|cayenne pepper|red pepper flakes|peppercorn|peppercorns)\b",
+            r"\b(?:cinnamon|nutmeg|paprika|cumin|seasoning|spice|spices)\b",
+            r"\b(?:garlic powder|onion powder|chili powder|chile powder)\b",
+        ),
+        "SPICES & SEASONINGS",
+    ),
+    (
+        (
+            r"\b(?:potato|potatoes|sweet potato|sweet potatoes|yuca|cassava)\b",
+            r"\b(?:onion|garlic|tomato|tomatoes|lemon|lime|basil|parsley|cilantro)\b",
+            r"\b(?:spinach|lettuce|carrot|carrots|celery|corn|mushroom|mushrooms|avocado)\b",
+            r"\b(?:bell pepper|bell peppers|jalapeno|jalapenos|scallion|scallions)\b",
+        ),
+        "PRODUCE",
+    ),
+    (
+        (
+            r"\b(?:beef|chicken|pork|turkey|fish|shrimp|salmon|sausage|bacon|ham)\b",
+        ),
+        "MEAT & SEAFOOD",
+    ),
+    (
+        (
+            r"\b(?:pasta|spaghetti|linguine|rice|oats|quinoa|breadcrumbs|bread crumbs)\b",
+        ),
+        "PASTA, RICE & GRAINS",
+    ),
+    (
+        (
+            r"\b(?:flour|sugar|powdered sugar|confectioners sugar|confectioners' sugar)\b",
+            r"\b(?:yeast|baking powder|baking soda|chocolate|cocoa powder|corn syrup|vanilla extract)\b",
+        ),
+        "BAKING",
+    ),
+    (
+        (
+            r"\b(?:oil|olive oil|vegetable oil|vinegar)\b",
+        ),
+        "OILS & VINEGARS",
+    ),
+    (
+        (
+            r"\b(?:bread|rolls|bun|buns|baguette|tortilla|tortillas)\b",
+        ),
+        "BAKERY",
+    ),
+)
+INGREDIENT_STORE_SECTION_CONFLICT_OVERRIDES = (
+    ("CANNED", "MEAT & SEAFOOD", r"\b(?:broth|stock|bouillon|consomme)\b"),
+    ("SAUCES & CONDIMENTS", "MEAT & SEAFOOD", r"\b(?:sauce|salsa|paste|pesto)\b"),
+    ("SAUCES & CONDIMENTS", "DAIRY & EGGS", r"\b(?:sauce|salsa|paste|pesto)\b"),
+)
 MASTER_RECORD_TABLES = {
     "ingredients": {
         "usage_table": "recipe_ingredients",
@@ -489,6 +565,54 @@ def ingredient_store_section_sort_key(section):
         clean_ingredient_store_section(section),
         INGREDIENT_STORE_SECTION_ORDER["MISC"],
     )
+
+
+def ingredient_store_section_match_text(value):
+    normalized = unicodedata.normalize("NFKD", clean_text(value).lower())
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9&']+", " ", ascii_text).strip()
+
+
+def classify_ingredient_store_section(value):
+    text = ingredient_store_section_match_text(value)
+    if not text:
+        return ""
+
+    for patterns, section in INGREDIENT_STORE_SECTION_KEYWORD_RULES:
+        if any(re.search(pattern, text) for pattern in patterns):
+            return section
+
+    return ""
+
+
+def ingredient_store_section_should_use_classification(value, current_section, classified_section):
+    current_section = clean_ingredient_store_section(current_section, default="")
+    classified_section = clean_ingredient_store_section(classified_section, default="")
+    if not classified_section:
+        return False
+    if not current_section or current_section == "MISC":
+        return True
+    if current_section == classified_section:
+        return True
+
+    text = ingredient_store_section_match_text(value)
+    for desired_section, conflicting_section, pattern in INGREDIENT_STORE_SECTION_CONFLICT_OVERRIDES:
+        if (
+            classified_section == desired_section
+            and current_section == conflicting_section
+            and re.search(pattern, text)
+        ):
+            return True
+
+    return False
+
+
+def resolve_ingredient_store_section(value, source_section=None, default="MISC"):
+    section = clean_ingredient_store_section(source_section, default="")
+    classified = classify_ingredient_store_section(value)
+    if ingredient_store_section_should_use_classification(value, section, classified):
+        return classified
+    return section or classified or default
 
 
 def normalize_existing_ingredient_store_sections(connection):
@@ -1207,7 +1331,11 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             normalized_name = normalized_master_name(
                 item.get("master_normalized_name") or item.get("normalized_name")
             )
-            store_section = ingredient_store_section_from_source(item.get("store_section") or item.get("section"))
+            store_section = resolve_ingredient_store_section(
+                " ".join(part for part in (name, buy_as, original_text, normalized_name) if part),
+                item.get("store_section") or item.get("section"),
+                default="",
+            )
             optional = truthy(item.get("optional"))
             image_url, image_path = compact_image_fields(item, "ingredient_image_url", "image_url")
         else:
@@ -1296,7 +1424,7 @@ def upsert_master_record(
 
     now = utc_now_iso()
     if table_name == "ingredients":
-        store_section = clean_ingredient_store_section(store_section)
+        store_section = resolve_ingredient_store_section(name, store_section)
         previous_row = connection.execute(
             """
             SELECT id, store_section
@@ -1426,7 +1554,19 @@ def update_ingredient_master_record_from_recipe_row(
 
     matched_ingredient_id = int(master_row["id"])
     previous_section = clean_ingredient_store_section(master_row["store_section"])
-    proposed_section = clean_ingredient_store_section(row.get("store_section"))
+    proposed_section = resolve_ingredient_store_section(
+        " ".join(
+            part
+            for part in (
+                row.get("name"),
+                row.get("buy_as"),
+                row.get("original_recipe_text"),
+                row.get("normalized_name"),
+            )
+            if part
+        ),
+        row.get("store_section"),
+    )
     next_section = previous_section
     if force_store_section or previous_section == "MISC":
         next_section = proposed_section
@@ -1682,8 +1822,9 @@ def backfill_ingredient_store_sections_for_user(user_id):
         now = utc_now_iso()
         for ingredient in ingredients.values():
             section_counts = ingredient["section_counts"]
+            section_source = "recipe_ingredients_most_common"
             if section_counts:
-                section = sorted(
+                most_common_section = sorted(
                     section_counts,
                     key=lambda candidate: (
                         -section_counts[candidate],
@@ -1691,20 +1832,27 @@ def backfill_ingredient_store_sections_for_user(user_id):
                         candidate,
                     ),
                 )[0]
+                section = resolve_ingredient_store_section(
+                    ingredient["normalized_name"],
+                    most_common_section,
+                )
+                if section != most_common_section:
+                    section_source = "classifier"
                 print(
                     "[IngredientMaster] "
                     f"action=store_section_set ingredient_id={ingredient['id']} "
                     f"normalized_name=\"{recipe_master_log_value(ingredient['normalized_name'])}\" "
-                    f"section=\"{section}\" source=\"recipe_ingredients_most_common\""
+                    f"section=\"{section}\" source=\"{section_source}\""
                 )
             else:
-                section = "MISC"
+                section = resolve_ingredient_store_section(ingredient["normalized_name"])
                 defaulted += 1
+                section_source = "classifier" if section != "MISC" else "default"
                 print(
                     "[IngredientMaster] "
                     f"action=store_section_defaulted ingredient_id={ingredient['id']} "
                     f"normalized_name=\"{recipe_master_log_value(ingredient['normalized_name'])}\" "
-                    'section="MISC"'
+                    f"section=\"{section}\" source=\"{section_source}\""
                 )
 
             if ingredient["current_section"] != section:

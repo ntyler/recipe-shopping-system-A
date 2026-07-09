@@ -1,5 +1,6 @@
 === PRODUCE ===
 Cilantro
+yuca root
 === DAIRY & EGGS ===
 egg
 egg yolk
@@ -9,6 +10,7 @@ Monterey jack cheese
 heavy cream
 butter
 clarified butter
+cocoa butter OR vegetable oil
 unsalted butter
 === BAKING ===
 all-purpose flour
@@ -22,7 +24,6 @@ sugar
 vanilla extract
 semisweet chocolate
 Dutch-processed cocoa powder
-cocoa butter OR vegetable oil
 === SAUCES & CONDIMENTS ===
 green enchilada sauce
 === SPICES & SEASONINGS ===
@@ -35,4 +36,3 @@ green chiles
 warm water
 water
 young green jackfruit
-yuca root

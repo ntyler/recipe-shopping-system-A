@@ -203,3 +203,42 @@ def test_recipe_editor_missing_store_section_defaults_to_misc(monkeypatch, tmp_p
         '[IngredientMaster] action=store_section_missing_default '
         'ingredient="Mystery crunch" section="MISC"'
     ) in output
+
+
+def test_recipe_editor_load_classifies_common_generic_or_conflicting_sections(monkeypatch, tmp_path):
+    configure_editor_master_sync(monkeypatch, tmp_path)
+    url = "https://example.com/huancaina"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Papa a la Huancaina",
+        "ingredients": [
+            {
+                "ingredient": "potatoes",
+                "normalized_name": "potato",
+                "store_section": "MISC",
+                "original_text": "4 medium potatoes",
+            },
+            {
+                "ingredient": "crema",
+                "normalized_name": "crema",
+                "store_section": "MISC",
+                "original_text": "1 cup crema",
+            },
+            {
+                "ingredient": "chicken broth",
+                "normalized_name": "chicken broth",
+                "store_section": "MEAT & SEAFOOD",
+                "original_text": "2 cups chicken broth",
+            },
+        ],
+        "instructions": [{"instruction": "Simmer."}],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)
+    ingredients = loaded["recipe"]["ingredients"]
+
+    assert [item["store_section"] for item in ingredients] == [
+        "PRODUCE",
+        "DAIRY & EGGS",
+        "CANNED",
+    ]

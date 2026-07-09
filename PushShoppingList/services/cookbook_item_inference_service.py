@@ -31,6 +31,7 @@ from PushShoppingList.services.recipe_extract_service import normalize_extracted
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
+from PushShoppingList.services.recipe_master_data_service import resolve_ingredient_store_section
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import active_user_id
@@ -895,7 +896,10 @@ def normalize_ai_ingredients(value, recipe_context=None):
         original_text = build_original_ingredient_text(item)
         if not name and not original_text:
             continue
-        store_section = clean_text(item.get("store_section")) or classify_store_section(name or original_text)
+        store_section = resolve_ingredient_store_section(
+            " ".join(part for part in (name, original_text, item.get("purchasable_item"), item.get("buy_as")) if part),
+            item.get("store_section"),
+        )
         if store_section not in STORE_SECTION_ORDER:
             store_section = classify_store_section(name or original_text)
         row = {

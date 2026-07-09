@@ -88,6 +88,7 @@ from PushShoppingList.services.recipe_master_data_service import ingredient_stor
 from PushShoppingList.services.recipe_master_data_service import normalized_master_name
 from PushShoppingList.services.recipe_master_data_service import recipe_master_rows
 from PushShoppingList.services.recipe_master_data_service import remove_recipe_master_records_for_recipe
+from PushShoppingList.services.recipe_master_data_service import resolve_ingredient_store_section
 from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.recipe_url_service import load_recipe_urls
@@ -6929,6 +6930,26 @@ def recipe_edit_ingredient_name(item):
     )
 
 
+def recipe_edit_ingredient_classification_text(item, master_record=None):
+    item = item if isinstance(item, dict) else {}
+    master_record = master_record if isinstance(master_record, dict) else {}
+    return " ".join(
+        part
+        for part in (
+            recipe_edit_ingredient_name(item),
+            item.get("buy_as"),
+            item.get("purchasable_item"),
+            item.get("original_recipe_text"),
+            item.get("original_text"),
+            item.get("normalized_name"),
+            item.get("master_normalized_name"),
+            master_record.get("name"),
+            master_record.get("normalized_name"),
+        )
+        if part
+    )
+
+
 def recipe_edit_ingredient_master_id(item):
     if not isinstance(item, dict):
         return 0
@@ -7030,7 +7051,11 @@ def recipe_edit_store_section_for_ingredient(item, master_lookup, recipe_id=""):
     ingredient_name = recipe_edit_ingredient_name(item)
     master_record = recipe_edit_master_record_for_ingredient(item, master_lookup)
     if master_record:
-        section = clean_ingredient_store_section(master_record.get("store_section"), default="")
+        section = resolve_ingredient_store_section(
+            recipe_edit_ingredient_classification_text(item, master_record),
+            master_record.get("store_section"),
+            default="",
+        )
         if section:
             print(
                 "[IngredientMaster] "
@@ -7041,7 +7066,8 @@ def recipe_edit_store_section_for_ingredient(item, master_lookup, recipe_id=""):
             )
             return section, master_record
 
-    row_section = clean_ingredient_store_section(
+    row_section = resolve_ingredient_store_section(
+        recipe_edit_ingredient_classification_text(item),
         item.get("store_section") or item.get("section"),
         default="",
     )
@@ -7324,7 +7350,18 @@ def sanitize_ingredients(value, existing_value=None):
             or (existing_rows[index] if index < len(existing_rows) else {})
             or {}
         )
-        store_section = clean_ingredient_store_section(
+        store_section = resolve_ingredient_store_section(
+            " ".join(
+                part
+                for part in (
+                    name,
+                    item.get("purchasable_item") or item.get("buy_as"),
+                    original_text,
+                    item.get("normalized_name"),
+                    item.get("master_normalized_name"),
+                )
+                if part
+            ),
             item.get("store_section") or existing.get("store_section"),
             default="MISC",
         )
