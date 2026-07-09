@@ -915,6 +915,43 @@ PDF_PRINT_FIX_CSS = """
     top: auto !important;
     transform: none !important;
   }
+
+  .wprm-recipe-notes-container,
+  .wprm-recipe-notes {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .wprm-recipe-notes-container {
+    margin-top: 18px !important;
+    padding-top: 12px !important;
+    border-top: 1px solid #263447 !important;
+  }
+
+  .wprm-recipe-notes-container .wprm-recipe-header,
+  .wprm-recipe-notes-container h2,
+  .wprm-recipe-notes-container h3,
+  .wprm-recipe-notes-container h4 {
+    margin: 0 0 10px 0 !important;
+  }
+
+  .wprm-recipe-notes-container ul,
+  .wprm-recipe-notes-container ol,
+  .wprm-recipe-notes ul,
+  .wprm-recipe-notes ol {
+    margin: 8px 0 14px 1.35em !important;
+    padding: 0 !important;
+  }
+
+  .wprm-recipe-notes-container li,
+  .wprm-recipe-notes li {
+    margin: 0 0 6px 0 !important;
+  }
+
+  .wprm-recipe-notes-container li:empty,
+  .wprm-recipe-notes li:empty {
+    display: none !important;
+  }
 }
 """
 
@@ -5241,6 +5278,8 @@ def sanitize_html_for_pdf_source(html_text):
                 if str(attr_name).lower().startswith("on"):
                     del tag.attrs[attr_name]
 
+        remove_empty_recipe_note_list_items(soup)
+
         for img in soup.find_all("img"):
             promote_lazy_tag_attribute(
                 img,
@@ -5277,6 +5316,15 @@ def sanitize_html_for_pdf_source(html_text):
         return str(soup)
     except Exception:
         return source_html
+
+
+def remove_empty_recipe_note_list_items(soup):
+    note_containers = soup.select(".wprm-recipe-notes-container, .wprm-recipe-notes")
+    for container in note_containers:
+        for item in container.find_all("li"):
+            if clean_recipe_text(item.get_text(" ", strip=True)):
+                continue
+            item.decompose()
 
 
 def promote_lazy_tag_attribute(tag, target_attr, source_attrs):
@@ -7215,7 +7263,7 @@ EQUIPMENT RULES
 COOKING INSTRUCTION RULES
 ========================
 - Extract ONLY the actual cooking/preparation directions.
-- Do NOT include intro text, serving suggestions, storage tips, FAQs, nutrition notes, comments, ads, or unrelated article text.
+- Do NOT include intro text, serving suggestions, storage tips, FAQs, nutrition notes, comments, ads, or unrelated article text in instructions.
 - Preserve the recipe's step order exactly.
 - Each instruction must be one complete action step.
 - Do NOT summarize the whole recipe into one paragraph.
@@ -7232,6 +7280,15 @@ INSTRUCTION DEDUPE RULES:
 - Remove duplicate instruction steps.
 - Prefer the cleanest and most complete version of repeated instructions.
 - Preserve original recipe order.
+
+========================
+RECIPE NOTE RULES
+========================
+- Extract helpful recipe notes separately in recipe_notes.
+- Recipe notes include source sections such as "Notes", "Substitutions & Variations", "Storing & Reheating", "Top Tips", serving tips, make-ahead tips, or allergy/substitution guidance.
+- Do NOT put recipe notes into ingredients, equipment, or cooking instructions.
+- Preserve note section headings and bullet wording when present.
+- Drop empty note bullets and empty note sections.
 
 ========================
 NUTRITION RULES
@@ -7351,6 +7408,12 @@ FINAL OUTPUT FORMAT
       "temperature": null,
       "time": null,
       "equipment_used": []
+    }}
+  ],
+  "recipe_notes": [
+    {{
+      "heading": null,
+      "items": []
     }}
   ],
   "nutrition": {{
@@ -8496,6 +8559,90 @@ def normalize_recipe_text_list(value):
 
     text = clean_recipe_text(value)
     return [text] if text else []
+
+
+def normalize_recipe_note_items(value):
+    if isinstance(value, list):
+        rows = []
+        for item in value:
+            if isinstance(item, dict):
+                text = clean_recipe_text(
+                    item.get("text")
+                    or item.get("note")
+                    or item.get("item")
+                    or item.get("content")
+                    or item.get("description")
+                )
+            else:
+                text = clean_recipe_text(item)
+            if text:
+                rows.append(text)
+        return rows
+
+    if isinstance(value, str):
+        rows = [
+            clean_recipe_text(part)
+            for part in re.split(r"\n+", value.replace("\r\n", "\n").replace("\r", "\n"))
+            if clean_recipe_text(part)
+        ]
+        return rows
+
+    text = clean_recipe_text(value)
+    return [text] if text else []
+
+
+def normalize_recipe_note_sections(value, include_plain_strings=True):
+    if isinstance(value, dict):
+        nested_sections = value.get("sections") or value.get("recipe_notes")
+        if isinstance(nested_sections, list):
+            return normalize_recipe_note_sections(nested_sections, include_plain_strings=include_plain_strings)
+
+        heading = clean_recipe_text(
+            value.get("heading")
+            or value.get("title")
+            or value.get("section")
+            or value.get("name")
+        )
+        items = []
+        for key in ("items", "bullets", "points", "list"):
+            items = normalize_recipe_note_items(value.get(key))
+            if items:
+                break
+
+        if not items:
+            items = normalize_recipe_note_items(
+                value.get("text")
+                or value.get("note")
+                or value.get("content")
+                or value.get("description")
+            )
+
+        return [{"heading": heading, "items": items}] if heading or items else []
+
+    if isinstance(value, list):
+        sections = []
+        plain_items = []
+
+        for item in value:
+            if isinstance(item, dict):
+                sections.extend(normalize_recipe_note_sections(item, include_plain_strings=True))
+            elif include_plain_strings:
+                plain_items.extend(normalize_recipe_note_items(item))
+
+        if plain_items:
+            sections.append({"heading": "", "items": plain_items})
+
+        return [
+            section
+            for section in sections
+            if section.get("heading") or section.get("items")
+        ]
+
+    if include_plain_strings:
+        items = normalize_recipe_note_items(value)
+        return [{"heading": "", "items": items}] if items else []
+
+    return []
 
 
 def build_food_image_inference_prompt(recipe_url, filename, user_description=""):
@@ -10724,6 +10871,11 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         "ingredients": ingredients,
         "equipment": json_data.get("equipment", []),
         "instructions": json_data.get("instructions", []),
+        "recipe_notes": normalize_recipe_note_sections(
+            json_data.get("recipe_notes")
+            or json_data.get("recipe_note_sections")
+            or json_data.get("source_notes")
+        ),
         "nutrition": json_data.get("nutrition", {}),
         "raw": json_data,
         "source_type": json_data.get("source_type") or extraction_method,

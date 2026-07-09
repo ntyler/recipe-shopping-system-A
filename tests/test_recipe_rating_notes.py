@@ -1,6 +1,8 @@
 from pathlib import Path
 
+from PushShoppingList.routes import main_routes
 from PushShoppingList.services import recipe_edit_service
+from PushShoppingList.services import recipe_extract_service
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -139,3 +141,78 @@ def test_current_recipe_menu_can_hide_ai_inferred_badges():
     assert "CURRENT_RECIPES_HIDE_AI_INFERRED_BADGE_KEY" in script
     assert "function restoreCurrentRecipesAiInferredBadgeSetting" in script
     assert "restoreCurrentRecipesAiInferredBadgeSetting()" in script
+
+
+def test_recipe_view_notes_render_as_collapsible_detail_section():
+    recipe_view = read_text("PushShoppingList/templates/sections/items.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert "{% if recipe.recipe_notes %}" in recipe_view
+    assert 'data-detail-key="notes|{{ recipe.url }}"' in recipe_view
+    assert 'data-detail-content="notes|{{ recipe.url }}"' in recipe_view
+    assert recipe_view.index('data-detail-key="instructions|{{ recipe.url }}"') < recipe_view.index('data-detail-key="notes|{{ recipe.url }}"')
+    assert recipe_view.index('data-detail-key="notes|{{ recipe.url }}"') < recipe_view.index('data-nutrition-key="nutrition|{{ recipe.url }}"')
+    assert "recipe-note-section" in recipe_view
+    assert ".recipe-note-section" in css
+    assert "border-bottom: 1px solid #263447;" in css
+    assert ".recipe-note-section li:empty" in css
+
+
+def test_recipe_notes_for_view_drops_empty_items_and_dedupes_sections():
+    sections = main_routes.recipe_notes_for_view({
+        "recipe_notes": [
+            {
+                "heading": "Top Tips",
+                "items": [
+                    "Keep the slow cooker on warm.",
+                    " ",
+                ],
+            },
+            {
+                "heading": "Top Tips",
+                "items": [
+                    "Keep the slow cooker on warm.",
+                ],
+            },
+        ],
+    })
+
+    assert sections == [{
+        "heading": "Top Tips",
+        "items": ["Keep the slow cooker on warm."],
+    }]
+
+
+def test_recipe_extraction_prompt_preserves_notes_separately():
+    prompt = recipe_extract_service.build_prompt(
+        "https://example.test/chili",
+        "NOTES\nTOP TIPS:\n- Keep warm while serving.",
+    )
+
+    assert "RECIPE NOTE RULES" in prompt
+    assert "recipe_notes" in prompt
+    assert "Do NOT put recipe notes into ingredients, equipment, or cooking instructions." in prompt
+
+
+def test_source_pdf_notes_sanitizer_removes_empty_wprm_bullets():
+    html = """
+    <html>
+      <body>
+        <div class="wprm-recipe-notes-container">
+          <div class="wprm-recipe-notes">
+            <ul>
+              <li>Store leftovers up to 5 days.</li>
+              <li>   </li>
+              <li><br></li>
+            </ul>
+          </div>
+        </div>
+      </body>
+    </html>
+    """
+
+    sanitized = recipe_extract_service.sanitize_html_for_pdf_source(html)
+
+    assert sanitized.count("<li>") == 1
+    assert "Store leftovers up to 5 days." in sanitized
+    assert ".wprm-recipe-notes-container" in recipe_extract_service.PDF_PRINT_FIX_CSS

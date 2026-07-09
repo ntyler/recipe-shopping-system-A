@@ -823,6 +823,39 @@
                     {% endif %}
                 </div>
 
+                {% if recipe.recipe_notes %}
+                    <div class="recipe-divider"></div>
+
+                    <div class="recipe-detail-header">
+                        <button type="button"
+                                class="detail-toggle"
+                                data-detail-key="notes|{{ recipe.url }}"
+                                aria-expanded="false">
+                            <span>Notes</span>
+                        </button>
+                    </div>
+
+                    <div class="detail-content collapsed recipe-notes-content"
+                         data-detail-content="notes|{{ recipe.url }}">
+                        <div class="recipe-note-list">
+                            {% for note_section in recipe.recipe_notes %}
+                                <section class="recipe-note-section">
+                                    {% if note_section.heading %}
+                                        <h4>{{ note_section.heading }}</h4>
+                                    {% endif %}
+                                    {% if note_section.items %}
+                                        <ul>
+                                            {% for note_item in note_section.items %}
+                                                <li>{{ note_item }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endif %}
+                                </section>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+
                 <div class="recipe-divider"></div>
 
                 <div class="recipe-detail-header recipe-detail-header-with-menu">

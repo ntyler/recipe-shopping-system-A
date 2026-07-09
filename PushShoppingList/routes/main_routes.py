@@ -100,6 +100,7 @@ from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_exists
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
+from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections
 from PushShoppingList.services.recipe_extract_service import recipe_scaling_from_data
 from PushShoppingList.services.recipe_extract_service import scaling_multiplier_label
 from PushShoppingList.services.recipe_extract_service import supports_custom_temperature
@@ -1469,6 +1470,7 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
                 if include_detail_images
                 else []
             ),
+            "recipe_notes": recipe_notes_for_view(recipe_data),
             "nutrition_items": normalize_nutrition_items(recipe_data.get("nutrition", {})),
             "sections": sections,
         })
@@ -1496,6 +1498,40 @@ def recipe_description_for_view(recipe_data):
             return value
 
     return ""
+
+
+def recipe_notes_for_view(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    sections = []
+
+    for key in ("recipe_notes", "recipe_note_sections", "source_notes"):
+        sections.extend(normalize_recipe_note_sections(recipe_data.get(key)))
+
+    raw = recipe_data.get("raw") if isinstance(recipe_data.get("raw"), dict) else {}
+    for key in ("recipe_notes", "recipe_note_sections", "source_notes"):
+        sections.extend(normalize_recipe_note_sections(raw.get(key)))
+
+    seen = set()
+    unique_sections = []
+    for section in sections:
+        heading = clean_display_text(section.get("heading"))
+        items = [
+            clean_display_text(item)
+            for item in section.get("items", [])
+            if clean_display_text(item)
+        ]
+        if not heading and not items:
+            continue
+        signature = (heading.lower(), tuple(item.lower() for item in items))
+        if signature in seen:
+            continue
+        seen.add(signature)
+        unique_sections.append({
+            "heading": heading,
+            "items": items,
+        })
+
+    return unique_sections
 
 
 def recipe_import_failure_status(recipe_data):

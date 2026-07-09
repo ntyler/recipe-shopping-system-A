@@ -4708,6 +4708,53 @@ body {
             margin-top: 10px;
         }
 
+        .recipe-notes-content {
+            margin-top: 10px;
+        }
+
+        .recipe-note-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .recipe-note-section {
+            padding: 12px 14px;
+            border: 0;
+            border-bottom: 1px solid #263447;
+            border-radius: 8px;
+            background: linear-gradient(90deg, rgba(15, 23, 42, 0.62), rgba(8, 13, 23, 0.72));
+            box-shadow: none;
+        }
+
+        .recipe-note-section h4 {
+            margin: 0 0 8px 0;
+            color: #d8e2eb;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+
+        .recipe-note-section ul,
+        .recipe-note-section ol {
+            margin: 0 0 0 18px;
+            padding: 0;
+        }
+
+        .recipe-note-section li {
+            margin: 0 0 6px 0;
+            color: #d1d5db;
+            line-height: 1.45;
+        }
+
+        .recipe-note-section li:last-child {
+            margin-bottom: 0;
+        }
+
+        .recipe-note-section li:empty {
+            display: none;
+        }
+
         .detail-content.collapsed,
         .nutrition-content.collapsed {
             display: none;
