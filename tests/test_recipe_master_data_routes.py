@@ -595,6 +595,23 @@ def test_master_data_image_generation_syncs_visible_filter_scope():
     assert "syncImageFormFromFilters(form);" in script
 
 
+def test_master_data_user_filter_aligns_with_filter_row():
+    template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    user_field_start = template.index('class="master-data-user-filter-field"')
+    user_field_end = template.index("</label>", user_field_start)
+    user_note_start = template.index('class="master-data-user-field-note master-data-user-filter-note"')
+
+    assert user_field_end < user_note_start
+    assert 'aria-describedby="masterDataUserHint"' in template[user_field_start:user_field_end]
+    assert ".master-data-filter-form .master-data-user-filter-note" in css
+    assert "grid-column: 3 / 4;" in css
+    assert "grid-row: 2;" in css
+    assert "grid-column: auto;" in css
+    assert "grid-row: auto;" in css
+
+
 def test_master_data_reference_expander_is_wired():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")

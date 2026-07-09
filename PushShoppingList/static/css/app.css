@@ -24773,6 +24773,14 @@ img[data-deferred-src] {
             min-width: 220px;
         }
 
+        .master-data-filter-form .master-data-user-filter-note {
+            grid-column: 3 / 4;
+            grid-row: 2;
+            align-self: start;
+            min-width: 0;
+            margin-top: -2px;
+        }
+
         .master-data-filter-form--ingredients {
             grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(130px, 1fr)) auto;
         }
@@ -24791,7 +24799,8 @@ img[data-deferred-src] {
             font-size: 15px;
         }
 
-        .master-data-filter-form label span.master-data-user-field-note {
+        .master-data-filter-form .master-data-user-field-note {
+            display: block;
             color: #9fb3c8;
             font-size: 12px;
             font-weight: 800;
@@ -25262,6 +25271,12 @@ img[data-deferred-src] {
             .master-data-image-form,
             .master-data-filter-form {
                 grid-template-columns: 1fr;
+            }
+
+            .master-data-filter-form .master-data-user-filter-note {
+                grid-column: auto;
+                grid-row: auto;
+                margin-top: -4px;
             }
 
             .master-data-backfill-progress-header,

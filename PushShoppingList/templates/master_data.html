@@ -249,7 +249,7 @@
                         <option value="user" {% if master_data.scope == 'user' %}selected{% endif %}>Specific user</option>
                     </select>
                 </label>
-                <label>
+                <label class="master-data-user-filter-field">
                     <span>User</span>
                     <input type="text"
                            name="user_id"
@@ -262,14 +262,14 @@
                             <option value="{{ user.user_id }}" label="{{ user.label }}">{{ user.label }}</option>
                         {% endfor %}
                     </datalist>
-                    <span id="masterDataUserHint" class="master-data-user-field-note">
-                        {% if master_data.scope == 'user' and master_data.scope_user.user_id %}
-                            {{ master_data.scope_user.label }}
-                        {% else %}
-                            {{ master_data.current_scope_user.label }}
-                        {% endif %}
-                    </span>
                 </label>
+                <span id="masterDataUserHint" class="master-data-user-field-note master-data-user-filter-note">
+                    {% if master_data.scope == 'user' and master_data.scope_user.user_id %}
+                        {{ master_data.scope_user.label }}
+                    {% else %}
+                        {{ master_data.current_scope_user.label }}
+                    {% endif %}
+                </span>
             {% endif %}
             {% if master_data.record_type == 'ingredients' %}
                 <label>
