@@ -27675,6 +27675,13 @@ function recipeInferPreviewEnabled() {
     return Boolean(checkbox && checkbox.checked);
 }
 
+function recipeInferenceOptionEnabled(options, key, fallback) {
+    const optionObject = options && typeof options === "object" ? options : {};
+    return Object.prototype.hasOwnProperty.call(optionObject, key)
+        ? Boolean(optionObject[key])
+        : Boolean(fallback);
+}
+
 function applyRecipeEditorInferenceOptions(options = {}) {
     const optionObject = options && typeof options === "object" ? options : {};
     const overwriteCheckbox = document.getElementById("recipeEditInferOverwriteAiFields");
@@ -27865,10 +27872,15 @@ async function runRecipeEditorInferenceFollowups() {
     return result;
 }
 
-async function inferMissingRecipeDetails(button) {
+async function inferMissingRecipeDetails(button, options = {}) {
     const recipeUrl = recipeEditorCurrentUrl();
     const originalText = button ? button.textContent : "";
-    const previewOnly = recipeInferPreviewEnabled();
+    const optionObject = options && typeof options === "object" ? options : {};
+    const previewOnly = recipeInferenceOptionEnabled(optionObject, "previewOnly", recipeInferPreviewEnabled());
+    const overwriteAiFields = recipeInferenceOptionEnabled(optionObject, "overwriteAiFields", recipeInferOverwriteEnabled());
+    const statusSubject = String(optionObject.statusSubject || "missing recipe details").trim() || "missing recipe details";
+    const restoreText = String(optionObject.restoreText || "Infer Missing Details").trim() || "Infer Missing Details";
+    const applyPreviewToEditor = Boolean(optionObject.applyPreviewToEditor);
 
     if (!recipeUrl) {
         setRecipeEditStatus("Recipe URL is required before inference.", true);
@@ -27880,7 +27892,7 @@ async function inferMissingRecipeDetails(button) {
             button.disabled = true;
             button.textContent = previewOnly ? "Previewing..." : "Inferring...";
         }
-        setRecipeEditStatus(`${previewOnly ? "Previewing" : "Inferring"} missing recipe details...`);
+        setRecipeEditStatus(`${previewOnly ? "Previewing" : "Inferring"} ${statusSubject}...`);
 
         const response = await fetch("/api/recipe/infer_missing_details", {
             method: "POST",
@@ -27892,7 +27904,7 @@ async function inferMissingRecipeDetails(button) {
                 url: recipeUrl,
                 cookbook_id: recipeEditInferenceContext.cookbook_id || "",
                 cookbook_name: recipeEditInferenceContext.cookbook_name || "",
-                overwrite_ai_fields: recipeInferOverwriteEnabled(),
+                overwrite_ai_fields: overwriteAiFields,
                 preview_only: previewOnly,
             }),
         });
@@ -27913,6 +27925,9 @@ async function inferMissingRecipeDetails(button) {
         }
 
         syncOpenAiUsageDashboardFromResponse(data);
+        if (previewOnly && applyPreviewToEditor && data.recipe) {
+            populateRecipeEditor(data.recipe, data.recipe.source_url || data.recipe_url || recipeUrl);
+        }
         if (!previewOnly) {
             await refreshStoreMarkup({ cacheBust: true });
         }
@@ -27925,6 +27940,7 @@ async function inferMissingRecipeDetails(button) {
         const followupResult = previewOnly ? null : await runRecipeEditorInferenceFollowups();
         const message = [
             recipeInferenceSummary(data),
+            previewOnly && applyPreviewToEditor && data.recipe ? "Preview loaded in the editor. Save Recipe to keep it." : "",
             followupResult ? recipeEditorInferenceFollowupSummary(followupResult) : "",
         ].filter(Boolean).join(" ");
         setRecipeEditStatus(message);
@@ -27935,11 +27951,26 @@ async function inferMissingRecipeDetails(button) {
     } finally {
         if (button) {
             button.disabled = false;
-            button.textContent = originalText || "Infer Missing Details";
+            button.textContent = originalText || restoreText;
         }
     }
 
     return false;
+}
+
+function rerunRecipePredictionFromMenu(button) {
+    applyRecipeEditorInferenceOptions({
+        overwriteAiFields: true,
+        previewOnly: true,
+    });
+    closeRecipeEditRowMenus();
+    return inferMissingRecipeDetails(button, {
+        overwriteAiFields: true,
+        previewOnly: true,
+        applyPreviewToEditor: true,
+        statusSubject: "recipe prediction refresh",
+        restoreText: "Re-run Recipe Prediction...",
+    });
 }
 
 function recipePdfCreationReasonOnSave(recipe) {

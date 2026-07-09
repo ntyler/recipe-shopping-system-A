@@ -112,6 +112,7 @@ def test_recipe_editor_mobile_footer_uses_compact_ai_controls():
 
 def test_recipe_editor_infer_missing_details_runs_full_ai_followups():
     script = read_text("PushShoppingList/static/js/app.js")
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
 
     assert "async function estimateRecipeNutrition(button, options = {})" in script
     assert "async function decideRecipeEditCategoriesWithChatGPT(button, mode = \"missing\", options = {})" in script
@@ -125,6 +126,14 @@ def test_recipe_editor_infer_missing_details_runs_full_ai_followups():
     assert "await decideRecipeEditCategoriesWithChatGPT(null, \"all\", {" in script
     assert "const followupResult = previewOnly ? null : await runRecipeEditorInferenceFollowups();" in script
     assert "Save Recipe to keep nutrition/categories." in script
+    assert "Recipe AI" in template
+    assert "Re-run Recipe Prediction..." in template
+    assert "onclick=\"return rerunRecipePredictionFromMenu(this)\"" in template
+    assert "function rerunRecipePredictionFromMenu(button)" in script
+    assert "previewOnly: true" in script
+    assert "overwriteAiFields: true" in script
+    assert "applyPreviewToEditor: true" in script
+    assert "Preview loaded in the editor. Save Recipe to keep it." in script
 
 
 def test_recipe_editor_estimate_per_serving_prompts_before_overwrite():
