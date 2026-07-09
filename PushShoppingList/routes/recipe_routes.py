@@ -3736,6 +3736,10 @@ def api_recipe_infer_missing_details_route():
     if not recipe_url:
         return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
 
+    force_fields = data.get("force_fields") if isinstance(data.get("force_fields"), list) else []
+    if data.get("force_recipe_notes") and "recipe_notes" not in force_fields:
+        force_fields = [*force_fields, "recipe_notes"]
+
     result = infer_missing_details_for_recipe(
         recipe_url,
         cookbook_id=str(data.get("cookbook_id") or "").strip(),
@@ -3743,6 +3747,8 @@ def api_recipe_infer_missing_details_route():
         overwrite_ai_fields=bool(data.get("overwrite_ai_fields")),
         preview_only=bool(data.get("preview_only")),
         user_id=active_user_id(),
+        current_recipe=data.get("recipe") if isinstance(data.get("recipe"), dict) else None,
+        force_fields=force_fields,
     )
     status = 200 if result.get("ok") else 400
     return jsonify(with_openai_usage_dashboard(result)), status

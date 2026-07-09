@@ -229,17 +229,32 @@ def inferred_fields_for_recipe(recipe_data):
     }
 
 
-def should_fill_field(recipe_data, field, overwrite_ai_fields=False):
+def normalized_force_fields(force_fields=None):
+    return {
+        clean_text(field)
+        for field in (force_fields or [])
+        if clean_text(field) in DETAIL_FIELDS
+    }
+
+
+def should_fill_field(recipe_data, field, overwrite_ai_fields=False, force_fields=None):
+    if field in normalized_force_fields(force_fields):
+        return True
     if not field_has_real_value(recipe_data, field):
         return True
     return bool(overwrite_ai_fields and field in inferred_fields_for_recipe(recipe_data))
 
 
-def missing_fields_for_recipe(recipe_data, overwrite_ai_fields=False):
+def missing_fields_for_recipe(recipe_data, overwrite_ai_fields=False, force_fields=None):
     return [
         field
         for field in DETAIL_FIELDS
-        if should_fill_field(recipe_data, field, overwrite_ai_fields=overwrite_ai_fields)
+        if should_fill_field(
+            recipe_data,
+            field,
+            overwrite_ai_fields=overwrite_ai_fields,
+            force_fields=force_fields,
+        )
     ]
 
 
@@ -1253,6 +1268,35 @@ def recipe_data_for_note_regeneration(recipe_url, current_recipe=None):
     return recipe_data
 
 
+def recipe_data_for_detail_inference(recipe_url, current_recipe=None):
+    recipe_url = clean_text(recipe_url)
+    existing_data = recipe_edit_service.load_recipe_output(recipe_url) or {"source_url": recipe_url}
+    current_recipe = current_recipe if isinstance(current_recipe, dict) else {}
+    recipe_data = {
+        **existing_data,
+        **current_recipe,
+    }
+    recipe_data["source_url"] = clean_text(recipe_data.get("source_url")) or recipe_url
+    recipe_data["ingredients"] = recipe_edit_service.sanitize_ingredients(
+        recipe_data.get("ingredients", []),
+        existing_data.get("ingredients", []),
+    )
+    recipe_data["equipment"] = recipe_edit_service.sanitize_equipment_list(
+        recipe_data.get("equipment", []),
+        existing_data.get("equipment", []),
+    )
+    recipe_data["instructions"] = recipe_edit_service.sanitize_instruction_list(
+        recipe_data.get("instructions", []),
+        existing_data.get("instructions", []),
+    )
+    recipe_data["recipe_notes"] = recipe_edit_service.sanitize_recipe_notes(
+        recipe_data.get("recipe_notes", []),
+        existing_data.get("recipe_notes", []),
+    )
+    recipe_data["scaling"] = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
+    return recipe_data
+
+
 def regenerate_ingredients_for_recipe(
     recipe_url,
     current_recipe=None,
@@ -1749,12 +1793,15 @@ def infer_missing_details_for_recipe(
     overwrite_ai_fields=False,
     preview_only=False,
     user_id=None,
+    current_recipe=None,
+    force_fields=None,
 ):
     recipe_url = clean_text(recipe_url)
     if not recipe_url:
         return {"ok": False, "error": "Recipe URL is required."}
 
-    recipe_data = recipe_edit_service.load_recipe_output(recipe_url) or {"source_url": recipe_url}
+    force_fields = normalized_force_fields(force_fields)
+    recipe_data = recipe_data_for_detail_inference(recipe_url, current_recipe)
     recipe_data.setdefault("source_url", recipe_url)
     cookbook_context = cookbook_context_for_recipe(recipe_url, cookbook_id, cookbook_name)
     if recipe_needs_menu_recipe_generation(recipe_data):
@@ -1766,7 +1813,11 @@ def infer_missing_details_for_recipe(
             user_id=user_id,
         )
 
-    missing_fields = missing_fields_for_recipe(recipe_data, overwrite_ai_fields=overwrite_ai_fields)
+    missing_fields = missing_fields_for_recipe(
+        recipe_data,
+        overwrite_ai_fields=overwrite_ai_fields,
+        force_fields=force_fields,
+    )
     item_name = first_clean_text(
         recipe_data.get("menu_item_name"),
         recipe_data.get("recipe_title"),
@@ -1782,6 +1833,7 @@ def infer_missing_details_for_recipe(
         menu_item_name=item_name,
         menu_description=clean_text(recipe_data.get("menu_description")),
         detected_missing_fields=missing_fields,
+        force_fields=sorted(force_fields),
         model=model,
     )
 
@@ -1850,7 +1902,12 @@ def infer_missing_details_for_recipe(
     fields_to_fill = [
         field
         for field in missing_fields
-        if should_fill_field(recipe_data, field, overwrite_ai_fields=overwrite_ai_fields)
+        if should_fill_field(
+            recipe_data,
+            field,
+            overwrite_ai_fields=overwrite_ai_fields,
+            force_fields=force_fields,
+        )
     ]
     next_recipe_data, updated_fields = apply_ai_payload_to_recipe(
         recipe_data,

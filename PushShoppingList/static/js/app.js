@@ -27994,6 +27994,7 @@ async function inferMissingRecipeDetails(button, options = {}) {
     const statusSubject = String(optionObject.statusSubject || "missing recipe details").trim() || "missing recipe details";
     const restoreText = String(optionObject.restoreText || "Infer Missing Details").trim() || "Infer Missing Details";
     const applyPreviewToEditor = Boolean(optionObject.applyPreviewToEditor);
+    const forceFields = Array.isArray(optionObject.forceFields) ? optionObject.forceFields : [];
 
     if (!recipeUrl) {
         setRecipeEditStatus("Recipe URL is required before inference.", true);
@@ -28007,6 +28008,7 @@ async function inferMissingRecipeDetails(button, options = {}) {
         }
         setRecipeEditStatus(`${previewOnly ? "Previewing" : "Inferring"} ${statusSubject}...`);
 
+        const payload = collectRecipeEditorPayload();
         const response = await fetch("/api/recipe/infer_missing_details", {
             method: "POST",
             headers: {
@@ -28015,10 +28017,14 @@ async function inferMissingRecipeDetails(button, options = {}) {
             },
             body: JSON.stringify({
                 url: recipeUrl,
+                original_url: payload.original_url,
+                recipe: payload.recipe,
                 cookbook_id: recipeEditInferenceContext.cookbook_id || "",
                 cookbook_name: recipeEditInferenceContext.cookbook_name || "",
                 overwrite_ai_fields: overwriteAiFields,
                 preview_only: previewOnly,
+                force_recipe_notes: Boolean(optionObject.forceRecipeNotes),
+                force_fields: forceFields,
             }),
         });
         const data = await response.json();
@@ -28081,6 +28087,8 @@ function rerunRecipePredictionFromMenu(button) {
         overwriteAiFields: true,
         previewOnly: true,
         applyPreviewToEditor: true,
+        forceRecipeNotes: true,
+        forceFields: ["recipe_notes"],
         statusSubject: "recipe prediction refresh",
         restoreText: "Re-run Recipe Prediction...",
     });

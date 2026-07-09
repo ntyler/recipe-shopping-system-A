@@ -133,6 +133,10 @@ def test_recipe_editor_infer_missing_details_runs_full_ai_followups():
     assert "previewOnly: true" in script
     assert "overwriteAiFields: true" in script
     assert "applyPreviewToEditor: true" in script
+    assert "forceRecipeNotes: true" in script
+    assert 'forceFields: ["recipe_notes"]' in script
+    assert "recipe: payload.recipe" in script
+    assert "force_recipe_notes: Boolean(optionObject.forceRecipeNotes)" in script
     assert "Preview loaded in the editor. Save Recipe to keep it." in script
 
 

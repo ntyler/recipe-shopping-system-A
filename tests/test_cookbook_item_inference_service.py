@@ -511,6 +511,44 @@ def test_overwrite_ai_fields_does_not_replace_manual_ingredients(monkeypatch, tm
     }]
 
 
+def test_rerun_prediction_can_force_recipe_notes_without_replacing_manual_ingredients(monkeypatch, tmp_path):
+    configure_inference_storage(monkeypatch, tmp_path)
+    original = seed_cookbook_and_recipe(recipe_overrides={
+        "ingredients": [{"ingredient": "user-entered cabbage", "quantity": "1", "unit": "cup"}],
+        "recipe_notes": [{
+            "heading": "Top Tips",
+            "items": ["Old editor note."],
+        }],
+    })
+    calls = patch_openai_response(monkeypatch)
+
+    result = inference.infer_missing_details_for_recipe(
+        SPRING_ROLL_URL,
+        cookbook_id="vel-asian-cuisine",
+        overwrite_ai_fields=True,
+        preview_only=True,
+        current_recipe={
+            **original,
+            "recipe_notes": [{
+                "heading": "Top Tips",
+                "items": ["Current editor note should be visible to AI."],
+            }],
+        },
+        force_fields=["recipe_notes"],
+    )
+    saved = recipe_edit_service.load_recipe_output(SPRING_ROLL_URL)
+
+    assert result["ok"] is True
+    assert result["preview_only"] is True
+    assert "recipe_notes" in result["would_update_fields"]
+    assert "ingredients" not in result["would_update_fields"]
+    assert result["recipe"]["recipe_notes"][0]["heading"] == "Substitutions & Variations"
+    assert result["recipe"]["ingredients"][0]["ingredient"] == "user-entered cabbage"
+    assert saved == original
+    assert "Current editor note should be visible to AI." in calls[0]["prompt"]
+    assert "recipe_notes" in calls[0]["prompt"]
+
+
 def test_overwrite_ai_fields_replaces_fields_tagged_from_prior_inference(monkeypatch, tmp_path):
     configure_inference_storage(monkeypatch, tmp_path)
     seed_cookbook_and_recipe(recipe_overrides={
