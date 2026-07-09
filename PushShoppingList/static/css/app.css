@@ -18122,9 +18122,14 @@ body {
 
     .recipe-edit-ingredient-row .recipe-edit-ingredient-substitutions,
     .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-ingredient-substitutions {
-        grid-column: 3 / 4;
+        grid-column: 1 / -1;
         grid-row: 4;
         min-width: 0;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-substitution-heading,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-substitution-heading {
+        padding-left: calc(28px + 14px + 54px + 14px);
     }
 
     .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel,

@@ -102,6 +102,11 @@ def test_recipe_editor_ingredient_substitutions_are_wired():
     assert ".recipe-edit-ingredient-substitutions" in css
     assert ".recipe-edit-substitution-list" in css
     assert ".recipe-edit-substitution-option-row.recipe-edit-ingredient-row" not in css
+    substitution_grid_start = css.index(".recipe-edit-ingredient-row .recipe-edit-ingredient-substitutions,")
+    substitution_grid_end = css.index(".recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel", substitution_grid_start)
+    substitution_grid_css = css[substitution_grid_start:substitution_grid_end]
+    assert "grid-column: 1 / -1;" in substitution_grid_css
+    assert "padding-left: calc(28px + 14px + 54px + 14px);" in substitution_grid_css
     assert ".recipe-edit-ingredient-badge.substitution" in css
     assert ".recipe-edit-row-collapsed .recipe-edit-ingredient-substitutions" in css
 
