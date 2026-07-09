@@ -30,17 +30,19 @@
         {% if master_data.record_type == 'ingredients' %}
             <td>
                 <form class="master-data-store-section-form"
+                      data-master-store-section-form
                       method="POST"
                       action="{{ url_for('main_bp.update_ingredient_master_store_section_route', ingredient_id=row.id) }}">
                     <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
-                    <select name="store_section" aria-label="Store section for {{ row.name }}">
+                    <select name="store_section"
+                            data-original-store-section="{{ row.store_section }}"
+                            aria-label="Store section for {{ row.name }}">
                         {% for section in master_data.store_section_options %}
                             <option value="{{ section }}" {% if row.store_section == section %}selected{% endif %}>
                                 {{ section }}
                             </option>
                         {% endfor %}
                     </select>
-                    <button type="submit">Save</button>
                 </form>
             </td>
         {% endif %}
@@ -343,6 +345,21 @@
         </div>
 
         {% if master_data.rows %}
+            {% if master_data.record_type == 'ingredients' %}
+                <section class="master-data-store-section-save-panel"
+                         data-master-store-section-panel
+                         aria-live="polite">
+                    <div>
+                        <strong data-master-store-section-summary>No store section changes</strong>
+                        <span data-master-store-section-detail>Change store sections in the table, then save all pending changes here.</span>
+                    </div>
+                    <button type="button"
+                            data-master-store-section-save
+                            disabled>
+                        Save Changes
+                    </button>
+                </section>
+            {% endif %}
             <div class="master-data-table-wrap">
                 <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% endif %}">
                     <thead>

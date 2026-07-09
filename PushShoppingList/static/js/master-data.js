@@ -745,6 +745,230 @@
         });
     }
 
+    function masterDataStoreSectionForms(root = document) {
+        const scope = root && typeof root.querySelectorAll === "function" ? root : document;
+        return Array.from(scope.querySelectorAll("[data-master-store-section-form]"));
+    }
+
+    function storeSectionSelectFor(form) {
+        return form ? form.querySelector('select[name="store_section"]') : null;
+    }
+
+    function originalStoreSectionValue(select) {
+        return text(select && select.dataset ? select.dataset.originalStoreSection : "").trim();
+    }
+
+    function currentStoreSectionValue(select) {
+        return text(select ? select.value : "").trim();
+    }
+
+    function storeSectionFormIsDirty(form) {
+        const select = storeSectionSelectFor(form);
+        return !!select && currentStoreSectionValue(select) !== originalStoreSectionValue(select);
+    }
+
+    function updateStoreSectionFormState(form) {
+        const row = form && form.closest ? form.closest(".master-data-record-row") : null;
+        const dirty = storeSectionFormIsDirty(form);
+        form.classList.toggle("master-data-store-section-form-dirty", dirty);
+        if (row) {
+            row.classList.toggle("master-data-record-row-dirty", dirty);
+            if (dirty) {
+                row.classList.remove("master-data-record-row-saved");
+            }
+        }
+        return dirty;
+    }
+
+    function changedStoreSectionForms() {
+        return masterDataStoreSectionForms().filter((form) => updateStoreSectionFormState(form));
+    }
+
+    function storeSectionPanelElements() {
+        const panel = document.querySelector("[data-master-store-section-panel]");
+        return {
+            panel,
+            summary: panel && panel.querySelector("[data-master-store-section-summary]"),
+            detail: panel && panel.querySelector("[data-master-store-section-detail]"),
+            button: panel && panel.querySelector("[data-master-store-section-save]"),
+        };
+    }
+
+    function setStoreSectionPanelMessage(summary, detail) {
+        const els = storeSectionPanelElements();
+        if (els.summary) {
+            els.summary.textContent = summary;
+        }
+        if (els.detail) {
+            els.detail.textContent = detail;
+        }
+    }
+
+    function updateStoreSectionSavePanel() {
+        const els = storeSectionPanelElements();
+        if (!els.panel) {
+            return;
+        }
+
+        const changedForms = changedStoreSectionForms();
+        const count = changedForms.length;
+        els.panel.classList.toggle("has-changes", count > 0);
+        els.panel.classList.remove("has-error", "is-saving");
+        els.panel.setAttribute("aria-busy", "false");
+
+        if (els.button) {
+            els.button.disabled = count === 0;
+            els.button.textContent = count > 0
+                ? `Save ${count} Change${count === 1 ? "" : "s"}`
+                : "Save Changes";
+        }
+
+        if (count > 0) {
+            setStoreSectionPanelMessage(
+                `${count} unsaved store section change${count === 1 ? "" : "s"}`,
+                "Save once after making all section edits on this page."
+            );
+        } else {
+            setStoreSectionPanelMessage(
+                "No store section changes",
+                "Change store sections in the table, then save all pending changes here."
+            );
+        }
+    }
+
+    function setStoreSectionSaveBusy(busy) {
+        const els = storeSectionPanelElements();
+        if (els.panel) {
+            els.panel.classList.toggle("is-saving", busy);
+            els.panel.setAttribute("aria-busy", busy ? "true" : "false");
+        }
+        if (els.button) {
+            const changedCount = changedStoreSectionForms().length;
+            els.button.disabled = busy || changedCount === 0;
+            els.button.textContent = busy
+                ? "Saving..."
+                : changedCount > 0
+                    ? `Save ${changedCount} Change${changedCount === 1 ? "" : "s"}`
+                    : "Save Changes";
+        }
+        masterDataStoreSectionForms().forEach((form) => {
+            const select = storeSectionSelectFor(form);
+            if (select) {
+                select.disabled = busy;
+            }
+        });
+    }
+
+    async function submitStoreSectionForm(form) {
+        const response = await fetch(form.action, {
+            method: form.method || "POST",
+            body: new FormData(form),
+            headers: {
+                Accept: "application/json",
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false || data.success === false) {
+            throw new Error(data.message || data.error || "Store section could not be saved.");
+        }
+        return data;
+    }
+
+    async function saveChangedStoreSections(event) {
+        if (event) {
+            event.preventDefault();
+        }
+
+        let forms = changedStoreSectionForms();
+        if (!forms.length) {
+            updateStoreSectionSavePanel();
+            return;
+        }
+
+        if (!window.fetch || !window.FormData) {
+            forms[0].submit();
+            return;
+        }
+
+        setStoreSectionSaveBusy(true);
+        setStoreSectionPanelMessage(
+            `Saving ${forms.length} store section change${forms.length === 1 ? "" : "s"}...`,
+            "Please keep this page open while the updates finish."
+        );
+
+        let savedCount = 0;
+        const failures = [];
+        for (const form of forms) {
+            const select = storeSectionSelectFor(form);
+            const row = form.closest(".master-data-record-row");
+            try {
+                await submitStoreSectionForm(form);
+                if (select) {
+                    select.dataset.originalStoreSection = currentStoreSectionValue(select);
+                }
+                form.classList.remove("master-data-store-section-form-dirty");
+                if (row) {
+                    row.classList.remove("master-data-record-row-dirty", "master-data-record-row-error");
+                    row.classList.add("master-data-record-row-saved");
+                }
+                savedCount += 1;
+            } catch (error) {
+                failures.push(error && error.message ? error.message : "Store section could not be saved.");
+                if (row) {
+                    row.classList.add("master-data-record-row-error");
+                }
+            }
+        }
+
+        setStoreSectionSaveBusy(false);
+
+        const els = storeSectionPanelElements();
+        if (failures.length) {
+            if (els.panel) {
+                els.panel.classList.add("has-error");
+            }
+            setStoreSectionPanelMessage(
+                `${savedCount} saved, ${failures.length} failed`,
+                failures[0]
+            );
+            return;
+        }
+
+        setStoreSectionPanelMessage(
+            `${savedCount} store section change${savedCount === 1 ? "" : "s"} saved`,
+            "Refreshing the table so groups and filters stay up to date."
+        );
+
+        window.setTimeout(() => {
+            window.location.assign(window.location.href);
+        }, 700);
+    }
+
+    function initMasterDataStoreSectionBatchSave() {
+        const forms = masterDataStoreSectionForms();
+        if (!forms.length) {
+            return;
+        }
+
+        forms.forEach((form) => {
+            const select = storeSectionSelectFor(form);
+            if (select && !select.dataset.originalStoreSection) {
+                select.dataset.originalStoreSection = currentStoreSectionValue(select);
+            }
+            form.addEventListener("submit", saveChangedStoreSections);
+            form.addEventListener("change", updateStoreSectionSavePanel);
+            form.addEventListener("input", updateStoreSectionSavePanel);
+            updateStoreSectionFormState(form);
+        });
+
+        const els = storeSectionPanelElements();
+        if (els.button) {
+            els.button.addEventListener("click", saveChangedStoreSections);
+        }
+        updateStoreSectionSavePanel();
+    }
+
     function renderProgress(form, progress) {
         const els = elementsFor(form);
         if (!els.panel || !progress) {
@@ -1141,6 +1365,7 @@
         initMasterDataReferences();
         initMasterDataThumbnailSizeControls();
         initMasterDataImageLightbox();
+        initMasterDataStoreSectionBatchSave();
 
         const form = document.querySelector("[data-master-backfill-form]");
         if (form && window.fetch && window.FormData) {

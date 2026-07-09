@@ -156,6 +156,11 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Generate Missing Images" in all_html
     assert "Store Section" in all_html
     assert 'name="store_section"' in all_html
+    assert "data-master-store-section-panel" in all_html
+    assert "data-master-store-section-save" in all_html
+    assert "data-master-store-section-form" in all_html
+    assert 'data-original-store-section="PRODUCE"' in all_html
+    assert '<button type="submit">Save</button>' not in all_html
     assert "All sections" in all_html
     assert "PRODUCE" in all_html
     assert "SPICES &amp; SEASONINGS" in all_html
@@ -179,6 +184,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Generate Missing Images" in equipment_html
     assert "Store Section" not in equipment_html
     assert 'name="store_section"' not in equipment_html
+    assert "data-master-store-section-panel" not in equipment_html
     assert "data-master-image-form" in equipment_html
     assert "Creates equipment thumbnails" in equipment_html
     assert 'name="record_type" value="equipment"' in equipment_html
@@ -610,6 +616,33 @@ def test_master_data_user_filter_aligns_with_filter_row():
     assert "grid-row: 2;" in css
     assert "grid-column: auto;" in css
     assert "grid-row: auto;" in css
+
+
+def test_master_data_store_section_batch_save_is_wired():
+    template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
+    script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert "data-master-store-section-panel" in template
+    assert "data-master-store-section-summary" in template
+    assert "data-master-store-section-detail" in template
+    assert "data-master-store-section-save" in template
+    assert "data-master-store-section-form" in template
+    assert "data-original-store-section" in template
+    assert '<button type="submit">Save</button>' not in template
+
+    assert "function initMasterDataStoreSectionBatchSave" in script
+    assert "function changedStoreSectionForms" in script
+    assert "function saveChangedStoreSections" in script
+    assert "function submitStoreSectionForm" in script
+    assert "initMasterDataStoreSectionBatchSave();" in script
+    assert '"X-Requested-With": "fetch"' in script
+    assert "window.location.assign(window.location.href)" in script
+
+    assert ".master-data-store-section-save-panel" in css
+    assert ".master-data-store-section-save-panel.has-changes" in css
+    assert ".master-data-record-row-dirty td" in css
+    assert ".master-data-store-section-form {\n            display: block;" in css
 
 
 def test_master_data_reference_expander_is_wired():
