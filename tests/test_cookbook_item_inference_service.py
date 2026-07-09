@@ -45,7 +45,13 @@ def ai_payload(**overrides):
         "inactive_time": "10 minutes",
         "cook_time": "10 minutes",
         "ingredients": [
-            {"name": "spring roll wrappers", "quantity": "2", "unit": "", "notes": ""},
+            {
+                "name": "spring roll wrappers",
+                "quantity": "2",
+                "unit": "",
+                "notes": "",
+                "substitutions": ["rice paper wrappers"],
+            },
             {"name": "carrots", "quantity": "1/2", "unit": "cup", "notes": "julienned"},
             {"name": "cellophane noodles", "quantity": "1", "unit": "ounce", "notes": "soaked"},
             {"name": "mushrooms", "quantity": "1/4", "unit": "cup", "notes": "sliced"},
@@ -438,6 +444,7 @@ def test_infer_missing_details_fills_placeholder_menu_item_rows(monkeypatch, tmp
         "spring roll wrappers",
         "carrot",
     ]
+    assert saved["ingredients"][0]["substitutions"] == ["rice paper wrappers"]
     assert all(item.get("ingredient") or item.get("original_text") for item in saved["ingredients"])
     assert [item["equipment"] for item in saved["equipment"]] == ["Cutting board", "Mixing bowl", "Skillet"]
     assert all(item["instruction"] for item in saved["instructions"])

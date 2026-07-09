@@ -7159,6 +7159,11 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "store_section_order": ingredient_store_section_sort_key(store_section),
             "purchasable_item": item.get("purchasable_item") or item.get("buy_as") or "",
             "purchase_group": item.get("purchase_group") or "",
+            "substitutions": normalize_ingredient_substitutions(
+                item.get("substitutions")
+                or item.get("substitution_options")
+                or item.get("alternatives")
+            ),
             "ingredient_image_url": ingredient_image_url,
             "ingredient_image_generated_at": (
                 item.get("ingredient_image_generated_at") or item.get("image_generated_at") or ""
@@ -7327,6 +7332,48 @@ def normalize_nutrition_rows(nutrition, include_defaults=False):
     return rows
 
 
+def normalize_ingredient_substitutions(value, existing_value=None):
+    candidates = value
+    if candidates in (None, "", []):
+        candidates = existing_value
+    if candidates in (None, "", []):
+        return []
+
+    if isinstance(candidates, str):
+        rows = re.split(r"[\r\n;]+", candidates)
+    elif isinstance(candidates, list):
+        rows = candidates
+    else:
+        rows = [candidates]
+
+    normalized = []
+    seen = set()
+    for option in rows:
+        if isinstance(option, dict):
+            text = (
+                option.get("ingredient")
+                or option.get("name")
+                or option.get("substitute")
+                or option.get("option")
+                or option.get("text")
+                or option.get("label")
+                or ""
+            )
+        else:
+            text = option
+
+        text = str(text or "").strip()
+        if not text:
+            continue
+        key = instruction_match_text_key(text)
+        if key in seen:
+            continue
+        normalized.append(text)
+        seen.add(key)
+
+    return normalized
+
+
 def sanitize_ingredients(value, existing_value=None):
     if not isinstance(value, list):
         return []
@@ -7395,6 +7442,15 @@ def sanitize_ingredients(value, existing_value=None):
             nullable_string(item.get("ingredient_image_prompt") or item.get("image_prompt"))
             or nullable_string(existing.get("ingredient_image_prompt") or existing.get("image_prompt"))
         )
+        substitutions = normalize_ingredient_substitutions(
+            item.get("substitutions")
+            or item.get("substitution_options")
+            or item.get("alternatives")
+            or item.get("substitutions_text"),
+            existing.get("substitutions")
+            or existing.get("substitution_options")
+            or existing.get("alternatives"),
+        )
 
         row = {
             "ingredient_id": nullable_string(
@@ -7429,6 +7485,7 @@ def sanitize_ingredients(value, existing_value=None):
             "store_section_order": ingredient_store_section_sort_key(store_section),
             "purchasable_item": nullable_string(item.get("purchasable_item") or item.get("buy_as")),
             "purchase_group": nullable_string(item.get("purchase_group")),
+            "substitutions": substitutions,
             "ingredient_image_url": ingredient_image_url,
             "ingredient_image_generated_at": ingredient_image_generated_at,
             "ingredient_image_prompt": ingredient_image_prompt,

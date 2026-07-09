@@ -192,6 +192,38 @@ def test_recipe_editor_loads_and_saves_recipe_notes(monkeypatch, tmp_path):
     }]
 
 
+def test_recipe_editor_saves_ingredient_substitutions(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://example.test/recipe-with-ingredient-options"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Recipe With Ingredient Options",
+        "ingredients": [{
+            "ingredient": "potatoes",
+            "quantity": "4",
+            "unit": "medium",
+            "substitutions": ["sweet potatoes"],
+        }],
+        "instructions": [{"instruction": "Cook until done."}],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+    assert loaded["ingredients"][0]["substitutions"] == ["sweet potatoes"]
+
+    recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(url, ingredients=[{
+            "ingredient": "chicken broth",
+            "quantity": "2",
+            "unit": "cups",
+            "substitutions": ["vegetable broth", "vegetable broth", {"name": "mushroom broth"}],
+        }]),
+    )
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert saved["ingredients"][0]["substitutions"] == ["vegetable broth", "mushroom broth"]
+
+
 def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     js = read_text("PushShoppingList/static/js/app.js")

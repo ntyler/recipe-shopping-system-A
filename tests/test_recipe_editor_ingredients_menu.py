@@ -71,6 +71,29 @@ def test_ingredients_header_has_image_overflow_menu():
     assert "editFoodReviewManually" in script
 
 
+def test_recipe_editor_ingredient_substitutions_are_wired():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    row_start = script.index("function addRecipeIngredientRow")
+    row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
+    row_block = script[row_start:row_end]
+    collect_start = script.index("function collectRecipeIngredientRows")
+    collect_end = script.index("function collectRecipeNutritionRows", collect_start)
+    collect_block = script[collect_start:collect_end]
+
+    assert "function recipeIngredientSubstitutions(item = {})" in script
+    assert "recipe-edit-ingredient-substitutions" in row_block
+    assert "Substitutions / Options" in row_block
+    assert 'data-field="substitutions_text"' in row_block
+    assert "data-ingredient-substitution-count" in row_block
+    assert 'badges.push([`${substitutionCount} Option${substitutionCount === 1 ? "" : "s"}`, "substitution"]);' in script
+    assert "item.substitutions = recipeIngredientSubstitutions(item);" in collect_block
+    assert "delete item.substitutions_text;" in collect_block
+    assert ".recipe-edit-ingredient-substitutions" in css
+    assert ".recipe-edit-ingredient-badge.substitution" in css
+    assert ".recipe-edit-row-collapsed .recipe-edit-ingredient-substitutions" in css
+
+
 def test_recipe_editor_hide_all_images_keeps_title_image_visible():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     function_start = script.index("function setRecipeEditorImagesVisibleFromMenu")

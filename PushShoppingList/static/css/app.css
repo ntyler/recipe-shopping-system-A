@@ -17673,6 +17673,7 @@ body {
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-preparation-inline,
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-original-text-label,
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-choice-review,
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-substitutions,
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-qty-label,
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-unit-label,
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-buy-as-label,
@@ -17681,6 +17682,7 @@ body {
 .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-preparation-inline,
 .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-original-text-label,
 .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-choice-review,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-substitutions,
 .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-qty-label,
 .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-unit-label,
 .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-buy-as-label,
@@ -17821,6 +17823,12 @@ body {
     color: #9ec5ff;
 }
 
+.recipe-edit-ingredient-badge.substitution {
+    border-color: #52533a;
+    background: rgba(75, 75, 42, 0.68);
+    color: #d7e885;
+}
+
 .recipe-edit-extraction-warning {
     display: inline-flex;
     align-items: flex-start;
@@ -17887,6 +17895,55 @@ body {
     border-radius: 6px;
     background: #0b121c;
     padding: 5px 8px;
+}
+
+.recipe-edit-ingredient-substitutions {
+    min-width: 0;
+    padding-top: 6px;
+}
+
+.recipe-edit-ingredient-substitutions summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    color: #9ec5ff;
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+    list-style: none;
+}
+
+.recipe-edit-ingredient-substitutions summary::-webkit-details-marker {
+    display: none;
+}
+
+.recipe-edit-ingredient-substitutions summary::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 0.16s ease;
+}
+
+.recipe-edit-ingredient-substitutions[open] summary::before {
+    transform: rotate(45deg);
+}
+
+.recipe-edit-ingredient-substitutions textarea {
+    width: 100%;
+    min-height: 56px;
+    margin-top: 6px;
+    padding: 8px 10px;
+    border: 1px solid #263447;
+    border-radius: 6px;
+    background: rgba(5, 10, 18, 0.72);
+    color: #d7deea;
+    font-size: 13px;
+    line-height: 1.35;
+    resize: vertical;
 }
 
 .recipe-edit-ingredient-row label.recipe-edit-qty-label {
@@ -18015,6 +18072,14 @@ body {
     padding-right: 18px;
 }
 
+.recipe-edit-ingredient-row .recipe-edit-ingredient-substitutions textarea {
+    min-height: 56px;
+    padding: 8px 10px;
+    border: 1px solid #263447;
+    border-radius: 6px;
+    background: rgba(5, 10, 18, 0.72);
+}
+
 @media (min-width: 1181px) {
     .recipe-edit-ingredient-row,
     .recipe-edit-ingredient-row.has-ingredient-choice-review {
@@ -18062,6 +18127,13 @@ body {
     .recipe-edit-ingredient-row .recipe-edit-choice-review,
     .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-choice-review {
         grid-column: 3 / 4;
+        grid-row: 5;
+        min-width: 0;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-ingredient-substitutions,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-ingredient-substitutions {
+        grid-column: 3 / 4;
         grid-row: 4;
         min-width: 0;
     }
@@ -18069,7 +18141,7 @@ body {
     .recipe-edit-ingredient-row .recipe-ingredient-image-panel.recipe-edit-row-image-panel,
     .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
         grid-column: 3 / 4;
-        grid-row: 5;
+        grid-row: 6;
     }
 
     .recipe-edit-ingredient-row label.recipe-edit-qty-label,

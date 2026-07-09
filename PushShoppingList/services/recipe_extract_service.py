@@ -7121,6 +7121,9 @@ ALTERNATIVE INGREDIENT RULES:
 - If the alternatives have different quantities or units, put the complete quantity choices in quantity and set unit to null.
 - Preserve the full original line in original_text.
 - Assign the store_section for the best primary grocery placement.
+- If the source notes include a substitution tied to one specific ingredient, put the replacement grocery item in that ingredient object's substitutions array.
+- substitutions must be grocery option names only, one string per option, such as ["sweet potatoes"] or ["vegetable broth"].
+- Do NOT put broad technique, serving, or storage notes in ingredient substitutions.
 
 Examples:
 - "1 egg"
@@ -7441,6 +7444,7 @@ FINAL OUTPUT FORMAT
       "inferred": false,
       "warning": null,
       "food_review": {{}},
+      "substitutions": [],
       "optional": false,
       "store_section": null,
       "store_section_order": null
@@ -9487,6 +9491,44 @@ def normalize_ingredient_confidence(value, inferred=False, suspicious=False):
     return "medium" if inferred else "high"
 
 
+def normalize_ingredient_substitutions(value):
+    if value in (None, "", []):
+        return []
+
+    if isinstance(value, str):
+        rows = re.split(r"[\r\n;]+", value)
+    elif isinstance(value, list):
+        rows = value
+    else:
+        rows = [value]
+
+    normalized = []
+    seen = set()
+    for option in rows:
+        if isinstance(option, dict):
+            text = (
+                option.get("ingredient")
+                or option.get("name")
+                or option.get("substitute")
+                or option.get("option")
+                or option.get("text")
+                or option.get("label")
+                or ""
+            )
+        else:
+            text = option
+        text = clean_recipe_text(text)
+        if not text:
+            continue
+        key = normalize_ingredient_key(text)
+        if key in seen:
+            continue
+        normalized.append(text)
+        seen.add(key)
+
+    return normalized
+
+
 def normalize_extracted_ingredient_fields(json_data, source_text=""):
     json_data = json_data if isinstance(json_data, dict) else {}
     trusted_source_text = ingredient_validation_source_text(json_data, source_text)
@@ -9613,6 +9655,11 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
             item["base_unit"] = item.get("unit")
 
         apply_purchase_mapping_to_ingredient(item)
+        item["substitutions"] = normalize_ingredient_substitutions(
+            item.get("substitutions")
+            or item.get("substitution_options")
+            or item.get("alternatives")
+        )
         store_section_text = " ".join(
             clean_recipe_text(part)
             for part in (

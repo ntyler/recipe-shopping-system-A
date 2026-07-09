@@ -267,6 +267,27 @@ def test_recipe_extraction_prompt_preserves_notes_separately():
     assert 'return those as separate recipe_notes entries with those exact headings' in prompt
     assert 'Do NOT collapse those sections into one generic "Notes" section.' in prompt
     assert "Do NOT put recipe notes into ingredients, equipment, or cooking instructions." in prompt
+    assert "ingredient object's substitutions array" in prompt
+    assert '"substitutions": []' in prompt
+
+
+def test_ingredient_substitution_normalizer_preserves_unique_options():
+    recipe = {
+        "ingredients": [{
+            "ingredient": "potatoes",
+            "quantity": "4",
+            "unit": "medium",
+            "substitution_options": [
+                {"name": "sweet potatoes"},
+                "sweet potatoes",
+                "yuca",
+            ],
+        }],
+    }
+
+    recipe_extract_service.normalize_extracted_ingredient_fields(recipe)
+
+    assert recipe["ingredients"][0]["substitutions"] == ["sweet potatoes", "yuca"]
 
 
 def test_recipe_notes_import_normalizer_splits_common_source_sections():

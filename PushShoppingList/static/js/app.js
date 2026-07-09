@@ -24186,6 +24186,11 @@ function recipeIngredientBadgesHtml(item = {}) {
         badges.push(["Optional", "optional"]);
     }
 
+    const substitutionCount = recipeIngredientSubstitutions(item).length;
+    if (substitutionCount) {
+        badges.push([`${substitutionCount} Option${substitutionCount === 1 ? "" : "s"}`, "substitution"]);
+    }
+
     if (pantryText.includes("BEAN") || pantryText.includes("LEGUME") || pantryText.includes("SPICE")) {
         badges.push(["Pantry Staple", "pantry"]);
     } else if (ingredient && purchasable && !/\s+\bor\b\s+/i.test(ingredient)) {
@@ -24208,6 +24213,31 @@ function recipeIngredientInferredValue(item = {}) {
 
     const text = String(item.inferred || "").trim().toLowerCase();
     return ["1", "true", "yes", "on"].includes(text) ? "true" : "false";
+}
+
+function recipeIngredientSubstitutions(item = {}) {
+    const value = item && typeof item === "object"
+        ? (item.substitutions || item.substitution_options || item.alternatives || [])
+        : [];
+    const rows = Array.isArray(value) ? value : String(value || "").split(/\r?\n|;/);
+
+    return rows.map(option => {
+        if (option && typeof option === "object") {
+            return String(
+                option.ingredient
+                || option.name
+                || option.substitute
+                || option.option
+                || option.text
+                || ""
+            ).trim();
+        }
+        return String(option || "").trim();
+    }).filter(Boolean);
+}
+
+function recipeIngredientSubstitutionsText(item = {}) {
+    return recipeIngredientSubstitutions(item).join("\n");
 }
 
 function resizeRecipeIngredientNameField(field) {
@@ -24252,6 +24282,9 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     const ingredientImageGeneratedAt = item.ingredient_image_generated_at || item.image_generated_at || "";
     const ingredientImagePrompt = item.ingredient_image_prompt || item.image_prompt || "";
     const extractionWarning = recipeIngredientExtractionWarning(item);
+    const substitutionOptions = recipeIngredientSubstitutions(item);
+    const substitutionOptionsText = substitutionOptions.join("\n");
+    const substitutionCountText = substitutionOptions.length ? `(${substitutionOptions.length})` : "";
     const recipeUrl = recipeEditorCurrentUrl();
     const ingredientImagePanelHtml = `
             <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-ingredient-image-panel${ingredientImageUrl ? "" : " recipe-image-empty"}"
@@ -24355,6 +24388,15 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                 <span class="recipe-edit-choice-prompt">Pick one option</span>
                 <span class="recipe-edit-choice-options" data-ingredient-choice-options></span>
             </span>
+            <details class="recipe-edit-ingredient-substitutions">
+                <summary>
+                    <span>Substitutions / Options</span>
+                    <span data-ingredient-substitution-count>${escapeHtml(substitutionCountText)}</span>
+                </summary>
+                <textarea data-field="substitutions_text"
+                          rows="2"
+                          placeholder="One option per line">${escapeHtml(substitutionOptionsText)}</textarea>
+            </details>
             <span class="recipe-edit-extraction-warning" data-ingredient-warning-message ${extractionWarning ? "" : "hidden"}>
                 ${escapeHtml(extractionWarning)}
             </span>
@@ -24487,7 +24529,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
 }
 
 function bindRecipeIngredientSummaryUpdates(row) {
-    row.querySelectorAll('[data-field="ingredient"], [data-field="purchasable_item"], [data-field="store_section"], [data-field="optional"]').forEach(input => {
+    row.querySelectorAll('[data-field="ingredient"], [data-field="purchasable_item"], [data-field="store_section"], [data-field="optional"], [data-field="substitutions_text"]').forEach(input => {
         const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => updateRecipeIngredientSummary(row));
     });
@@ -24495,9 +24537,16 @@ function bindRecipeIngredientSummaryUpdates(row) {
 
 function updateRecipeIngredientSummary(row) {
     const badges = row ? row.querySelector("[data-ingredient-badges]") : null;
+    const substitutionCount = row ? row.querySelector("[data-ingredient-substitution-count]") : null;
+    const values = row ? fieldValuesFromRow(row) : {};
 
     if (badges) {
-        badges.innerHTML = recipeIngredientBadgesHtml(fieldValuesFromRow(row));
+        badges.innerHTML = recipeIngredientBadgesHtml(values);
+    }
+
+    if (substitutionCount) {
+        const count = recipeIngredientSubstitutions(values).length;
+        substitutionCount.textContent = count ? `(${count})` : "";
     }
 }
 
@@ -29015,6 +29064,8 @@ function collectRecipeIngredientRows() {
         .map(row => {
             const item = fieldValuesFromRow(row);
             const foodReview = recipeIngredientFoodReviewPayload(row);
+            item.substitutions = recipeIngredientSubstitutions(item);
+            delete item.substitutions_text;
 
             if (Math.abs(selectedMultiplier - 1) < 0.000001) {
                 item.base_quantity = item.quantity || "";

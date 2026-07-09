@@ -699,11 +699,13 @@ Conservative rules:
 - Difficulty must be Easy, Medium, or Hard.
 - Time estimates should be realistic for home cooking.
 - Ingredients should be inferred from the menu description and common restaurant preparation knowledge.
+- Put ingredient-specific swaps in the matching ingredient row's substitutions array, such as potatoes -> sweet potatoes or chicken broth -> vegetable broth.
+- Keep substitutions as grocery option names only, one string per option. Do not include broad serving tips or technique notes there.
 - Equipment should be practical home-kitchen equipment.
 - Instructions should be short, useful, and recipe-like.
 - Recipe notes should include useful source-style guidance when missing: "Substitutions & Variations", "Storing & Reheating", and "Top Tips".
 - Return recipe_notes as separate sections using those exact headings when there is useful content for them.
-- Keep recipe note bullets short, specific to this recipe, and practical; do not repeat ingredient or instruction rows as notes.
+- Keep recipe note bullets short, specific to this recipe, and practical; do not repeat ingredient row substitutions or instruction rows as notes.
 - Preserve any strong current details from the context and focus on these missing fields: {", ".join(missing_fields)}.
 - Mark ingredient rows inferred=true unless the source/menu description or current recipe text explicitly contains the ingredient name.
 - Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the source text.
@@ -734,7 +736,8 @@ Required response shape:
       "confidence": "medium",
       "inferred": true,
       "warning": "",
-      "food_review": {{}}
+      "food_review": {{}},
+      "substitutions": []
     }}
   ],
   "equipment": [
@@ -793,6 +796,7 @@ Conservative rules:
 - Do not regenerate recipe title, equipment, instructions, nutrition, categories, or PDFs.
 - Do not claim this is an exact restaurant recipe.
 - Prefer grocery-friendly ingredient names and put prep details in notes.
+- Put ingredient-specific swaps in substitutions, as grocery option names only, one string per option.
 - Quantities and units must be strings.
 - If exact quantities are uncertain, use realistic estimates based on the servings and instructions.
 - Mark ingredient rows inferred=true unless the source/menu description or current recipe text explicitly contains the ingredient name.
@@ -820,7 +824,8 @@ Required response shape:
       "confidence": "medium",
       "inferred": true,
       "warning": "",
-      "food_review": {{}}
+      "food_review": {{}},
+      "substitutions": []
     }}
   ],
   "confidence": "low | medium | high",
@@ -1084,6 +1089,11 @@ def normalize_ai_ingredients(value, recipe_context=None):
             "purchasable_item": clean_text(item.get("purchasable_item") or item.get("buy_as")),
             "buy_as": clean_text(item.get("buy_as") or item.get("purchasable_item")),
             "purchase_group": clean_text(item.get("purchase_group")),
+            "substitutions": recipe_edit_service.normalize_ingredient_substitutions(
+                item.get("substitutions")
+                or item.get("substitution_options")
+                or item.get("alternatives")
+            ),
         }
         ingredients.append(row)
 
