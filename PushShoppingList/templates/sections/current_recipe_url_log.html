@@ -711,6 +711,33 @@
                                     Hide all recipe images
                                 </button>
                             </div>
+                            <div class="overflow-menu-section recipe-edit-thumbnail-size-section">
+                                <div class="overflow-menu-section-title">Thumbnail Size</div>
+                                <div class="recipe-edit-thumbnail-size-controls" data-recipe-thumbnail-size-controls>
+                                    <button type="button"
+                                            class="recipe-edit-thumbnail-size-button"
+                                            data-recipe-thumbnail-size-decrease
+                                            aria-label="Decrease thumbnail size"
+                                            title="Decrease thumbnail size"
+                                            onclick="return changeRecipeImageThumbnailSize(this, -1)">
+                                        -
+                                    </button>
+                                    <span class="recipe-edit-thumbnail-size-value" data-recipe-thumbnail-size-value>40px</span>
+                                    <button type="button"
+                                            class="recipe-edit-thumbnail-size-button"
+                                            data-recipe-thumbnail-size-increase
+                                            aria-label="Increase thumbnail size"
+                                            title="Increase thumbnail size"
+                                            onclick="return changeRecipeImageThumbnailSize(this, 1)">
+                                        +
+                                    </button>
+                                    <button type="button"
+                                            class="recipe-edit-thumbnail-size-reset"
+                                            onclick="return resetRecipeImageThumbnailSize(this)">
+                                        Reset
+                                    </button>
+                                </div>
+                            </div>
                             <div class="overflow-menu-section">
                                 <div class="overflow-menu-section-title">Recipe</div>
                                 <button type="button"
@@ -1610,6 +1637,33 @@
                                         Hide ingredient images
                                     </button>
                                 </div>
+                                <div class="overflow-menu-section recipe-edit-thumbnail-size-section">
+                                    <div class="overflow-menu-section-title">Thumbnail Size</div>
+                                    <div class="recipe-edit-thumbnail-size-controls" data-recipe-thumbnail-size-controls>
+                                        <button type="button"
+                                                class="recipe-edit-thumbnail-size-button"
+                                                data-recipe-thumbnail-size-decrease
+                                                aria-label="Decrease thumbnail size"
+                                                title="Decrease thumbnail size"
+                                                onclick="return changeRecipeImageThumbnailSize(this, -1)">
+                                            -
+                                        </button>
+                                        <span class="recipe-edit-thumbnail-size-value" data-recipe-thumbnail-size-value>40px</span>
+                                        <button type="button"
+                                                class="recipe-edit-thumbnail-size-button"
+                                                data-recipe-thumbnail-size-increase
+                                                aria-label="Increase thumbnail size"
+                                                title="Increase thumbnail size"
+                                                onclick="return changeRecipeImageThumbnailSize(this, 1)">
+                                            +
+                                        </button>
+                                        <button type="button"
+                                                class="recipe-edit-thumbnail-size-reset"
+                                                onclick="return resetRecipeImageThumbnailSize(this)">
+                                            Reset
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1672,6 +1726,33 @@
                                             onclick="return setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'equipment' })">
                                         Hide equipment images
                                     </button>
+                                </div>
+                                <div class="overflow-menu-section recipe-edit-thumbnail-size-section">
+                                    <div class="overflow-menu-section-title">Thumbnail Size</div>
+                                    <div class="recipe-edit-thumbnail-size-controls" data-recipe-thumbnail-size-controls>
+                                        <button type="button"
+                                                class="recipe-edit-thumbnail-size-button"
+                                                data-recipe-thumbnail-size-decrease
+                                                aria-label="Decrease thumbnail size"
+                                                title="Decrease thumbnail size"
+                                                onclick="return changeRecipeImageThumbnailSize(this, -1)">
+                                            -
+                                        </button>
+                                        <span class="recipe-edit-thumbnail-size-value" data-recipe-thumbnail-size-value>40px</span>
+                                        <button type="button"
+                                                class="recipe-edit-thumbnail-size-button"
+                                                data-recipe-thumbnail-size-increase
+                                                aria-label="Increase thumbnail size"
+                                                title="Increase thumbnail size"
+                                                onclick="return changeRecipeImageThumbnailSize(this, 1)">
+                                            +
+                                        </button>
+                                        <button type="button"
+                                                class="recipe-edit-thumbnail-size-reset"
+                                                onclick="return resetRecipeImageThumbnailSize(this)">
+                                            Reset
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

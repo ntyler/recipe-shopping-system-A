@@ -15146,6 +15146,53 @@ body {
     min-width: 260px;
 }
 
+:root {
+    --recipe-edit-thumbnail-size: 40px;
+    --recipe-edit-thumbnail-slot: 42px;
+}
+
+.recipe-edit-thumbnail-size-controls {
+    display: grid;
+    grid-template-columns: 34px minmax(58px, 1fr) 34px auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.recipe-edit-thumbnail-size-button,
+.recipe-edit-thumbnail-size-reset {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid #314563;
+    border-radius: 7px;
+    background: #101a28;
+    color: #dbe7f4;
+    font-weight: 850;
+    line-height: 1;
+}
+
+.recipe-edit-thumbnail-size-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.recipe-edit-thumbnail-size-value {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid #263a55;
+    border-radius: 7px;
+    background: #07111d;
+    color: #cbd7e5;
+    font-size: 12px;
+    font-weight: 850;
+}
+
 .recipe-edit-header h2 {
     margin: 0;
     color: #f8fafc;
@@ -24826,7 +24873,7 @@ img[data-deferred-src] {
 
 @media (min-width: 761px) {
     .recipe-edit-equipment-row:has(.recipe-equipment-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-empty):not(.recipe-image-visibility-hidden) .recipe-equipment-image:not([hidden])) {
-        grid-template-columns: 26px 54px 42px minmax(0, 1fr) 44px;
+        grid-template-columns: 26px 54px var(--recipe-edit-thumbnail-slot, 42px) minmax(0, 1fr) 44px;
         gap: 10px 14px;
         align-items: center;
         min-height: 0;
@@ -24845,8 +24892,8 @@ img[data-deferred-src] {
         grid-row: 1;
         align-self: center;
         justify-self: center;
-        width: 40px;
-        max-width: 40px;
+        width: var(--recipe-edit-thumbnail-size, 40px);
+        max-width: var(--recipe-edit-thumbnail-size, 40px);
         margin: 0;
         padding: 0;
         border: 1px solid #2d4968;
@@ -24857,8 +24904,8 @@ img[data-deferred-src] {
 
     .recipe-edit-equipment-row:has(.recipe-equipment-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-empty):not(.recipe-image-visibility-hidden) .recipe-equipment-image:not([hidden])) .recipe-equipment-image {
         display: block;
-        width: 40px;
-        height: 40px;
+        width: var(--recipe-edit-thumbnail-size, 40px);
+        height: var(--recipe-edit-thumbnail-size, 40px);
         border-radius: 6px;
         object-fit: cover;
     }
@@ -24879,14 +24926,14 @@ img[data-deferred-src] {
 
 @media (min-width: 1181px) {
     .recipe-edit-equipment-row:has(.recipe-equipment-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-empty):not(.recipe-image-visibility-hidden) .recipe-equipment-image:not([hidden])) {
-        grid-template-columns: 28px 54px 42px minmax(260px, 1fr) 40px;
+        grid-template-columns: 28px 54px var(--recipe-edit-thumbnail-slot, 42px) minmax(260px, 1fr) 40px;
     }
 }
 
 @media (min-width: 1181px) {
     .recipe-edit-ingredient-row:has(.recipe-ingredient-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])),
     .recipe-edit-ingredient-row.has-ingredient-choice-review:has(.recipe-ingredient-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])) {
-        grid-template-columns: 28px 54px 42px minmax(260px, 1.5fr) minmax(74px, 0.42fr) minmax(100px, 0.52fr) minmax(160px, 0.8fr) minmax(190px, 0.95fr) 94px 40px;
+        grid-template-columns: 28px 54px var(--recipe-edit-thumbnail-slot, 42px) minmax(260px, 1.5fr) minmax(74px, 0.42fr) minmax(100px, 0.52fr) minmax(160px, 0.8fr) minmax(190px, 0.95fr) 94px 40px;
     }
 
     .recipe-edit-ingredient-row:has(.recipe-ingredient-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])) .recipe-ingredient-image-panel.recipe-edit-row-image-panel,
@@ -24896,8 +24943,8 @@ img[data-deferred-src] {
         grid-row: 1;
         align-self: start;
         justify-self: center;
-        width: 40px;
-        max-width: 40px;
+        width: var(--recipe-edit-thumbnail-size, 40px);
+        max-width: var(--recipe-edit-thumbnail-size, 40px);
         margin: 0;
         padding: 0;
         border: 1px solid #2d4968;
@@ -24909,8 +24956,8 @@ img[data-deferred-src] {
     .recipe-edit-ingredient-row:has(.recipe-ingredient-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])) .recipe-ingredient-image-panel .recipe-ingredient-image,
     .recipe-edit-ingredient-row.has-ingredient-choice-review:has(.recipe-ingredient-image-panel:not(.recipe-image-tools-visible):not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])) .recipe-ingredient-image-panel .recipe-ingredient-image {
         display: block;
-        width: 40px;
-        height: 40px;
+        width: var(--recipe-edit-thumbnail-size, 40px);
+        height: var(--recipe-edit-thumbnail-size, 40px);
         border-radius: 6px;
         object-fit: cover;
     }
@@ -24973,7 +25020,7 @@ img[data-deferred-src] {
 
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded):has(.recipe-ingredient-image-panel:not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])),
 .recipe-edit-ingredient-row.recipe-edit-row-collapsed:has(.recipe-ingredient-image-panel:not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])) {
-    grid-template-columns: 22px 40px 42px minmax(0, 1fr) 38px;
+    grid-template-columns: 22px 40px var(--recipe-edit-thumbnail-slot, 42px) minmax(0, 1fr) 38px;
 }
 
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded):has(.recipe-ingredient-image-panel:not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])) .recipe-edit-ingredient-name-label,
@@ -24988,8 +25035,8 @@ img[data-deferred-src] {
     grid-row: 1;
     align-self: center;
     justify-self: center;
-    width: 40px;
-    max-width: 40px;
+    width: var(--recipe-edit-thumbnail-size, 40px);
+    max-width: var(--recipe-edit-thumbnail-size, 40px);
     margin: 0;
     padding: 0;
     border: 1px solid #2d4968;
@@ -25001,8 +25048,8 @@ img[data-deferred-src] {
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded):has(.recipe-ingredient-image-panel:not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])) .recipe-ingredient-image-panel .recipe-ingredient-image,
 .recipe-edit-ingredient-row.recipe-edit-row-collapsed:has(.recipe-ingredient-image-panel:not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])) .recipe-ingredient-image-panel .recipe-ingredient-image {
     display: block;
-    width: 40px;
-    height: 40px;
+    width: var(--recipe-edit-thumbnail-size, 40px);
+    height: var(--recipe-edit-thumbnail-size, 40px);
     border-radius: 6px;
     object-fit: cover;
 }
@@ -25038,7 +25085,7 @@ img[data-deferred-src] {
 @media (min-width: 1181px) {
     .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded):has(.recipe-ingredient-image-panel:not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])),
     .recipe-edit-ingredient-row.recipe-edit-row-collapsed:has(.recipe-ingredient-image-panel:not(.recipe-image-visibility-hidden) .recipe-ingredient-image:not([hidden])) {
-        grid-template-columns: 28px 54px 42px minmax(0, 1fr) 40px;
+        grid-template-columns: 28px 54px var(--recipe-edit-thumbnail-slot, 42px) minmax(0, 1fr) 40px;
         gap: 10px 14px;
         padding-right: 18px;
         padding-left: 18px;

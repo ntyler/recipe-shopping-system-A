@@ -22858,7 +22858,13 @@ function cacheBustRecipeCoverSrc(src) {
 }
 
 const RECIPE_IMAGE_PROVIDER_STORAGE_KEY = "recipe-image-provider";
+const RECIPE_IMAGE_THUMBNAIL_SIZE_STORAGE_KEY = "recipe-image-thumbnail-size";
+const RECIPE_IMAGE_THUMBNAIL_DEFAULT_SIZE = 40;
+const RECIPE_IMAGE_THUMBNAIL_MIN_SIZE = 32;
+const RECIPE_IMAGE_THUMBNAIL_MAX_SIZE = 80;
+const RECIPE_IMAGE_THUMBNAIL_STEP_SIZE = 8;
 let recipeImageProviderSelectorEventsBound = false;
+let recipeImageThumbnailSize = RECIPE_IMAGE_THUMBNAIL_DEFAULT_SIZE;
 
 function normalizeRecipeImageProvider(value) {
     const provider = String(value || "").trim().toLowerCase().replace(/-/g, "_");
@@ -22953,6 +22959,83 @@ function initRecipeImageProviderSelector() {
             rememberRecipeImageProvider(select.value);
         }
     });
+}
+
+function normalizeRecipeImageThumbnailSize(value) {
+    const parsed = Number.parseInt(value, 10);
+
+    if (!Number.isFinite(parsed)) {
+        return RECIPE_IMAGE_THUMBNAIL_DEFAULT_SIZE;
+    }
+
+    const stepped = Math.round(parsed / RECIPE_IMAGE_THUMBNAIL_STEP_SIZE) * RECIPE_IMAGE_THUMBNAIL_STEP_SIZE;
+    return Math.max(
+        RECIPE_IMAGE_THUMBNAIL_MIN_SIZE,
+        Math.min(RECIPE_IMAGE_THUMBNAIL_MAX_SIZE, stepped)
+    );
+}
+
+function rememberedRecipeImageThumbnailSize() {
+    try {
+        return normalizeRecipeImageThumbnailSize(
+            window.localStorage
+                ? window.localStorage.getItem(RECIPE_IMAGE_THUMBNAIL_SIZE_STORAGE_KEY)
+                : ""
+        );
+    } catch (err) {
+        console.warn("Unable to restore recipe image thumbnail size.", err);
+        return RECIPE_IMAGE_THUMBNAIL_DEFAULT_SIZE;
+    }
+}
+
+function updateRecipeImageThumbnailSizeControls(size = recipeImageThumbnailSize) {
+    document.querySelectorAll("[data-recipe-thumbnail-size-value]").forEach(label => {
+        label.textContent = `${size}px`;
+    });
+    document.querySelectorAll("[data-recipe-thumbnail-size-decrease]").forEach(button => {
+        button.disabled = size <= RECIPE_IMAGE_THUMBNAIL_MIN_SIZE;
+    });
+    document.querySelectorAll("[data-recipe-thumbnail-size-increase]").forEach(button => {
+        button.disabled = size >= RECIPE_IMAGE_THUMBNAIL_MAX_SIZE;
+    });
+}
+
+function applyRecipeImageThumbnailSize(size, options = {}) {
+    const normalizedSize = normalizeRecipeImageThumbnailSize(size);
+    recipeImageThumbnailSize = normalizedSize;
+    document.documentElement.style.setProperty("--recipe-edit-thumbnail-size", `${normalizedSize}px`);
+    document.documentElement.style.setProperty("--recipe-edit-thumbnail-slot", `${normalizedSize + 2}px`);
+
+    if (options.persist) {
+        try {
+            if (window.localStorage) {
+                window.localStorage.setItem(RECIPE_IMAGE_THUMBNAIL_SIZE_STORAGE_KEY, String(normalizedSize));
+            }
+        } catch (err) {
+            console.warn("Unable to remember recipe image thumbnail size.", err);
+        }
+    }
+
+    updateRecipeImageThumbnailSizeControls(normalizedSize);
+    return normalizedSize;
+}
+
+function initRecipeImageThumbnailSizeControls() {
+    applyRecipeImageThumbnailSize(rememberedRecipeImageThumbnailSize());
+}
+
+function changeRecipeImageThumbnailSize(button, direction) {
+    const stepDirection = Number(direction) < 0 ? -1 : 1;
+    applyRecipeImageThumbnailSize(
+        recipeImageThumbnailSize + (stepDirection * RECIPE_IMAGE_THUMBNAIL_STEP_SIZE),
+        { persist: true }
+    );
+    return false;
+}
+
+function resetRecipeImageThumbnailSize(button) {
+    applyRecipeImageThumbnailSize(RECIPE_IMAGE_THUMBNAIL_DEFAULT_SIZE, { persist: true });
+    return false;
 }
 
 function recipeImageProviderFieldHtml(selectId = "") {
@@ -33768,6 +33851,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initLazySections", initLazySections],
         ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
         ["initRecipeImageProviderSelector", initRecipeImageProviderSelector],
+        ["initRecipeImageThumbnailSizeControls", initRecipeImageThumbnailSizeControls],
     ].forEach(([name, callback]) => runStartupTask(name, callback));
 
     runIdleStartupTasks([
