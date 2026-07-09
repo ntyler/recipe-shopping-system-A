@@ -24795,21 +24795,31 @@ img[data-deferred-src] {
         }
 
         .master-data-reference-title-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
             align-items: center;
             gap: 10px;
             min-width: 0;
         }
 
+        .master-data-reference-title-row.has-title-image {
+            grid-template-columns: var(--master-data-thumbnail-size, 64px) minmax(0, 1fr);
+        }
+
         .master-data-reference-title-image {
             display: block;
-            flex: 0 0 var(--master-data-thumbnail-size, 64px);
             width: var(--master-data-thumbnail-size, 64px);
             height: var(--master-data-thumbnail-size, 64px);
             border: 1px solid #334155;
             border-radius: 7px;
             background: #0f172a;
             object-fit: cover;
+        }
+
+        .master-data-reference-copy {
+            display: grid;
+            gap: 4px;
+            min-width: 0;
         }
 
         .master-data-reference-main strong {

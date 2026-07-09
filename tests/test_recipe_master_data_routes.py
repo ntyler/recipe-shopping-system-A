@@ -608,6 +608,8 @@ def test_master_data_reference_expander_is_wired():
     assert "recipe_image_url" in script
     assert "recipe_image_srcset" in script
     assert "master-data-reference-title-image" in script
+    assert "master-data-reference-copy" in script
+    assert "has-title-image" in script
     assert "Open Recipe" in script
     assert 'MASTER_DATA_THUMBNAIL_SIZE_STORAGE_KEY = "master-data-thumbnail-size"' in script
     assert "function applyMasterDataThumbnailSize" in script
@@ -620,7 +622,9 @@ def test_master_data_reference_expander_is_wired():
     assert ".master-data-reference-row[hidden]" in css
     assert ".master-data-reference-panel" in css
     assert ".master-data-reference-title-row" in css
+    assert ".master-data-reference-title-row.has-title-image" in css
     assert ".master-data-reference-title-image" in css
+    assert ".master-data-reference-copy" in css
     assert ".master-data-reference-item" in css
     assert "--master-data-thumbnail-size: 64px;" in css
     assert "width: var(--master-data-thumbnail-size, 64px);" in css

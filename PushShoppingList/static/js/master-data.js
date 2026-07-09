@@ -451,6 +451,7 @@
 
         const recipeImageUrl = text(reference.recipe_image_url || "");
         if (recipeImageUrl) {
+            titleRow.classList.add("has-title-image");
             const image = document.createElement("img");
             image.className = "master-data-reference-title-image";
             image.src = recipeImageUrl;
@@ -464,22 +465,27 @@
             titleRow.appendChild(image);
         }
 
+        const copy = document.createElement("div");
+        copy.className = "master-data-reference-copy";
+
         const title = document.createElement("strong");
         title.textContent = text(reference.recipe_title || reference.recipe_id || "Recipe");
-        titleRow.appendChild(title);
-        main.appendChild(titleRow);
+        copy.appendChild(title);
 
         const detail = document.createElement("div");
         detail.className = "master-data-reference-detail";
         detail.textContent = referenceDetailText(reference) || text(reference.recipe_id || "");
-        main.appendChild(detail);
+        copy.appendChild(detail);
 
         const recipeId = text(reference.recipe_id || "");
         if (recipeId) {
             const code = document.createElement("code");
             code.textContent = recipeId;
-            main.appendChild(code);
+            copy.appendChild(code);
         }
+
+        titleRow.appendChild(copy);
+        main.appendChild(titleRow);
 
         item.appendChild(main);
 
