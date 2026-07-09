@@ -119,6 +119,7 @@ from PushShoppingList.services.recipe_edit_service import log_recipe_pdf_timing
 from PushShoppingList.services.recipe_edit_service import recipe_note_feedback
 from PushShoppingList.services.recipe_edit_service import remove_recipe_cover_image
 from PushShoppingList.services.recipe_edit_service import remove_recipe_detail_image
+from PushShoppingList.services.recipe_edit_service import review_recipe_store_sections
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
 from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
@@ -3744,6 +3745,52 @@ def api_recipe_infer_missing_details_route():
     )
     status = 200 if result.get("ok") else 400
     return jsonify(with_openai_usage_dashboard(result)), status
+
+
+@recipe_bp.route("/api/recipe/review_store_sections", methods=["POST"])
+def api_recipe_review_store_sections_route():
+    data = request.get_json(silent=True) or {}
+    recipe_payload = data.get("recipe") if isinstance(data.get("recipe"), dict) else None
+    recipe_url = str(
+        data.get("original_url")
+        or data.get("url")
+        or data.get("recipe_url")
+        or data.get("source_url")
+        or (recipe_payload or {}).get("source_url")
+        or ""
+    ).strip()
+
+    if not recipe_url:
+        return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+
+    if recipe_payload is None:
+        loaded = load_editable_recipe(recipe_url)
+        recipe_payload = loaded.get("recipe") if isinstance(loaded, dict) else {}
+
+    result = review_recipe_store_sections(recipe_payload)
+    result["recipe_url"] = recipe_url
+    result["applied"] = False
+
+    if bool(data.get("apply")):
+        recipe_to_save = result.get("recipe") if isinstance(result.get("recipe"), dict) else recipe_payload
+        if _is_uploaded_recipe_url(recipe_url) and isinstance(recipe_to_save, dict):
+            recipe_to_save = _recipe_with_default_serving_basis(recipe_to_save)
+        save_result = save_editable_recipe(recipe_url, recipe_to_save)
+        if not save_result.get("ok"):
+            status = 400
+            save_result.setdefault("changes", result.get("changes", []))
+            save_result.setdefault("changed_count", result.get("changed_count", 0))
+            save_result.setdefault("reviewed_count", result.get("reviewed_count", 0))
+            save_result["applied"] = False
+            return jsonify(save_result), status
+
+        result.update(save_result)
+        result["applied"] = True
+        result["changes"] = result.get("changes", [])
+        result["changed_count"] = len(result["changes"])
+        result["reviewed_count"] = result.get("reviewed_count", 0)
+
+    return jsonify(result), 200
 
 
 @recipe_bp.route("/api/recipe/regenerate_ingredients", methods=["POST"])

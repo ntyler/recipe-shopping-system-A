@@ -67,6 +67,12 @@ INGREDIENT_STORE_SECTION_KEYWORD_RULES = (
     ),
     (
         (
+            r"\b(?:inca pepper|aji amarillo|aji panca)\b",
+        ),
+        "SAUCES & CONDIMENTS",
+    ),
+    (
+        (
             r"\b(?:crema|sour cream|heavy cream|half and half|cream cheese)\b",
             r"\b(?:milk|butter|yogurt|yoghurt|cheese|ricotta|parmesan|mozzarella|cheddar)\b",
             r"\b(?:egg|eggs|yolk|yolks)\b",
@@ -126,6 +132,7 @@ INGREDIENT_STORE_SECTION_CONFLICT_OVERRIDES = (
     ("CANNED", "MEAT & SEAFOOD", r"\b(?:broth|stock|bouillon|consomme)\b"),
     ("SAUCES & CONDIMENTS", "MEAT & SEAFOOD", r"\b(?:sauce|salsa|paste|pesto)\b"),
     ("SAUCES & CONDIMENTS", "DAIRY & EGGS", r"\b(?:sauce|salsa|paste|pesto)\b"),
+    ("SAUCES & CONDIMENTS", "SPICES & SEASONINGS", r"\b(?:inca pepper|aji amarillo|aji panca)\b"),
 )
 MASTER_RECORD_TABLES = {
     "ingredients": {

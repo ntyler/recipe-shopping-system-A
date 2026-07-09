@@ -242,3 +242,41 @@ def test_recipe_editor_load_classifies_common_generic_or_conflicting_sections(mo
         "DAIRY & EGGS",
         "CANNED",
     ]
+
+
+def test_review_recipe_store_sections_returns_preview_changes():
+    result = recipe_edit_service.review_recipe_store_sections({
+        "recipe_title": "Papa a la Huancaina",
+        "ingredients": [
+            {
+                "ingredient": "potatoes",
+                "store_section": "DAIRY & EGGS",
+                "original_text": "4 medium potatoes",
+            },
+            {
+                "ingredient": "chicken broth",
+                "store_section": "MEAT & SEAFOOD",
+                "original_text": "2 cups chicken broth",
+            },
+            {
+                "ingredient": "inca pepper",
+                "store_section": "SPICES & SEASONINGS",
+                "original_text": "inca pepper",
+            },
+        ],
+    })
+
+    assert result["ok"] is True
+    assert result["reviewed_count"] == 3
+    assert result["changed_count"] == 3
+    assert [change["proposed_store_section"] for change in result["changes"]] == [
+        "PRODUCE",
+        "CANNED",
+        "SAUCES & CONDIMENTS",
+    ]
+    assert result["changes"][0]["current_store_section"] == "DAIRY & EGGS"
+    assert [item["store_section"] for item in result["recipe"]["ingredients"]] == [
+        "PRODUCE",
+        "CANNED",
+        "SAUCES & CONDIMENTS",
+    ]

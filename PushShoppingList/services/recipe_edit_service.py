@@ -82,6 +82,7 @@ from PushShoppingList.services.recipe_ingredient_service import recipe_ingredien
 from PushShoppingList.services.recipe_ingredient_service import remove_unused_ingredients_from_shopping_list
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
 from PushShoppingList.services.recipe_master_data_service import clean_ingredient_store_section
+from PushShoppingList.services.recipe_master_data_service import classify_ingredient_store_section
 from PushShoppingList.services.recipe_master_data_service import ingredient_master_records_for_items
 from PushShoppingList.services.recipe_master_data_service import ingredient_store_section_sort_key
 from PushShoppingList.services.recipe_master_data_service import ingredient_store_section_options
@@ -7418,6 +7419,85 @@ def sanitize_ingredients(value, existing_value=None):
         ingredients.append(apply_purchase_mapping_to_ingredient(row))
 
     return ingredients
+
+
+def recipe_ingredient_store_section_review_text(item):
+    if not isinstance(item, dict):
+        return ""
+
+    parts = (
+        item.get("ingredient"),
+        item.get("name"),
+        item.get("parsed_name"),
+        item.get("normalized_name"),
+        item.get("master_normalized_name"),
+        item.get("purchasable_item") or item.get("buy_as"),
+        item.get("original_text"),
+        item.get("original_recipe_text"),
+    )
+    return " ".join(
+        str(part or "").strip()
+        for part in parts
+        if str(part or "").strip()
+    )
+
+
+def review_recipe_store_sections(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    ingredients = recipe_data.get("ingredients") if isinstance(recipe_data.get("ingredients"), list) else []
+    reviewed_count = 0
+    changes = []
+    updated_ingredients = []
+
+    for index, item in enumerate(ingredients):
+        if not isinstance(item, dict):
+            updated_ingredients.append(item)
+            continue
+
+        updated_item = dict(item)
+        review_text = recipe_ingredient_store_section_review_text(item)
+        if not review_text:
+            updated_ingredients.append(updated_item)
+            continue
+
+        reviewed_count += 1
+        current_section = clean_ingredient_store_section(item.get("store_section"), default="MISC")
+        classified_section = clean_ingredient_store_section(
+            classify_ingredient_store_section(review_text),
+            default="",
+        )
+        proposed_section = classified_section or clean_ingredient_store_section(
+            resolve_ingredient_store_section(review_text, current_section, default="MISC"),
+            default="MISC",
+        )
+        updated_item["store_section"] = proposed_section
+        updated_item["store_section_order"] = ingredient_store_section_sort_key(proposed_section)
+        updated_ingredients.append(updated_item)
+
+        if proposed_section != current_section:
+            changes.append({
+                "index": index,
+                "ingredient": nullable_string(
+                    item.get("ingredient")
+                    or item.get("name")
+                    or item.get("purchasable_item")
+                    or item.get("buy_as")
+                    or item.get("original_text")
+                ),
+                "current_store_section": current_section,
+                "proposed_store_section": proposed_section,
+            })
+
+    updated_recipe = dict(recipe_data)
+    updated_recipe["ingredients"] = updated_ingredients
+
+    return {
+        "ok": True,
+        "recipe": updated_recipe,
+        "changes": changes,
+        "changed_count": len(changes),
+        "reviewed_count": reviewed_count,
+    }
 
 
 def sanitize_text_list(value):

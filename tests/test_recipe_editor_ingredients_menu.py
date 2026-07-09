@@ -448,3 +448,21 @@ def test_standalone_recipe_edit_page_renders_editor(monkeypatch, tmp_path):
     assert 'data-recipe-edit-url="https://example.com/soup"' in html
     assert 'id="recipeEditModal"' in html
     assert 'id="currentRecipeUrlLogCard"' not in html
+
+
+def test_recipe_editor_has_store_section_review_controls():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8",
+    )
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
+
+    assert "Store Sections" in template
+    assert "Preview Store Sections" in template
+    assert "Apply Store Sections" in template
+    assert "reviewRecipeStoreSections(this, { apply: false })" in template
+    assert "reviewRecipeStoreSections(this, { apply: true })" in template
+    assert "function reviewRecipeStoreSections" in script
+    assert "function applyRecipeStoreSectionReviewToEditor" in script
+    assert 'fetch("/api/recipe/review_store_sections"' in script
+    assert '@recipe_bp.route("/api/recipe/review_store_sections", methods=["POST"])' in routes

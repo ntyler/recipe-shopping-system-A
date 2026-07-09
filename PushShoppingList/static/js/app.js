@@ -26011,6 +26011,109 @@ async function reapplyFoodRulesForRecipeIngredients(button) {
     return false;
 }
 
+function applyRecipeStoreSectionReviewToEditor(changes) {
+    const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
+
+    (Array.isArray(changes) ? changes : []).forEach(change => {
+        const index = Number(change.index);
+        const row = Number.isInteger(index) && index >= 0 ? rows[index] : null;
+        const section = change ? String(change.proposed_store_section || "").trim() : "";
+        const select = row ? row.querySelector('[data-field="store_section"]') : null;
+
+        if (!select || !section) {
+            return;
+        }
+
+        select.value = section;
+        updateRecipeIngredientSummary(row);
+    });
+}
+
+function recipeStoreSectionReviewStatus(data, apply) {
+    const changes = Array.isArray(data && data.changes) ? data.changes : [];
+    const reviewedCount = Number(data && data.reviewed_count) || 0;
+    const changedCount = Number(data && data.changed_count) || changes.length;
+    const reviewedLabel = `${reviewedCount} ingredient${reviewedCount === 1 ? "" : "s"}`;
+
+    if (!changedCount) {
+        return apply
+            ? `Store sections saved. Reviewed ${reviewedLabel}; no additional changes were needed.`
+            : `Reviewed ${reviewedLabel}. Store sections already look correct.`;
+    }
+
+    const examples = changes
+        .slice(0, 3)
+        .map(change => {
+            const name = String(change.ingredient || "ingredient").trim();
+            const before = String(change.current_store_section || "MISC").trim();
+            const after = String(change.proposed_store_section || "MISC").trim();
+            return `${name}: ${before} -> ${after}`;
+        })
+        .join("; ");
+    const more = changedCount > 3 ? `; +${changedCount - 3} more` : "";
+    const prefix = apply ? "Applied" : "Previewed";
+    const suffix = apply ? "." : ". Save Recipe or Apply Store Sections to keep them.";
+
+    return `${prefix} ${changedCount} store section change${changedCount === 1 ? "" : "s"} for ${reviewedLabel}: ${examples}${more}${suffix}`;
+}
+
+async function reviewRecipeStoreSections(button, options = {}) {
+    const apply = Boolean(options && options.apply);
+    const originalText = button ? button.textContent : "";
+
+    try {
+        closeRecipeEditRowMenus();
+        if (button) {
+            button.disabled = true;
+            button.textContent = apply ? "Applying..." : "Previewing...";
+        }
+
+        const payload = collectRecipeEditorPayload();
+        setRecipeEditStatus(apply ? "Applying store sections..." : "Reviewing store sections...");
+        const response = await fetch("/api/recipe/review_store_sections", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                ...payload,
+                apply,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to review store sections.");
+        }
+
+        applyRecipeStoreSectionReviewToEditor(data.changes);
+
+        if (apply && data.recipe) {
+            const recipeUrl = data.recipe.source_url || data.recipe_url || payload.recipe.source_url || payload.original_url;
+            invalidateRecipeEditorCache(payload.original_url);
+            rememberRecipeEditorData(recipeUrl, {
+                recipe: data.recipe,
+                store_sections: recipeEditStoreSections,
+                food_rules: recipeEditFoodRules,
+            });
+            await refreshStoreMarkup();
+            populateRecipeEditor(data.recipe, recipeUrl);
+        }
+
+        setRecipeEditStatus(recipeStoreSectionReviewStatus(data, apply));
+    } catch (err) {
+        console.warn("Unable to review recipe store sections.", err);
+        setRecipeEditStatus(err.message || "Unable to review store sections.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || (apply ? "Apply Store Sections" : "Preview Store Sections");
+        }
+    }
+
+    return false;
+}
+
 async function reapplyFoodRulesForIngredient(button) {
     const row = button ? button.closest(".recipe-edit-ingredient-row") : null;
     const originalText = button ? button.textContent : "";
