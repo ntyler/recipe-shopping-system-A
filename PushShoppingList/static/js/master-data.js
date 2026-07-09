@@ -161,6 +161,129 @@
         });
     }
 
+    function masterDataLightboxImageSelector() {
+        return ".master-data-thumbnail[src], .master-data-reference-title-image[src]";
+    }
+
+    function ensureMasterDataImageLightbox() {
+        let lightbox = document.getElementById("recipeImageLightbox");
+
+        if (lightbox) {
+            return lightbox;
+        }
+
+        lightbox = document.createElement("div");
+        lightbox.id = "recipeImageLightbox";
+        lightbox.className = "recipe-image-lightbox";
+        lightbox.setAttribute("aria-hidden", "true");
+        lightbox.innerHTML = `
+            <div class="recipe-image-lightbox-content"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Enlarged recipe image">
+                <button type="button" class="recipe-image-lightbox-close">Close</button>
+                <img id="recipeImageLightboxImage" alt="">
+            </div>
+        `;
+        lightbox.addEventListener("click", (event) => {
+            if (
+                event.target === lightbox
+                || event.target.classList.contains("recipe-image-lightbox-content")
+            ) {
+                closeMasterDataImageLightbox();
+            }
+        });
+        const closeButton = lightbox.querySelector(".recipe-image-lightbox-close");
+        if (closeButton) {
+            closeButton.addEventListener("click", closeMasterDataImageLightbox);
+        }
+        document.body.appendChild(lightbox);
+
+        return lightbox;
+    }
+
+    function openMasterDataImageLightbox(image) {
+        if (!image || !(image.dataset.fullSrc || image.currentSrc || image.src)) {
+            return;
+        }
+
+        const lightbox = ensureMasterDataImageLightbox();
+        const lightboxImage = document.getElementById("recipeImageLightboxImage");
+
+        if (!lightboxImage) {
+            return;
+        }
+
+        lightboxImage.src = image.dataset.fullSrc || image.currentSrc || image.src;
+        lightboxImage.alt = image.alt || "Recipe image";
+        lightbox.classList.add("open");
+        lightbox.setAttribute("aria-hidden", "false");
+        document.body.classList.add("image-lightbox-open");
+
+        const closeButton = lightbox.querySelector(".recipe-image-lightbox-close");
+        if (closeButton) {
+            closeButton.focus({ preventScroll: true });
+        }
+    }
+
+    function closeMasterDataImageLightbox() {
+        const lightbox = document.getElementById("recipeImageLightbox");
+        const lightboxImage = document.getElementById("recipeImageLightboxImage");
+
+        if (!lightbox) {
+            return;
+        }
+
+        lightbox.classList.remove("open");
+        lightbox.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("image-lightbox-open");
+
+        if (lightboxImage) {
+            lightboxImage.removeAttribute("src");
+            lightboxImage.alt = "";
+        }
+    }
+
+    function decorateMasterDataLightboxImages(root = document) {
+        const scope = root && typeof root.querySelectorAll === "function" ? root : document;
+        scope.querySelectorAll(masterDataLightboxImageSelector()).forEach((image) => {
+            image.tabIndex = 0;
+            image.setAttribute("role", "button");
+            image.setAttribute("aria-label", `Enlarge ${image.alt || "recipe image"}`);
+        });
+    }
+
+    function initMasterDataImageLightbox() {
+        decorateMasterDataLightboxImages(document);
+        document.addEventListener("click", (event) => {
+            const image = event.target && event.target.closest
+                ? event.target.closest(masterDataLightboxImageSelector())
+                : null;
+            if (!image) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            openMasterDataImageLightbox(image);
+        });
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                closeMasterDataImageLightbox();
+                return;
+            }
+
+            const image = event.target && event.target.closest
+                ? event.target.closest(masterDataLightboxImageSelector())
+                : null;
+            if (!image || (event.key !== "Enter" && event.key !== " ")) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            openMasterDataImageLightbox(image);
+        });
+    }
+
     function query(form, selector) {
         const root = form.closest(".master-data-page") || document;
         return root.querySelector(selector);
@@ -455,6 +578,7 @@
             const image = document.createElement("img");
             image.className = "master-data-reference-title-image";
             image.src = recipeImageUrl;
+            image.dataset.fullSrc = text(reference.recipe_image_full_url || recipeImageUrl);
             image.alt = text(reference.recipe_image_alt || reference.recipe_title || "Recipe image");
             image.loading = "lazy";
             const srcset = text(reference.recipe_image_srcset || "");
@@ -541,6 +665,7 @@
             list.appendChild(renderReferenceItem(reference || {}));
         });
         panel.appendChild(list);
+        decorateMasterDataLightboxImages(panel);
     }
 
     function closeOtherReferenceRows(activeButton) {
@@ -1015,6 +1140,7 @@
     function initMasterDataPage() {
         initMasterDataReferences();
         initMasterDataThumbnailSizeControls();
+        initMasterDataImageLightbox();
 
         const form = document.querySelector("[data-master-backfill-form]");
         if (form && window.fetch && window.FormData) {

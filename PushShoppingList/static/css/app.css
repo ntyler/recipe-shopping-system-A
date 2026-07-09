@@ -9394,13 +9394,17 @@ body {
 
         .recipe-cover-image,
         .recipe-step-image[src]:not([hidden]),
-        .ai-pantry-inventory-thumbnail-image[src]:not([hidden]) {
+        .ai-pantry-inventory-thumbnail-image[src]:not([hidden]),
+        .master-data-thumbnail[src],
+        .master-data-reference-title-image[src] {
             cursor: zoom-in;
         }
 
         .recipe-cover-image:focus-visible,
         .recipe-step-image[src]:not([hidden]):focus-visible,
-        .ai-pantry-inventory-thumbnail-image[src]:not([hidden]):focus-visible {
+        .ai-pantry-inventory-thumbnail-image[src]:not([hidden]):focus-visible,
+        .master-data-thumbnail[src]:focus-visible,
+        .master-data-reference-title-image[src]:focus-visible {
             outline: 2px solid #12d6c5;
             outline-offset: 3px;
         }

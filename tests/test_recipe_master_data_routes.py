@@ -137,6 +137,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Tomato" in all_html
     assert "Garlic" in all_html
     assert "Run Backfill" in all_html
+    assert 'data-full-src="/static/generated/tomato.png"' in all_html
     assert "Backfill progress" in all_html
     assert "data-master-backfill-form" in all_html
     assert "data-master-reference-toggle" in all_html
@@ -220,6 +221,7 @@ def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_
     assert admin_payload["references"][0]["recipe_url"] == "https://example.com/user-a-soup"
     assert "/recipe/edit?url=https://example.com/user-a-soup" in admin_payload["references"][0]["edit_url"]
     assert "/recipe_cover_image?url=https://example.com/user-a-soup" in admin_payload["references"][0]["recipe_image_url"]
+    assert "/recipe_cover_image?url=https://example.com/user-a-soup" in admin_payload["references"][0]["recipe_image_full_url"]
     assert admin_payload["references"][0]["recipe_image_alt"] == "User A Soup title image"
     assert own_response.status_code == 200
     assert own_payload["record"]["name"] == "Tomato"
@@ -600,17 +602,24 @@ def test_master_data_reference_expander_is_wired():
     assert "data-master-thumbnail-size-decrease" in template
     assert "data-master-thumbnail-size-increase" in template
     assert "data-master-thumbnail-size-value>64px" in template
+    assert "data-full-src=\"{{ row.image_url }}\"" in template
 
     assert "function toggleReferenceRow" in script
     assert "function renderReferences" in script
     assert "[data-master-reference-toggle]" in script
     assert "data-master-reference-panel" in script
     assert "recipe_image_url" in script
+    assert "recipe_image_full_url" in script
     assert "recipe_image_srcset" in script
     assert "master-data-reference-title-image" in script
     assert "master-data-reference-copy" in script
     assert "has-title-image" in script
     assert "Open Recipe" in script
+    assert "function ensureMasterDataImageLightbox" in script
+    assert "function openMasterDataImageLightbox" in script
+    assert "function closeMasterDataImageLightbox" in script
+    assert "masterDataLightboxImageSelector" in script
+    assert "image-lightbox-open" in script
     assert 'MASTER_DATA_THUMBNAIL_SIZE_STORAGE_KEY = "master-data-thumbnail-size"' in script
     assert "function applyMasterDataThumbnailSize" in script
     assert 'document.documentElement.style.setProperty("--master-data-thumbnail-size"' in script
@@ -626,6 +635,7 @@ def test_master_data_reference_expander_is_wired():
     assert ".master-data-reference-title-image" in css
     assert ".master-data-reference-copy" in css
     assert ".master-data-reference-item" in css
+    assert ".master-data-thumbnail[src]" in css
     assert "--master-data-thumbnail-size: 64px;" in css
     assert "width: var(--master-data-thumbnail-size, 64px);" in css
     assert "height: var(--master-data-thumbnail-size, 64px);" in css

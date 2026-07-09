@@ -892,10 +892,17 @@ def master_data_record_references_route(record_type, record_id):
                 "cover_image": cover_image,
             },
             {"cover_image": cover_image},
-            variants=("thumb",),
+            variants=("thumb", "detail"),
         )
         reference["recipe_image_url"] = (
             rendered_cover_image.get("thumb_url")
+            or rendered_cover_image.get("display_url")
+            or rendered_cover_image.get("src")
+            or ""
+        )
+        reference["recipe_image_full_url"] = (
+            rendered_cover_image.get("full_url")
+            or rendered_cover_image.get("detail_url")
             or rendered_cover_image.get("display_url")
             or rendered_cover_image.get("src")
             or ""

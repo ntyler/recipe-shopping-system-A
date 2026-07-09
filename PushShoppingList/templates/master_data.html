@@ -34,6 +34,7 @@
             {% if row.image_url %}
                 <img class="master-data-thumbnail"
                      src="{{ row.image_url }}"
+                     data-full-src="{{ row.image_url }}"
                      alt="{{ row.name }} image">
             {% else %}
                 <span class="master-data-no-image">No image</span>
