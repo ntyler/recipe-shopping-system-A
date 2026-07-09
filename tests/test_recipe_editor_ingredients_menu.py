@@ -124,7 +124,8 @@ def test_recipe_editor_equipment_images_use_thumbnail_previews():
     assert ".recipe-edit-equipment-row .recipe-equipment-image-panel .recipe-equipment-image" in css
     assert ".recipe-edit-equipment-row .recipe-equipment-image-panel:not(.recipe-image-tools-visible)" in css
     assert ".recipe-edit-equipment-row .recipe-equipment-image-panel.recipe-image-empty:not(.recipe-image-tools-visible)" in css
-    assert ".recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-empty):not(.recipe-image-visibility-hidden)))" in css
+    assert ".recipe-edit-equipment.recipe-edit-equipment-collapsed .recipe-edit-equipment-row:not(.recipe-edit-row-expanded):not(:has([data-equipment-image-panel]:not(.recipe-image-empty):not(.recipe-image-visibility-hidden)))" in css
+    assert ".recipe-edit-equipment-row.recipe-edit-row-collapsed:not(:has([data-equipment-image-panel]:not(.recipe-image-empty):not(.recipe-image-visibility-hidden)))" in css
 
 
 def test_recipe_editor_ingredient_thumbnail_uses_consistent_inline_slot():
@@ -346,7 +347,7 @@ def test_collapsed_ingredient_rows_use_compact_one_line_layout():
         ".recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),",
         final_surface_start,
     )
-    compact_end = css.index(".recipe-edit-equipment-row:not(:has", compact_start)
+    compact_end = css.index(".recipe-edit-equipment.recipe-edit-equipment-collapsed", compact_start)
     compact_css = css[compact_start:compact_end]
 
     assert "grid-template-columns: 22px 40px minmax(0, 1fr) 38px;" in compact_css
@@ -388,6 +389,34 @@ def test_collapsed_ingredient_rows_put_thumbnail_between_number_and_name():
     assert "grid-template-columns: 28px 54px var(--recipe-edit-thumbnail-slot, 66px) minmax(0, 1fr) 40px;" in compact_css
     assert "padding-right: 18px;" in compact_css
     assert "padding-left: 18px;" in compact_css
+
+
+def test_recipe_editor_equipment_uses_same_compact_expand_controls_as_ingredients():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8",
+    )
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert 'data-recipe-ingredients-collapse-toggle' in template
+    assert 'addRecipeIngredientRow({}, { expanded: true })' in template
+    assert 'data-recipe-equipment-collapse-toggle' in template
+    assert "toggleRecipeEquipmentCollapsed(this)" in template
+    assert "addRecipeEquipmentRow('', { expanded: true })" in template
+    assert "function setRecipeIngredientsCollapsed" in script
+    assert "function setRecipeEquipmentCollapsed" in script
+    assert "function toggleRecipeEquipmentRowCollapsed" in script
+    assert "function isRecipeEquipmentRowCollapsed" in script
+    assert "setRecipeIngredientsCollapsed(true);" in script
+    assert "setRecipeEquipmentCollapsed(true);" in script
+    assert "addRecipeIngredientRow({}, { expanded: true });" in script
+    assert 'addRecipeEquipmentRow("", { expanded: true });' in script
+    assert "expandRecipeEquipmentRow(row);" in script
+    assert "recipe-edit-equipment-collapsed" in script
+    assert "Expand equipment" in script
+    assert "Collapse equipment" in script
+    assert ".recipe-edit-equipment.recipe-edit-equipment-collapsed .recipe-edit-equipment-row:not(.recipe-edit-row-expanded):has(" in css
+    assert ".recipe-edit-equipment-row.recipe-edit-row-collapsed:has(" in css
 
 
 def test_recipe_menu_edit_links_to_standalone_editor_page():

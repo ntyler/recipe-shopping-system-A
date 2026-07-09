@@ -21239,17 +21239,25 @@ function populateRecipeEditor(recipe, originalUrl) {
 
     if (ingredientWrap) {
         ingredientWrap.innerHTML = "";
-        (recipe.ingredients || []).forEach(item => addRecipeIngredientRow(item));
-        if (!recipe.ingredients || !recipe.ingredients.length) {
-            addRecipeIngredientRow();
+        const hasIngredients = Boolean(recipe.ingredients && recipe.ingredients.length);
+        if (hasIngredients) {
+            (recipe.ingredients || []).forEach(item => addRecipeIngredientRow(item));
+            setRecipeIngredientsCollapsed(true);
+        } else {
+            setRecipeIngredientsCollapsed(false);
+            addRecipeIngredientRow({}, { expanded: true });
         }
     }
 
     if (equipmentWrap) {
         equipmentWrap.innerHTML = recipeEquipmentHeaderHtml();
-        (recipe.equipment || []).forEach(item => addRecipeEquipmentRow(item));
-        if (!recipe.equipment || !recipe.equipment.length) {
-            addRecipeEquipmentRow();
+        const hasEquipment = Boolean(recipe.equipment && recipe.equipment.length);
+        if (hasEquipment) {
+            (recipe.equipment || []).forEach(item => addRecipeEquipmentRow(item));
+            setRecipeEquipmentCollapsed(true);
+        } else {
+            setRecipeEquipmentCollapsed(false);
+            addRecipeEquipmentRow("", { expanded: true });
         }
     }
 
@@ -21289,9 +21297,13 @@ function replaceRecipeEditorIngredients(ingredients = []) {
     }
 
     ingredientWrap.innerHTML = "";
-    (Array.isArray(ingredients) ? ingredients : []).forEach(item => addRecipeIngredientRow(item));
+    const hasIngredients = Boolean(Array.isArray(ingredients) && ingredients.length);
+    (hasIngredients ? ingredients : []).forEach(item => addRecipeIngredientRow(item));
     if (!ingredientWrap.querySelector(".recipe-edit-ingredient-row")) {
-        addRecipeIngredientRow();
+        setRecipeIngredientsCollapsed(false);
+        addRecipeIngredientRow({}, { expanded: true });
+    } else {
+        setRecipeIngredientsCollapsed(true);
     }
     updateRecipeIngredientRowIndexes();
     return true;
@@ -24198,13 +24210,14 @@ function bindRecipeIngredientNameField(row) {
     window.requestAnimationFrame(() => resizeRecipeIngredientNameField(field));
 }
 
-function addRecipeIngredientRow(item = {}) {
+function addRecipeIngredientRow(item = {}, options = {}) {
     const wrap = document.getElementById("recipeEditIngredients");
 
     if (!wrap) {
         return;
     }
 
+    item = item && typeof item === "object" ? item : {};
     const row = document.createElement("div");
     const baseQuantity = item.base_quantity !== undefined && item.base_quantity !== null
         ? item.base_quantity
@@ -24440,6 +24453,15 @@ function addRecipeIngredientRow(item = {}) {
     updateRecipeIngredientRowIndexes();
     initDeferredImages(row);
     refreshRecipeImageProviderSelectors(row);
+    if (options && options.expanded) {
+        expandRecipeIngredientRow(row);
+        const field = row.querySelector('[data-field="ingredient"]');
+        if (field && document.activeElement !== field) {
+            field.focus({ preventScroll: true });
+        }
+    } else {
+        updateRecipeIngredientRowCollapseToggle(row);
+    }
     return row;
 }
 
@@ -25305,22 +25327,12 @@ function moveRecipeIngredientRow(button, direction) {
     return moveRecipeEditRow(button, direction);
 }
 
-function toggleRecipeIngredientsCollapsed(button) {
+function updateRecipeIngredientsCollapsedToggle() {
     const list = document.getElementById("recipeEditIngredients");
+    const button = document.querySelector("[data-recipe-ingredients-collapse-toggle]");
     const label = button ? button.querySelector("span:last-child") : null;
     const icon = button ? button.querySelector(".recipe-edit-button-icon") : null;
-
-    if (!list) {
-        return false;
-    }
-
-    const collapsed = list.classList.toggle("recipe-edit-ingredients-collapsed");
-
-    list.querySelectorAll(".recipe-edit-ingredient-row").forEach(row => {
-        row.classList.remove("recipe-edit-row-collapsed");
-        row.classList.remove("recipe-edit-row-expanded");
-        updateRecipeIngredientRowCollapseToggle(row);
-    });
+    const collapsed = Boolean(list && list.classList.contains("recipe-edit-ingredients-collapsed"));
 
     if (label) {
         label.textContent = collapsed ? "Expand All" : "Collapse All";
@@ -25329,7 +25341,165 @@ function toggleRecipeIngredientsCollapsed(button) {
     if (icon) {
         icon.textContent = collapsed ? "v" : "^";
     }
+}
 
+function setRecipeIngredientsCollapsed(collapsed) {
+    const list = document.getElementById("recipeEditIngredients");
+
+    if (!list) {
+        return false;
+    }
+
+    list.classList.toggle("recipe-edit-ingredients-collapsed", Boolean(collapsed));
+
+    list.querySelectorAll(".recipe-edit-ingredient-row").forEach(row => {
+        row.classList.remove("recipe-edit-row-collapsed");
+        row.classList.remove("recipe-edit-row-expanded");
+        updateRecipeIngredientRowCollapseToggle(row);
+    });
+
+    updateRecipeIngredientsCollapsedToggle();
+    return true;
+}
+
+function toggleRecipeIngredientsCollapsed(button) {
+    const list = document.getElementById("recipeEditIngredients");
+
+    if (!list) {
+        return false;
+    }
+
+    setRecipeIngredientsCollapsed(!list.classList.contains("recipe-edit-ingredients-collapsed"));
+    return false;
+}
+
+function isRecipeEquipmentRowCollapsed(row) {
+    const list = row ? row.closest("#recipeEditEquipment") : null;
+
+    if (!row) {
+        return false;
+    }
+
+    if (row.classList.contains("recipe-edit-row-collapsed")) {
+        return true;
+    }
+
+    return Boolean(
+        list
+        && list.classList.contains("recipe-edit-equipment-collapsed")
+        && !row.classList.contains("recipe-edit-row-expanded")
+    );
+}
+
+function setRecipeEquipmentRowCollapsed(row, collapsed) {
+    const list = row ? row.closest("#recipeEditEquipment") : null;
+    const panel = row ? row.querySelector("[data-equipment-image-panel]") : null;
+
+    if (!row || !row.classList.contains("recipe-edit-equipment-row")) {
+        return;
+    }
+
+    if (collapsed) {
+        row.classList.add("recipe-edit-row-collapsed");
+        row.classList.remove("recipe-edit-row-expanded");
+        if (panel) {
+            panel.classList.remove("recipe-image-tools-visible");
+            panel.setAttribute("aria-expanded", "false");
+        }
+    } else {
+        row.classList.remove("recipe-edit-row-collapsed");
+
+        if (list && list.classList.contains("recipe-edit-equipment-collapsed")) {
+            row.classList.add("recipe-edit-row-expanded");
+        } else {
+            row.classList.remove("recipe-edit-row-expanded");
+        }
+
+        if (panel) {
+            panel.classList.add("recipe-image-tools-visible");
+            panel.setAttribute("aria-expanded", "true");
+        }
+    }
+
+    updateRecipeEquipmentRowCollapseToggle(row);
+    updateRecipeEditRowImageMenu(row);
+}
+
+function expandRecipeEquipmentRow(row) {
+    setRecipeEquipmentRowCollapsed(row, false);
+}
+
+function toggleRecipeEquipmentRowCollapsed(button) {
+    const row = recipeEditActionRowFromButton(button);
+
+    if (!row || !row.classList.contains("recipe-edit-equipment-row")) {
+        return false;
+    }
+
+    setRecipeEquipmentRowCollapsed(row, !isRecipeEquipmentRowCollapsed(row));
+    closeRecipeEditRowMenus();
+    return false;
+}
+
+function updateRecipeEquipmentRowCollapseToggle(row) {
+    const button = row ? row.querySelector(".recipe-edit-row-collapse-toggle") : null;
+
+    if (!button) {
+        return;
+    }
+
+    button.textContent = isRecipeEquipmentRowCollapsed(row) ? "Expand equipment" : "Collapse equipment";
+}
+
+function updateRecipeEquipmentCollapsedToggle() {
+    const list = document.getElementById("recipeEditEquipment");
+    const button = document.querySelector("[data-recipe-equipment-collapse-toggle]");
+    const label = button ? button.querySelector("span:last-child") : null;
+    const icon = button ? button.querySelector(".recipe-edit-button-icon") : null;
+    const collapsed = Boolean(list && list.classList.contains("recipe-edit-equipment-collapsed"));
+
+    if (label) {
+        label.textContent = collapsed ? "Expand All" : "Collapse All";
+    }
+
+    if (icon) {
+        icon.textContent = collapsed ? "v" : "^";
+    }
+}
+
+function setRecipeEquipmentCollapsed(collapsed) {
+    const list = document.getElementById("recipeEditEquipment");
+
+    if (!list) {
+        return false;
+    }
+
+    list.classList.toggle("recipe-edit-equipment-collapsed", Boolean(collapsed));
+
+    list.querySelectorAll(".recipe-edit-equipment-row").forEach(row => {
+        const panel = row.querySelector("[data-equipment-image-panel]");
+        row.classList.remove("recipe-edit-row-collapsed");
+        row.classList.remove("recipe-edit-row-expanded");
+        if (panel) {
+            panel.classList.remove("recipe-image-tools-visible");
+            panel.setAttribute("aria-expanded", "false");
+        }
+        updateRecipeEquipmentRowCollapseToggle(row);
+        updateRecipeEditRowImageMenu(row);
+    });
+
+    updateRecipeEquipmentCollapsedToggle();
+    return true;
+}
+
+function toggleRecipeEquipmentCollapsed(button) {
+    const list = document.getElementById("recipeEditEquipment");
+
+    if (!list) {
+        return false;
+    }
+
+    setRecipeEquipmentCollapsed(!list.classList.contains("recipe-edit-equipment-collapsed"));
     return false;
 }
 
@@ -26256,7 +26426,7 @@ function recipeStoreSectionOptions(selected) {
     }).join("");
 }
 
-function addRecipeEquipmentRow(value = "") {
+function addRecipeEquipmentRow(value = "", options = {}) {
     const wrap = document.getElementById("recipeEditEquipment");
 
     if (!wrap) {
@@ -26371,6 +26541,11 @@ function addRecipeEquipmentRow(value = "") {
             <div class="recipe-edit-row-menu overflow-menu recipe-edit-text-row-menu" hidden>
                 <div class="overflow-menu-section">
                     <div class="overflow-menu-section-title">Content</div>
+                    <button type="button"
+                            class="recipe-edit-row-collapse-toggle"
+                            onclick="return toggleRecipeEquipmentRowCollapsed(this)">
+                        Collapse equipment
+                    </button>
                     <button type="button" onclick="moveRecipeEditRow(this, -1)">Move equipment up</button>
                     <button type="button" onclick="moveRecipeEditRow(this, 1)">Move equipment down</button>
                     <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete equipment</button>
@@ -26424,6 +26599,15 @@ function addRecipeEquipmentRow(value = "") {
     updateRecipeEquipmentRowNumbers();
     initDeferredImages(row);
     refreshRecipeImageProviderSelectors(row);
+    if (options && options.expanded) {
+        expandRecipeEquipmentRow(row);
+        const field = row.querySelector('[data-field="text"]');
+        if (field && document.activeElement !== field) {
+            field.focus({ preventScroll: true });
+        }
+    } else {
+        updateRecipeEquipmentRowCollapseToggle(row);
+    }
     return row;
 }
 
@@ -30735,6 +30919,14 @@ function setRecipeEditRowImageToolsVisible(row, visible) {
 
     if (!panel) {
         return false;
+    }
+
+    if (visible) {
+        if (row.classList.contains("recipe-edit-equipment-row")) {
+            expandRecipeEquipmentRow(row);
+        } else if (row.classList.contains("recipe-edit-ingredient-row")) {
+            expandRecipeIngredientRow(row);
+        }
     }
 
     panel.classList.toggle("recipe-image-tools-visible", Boolean(visible));

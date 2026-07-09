@@ -1562,13 +1562,15 @@
                         </div>
                     </div>
                     <div class="recipe-edit-section-actions recipe-edit-ingredient-actions">
-                        <button type="button" onclick="addRecipeIngredientRow()">
+                        <button type="button" onclick="addRecipeIngredientRow({}, { expanded: true })">
                             <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
                             <span>Add Ingredient</span>
                         </button>
-                        <button type="button" onclick="toggleRecipeIngredientsCollapsed(this)">
-                            <span class="recipe-edit-button-icon" aria-hidden="true">^</span>
-                            <span>Collapse All</span>
+                        <button type="button"
+                                data-recipe-ingredients-collapse-toggle
+                                onclick="toggleRecipeIngredientsCollapsed(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">v</span>
+                            <span>Expand All</span>
                         </button>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-ingredients-menu-wrap">
                             <button type="button"
@@ -1692,9 +1694,15 @@
                         </div>
                     </div>
                     <div class="recipe-edit-section-actions recipe-edit-equipment-actions">
-                        <button type="button" onclick="addRecipeEquipmentRow()">
+                        <button type="button" onclick="addRecipeEquipmentRow('', { expanded: true })">
                             <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
                             <span>Add Equipment</span>
+                        </button>
+                        <button type="button"
+                                data-recipe-equipment-collapse-toggle
+                                onclick="toggleRecipeEquipmentCollapsed(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">v</span>
+                            <span>Expand All</span>
                         </button>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-equipment-menu-wrap">
                             <button type="button"
