@@ -24692,7 +24692,7 @@ function toggleRecipeIngredientRowMenu(button, event = null) {
 }
 
 function recipeEditMovableRowSelector() {
-    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-edit-reflection-note-row, .recipe-edit-cookbook-field, .recipe-import-cookbook-field, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group, .rules-editor-food-row";
+    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-edit-note-section-row, .recipe-edit-reflection-note-row, .recipe-edit-cookbook-field, .recipe-import-cookbook-field, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group, .rules-editor-food-row";
 }
 
 function recipeEditMoveSelectorForRow(row) {
@@ -24714,6 +24714,10 @@ function recipeEditMoveSelectorForRow(row) {
 
     if (row.classList.contains("recipe-edit-nutrition-row")) {
         return ".recipe-edit-nutrition-row";
+    }
+
+    if (row.classList.contains("recipe-edit-note-section-row")) {
+        return ".recipe-edit-note-section-row";
     }
 
     if (row.classList.contains("recipe-edit-reflection-note-row")) {

@@ -183,6 +183,9 @@ def test_recipe_notes_are_editable_between_instructions_and_nutrition():
         "normalizeRecipeNoteSectionsSnapshot",
         "updateRecipeNoteSectionCount",
         "updateRecipeNotesEmptyState",
+        ".recipe-edit-note-section-row, .recipe-edit-reflection-note-row",
+        'return ".recipe-edit-note-section-row";',
+        "Delete note section",
         "recipe_notes: collectRecipeNoteSections()",
     ):
         assert token in script
