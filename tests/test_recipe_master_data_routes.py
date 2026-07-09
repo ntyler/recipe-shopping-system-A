@@ -596,6 +596,10 @@ def test_master_data_reference_expander_is_wired():
     assert "master-data-usage-chevron" not in template
     assert "data-reference-url" in template
     assert "js/master-data.js" in template
+    assert "data-master-thumbnail-size-controls" in template
+    assert "data-master-thumbnail-size-decrease" in template
+    assert "data-master-thumbnail-size-increase" in template
+    assert "data-master-thumbnail-size-value>64px" in template
 
     assert "function toggleReferenceRow" in script
     assert "function renderReferences" in script
@@ -605,6 +609,10 @@ def test_master_data_reference_expander_is_wired():
     assert "recipe_image_srcset" in script
     assert "master-data-reference-title-image" in script
     assert "Open Recipe" in script
+    assert 'MASTER_DATA_THUMBNAIL_SIZE_STORAGE_KEY = "master-data-thumbnail-size"' in script
+    assert "function applyMasterDataThumbnailSize" in script
+    assert 'document.documentElement.style.setProperty("--master-data-thumbnail-size"' in script
+    assert "updateReferenceImageSizes" in script
 
     assert ".master-data-usage-button" in css
     assert ".master-data-usage-button span:nth-child" not in css
@@ -614,6 +622,9 @@ def test_master_data_reference_expander_is_wired():
     assert ".master-data-reference-title-row" in css
     assert ".master-data-reference-title-image" in css
     assert ".master-data-reference-item" in css
+    assert "--master-data-thumbnail-size: 64px;" in css
+    assert "width: var(--master-data-thumbnail-size, 64px);" in css
+    assert "height: var(--master-data-thumbnail-size, 64px);" in css
 
 
 def test_admin_image_generation_status_route_returns_progress(monkeypatch, tmp_path):
