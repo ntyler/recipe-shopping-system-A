@@ -169,18 +169,29 @@ def test_recipe_notes_are_editable_between_instructions_and_nutrition():
     assert current_recipes.index('id="recipeEditInstructions"') < current_recipes.index('id="recipeEditRecipeNotes"')
     assert current_recipes.index('id="recipeEditRecipeNotes"') < current_recipes.index('id="recipeEditNutrition"')
     assert current_recipes.index('id="recipeEditNutrition"') < current_recipes.index('id="recipeEditReflectionNotes"')
+    assert 'data-recipe-note-preset="Substitutions & Variations"' in current_recipes
+    assert 'data-recipe-note-preset="Storing & Reheating"' in current_recipes
+    assert 'data-recipe-note-preset="Top Tips"' in current_recipes
+    assert "data-recipe-notes-empty" in current_recipes
 
     for token in (
         "recipe.recipe_notes || []",
         "recipeNotesHeaderHtml",
+        "addRecipePresetNoteSection",
         "addRecipeNoteSectionRow",
         "collectRecipeNoteSections",
         "normalizeRecipeNoteSectionsSnapshot",
+        "updateRecipeNoteSectionCount",
+        "updateRecipeNotesEmptyState",
         "recipe_notes: collectRecipeNoteSections()",
     ):
         assert token in script
 
+    assert ".recipe-edit-note-presets" in css
     assert ".recipe-edit-note-section-row" in css
+    assert ".recipe-edit-note-section-main" in css
+    assert ".recipe-edit-note-count" in css
+    assert ".recipe-edit-recipe-notes-empty" in css
     assert ".recipe-edit-panel-icon-notes" in css
     assert "from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections" in service
     assert '"recipe_notes": normalize_recipe_note_sections' in service

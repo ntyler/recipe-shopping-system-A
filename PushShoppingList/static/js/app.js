@@ -26927,7 +26927,84 @@ function recipeNotesHeaderHtml() {
             <span>Items</span>
             <span></span>
         </div>
+        <div class="recipe-edit-recipe-notes-empty" data-recipe-notes-empty>
+            Add source notes for substitutions, storage, reheating, or tips.
+        </div>
     `;
+}
+
+function recipeNoteHeadingKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
+}
+
+function recipeNoteItemCountLabel(count) {
+    return `${count} note${count === 1 ? "" : "s"}`;
+}
+
+function updateRecipeNoteSectionCount(row) {
+    if (!row) {
+        return;
+    }
+
+    const itemsField = row.querySelector('[data-field="items"]');
+    const count = normalizeRecipeNoteItemsForEditor(
+        itemsField ? itemsField.value : ""
+    ).length;
+    const countBadge = row.querySelector("[data-note-count]");
+
+    if (countBadge) {
+        countBadge.textContent = recipeNoteItemCountLabel(count);
+    }
+}
+
+function updateRecipeNotesEmptyState() {
+    const wrap = document.getElementById("recipeEditRecipeNotes");
+
+    if (!wrap) {
+        return;
+    }
+
+    const hasRows = Boolean(wrap.querySelector(".recipe-edit-note-section-row"));
+    const emptyState = wrap.querySelector("[data-recipe-notes-empty]");
+
+    if (emptyState) {
+        emptyState.hidden = hasRows;
+    }
+}
+
+function focusRecipeNoteSectionRow(row) {
+    if (!row) {
+        return;
+    }
+
+    const target = row.querySelector('[data-field="items"]') || row.querySelector('[data-field="heading"]');
+
+    row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (target) {
+        target.focus();
+    }
+}
+
+function addRecipePresetNoteSection(button) {
+    const heading = String(button && button.dataset ? button.dataset.recipeNotePreset || "" : "").trim();
+
+    if (!heading) {
+        return false;
+    }
+
+    const existing = [...document.querySelectorAll("#recipeEditRecipeNotes .recipe-edit-note-section-row")]
+        .find(row => {
+            const headingField = row.querySelector('[data-field="heading"]');
+            return recipeNoteHeadingKey(headingField ? headingField.value : "") === recipeNoteHeadingKey(heading);
+        });
+
+    if (existing) {
+        focusRecipeNoteSectionRow(existing);
+        return false;
+    }
+
+    focusRecipeNoteSectionRow(addRecipeNoteSectionRow({ heading, items: [] }));
+    return false;
 }
 
 function addRecipeNoteSectionRow(section = {}) {
@@ -26942,19 +27019,25 @@ function addRecipeNoteSectionRow(section = {}) {
     row.className = "recipe-edit-note-section-row";
     row.innerHTML = `
         <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
-        <label class="recipe-edit-note-section-heading">
-            <span class="sr-only">Note section heading</span>
-            <input type="text"
-                   data-field="heading"
-                   placeholder="Top Tips"
-                   value="${escapeAttribute(normalized.heading)}">
-        </label>
-        <label class="recipe-edit-note-section-items">
-            <span class="sr-only">Note items</span>
-            <textarea data-field="items"
-                      rows="4"
-                      placeholder="One note per line">${escapeHtml(normalized.items.join("\n"))}</textarea>
-        </label>
+        <div class="recipe-edit-note-section-main">
+            <div class="recipe-edit-note-section-topline">
+                <label class="recipe-edit-note-section-heading">
+                    <span class="sr-only">Note section heading</span>
+                    <input type="text"
+                           data-field="heading"
+                           placeholder="Top Tips"
+                           value="${escapeAttribute(normalized.heading)}">
+                </label>
+                <span class="recipe-edit-note-count" data-note-count>${escapeHtml(recipeNoteItemCountLabel(normalized.items.length))}</span>
+            </div>
+            <label class="recipe-edit-note-section-items">
+                <span class="sr-only">Note items</span>
+                <textarea data-field="items"
+                          rows="3"
+                          placeholder="- Add one useful note per line"
+                          oninput="updateRecipeNoteSectionCount(this.closest('.recipe-edit-note-section-row'))">${escapeHtml(normalized.items.join("\n"))}</textarea>
+            </label>
+        </div>
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
                     class="recipe-edit-row-menu-btn"
@@ -26974,16 +27057,18 @@ function addRecipeNoteSectionRow(section = {}) {
     `;
     wrap.appendChild(row);
     bindRecipeEditDragAndDrop(row);
+    updateRecipeNoteSectionCount(row);
+    updateRecipeNotesEmptyState();
     return row;
 }
 
 function collectRecipeNoteSections() {
     return [...document.querySelectorAll("#recipeEditRecipeNotes .recipe-edit-note-section-row")]
         .map(row => {
-            const heading = String(row.querySelector('[data-field="heading"]')?.value || "").trim();
-            const items = normalizeRecipeNoteItemsForEditor(
-                row.querySelector('[data-field="items"]')?.value || ""
-            );
+            const headingField = row.querySelector('[data-field="heading"]');
+            const itemsField = row.querySelector('[data-field="items"]');
+            const heading = String(headingField ? headingField.value : "").trim();
+            const items = normalizeRecipeNoteItemsForEditor(itemsField ? itemsField.value : "");
 
             return { heading, items };
         })
@@ -27311,6 +27396,7 @@ function removeRecipeEditRow(button) {
         const wasIngredient = row.classList.contains("recipe-edit-ingredient-row");
         const wasEquipment = row.classList.contains("recipe-edit-equipment-row");
         const wasInstruction = row.classList.contains("recipe-edit-instruction-row");
+        const wasRecipeNote = row.classList.contains("recipe-edit-note-section-row");
         closeRecipeEditRowMenus();
         row.remove();
 
@@ -27322,6 +27408,9 @@ function removeRecipeEditRow(button) {
         }
         if (wasInstruction) {
             updateRecipeInstructionStepNumbers();
+        }
+        if (wasRecipeNote) {
+            updateRecipeNotesEmptyState();
         }
     }
 

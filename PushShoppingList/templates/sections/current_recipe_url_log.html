@@ -1873,12 +1873,33 @@
                         </button>
                     </div>
                 </div>
+                <div class="recipe-edit-note-presets" aria-label="Common recipe note sections">
+                    <span>Quick add</span>
+                    <button type="button"
+                            data-recipe-note-preset="Substitutions & Variations"
+                            onclick="return addRecipePresetNoteSection(this)">
+                        Substitutions & Variations
+                    </button>
+                    <button type="button"
+                            data-recipe-note-preset="Storing & Reheating"
+                            onclick="return addRecipePresetNoteSection(this)">
+                        Storing & Reheating
+                    </button>
+                    <button type="button"
+                            data-recipe-note-preset="Top Tips"
+                            onclick="return addRecipePresetNoteSection(this)">
+                        Top Tips
+                    </button>
+                </div>
                 <div id="recipeEditRecipeNotes" class="recipe-edit-recipe-notes">
                     <div class="recipe-edit-recipe-notes-header" aria-hidden="true">
                         <span></span>
                         <span>Section</span>
                         <span>Items</span>
                         <span></span>
+                    </div>
+                    <div class="recipe-edit-recipe-notes-empty" data-recipe-notes-empty>
+                        Add source notes for substitutions, storage, reheating, or tips.
                     </div>
                 </div>
             </section>
