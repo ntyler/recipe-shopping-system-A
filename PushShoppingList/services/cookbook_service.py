@@ -342,6 +342,37 @@ def clean_custom_categories(value):
     return items
 
 
+def clean_recipe_note_sections(value):
+    if isinstance(value, str):
+        value = [{"heading": "", "items": [value]}] if clean_text(value) else []
+
+    if not isinstance(value, list):
+        return []
+
+    sections = []
+    seen = set()
+    for section in value:
+        if not isinstance(section, dict):
+            section = {"heading": "", "items": [section]}
+
+        heading = clean_text(section.get("heading") or section.get("title") or section.get("name"))
+        raw_items = section.get("items") or section.get("notes") or section.get("text") or []
+        items = clean_text_list(raw_items)
+        if not items:
+            continue
+
+        key = (heading.lower(), tuple(item.lower() for item in items))
+        if key in seen:
+            continue
+        seen.add(key)
+        sections.append({
+            "heading": heading,
+            "items": items,
+        })
+
+    return sections
+
+
 def clean_cover_image(value):
     if not isinstance(value, dict):
         return {}
@@ -452,6 +483,7 @@ def clean_recipe_record(value):
         "scaled_servings": clean_text(value.get("scaled_servings")),
         "equipment_items": clean_text_list(value.get("equipment_items")),
         "instruction_items": clean_text_list(value.get("instruction_items")),
+        "recipe_notes": clean_recipe_note_sections(value.get("recipe_notes")),
         "sections": clean_recipe_sections(value.get("sections")),
         "custom_categories": clean_custom_categories(value.get("custom_categories")),
         "categories": clean_custom_categories(value.get("categories")),

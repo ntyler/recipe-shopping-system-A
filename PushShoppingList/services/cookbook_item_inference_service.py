@@ -28,6 +28,7 @@ from PushShoppingList.services.recipe_extract_service import menu_batch_item_fro
 from PushShoppingList.services.recipe_extract_service import menu_item_name_is_blank_divider
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
+from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
@@ -71,7 +72,7 @@ TEXT_DETAIL_FIELDS = (
     "inactive_time",
     "cook_time",
 )
-DETAIL_FIELDS = (*TEXT_DETAIL_FIELDS, "ingredients", "equipment", "instructions")
+DETAIL_FIELDS = (*TEXT_DETAIL_FIELDS, "ingredients", "equipment", "instructions", "recipe_notes")
 PLACEHOLDER_TEXT_VALUES = {
     "",
     "none",
@@ -155,6 +156,10 @@ def instructions_have_real_values(value):
     return bool(recipe_edit_service.normalize_instruction_records(value))
 
 
+def recipe_notes_have_real_values(value):
+    return bool(normalize_recipe_note_sections(value))
+
+
 def field_has_real_value(recipe_data, field):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     if field == "ingredients":
@@ -163,6 +168,12 @@ def field_has_real_value(recipe_data, field):
         return equipment_have_real_values(recipe_data.get("equipment"))
     if field == "instructions":
         return instructions_have_real_values(recipe_data.get("instructions"))
+    if field == "recipe_notes":
+        return recipe_notes_have_real_values(
+            recipe_data.get("recipe_notes")
+            or recipe_data.get("recipe_note_sections")
+            or recipe_data.get("source_notes")
+        )
     if field == "servings":
         scaling = recipe_data.get("scaling") if isinstance(recipe_data.get("scaling"), dict) else {}
         return not missing_text(recipe_data.get("servings")) or not missing_text(scaling.get("base_servings"))
@@ -594,6 +605,15 @@ def text_list_for_prompt(value, kind):
             item.get("instruction") or item.get("text")
             for item in recipe_edit_service.normalize_instruction_records(value)
         ]
+    if kind == "recipe_notes":
+        rows = []
+        for section in normalize_recipe_note_sections(value):
+            heading = clean_text(section.get("heading"))
+            for item in section.get("items", []):
+                text = clean_text(item)
+                if text:
+                    rows.append(f"{heading}: {text}" if heading else text)
+        return rows
     return []
 
 
@@ -638,6 +658,12 @@ def build_prompt_context(recipe_url, recipe_data, cookbook_id="", cookbook_name=
             "ingredients": text_list_for_prompt(recipe_data.get("ingredients"), "ingredients"),
             "equipment": text_list_for_prompt(recipe_data.get("equipment"), "equipment"),
             "instructions": text_list_for_prompt(recipe_data.get("instructions"), "instructions"),
+            "recipe_notes": text_list_for_prompt(
+                recipe_data.get("recipe_notes")
+                or recipe_data.get("recipe_note_sections")
+                or recipe_data.get("source_notes"),
+                "recipe_notes",
+            ),
         },
     }
 
@@ -660,6 +686,9 @@ Conservative rules:
 - Ingredients should be inferred from the menu description and common restaurant preparation knowledge.
 - Equipment should be practical home-kitchen equipment.
 - Instructions should be short, useful, and recipe-like.
+- Recipe notes should include useful source-style guidance when missing: "Substitutions & Variations", "Storing & Reheating", and "Top Tips".
+- Return recipe_notes as separate sections using those exact headings when there is useful content for them.
+- Keep recipe note bullets short, specific to this recipe, and practical; do not repeat ingredient or instruction rows as notes.
 - Preserve any strong current details from the context and focus on these missing fields: {", ".join(missing_fields)}.
 - Mark ingredient rows inferred=true unless the source/menu description or current recipe text explicitly contains the ingredient name.
 - Do not generate unusual ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, or pepper milk unless the exact phrase appears in the source text.
@@ -698,6 +727,26 @@ Required response shape:
   ],
   "instructions": [
     ""
+  ],
+  "recipe_notes": [
+    {{
+      "heading": "Substitutions & Variations",
+      "items": [
+        ""
+      ]
+    }},
+    {{
+      "heading": "Storing & Reheating",
+      "items": [
+        ""
+      ]
+    }},
+    {{
+      "heading": "Top Tips",
+      "items": [
+        ""
+      ]
+    }}
   ],
   "confidence": "low | medium | high",
   "ai_inferred": true,
@@ -942,6 +991,16 @@ def normalize_ai_instructions(value):
     return recipe_edit_service.sanitize_instruction_list(value)
 
 
+def normalize_ai_recipe_notes(parsed):
+    parsed = parsed if isinstance(parsed, dict) else {}
+    return recipe_edit_service.sanitize_recipe_notes(
+        parsed.get("recipe_notes")
+        or parsed.get("recipe_note_sections")
+        or parsed.get("source_notes")
+        or parsed.get("notes")
+    )
+
+
 def normalize_ai_payload(parsed, recipe_context=None):
     parsed = parsed if isinstance(parsed, dict) else {}
     confidence = clean_text(parsed.get("confidence")).lower()
@@ -959,6 +1018,7 @@ def normalize_ai_payload(parsed, recipe_context=None):
         "ingredients": normalize_ai_ingredients(parsed.get("ingredients"), recipe_context=recipe_context),
         "equipment": normalize_ai_equipment(parsed.get("equipment")),
         "instructions": normalize_ai_instructions(parsed.get("instructions")),
+        "recipe_notes": normalize_ai_recipe_notes(parsed),
         "confidence": confidence,
         "ai_inferred": True,
         "source_type": clean_text(parsed.get("source_type")) or COOKBOOK_ITEM_SOURCE_TYPE,
@@ -985,7 +1045,7 @@ def apply_ai_payload_to_recipe(recipe_data, ai_payload, fields_to_fill, model, c
 
     for field in fields_to_fill:
         value = value_for_field(ai_payload, field)
-        if field in {"ingredients", "equipment", "instructions"}:
+        if field in {"ingredients", "equipment", "instructions", "recipe_notes"}:
             if isinstance(value, list) and value:
                 recipe_data[field] = value
                 updated_fields.append(field)
@@ -1270,6 +1330,9 @@ def update_cookbook_recipe_snapshot(cookbook_id, recipe_url, recipe_data):
             recipe["base_servings"] = recipe_data.get("servings") or recipe.get("base_servings", "")
             recipe["equipment_items"] = text_list_for_prompt(recipe_data.get("equipment", []), "equipment")
             recipe["instruction_items"] = text_list_for_prompt(recipe_data.get("instructions", []), "instructions")
+            recipe_notes = normalize_recipe_note_sections(recipe_data.get("recipe_notes"))
+            if recipe_notes:
+                recipe["recipe_notes"] = recipe_notes
             recipe["sections"] = cookbook_service.ingredient_sections_from_recipe_data(
                 recipe_data.get("ingredients", [])
             )
@@ -1552,6 +1615,7 @@ def infer_missing_details_for_recipe(
         saved_ingredient_count=len(loaded_recipe.get("ingredients", [])),
         saved_equipment_count=len(loaded_recipe.get("equipment", [])),
         saved_instruction_count=len(loaded_recipe.get("instructions", [])),
+        saved_recipe_note_count=len(normalize_recipe_note_sections(loaded_recipe.get("recipe_notes"))),
     )
 
     return {
@@ -1573,6 +1637,7 @@ def infer_missing_details_for_recipe(
             "ingredients": len(loaded_recipe.get("ingredients", [])),
             "equipment": len(loaded_recipe.get("equipment", [])),
             "instructions": len(loaded_recipe.get("instructions", [])),
+            "recipe_notes": len(normalize_recipe_note_sections(loaded_recipe.get("recipe_notes"))),
         },
     }
 

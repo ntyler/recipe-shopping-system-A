@@ -56,6 +56,20 @@ def ai_payload(**overrides):
             "Toss the vegetables and noodles together for the filling.",
             "Wrap the filling in spring roll wrappers and fry until golden.",
         ],
+        "recipe_notes": [
+            {
+                "heading": "Substitutions & Variations",
+                "items": ["Use rice paper wrappers for a lighter version."],
+            },
+            {
+                "heading": "Storing & Reheating",
+                "items": ["Reheat in a hot oven or air fryer to keep the wrappers crisp."],
+            },
+            {
+                "heading": "Top Tips",
+                "items": ["Drain the filling well so the wrappers fry crisp."],
+            },
+        ],
         "confidence": "medium",
         "ai_inferred": True,
         "source_type": "cookbook_item_inferred",
@@ -89,6 +103,7 @@ def seed_cookbook_and_recipe(url=SPRING_ROLL_URL, recipe_overrides=None, cookboo
         "ingredients": [{"ingredient": "", "original_text": "", "quantity": "", "unit": ""}],
         "equipment": [""],
         "instructions": [{"instruction": "", "text": ""}],
+        "recipe_notes": [],
     }
     recipe.update(recipe_overrides or {})
     recipe_edit_service.save_recipe_output(url, recipe)
@@ -329,7 +344,11 @@ def test_infer_missing_details_fills_placeholder_menu_item_rows(monkeypatch, tmp
         "ingredients",
         "equipment",
         "instructions",
+        "recipe_notes",
     }.issubset(set(result["updated_fields"]))
+    assert "Substitutions & Variations" in calls[0]["prompt"]
+    assert "Storing & Reheating" in calls[0]["prompt"]
+    assert "Top Tips" in calls[0]["prompt"]
     assert saved["recipe_amount"] == "2 spring rolls"
     assert saved["servings"] == "1 appetizer serving"
     assert saved["yield"] == "2 pieces"
@@ -347,11 +366,26 @@ def test_infer_missing_details_fills_placeholder_menu_item_rows(monkeypatch, tmp
     assert all(item.get("ingredient") or item.get("original_text") for item in saved["ingredients"])
     assert [item["equipment"] for item in saved["equipment"]] == ["Cutting board", "Mixing bowl", "Skillet"]
     assert all(item["instruction"] for item in saved["instructions"])
+    assert saved["recipe_notes"] == [
+        {
+            "heading": "Substitutions & Variations",
+            "items": ["Use rice paper wrappers for a lighter version."],
+        },
+        {
+            "heading": "Storing & Reheating",
+            "items": ["Reheat in a hot oven or air fryer to keep the wrappers crisp."],
+        },
+        {
+            "heading": "Top Tips",
+            "items": ["Drain the filling well so the wrappers fry crisp."],
+        },
+    ]
     assert saved["scaling"]["base_servings"] == "1 appetizer serving"
     assert cookbook_recipe["recipe_amount"] == "2 spring rolls"
     assert cookbook_recipe["servings"] == "1 appetizer serving"
     assert cookbook_recipe["source_type"] == "menu_item_inferred"
     assert cookbook_recipe["equipment_items"] == ["Cutting board", "Mixing bowl", "Skillet"]
+    assert cookbook_recipe["recipe_notes"][0]["heading"] == "Substitutions & Variations"
 
 
 def test_preview_only_returns_would_update_fields_without_saving(monkeypatch, tmp_path):
@@ -369,6 +403,8 @@ def test_preview_only_returns_would_update_fields_without_saving(monkeypatch, tm
     assert result["ok"] is True
     assert result["preview_only"] is True
     assert "ingredients" in result["would_update_fields"]
+    assert "recipe_notes" in result["would_update_fields"]
+    assert result["recipe"]["recipe_notes"][0]["heading"] == "Substitutions & Variations"
     assert saved == original
 
 
@@ -376,6 +412,10 @@ def test_overwrite_ai_fields_does_not_replace_manual_ingredients(monkeypatch, tm
     configure_inference_storage(monkeypatch, tmp_path)
     seed_cookbook_and_recipe(recipe_overrides={
         "ingredients": [{"ingredient": "user-entered cabbage", "quantity": "1", "unit": "cup"}],
+        "recipe_notes": [{
+            "heading": "Top Tips",
+            "items": ["User-entered note stays put."],
+        }],
     })
     patch_openai_response(monkeypatch)
 
@@ -388,14 +428,23 @@ def test_overwrite_ai_fields_does_not_replace_manual_ingredients(monkeypatch, tm
 
     assert result["ok"] is True
     assert "ingredients" not in result["updated_fields"]
+    assert "recipe_notes" not in result["updated_fields"]
     assert saved["ingredients"][0]["ingredient"] == "user-entered cabbage"
+    assert saved["recipe_notes"] == [{
+        "heading": "Top Tips",
+        "items": ["User-entered note stays put."],
+    }]
 
 
 def test_overwrite_ai_fields_replaces_fields_tagged_from_prior_inference(monkeypatch, tmp_path):
     configure_inference_storage(monkeypatch, tmp_path)
     seed_cookbook_and_recipe(recipe_overrides={
         "ingredients": [{"ingredient": "old AI wrapper", "quantity": "2"}],
-        inference.INFERRED_FIELD_METADATA_KEY: ["ingredients"],
+        "recipe_notes": [{
+            "heading": "Top Tips",
+            "items": ["Old AI note."],
+        }],
+        inference.INFERRED_FIELD_METADATA_KEY: ["ingredients", "recipe_notes"],
     })
     patch_openai_response(monkeypatch)
 
@@ -408,8 +457,10 @@ def test_overwrite_ai_fields_replaces_fields_tagged_from_prior_inference(monkeyp
 
     assert result["ok"] is True
     assert "ingredients" in result["updated_fields"]
+    assert "recipe_notes" in result["updated_fields"]
     assert saved["ingredients"][0]["ingredient"] == "spring roll wrappers"
     assert "old AI wrapper" not in [item["ingredient"] for item in saved["ingredients"]]
+    assert saved["recipe_notes"][0]["heading"] == "Substitutions & Variations"
 
 
 def test_cookbook_batch_only_processes_selected_cookbook(monkeypatch, tmp_path):
