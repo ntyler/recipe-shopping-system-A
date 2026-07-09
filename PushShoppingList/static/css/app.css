@@ -19057,8 +19057,10 @@ body {
 }
 
 .recipe-edit-ingredient-row,
-.recipe-edit-ingredient-row.has-ingredient-choice-review {
-    border: 1px solid #263447;
+.recipe-edit-ingredient-row.has-ingredient-choice-review,
+.recipe-edit-equipment-row {
+    border: 0;
+    border-bottom: 1px solid #263447;
     border-radius: 8px;
     background:
         linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96)),
@@ -19067,7 +19069,8 @@ body {
 }
 
 .recipe-edit-ingredient-row:last-child,
-.recipe-edit-ingredient-row.has-ingredient-choice-review:last-child {
+.recipe-edit-ingredient-row.has-ingredient-choice-review:last-child,
+.recipe-edit-equipment-row:last-child {
     border-bottom: 1px solid #263447;
 }
 
@@ -19086,6 +19089,13 @@ body {
     align-items: center;
     min-height: 0;
     padding: 10px 14px;
+    border: 0;
+    border-bottom: 1px solid #263447;
+    border-radius: 8px;
+    background:
+        linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96)),
+        #0d1520;
+    box-shadow: none;
 }
 
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-row-handle,
@@ -19182,7 +19192,8 @@ body {
 
 .recipe-edit-equipment.recipe-edit-equipment-collapsed .recipe-edit-equipment-row:not(.recipe-edit-row-expanded),
 .recipe-edit-equipment-row.recipe-edit-row-collapsed {
-    border: 1px solid #263447;
+    border: 0;
+    border-bottom: 1px solid #263447;
     border-radius: 8px;
     background:
         linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96)),

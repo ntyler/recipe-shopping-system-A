@@ -343,6 +343,8 @@ def test_collapsed_ingredient_rows_use_compact_one_line_layout():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     final_surface_start = css.index("/* Keep ingredient rows visually aligned with the Equipment row surface. */")
+    shared_surface_end = css.index("@media (min-width: 761px)", final_surface_start)
+    shared_surface_css = css[final_surface_start:shared_surface_end]
     compact_start = css.index(
         ".recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),",
         final_surface_start,
@@ -350,6 +352,9 @@ def test_collapsed_ingredient_rows_use_compact_one_line_layout():
     compact_end = css.index(".recipe-edit-equipment.recipe-edit-equipment-collapsed", compact_start)
     compact_css = css[compact_start:compact_end]
 
+    assert ".recipe-edit-equipment-row {" in shared_surface_css
+    assert "border: 0;" in shared_surface_css
+    assert "border-bottom: 1px solid #263447;" in shared_surface_css
     assert "grid-template-columns: 22px 40px minmax(0, 1fr) 38px;" in compact_css
     assert "min-height: 0;" in compact_css
     assert "padding: 10px 14px;" in compact_css
@@ -365,6 +370,8 @@ def test_collapsed_ingredient_rows_use_compact_one_line_layout():
     assert "width: 34px;" in compact_css
     assert "height: 34px;" in compact_css
     assert "min-height: 20px;" in compact_css
+    assert "border: 0;" in compact_css
+    assert "border-bottom: 1px solid #263447;" in compact_css
 
 
 def test_collapsed_ingredient_rows_put_thumbnail_between_number_and_name():
@@ -425,7 +432,8 @@ def test_recipe_editor_equipment_uses_same_compact_expand_controls_as_ingredient
         compact_equipment_start,
     )
     compact_equipment_css = css[compact_equipment_start:compact_equipment_end]
-    assert "border: 1px solid #263447;" in compact_equipment_css
+    assert "border: 0;" in compact_equipment_css
+    assert "border-bottom: 1px solid #263447;" in compact_equipment_css
     assert "border-radius: 8px;" in compact_equipment_css
     assert "linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96))" in compact_equipment_css
 
