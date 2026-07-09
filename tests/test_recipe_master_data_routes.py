@@ -139,6 +139,10 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Run Backfill" in all_html
     assert "Backfill progress" in all_html
     assert "data-master-backfill-form" in all_html
+    assert "data-master-reference-toggle" in all_html
+    assert "data-master-reference-row" in all_html
+    assert "View recipes" in all_html
+    assert "/api/master-data/ingredients/" in all_html
     assert "Generate Missing Images" in all_html
     assert "Store Section" in all_html
     assert 'name="store_section"' in all_html
@@ -164,6 +168,44 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "data-master-image-form" in equipment_html
     assert "Creates equipment thumbnails" in equipment_html
     assert 'name="record_type" value="equipment"' in equipment_html
+
+
+def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+    user_a_tomato = master_data.master_record_for_name("ingredients", "user-a", "tomato")
+    user_b_garlic = master_data.master_record_for_name("ingredients", "user-b", "garlic")
+
+    with app.test_client() as client:
+        sign_in(client, "admin-user")
+        admin_response = client.get(
+            f"/api/master-data/ingredients/{user_a_tomato['id']}/references?scope=all",
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+        sign_in(client, "user-a")
+        own_response = client.get(
+            f"/api/master-data/ingredients/{user_a_tomato['id']}/references",
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+        blocked_response = client.get(
+            f"/api/master-data/ingredients/{user_b_garlic['id']}/references",
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+
+    admin_payload = admin_response.get_json()
+    own_payload = own_response.get_json()
+    blocked_payload = blocked_response.get_json()
+
+    assert admin_response.status_code == 200
+    assert admin_payload["record"]["name"] == "Tomato"
+    assert admin_payload["total"] == 1
+    assert admin_payload["references"][0]["recipe_title"] == "User A Soup"
+    assert admin_payload["references"][0]["recipe_url"] == "https://example.com/user-a-soup"
+    assert "/recipe/edit?url=https://example.com/user-a-soup" in admin_payload["references"][0]["edit_url"]
+    assert own_response.status_code == 200
+    assert own_payload["record"]["name"] == "Tomato"
+    assert blocked_response.status_code == 404
+    assert blocked_payload["ok"] is False
 
 
 def test_ingredient_master_data_filters_and_groups_by_store_section(monkeypatch, tmp_path):
@@ -519,6 +561,31 @@ def test_master_data_image_generation_syncs_visible_filter_scope():
     assert 'setNamedFormValue(form, "user_id", userId);' in script
     assert 'setNamedFormValue(form, "redirect_url", redirectUrl);' in script
     assert "syncImageFormFromFilters(form);" in script
+
+
+def test_master_data_reference_expander_is_wired():
+    template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
+    script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert "data-master-reference-toggle" in template
+    assert "data-master-reference-row" in template
+    assert "master_data_record_references_route" in template
+    assert "aria-expanded=\"false\"" in template
+    assert "View recipes" in template
+    assert "data-reference-url" in template
+    assert "js/master-data.js" in template
+
+    assert "function toggleReferenceRow" in script
+    assert "function renderReferences" in script
+    assert "[data-master-reference-toggle]" in script
+    assert "data-master-reference-panel" in script
+    assert "Open Recipe" in script
+
+    assert ".master-data-usage-button" in css
+    assert ".master-data-reference-row[hidden]" in css
+    assert ".master-data-reference-panel" in css
+    assert ".master-data-reference-item" in css
 
 
 def test_admin_image_generation_status_route_returns_progress(monkeypatch, tmp_path):

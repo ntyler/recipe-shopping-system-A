@@ -854,6 +854,49 @@ def master_data_equipment_route():
     return render_master_data_page("equipment")
 
 
+@main_bp.route("/api/master-data/<record_type>/<int:record_id>/references")
+def master_data_record_references_route(record_type, record_id):
+    if record_type not in MASTER_DATA_PAGE_CONFIG:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Unsupported master data type.",
+        }), 404
+
+    active_public_user = current_public_user()
+    scope_info = master_data_scope(is_admin_user(active_public_user))
+    references = recipe_master_data.list_master_record_recipe_references(
+        record_type,
+        record_id,
+        user_id=scope_info["user_id"],
+        include_all_users=scope_info["include_all_users"],
+        limit=int_query_arg("limit", 25, minimum=1, maximum=100),
+    )
+    if not references.get("record"):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Master data record was not found for this scope.",
+        }), 404
+
+    enriched_references = []
+    for reference in references.get("references", []):
+        recipe_url = recipe_master_data.clean_text(reference.get("recipe_url"))
+        reference = dict(reference)
+        reference["edit_url"] = url_for("recipe_bp.edit_recipe_page_route", url=recipe_url) if recipe_url else ""
+        enriched_references.append(reference)
+
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "record_type": record_type,
+        "record": references.get("record"),
+        "references": enriched_references,
+        "total": int(references.get("total") or 0),
+        "limit": int(references.get("limit") or 0),
+    })
+
+
 @main_bp.route("/admin/master-data/ingredients/<int:ingredient_id>/store-section", methods=["POST"])
 def update_ingredient_master_store_section_route(ingredient_id):
     active_public_user = current_public_user()

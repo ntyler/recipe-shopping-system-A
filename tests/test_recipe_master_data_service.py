@@ -354,6 +354,89 @@ def test_list_master_records_searches_sorts_and_counts_usage(monkeypatch, tmp_pa
     assert master_data.count_ingredients(user_id="user-a", store_section="PRODUCE") == 1
 
 
+def test_list_master_record_recipe_references_returns_usage_details(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    monkeypatch.setattr(master_data.storage_service, "USER_DATA_DIR", tmp_path / "users")
+
+    first_url = "https://example.com/onion-soup"
+    second_url = "https://example.com/onion-salad"
+    master_data.sync_recipe_master_records(
+        first_url,
+        recipe_data={
+            "ingredients": [{
+                "ingredient": "Onion",
+                "quantity": "1",
+                "unit": "large",
+                "buy_as": "yellow onion",
+                "store_section": "Produce",
+                "original_text": "1 large yellow onion, diced",
+            }],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        second_url,
+        recipe_data={
+            "ingredients": [{
+                "ingredient": "Onion",
+                "quantity": "1/2",
+                "unit": "cup",
+                "store_section": "Produce",
+                "optional": True,
+                "original_text": "1/2 cup onion",
+            }],
+        },
+        user_id="user-a",
+    )
+    metadata_path = (
+        tmp_path
+        / "users"
+        / "user-a"
+        / "recipe-extractor"
+        / "data"
+        / "recipe_ingredients.json"
+    )
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text(
+        json.dumps({
+            master_data.recipe_id_for_url(first_url): {
+                "url": first_url,
+                "name": "Onion Soup",
+            },
+            master_data.recipe_id_for_url(second_url): {
+                "url": second_url,
+                "recipe_title": "Onion Salad",
+            },
+        }),
+        encoding="utf-8",
+    )
+
+    onion = master_data.master_record_for_name("ingredients", "user-a", "onion")
+    result = master_data.list_master_record_recipe_references(
+        "ingredients",
+        onion["id"],
+        user_id="user-a",
+    )
+    blocked_result = master_data.list_master_record_recipe_references(
+        "ingredients",
+        onion["id"],
+        user_id="user-b",
+    )
+
+    assert result["record"]["name"] == "Onion"
+    assert result["total"] == 2
+    assert [row["recipe_title"] for row in result["references"]] == ["Onion Salad", "Onion Soup"]
+    soup_reference = result["references"][1]
+    assert soup_reference["recipe_url"] == first_url
+    assert soup_reference["quantity"] == "1"
+    assert soup_reference["unit"] == "large"
+    assert soup_reference["buy_as"] == "yellow onion"
+    assert soup_reference["store_section"] == "PRODUCE"
+    assert soup_reference["original_recipe_text"] == "1 large yellow onion, diced"
+    assert blocked_result["record"] is None
+    assert blocked_result["references"] == []
+
+
 def test_missing_master_image_rows_scope_to_ingredients_without_images(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
 

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from PushShoppingList.services import storage_service
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
+from PushShoppingList.services.recipe_url_service import recipe_url_name
 
 
 LOCAL_USER_ID = "local"
@@ -755,6 +756,196 @@ def count_ingredient_usage(record_id, user_id=None):
 
 def count_equipment_usage(record_id, user_id=None):
     return count_master_usage("equipment", record_id, user_id=user_id)
+
+
+def master_record_for_id(table_name, record_id, user_id=None, include_all_users=False):
+    if table_name not in {"ingredients", "equipment"}:
+        raise ValueError("Unsupported master table.")
+    try:
+        record_id = int(record_id or 0)
+    except (TypeError, ValueError):
+        record_id = 0
+    if record_id <= 0:
+        return None
+
+    where = ["id = ?"]
+    params = [record_id]
+    user_id = clean_text(user_id)
+    if include_all_users:
+        if user_id:
+            where.append("user_id = ?")
+            params.append(user_id)
+    else:
+        where.append("user_id = ?")
+        params.append(scoped_recipe_user_id(user_id))
+
+    store_section_select = ", store_section" if table_name == "ingredients" else ""
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return None
+
+        row = connection.execute(
+            f"""
+            SELECT
+                id,
+                user_id,
+                name,
+                normalized_name{store_section_select},
+                image_url,
+                image_path,
+                created_at,
+                updated_at
+              FROM {table_name}
+             WHERE {' AND '.join(where)}
+            """,
+            params,
+        ).fetchone()
+
+    if not row:
+        return None
+
+    row_data = dict(row)
+    if table_name == "ingredients":
+        row_data["store_section"] = clean_ingredient_store_section(row_data.get("store_section"))
+    return row_data
+
+
+def recipe_reference_metadata_path(user_id):
+    user_id = clean_text(user_id)
+    if user_id == LOCAL_USER_ID:
+        return storage_service.LEGACY_EXTRACTOR_DIR / "data" / "recipe_ingredients.json"
+    if user_id.startswith("guest:"):
+        guest_id = storage_service.safe_user_id(user_id.split(":", 1)[1])
+        return storage_service.GUEST_DATA_DIR / guest_id / "recipe-extractor" / "data" / "recipe_ingredients.json"
+    safe_user_id = storage_service.safe_user_id(user_id)
+    return storage_service.USER_DATA_DIR / safe_user_id / "recipe-extractor" / "data" / "recipe_ingredients.json"
+
+
+def recipe_reference_metadata(user_id):
+    data = load_json_file(recipe_reference_metadata_path(user_id))
+    return data if isinstance(data, dict) else {}
+
+
+def recipe_reference_title(recipe_id, metadata_record=None):
+    metadata_record = metadata_record if isinstance(metadata_record, dict) else {}
+    for field in ("name", "recipe_title", "display_name", "title"):
+        title = clean_text(metadata_record.get(field))
+        if title:
+            return title
+
+    recipe_url = clean_text(metadata_record.get("url")) or clean_text(recipe_id)
+    return recipe_url_name(recipe_url) if recipe_url else "Recipe"
+
+
+def list_master_record_recipe_references(
+    table_name,
+    record_id,
+    user_id=None,
+    include_all_users=False,
+    limit=25,
+):
+    config = master_record_table_config(table_name)
+    record = master_record_for_id(
+        table_name,
+        record_id,
+        user_id=user_id,
+        include_all_users=include_all_users,
+    )
+    if not record:
+        return {
+            "record": None,
+            "references": [],
+            "total": 0,
+        }
+
+    limit = bounded_master_limit(limit, default=25, maximum=100)
+    usage_table = config["usage_table"]
+    usage_fk = config["usage_fk"]
+    if table_name == "ingredients":
+        detail_columns = """
+                r.quantity,
+                r.unit,
+                r.buy_as,
+                r.store_section,
+                r.original_recipe_text,
+                r.optional,
+                r.sort_order
+        """
+    else:
+        detail_columns = """
+                '' AS quantity,
+                '' AS unit,
+                '' AS buy_as,
+                '' AS store_section,
+                r.original_recipe_text,
+                r.optional,
+                r.sort_order
+        """
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {
+                "record": record,
+                "references": [],
+                "total": 0,
+            }
+
+        total_row = connection.execute(
+            f"""
+            SELECT COUNT(*) AS reference_count
+              FROM {usage_table} r
+             WHERE r.user_id = ?
+               AND r.{usage_fk} = ?
+            """,
+            (record["user_id"], int(record["id"])),
+        ).fetchone()
+        rows = connection.execute(
+            f"""
+            SELECT
+                r.id,
+                r.user_id,
+                r.recipe_id,
+                {detail_columns}
+              FROM {usage_table} r
+             WHERE r.user_id = ?
+               AND r.{usage_fk} = ?
+             ORDER BY LOWER(r.recipe_id) ASC, r.sort_order ASC, r.id ASC
+             LIMIT ?
+            """,
+            (record["user_id"], int(record["id"]), limit),
+        ).fetchall()
+
+    metadata = recipe_reference_metadata(record["user_id"])
+    references = []
+    for row in rows:
+        row_data = dict(row)
+        recipe_id = clean_text(row_data.get("recipe_id"))
+        metadata_record = metadata.get(recipe_id)
+        metadata_record = metadata_record if isinstance(metadata_record, dict) else {}
+        recipe_url = clean_text(metadata_record.get("url")) or recipe_id
+        references.append({
+            "id": int(row_data.get("id") or 0),
+            "user_id": clean_text(row_data.get("user_id")),
+            "recipe_id": recipe_id,
+            "recipe_url": recipe_url,
+            "recipe_title": recipe_reference_title(recipe_id, metadata_record),
+            "quantity": clean_text(row_data.get("quantity")),
+            "unit": clean_text(row_data.get("unit")),
+            "buy_as": clean_text(row_data.get("buy_as")),
+            "store_section": clean_ingredient_store_section(row_data.get("store_section"), default="")
+            if table_name == "ingredients"
+            else "",
+            "original_recipe_text": clean_text(row_data.get("original_recipe_text")),
+            "optional": bool(row_data.get("optional")),
+            "sort_order": int(row_data.get("sort_order") or 0),
+        })
+
+    return {
+        "record": record,
+        "references": references,
+        "total": int(total_row["reference_count"] or 0) if total_row else 0,
+        "limit": limit,
+    }
 
 
 def update_ingredient_store_section(ingredient_id, store_section, user_id=None, allow_other_users=False):

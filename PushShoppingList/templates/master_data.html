@@ -7,8 +7,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
 </head>
 <body>
+{% macro master_data_reference_url(row, master_data) -%}{{ url_for('main_bp.master_data_record_references_route', record_type=master_data.record_type, record_id=row.id) }}{% if master_data.scope == 'all' %}?scope=all{% elif master_data.scope == 'user' and master_data.scope_user_id %}?scope=user&user_id={{ master_data.scope_user_id|urlencode }}{% endif %}{%- endmacro %}
 {% macro render_master_data_row(row, master_data) -%}
-    <tr>
+    {% set reference_row_id = 'masterDataReferences-' ~ master_data.record_type ~ '-' ~ row.id %}
+    <tr class="master-data-record-row" data-master-record-id="{{ row.id }}">
         <td><strong>{{ row.name }}</strong></td>
         <td><code>{{ row.normalized_name }}</code></td>
         {% if master_data.record_type == 'ingredients' %}
@@ -46,10 +48,39 @@
                 <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
             </div>
         </td>
-        <td>{{ row.usage_count }}</td>
+        <td>
+            {% if row.usage_count %}
+                <button type="button"
+                        class="master-data-usage-button"
+                        data-master-reference-toggle
+                        data-reference-url="{{ master_data_reference_url(row, master_data) }}"
+                        aria-expanded="false"
+                        aria-controls="{{ reference_row_id }}">
+                    <span>{{ row.usage_count }}</span>
+                    <span>View recipes</span>
+                    <span class="master-data-usage-chevron" aria-hidden="true">v</span>
+                </button>
+            {% else %}
+                <span class="master-data-usage-empty">0</span>
+            {% endif %}
+        </td>
         <td>{{ row.updated_at }}</td>
         <td>{{ row.created_at }}</td>
     </tr>
+    {% if row.usage_count %}
+        <tr class="master-data-reference-row"
+            id="{{ reference_row_id }}"
+            data-master-reference-row
+            hidden>
+            <td colspan="{{ master_data.table_column_count }}">
+                <div class="master-data-reference-panel"
+                     data-master-reference-panel
+                     aria-live="polite">
+                    <div class="master-data-reference-placeholder">Recipe references will load when expanded.</div>
+                </div>
+            </td>
+        </tr>
+    {% endif %}
 {%- endmacro %}
 <main id="appContent" class="app-content master-data-app-content">
     <section class="master-data-page" aria-labelledby="masterDataTitle">
@@ -335,8 +366,6 @@
         </div>
     </section>
 </main>
-{% if master_data.is_admin %}
-    <script src="{{ url_for('static', filename='js/master-data.js', v=master_data_js_version) }}" defer></script>
-{% endif %}
+<script src="{{ url_for('static', filename='js/master-data.js', v=master_data_js_version) }}" defer></script>
 </body>
 </html>

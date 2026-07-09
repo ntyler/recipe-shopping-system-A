@@ -275,6 +275,214 @@
         return row;
     }
 
+    function referenceRowForButton(button) {
+        const rowId = button && button.getAttribute("aria-controls");
+        return rowId ? document.getElementById(rowId) : null;
+    }
+
+    function panelForReferenceRow(row) {
+        return row ? row.querySelector("[data-master-reference-panel]") : null;
+    }
+
+    function setReferenceLoading(panel) {
+        if (!panel) {
+            return;
+        }
+        panel.replaceChildren();
+        const message = document.createElement("div");
+        message.className = "master-data-reference-placeholder";
+        message.textContent = "Loading recipe references...";
+        panel.appendChild(message);
+    }
+
+    function setReferenceError(panel, message) {
+        if (!panel) {
+            return;
+        }
+        panel.replaceChildren();
+        const error = document.createElement("div");
+        error.className = "master-data-reference-error";
+        error.textContent = message || "Recipe references could not be loaded.";
+        panel.appendChild(error);
+    }
+
+    function referenceDetailText(reference) {
+        const details = [];
+        const amount = [reference.quantity, reference.unit].map(text).filter(Boolean).join(" ");
+        if (amount) {
+            details.push(amount);
+        }
+        if (reference.buy_as) {
+            details.push(`Buy as: ${reference.buy_as}`);
+        }
+        if (reference.store_section) {
+            details.push(reference.store_section);
+        }
+        if (reference.original_recipe_text) {
+            details.push(reference.original_recipe_text);
+        }
+        if (reference.optional) {
+            details.push("Optional");
+        }
+        return details.join(" | ");
+    }
+
+    function renderReferenceItem(reference) {
+        const item = document.createElement("article");
+        item.className = "master-data-reference-item";
+
+        const main = document.createElement("div");
+        main.className = "master-data-reference-main";
+
+        const title = document.createElement("strong");
+        title.textContent = text(reference.recipe_title || reference.recipe_id || "Recipe");
+        main.appendChild(title);
+
+        const detail = document.createElement("div");
+        detail.className = "master-data-reference-detail";
+        detail.textContent = referenceDetailText(reference) || text(reference.recipe_id || "");
+        main.appendChild(detail);
+
+        const recipeId = text(reference.recipe_id || "");
+        if (recipeId) {
+            const code = document.createElement("code");
+            code.textContent = recipeId;
+            main.appendChild(code);
+        }
+
+        item.appendChild(main);
+
+        if (reference.edit_url) {
+            const link = document.createElement("a");
+            link.className = "master-data-reference-link";
+            link.href = reference.edit_url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = "Open Recipe";
+            item.appendChild(link);
+        }
+
+        return item;
+    }
+
+    function renderReferences(panel, data) {
+        if (!panel) {
+            return;
+        }
+        panel.replaceChildren();
+
+        const references = Array.isArray(data && data.references) ? data.references : [];
+        const total = Number(data && data.total) || references.length;
+
+        const header = document.createElement("div");
+        header.className = "master-data-reference-header";
+
+        const title = document.createElement("strong");
+        const recordName = text(data && data.record && data.record.name);
+        title.textContent = `${recordName || "Record"} is used by ${total} recipe${total === 1 ? "" : "s"}`;
+        header.appendChild(title);
+
+        if (total > references.length) {
+            const note = document.createElement("span");
+            note.textContent = `Showing first ${references.length}.`;
+            header.appendChild(note);
+        }
+
+        panel.appendChild(header);
+
+        if (!references.length) {
+            const empty = document.createElement("div");
+            empty.className = "master-data-reference-placeholder";
+            empty.textContent = "No recipe references were found for this record.";
+            panel.appendChild(empty);
+            return;
+        }
+
+        const list = document.createElement("div");
+        list.className = "master-data-reference-list";
+        references.forEach((reference) => {
+            list.appendChild(renderReferenceItem(reference || {}));
+        });
+        panel.appendChild(list);
+    }
+
+    function closeOtherReferenceRows(activeButton) {
+        document.querySelectorAll("[data-master-reference-toggle]").forEach((button) => {
+            if (button === activeButton) {
+                return;
+            }
+            button.setAttribute("aria-expanded", "false");
+            const row = referenceRowForButton(button);
+            if (row) {
+                row.hidden = true;
+            }
+        });
+    }
+
+    async function toggleReferenceRow(button) {
+        if (!button) {
+            return;
+        }
+
+        const row = referenceRowForButton(button);
+        const panel = panelForReferenceRow(row);
+        if (!row || !panel) {
+            return;
+        }
+
+        const isExpanded = button.getAttribute("aria-expanded") === "true";
+        if (isExpanded) {
+            button.setAttribute("aria-expanded", "false");
+            row.hidden = true;
+            return;
+        }
+
+        closeOtherReferenceRows(button);
+        button.setAttribute("aria-expanded", "true");
+        row.hidden = false;
+
+        if (row.dataset.loaded === "true") {
+            return;
+        }
+
+        const referenceUrl = button.dataset.referenceUrl;
+        if (!referenceUrl || !window.fetch) {
+            setReferenceError(panel, "Recipe references are not available in this browser.");
+            return;
+        }
+
+        setReferenceLoading(panel);
+        try {
+            const response = await fetch(referenceUrl, {
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "fetch",
+                },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                setReferenceError(panel, data.error || data.message || "Recipe references could not be loaded.");
+                return;
+            }
+            renderReferences(panel, data);
+            row.dataset.loaded = "true";
+        } catch (error) {
+            setReferenceError(panel, error && error.message ? error.message : "Recipe references could not be loaded.");
+        }
+    }
+
+    function initMasterDataReferences() {
+        document.addEventListener("click", (event) => {
+            const target = event.target && event.target.closest ? event.target : null;
+            const button = target ? target.closest("[data-master-reference-toggle]") : null;
+            if (!button) {
+                return;
+            }
+            event.preventDefault();
+            toggleReferenceRow(button);
+        });
+    }
+
     function renderProgress(form, progress) {
         const els = elementsFor(form);
         if (!els.panel || !progress) {
@@ -667,7 +875,9 @@
         }
     }
 
-    function initMasterDataBackfill() {
+    function initMasterDataPage() {
+        initMasterDataReferences();
+
         const form = document.querySelector("[data-master-backfill-form]");
         if (form && window.fetch && window.FormData) {
             form.addEventListener("submit", submitBackfill);
@@ -683,8 +893,8 @@
     }
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initMasterDataBackfill);
+        document.addEventListener("DOMContentLoaded", initMasterDataPage);
     } else {
-        initMasterDataBackfill();
+        initMasterDataPage();
     }
 }());
