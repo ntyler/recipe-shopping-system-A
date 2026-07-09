@@ -257,7 +257,96 @@ def test_recipe_extraction_prompt_preserves_notes_separately():
 
     assert "RECIPE NOTE RULES" in prompt
     assert "recipe_notes" in prompt
+    assert 'return those as separate recipe_notes entries with those exact headings' in prompt
+    assert 'Do NOT collapse those sections into one generic "Notes" section.' in prompt
     assert "Do NOT put recipe notes into ingredients, equipment, or cooking instructions." in prompt
+
+
+def test_recipe_notes_import_normalizer_splits_common_source_sections():
+    notes = recipe_extract_service.normalize_recipe_note_sections({
+        "heading": "Notes",
+        "items": [
+            "Substitutions and Variations: Use ground turkey instead.",
+            "Storing & Reheating: Reheat in the microwave for 30-60 seconds.",
+            "Top Tips: Keep warm while serving.",
+        ],
+    })
+
+    assert notes == [
+        {
+            "heading": "Substitutions & Variations",
+            "items": ["Use ground turkey instead."],
+        },
+        {
+            "heading": "Storing & Reheating",
+            "items": ["Reheat in the microwave for 30-60 seconds."],
+        },
+        {
+            "heading": "Top Tips",
+            "items": ["Keep warm while serving."],
+        },
+    ]
+
+
+def test_recipe_notes_import_normalizer_preserves_generic_notes_without_subsections():
+    notes = recipe_extract_service.normalize_recipe_note_sections({
+        "heading": "Notes",
+        "items": ["Let the chili rest before serving."],
+    })
+
+    assert notes == [{
+        "heading": "Notes",
+        "items": ["Let the chili rest before serving."],
+    }]
+
+
+def test_structured_import_extracts_recipe_notes_from_html_container():
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Slow Cooker Chili",
+          "recipeYield": "6 servings",
+          "recipeIngredient": ["1 pound ground beef"],
+          "recipeInstructions": [{"@type": "HowToStep", "text": "Cook until done."}]
+        }
+        </script>
+      </head>
+      <body>
+        <div class="wprm-recipe-notes-container">
+          <h2>Notes</h2>
+          <h3>Substitutions & Variations:</h3>
+          <ul><li>Use ground turkey instead.</li></ul>
+          <h3>Storing & Reheating:</h3>
+          <ul><li>Reheat in the microwave for 30-60 seconds.</li></ul>
+          <h3>Top Tips:</h3>
+          <ul><li>Keep warm while serving.</li></ul>
+        </div>
+      </body>
+    </html>
+    """
+
+    recipe = recipe_extract_service.extract_recipe_from_structured_data(
+        "https://example.test/slow-cooker-chili",
+        html,
+    )
+
+    assert recipe["recipe_notes"] == [
+        {
+            "heading": "Substitutions & Variations",
+            "items": ["Use ground turkey instead."],
+        },
+        {
+            "heading": "Storing & Reheating",
+            "items": ["Reheat in the microwave for 30-60 seconds."],
+        },
+        {
+            "heading": "Top Tips",
+            "items": ["Keep warm while serving."],
+        },
+    ]
 
 
 def test_source_pdf_notes_sanitizer_removes_empty_wprm_bullets():

@@ -2129,6 +2129,7 @@ def extract_recipe_from_structured_data(recipe_url, html_text):
 
         apply_recipe_scaling_metadata(json_data, html_text)
         apply_recipe_cover_image_metadata(json_data, html_text, recipe_url)
+        apply_recipe_note_metadata(json_data, html_text)
 
         return json_data
 
@@ -5327,6 +5328,55 @@ def remove_empty_recipe_note_list_items(soup):
             item.decompose()
 
 
+def extract_recipe_notes_from_html(html_text):
+    if not html_text:
+        return []
+
+    try:
+        soup = BeautifulSoup(str(html_text or ""), "html.parser")
+    except Exception:
+        return []
+
+    containers = soup.select(
+        ".wprm-recipe-notes-container, "
+        ".wprm-recipe-notes, "
+        "[class*='recipe-notes'], "
+        "[id*='recipe-notes']"
+    )
+    sections = []
+
+    for container in containers:
+        lines = []
+        for element in container.find_all(["h2", "h3", "h4", "li", "p"], recursive=True):
+            text = clean_recipe_text(element.get_text(" ", strip=True))
+            if text:
+                lines.append(text)
+
+        if not lines:
+            text = container.get_text("\n", strip=True)
+            lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
+
+        sections.extend(normalize_recipe_note_sections("\n".join(lines)))
+
+    return consolidate_recipe_note_sections(sections)
+
+
+def apply_recipe_note_metadata(json_data, html_text=None):
+    if not isinstance(json_data, dict):
+        return
+
+    notes = normalize_recipe_note_sections(
+        json_data.get("recipe_notes")
+        or json_data.get("recipe_note_sections")
+        or json_data.get("source_notes")
+    )
+
+    if not notes and html_text:
+        notes = extract_recipe_notes_from_html(html_text)
+
+    json_data["recipe_notes"] = notes
+
+
 def promote_lazy_tag_attribute(tag, target_attr, source_attrs):
     current_value = str(tag.get(target_attr) or "").strip()
 
@@ -7286,6 +7336,8 @@ RECIPE NOTE RULES
 ========================
 - Extract helpful recipe notes separately in recipe_notes.
 - Recipe notes include source sections such as "Notes", "Substitutions & Variations", "Storing & Reheating", "Top Tips", serving tips, make-ahead tips, or allergy/substitution guidance.
+- When the source has "Substitutions & Variations", "Storing & Reheating", or "Top Tips", return those as separate recipe_notes entries with those exact headings.
+- Do NOT collapse those sections into one generic "Notes" section.
 - Do NOT put recipe notes into ingredients, equipment, or cooking instructions.
 - Preserve note section headings and bullet wording when present.
 - Drop empty note bullets and empty note sections.
@@ -8128,6 +8180,7 @@ def save_json_response(recipe_url, response_text, html_text=None, source_text=No
         apply_recipe_info_metadata(json_data, html_text)
         apply_recipe_scaling_metadata(json_data, html_text)
         apply_recipe_cover_image_metadata(json_data, html_text, recipe_url)
+        apply_recipe_note_metadata(json_data, html_text)
         apply_recipe_owner_metadata(json_data)
         upload_result = maybe_upload_recipe_archive_pdf_to_cloudflare(recipe_url)
         attach_cloudflare_pdf_metadata(
@@ -8591,6 +8644,164 @@ def normalize_recipe_note_items(value):
     return [text] if text else []
 
 
+RECIPE_NOTE_HEADING_ALIASES = {
+    "substitutions": "Substitutions & Variations",
+    "substitution": "Substitutions & Variations",
+    "substitutions variations": "Substitutions & Variations",
+    "substitution variation": "Substitutions & Variations",
+    "substitutions and variations": "Substitutions & Variations",
+    "substitution and variation": "Substitutions & Variations",
+    "variations": "Substitutions & Variations",
+    "variation": "Substitutions & Variations",
+    "storing": "Storing & Reheating",
+    "storage": "Storing & Reheating",
+    "reheating": "Storing & Reheating",
+    "storing reheating": "Storing & Reheating",
+    "storage reheating": "Storing & Reheating",
+    "storing and reheating": "Storing & Reheating",
+    "storage and reheating": "Storing & Reheating",
+    "store reheat": "Storing & Reheating",
+    "storing reheat": "Storing & Reheating",
+    "store and reheat": "Storing & Reheating",
+    "storing and reheat": "Storing & Reheating",
+    "make ahead": "Storing & Reheating",
+    "make ahead storage": "Storing & Reheating",
+    "top tips": "Top Tips",
+    "tips": "Top Tips",
+    "recipe tips": "Top Tips",
+    "expert tips": "Top Tips",
+    "cooking tips": "Top Tips",
+}
+GENERIC_RECIPE_NOTE_HEADINGS = {
+    "note",
+    "notes",
+    "recipe note",
+    "recipe notes",
+    "source note",
+    "source notes",
+}
+
+
+def recipe_note_heading_key(value):
+    text = clean_recipe_text(value).lower()
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+
+
+def canonical_recipe_note_heading(value):
+    text = clean_recipe_text(value).strip().rstrip(":").strip()
+    if not text:
+        return ""
+    return RECIPE_NOTE_HEADING_ALIASES.get(recipe_note_heading_key(text), text)
+
+
+def recipe_note_heading_is_generic(value):
+    return recipe_note_heading_key(value) in GENERIC_RECIPE_NOTE_HEADINGS
+
+
+def recipe_note_heading_from_line(line):
+    text = clean_recipe_text(line).strip()
+    if not text:
+        return ""
+
+    candidate_source = text.split(":", 1)[0] if ":" in text else text
+    candidate = re.sub(r"^\s*[-*]\s+", "", candidate_source).strip()
+    candidate = re.sub(r"^\s*\d+[.)]\s+", "", candidate).strip().rstrip(":").strip()
+    key = recipe_note_heading_key(candidate)
+
+    if key in RECIPE_NOTE_HEADING_ALIASES:
+        return RECIPE_NOTE_HEADING_ALIASES[key]
+
+    if key in GENERIC_RECIPE_NOTE_HEADINGS:
+        return "Notes"
+
+    if not text.endswith(":") or len(candidate) > 80:
+        return ""
+
+    return candidate
+
+
+def clean_recipe_note_item_line(line):
+    text = clean_recipe_text(line)
+    text = re.sub(r"^\s*[-*]\s+", "", text).strip()
+    text = re.sub(r"^\s*\d+[.)]\s+", "", text).strip()
+    return text
+
+
+def split_recipe_note_text_sections(value):
+    raw_text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
+    sections = []
+    current_heading = ""
+    current_items = []
+
+    def flush_current():
+        nonlocal current_heading, current_items
+        if current_items:
+            sections.append({
+                "heading": canonical_recipe_note_heading(current_heading),
+                "items": current_items,
+            })
+        current_heading = ""
+        current_items = []
+
+    for line in lines:
+        heading = recipe_note_heading_from_line(line)
+        if heading:
+            inline_text = ""
+            if ":" in line:
+                _, inline_text = line.split(":", 1)
+                inline_text = clean_recipe_note_item_line(inline_text)
+
+            flush_current()
+            current_heading = heading
+            if inline_text:
+                current_items.append(inline_text)
+            continue
+
+        item = clean_recipe_note_item_line(line)
+        if item:
+            current_items.append(item)
+
+    flush_current()
+    return consolidate_recipe_note_sections(sections)
+
+
+def consolidate_recipe_note_sections(sections):
+    rows = []
+    by_key = {}
+
+    for section in (sections if isinstance(sections, list) else []):
+        if not isinstance(section, dict):
+            continue
+
+        heading = canonical_recipe_note_heading(section.get("heading") or "")
+
+        items = normalize_recipe_note_items(section.get("items"))
+        if not heading and not items:
+            continue
+
+        key = recipe_note_heading_key(heading) if heading else f"__plain_{len(rows)}"
+        existing = by_key.get(key)
+
+        if not existing:
+            existing = {"heading": heading, "items": []}
+            rows.append(existing)
+            by_key[key] = existing
+
+        seen = {recipe_note_heading_key(item) for item in existing["items"]}
+        for item in items:
+            item_key = recipe_note_heading_key(item)
+            if item_key and item_key not in seen:
+                existing["items"].append(item)
+                seen.add(item_key)
+
+    return [
+        section
+        for section in rows
+        if section.get("heading") or section.get("items")
+    ]
+
+
 def normalize_recipe_note_sections(value, include_plain_strings=True):
     if isinstance(value, dict):
         nested_sections = value.get("sections") or value.get("recipe_notes")
@@ -8617,7 +8828,12 @@ def normalize_recipe_note_sections(value, include_plain_strings=True):
                 or value.get("description")
             )
 
-        return [{"heading": heading, "items": items}] if heading or items else []
+        if (not heading or recipe_note_heading_is_generic(heading)) and items:
+            split_sections = split_recipe_note_text_sections("\n".join(items))
+            if split_sections and any(section.get("heading") for section in split_sections):
+                return split_sections
+
+        return consolidate_recipe_note_sections([{"heading": heading, "items": items}])
 
     if isinstance(value, list):
         sections = []
@@ -8630,17 +8846,18 @@ def normalize_recipe_note_sections(value, include_plain_strings=True):
                 plain_items.extend(normalize_recipe_note_items(item))
 
         if plain_items:
-            sections.append({"heading": "", "items": plain_items})
+            split_sections = split_recipe_note_text_sections("\n".join(plain_items))
+            sections.extend(split_sections or [{"heading": "", "items": plain_items}])
 
-        return [
-            section
-            for section in sections
-            if section.get("heading") or section.get("items")
-        ]
+        return consolidate_recipe_note_sections(sections)
 
     if include_plain_strings:
+        split_sections = split_recipe_note_text_sections(value)
+        if split_sections:
+            return split_sections
+
         items = normalize_recipe_note_items(value)
-        return [{"heading": "", "items": items}] if items else []
+        return consolidate_recipe_note_sections([{"heading": "", "items": items}]) if items else []
 
     return []
 
@@ -9479,6 +9696,7 @@ def save_extracted_recipe_json(recipe_url, json_data, source_text=""):
     apply_recipe_info_metadata(json_data)
     apply_recipe_scaling_metadata(json_data)
     apply_recipe_cover_image_metadata(json_data, recipe_url=recipe_url)
+    apply_recipe_note_metadata(json_data)
     apply_recipe_owner_metadata(json_data)
 
     if recipe_has_shared_menu_source_pdf(json_data):
