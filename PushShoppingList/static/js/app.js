@@ -406,15 +406,50 @@ function appShellNavTargetId(link) {
     return href.startsWith("#") ? href.slice(1) : "";
 }
 
+function appShellNavActiveKey(link) {
+    if (!link) {
+        return "";
+    }
+
+    const action = String(link.dataset.appNavAction || "");
+    const targetId = appShellNavTargetId(link);
+
+    if (action === "app-page" || action === "ai-pantry") {
+        const pageId = String(link.dataset.appPageTarget || "")
+            || appPageFromTargetId(targetId);
+        return pageId ? `page:${pageId}` : `target:${targetId}`;
+    }
+
+    if (action === "settings-section") {
+        const sectionKey = String(link.dataset.settingsSectionTarget || "")
+            || settingsSectionFromTargetId(targetId);
+        return sectionKey ? `settings:${sectionKey}` : `target:${targetId}`;
+    }
+
+    if (action === "home") {
+        return "action:home";
+    }
+
+    return action
+        ? `action:${action}:${targetId}`
+        : `target:${targetId}`;
+}
+
 function appShellSetActiveLink(activeLink) {
-    const activeTarget = appShellNavTargetId(activeLink);
-    const activeAction = activeLink ? String(activeLink.dataset.appNavAction || "") : "";
+    const activeKey = appShellNavActiveKey(activeLink);
 
     document.querySelectorAll("[data-app-nav-link]").forEach(link => {
-        const sameTarget = activeTarget && appShellNavTargetId(link) === activeTarget;
-        const sameAction = activeAction && String(link.dataset.appNavAction || "") === activeAction;
-        link.classList.toggle("is-active", Boolean(sameTarget || sameAction));
+        const sameLinkKey = activeKey && appShellNavActiveKey(link) === activeKey;
+        link.classList.toggle("is-active", Boolean(sameLinkKey));
     });
+}
+
+function appShellSetActivePageLink(pageId) {
+    const pageKey = String(pageId || "");
+    const pageLink = [...document.querySelectorAll("[data-app-nav-link]")]
+        .find(link => String(link.dataset.appPageTarget || "") === pageKey);
+
+    appShellSetActiveLink(pageLink || null);
 }
 
 function appShellSetSearchStatus(message) {
@@ -555,6 +590,7 @@ async function openAppPage(pageId, options = {}) {
     setUserAccountWorkspaceVisible(false);
     hideAppPageWorkspaces(page);
     page.hidden = false;
+    appShellSetActivePageLink(pageId);
 
     const targetId = options.targetId || "";
     const panelId = WORKSPACE_PANEL_TARGETS[targetId] || "";

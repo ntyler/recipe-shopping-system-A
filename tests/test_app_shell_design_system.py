@@ -209,7 +209,13 @@ def test_app_shell_navigation_reuses_existing_lazy_and_account_panel_functions()
 
     assert "function initAppShellNavigation()" in script
     assert "function submitAppGlobalSearch(form)" in script
+    assert "function appShellNavActiveKey(link)" in script
+    assert "function appShellSetActivePageLink(pageId)" in script
     assert "async function activateAppShellNavLink(link" in script
+    assert 'return pageId ? `page:${pageId}` : `target:${targetId}`;' in script
+    assert "appShellNavActiveKey(link) === activeKey" in script
+    assert "appShellSetActivePageLink(pageId);" in script
+    assert "sameAction" not in script
     assert 'return openAiPantryPanel({' in script
     assert 'pageId: String(link.dataset.appPageTarget || "") || "pantryPage"' in script
     assert "const pantryPageId = options.pageId || \"pantryPage\";" in script
