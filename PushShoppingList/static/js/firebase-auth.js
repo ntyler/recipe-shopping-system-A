@@ -711,6 +711,13 @@ function bindPushNotificationsPanel() {
 
     document.querySelectorAll("[data-push-notifications-open]").forEach((button) => {
         button.addEventListener("click", () => {
+            if (typeof window.openUserAccountWorkspace === "function") {
+                window.openUserAccountWorkspace({
+                    targetId: "accountPushNotificationsPanel",
+                    updateHash: false,
+                    scroll: false,
+                });
+            }
             panel.hidden = false;
             setPushNotificationsStatus("", "success");
             hideAccountMenuPanels(panel);

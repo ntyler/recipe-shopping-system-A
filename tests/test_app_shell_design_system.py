@@ -27,6 +27,8 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert "Ctrl + K" in template
     assert 'onsubmit="return submitAppGlobalSearch(this)"' in template
     assert "app-toolbar-primary" in template
+    assert 'data-app-page-target="notificationsPage"' in template
+    assert 'data-app-nav-action="account-workspace"' in template
     assert 'class="app-account-avatar-image"' in template
     assert "current_user.avatar_path" in template
     assert "current_user.picture" in template
@@ -93,12 +95,19 @@ def test_app_workspaces_define_mockup_style_individual_pages():
     template = read_text("PushShoppingList/templates/sections/app_workspaces.html")
 
     assert 'id="recipesPage"' in template
+    assert 'id="menusPage"' in template
     assert 'id="cookbooksPage"' in template
     assert 'id="shoppingListsPage"' in template
     assert 'id="pantryPage"' in template
     assert 'id="storesPage"' in template
     assert 'id="priceComparisonPage"' in template
     assert 'id="importPage"' in template
+    assert 'id="recipeUrlsPage"' in template
+    assert 'id="importDocumentPage"' in template
+    assert 'id="generateImagePage"' in template
+    assert 'id="menuUrlPage"' in template
+    assert 'id="menuDocumentPage"' in template
+    assert 'id="notificationsPage"' in template
     assert 'data-app-page-workspace' in template
     assert 'id="currentRecipeUrlLogCard"' in template
     assert 'id="cookbooksCard"' in template
@@ -108,7 +117,13 @@ def test_app_workspaces_define_mockup_style_individual_pages():
     assert 'class="app-page-layout"' in template
     assert 'class="app-page-rail"' in template
     assert 'class="app-page-tabs"' in template
-    assert 'class="app-import-method-grid"' in template
+    assert "app-import-method-grid" in template
+    assert 'class="app-import-flow-card"' in template
+    assert 'data-recipe-media-upload-status-mirror' in template
+    assert 'id="menuUrlsTextarea"' in template
+    assert "submitMenuUrlPageImport(this)" in template
+    assert "Import Menu From Document" in template
+    assert '{% include "sections/edit_items.html" %}' in template
 
 
 def test_settings_workspace_groups_moved_sections_without_renaming_behaviors():
@@ -170,6 +185,13 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert ".app-page-tabs button" in css
     assert "width: auto;" in css
     assert ".app-import-method-grid" in css
+    assert ".app-import-flow-card" in css
+    assert ".app-page-summary-cards" in css
+    assert ".app-page-chip-row" in css
+    assert ".app-page-filter-card" in css
+    assert ".app-page-action-grid" in css
+    assert ".app-notification-list" in css
+    assert ".user-account-card[hidden]" in css
     assert ".app-workspace-panel[hidden]" in css
     assert "@media (max-width: 1099px)" in css
     assert "@media (min-width: 768px) and (max-width: 1099px)" in css
@@ -193,6 +215,19 @@ def test_app_shell_navigation_reuses_existing_lazy_and_account_panel_functions()
     assert "const pantryPageId = options.pageId || \"pantryPage\";" in script
     assert "if (!pantryPage || pantryPage.hidden)" in script
     assert "toggleUsageDashboardPanel(true)" in script
+    assert "function openUserAccountWorkspace" in script
+    assert "function setUserAccountWorkspaceVisible" in script
+    assert "initAppShellInitialWorkspace" in script
+    assert 'action === "account-workspace"' in script
+    assert "menusPage" in script
+    assert "notificationsPage" in script
+    assert "recipeUrlsPage" in script
+    assert "importDocumentPage" in script
+    assert "generateImagePage" in script
+    assert "menuUrlPage" in script
+    assert "menuDocumentPage" in script
+    assert "function submitMenuUrlPageImport" in script
+    assert "function setRecipeMediaUploadStatus" in script
     assert "openFeedbackSupportSection()" in script
     assert "toggleUserProfileEditor(true)" in script
     assert "async function openAppPage" in script

@@ -1,4 +1,11 @@
 {% import "includes/app_shell_macros.html" as shell %}
+{% set menu_page_summary = namespace(count=0, pdf_count=0) %}
+{% if cookbook_view and cookbook_view.cookbooks %}
+    {% for cookbook in cookbook_view.cookbooks %}
+        {% set menu_page_summary.count = menu_page_summary.count + (cookbook.restaurant_menus|default([])|length) %}
+        {% set menu_page_summary.pdf_count = menu_page_summary.pdf_count + (cookbook.menu_pdf_logs|default([])|length) %}
+    {% endfor %}
+{% endif %}
 
 <section id="recipesPage"
          class="app-page-workspace app-page-workspace-recipes"
@@ -81,6 +88,153 @@
                    data-app-page-target="pantryPage"
                    data-app-nav-target="aiPantryCookWithWhatIHave"
                    data-app-nav-lazy-section="pantry">View Suggestions</a>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="menusPage"
+         class="app-page-workspace app-page-workspace-menus"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Menus</h2>
+            <p>Import restaurant menus, build cookbook menus, and manage generated menu pages.</p>
+        </div>
+        <div class="app-page-actions">
+            <a class="app-page-secondary-action"
+               href="#menuUrlPage"
+               data-app-nav-link
+               data-app-nav-action="app-page"
+               data-app-page-target="menuUrlPage"
+               data-app-nav-target="menuUrlPage">
+                {{ shell.app_icon("link") }}
+                <span>Import Menu</span>
+            </a>
+            <a class="app-page-primary-action"
+               href="{{ url_for('menu_bp.custom_menu_builder_route') }}">
+                {{ shell.svg_icon("plus") }}
+                <span>Custom Menu</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="app-page-tabs" aria-label="Menu filters">
+        <button type="button" class="is-active">All Menus <span>{{ menu_page_summary.count }}</span></button>
+        <button type="button">Imported Menus</button>
+        <button type="button">Cookbook Menus</button>
+        <button type="button">PDF Log <span>{{ menu_page_summary.pdf_count }}</span></button>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section class="app-page-table-card app-menus-overview-card">
+                <div class="app-page-stat-strip">
+                    <article><strong>{{ menu_page_summary.count }}</strong><span>Saved Menus</span></article>
+                    <article><strong>{{ menu_page_summary.pdf_count }}</strong><span>Menu PDFs</span></article>
+                    <article><strong>{{ cookbook_count | default(0) }}</strong><span>Cookbooks</span></article>
+                    <article><strong>AI</strong><span>Menu extraction</span></article>
+                </div>
+                <div class="app-page-panel-header">
+                    <h3>Restaurant Menu Library</h3>
+                    <a class="app-page-table-action"
+                       href="#menuUrlPage"
+                       data-app-nav-link
+                       data-app-nav-action="app-page"
+                       data-app-page-target="menuUrlPage"
+                       data-app-nav-target="menuUrlPage">Add menu</a>
+                </div>
+                <div class="app-page-table-wrap">
+                    <table class="app-page-table app-menus-table">
+                        <thead>
+                            <tr>
+                                <th>Menu</th>
+                                <th>Cookbook</th>
+                                <th>Source</th>
+                                <th>PDFs</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set rendered_menu_rows = namespace(count=0) %}
+                            {% if cookbook_view and cookbook_view.cookbooks %}
+                                {% for cookbook in cookbook_view.cookbooks %}
+                                    {% for restaurant_menu in cookbook.restaurant_menus|default([]) %}
+                                        {% set rendered_menu_rows.count = rendered_menu_rows.count + 1 %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ restaurant_menu.restaurant.restaurant_name or restaurant_menu.menu.menu_title or "Restaurant Menu" }}</strong>
+                                                <span>{{ restaurant_menu.menu.menu_title or cookbook.name }}</span>
+                                            </td>
+                                            <td><strong>{{ cookbook.name }}</strong><span>{{ cookbook.recipes|length }} recipes</span></td>
+                                            <td><span class="app-page-pill">{{ restaurant_menu.menu.source_type or "Menu" }}</span></td>
+                                            <td><strong>{{ cookbook.menu_pdf_logs|default([])|length }}</strong><span>PDF log entries</span></td>
+                                            <td>
+                                                <a class="app-page-table-action"
+                                                   href="{{ url_for('menu_bp.menu_view_route', menu_id=restaurant_menu.menu.id) }}">Open</a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endfor %}
+                            {% endif %}
+                            {% if rendered_menu_rows.count == 0 %}
+                                <tr>
+                                    <td colspan="5">
+                                        <strong>No menus yet.</strong>
+                                        <span>Import a menu URL, upload a menu document, or create one from a cookbook.</span>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="app-page-action-grid app-menu-action-grid" aria-label="Menu actions">
+                <a href="#menuUrlPage"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="menuUrlPage"
+                   data-app-nav-target="menuUrlPage">
+                    {{ shell.app_icon("link") }}
+                    <strong>Import Menu URL</strong>
+                    <span>Extract restaurant menu items from a menu page.</span>
+                </a>
+                <a href="#menuDocumentPage"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="menuDocumentPage"
+                   data-app-nav-target="menuDocumentPage">
+                    {{ shell.app_icon("document") }}
+                    <strong>Import Menu From Document</strong>
+                    <span>Upload a PDF, document, or image of a restaurant menu.</span>
+                </a>
+                <a href="{{ url_for('menu_bp.selected_cookbook_menu_builder_route') }}">
+                    {{ shell.app_icon("menus") }}
+                    <strong>Custom Restaurant Menu Builder</strong>
+                    <span>Create a polished menu page from cookbook recipes.</span>
+                </a>
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Menu summary">
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("menus") }}</span>
+                <h3>Menu Overview</h3>
+                <strong>{{ menu_page_summary.count }}</strong>
+                <span>Total Menus</span>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Import Options</h3>
+                <ul class="app-page-link-list">
+                    <li><a href="#menuUrlPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="menuUrlPage" data-app-nav-target="menuUrlPage">Menu URL <span>AI extract</span></a></li>
+                    <li><a href="#menuDocumentPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="menuDocumentPage" data-app-nav-target="menuDocumentPage">Menu Document <span>PDF/photo</span></a></li>
+                    <li><a href="{{ url_for('menu_bp.selected_cookbook_menu_builder_route') }}">Menu Builder <span>Cookbook</span></a></li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card app-page-soft-card">
+                <h3>Menu Recipes</h3>
+                <p>Imported menu items can become editable recipes with preserved restaurant source details.</p>
             </article>
         </aside>
     </div>
@@ -211,6 +365,9 @@
                 </button>
                 <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
             </div>
+            <section class="app-workspace-panel app-shopping-edit-panel" data-workspace-panel>
+                {% include "sections/edit_items.html" %}
+            </section>
         </div>
         <aside class="app-page-rail" aria-label="Shopping summary">
             <article class="app-page-rail-card app-page-metric-card">
@@ -257,15 +414,51 @@
         </div>
     </div>
 
-    <div class="app-page-tabs" aria-label="Pantry filters">
-        <button type="button" class="is-active">All Items</button>
-        <button type="button">Running Low</button>
-        <button type="button">Expiring Soon</button>
-        <button type="button">Locations</button>
+    <div class="app-page-summary-cards app-pantry-summary-cards" aria-label="Pantry status">
+        <article class="is-active">
+            {{ shell.app_icon("pantry") }}
+            <span>All Items</span>
+            <strong>Live</strong>
+        </article>
+        <article>
+            {{ shell.app_icon("import") }}
+            <span>Running Low</span>
+            <strong>Track</strong>
+        </article>
+        <article>
+            {{ shell.app_icon("document") }}
+            <span>Expiring Soon</span>
+            <strong>Dates</strong>
+        </article>
+        <article>
+            {{ shell.app_icon("menus") }}
+            <span>Out of Stock</span>
+            <strong>Restock</strong>
+        </article>
+    </div>
+
+    <div class="app-page-chip-row" aria-label="Pantry categories">
+        <button type="button" class="is-active">All Categories</button>
+        <button type="button">Baking</button>
+        <button type="button">Beverages</button>
+        <button type="button">Canned Goods</button>
+        <button type="button">Dairy &amp; Eggs</button>
+        <button type="button">Produce</button>
+        <button type="button">More</button>
     </div>
 
     <div class="app-page-layout">
         <div class="app-page-main-column">
+            <section class="app-page-filter-card app-pantry-filter-card" aria-label="Pantry filters">
+                <label>
+                    <span class="sr-only">Search pantry items</span>
+                    {{ shell.svg_icon("search") }}
+                    <input type="search" placeholder="Search pantry items...">
+                </label>
+                <button type="button">{{ shell.svg_icon("settings") }} <span>All Locations</span></button>
+                <button type="button">{{ shell.svg_icon("price") }} <span>Filter</span></button>
+                <button type="button">{{ shell.svg_icon("menus") }} <span>Sort: Category</span></button>
+            </section>
             <section id="aiPantrySection"
                      class="ai-pantry-card user-ai-pantry-panel lazy-section-placeholder"
                      data-ai-pantry-panel
@@ -297,16 +490,31 @@
                 <span>Inventory workspace</span>
             </article>
             <article class="app-page-rail-card">
-                <h3>Quick Actions</h3>
+                <h3>Running Low</h3>
+                <ul class="app-page-media-list">
+                    <li><span class="app-page-thumb-icon">{{ shell.app_icon("shopping") }}</span><span>Chicken Breast</span></li>
+                    <li><span class="app-page-thumb-icon">{{ shell.app_icon("shopping") }}</span><span>Cheddar Cheese</span></li>
+                    <li><span class="app-page-thumb-icon">{{ shell.app_icon("shopping") }}</span><span>Almond Milk</span></li>
+                    <li><span class="app-page-thumb-icon">{{ shell.app_icon("shopping") }}</span><span>Greek Yogurt</span></li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Pantry Actions</h3>
                 <ul class="app-page-link-list">
-                    <li><a href="#aiPantryInventory" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryInventory" data-app-nav-lazy-section="pantry">Inventory</a></li>
-                    <li><a href="#aiPantryUseSoon" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryUseSoon" data-app-nav-lazy-section="pantry">Use Soon</a></li>
-                    <li><a href="#aiPantryUploadReceipt" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryUploadReceipt" data-app-nav-lazy-section="pantry">Upload Receipt</a></li>
+                    <li><a href="#aiPantryInventory" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryInventory" data-app-nav-lazy-section="pantry">Inventory <span>Open</span></a></li>
+                    <li><a href="#aiPantryUseSoon" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryUseSoon" data-app-nav-lazy-section="pantry">Expiring Soon <span>Review</span></a></li>
+                    <li><a href="#aiPantryUploadReceipt" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryUploadReceipt" data-app-nav-lazy-section="pantry">Upload Receipt <span>Scan</span></a></li>
                 </ul>
             </article>
             <article class="app-page-rail-card app-page-soft-card">
                 <h3>Reduce Waste</h3>
                 <p>Use pantry dates and recipe matches to prioritize ingredients.</p>
+                <a href="#aiPantryCookWithWhatIHave"
+                   data-app-nav-link
+                   data-app-nav-action="ai-pantry"
+                   data-app-page-target="pantryPage"
+                   data-app-nav-target="aiPantryCookWithWhatIHave"
+                   data-app-nav-lazy-section="pantry">Get Suggestions</a>
             </article>
         </aside>
     </div>
@@ -479,54 +687,676 @@
     <div class="app-page-heading-row">
         <div>
             <h2>Import</h2>
-            <p>Bring recipes into AI Pantry from URLs, documents, photos, or barcode workflows.</p>
+            <p>Bring recipes into AI Pantry from any source. We'll extract the details and add them to your cookbooks.</p>
         </div>
     </div>
 
-    <div class="app-import-method-grid" aria-label="Import methods">
-        <a class="app-import-method-card is-active" href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="recipeUrlsTextarea">
+    <h3 class="app-page-section-title">Choose an Import Method</h3>
+    <div class="app-import-method-grid app-import-method-grid-six" aria-label="Import methods">
+        <a class="app-import-method-card"
+           href="#recipeUrlsPage"
+           data-app-nav-link
+           data-app-nav-action="app-page"
+           data-app-page-target="recipeUrlsPage"
+           data-app-nav-target="recipeUrlsPage">
             {{ shell.app_icon("link") }}
             <strong>Import Recipe URLs</strong>
-            <span>Paste one or more URLs.</span>
+            <span>Import recipes from websites by pasting one or more URLs.</span>
+            <small>Supports multiple URLs</small>
         </a>
-        <a class="app-import-method-card" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="recipeMediaUploadForm">
+        <a class="app-import-method-card"
+           href="#importDocumentPage"
+           data-app-nav-link
+           data-app-nav-action="app-page"
+           data-app-page-target="importDocumentPage"
+           data-app-nav-target="importDocumentPage">
             {{ shell.app_icon("document") }}
             <strong>Import from Document</strong>
-            <span>Upload PDFs, docs, or images.</span>
+            <span>Upload a PDF, Word document, text file, or recipe image.</span>
+            <small>PDF, DOCX, TXT, PNG, JPG</small>
         </a>
-        <a class="app-import-method-card" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="recipeMediaUploadForm">
+        <a class="app-import-method-card"
+           href="#generateImagePage"
+           data-app-nav-link
+           data-app-nav-action="app-page"
+           data-app-page-target="generateImagePage"
+           data-app-nav-target="generateImagePage">
             {{ shell.app_icon("image") }}
             <strong>Generate from Image</strong>
-            <span>Extract recipe details from a photo.</span>
+            <span>Upload a recipe photo or dish image and let AI build the recipe.</span>
+            <small>Great for handwritten recipes</small>
         </a>
-        <a class="app-import-method-card" href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
+        <a class="app-import-method-card"
+           href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
             {{ shell.app_icon("barcode") }}
             <strong>Scan Barcode</strong>
-            <span>Add grocery products to pantry or lists.</span>
+            <span>Look up products and add grocery items to pantry or lists.</span>
+            <small>Product lookup</small>
+        </a>
+        <a class="app-import-method-card"
+           href="#menuUrlPage"
+           data-app-nav-link
+           data-app-nav-action="app-page"
+           data-app-page-target="menuUrlPage"
+           data-app-nav-target="menuUrlPage">
+            {{ shell.app_icon("menus") }}
+            <strong>Menu URL</strong>
+            <span>Extract restaurant menus and create inferred recipes from menu items.</span>
+            <small>Restaurant menu pages</small>
+        </a>
+        <a class="app-import-method-card"
+           href="#menuDocumentPage"
+           data-app-nav-link
+           data-app-nav-action="app-page"
+           data-app-page-target="menuDocumentPage"
+           data-app-nav-target="menuDocumentPage">
+            {{ shell.app_icon("document") }}
+            <strong>Import Menu From Document</strong>
+            <span>Upload a menu PDF, photo, or document for restaurant-menu extraction.</span>
+            <small>Menu PDF or photo</small>
         </a>
     </div>
 
     <div class="app-page-layout">
         <div class="app-page-main-column">
-            <section id="importWorkspaceSection" class="app-workspace-panel" data-workspace-panel hidden>
-                {% include "sections/enter_recipe_links.html" %}
-                {% include "sections/edit_items.html" %}
+            <section class="app-page-table-card app-import-recent-card">
+                <div class="app-page-panel-header">
+                    <h3>Recent Imports</h3>
+                    <a class="app-page-table-action"
+                       href="#currentRecipeUrlLogCard"
+                       data-app-nav-link
+                       data-app-nav-action="app-page"
+                       data-app-page-target="recipesPage"
+                       data-app-nav-target="currentRecipeUrlLogCard"
+                       data-app-nav-lazy-section="current-recipes">View all imports</a>
+                </div>
+                <div class="app-page-table-wrap">
+                    <table class="app-page-table app-import-table">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Type</th>
+                                <th>Imported To</th>
+                                <th>Items</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Recipe URLs</strong><span>Website recipes and blogs</span></td>
+                                <td><span class="app-page-pill">URL</span></td>
+                                <td><strong>Cookbooks</strong><span>Selected destination</span></td>
+                                <td><strong>{{ current_recipe_count | default(0) }}</strong><span>recipes in log</span></td>
+                                <td><strong class="app-page-positive">Ready</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Documents &amp; Images</strong><span>PDF, DOCX, TXT, PNG, JPG</span></td>
+                                <td><span class="app-page-pill">File</span></td>
+                                <td><strong>{{ cookbook_count | default(0) }} cookbooks</strong><span>Available destinations</span></td>
+                                <td><strong>AI</strong><span>extracts details</span></td>
+                                <td><strong class="app-page-positive">Ready</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Restaurant Menus</strong><span>Menu URLs and documents</span></td>
+                                <td><span class="app-page-pill">Menu</span></td>
+                                <td><strong>{{ menu_page_summary.count }}</strong><span>saved menus</span></td>
+                                <td><strong>{{ menu_page_summary.pdf_count }}</strong><span>PDF logs</span></td>
+                                <td><strong class="app-page-positive">Ready</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
         </div>
         <aside class="app-page-rail" aria-label="Import summary">
             <article class="app-page-rail-card">
                 <h3>Import Tips</h3>
                 <ul class="app-page-bullet-list">
-                    <li>Use the main recipe page URL.</li>
+                    <li>Use the main recipe page URL for website imports.</li>
+                    <li>PDFs with clear text work better than scanned images.</li>
                     <li>Review extracted details before saving.</li>
-                    <li>One URL per line works best.</li>
                 </ul>
             </article>
             <article class="app-page-rail-card app-page-metric-card">
                 <span class="app-page-rail-icon">{{ shell.app_icon("recipes") }}</span>
-                <h3>Recent Imports</h3>
+                <h3>Import Status</h3>
                 <strong>{{ current_recipe_count | default(0) }}</strong>
                 <span>Recipes in log</span>
+            </article>
+            <article class="app-page-rail-card app-page-soft-card">
+                <h3>Need Help?</h3>
+                <p>Guides and support are available from Help &amp; Support.</p>
+                <a href="#feedbackSupportSection"
+                   data-app-nav-link
+                   data-app-nav-action="feedback-support"
+                   data-app-nav-target="feedbackSupportSection">Visit Help Center</a>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="recipeUrlsPage"
+         class="app-page-workspace app-page-workspace-recipe-urls"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Import Recipe URLs</h2>
+            <p>Add one or more recipe URLs and we'll extract recipes, ingredients, and instructions.</p>
+        </div>
+        <div class="app-page-actions">
+            <a class="app-page-secondary-action"
+               href="#importPage"
+               data-app-nav-link
+               data-app-nav-action="app-page"
+               data-app-page-target="importPage"
+               data-app-nav-target="importPage">All import methods</a>
+        </div>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section id="importWorkspaceSection" class="app-workspace-panel app-import-url-panel" data-workspace-panel>
+                {% include "sections/enter_recipe_links.html" %}
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Recipe URL import guidance">
+            <article class="app-page-rail-card">
+                <h3>Supported Sites</h3>
+                <ul class="app-page-bullet-list">
+                    <li>Recipe platforms and cooking websites.</li>
+                    <li>Blog recipes and personal sites.</li>
+                    <li>Recipe cards from major publishers.</li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Tips for Best Results</h3>
+                <ul class="app-page-bullet-list">
+                    <li>Use one URL per line.</li>
+                    <li>Paste the main recipe page, not search pages.</li>
+                    <li>Review imported recipes before editing shopping lists.</li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("recipes") }}</span>
+                <h3>Your Import Activity</h3>
+                <strong>{{ current_recipe_count | default(0) }}</strong>
+                <span>Recipes in log</span>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="importDocumentPage"
+         class="app-page-workspace app-page-workspace-import-document"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Import from Document</h2>
+            <p>Upload a recipe document and we'll extract recipes, ingredients, and instructions.</p>
+        </div>
+        <div class="app-page-actions">
+            <button type="button"
+                    class="app-page-secondary-action"
+                    onclick="openRecipeMediaUpload('recipe'); return false;">
+                {{ shell.svg_icon("plus") }}
+                <span>Choose File</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>1</span>
+                    <div>
+                        <h3>Upload Your Document</h3>
+                        <p>We support PDF, DOCX, TXT, PNG, and JPG files.</p>
+                    </div>
+                </div>
+                <button type="button"
+                        class="app-import-dropzone"
+                        onclick="openRecipeMediaUpload('recipe'); return false;">
+                    {{ shell.app_icon("document") }}
+                    <strong>Drag and drop your file here</strong>
+                    <span>or choose a file from your computer</span>
+                </button>
+                <div class="app-import-upload-status" data-recipe-media-upload-status-mirror aria-live="polite"></div>
+            </section>
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>2</span>
+                    <div>
+                        <h3>Choose Destination</h3>
+                        <p>Your current import destination is managed by the recipe URL import controls.</p>
+                    </div>
+                </div>
+                <a class="app-page-secondary-action"
+                   href="#recipeUrlsTextarea"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="recipeUrlsPage"
+                   data-app-nav-target="recipeUrlsTextarea">Change cookbook destination</a>
+            </section>
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>3</span>
+                    <div>
+                        <h3>Extraction Options</h3>
+                        <p>AI Pantry extracts recipes, ingredients, instructions, nutrition details, and images when available.</p>
+                    </div>
+                </div>
+                <div class="app-import-option-row">
+                    <span>Extract recipes</span>
+                    <span>Extract ingredients</span>
+                    <span>Extract instructions</span>
+                    <span>Extract images</span>
+                </div>
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Document import guidance">
+            <article class="app-page-rail-card">
+                <h3>Import Tips</h3>
+                <ul class="app-page-bullet-list">
+                    <li>PDFs with clear text give the best results.</li>
+                    <li>One recipe per page is ideal but not required.</li>
+                    <li>You can review extracted data before saving.</li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Supported File Types</h3>
+                <div class="app-import-file-grid">
+                    <span>PDF</span>
+                    <span>DOCX</span>
+                    <span>TXT</span>
+                    <span>PNG</span>
+                    <span>JPG</span>
+                </div>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="generateImagePage"
+         class="app-page-workspace app-page-workspace-generate-image"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Generate from Image</h2>
+            <p>Upload a photo of a recipe, handwritten note, or dish and we'll generate the recipe for you.</p>
+        </div>
+        <div class="app-page-actions">
+            <button type="button"
+                    class="app-page-secondary-action"
+                    onclick="openRecipeMediaUpload('recipe'); return false;">
+                {{ shell.svg_icon("plus") }}
+                <span>Choose Image</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>1</span>
+                    <div>
+                        <h3>Upload an Image</h3>
+                        <p>Use a clear photo of a recipe card, cookbook page, note, or finished dish.</p>
+                    </div>
+                </div>
+                <button type="button"
+                        class="app-import-dropzone app-import-image-dropzone"
+                        onclick="openRecipeMediaUpload('recipe'); return false;">
+                    {{ shell.app_icon("image") }}
+                    <strong>Drag and drop an image here</strong>
+                    <span>JPG, PNG, or WEBP up to the configured upload limit</span>
+                </button>
+                <div class="app-import-upload-status" data-recipe-media-upload-status-mirror aria-live="polite"></div>
+            </section>
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>2</span>
+                    <div>
+                        <h3>What would you like to generate?</h3>
+                        <p>Select the information you want AI Pantry to extract and create.</p>
+                    </div>
+                </div>
+                <div class="app-import-choice-grid">
+                    <span class="is-active">Full Recipe</span>
+                    <span>Ingredients Only</span>
+                    <span>Instructions Only</span>
+                    <span>Nutrition Info</span>
+                    <span>Detect Dish</span>
+                </div>
+            </section>
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>3</span>
+                    <div>
+                        <h3>Advanced Options</h3>
+                        <p>Language, dietary preferences, and cooking-skill settings are applied during review.</p>
+                    </div>
+                </div>
+                <button type="button"
+                        class="app-page-primary-action"
+                        onclick="openRecipeMediaUpload('recipe'); return false;">Generate Recipe</button>
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Image generation guidance">
+            <article class="app-page-rail-card">
+                <h3>Image Tips</h3>
+                <ul class="app-page-bullet-list">
+                    <li>Use clear, well-lit photos.</li>
+                    <li>Avoid blur and heavy shadows.</li>
+                    <li>Crop out background clutter when possible.</li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card app-page-soft-card">
+                <h3>Need Better Results?</h3>
+                <p>Try cropping the image or improving lighting before uploading.</p>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="menuUrlPage"
+         class="app-page-workspace app-page-workspace-menu-url"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Import Menu URL</h2>
+            <p>Add one or more restaurant menu URLs and we'll extract menu items before generating recipes.</p>
+        </div>
+        <div class="app-page-actions">
+            <a class="app-page-secondary-action"
+               href="#menusPage"
+               data-app-nav-link
+               data-app-nav-action="app-page"
+               data-app-page-target="menusPage"
+               data-app-nav-target="menusPage">Menus</a>
+        </div>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>1</span>
+                    <div>
+                        <h3>Add Menu URLs</h3>
+                        <p>Paste menu URLs below, one per line. Menu import is available to admins.</p>
+                    </div>
+                </div>
+                <textarea id="menuUrlsTextarea"
+                          class="app-import-textarea"
+                          data-menu-url-import-textarea
+                          placeholder="https://restaurant.example.com/menu&#10;https://another-restaurant.example.com/order"></textarea>
+                <div class="app-import-action-row">
+                    <span data-menu-url-count-label>0 URLs added</span>
+                    <button type="button"
+                            class="app-page-primary-action"
+                            {% if can_import_menus %}
+                            onclick="return submitMenuUrlPageImport(this)"
+                            {% else %}
+                            disabled
+                            aria-disabled="true"
+                            title="Admin only"
+                            {% endif %}>Validate Menu URLs</button>
+                </div>
+            </section>
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>2</span>
+                    <div>
+                        <h3>Choose Destination</h3>
+                        <p>Menu-derived recipes use the same cookbook destination as recipe imports.</p>
+                    </div>
+                </div>
+                <a class="app-page-secondary-action"
+                   href="#recipeUrlsTextarea"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="recipeUrlsPage"
+                   data-app-nav-target="recipeUrlsTextarea">Change cookbook destination</a>
+            </section>
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>3</span>
+                    <div>
+                        <h3>Extraction Options</h3>
+                        <p>Menu imports preserve restaurant details, menu sections, item descriptions, prices, and inferred recipe data.</p>
+                    </div>
+                </div>
+                <div class="app-import-option-row">
+                    <span>Restaurant metadata</span>
+                    <span>Menu sections</span>
+                    <span>Item descriptions</span>
+                    <span>Generated recipes</span>
+                </div>
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Menu URL import guidance">
+            <article class="app-page-rail-card">
+                <h3>Supported Menu Sites</h3>
+                <ul class="app-page-bullet-list">
+                    <li>Restaurant menu pages.</li>
+                    <li>Ordering pages with visible menu items.</li>
+                    <li>Menu pages loaded through supported site payloads.</li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Tips for Best Results</h3>
+                <ul class="app-page-bullet-list">
+                    <li>Use the main menu page URL.</li>
+                    <li>One menu URL per line.</li>
+                    <li>Review generated recipe stubs before saving.</li>
+                </ul>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="menuDocumentPage"
+         class="app-page-workspace app-page-workspace-menu-document"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Import Menu From Document</h2>
+            <p>Upload a menu document, PDF, or image and we'll extract restaurant menu items for recipe generation.</p>
+        </div>
+        <div class="app-page-actions">
+            <button type="button"
+                    class="app-page-secondary-action"
+                    {% if can_import_menus %}
+                    onclick="openRecipeMediaUpload('menu_extract'); return false;"
+                    {% else %}
+                    disabled
+                    aria-disabled="true"
+                    title="Admin only"
+                    {% endif %}>
+                {{ shell.svg_icon("plus") }}
+                <span>Choose Menu File</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>1</span>
+                    <div>
+                        <h3>Upload Your Menu</h3>
+                        <p>Use a restaurant menu PDF, document, image, or text file.</p>
+                    </div>
+                </div>
+                <button type="button"
+                        class="app-import-dropzone"
+                        {% if can_import_menus %}
+                        onclick="openRecipeMediaUpload('menu_extract'); return false;"
+                        {% else %}
+                        disabled
+                        aria-disabled="true"
+                        title="Admin only"
+                        {% endif %}>
+                    {{ shell.app_icon("document") }}
+                    <strong>Drag and drop your menu file here</strong>
+                    <span>or choose a file to start menu extraction</span>
+                </button>
+                <div class="app-import-upload-status" data-recipe-media-upload-status-mirror aria-live="polite"></div>
+            </section>
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>2</span>
+                    <div>
+                        <h3>Review Menu Items</h3>
+                        <p>AI Pantry stages menu sections and items so you can review before generating recipes.</p>
+                    </div>
+                </div>
+                <div class="app-import-option-row">
+                    <span>Restaurant source</span>
+                    <span>Menu sections</span>
+                    <span>Prices</span>
+                    <span>Recipe stubs</span>
+                </div>
+            </section>
+            <section class="app-import-flow-card">
+                <div class="app-import-step-heading">
+                    <span>3</span>
+                    <div>
+                        <h3>Create Recipes</h3>
+                        <p>Generated recipes keep menu source metadata and can be edited from the recipe page.</p>
+                    </div>
+                </div>
+                <a class="app-page-secondary-action"
+                   href="{{ url_for('menu_bp.selected_cookbook_menu_builder_route') }}">Open Menu Builder</a>
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Menu document import guidance">
+            <article class="app-page-rail-card">
+                <h3>Import Tips</h3>
+                <ul class="app-page-bullet-list">
+                    <li>Clear PDFs or photos produce better sections.</li>
+                    <li>One menu per document keeps review simpler.</li>
+                    <li>Confirm item names, descriptions, and prices before generating recipes.</li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Supported File Types</h3>
+                <div class="app-import-file-grid">
+                    <span>PDF</span>
+                    <span>DOCX</span>
+                    <span>TXT</span>
+                    <span>PNG</span>
+                    <span>JPG</span>
+                </div>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="notificationsPage"
+         class="app-page-workspace app-page-workspace-notifications"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Notifications</h2>
+            <p>Review app alerts, import progress, and push notification settings.</p>
+        </div>
+        <div class="app-page-actions">
+            <button type="button"
+                    class="app-page-secondary-action"
+                    data-push-notifications-open
+                    aria-controls="accountPushNotificationsPanel">
+                {{ shell.app_icon("bell") }}
+                <span>Push Settings</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section class="app-page-table-card">
+                <div class="app-page-panel-header">
+                    <h3>Notification Center</h3>
+                    <span>3 unread</span>
+                </div>
+                <div class="app-notification-list">
+                    <article>
+                        {{ shell.app_icon("import") }}
+                        <div>
+                            <strong>Import queue ready</strong>
+                            <span>Recipe and menu imports will appear here while they run.</span>
+                        </div>
+                        <small>Now</small>
+                    </article>
+                    <article>
+                        {{ shell.app_icon("pantry") }}
+                        <div>
+                            <strong>Pantry reminder</strong>
+                            <span>Use-soon pantry suggestions are available from the Pantry page.</span>
+                        </div>
+                        <small>Today</small>
+                    </article>
+                    <article>
+                        {{ shell.app_icon("shopping") }}
+                        <div>
+                            <strong>Shopping list status</strong>
+                            <span>Open Shopping Lists to review unchecked items and store-ready lists.</span>
+                        </div>
+                        <small>This week</small>
+                    </article>
+                </div>
+            </section>
+            <section class="app-page-action-grid app-notification-action-grid" aria-label="Notification actions">
+                <button type="button"
+                        onclick="openUserAccountWorkspace({ targetId: 'jobActivitySection', updateHash: false, scroll: false }); return openJobActivityPanel();">
+                    {{ shell.app_icon("document") }}
+                    <strong>Job Activity</strong>
+                    <span>Review import progress and background jobs.</span>
+                </button>
+                <button type="button"
+                        data-push-notifications-open
+                        aria-controls="accountPushNotificationsPanel">
+                    {{ shell.app_icon("bell") }}
+                    <strong>Push Notifications</strong>
+                    <span>Configure mobile and web push delivery.</span>
+                </button>
+                <a href="#feedbackSupportSection"
+                   data-app-nav-link
+                   data-app-nav-action="feedback-support"
+                   data-app-nav-target="feedbackSupportSection">
+                    {{ shell.app_icon("help") }}
+                    <strong>Support</strong>
+                    <span>Get help if alerts or notifications look wrong.</span>
+                </a>
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Notification summary">
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("bell") }}</span>
+                <h3>Alerts</h3>
+                <strong>3</strong>
+                <span>Unread updates</span>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Notification Types</h3>
+                <ul class="app-page-link-list">
+                    <li><span>Import progress <span>On</span></span></li>
+                    <li><span>Pantry reminders <span>On</span></span></li>
+                    <li><span>Account notices <span>On</span></span></li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card app-page-soft-card">
+                <h3>Quiet Workspace</h3>
+                <p>Use push settings to choose which alerts should leave the browser.</p>
             </article>
         </aside>
     </div>

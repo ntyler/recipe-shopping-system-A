@@ -37,7 +37,12 @@
                 {{ shell.app_icon("recipes") }}
                 <span class="app-nav-text">Recipes</span>
             </a>
-            <a class="app-nav-link" href="{{ url_for('menu_bp.custom_menu_builder_route') }}">
+            <a class="app-nav-link"
+               href="#menusPage"
+               data-app-nav-link
+               data-app-nav-action="app-page"
+               data-app-page-target="menusPage"
+               data-app-nav-target="menusPage">
                 {{ shell.app_icon("menus") }}
                 <span class="app-nav-text">Menus</span>
             </a>
@@ -69,40 +74,58 @@
             </a>
             <div class="app-nav-section-title">Import</div>
             <a class="app-nav-link"
-               href="#recipeUrlsTextarea"
+               href="#importPage"
                data-app-nav-link
                data-app-nav-action="app-page"
                data-app-page-target="importPage"
-               data-app-nav-target="recipeUrlsTextarea">
+               data-app-nav-target="importPage">
                 {{ shell.app_icon("import") }}
                 <span class="app-nav-text">Import</span>
             </a>
             <a class="app-nav-link"
-               href="#recipeUrlsTextarea"
+               href="#recipeUrlsPage"
                data-app-nav-link
                data-app-nav-action="app-page"
-               data-app-page-target="importPage"
-               data-app-nav-target="recipeUrlsTextarea">
+               data-app-page-target="recipeUrlsPage"
+               data-app-nav-target="recipeUrlsPage">
                 {{ shell.app_icon("link") }}
                 <span class="app-nav-text">Recipe URLs</span>
             </a>
             <a class="app-nav-link"
-               href="#recipeMediaUploadForm"
+               href="#importDocumentPage"
                data-app-nav-link
                data-app-nav-action="app-page"
-               data-app-page-target="importPage"
-               data-app-nav-target="recipeMediaUploadForm">
+               data-app-page-target="importDocumentPage"
+               data-app-nav-target="importDocumentPage">
                 {{ shell.app_icon("document") }}
                 <span class="app-nav-text">Import From Document</span>
             </a>
             <a class="app-nav-link"
-               href="#recipeMediaUploadForm"
+               href="#generateImagePage"
                data-app-nav-link
                data-app-nav-action="app-page"
-               data-app-page-target="importPage"
-               data-app-nav-target="recipeMediaUploadForm">
+               data-app-page-target="generateImagePage"
+               data-app-nav-target="generateImagePage">
                 {{ shell.app_icon("image") }}
                 <span class="app-nav-text">Generate From Image</span>
+            </a>
+            <a class="app-nav-link"
+               href="#menuUrlPage"
+               data-app-nav-link
+               data-app-nav-action="app-page"
+               data-app-page-target="menuUrlPage"
+               data-app-nav-target="menuUrlPage">
+                {{ shell.app_icon("menus") }}
+                <span class="app-nav-text">Menu URL</span>
+            </a>
+            <a class="app-nav-link"
+               href="#menuDocumentPage"
+               data-app-nav-link
+               data-app-nav-action="app-page"
+               data-app-page-target="menuDocumentPage"
+               data-app-nav-target="menuDocumentPage">
+                {{ shell.app_icon("document") }}
+                <span class="app-nav-text">Import Menu From Document</span>
             </a>
             <a class="app-nav-link" href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
                 {{ shell.app_icon("barcode") }}
@@ -172,23 +195,25 @@
             </form>
             <div class="app-toolbar-actions" aria-label="Quick actions">
                 <a class="app-toolbar-button app-toolbar-primary"
-                   href="#recipeUrlsTextarea"
+                   href="#importPage"
                    data-app-nav-link
                    data-app-nav-action="app-page"
                    data-app-page-target="importPage"
-                   data-app-nav-target="recipeUrlsTextarea">
+                   data-app-nav-target="importPage">
                     {{ shell.svg_icon("plus") }}
                     <span>Import</span>
                 </a>
-                <button type="button"
-                        class="app-toolbar-button app-toolbar-icon-button"
-                        data-push-notifications-open
-                        aria-controls="accountPushNotificationsPanel"
-                        title="Notifications">
+                <a class="app-toolbar-button app-toolbar-icon-button"
+                   href="#notificationsPage"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="notificationsPage"
+                   data-app-nav-target="notificationsPage"
+                   title="Notifications">
                     {{ shell.svg_icon("bell") }}
                     <span class="sr-only">Notifications</span>
                     <span class="app-notification-badge" aria-hidden="true">3</span>
-                </button>
+                </a>
                 <button type="button"
                         class="app-toolbar-button app-help-button"
                         onclick="return openFeedbackSupportSection()"
@@ -200,6 +225,7 @@
                 <a class="app-toolbar-button app-account-button"
                    href="#userAccountSection"
                    data-app-nav-link
+                   data-app-nav-action="account-workspace"
                    data-app-nav-target="userAccountSection">
                     <span class="app-account-avatar" aria-hidden="true">
                         {% if current_user and current_user.avatar_path %}
@@ -353,24 +379,24 @@
                     <a href="#recipeUrlsTextarea"
                        data-app-nav-link
                        data-app-nav-action="app-page"
-                       data-app-page-target="importPage"
+                       data-app-page-target="recipeUrlsPage"
                        data-app-nav-target="recipeUrlsTextarea">
                         {{ shell.app_icon("link") }}
                         <span>Import Recipe URLs</span>
                     </a>
-                    <a href="#recipeMediaUploadForm"
+                    <a href="#importDocumentPage"
                        data-app-nav-link
                        data-app-nav-action="app-page"
-                       data-app-page-target="importPage"
-                       data-app-nav-target="recipeMediaUploadForm">
+                       data-app-page-target="importDocumentPage"
+                       data-app-nav-target="importDocumentPage">
                         {{ shell.app_icon("document") }}
                         <span>Import Document</span>
                     </a>
-                    <a href="#recipeMediaUploadForm"
+                    <a href="#generateImagePage"
                        data-app-nav-link
                        data-app-nav-action="app-page"
-                       data-app-page-target="importPage"
-                       data-app-nav-target="recipeMediaUploadForm">
+                       data-app-page-target="generateImagePage"
+                       data-app-nav-target="generateImagePage">
                         {{ shell.app_icon("image") }}
                         <span>Generate From Image</span>
                     </a>
@@ -489,7 +515,7 @@
         {{ shell.app_icon("pantry") }}
         <span>Pantry</span>
     </a>
-    <a class="app-mobile-nav-link" href="#userAccountSection" data-app-nav-link data-app-nav-target="userAccountSection">
+    <a class="app-mobile-nav-link" href="#userAccountSection" data-app-nav-link data-app-nav-action="account-workspace" data-app-nav-target="userAccountSection">
         {{ shell.app_icon("more") }}
         <span>More</span>
     </a>

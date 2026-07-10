@@ -183,6 +183,7 @@ const WORKSPACE_PANEL_TARGETS = {
 const APP_PAGE_TARGETS = {
     recipesPage: "recipesPage",
     currentRecipeUrlLogCard: "recipesPage",
+    menusPage: "menusPage",
     cookbooksPage: "cookbooksPage",
     cookbooksCard: "cookbooksPage",
     shoppingListsPage: "shoppingListsPage",
@@ -201,9 +202,19 @@ const APP_PAGE_TARGETS = {
     storesPage: "storesPage",
     priceComparisonPage: "priceComparisonPage",
     importPage: "importPage",
-    recipeUrlsTextarea: "importPage",
-    recipeMediaUploadForm: "importPage",
-    importWorkspaceSection: "importPage",
+    recipeUrlsPage: "recipeUrlsPage",
+    recipeUrlsTextarea: "recipeUrlsPage",
+    importWorkspaceSection: "recipeUrlsPage",
+    importDocumentPage: "importDocumentPage",
+    recipeMediaUploadForm: "importDocumentPage",
+    recipeMediaUploadInput: "importDocumentPage",
+    generateImagePage: "generateImagePage",
+    menuUrlPage: "menuUrlPage",
+    menuUrlsTextarea: "menuUrlPage",
+    menuDocumentPage: "menuDocumentPage",
+    menuMediaPreviewForm: "menuDocumentPage",
+    menuMediaPreviewInput: "menuDocumentPage",
+    notificationsPage: "notificationsPage",
 };
 const APP_PAGE_LAZY_SECTIONS = {
     recipesPage: "current-recipes",
@@ -460,6 +471,17 @@ function setHomeHeaderVisible(visible) {
     });
 }
 
+function setUserAccountWorkspaceVisible(visible) {
+    const section = document.getElementById("userAccountSection");
+
+    if (!section || document.body.classList.contains("account-action-token")) {
+        return section;
+    }
+
+    section.hidden = !visible;
+    return section;
+}
+
 function hideAppPageWorkspaces(exceptPage = null) {
     document.querySelectorAll("[data-app-page-workspace]").forEach(page => {
         if (page !== exceptPage) {
@@ -471,6 +493,7 @@ function hideAppPageWorkspaces(exceptPage = null) {
 function openHomeWorkspace(options = {}) {
     hideAppPageWorkspaces();
     setSettingsWorkspaceVisible(false);
+    setUserAccountWorkspaceVisible(false);
     setHomeHeaderVisible(true);
     setHomeDashboardVisible(true);
 
@@ -488,6 +511,37 @@ function openHomeWorkspace(options = {}) {
     return false;
 }
 
+function openUserAccountWorkspace(options = {}) {
+    hideAppPageWorkspaces();
+    setSettingsWorkspaceVisible(false);
+    setHomeHeaderVisible(false);
+    setHomeDashboardVisible(false);
+    const section = setUserAccountWorkspaceVisible(true);
+
+    if (!section) {
+        return false;
+    }
+
+    const targetId = options.targetId || "userAccountSection";
+    const target = targetId ? document.getElementById(targetId) : null;
+    const scrollTarget = target || section;
+
+    if (options.updateHash !== false) {
+        appShellUpdateHash(targetId || "userAccountSection");
+    }
+
+    if (options.scroll !== false && scrollTarget) {
+        window.requestAnimationFrame(() => {
+            appShellScrollToTarget(scrollTarget.id || "userAccountSection", {
+                focusTarget: Boolean(target && targetId !== "userAccountSection"),
+                behavior: options.behavior || "smooth",
+            });
+        });
+    }
+
+    return false;
+}
+
 async function openAppPage(pageId, options = {}) {
     const page = document.getElementById(pageId);
 
@@ -498,6 +552,7 @@ async function openAppPage(pageId, options = {}) {
     setHomeDashboardVisible(false);
     setHomeHeaderVisible(false);
     setSettingsWorkspaceVisible(false);
+    setUserAccountWorkspaceVisible(false);
     hideAppPageWorkspaces(page);
     page.hidden = false;
 
@@ -574,6 +629,7 @@ async function openSettingsSection(sectionKey = "profile", options = {}) {
 
     setHomeDashboardVisible(false);
     setHomeHeaderVisible(false);
+    setUserAccountWorkspaceVisible(false);
     hideAppPageWorkspaces();
 
     const normalizedSection = String(sectionKey || "profile");
@@ -707,6 +763,16 @@ async function openHashTargetWorkspace(hash = window.location.hash, options = {}
         return true;
     }
 
+    const accountPanelKey = USER_ACCOUNT_PANEL_HASH_KEYS[`#${targetId}`] || "";
+    if (targetId === "userAccountSection" || (accountPanelKey && accountPanelKey !== "feedbackSupport")) {
+        openUserAccountWorkspace({
+            targetId,
+            updateHash: false,
+            scroll: options.scroll !== false,
+        });
+        return true;
+    }
+
     const settingsSection = settingsSectionFromTargetId(targetId);
     if (settingsSection) {
         await openSettingsSection(settingsSection, {
@@ -733,6 +799,25 @@ async function openHashTargetWorkspace(hash = window.location.hash, options = {}
 function initSettingsWorkspace(options = {}) {
     openHashTargetWorkspace(window.location.hash, {
         scroll: options.scroll !== false,
+    });
+}
+
+function initAppShellInitialWorkspace() {
+    if (targetIdFromHash(window.location.hash)) {
+        return;
+    }
+
+    if (document.body.classList.contains("account-action-token")) {
+        openUserAccountWorkspace({
+            updateHash: false,
+            scroll: false,
+        });
+        return;
+    }
+
+    openHomeWorkspace({
+        updateHash: false,
+        scroll: false,
     });
 }
 
@@ -781,7 +866,20 @@ async function activateAppShellNavLink(link, options = {}) {
 
     if (action === "usage-dashboard" && typeof toggleUsageDashboardPanel === "function") {
         appShellUpdateHash(targetId || "accountUsageDashboardPanel");
+        openUserAccountWorkspace({
+            targetId: "userAccountSection",
+            updateHash: false,
+            scroll: false,
+        });
         return toggleUsageDashboardPanel(true);
+    }
+
+    if (action === "account-workspace") {
+        appShellUpdateHash(targetId || "userAccountSection");
+        return openUserAccountWorkspace({
+            targetId: targetId || "userAccountSection",
+            updateHash: false,
+        });
     }
 
     if (action === "settings-section") {
@@ -12779,6 +12877,30 @@ function openMenuMediaPreviewUpload() {
     }
 }
 
+function recipeMediaUploadStatusElements() {
+    const elements = [];
+    const primary = document.getElementById("recipeMediaUploadStatus");
+
+    if (primary) {
+        elements.push(primary);
+    }
+
+    document.querySelectorAll("[data-recipe-media-upload-status-mirror]").forEach(status => {
+        if (!elements.includes(status)) {
+            elements.push(status);
+        }
+    });
+
+    return elements;
+}
+
+function setRecipeMediaUploadStatus(message, isError = false) {
+    recipeMediaUploadStatusElements().forEach(status => {
+        status.textContent = message || "";
+        status.classList.toggle("error", Boolean(isError));
+    });
+}
+
 function submitMenuMediaPreviewUpload(input) {
     const form = document.getElementById("menuMediaPreviewForm");
     const fileInput = input && input.files ? input : document.getElementById("menuMediaPreviewInput");
@@ -12805,10 +12927,7 @@ function submitMenuMediaPreviewUpload(input) {
         }
         return waitForJobCompletion(jobId, {
             onUpdate(job) {
-                const status = document.getElementById("recipeMediaUploadStatus");
-                if (status) {
-                    status.textContent = job.current_step || "Importing menu file...";
-                }
+                setRecipeMediaUploadStatus(job.current_step || "Importing menu file...");
             },
         });
     }).then(job => {
@@ -12816,10 +12935,7 @@ function submitMenuMediaPreviewUpload(input) {
             window.location.reload();
         }
     }).catch(err => {
-        const status = document.getElementById("recipeMediaUploadStatus");
-        if (status) {
-            status.textContent = err.message || "Unable to import menu file.";
-        }
+        setRecipeMediaUploadStatus(err.message || "Unable to import menu file.", true);
     });
     return false;
 }
@@ -12838,6 +12954,57 @@ function submitMenuUrlPreviewFromEntry() {
     const button = document.querySelector(".recipe-import-action-url-menu");
     startRecipeExtractionUrls(urls, { extractionMode: "menu_extract", button });
     return false;
+}
+
+function submitMenuUrlPageImport(button = null) {
+    const menuTextarea = document.getElementById("menuUrlsTextarea");
+    const recipeTextarea = document.getElementById("recipeUrlsTextarea");
+
+    if (!menuTextarea || !recipeTextarea) {
+        return false;
+    }
+
+    recipeTextarea.value = menuTextarea.value;
+    const urls = menuTextarea.value
+        .split(/\r?\n/)
+        .map(url => url.trim())
+        .filter(Boolean);
+
+    if (!urls.length) {
+        alert("Paste at least one menu URL.");
+        return false;
+    }
+
+    startRecipeExtractionUrls(urls, { extractionMode: "menu_extract", button });
+    return false;
+}
+
+function updateMenuUrlImportCount() {
+    const textarea = document.getElementById("menuUrlsTextarea");
+    const label = document.querySelector("[data-menu-url-count-label]");
+
+    if (!textarea || !label) {
+        return;
+    }
+
+    const count = textarea.value
+        .split(/\r?\n/)
+        .map(url => url.trim())
+        .filter(Boolean)
+        .length;
+    label.textContent = `${count} URL${count === 1 ? "" : "s"} added`;
+}
+
+function bindMenuUrlImportPage() {
+    const textarea = document.getElementById("menuUrlsTextarea");
+
+    if (!textarea || textarea.dataset.menuUrlImportBound === "1") {
+        return;
+    }
+
+    textarea.dataset.menuUrlImportBound = "1";
+    textarea.addEventListener("input", updateMenuUrlImportCount);
+    updateMenuUrlImportCount();
 }
 
 function getRecipeMediaUploadInput() {
@@ -13022,7 +13189,6 @@ function resetRecipeFileImageNextSteps() {
 
 async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode = "read_text", importMode = null) {
     const form = document.getElementById("recipeMediaUploadForm");
-    const status = document.getElementById("recipeMediaUploadStatus");
     const fileInput = input && input.files ? input : getRecipeMediaUploadInput();
     const photoDescription = String(manualDescription || "").trim();
     const normalizedUploadMode = normalizeRecipeUploadMode(uploadMode);
@@ -13045,9 +13211,7 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
     const sourceTypeLabel = recipeUploadSourceTypeLabel(file);
     const fileLabel = file.name || "uploaded file";
 
-    if (status) {
-        status.textContent = `Importing ${fileLabel}...`;
-    }
+    setRecipeMediaUploadStatus(`Importing ${fileLabel}...`);
 
     console.log("[recipe_import] selected import cookbook", destination);
     showRecipeFileLoadingOverlay(file.name, sourceTypeLabel, isImageUpload);
@@ -13412,7 +13576,6 @@ async function submitRecipeMediaDescription() {
 
 async function submitRecipeMediaDescribeImage() {
     const uploadedFilePath = getRecipeMediaUploadPath();
-    const status = document.getElementById("recipeMediaUploadStatus");
     const fileInput = getRecipeMediaUploadInput();
     const file = fileInput && fileInput.files ? fileInput.files[0] : null;
     const fileLabel = file && file.name
@@ -13468,9 +13631,7 @@ async function submitRecipeMediaDescribeImage() {
         setRecipeFileLoadingSummary(data.description || data.text || "Image described.");
         setRecipeFileManualDescriptionPanelVisible(true, data.description || data.text || "", data.description || data.text || "");
         setRecipeFileActionButtonsEnabled(true);
-        if (status) {
-            status.textContent = "Image description ready.";
-        }
+        setRecipeMediaUploadStatus("Image description ready.");
     } catch (err) {
         const data = err && err.data ? err.data : {};
         const debug = data && data.debug ? data.debug : {};
@@ -13506,9 +13667,7 @@ async function submitRecipeMediaDescribeImage() {
         });
         setRecipeFileModelUsed(`${responseModelUsed || "Unknown"}${responseModelSource ? ` (${responseModelSource})` : ""}`);
         setRecipeFileActionButtonsEnabled(true);
-        if (status) {
-            status.textContent = message;
-        }
+        setRecipeMediaUploadStatus(message, true);
     }
 }
 
@@ -13831,9 +13990,8 @@ async function openImportedRecipeEditorAfterMediaImport(data = {}, options = {})
     await waitForNextPaint();
     await openRecipeEditor({ dataset: { recipeUrl } });
 
-    const status = document.getElementById("recipeMediaUploadStatus");
-    if (status && statusMessage) {
-        status.textContent = statusMessage;
+    if (statusMessage) {
+        setRecipeMediaUploadStatus(statusMessage);
     }
 }
 
@@ -13954,7 +14112,6 @@ async function submitRecipeMediaVision() {
     }
 
     const fileInput = getRecipeMediaUploadInput();
-    const status = document.getElementById("recipeMediaUploadStatus");
     const file = fileInput && fileInput.files ? fileInput.files[0] : null;
     const uploadedFilePath = getRecipeMediaUploadPath();
     const isImageUploadPath = recipeUploadedPathLooksLikeImage(uploadedFilePath);
@@ -13989,9 +14146,7 @@ async function submitRecipeMediaVision() {
             json_parse_success: false,
             recipe_creation_success: false,
         }, { visible: true });
-        if (status) {
-            status.textContent = message;
-        }
+        setRecipeMediaUploadStatus(message, true);
         setRecipeFileLoadingSummary(message);
         setRecipeFileManualDescriptionPanelVisible(true, message);
         return;
@@ -14150,9 +14305,7 @@ async function submitRecipeMediaVision() {
         }
 
         setRecipeFileActionButtonsEnabled(false);
-        if (status) {
-            status.textContent = categoryStatusMessage || "Recipe estimated from uploaded image.";
-        }
+        setRecipeMediaUploadStatus(categoryStatusMessage || "Recipe estimated from uploaded image.");
         await openImportedRecipeEditorAfterMediaImport(data, {
             statusMessage: categoryStatusMessage || "Recipe estimated from uploaded image.",
             refreshMessage: "Refreshing recipe and opening the editor...",
@@ -14239,9 +14392,7 @@ async function submitRecipeMediaVision() {
         setRecipeFileLoadingSummary(message || "Could not estimate a recipe from this image. Try describing the meal manually.");
         setRecipeFileActionButtonsEnabled(true);
 
-        if (status) {
-            status.textContent = message;
-        }
+        setRecipeMediaUploadStatus(message, true);
     } finally {
         recipeMediaVisionInProgress = false;
     }
@@ -35928,6 +36079,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindRecipeQuantityInputs", bindRecipeQuantityInputs],
         ["bindRecipeNameInputs", bindRecipeNameInputs],
         ["bindImportCookbookSelector", bindImportCookbookSelector],
+        ["bindMenuUrlImportPage", bindMenuUrlImportPage],
         ["bindStoreButtons", bindStoreButtons],
         ["bindStoreLinks", bindStoreLinks],
         ["bindPantryLocationChoices", bindPantryLocationChoices],
@@ -35941,6 +36093,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initJobActivityPanel", initJobActivityPanel],
         ["initAppShellNavigation", initAppShellNavigation],
         ["initSettingsWorkspace", () => initSettingsWorkspace({ scroll: false })],
+        ["initAppShellInitialWorkspace", initAppShellInitialWorkspace],
         ["initLazySections", initLazySections],
         ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
         ["initRecipeEditTabs", initRecipeEditTabs],
