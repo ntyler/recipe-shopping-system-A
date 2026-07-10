@@ -397,6 +397,26 @@
                     <div class="app-home-recipe-grid">
                         {% for recipe in recipe_preview_rows[:4] %}
                             <article class="app-home-recipe-card" data-recipe-url="{{ recipe.url }}">
+                                <div class="app-home-recipe-actions">
+                                    <button type="button"
+                                            class="app-home-recipe-menu-toggle"
+                                            aria-label="More actions for {{ recipe.name }}"
+                                            aria-haspopup="menu"
+                                            aria-expanded="false"
+                                            onclick="return toggleHomeRecipeMenu(this, event)">
+                                        {{ shell.svg_icon("more") }}
+                                    </button>
+                                    <div class="app-home-recipe-menu" role="menu" hidden>
+                                        <button type="button"
+                                                role="menuitem"
+                                                data-recipe-url="{{ recipe.url }}"
+                                                onclick="return openHomeRecipeAction(this, 'open', event)">Open Recipe</button>
+                                        <button type="button"
+                                                role="menuitem"
+                                                data-recipe-url="{{ recipe.url }}"
+                                                onclick="return openHomeRecipeAction(this, 'edit', event)">Edit Recipe</button>
+                                    </div>
+                                </div>
                                 <a class="app-home-recipe-media"
                                    href="#recipeView"
                                    data-recipe-url="{{ recipe.url }}"
@@ -404,14 +424,26 @@
                                     {% if recipe.cover_image and recipe.cover_image.src %}
                                         <img src="{{ recipe.cover_image.card_url or recipe.cover_image.thumb_url or recipe.cover_image.src }}"
                                              alt="{{ recipe.cover_image.alt or recipe.name }}"
-                                             loading="lazy">
+                                             loading="eager"
+                                             {% if loop.first %}fetchpriority="high"{% endif %}>
                                     {% else %}
                                         {{ shell.app_icon("recipes") }}
                                     {% endif %}
                                 </a>
                                 <h3><a href="#recipeView" data-recipe-url="{{ recipe.url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ recipe.name }}</a></h3>
-                                <div><span class="app-home-recipe-rating" aria-label="{{ recipe.rating }} out of 5 stars">{{ recipe.rating_stars }}</span><span>{{ recipe.preview_time or "Time TBD" }}</span></div>
-                                <small>{{ recipe.cookbook_name or "Unclassified" }}</small>
+                                {% if recipe.rating or recipe.home_preview_time %}
+                                    <div class="app-home-recipe-meta-row">
+                                        {% if recipe.rating %}
+                                            <span class="app-home-recipe-rating" aria-label="{{ recipe.rating }} out of 5 stars">
+                                                {% for star_number in range(1, 6) %}<span class="{% if star_number <= recipe.rating %}is-selected{% else %}is-unselected{% endif %}" aria-hidden="true">&#9733;</span>{% endfor %}
+                                            </span>
+                                        {% endif %}
+                                        {% if recipe.home_preview_time %}
+                                            <span class="app-home-recipe-time">{{ shell.svg_icon("clock") }} {{ recipe.home_preview_time }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                                {% if recipe.home_badge %}<small class="app-home-recipe-badge">{{ recipe.home_badge }}</small>{% endif %}
                             </article>
                         {% endfor %}
                     </div>
@@ -456,7 +488,7 @@
         <div class="app-home-secondary-grid">
             <section class="app-home-panel app-home-smart-suggestions" aria-label="Smart suggestions">
                 <div class="app-home-panel-header">
-                    <h2>Smart Suggestions</h2>
+                    <h2 class="app-home-panel-title">{{ shell.svg_icon("sparkles") }} <span>Smart Suggestions</span></h2>
                 </div>
                 {% if pantry_preview_items %}
                     {% set pantry_suggestion = pantry_preview_items[0] %}
@@ -471,7 +503,7 @@
             </section>
 
             <section class="app-home-panel app-home-price-preview" aria-label="Price comparison">
-                <div class="app-home-panel-header"><h2>Price Comparison</h2></div>
+                <div class="app-home-panel-header"><h2 class="app-home-panel-title">{{ shell.svg_icon("price") }} <span>Price Comparison</span></h2></div>
                 <p>Compare current shopping items across your enabled stores. Prices appear only after a supported lookup.</p>
                 <a class="app-page-secondary-action" href="#priceComparisonPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="priceComparisonPage" data-app-nav-target="priceComparisonPage">Compare prices</a>
             </section>
@@ -479,16 +511,30 @@
             <section class="app-home-panel app-home-recent-imports" aria-label="Recent imports">
                 <div class="app-home-panel-header">
                     <h2>Recent Imports</h2>
-                    <a href="#importPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="importPage">View all</a>
+                    <a href="#jobActivitySection" onclick="return openHomeRecentImport()">View all</a>
                 </div>
-                {% if recipe_preview_rows %}
+                {% if home_recent_imports %}
                     <ul class="app-home-import-list">
-                        {% for recipe in recipe_preview_rows[:3] %}
-                            <li>{{ shell.app_icon("link") }}<a href="#recipeView" data-recipe-url="{{ recipe.url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ recipe.name }}</a><span>{{ recipe.cookbook_name or "Unclassified" }}</span></li>
+                        {% for recent_import in home_recent_imports %}
+                            <li>
+                                <button type="button" onclick="return openHomeRecentImport('{{ recent_import.job_id }}')">
+                                    <span class="app-home-import-icon">{{ shell.app_icon(recent_import.source_icon) }}</span>
+                                    <span class="app-home-import-copy">
+                                        <strong>{{ recent_import.title }}</strong>
+                                        {% if recent_import.count_text %}<small>{{ recent_import.count_text }}</small>{% endif %}
+                                    </span>
+                                    <span class="app-home-import-meta">
+                                        {% if recent_import.time_label %}<time>{{ recent_import.time_label }}</time>{% endif %}
+                                        <span class="app-home-import-status is-{{ recent_import.status }}"
+                                              aria-label="{{ recent_import.status | replace('_', ' ') | title }}"
+                                              {% if recent_import.error_message %}title="{{ recent_import.error_message }}"{% endif %}></span>
+                                    </span>
+                                </button>
+                            </li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <div class="app-home-empty-state"><strong>No imports yet.</strong><span>Imported recipes will appear here.</span></div>
+                    <div class="app-home-empty-state"><strong>No recent import jobs.</strong><span>Recipe and menu imports will appear here when they run.</span><a href="#importPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="importPage">Start an import</a></div>
                 {% endif %}
             </section>
         </div>

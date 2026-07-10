@@ -1023,6 +1023,10 @@ function initAppShellNavigation() {
     }
 
     document.addEventListener("click", event => {
+        if (!event.target || !event.target.closest || !event.target.closest(".app-home-recipe-actions")) {
+            closeHomeRecipeMenus();
+        }
+
         const link = event.target && event.target.closest
             ? event.target.closest("[data-app-nav-link]")
             : null;
@@ -1044,6 +1048,11 @@ function initAppShellNavigation() {
     });
 
     document.addEventListener("keydown", event => {
+        if (event && event.key === "Escape") {
+            closeHomeRecipeMenus({ restoreFocus: true });
+            return;
+        }
+
         if (!event || event.defaultPrevented || event.altKey || event.shiftKey) {
             return;
         }
@@ -1066,6 +1075,78 @@ function initAppShellNavigation() {
             input.select();
         }
     });
+}
+
+function homeRecipeMenuButtons() {
+    return [...document.querySelectorAll(".app-home-recipe-menu-toggle")];
+}
+
+function closeHomeRecipeMenus(options = {}) {
+    let focusTarget = null;
+    homeRecipeMenuButtons().forEach(button => {
+        const menu = button.parentElement
+            ? button.parentElement.querySelector(".app-home-recipe-menu")
+            : null;
+        if (menu && !menu.hidden) {
+            focusTarget = focusTarget || button;
+            menu.hidden = true;
+        }
+        button.setAttribute("aria-expanded", "false");
+    });
+    if (options.restoreFocus && focusTarget) {
+        focusTarget.focus();
+    }
+    return false;
+}
+
+function toggleHomeRecipeMenu(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const menu = button && button.parentElement
+        ? button.parentElement.querySelector(".app-home-recipe-menu")
+        : null;
+    if (!menu) {
+        return false;
+    }
+    const willOpen = menu.hidden;
+    closeHomeRecipeMenus();
+    menu.hidden = !willOpen;
+    button.setAttribute("aria-expanded", willOpen ? "true" : "false");
+    if (willOpen) {
+        const firstItem = menu.querySelector('[role="menuitem"]');
+        if (firstItem) {
+            firstItem.focus();
+        }
+    }
+    return false;
+}
+
+function openHomeRecipeAction(button, action, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    closeHomeRecipeMenus();
+    if (action === "edit") {
+        window.requestAnimationFrame(() => openRecipeEditor(button));
+        return false;
+    }
+    return jumpToRecipeViewRecipe(button, event);
+}
+
+function openHomeRecentImport(jobId = "") {
+    const normalizedJobId = String(jobId || "").trim();
+    if (normalizedJobId) {
+        jobActivityExpandedRows.add(normalizedJobId);
+    }
+    openUserAccountWorkspace({
+        targetId: "jobActivitySection",
+        updateHash: true,
+        scroll: false,
+    });
+    return openJobActivityPanel();
 }
 
 function setAppSidebarCollapsed(collapsed, options = {}) {

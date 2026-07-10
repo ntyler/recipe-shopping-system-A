@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 from datetime import timezone
 from fractions import Fraction
+from urllib.parse import urlparse
 
 import requests
 from openai import OpenAI
@@ -28,6 +29,7 @@ from PushShoppingList.services.food_rules_service import shopping_item_food_rule
 from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
 from PushShoppingList.services.guest_session_service import is_guest_session
 from PushShoppingList.services.cookbook_service import cookbook_view
+from PushShoppingList.services.cookbook_service import duration_minutes
 from PushShoppingList.services.cookbook_service import create_cookbook
 from PushShoppingList.services.cookbook_service import find_cookbook
 from PushShoppingList.services.cookbook_service import find_or_create_cookbook
@@ -131,6 +133,9 @@ from PushShoppingList.services.menu_store_service import menus_by_cookbook
 from PushShoppingList.services.meal_plan_service import add_meal
 from PushShoppingList.services.meal_plan_service import delete_meal
 from PushShoppingList.services.meal_plan_service import meal_plan_for_week
+from PushShoppingList.services.job_service import job_for_client
+from PushShoppingList.services.job_service import recent_jobs
+from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.user_account_service import SUPPORT_ADMIN_EMAILS
 from PushShoppingList.services.user_account_service import SUPPORT_EMAIL
 from PushShoppingList.services.user_account_service import current_public_user
@@ -479,6 +484,12 @@ def shell_context(active_public_user=None):
         image_variants=("card", "thumb"),
         recipe_ingredient_data=recipe_ingredient_data,
     )
+    cookbook_records_by_key = recipe_cookbook_index.get("records_by_key", {})
+    for recipe in recipe_preview_rows:
+        recipe_key = normalize_recipe_url_key(recipe.get("url"))
+        cookbook_record = cookbook_records_by_key.get(recipe_key, {})
+        recipe["home_badge"] = recipe_home_badge_label(recipe, cookbook_record)
+        recipe["home_preview_time"] = recipe_home_preview_time_label(recipe)
     cookbook_view_data = lightweight_cookbook_view()
     store_settings = load_store_settings()
     pantry_items = pantry_items_for_view()
@@ -516,12 +527,25 @@ def shell_context(active_public_user=None):
         for item in pantry_items
         if str(item.get("status") or "").lower() == "out of stock"
     ]
+    actor_user_id = str((active_public_user or {}).get("user_id") or "").strip()
+    actor_guest_session_id = str(active_guest_session_id() or "").strip()
+    home_recent_imports = []
+    if actor_user_id or actor_guest_session_id:
+        home_recent_imports = home_recent_import_rows([
+            job_for_client(job)
+            for job in recent_jobs(
+                user_id=actor_user_id,
+                guest_session_id=actor_guest_session_id,
+                limit=100,
+            )
+        ])
 
     return {
         **shared_page_context(active_public_user),
         "raw_items": "\n".join(items),
         "items": items,
         "recipe_preview_rows": recipe_preview_rows,
+        "home_recent_imports": home_recent_imports,
         "recipe_collection_breakdown": recipe_collection_breakdown(
             recipe_urls,
             records_by_key=recipe_cookbook_index.get("records_by_key", {}),
@@ -1765,6 +1789,9 @@ def recipe_url_log_rows(
             "ai_inferred": bool(recipe_data.get("ai_inferred")),
             "needs_ai_recipe": bool(recipe_data.get("needs_ai_recipe")),
             "recipe_status": recipe_data.get("recipe_status", ""),
+            "meal_type": recipe_data.get("meal_type", ""),
+            "recipe_category": recipe_data.get("recipe_category") or recipe_data.get("category") or "",
+            "recipe_tags": recipe_data.get("tags") or recipe_data.get("recipe_tags") or [],
             "menu_section": recipe_data.get("menu_section", ""),
             "menu_order_url": clean_display_text(recipe_data.get("menu_order_url") or recipe_data.get("deep_link_url")),
             "deep_link_url": clean_display_text(recipe_data.get("deep_link_url") or recipe_data.get("menu_order_url")),
@@ -1846,6 +1873,159 @@ def recipe_preview_time_label(recipe_data):
         return value
 
     return "Time TBD"
+
+
+def home_label_text(value):
+    if isinstance(value, (list, tuple)):
+        value = next((item for item in value if str(item or "").strip()), "")
+    text = clean_display_text(value)
+    text = re.sub(r"^[^A-Za-z0-9]+", "", text).strip()
+    return text
+
+
+def recipe_home_badge_label(recipe, cookbook_record=None):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    cookbook_record = cookbook_record if isinstance(cookbook_record, dict) else {}
+    candidates = (
+        recipe.get("meal_type"),
+        cookbook_record.get("meal_type"),
+        recipe.get("recipe_category"),
+        cookbook_record.get("recipe_category") or cookbook_record.get("category"),
+        recipe.get("menu_section"),
+        cookbook_record.get("menu_section") or cookbook_record.get("section_name"),
+        recipe.get("recipe_tags"),
+        cookbook_record.get("custom_categories"),
+        cookbook_record.get("categories"),
+        cookbook_record.get("menu_tags"),
+    )
+    return next((label for label in map(home_label_text, candidates) if label), "")
+
+
+def format_home_duration(minutes):
+    if minutes is None:
+        return ""
+    minutes = max(0, int(minutes))
+    hours, remainder = divmod(minutes, 60)
+    if hours and remainder:
+        return f"{hours} hr {remainder} min"
+    if hours:
+        return f"{hours} hr"
+    return f"{remainder} min"
+
+
+def recipe_home_preview_time_label(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    total_time = duration_minutes(recipe_data.get("total_time"))
+    if total_time is not None:
+        return format_home_duration(total_time)
+
+    prep_time = duration_minutes(recipe_data.get("prep_time"))
+    cook_time = duration_minutes(recipe_data.get("cook_time"))
+    if prep_time is not None and cook_time is not None:
+        return format_home_duration(prep_time + cook_time)
+    if cook_time is not None:
+        return format_home_duration(cook_time)
+    return ""
+
+
+HOME_IMPORT_JOB_TYPES = {
+    "recipe-import": {"fallback_title": "Recipe URL import", "count_noun": "recipes imported", "icon": "link"},
+    "doc-photo-import": {"fallback_title": "Recipe document import", "count_noun": "recipes extracted", "icon": "document"},
+    "menu-import": {"fallback_title": "Menu import", "count_noun": "menu items extracted", "icon": "menus"},
+    "menu-generate-recipes": {"fallback_title": "Menu recipe import", "count_noun": "recipes imported", "icon": "menus"},
+}
+
+
+def relative_time_label(value, reference_time=None):
+    try:
+        parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return ""
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    reference_time = reference_time or datetime.now(timezone.utc)
+    if reference_time.tzinfo is None:
+        reference_time = reference_time.replace(tzinfo=timezone.utc)
+    seconds = max(0, int((reference_time - parsed.astimezone(timezone.utc)).total_seconds()))
+    if seconds < 60:
+        return "just now"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours}h ago"
+    days = hours // 24
+    if days == 1:
+        return "yesterday"
+    return f"{days}d ago"
+
+
+def home_import_source_title(job, fallback_title):
+    source_items = job.get("source_items") if isinstance(job.get("source_items"), list) else []
+    first = source_items[0] if source_items and isinstance(source_items[0], dict) else {}
+    label = clean_display_text(first.get("label"))
+    if label.lower().startswith(("http://", "https://")):
+        parsed = urlparse(label)
+        path_name = parsed.path.rstrip("/").split("/")[-1].replace("-", " ").replace("_", " ").strip()
+        label = path_name or parsed.netloc
+    if not label:
+        label = fallback_title
+    remaining = max(0, len(source_items) - 1)
+    return f"{label} + {remaining} more" if remaining else label
+
+
+def home_import_success_count(job):
+    result = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    for key in ("created_urls", "successful_urls", "recipes", "extracted_recipes"):
+        values = result.get(key)
+        if isinstance(values, list):
+            return len(values)
+    return max(0, int(job.get("completed_items") or 0))
+
+
+def home_recent_import_rows(jobs, limit=3, reference_time=None):
+    rows = []
+    for job in jobs or []:
+        job_type = str((job or {}).get("job_type") or "").strip()
+        config = HOME_IMPORT_JOB_TYPES.get(job_type)
+        if not config:
+            continue
+        status = str(job.get("status") or "").strip().lower()
+        completed_count = home_import_success_count(job)
+        failed_count = max(0, int(job.get("failed_items") or 0))
+        if status == "completed" and failed_count:
+            status = "failed" if not completed_count else "completed_with_warnings"
+        timestamp = (
+            job.get("completed_at")
+            or job.get("finished_at")
+            or job.get("updated_at")
+            or job.get("created_at")
+        )
+        count_text = ""
+        if completed_count:
+            count_text = f"{completed_count} {config['count_noun']}"
+        elif status in {"queued", "running", "cancel_requested"}:
+            total_items = max(0, int(job.get("total_items") or 0))
+            count_text = (
+                f"{int(job.get('progress_percent') or 0)}% complete"
+                if int(job.get("progress_percent") or 0)
+                else (f"0 of {total_items} processed" if total_items else "Processing")
+            )
+        elif status in {"failed", "cancelled"}:
+            count_text = "Import failed" if status == "failed" else "Import cancelled"
+        rows.append({
+            "job_id": str(job.get("id") or job.get("job_id") or ""),
+            "title": home_import_source_title(job, config["fallback_title"]),
+            "count_text": count_text,
+            "time_label": relative_time_label(timestamp, reference_time=reference_time),
+            "status": status or "queued",
+            "source_icon": config["icon"],
+            "error_message": clean_display_text(job.get("error_message")),
+        })
+        if len(rows) >= max(1, int(limit or 3)):
+            break
+    return rows
 
 
 def recipe_top_ingredient_rows(recipe_urls, recipe_ingredient_data=None, limit=5):

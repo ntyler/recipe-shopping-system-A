@@ -1,0 +1,137 @@
+from datetime import datetime
+from datetime import timezone
+from pathlib import Path
+
+from PushShoppingList.routes import main_routes
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def read_text(relative_path):
+    return (ROOT / relative_path).read_text(encoding="utf-8")
+
+
+def test_home_recipe_badge_uses_real_metadata_priority():
+    assert main_routes.recipe_home_badge_label(
+        {"meal_type": "Dinner", "menu_section": "Entrees"},
+        {"custom_categories": ["Weeknight"]},
+    ) == "Dinner"
+    assert main_routes.recipe_home_badge_label(
+        {"recipe_category": "Breakfast", "menu_section": "Brunch"},
+        {"meal_type": ""},
+    ) == "Breakfast"
+    assert main_routes.recipe_home_badge_label(
+        {"menu_section": "Appetizers"},
+        {"custom_categories": ["Party"]},
+    ) == "Appetizers"
+    assert main_routes.recipe_home_badge_label(
+        {"recipe_tags": ["Vegetarian"]},
+        {},
+    ) == "Vegetarian"
+    assert main_routes.recipe_home_badge_label({}, {}) == ""
+
+
+def test_home_recipe_time_uses_requested_priority_without_placeholder():
+    assert main_routes.recipe_home_preview_time_label({
+        "total_time": "1 hr 5 min",
+        "prep_time": "10 min",
+        "cook_time": "20 min",
+    }) == "1 hr 5 min"
+    assert main_routes.recipe_home_preview_time_label({
+        "prep_time": "15 min",
+        "cook_time": "35 min",
+    }) == "50 min"
+    assert main_routes.recipe_home_preview_time_label({"cook_time": "90"}) == "1 hr 30 min"
+    assert main_routes.recipe_home_preview_time_label({"prep_time": "10 min"}) == ""
+    assert main_routes.recipe_home_preview_time_label({}) == ""
+
+
+def test_relative_time_formatter_is_compact_and_shared_by_import_rows():
+    now = datetime(2026, 7, 10, 12, 0, tzinfo=timezone.utc)
+    assert main_routes.relative_time_label("2026-07-10T11:59:45Z", now) == "just now"
+    assert main_routes.relative_time_label("2026-07-10T11:48:00Z", now) == "12m ago"
+    assert main_routes.relative_time_label("2026-07-10T10:00:00Z", now) == "2h ago"
+    assert main_routes.relative_time_label("2026-07-09T12:00:00Z", now) == "yesterday"
+    assert main_routes.relative_time_label("2026-07-07T12:00:00Z", now) == "3d ago"
+
+
+def test_home_recent_import_rows_use_real_counts_timestamps_and_statuses():
+    now = datetime(2026, 7, 10, 12, 0, tzinfo=timezone.utc)
+    rows = main_routes.home_recent_import_rows([
+        {
+            "id": "done-job",
+            "job_type": "recipe-import",
+            "status": "completed",
+            "completed_items": 4,
+            "failed_items": 0,
+            "result_payload": {"created_urls": ["a", "b", "c"]},
+            "source_items": [{"label": "https://example.test/recipes/weeknight-pasta"}],
+            "completed_at": "2026-07-10T10:00:00Z",
+        },
+        {
+            "id": "running-job",
+            "job_type": "doc-photo-import",
+            "status": "running",
+            "progress_percent": 40,
+            "source_items": [{"label": "family-recipes.pdf"}],
+            "updated_at": "2026-07-10T11:48:00Z",
+        },
+        {"id": "not-an-import", "job_type": "create-recipe-pdf", "status": "completed"},
+    ], reference_time=now)
+
+    assert rows == [
+        {
+            "job_id": "done-job",
+            "title": "weeknight pasta",
+            "count_text": "3 recipes imported",
+            "time_label": "2h ago",
+            "status": "completed",
+            "source_icon": "link",
+            "error_message": "",
+        },
+        {
+            "job_id": "running-job",
+            "title": "family-recipes.pdf",
+            "count_text": "40% complete",
+            "time_label": "12m ago",
+            "status": "running",
+            "source_icon": "document",
+            "error_message": "",
+        },
+    ]
+
+
+def test_home_template_has_supported_overflow_and_no_fake_favorite():
+    template = read_text("PushShoppingList/templates/index.html")
+    home_start = template.index('<section class="app-home-dashboard"')
+    home_end = template.index("{% include \"sections/app_workspaces.html\" %}")
+    home = template[home_start:home_end]
+
+    assert "toggleHomeRecipeMenu(this, event)" in home
+    assert "More actions for {{ recipe.name }}" in home
+    assert "Open Recipe" in home
+    assert "Edit Recipe" in home
+    assert "openHomeRecentImport" in home
+    assert "home_recent_imports" in home
+    assert "app-home-panel-title" in home
+    assert "Time TBD" not in home
+    assert "favorite" not in home.lower()
+    assert "heart" not in home.lower()
+
+
+def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
+    css = read_text("PushShoppingList/static/css/app.css")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-content" in css
+    assert "width: calc(100% - 60px);" in css
+    assert ".app-home-summary-icon .app-icon-svg" in css
+    assert ".app-home-recipe-menu-toggle" in css
+    assert ".app-home-recipe-rating .is-unselected" in css
+    assert ".app-home-import-status.is-running::before" in css
+    assert "(min-width: 1100px) and (prefers-color-scheme: dark)" in css
+    assert "function toggleHomeRecipeMenu" in script
+    assert "function closeHomeRecipeMenus" in script
+    assert "function openHomeRecipeAction" in script
+    assert "function openHomeRecentImport" in script
