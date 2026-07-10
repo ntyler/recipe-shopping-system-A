@@ -54,7 +54,12 @@
                 <span class="app-nav-text">Pantry</span>
             </a>
             <div class="app-nav-section-title">Shop</div>
-            <a class="app-nav-link" href="#storeOptionsSection" data-app-nav-link data-app-nav-target="storeOptionsSection" data-app-nav-lazy-section="store-options">
+            <a class="app-nav-link"
+               href="#storeOptionsSection"
+               data-app-nav-link
+               data-app-nav-action="settings-section"
+               data-settings-section-target="stores-shopping"
+               data-app-nav-target="storeOptionsSection">
                 {{ shell.app_icon("stores") }}
                 <span class="app-nav-text">Stores / Store Links</span>
             </a>
@@ -63,19 +68,39 @@
                 <span class="app-nav-text">Price Comparison</span>
             </a>
             <div class="app-nav-section-title">Import</div>
-            <a class="app-nav-link" href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-target="recipeUrlsTextarea">
+            <a class="app-nav-link"
+               href="#recipeUrlsTextarea"
+               data-app-nav-link
+               data-app-nav-action="workspace-panel"
+               data-workspace-panel-target="importWorkspaceSection"
+               data-app-nav-target="recipeUrlsTextarea">
                 {{ shell.app_icon("import") }}
                 <span class="app-nav-text">Import</span>
             </a>
-            <a class="app-nav-link" href="#currentRecipeUrlLogCard" data-app-nav-link data-app-nav-target="currentRecipeUrlLogCard" data-app-nav-lazy-section="current-recipes">
+            <a class="app-nav-link"
+               href="#recipeUrlsTextarea"
+               data-app-nav-link
+               data-app-nav-action="workspace-panel"
+               data-workspace-panel-target="importWorkspaceSection"
+               data-app-nav-target="recipeUrlsTextarea">
                 {{ shell.app_icon("link") }}
                 <span class="app-nav-text">Recipe URLs</span>
             </a>
-            <a class="app-nav-link" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-target="recipeMediaUploadForm">
+            <a class="app-nav-link"
+               href="#recipeMediaUploadForm"
+               data-app-nav-link
+               data-app-nav-action="workspace-panel"
+               data-workspace-panel-target="importWorkspaceSection"
+               data-app-nav-target="recipeMediaUploadForm">
                 {{ shell.app_icon("document") }}
                 <span class="app-nav-text">Import From Document</span>
             </a>
-            <a class="app-nav-link" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-target="recipeMediaUploadForm">
+            <a class="app-nav-link"
+               href="#recipeMediaUploadForm"
+               data-app-nav-link
+               data-app-nav-action="workspace-panel"
+               data-workspace-panel-target="importWorkspaceSection"
+               data-app-nav-target="recipeMediaUploadForm">
                 {{ shell.app_icon("image") }}
                 <span class="app-nav-text">Generate From Image</span>
             </a>
@@ -84,7 +109,12 @@
                 <span class="app-nav-text">Scan Barcode</span>
             </a>
             <div class="app-nav-section-title">Account</div>
-            <a class="app-nav-link" href="#userAccountSection" data-app-nav-link data-app-nav-action="account-settings" data-app-nav-target="userAccountSection">
+            <a class="app-nav-link"
+               href="#settingsWorkspaceSection"
+               data-app-nav-link
+               data-app-nav-action="settings-section"
+               data-settings-section-target="profile"
+               data-app-nav-target="settingsWorkspaceSection">
                 {{ shell.app_icon("settings") }}
                 <span class="app-nav-text">Settings</span>
             </a>
@@ -144,6 +174,8 @@
                 <a class="app-toolbar-button app-toolbar-primary"
                    href="#recipeUrlsTextarea"
                    data-app-nav-link
+                   data-app-nav-action="workspace-panel"
+                   data-workspace-panel-target="importWorkspaceSection"
                    data-app-nav-target="recipeUrlsTextarea">
                     {{ shell.svg_icon("plus") }}
                     <span>Import</span>
@@ -191,7 +223,7 @@
 <main id="appContent" class="app-content">
     <header id="appPageHeader" class="app-page-header">
         <div>
-            <h1>AI Pantry</h1>
+            <h1>Welcome back{% if current_user %}, {{ current_user.first_name or current_user.display_name }}{% endif %}</h1>
             <p>Plan recipes, manage pantry inventory, and build a store-ready shopping list from one workspace.</p>
         </div>
         <div class="shopping-global-collapse-controls" data-global-collapse-controls>
@@ -247,7 +279,138 @@
     <div class="message">{{ message }}</div>
     {% endif %}
 
+    <section class="app-home-dashboard" aria-label="Home dashboard">
+        <div class="app-home-summary-grid">
+            <a class="app-home-summary-card"
+               href="#shoppingViewsSection"
+               data-app-nav-link
+               data-app-nav-target="shoppingViewsSection"
+               data-app-nav-lazy-section="recipe-view">
+                <span class="app-home-summary-icon">{{ shell.app_icon("shopping") }}</span>
+                <span>Shopping List</span>
+                <strong>{{ items|length }}</strong>
+                <small>item{% if (items|length) != 1 %}s{% endif %}</small>
+            </a>
+            <a class="app-home-summary-card"
+               href="#currentRecipeUrlLogCard"
+               data-app-nav-link
+               data-app-nav-target="currentRecipeUrlLogCard"
+               data-app-nav-lazy-section="current-recipes">
+                <span class="app-home-summary-icon">{{ shell.app_icon("recipes") }}</span>
+                <span>Current Recipes</span>
+                <strong>{{ current_recipe_count | default(0) }}</strong>
+                <small>saved recipe{% if (current_recipe_count | default(0)) != 1 %}s{% endif %}</small>
+            </a>
+            <a class="app-home-summary-card"
+               href="#cookbooksCard"
+               data-app-nav-link
+               data-app-nav-target="cookbooksCard"
+               data-app-nav-lazy-section="cookbooks">
+                <span class="app-home-summary-icon">{{ shell.app_icon("cookbooks") }}</span>
+                <span>Cookbooks</span>
+                <strong>{{ cookbook_count | default(0) }}</strong>
+                <small>{{ cookbook_recipe_count | default(0) }} recipe{% if (cookbook_recipe_count | default(0)) != 1 %}s{% endif %}</small>
+            </a>
+            <a class="app-home-summary-card"
+               href="#aiPantrySection"
+               data-app-nav-link
+               data-app-nav-action="ai-pantry"
+               data-app-nav-target="aiPantrySection"
+               data-app-nav-lazy-section="pantry">
+                <span class="app-home-summary-icon">{{ shell.app_icon("pantry") }}</span>
+                <span>Pantry</span>
+                <strong>Open</strong>
+                <small>inventory and use-soon items</small>
+            </a>
+        </div>
+
+        <div class="app-home-content-grid">
+            <section class="app-home-panel app-home-quick-actions" aria-label="Quick actions">
+                <div class="app-home-panel-header">
+                    <h2>Quick Actions</h2>
+                </div>
+                <div class="app-home-action-grid">
+                    <a href="#recipeUrlsTextarea"
+                       data-app-nav-link
+                       data-app-nav-action="workspace-panel"
+                       data-workspace-panel-target="importWorkspaceSection"
+                       data-app-nav-target="recipeUrlsTextarea">
+                        {{ shell.app_icon("link") }}
+                        <span>Import Recipe URLs</span>
+                    </a>
+                    <a href="#recipeMediaUploadForm"
+                       data-app-nav-link
+                       data-app-nav-action="workspace-panel"
+                       data-workspace-panel-target="importWorkspaceSection"
+                       data-app-nav-target="recipeMediaUploadForm">
+                        {{ shell.app_icon("document") }}
+                        <span>Import Document</span>
+                    </a>
+                    <a href="#recipeMediaUploadForm"
+                       data-app-nav-link
+                       data-app-nav-action="workspace-panel"
+                       data-workspace-panel-target="importWorkspaceSection"
+                       data-app-nav-target="recipeMediaUploadForm">
+                        {{ shell.app_icon("image") }}
+                        <span>Generate From Image</span>
+                    </a>
+                    <a href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
+                        {{ shell.app_icon("barcode") }}
+                        <span>Scan Barcode</span>
+                    </a>
+                </div>
+            </section>
+
+            <section class="app-home-panel app-home-list-preview" aria-label="Current shopping list preview">
+                <div class="app-home-panel-header">
+                    <h2>Current Shopping List</h2>
+                    <a href="#shoppingViewsSection"
+                       data-app-nav-link
+                       data-app-nav-target="shoppingViewsSection"
+                       data-app-nav-lazy-section="recipe-view">Open list</a>
+                </div>
+                {% if items %}
+                    <ul class="app-home-preview-list">
+                        {% for item in items[:6] %}
+                            <li><span>{{ item }}</span></li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="app-home-empty-state">
+                        <strong>No shopping items yet.</strong>
+                        <span>Add items from recipes, imports, or the pantry.</span>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="app-home-panel app-home-recipe-preview" aria-label="Recipe and cookbook summary">
+                <div class="app-home-panel-header">
+                    <h2>Recipes &amp; Cookbooks</h2>
+                    <a href="#currentRecipeUrlLogCard"
+                       data-app-nav-link
+                       data-app-nav-target="currentRecipeUrlLogCard"
+                       data-app-nav-lazy-section="current-recipes">Open recipes</a>
+                </div>
+                <div class="app-home-mini-grid">
+                    <article>
+                        <span>Current Recipes</span>
+                        <strong>{{ current_recipe_count | default(0) }}</strong>
+                    </article>
+                    <article>
+                        <span>Cookbooks</span>
+                        <strong>{{ cookbook_count | default(0) }}</strong>
+                    </article>
+                    <article>
+                        <span>Cookbook Recipes</span>
+                        <strong>{{ cookbook_recipe_count | default(0) }}</strong>
+                    </article>
+                </div>
+            </section>
+        </div>
+    </section>
+
     {% include "sections/user_account.html" %}
+    {% include "sections/settings_workspace.html" %}
     {% if not current_user %}
         {% include "sections/feedback_support.html" %}
     {% endif %}
@@ -275,13 +438,16 @@
             </dl>
         </section>
     {% endif %}
-    {% include "sections/enter_recipe_links.html" %}
-    {% include "sections/edit_items.html" %}
+    <section id="importWorkspaceSection" class="app-workspace-panel" data-workspace-panel hidden>
+        {% include "sections/enter_recipe_links.html" %}
+        {% include "sections/edit_items.html" %}
+    </section>
     <div id="currentRecipeUrlLogCard"
          class="app-card lazy-section-placeholder"
          data-lazy-section="current-recipes"
          data-lazy-url="{{ url_for('main_bp.current_recipes_section') }}"
-         aria-busy="false">
+         aria-busy="false"
+         hidden>
         <button type="button"
                 class="card-collapse-toggle recipe-url-log-toggle"
                 onclick="loadLazySection('current-recipes', { focus: true }); return false;">
@@ -299,7 +465,8 @@
          class="app-card lazy-section-placeholder"
          data-lazy-section="cookbooks"
          data-lazy-url="{{ url_for('main_bp.cookbooks_section') }}"
-         aria-busy="false">
+         aria-busy="false"
+         hidden>
         <button type="button"
                 class="card-collapse-toggle cookbooks-toggle"
                 onclick="loadLazySection('cookbooks', { focus: true }); return false;">
@@ -313,40 +480,13 @@
         </button>
         <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
     </div>
-    <div id="rulesCard"
-         class="app-card lazy-section-placeholder"
-         data-lazy-section="rules"
-         data-lazy-url="{{ url_for('main_bp.rules_section') }}"
-         aria-busy="false">
-        <button type="button"
-                class="card-collapse-toggle rules-toggle"
-                onclick="loadLazySection('rules', { focus: true }); return false;">
-            <span>Rules</span>
-        </button>
-        <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
-    </div>
-    {% if not is_guest_demo %}
-        {% include "sections/home_address.html" %}
-    {% endif %}
-    <div id="storeOptionsSection"
-         class="app-card lazy-section-placeholder"
-         data-lazy-section="store-options"
-         data-store-options-account-id="{{ current_user.user_id if current_user else '' }}"
-         data-lazy-url="{{ url_for('main_bp.store_options_section') }}"
-         aria-busy="false">
-        <button type="button"
-                class="card-collapse-toggle store-options-title-toggle"
-                onclick="loadLazySection('store-options', { focus: true }); return false;">
-            <span>Store Options</span>
-        </button>
-        <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
-    </div>
     {% include "sections/view_behavior.html" %}
     <div id="shoppingViewsSection"
          class="app-card lazy-section-placeholder"
          data-lazy-section="recipe-view"
          data-lazy-url="{{ url_for('main_bp.recipe_view_section') }}"
-         aria-busy="false">
+         aria-busy="false"
+         hidden>
         <button type="button"
                 class="card-collapse-toggle"
                 onclick="loadLazySection('recipe-view', { focus: true }); return false;">

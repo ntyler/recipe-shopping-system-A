@@ -1,0 +1,430 @@
+{% import "includes/app_shell_macros.html" as shell %}
+<section id="settingsWorkspaceSection"
+         class="settings-workspace-section app-card"
+         data-settings-workspace
+         hidden>
+    <div class="settings-workspace-layout">
+        <aside class="settings-workspace-nav" aria-label="Settings categories">
+            <div class="settings-workspace-heading">
+                <h2>Settings</h2>
+                <p>Manage account, automation, location, stores, data, and privacy.</p>
+            </div>
+            <nav class="settings-category-list" aria-label="Settings sections">
+                <div class="settings-category-group-label">Account</div>
+                <button type="button"
+                        class="settings-category-button is-active"
+                        data-settings-nav-button
+                        data-settings-section="profile"
+                        aria-controls="settingsProfilePanel"
+                        aria-current="page"
+                        onclick="return openSettingsSection('profile', { targetId: 'settingsProfilePanel' });">
+                    {{ shell.svg_icon("user") }}
+                    <span>Profile</span>
+                </button>
+                <button type="button"
+                        class="settings-category-button"
+                        data-settings-nav-button
+                        data-settings-section="usage-billing"
+                        aria-controls="settingsUsageBillingPanel"
+                        onclick="return openSettingsSection('usage-billing', { targetId: 'settingsUsageBillingPanel' });">
+                    {{ shell.svg_icon("billing") }}
+                    <span>Usage &amp; Billing</span>
+                </button>
+                <button type="button"
+                        class="settings-category-button"
+                        data-settings-nav-button
+                        data-settings-section="security"
+                        aria-controls="settingsSecurityPanel"
+                        onclick="return openSettingsSection('security', { targetId: 'settingsSecurityPanel' });">
+                    {{ shell.svg_icon("help") }}
+                    <span>Security</span>
+                </button>
+                <button type="button"
+                        class="settings-category-button"
+                        data-settings-nav-button
+                        data-settings-section="communications"
+                        aria-controls="settingsCommunicationsPanel"
+                        onclick="return openSettingsSection('communications', { targetId: 'settingsCommunicationsPanel' });">
+                    {{ shell.svg_icon("bell") }}
+                    <span>Communications</span>
+                </button>
+                <button type="button"
+                        class="settings-category-button"
+                        data-settings-nav-button
+                        data-settings-section="sessions"
+                        aria-controls="settingsSessionsPanel"
+                        onclick="return openSettingsSection('sessions', { targetId: 'settingsSessionsPanel' });">
+                    {{ shell.svg_icon("settings") }}
+                    <span>Sessions</span>
+                </button>
+
+                <div class="settings-category-group-label">Preferences</div>
+                <button type="button"
+                        class="settings-category-button"
+                        data-settings-nav-button
+                        data-settings-section="display"
+                        aria-controls="settingsDisplayPanel"
+                        onclick="return openSettingsSection('display', { targetId: 'settingsDisplayPanel' });">
+                    {{ shell.svg_icon("settings") }}
+                    <span>Display &amp; Accessibility</span>
+                </button>
+
+                <div class="settings-category-group-label">Automation</div>
+                <button type="button"
+                        class="settings-category-button"
+                        data-settings-nav-button
+                        data-settings-section="rules-automation"
+                        aria-controls="settingsRulesAutomationPanel"
+                        onclick="return openSettingsSection('rules-automation', { targetId: 'rulesCard' });">
+                    {{ shell.svg_icon("recipes") }}
+                    <span>Rules &amp; Automation</span>
+                </button>
+
+                <div class="settings-category-group-label">Location</div>
+                <button type="button"
+                        class="settings-category-button"
+                        data-settings-nav-button
+                        data-settings-section="location"
+                        aria-controls="settingsLocationPanel"
+                        onclick="return openSettingsSection('location', { targetId: 'home-address-section' });">
+                    {{ shell.svg_icon("stores") }}
+                    <span>Home Address</span>
+                </button>
+
+                <div class="settings-category-group-label">Stores</div>
+                <button type="button"
+                        class="settings-category-button"
+                        data-settings-nav-button
+                        data-settings-section="stores-shopping"
+                        aria-controls="settingsStoresShoppingPanel"
+                        onclick="return openSettingsSection('stores-shopping', { targetId: 'storeOptionsSection' });">
+                    {{ shell.svg_icon("stores") }}
+                    <span>Stores &amp; Shopping</span>
+                </button>
+
+                <div class="settings-category-group-label">Data</div>
+                <button type="button"
+                        class="settings-category-button"
+                        data-settings-nav-button
+                        data-settings-section="privacy"
+                        aria-controls="settingsPrivacyPanel"
+                        onclick="return openSettingsSection('privacy', { targetId: 'settingsPrivacyPanel' });">
+                    {{ shell.svg_icon("help") }}
+                    <span>Privacy</span>
+                </button>
+
+                <div class="settings-category-group-label settings-category-danger-label">Danger Zone</div>
+                <button type="button"
+                        class="settings-category-button settings-category-danger"
+                        data-settings-nav-button
+                        data-settings-section="danger-zone"
+                        aria-controls="settingsDangerZonePanel"
+                        onclick="return openSettingsSection('danger-zone', { targetId: 'settingsDangerZonePanel' });">
+                    {{ shell.svg_icon("more") }}
+                    <span>Delete Account</span>
+                </button>
+            </nav>
+        </aside>
+
+        <div class="settings-workspace-panels">
+            <section id="settingsProfilePanel"
+                     class="settings-panel"
+                     data-settings-panel="profile">
+                <div class="settings-panel-header">
+                    <div>
+                        <h3>Profile</h3>
+                        <p>Account identity and profile photo.</p>
+                    </div>
+                    {% if current_user %}
+                        <button type="button"
+                                class="settings-panel-action"
+                                onclick="return toggleUserProfileEditor(true)">
+                            Edit Profile
+                        </button>
+                    {% endif %}
+                </div>
+                {% if current_user %}
+                    <article class="settings-profile-summary">
+                        <div class="settings-profile-avatar" aria-hidden="true">
+                            {% if current_user.avatar_path %}
+                                <img src="{{ url_for('static', filename=current_user.avatar_path) }}"
+                                     alt="">
+                            {% elif current_user.picture %}
+                                <img src="{{ current_user.picture }}" alt="" referrerpolicy="no-referrer">
+                            {% else %}
+                                {{ current_user.display_name[:1]|upper }}
+                            {% endif %}
+                        </div>
+                        <div>
+                            <strong>{{ current_user.display_name }}</strong>
+                            <span>{{ current_user.email }}</span>
+                            <small>{{ current_user.role }} - {{ current_user.email_verified_label }}</small>
+                        </div>
+                    </article>
+                {% else %}
+                    <article class="settings-empty-panel">
+                        <strong>Sign in required</strong>
+                        <span>Profile settings are available after sign-in.</span>
+                        <a href="#userAccountSection"
+                           data-app-nav-link
+                           data-app-nav-target="userAccountSection">Open Account</a>
+                    </article>
+                {% endif %}
+            </section>
+
+            <section id="settingsUsageBillingPanel"
+                     class="settings-panel"
+                     data-settings-panel="usage-billing"
+                     hidden>
+                {% set openai_usage = openai_usage_dashboard|default({}) %}
+                <div class="settings-panel-header">
+                    <div>
+                        <h3>Usage &amp; Billing</h3>
+                        <p>Plan, AI usage, limits, and estimated AI cost.</p>
+                    </div>
+                    {% if current_user %}
+                        <button type="button"
+                                class="settings-panel-action"
+                                onclick="return toggleUsageDashboardPanel(true)">
+                            Open Details
+                        </button>
+                    {% endif %}
+                </div>
+                <div class="settings-summary-grid">
+                    <article>
+                        <span>Current Plan</span>
+                        <strong>{{ openai_usage.plan_label or "Personal Workspace" }}</strong>
+                    </article>
+                    <article>
+                        <span>Recipe Imports</span>
+                        <strong data-openai-usage-metric="monthly_recipe_import_count_label">{{ "{:,}".format(openai_usage.monthly_recipe_import_count|default(0)) }}</strong>
+                    </article>
+                    <article>
+                        <span>Pantry Scans</span>
+                        <strong data-openai-usage-metric="monthly_pantry_scan_count_label">{{ "{:,}".format(openai_usage.monthly_pantry_scan_count|default(0)) }}</strong>
+                    </article>
+                    <article>
+                        <span>Estimated AI Cost</span>
+                        <strong data-openai-usage-metric="monthly_estimated_cost_label">{{ openai_usage.monthly_estimated_cost_label or "Not available yet" }}</strong>
+                    </article>
+                </div>
+            </section>
+
+            <section id="settingsSecurityPanel"
+                     class="settings-panel"
+                     data-settings-panel="security"
+                     hidden>
+                <div class="settings-panel-header">
+                    <div>
+                        <h3>Security</h3>
+                        <p>Password, email verification, and two-factor authentication.</p>
+                    </div>
+                </div>
+                <div class="settings-action-list">
+                    {% if current_user and current_user.auth_provider == "firebase" %}
+                        <button type="button"
+                                data-firebase-change-password
+                                data-user-email="{{ current_user.email }}">
+                            Change Password
+                        </button>
+                        {% if not current_user.email_verified %}
+                            <button type="button" data-firebase-verify-email>
+                                Verify Email
+                            </button>
+                        {% endif %}
+                    {% elif current_user %}
+                        <button type="button" onclick="return toggleUserProfileEditor(true)">
+                            Change Password
+                        </button>
+                    {% endif %}
+                    {% if current_user %}
+                        <button type="button"
+                                data-two-factor-open
+                                aria-controls="accountTwoFactorPanel">
+                            Two-Factor Authentication
+                        </button>
+                    {% else %}
+                        <article class="settings-empty-panel">
+                            <strong>Sign in required</strong>
+                            <span>Security settings are available after sign-in.</span>
+                        </article>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section id="settingsCommunicationsPanel"
+                     class="settings-panel"
+                     data-settings-panel="communications"
+                     hidden>
+                <div class="settings-panel-header">
+                    <div>
+                        <h3>Communications</h3>
+                        <p>Notifications and support communication.</p>
+                    </div>
+                </div>
+                <div class="settings-action-list">
+                    {% if current_user %}
+                        <button type="button"
+                                data-push-notifications-open
+                                aria-controls="accountPushNotificationsPanel">
+                            Push Notifications
+                        </button>
+                    {% endif %}
+                    <button type="button"
+                            onclick="return openFeedbackSupportSection()"
+                            aria-controls="feedbackSupportSection">
+                        Feedback &amp; Support
+                    </button>
+                </div>
+            </section>
+
+            <section id="settingsSessionsPanel"
+                     class="settings-panel"
+                     data-settings-panel="sessions"
+                     hidden>
+                <div class="settings-panel-header">
+                    <div>
+                        <h3>Sessions</h3>
+                        <p>Current browser session.</p>
+                    </div>
+                </div>
+                {% if current_user %}
+                    <form class="settings-inline-form"
+                          data-firebase-sign-out-form
+                          method="POST"
+                          action="{{ url_for('account_bp.sign_out_route') }}">
+                        <button type="submit" class="settings-panel-action settings-danger-action">
+                            Sign Out
+                        </button>
+                    </form>
+                {% else %}
+                    <article class="settings-empty-panel">
+                        <strong>Guest session</strong>
+                        <span>Sign in to manage account sessions.</span>
+                    </article>
+                {% endif %}
+            </section>
+
+            <section id="settingsDisplayPanel"
+                     class="settings-panel"
+                     data-settings-panel="display"
+                     hidden>
+                <div class="settings-panel-header">
+                    <div>
+                        <h3>Display &amp; Accessibility</h3>
+                        <p>Screen preview and display controls.</p>
+                    </div>
+                    {% if current_user and current_user.is_admin %}
+                        <button type="button"
+                                class="settings-panel-action"
+                                onclick="return toggleScreenSettingsPanel()">
+                            Open Display Settings
+                        </button>
+                    {% endif %}
+                </div>
+                <article class="settings-empty-panel">
+                    <strong>Display follows your device theme</strong>
+                    <span>Light and dark mode use the shared AI Pantry design system.</span>
+                </article>
+            </section>
+
+            <section id="settingsRulesAutomationPanel"
+                     class="settings-panel settings-panel-flush"
+                     data-settings-panel="rules-automation"
+                     hidden>
+                <div id="rulesCard"
+                     class="app-card lazy-section-placeholder"
+                     data-lazy-section="rules"
+                     data-lazy-url="{{ url_for('main_bp.rules_section') }}"
+                     aria-busy="false"
+                     hidden>
+                    <button type="button"
+                            class="card-collapse-toggle rules-toggle"
+                            onclick="loadLazySection('rules', { focus: true }); return false;">
+                        <span>Rules &amp; Automation</span>
+                    </button>
+                    <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+                </div>
+            </section>
+
+            <section id="settingsLocationPanel"
+                     class="settings-panel settings-panel-flush"
+                     data-settings-panel="location"
+                     hidden>
+                {% if not is_guest_demo %}
+                    {% include "sections/home_address.html" %}
+                {% else %}
+                    <article class="settings-empty-panel">
+                        <strong>Location unavailable in guest demo</strong>
+                        <span>Create an account to save a private home address.</span>
+                    </article>
+                {% endif %}
+            </section>
+
+            <section id="settingsStoresShoppingPanel"
+                     class="settings-panel settings-panel-flush"
+                     data-settings-panel="stores-shopping"
+                     hidden>
+                <div id="storeOptionsSection"
+                     class="app-card lazy-section-placeholder"
+                     data-lazy-section="store-options"
+                     data-store-options-account-id="{{ current_user.user_id if current_user else '' }}"
+                     data-lazy-url="{{ url_for('main_bp.store_options_section') }}"
+                     aria-busy="false"
+                     hidden>
+                    <button type="button"
+                            class="card-collapse-toggle store-options-title-toggle"
+                            onclick="loadLazySection('store-options', { focus: true }); return false;">
+                        <span>Stores &amp; Shopping</span>
+                    </button>
+                    <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+                </div>
+            </section>
+
+            <section id="settingsPrivacyPanel"
+                     class="settings-panel"
+                     data-settings-panel="privacy"
+                     hidden>
+                <div class="settings-panel-header">
+                    <div>
+                        <h3>Privacy</h3>
+                        <p>Workspace privacy and data ownership.</p>
+                    </div>
+                </div>
+                <article class="settings-privacy-card">
+                    {{ shell.svg_icon("help") }}
+                    <div>
+                        <strong>Your workspace data stays private to your account.</strong>
+                        <span>Recipes, lists, pantry records, and preferences are scoped to the active user or guest workspace.</span>
+                    </div>
+                </article>
+            </section>
+
+            <section id="settingsDangerZonePanel"
+                     class="settings-panel"
+                     data-settings-panel="danger-zone"
+                     hidden>
+                <div class="settings-panel-header">
+                    <div>
+                        <h3>Danger Zone</h3>
+                        <p>Irreversible account actions.</p>
+                    </div>
+                </div>
+                <div class="settings-action-list settings-danger-list">
+                    {% if current_user %}
+                        <button type="button"
+                                data-delete-account-open
+                                aria-controls="accountDeletePanel">
+                            Delete Account
+                        </button>
+                    {% else %}
+                        <article class="settings-empty-panel">
+                            <strong>No account session</strong>
+                            <span>Delete-account controls are available after sign-in.</span>
+                        </article>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+</section>

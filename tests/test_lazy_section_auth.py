@@ -80,7 +80,7 @@ def test_logged_out_store_options_section_is_read_only_and_sanitized(monkeypatch
     assert "<h1>Shopping List</h1>" not in html
 
 
-def test_logged_out_index_shows_store_options_placeholder(monkeypatch, tmp_path):
+def test_logged_out_index_exposes_store_options_inside_settings_workspace(monkeypatch, tmp_path):
     configure_auth_paths(monkeypatch, tmp_path)
     app = create_app()
     app.config.update(TESTING=True)
@@ -91,7 +91,9 @@ def test_logged_out_index_shows_store_options_placeholder(monkeypatch, tmp_path)
     html = response.get_data(as_text=True)
     assert response.status_code == 200
     assert 'data-public-workspace="1"' in html
+    assert 'id="settingsWorkspaceSection"' in html
+    assert 'data-settings-workspace' in html
     assert 'id="storeOptionsSection"' in html
     assert 'data-lazy-section="store-options"' in html
-    assert ">Store Options<" in html
+    assert "Stores &amp; Shopping" in html
     assert ">Home Address<" in html

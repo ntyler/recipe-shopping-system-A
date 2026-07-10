@@ -143,6 +143,43 @@ const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#accountDeletePanel": "deleteAccount",
     "#feedbackSupportSection": "feedbackSupport",
 };
+const SETTINGS_SECTION_TARGETS = {
+    settingsWorkspaceSection: "profile",
+    settingsProfilePanel: "profile",
+    userAccountSection: "profile",
+    userProfileEditForm: "profile",
+    settingsUsageBillingPanel: "usage-billing",
+    accountUsageDashboardPanel: "usage-billing",
+    settingsSecurityPanel: "security",
+    accountTwoFactorPanel: "security",
+    settingsCommunicationsPanel: "communications",
+    accountPushNotificationsPanel: "communications",
+    feedbackSupportSection: "communications",
+    settingsSessionsPanel: "sessions",
+    screenSettingsCard: "display",
+    settingsDisplayPanel: "display",
+    rulesCard: "rules-automation",
+    settingsRulesAutomationPanel: "rules-automation",
+    "rules": "rules-automation",
+    "home-address": "location",
+    "home-address-section": "location",
+    settingsLocationPanel: "location",
+    storeOptionsSection: "stores-shopping",
+    settingsStoresShoppingPanel: "stores-shopping",
+    "store-options": "stores-shopping",
+    settingsPrivacyPanel: "privacy",
+    accountDeletePanel: "danger-zone",
+    settingsDangerZonePanel: "danger-zone",
+};
+const SETTINGS_SECTION_LAZY_SECTIONS = {
+    "rules-automation": "rules",
+    "stores-shopping": "store-options",
+};
+const WORKSPACE_PANEL_TARGETS = {
+    recipeUrlsTextarea: "importWorkspaceSection",
+    recipeMediaUploadForm: "importWorkspaceSection",
+    importWorkspaceSection: "importWorkspaceSection",
+};
 
 function getPublicSupportEmail(email) {
     const normalized = (email || "").toLowerCase();
@@ -254,7 +291,9 @@ function lazySectionFromTargetId(targetId) {
         currentRecipeUrlLogCard: "current-recipes",
         cookbooksCard: "cookbooks",
         rulesCard: "rules",
+        rules: "rules",
         storeOptionsSection: "store-options",
+        "store-options": "store-options",
         sharedRecipePdfsSection: "shared-recipe-pdfs",
         shoppingViewsSection: "recipe-view",
         sectionView: "recipe-view",
@@ -374,6 +413,165 @@ function appShellScrollToTarget(targetId, options = {}) {
     return true;
 }
 
+function settingsSectionFromTargetId(targetId) {
+    return SETTINGS_SECTION_TARGETS[String(targetId || "")] || "";
+}
+
+function settingsSectionFromHash(hash = window.location.hash) {
+    return settingsSectionFromTargetId(targetIdFromHash(hash));
+}
+
+function setSettingsWorkspaceVisible(visible) {
+    const workspace = document.querySelector("[data-settings-workspace]");
+
+    if (workspace) {
+        workspace.hidden = !visible;
+    }
+
+    return workspace;
+}
+
+async function openSettingsSection(sectionKey = "profile", options = {}) {
+    const workspace = setSettingsWorkspaceVisible(true);
+
+    if (!workspace) {
+        return false;
+    }
+
+    const normalizedSection = String(sectionKey || "profile");
+    let activePanel = [...workspace.querySelectorAll("[data-settings-panel]")]
+        .find(panel => panel.dataset.settingsPanel === normalizedSection);
+    const fallbackPanel = workspace.querySelector('[data-settings-panel="profile"]');
+    const activeSection = activePanel ? normalizedSection : "profile";
+
+    activePanel = activePanel || fallbackPanel;
+
+    workspace.querySelectorAll("[data-settings-panel]").forEach(panel => {
+        panel.hidden = panel !== activePanel;
+    });
+
+    workspace.querySelectorAll("[data-settings-nav-button]").forEach(button => {
+        const isActive = button.dataset.settingsSection === activeSection;
+        button.classList.toggle("is-active", isActive);
+        if (isActive) {
+            button.setAttribute("aria-current", "page");
+        } else {
+            button.removeAttribute("aria-current");
+        }
+    });
+
+    const lazySection = SETTINGS_SECTION_LAZY_SECTIONS[activeSection] || "";
+    if (lazySection) {
+        const placeholder = lazySectionElement(lazySection);
+        if (placeholder) {
+            placeholder.hidden = false;
+        }
+        await loadLazySection(lazySection, {
+            focus: false,
+            targetId: options.targetId || "",
+            userInitiated: true,
+        });
+    }
+
+    restoreHomeAddressHistoryCollapseState();
+    restoreStoreOptionsDisplaySettings();
+    restoreActiveStoreIconMode();
+    restoreStoreOptionsListSort();
+    initStoreLocationMaps();
+
+    const targetId = options.targetId || "";
+    const target = targetId ? document.getElementById(targetId) : null;
+    const scrollTarget = target || activePanel || workspace;
+
+    if (options.updateHash !== false) {
+        appShellUpdateHash(targetId || (activePanel ? activePanel.id : "settingsWorkspaceSection"));
+    }
+
+    if (options.scroll !== false && scrollTarget) {
+        window.requestAnimationFrame(() => {
+            scrollToLazySectionTarget(targetId, scrollTarget, {
+                focusTarget: Boolean(targetId && target),
+            }) || appShellScrollToTarget(scrollTarget.id || "settingsWorkspaceSection", {
+                focusTarget: false,
+            });
+        });
+    }
+
+    return false;
+}
+
+function openWorkspacePanel(panelId, options = {}) {
+    const panel = document.getElementById(panelId);
+
+    if (!panel) {
+        return false;
+    }
+
+    panel.hidden = false;
+
+    const targetId = options.targetId || "";
+    const target = targetId ? document.getElementById(targetId) : null;
+
+    if (options.updateHash !== false) {
+        appShellUpdateHash(targetId || panelId);
+    }
+
+    if (options.scroll === false) {
+        return false;
+    }
+
+    window.requestAnimationFrame(() => {
+        (target || panel).scrollIntoView({
+            behavior: options.behavior || "smooth",
+            block: "start",
+        });
+
+        const firstControl = (target && typeof target.focus === "function" ? target : null)
+            || panel.querySelector("button, input, select, textarea, a[href]");
+        if (firstControl && typeof firstControl.focus === "function") {
+            firstControl.focus({ preventScroll: true });
+        }
+    });
+
+    return false;
+}
+
+async function openHashTargetWorkspace(hash = window.location.hash, options = {}) {
+    const targetId = targetIdFromHash(hash);
+
+    if (!targetId) {
+        return false;
+    }
+
+    const settingsSection = settingsSectionFromTargetId(targetId);
+    if (settingsSection) {
+        await openSettingsSection(settingsSection, {
+            targetId,
+            updateHash: false,
+            scroll: options.scroll !== false,
+        });
+        return true;
+    }
+
+    const workspacePanelId = WORKSPACE_PANEL_TARGETS[targetId] || "";
+    if (workspacePanelId) {
+        openWorkspacePanel(workspacePanelId, {
+            targetId,
+            updateHash: false,
+            scroll: options.scroll !== false,
+        });
+        return true;
+    }
+
+    return false;
+}
+
+function initSettingsWorkspace(options = {}) {
+    openHashTargetWorkspace(window.location.hash, {
+        scroll: options.scroll !== false,
+    });
+}
+
 async function activateAppShellNavLink(link, options = {}) {
     if (!link) {
         return false;
@@ -398,6 +596,31 @@ async function activateAppShellNavLink(link, options = {}) {
     if (action === "usage-dashboard" && typeof toggleUsageDashboardPanel === "function") {
         appShellUpdateHash(targetId || "accountUsageDashboardPanel");
         return toggleUsageDashboardPanel(true);
+    }
+
+    if (action === "settings-section") {
+        const sectionKey = String(link.dataset.settingsSectionTarget || "")
+            || settingsSectionFromTargetId(targetId)
+            || "profile";
+        appShellUpdateHash(targetId || "settingsWorkspaceSection");
+        await openSettingsSection(sectionKey, {
+            targetId: targetId || "settingsWorkspaceSection",
+            updateHash: false,
+        });
+        return false;
+    }
+
+    if (action === "workspace-panel") {
+        const panelId = String(link.dataset.workspacePanelTarget || "")
+            || WORKSPACE_PANEL_TARGETS[targetId]
+            || "";
+        if (panelId) {
+            appShellUpdateHash(targetId || panelId);
+            return openWorkspacePanel(panelId, {
+                targetId,
+                updateHash: false,
+            });
+        }
     }
 
     if (action === "feedback-support" && typeof openFeedbackSupportSection === "function") {
@@ -463,6 +686,10 @@ function initAppShellNavigation() {
 
         event.preventDefault();
         activateAppShellNavLink(link);
+    });
+
+    window.addEventListener("hashchange", () => {
+        openHashTargetWorkspace(window.location.hash, { scroll: true });
     });
 
     document.addEventListener("keydown", event => {
@@ -35486,8 +35713,9 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindPantryReceiptDateWarnings", bindPantryReceiptDateWarnings],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
         ["initJobActivityPanel", initJobActivityPanel],
-        ["initLazySections", initLazySections],
         ["initAppShellNavigation", initAppShellNavigation],
+        ["initSettingsWorkspace", () => initSettingsWorkspace({ scroll: false })],
+        ["initLazySections", initLazySections],
         ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
         ["initRecipeEditTabs", initRecipeEditTabs],
         ["initRecipeEditContextPanels", initRecipeEditContextPanels],

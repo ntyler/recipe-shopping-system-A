@@ -381,29 +381,50 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("function formActionUrl(form)", script)
         self.assertNotIn("fetch(form.action", script)
 
-    def test_store_options_stays_below_home_address_in_main_page_flow(self):
+    def test_home_address_and_store_options_move_into_settings_workspace(self):
         index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+        settings_template = Path("PushShoppingList/templates/sections/settings_workspace.html").read_text(
+            encoding="utf-8"
+        )
 
-        store_options_index = index_template.index('{% include "sections/store_options.html" %}')
-        enter_recipe_index = index_template.index('{% include "sections/enter_recipe_links.html" %}')
-        home_address_index = index_template.index('{% include "sections/home_address.html" %}')
+        settings_include_index = index_template.index('{% include "sections/settings_workspace.html" %}')
+        import_workspace_index = index_template.index('id="importWorkspaceSection"')
+        home_address_index = settings_template.index('{% include "sections/home_address.html" %}')
+        store_options_index = settings_template.index('id="storeOptionsSection"')
 
-        self.assertGreater(store_options_index, enter_recipe_index)
+        self.assertGreater(import_workspace_index, settings_include_index)
         self.assertGreater(store_options_index, home_address_index)
+        self.assertNotIn('{% include "sections/store_options.html" %}', index_template)
+        self.assertNotIn('{% include "sections/home_address.html" %}', index_template)
+        self.assertIn('data-settings-panel="location"', settings_template)
+        self.assertIn('data-settings-panel="stores-shopping"', settings_template)
+        self.assertIn('data-lazy-section="store-options"', settings_template)
+        self.assertIn("Stores &amp; Shopping", settings_template)
 
-    def test_cookbooks_section_sits_between_recipe_log_and_rules(self):
+    def test_current_recipes_and_cookbooks_use_compact_home_summaries(self):
         index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+        settings_template = Path("PushShoppingList/templates/sections/settings_workspace.html").read_text(
+            encoding="utf-8"
+        )
         cookbook_template = Path("PushShoppingList/templates/sections/cookbooks.html").read_text(encoding="utf-8")
         script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
-        recipe_log_index = index_template.index('id="currentRecipeUrlLogCard"')
-        cookbooks_index = index_template.index('id="cookbooksCard"')
-        rules_index = index_template.index('id="rulesCard"')
-
-        self.assertGreater(cookbooks_index, recipe_log_index)
-        self.assertLess(cookbooks_index, rules_index)
+        self.assertIn('class="app-home-dashboard"', index_template)
+        self.assertIn("Current Recipes</span>", index_template)
+        self.assertIn("Cookbooks</span>", index_template)
+        self.assertIn('id="currentRecipeUrlLogCard"', index_template)
+        self.assertIn('id="cookbooksCard"', index_template)
+        self.assertIn('data-lazy-section="current-recipes"', index_template)
         self.assertIn('data-lazy-section="cookbooks"', index_template)
+        recipe_log_block = index_template[
+            index_template.index('id="currentRecipeUrlLogCard"'):index_template.index('id="cookbooksCard"')
+        ]
+        self.assertIn("hidden>", recipe_log_block)
+        self.assertNotIn('id="rulesCard"', index_template)
+        self.assertIn('id="rulesCard"', settings_template)
+        self.assertIn('data-settings-panel="rules-automation"', settings_template)
+        self.assertIn('data-lazy-section="rules"', settings_template)
         self.assertIn('id="cookbooksCard"', cookbook_template)
         self.assertIn("Add Selected to Recipe Log", cookbook_template)
         self.assertIn("data-cookbook-restore-checkbox", cookbook_template)
