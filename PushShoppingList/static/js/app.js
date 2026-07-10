@@ -20797,6 +20797,8 @@ async function openRecipeEditor(button, options = {}) {
         return;
     }
 
+    initRecipeEditTabs();
+    initRecipeEditContextPanels();
     rememberRecipeEditorReturnState(button, url);
     recipeEditInferenceContext = {};
     syncRecipeEditSourceFilesDetails();
@@ -21384,6 +21386,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     recipeEditOriginalSnapshot = normalizeRecipeEditorSnapshot({
         display_name: recipe.display_name || "",
         recipe_title: recipe.recipe_title || "",
+        description: recipe.description || "",
         source_url: recipe.source_url || originalUrl,
         quantity: recipe.quantity || "1",
         servings: recipe.servings || "",
@@ -21404,11 +21407,13 @@ function populateRecipeEditor(recipe, originalUrl) {
         instructions: recipe.instructions || [],
         nutrition: recipe.nutrition || [],
         menu_metadata: recipeMenuMetadataSnapshot(recipe),
+        ai_inferred: Boolean(recipe.ai_inferred),
     });
 
     setValue("recipeEditOriginalUrl", originalUrl);
     setValue("recipeEditDisplayName", recipe.display_name || "");
     setValue("recipeEditTitleInput", recipe.recipe_title || "");
+    setValue("recipeEditDescription", recipe.description || "");
     setRecipeEditorSourceUrlField(recipe, originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
@@ -21483,6 +21488,8 @@ function populateRecipeEditor(recipe, originalUrl) {
         (recipe.reflection_notes || []).forEach(item => addRecipeReflectionNoteRow(item));
     }
 
+    setRecipeEditActiveTab("ingredients");
+    updateRecipeEditContextPanels();
     updateRecipeEditStickyOffsets();
     window.setTimeout(() => {
         applyKnownRecipeImageProgressItems();
@@ -21769,6 +21776,8 @@ function updateRecipeMenuMetadataUrlLink(inputId, linkId) {
     if (inputId === "recipeEditMenuOrderUrl") {
         updateRecipeEditMenuOrderButton(url, canOpen);
     }
+    syncRecipeEditDocumentRows();
+    updateRecipeEditRestaurantCard();
 }
 
 function updateRecipeEditMenuOrderButton(url, canOpen = isLegitimateWebUrl(url)) {
@@ -22694,6 +22703,7 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
         button.title = requiresServingEstimate ? createPdfUnavailableReason : "Create recipe PDF";
         button.setAttribute("aria-label", requiresServingEstimate ? createPdfUnavailableReason : "Create recipe PDF");
     });
+    syncRecipeEditDocumentRows();
 }
 
 function syncRecipeEditSourceFilesDetails() {
@@ -22707,7 +22717,339 @@ function syncRecipeEditSourceFilesDetails() {
         ? window.matchMedia("(max-width: 760px)").matches
         : window.innerWidth <= 760;
 
-    details.open = !mobile;
+    details.open = false;
+}
+
+function recipeEditTabKey(value) {
+    const normalized = String(value || "").trim().toLowerCase().replace(/[^a-z]+/g, "");
+    return {
+        ingredient: "ingredients",
+        ingredients: "ingredients",
+        instruction: "instructions",
+        instructions: "instructions",
+        equipment: "equipment",
+        nutrition: "nutrition",
+        note: "notes",
+        notes: "notes",
+        reflection: "notes",
+    }[normalized] || "ingredients";
+}
+
+function setRecipeEditActiveTab(tabKey, options = {}) {
+    const activeKey = recipeEditTabKey(tabKey);
+    const tabsRoot = document.querySelector("[data-recipe-edit-tabs]");
+
+    if (!tabsRoot) {
+        return false;
+    }
+
+    tabsRoot.querySelectorAll("[data-recipe-edit-tab]").forEach(tab => {
+        const selected = recipeEditTabKey(tab.dataset.recipeEditTab) === activeKey;
+        tab.classList.toggle("is-active", selected);
+        tab.setAttribute("aria-selected", selected ? "true" : "false");
+        tab.tabIndex = selected ? 0 : -1;
+        if (selected && options.focus) {
+            tab.focus({ preventScroll: true });
+        }
+    });
+
+    tabsRoot.querySelectorAll("[data-recipe-edit-tab-panel]").forEach(panel => {
+        panel.hidden = recipeEditTabKey(panel.dataset.recipeEditTabPanel) !== activeKey;
+    });
+
+    updateRecipeEditStickyOffsets();
+    return true;
+}
+
+function initRecipeEditTabs() {
+    const tabsRoot = document.querySelector("[data-recipe-edit-tabs]");
+
+    if (!tabsRoot || tabsRoot.dataset.recipeEditTabsBound === "1") {
+        return;
+    }
+
+    tabsRoot.dataset.recipeEditTabsBound = "1";
+
+    tabsRoot.querySelectorAll("[data-recipe-edit-tab]").forEach(tab => {
+        tab.addEventListener("click", () => {
+            setRecipeEditActiveTab(tab.dataset.recipeEditTab, { focus: false });
+        });
+        tab.addEventListener("keydown", event => {
+            const tabs = Array.from(tabsRoot.querySelectorAll("[data-recipe-edit-tab]"));
+            const index = tabs.indexOf(tab);
+            let nextIndex = -1;
+
+            if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                nextIndex = (index + 1) % tabs.length;
+            } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                nextIndex = (index - 1 + tabs.length) % tabs.length;
+            } else if (event.key === "Home") {
+                nextIndex = 0;
+            } else if (event.key === "End") {
+                nextIndex = tabs.length - 1;
+            }
+
+            if (nextIndex >= 0) {
+                event.preventDefault();
+                setRecipeEditActiveTab(tabs[nextIndex].dataset.recipeEditTab, { focus: true });
+            }
+        });
+    });
+
+    setRecipeEditActiveTab("ingredients");
+}
+
+function recipeEditInputValue(id) {
+    const input = document.getElementById(id);
+    return input ? String(input.value || "").trim() : "";
+}
+
+function syncRecipeEditDocumentRows() {
+    document.querySelectorAll("[data-recipe-edit-document-row]").forEach(row => {
+        const inputId = row.dataset.documentInputId || "";
+        const linkId = row.dataset.documentLinkId || "";
+        const status = row.querySelector("[data-document-status]");
+        const open = row.querySelector("[data-document-open]");
+        const download = row.querySelector("[data-document-download]");
+        const copy = row.querySelector("[data-document-copy]");
+        const input = document.getElementById(inputId);
+        const sourceValue = inputId === "recipeEditSourceUrl"
+            ? recipeEditorSourceUrlForOpen()
+            : (input ? String(input.value || "").trim() : "");
+        const linked = document.getElementById(linkId);
+        const href = linked && linked.href && !linked.hidden ? linked.href : "";
+        const canOpen = Boolean(href && href !== "#" && sourceValue);
+        const hasValue = Boolean(sourceValue);
+
+        row.classList.toggle("is-available", hasValue);
+        row.dataset.documentValue = sourceValue;
+
+        if (status) {
+            status.textContent = canOpen ? "Available" : (hasValue ? "Saved path" : "Missing");
+        }
+
+        if (open) {
+            open.hidden = !canOpen;
+            open.href = canOpen ? href : "#";
+        }
+
+        if (download) {
+            const downloadable = canOpen && !["recipeEditSourceUrl", "recipeEditSourceMenuUrl"].includes(inputId);
+            download.hidden = !downloadable;
+            download.href = downloadable ? href : "#";
+        }
+
+        if (copy) {
+            copy.disabled = !hasValue;
+            copy.dataset.copyValue = sourceValue;
+        }
+    });
+}
+
+function copyRecipeEditorDocumentValue(button) {
+    const value = button ? String(button.dataset.copyValue || "").trim() : "";
+
+    if (!value) {
+        return false;
+    }
+
+    const finish = () => {
+        const row = button.closest("[data-recipe-edit-document-row]");
+        const status = row ? row.querySelector("[data-document-status]") : null;
+        if (status) {
+            status.textContent = "Copied";
+        }
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(finish).catch(() => {});
+    } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand("copy");
+            finish();
+        } finally {
+            textarea.remove();
+        }
+    }
+
+    return false;
+}
+
+function updateRecipeEditRestaurantCard() {
+    const name = recipeEditInputValue("recipeEditRestaurantName");
+    const website = recipeEditInputValue("recipeEditRestaurantWebsiteUrl");
+    const menu = recipeEditInputValue("recipeEditSourceMenuUrl");
+    const phone = recipeEditInputValue("recipeEditRestaurantPhone");
+    const address = recipeEditInputValue("recipeEditRestaurantAddress");
+    const cuisine = recipeEditInputValue("recipeEditRestaurantCuisineTags");
+    const setText = (selector, value, fallback = "") => {
+        const element = document.querySelector(selector);
+        if (element) {
+            element.textContent = value || fallback;
+            element.hidden = !value && !fallback;
+        }
+    };
+    const setAction = (nameValue, href) => {
+        const link = document.querySelector(`[data-restaurant-action="${nameValue}"]`);
+        if (!link) {
+            return;
+        }
+        link.hidden = !href;
+        link.href = href || "#";
+    };
+
+    setText('[data-restaurant-field="name"]', name, "No restaurant source");
+    setText('[data-restaurant-field="cuisine"]', cuisine);
+    setText('[data-restaurant-field="address"]', address);
+    setText('[data-restaurant-field="phone"]', phone);
+
+    setAction("website", isLegitimateWebUrl(website) ? website : "");
+    setAction("menu", isLegitimateWebUrl(menu) ? menu : "");
+    setAction("map", address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
+    setAction("call", phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : "");
+}
+
+function recipeEditGalleryImageUrl(row) {
+    const input = row ? row.querySelector('[data-field="ingredient_image_url"]') : null;
+    return input ? String(input.value || "").trim() : "";
+}
+
+function updateRecipeEditIngredientGallery() {
+    const gallery = document.getElementById("recipeEditIngredientGallery");
+
+    if (!gallery) {
+        return;
+    }
+
+    const rows = recipeEditIngredientRows().slice(0, 18);
+
+    if (!rows.length) {
+        gallery.innerHTML = '<span class="recipe-edit-context-empty">No ingredients yet.</span>';
+        return;
+    }
+
+    gallery.innerHTML = rows.map(row => {
+        const values = fieldValuesFromRow(row);
+        const name = values.ingredient || values.purchasable_item || "Ingredient";
+        const imageUrl = recipeEditGalleryImageUrl(row);
+        const displayUrl = imageUrl ? recipeImageVariantUrl(imageUrl, "thumb") : "";
+        const initials = name.trim().slice(0, 2).toUpperCase() || "--";
+
+        return `
+            <span class="recipe-edit-gallery-item" title="${escapeAttribute(name)}">
+                ${displayUrl
+                    ? `<img src="${escapeAttribute(displayUrl)}" alt="${escapeAttribute(name)}">`
+                    : `<span class="recipe-edit-gallery-placeholder" aria-hidden="true">${escapeHtml(initials)}</span>`}
+                <span>${escapeHtml(name)}</span>
+            </span>
+        `;
+    }).join("");
+}
+
+function recipeEditCompletenessStatus(complete) {
+    if (!complete) {
+        return { label: "Missing", className: "missing" };
+    }
+
+    const inferred = Boolean(recipeEditOriginalSnapshot && recipeEditOriginalSnapshot.ai_inferred);
+    return inferred
+        ? { label: "Complete - AI inferred", className: "inferred" }
+        : { label: "Complete - User confirmed", className: "confirmed" };
+}
+
+function updateRecipeEditorHealth() {
+    const list = document.getElementById("recipeEditHealthList");
+
+    if (!list) {
+        return;
+    }
+
+    const checks = [
+        ["Title", Boolean(recipeEditInputValue("recipeEditTitleInput") || recipeEditInputValue("recipeEditDisplayName"))],
+        ["Description", Boolean(recipeEditInputValue("recipeEditDescription") || recipeEditInputValue("recipeEditMenuDescription"))],
+        ["Ingredients", collectRecipeIngredientRows().length > 0],
+        ["Instructions", collectRecipeInstructionRows().length > 0],
+        ["Equipment", collectRecipeEquipmentRows().length > 0],
+        ["Nutrition", collectRecipeNutritionRows().length > 0],
+        ["Recipe image", Boolean(recipeEditInputValue("recipeEditCoverPath") || recipeEditInputValue("recipeEditCoverUrl"))],
+        ["Cookbook assignment", Boolean(recipeEditInputValue("recipeEditCookbookId") || (document.getElementById("recipeEditCookbookName") || {}).textContent && !/No cookbook assigned/i.test(document.getElementById("recipeEditCookbookName").textContent))],
+        ["Source information", Boolean(recipeEditorSourceUrlForOpen() || recipeEditInputValue("recipeEditSourceMenuUrl") || recipeEditInputValue("recipeEditGeneratedCloudflarePdfUrl"))],
+    ];
+
+    list.innerHTML = checks.map(([label, complete]) => {
+        const status = recipeEditCompletenessStatus(complete);
+        return `
+            <div class="recipe-edit-health-row ${status.className}"
+                 data-recipe-edit-health-item
+                 data-health-status="${escapeAttribute(status.className)}">
+                <span class="recipe-edit-health-label">${escapeHtml(label)}</span>
+                <strong class="recipe-edit-health-status">${escapeHtml(status.label)}</strong>
+            </div>
+        `;
+    }).join("");
+}
+
+function updateRecipeEditContextPanels() {
+    syncRecipeEditDocumentRows();
+    updateRecipeEditRestaurantCard();
+    updateRecipeEditIngredientGallery();
+    updateRecipeEditorHealth();
+}
+
+function initRecipeEditContextPanels() {
+    if (document.documentElement.dataset.recipeEditContextPanelsBound === "1") {
+        return;
+    }
+
+    document.documentElement.dataset.recipeEditContextPanelsBound = "1";
+    document.addEventListener("input", event => {
+        if (event.target && event.target.closest && event.target.closest("#recipeEditForm")) {
+            updateRecipeEditContextPanels();
+        }
+    });
+    document.addEventListener("change", event => {
+        if (event.target && event.target.closest && event.target.closest("#recipeEditForm")) {
+            updateRecipeEditContextPanels();
+        }
+    });
+}
+
+function previewRecipeFromEditor() {
+    const url = recipeEditorCurrentUrl();
+
+    if (!url) {
+        setRecipeEditStatus("Unable to preview recipe: missing recipe URL.", true);
+        return false;
+    }
+
+    if (recipeEditorStandalonePageIsActive()) {
+        window.location.assign(recipeEditPageReturnUrlFromState() || "/#shoppingViewsSection");
+        return false;
+    }
+
+    closeRecipeEditor();
+
+    Promise.resolve(
+        typeof loadLazySection === "function"
+            ? loadLazySection("recipe-view", { allowDuringAuthCollapse: true })
+            : null
+    ).then(() => {
+        if (typeof showView === "function") {
+            showView("recipeView");
+        }
+        if (typeof jumpToRecipeViewRecipe === "function") {
+            jumpToRecipeViewRecipe({ dataset: { recipeUrl: url } });
+        }
+    });
+
+    return false;
 }
 
 function setRecipePdfFieldOpenTarget(input, link, value, openUrl, label, options = {}) {
@@ -23870,6 +24212,7 @@ function ingredientJumpMatchScore(targetKey, ingredientKey, originalTextKey) {
 
 function scrollRecipeEditorToSection(sectionKey) {
     const normalized = String(sectionKey || "").trim().toLowerCase().replace(/[^a-z]+/g, "");
+    setRecipeEditActiveTab(normalized);
     const selector = {
         ingredients: ".recipe-edit-ingredients-section",
         equipment: ".recipe-edit-equipment-section",
@@ -24535,6 +24878,12 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
                     <span aria-hidden="true"></span>
                 </button>
                 <div class="recipe-edit-row-menu recipe-edit-substitution-row-menu" hidden>
+                    <div class="recipe-edit-menu-group">
+                        <div class="recipe-edit-menu-group-label">Substitution</div>
+                        <button type="button" onclick="return replaceRecipeIngredientWithSubstitution(this)">Replace ingredient with this option</button>
+                        <button type="button" onclick="return viewAllRecipeIngredientSubstitutions(this)">View all substitutions</button>
+                        <button type="button" onclick="return cancelRecipeIngredientSubstitutionMenu(this)">Cancel</button>
+                    </div>
                     <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
                         <button type="button" class="delete" onclick="return removeRecipeIngredientSubstitutionRow(this)">Delete substitution option</button>
                     </div>
@@ -24606,6 +24955,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     const extractionWarning = recipeIngredientExtractionWarning(item);
     const substitutionOptions = recipeIngredientSubstitutionRows(item);
     const substitutionCountText = substitutionOptions.length ? `(${substitutionOptions.length})` : "";
+    const ingredientType = item.section || item.ingredient_type || item.type || "";
     const recipeUrl = recipeEditorCurrentUrl();
     const ingredientImagePanelHtml = `
             <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-ingredient-image-panel${ingredientImageUrl ? "" : " recipe-image-empty"}"
@@ -24741,6 +25091,13 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                    value="${escapeAttribute(item.purchasable_item || item.buy_as || "")}"
                    oninput="syncRecipeIngredientPurchaseGroup(this)">
         </label>
+        <label class="recipe-edit-section-label">
+            <span>Type</span>
+            <input type="text"
+                   data-field="section"
+                   placeholder="main, sauce, garnish"
+                   value="${escapeAttribute(ingredientType)}">
+        </label>
         <label class="recipe-edit-store-section-label">
             <span>Store Section</span>
             <select data-field="store_section">${recipeStoreSectionOptions(item.store_section || "")}</select>
@@ -24810,7 +25167,6 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                 </div>
             </div>
         </div>
-        <input type="hidden" data-field="section" value="${escapeAttribute(item.section || "")}">
         <input type="hidden" data-field="ingredient_id" value="${escapeAttribute(item.ingredient_id || item.master_ingredient_id || "")}">
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
@@ -24854,7 +25210,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
 }
 
 function bindRecipeIngredientSummaryUpdates(row) {
-    row.querySelectorAll('[data-field="ingredient"], [data-field="purchasable_item"], [data-field="store_section"], [data-field="optional"]').forEach(input => {
+    row.querySelectorAll('[data-field="ingredient"], [data-field="purchasable_item"], [data-field="section"], [data-field="store_section"], [data-field="optional"]').forEach(input => {
         const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => updateRecipeIngredientSummary(row));
     });
@@ -24972,6 +25328,74 @@ function removeRecipeIngredientSubstitutionRow(button) {
     return false;
 }
 
+function replaceRecipeIngredientWithSubstitution(button) {
+    const optionRow = button ? button.closest("[data-substitution-option-row]") : null;
+    const row = recipeIngredientParentRowFromControl(optionRow);
+    const option = optionRow ? fieldValuesFromRow(optionRow) : {};
+
+    if (!row || !option.ingredient) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    const current = fieldValuesFromRow(row);
+    const confirmed = window.confirm(
+        `Replace ${current.ingredient || "this ingredient"} with ${option.ingredient}? This updates only the current recipe until you choose to save.`
+    );
+
+    if (!confirmed) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    setRowFieldValue(row, "ingredient", option.ingredient || "");
+    setRowFieldValue(row, "quantity", option.quantity || current.quantity || "");
+    setRowFieldValue(row, "unit", option.unit || current.unit || "");
+    setRowFieldValue(row, "purchasable_item", option.purchasable_item || option.buy_as || option.ingredient || "");
+    setRowFieldValue(row, "store_section", option.store_section || current.store_section || "");
+    setRowFieldValue(row, "section", option.section || current.section || "");
+    setRowFieldValue(row, "preparation", option.preparation || current.preparation || "");
+    setRowFieldValue(row, "parsed_name", option.parsed_name || option.ingredient || "");
+    setRowFieldValue(row, "normalized_name", option.normalized_name || option.ingredient || "");
+    setRowFieldValue(row, "confidence", option.confidence || "medium");
+    setRowFieldValue(row, "inferred", option.inferred === false ? "false" : "true");
+    setRowFieldValue(
+        row,
+        "original_text",
+        option.original_text || `${option.quantity || ""} ${option.unit || ""} ${option.ingredient || ""}`.trim()
+    );
+
+    updateRecipeIngredientSummary(row);
+    updateRecipeIngredientFoodRuleWarning(row);
+    updateRecipeEditorHealth();
+    closeRecipeEditRowMenus();
+    setRecipeEditStatus(`Replaced ingredient with ${option.ingredient}. Save Recipe to keep it.`);
+    return false;
+}
+
+function viewAllRecipeIngredientSubstitutions(button) {
+    const row = recipeIngredientParentRowFromControl(button);
+    const substitutions = row ? row.querySelector("[data-ingredient-substitutions]") : null;
+
+    closeRecipeEditRowMenus();
+
+    if (substitutions) {
+        substitutions.hidden = false;
+        substitutions.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        const firstControl = substitutions.querySelector("button, input, textarea, select");
+        if (firstControl) {
+            firstControl.focus({ preventScroll: true });
+        }
+    }
+
+    return false;
+}
+
+function cancelRecipeIngredientSubstitutionMenu() {
+    closeRecipeEditRowMenus();
+    return false;
+}
+
 function updateRecipeIngredientSummary(row) {
     const badges = row ? row.querySelector("[data-ingredient-badges]") : null;
     const substitutionCount = row ? row.querySelector("[data-ingredient-substitution-count]") : null;
@@ -25020,6 +25444,8 @@ function updateRecipeIngredientRowIndexes() {
     if (count) {
         count.textContent = `(${rows.length})`;
     }
+    updateRecipeEditIngredientGallery();
+    updateRecipeEditorHealth();
 }
 
 function toggleRecipeEditRowMenu(button, event = null) {
@@ -29028,6 +29454,7 @@ function normalizeRecipeEditorSnapshot(recipe) {
     return {
         display_name: String(recipe.display_name || "").trim(),
         recipe_title: String(recipe.recipe_title || "").trim(),
+        description: String(recipe.description || "").trim(),
         source_url: String(recipe.source_url || "").trim(),
         quantity: String(parseRecipeScaleMultiplier(recipe.quantity || "1") || 1),
         servings: String(recipe.servings || "").trim(),
@@ -29135,6 +29562,7 @@ function buildRecipeSaveProgressItems(recipe) {
     [
         ["Display name", "display_name"],
         ["Recipe title", "recipe_title"],
+        ["Description", "description"],
         ["Source URL", "source_url"],
         ["Quantity", "quantity"],
         ["Servings", "servings"],
@@ -29416,6 +29844,9 @@ function collectRecipeEditorPayload() {
         recipe: {
             display_name: document.getElementById("recipeEditDisplayName").value.trim(),
             recipe_title: document.getElementById("recipeEditTitleInput").value.trim(),
+            description: document.getElementById("recipeEditDescription")
+                ? document.getElementById("recipeEditDescription").value.trim()
+                : "",
             source_url: sourceUrl,
             source_pdf_path: document.getElementById("recipeEditSourcePdfPath")
                 ? document.getElementById("recipeEditSourcePdfPath").value.trim()
@@ -29503,6 +29934,7 @@ function updateRecipeEditSourceUrlLink() {
     sourceLink.setAttribute("aria-disabled", canOpen ? "false" : "true");
     sourceLink.title = canOpen ? "Open Source URL" : "No web source URL";
     sourceLink.setAttribute("aria-label", canOpen ? "Open Source URL" : "No web source URL");
+    syncRecipeEditDocumentRows();
 }
 
 function collectRecipeIngredientSubstitutionRows(row) {
@@ -35033,6 +35465,8 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initLazySections", initLazySections],
         ["initAppShellNavigation", initAppShellNavigation],
         ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
+        ["initRecipeEditTabs", initRecipeEditTabs],
+        ["initRecipeEditContextPanels", initRecipeEditContextPanels],
         ["initRecipeImageProviderSelector", initRecipeImageProviderSelector],
         ["initRecipeImageThumbnailSizeControls", initRecipeImageThumbnailSizeControls],
     ].forEach(([name, callback]) => runStartupTask(name, callback));

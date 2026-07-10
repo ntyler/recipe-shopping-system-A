@@ -558,10 +558,20 @@
         <form id="recipeEditForm" onsubmit="return saveRecipeEditor(event)">
             <div class="recipe-edit-header">
                 <div class="recipe-edit-title-block">
+                    <nav class="recipe-edit-breadcrumb" aria-label="Breadcrumb">
+                        <a href="{{ url_for('main_bp.index') }}#currentRecipeUrlLogCard">Recipes</a>
+                        <span aria-hidden="true">/</span>
+                        <span>Edit Recipe</span>
+                    </nav>
                     <h2 id="recipeEditTitle">Edit Recipe</h2>
-                    <p>Manage and optimize the ingredients in this recipe.</p>
+                    <p>Manage recipe details, normalized ingredients, AI enrichment, and source documents.</p>
                 </div>
                 <div class="recipe-edit-header-actions">
+                    <button type="button"
+                            class="recipe-edit-preview-button"
+                            onclick="return previewRecipeFromEditor(this)">
+                        Preview Recipe
+                    </button>
                     <a id="recipeEditPdfButton"
                        class="recipe-edit-pdf-button recipe-edit-header-pdf-button recipe-edit-modal-header-pdf-button"
                        href="#"
@@ -755,6 +765,10 @@
                             </div>
                         </div>
                     </div>
+                    <button type="button" class="recipe-edit-cancel recipe-edit-header-cancel" onclick="closeRecipeEditor()">Cancel</button>
+                    <button type="submit" class="recipe-edit-save recipe-edit-header-save">
+                        <span>Save Recipe</span>
+                    </button>
                 </div>
             </div>
 
@@ -762,6 +776,9 @@
             <input type="hidden" name="quantity" id="recipeEditQuantity" value="1">
 
             <div id="recipeEditStatus" class="recipe-edit-status"></div>
+
+            <div class="recipe-edit-layout">
+                <div class="recipe-edit-main-workspace">
 
             <section class="recipe-edit-info-panel">
                 <div class="recipe-edit-panel-heading">
@@ -824,6 +841,10 @@
                     <label>
                         <span>Recipe Title</span>
                         <input type="text" name="recipe_title" id="recipeEditTitleInput">
+                    </label>
+                    <label class="recipe-edit-wide">
+                        <span>Description</span>
+                        <textarea name="description" id="recipeEditDescription" rows="3"></textarea>
                     </label>
                     <div class="recipe-edit-cover-field" id="recipeEditCoverField">
                         <div class="recipe-edit-cover-preview" id="recipeEditCoverPreview" data-recipe-edit-title-image-panel>
@@ -951,7 +972,7 @@
                     <details id="recipeEditSourceFilesDetails"
                              class="recipe-edit-source-files-details recipe-edit-wide">
                         <summary class="recipe-edit-source-files-summary">
-                            <span>Advanced Source Files</span>
+                            <span>Technical details</span>
                             <span class="recipe-edit-source-files-chevron" aria-hidden="true"></span>
                         </summary>
                         <div class="recipe-edit-file-groups">
@@ -1559,7 +1580,67 @@
                 </div>
             </section>
 
-            <section class="recipe-edit-section recipe-edit-ingredients-section">
+            <section class="recipe-edit-tabs-card" data-recipe-edit-tabs>
+                <div class="recipe-edit-tab-list"
+                     role="tablist"
+                     aria-label="Recipe editor sections">
+                    <button type="button"
+                            id="recipeEditTabIngredients"
+                            class="recipe-edit-tab is-active"
+                            role="tab"
+                            aria-selected="true"
+                            aria-controls="recipeEditPanelIngredients"
+                            data-recipe-edit-tab="ingredients">
+                        Ingredients
+                    </button>
+                    <button type="button"
+                            id="recipeEditTabInstructions"
+                            class="recipe-edit-tab"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="recipeEditPanelInstructions"
+                            tabindex="-1"
+                            data-recipe-edit-tab="instructions">
+                        Instructions
+                    </button>
+                    <button type="button"
+                            id="recipeEditTabEquipment"
+                            class="recipe-edit-tab"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="recipeEditPanelEquipment"
+                            tabindex="-1"
+                            data-recipe-edit-tab="equipment">
+                        Equipment
+                    </button>
+                    <button type="button"
+                            id="recipeEditTabNutrition"
+                            class="recipe-edit-tab"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="recipeEditPanelNutrition"
+                            tabindex="-1"
+                            data-recipe-edit-tab="nutrition">
+                        Nutrition
+                    </button>
+                    <button type="button"
+                            id="recipeEditTabNotes"
+                            class="recipe-edit-tab"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="recipeEditPanelNotes"
+                            tabindex="-1"
+                            data-recipe-edit-tab="notes">
+                        Notes
+                    </button>
+                </div>
+                <div class="recipe-edit-tab-panels">
+
+            <section id="recipeEditPanelIngredients"
+                     class="recipe-edit-section recipe-edit-ingredients-section"
+                     role="tabpanel"
+                     aria-labelledby="recipeEditTabIngredients"
+                     data-recipe-edit-tab-panel="ingredients">
                 <div class="recipe-edit-section-header">
                     <div class="recipe-edit-section-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-ingredients" aria-hidden="true"></span>
@@ -1691,7 +1772,12 @@
                 <div id="recipeEditIngredients" class="recipe-edit-ingredients"></div>
             </section>
 
-            <section class="recipe-edit-section recipe-edit-equipment-section">
+            <section id="recipeEditPanelEquipment"
+                     class="recipe-edit-section recipe-edit-equipment-section"
+                     role="tabpanel"
+                     aria-labelledby="recipeEditTabEquipment"
+                     data-recipe-edit-tab-panel="equipment"
+                     hidden>
                 <div class="recipe-edit-section-header">
                     <div class="recipe-edit-section-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-equipment" aria-hidden="true"></span>
@@ -1794,7 +1880,12 @@
                 </div>
             </section>
 
-            <section class="recipe-edit-section recipe-edit-instructions-section">
+            <section id="recipeEditPanelInstructions"
+                     class="recipe-edit-section recipe-edit-instructions-section"
+                     role="tabpanel"
+                     aria-labelledby="recipeEditTabInstructions"
+                     data-recipe-edit-tab-panel="instructions"
+                     hidden>
                 <div class="recipe-edit-section-header">
                     <div class="recipe-edit-section-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-instructions" aria-hidden="true"></span>
@@ -1864,7 +1955,12 @@
                 </div>
             </section>
 
-            <section class="recipe-edit-section recipe-edit-recipe-notes-section">
+            <section id="recipeEditPanelNotes"
+                     class="recipe-edit-section recipe-edit-recipe-notes-section"
+                     role="tabpanel"
+                     aria-labelledby="recipeEditTabNotes"
+                     data-recipe-edit-tab-panel="notes"
+                     hidden>
                 <div class="recipe-edit-section-header">
                     <div class="recipe-edit-section-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-notes" aria-hidden="true"></span>
@@ -1931,7 +2027,12 @@
                 </div>
             </section>
 
-            <section class="recipe-edit-section recipe-edit-nutrition-section">
+            <section id="recipeEditPanelNutrition"
+                     class="recipe-edit-section recipe-edit-nutrition-section"
+                     role="tabpanel"
+                     aria-labelledby="recipeEditTabNutrition"
+                     data-recipe-edit-tab-panel="nutrition"
+                     hidden>
                 <div class="recipe-edit-section-header">
                     <div class="recipe-edit-section-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-nutrition" aria-hidden="true"></span>
@@ -1962,7 +2063,11 @@
                 </div>
             </section>
 
-            <section class="recipe-edit-section recipe-edit-reflection-section">
+            <section class="recipe-edit-section recipe-edit-reflection-section"
+                     role="tabpanel"
+                     aria-labelledby="recipeEditTabNotes"
+                     data-recipe-edit-tab-panel="notes"
+                     hidden>
                 <div class="recipe-edit-section-header">
                     <div class="recipe-edit-section-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-reflection" aria-hidden="true"></span>
@@ -1981,7 +2086,154 @@
                 <div id="recipeEditReflectionNotes" class="recipe-edit-reflection-notes"></div>
             </section>
 
-            <div class="recipe-edit-actions">
+                </div>
+            </section>
+
+                </div>
+                <aside class="recipe-edit-context-sidebar" aria-label="Recipe context">
+                    <details class="recipe-edit-context-card recipe-edit-source-documents-card" open>
+                        <summary>
+                            <span>Source &amp; Documents</span>
+                            <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
+                        </summary>
+                        <div class="recipe-edit-document-list" data-recipe-edit-document-list>
+                            <div class="recipe-edit-document-row"
+                                 data-recipe-edit-document-row
+                                 data-document-input-id="recipeEditSourceUrl"
+                                 data-document-link-id="recipeEditSourceUrlLink"
+                                 data-document-open-source="source-url">
+                                <div>
+                                    <strong>Source URL</strong>
+                                    <span data-document-status>Unavailable</span>
+                                </div>
+                                <div class="recipe-edit-document-actions">
+                                    <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
+                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
+                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                </div>
+                            </div>
+                            <div class="recipe-edit-document-row"
+                                 data-recipe-edit-document-row
+                                 data-document-input-id="recipeEditSourceMenuUrl"
+                                 data-document-link-id="recipeEditSourceMenuUrlLink">
+                                <div>
+                                    <strong>Source Menu URL</strong>
+                                    <span data-document-status>Unavailable</span>
+                                </div>
+                                <div class="recipe-edit-document-actions">
+                                    <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
+                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
+                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                </div>
+                            </div>
+                            <div class="recipe-edit-document-row"
+                                 data-recipe-edit-document-row
+                                 data-document-input-id="recipeEditSourcePdfPath"
+                                 data-document-link-id="recipeEditSourcePdfPathLink">
+                                <div>
+                                    <strong>Source PDF Path</strong>
+                                    <span data-document-status>Unavailable</span>
+                                </div>
+                                <div class="recipe-edit-document-actions">
+                                    <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
+                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
+                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                </div>
+                            </div>
+                            <div class="recipe-edit-document-row"
+                                 data-recipe-edit-document-row
+                                 data-document-input-id="recipeEditSourceCloudflarePdfUrl"
+                                 data-document-link-id="recipeEditSourceCloudflarePdfUrlLink">
+                                <div>
+                                    <strong>Source Cloudflare PDF Path</strong>
+                                    <span data-document-status>Unavailable</span>
+                                </div>
+                                <div class="recipe-edit-document-actions">
+                                    <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
+                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
+                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                </div>
+                            </div>
+                            <div class="recipe-edit-document-row"
+                                 data-recipe-edit-document-row
+                                 data-document-input-id="recipeEditGeneratedPdfPath"
+                                 data-document-link-id="recipeEditGeneratedPdfPathLink">
+                                <div>
+                                    <strong>Generated PDF Path</strong>
+                                    <span data-document-status>Unavailable</span>
+                                </div>
+                                <div class="recipe-edit-document-actions">
+                                    <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
+                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
+                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                </div>
+                            </div>
+                            <div class="recipe-edit-document-row"
+                                 data-recipe-edit-document-row
+                                 data-document-input-id="recipeEditGeneratedCloudflarePdfUrl"
+                                 data-document-link-id="recipeEditGeneratedCloudflarePdfUrlLink">
+                                <div>
+                                    <strong>Generated Cloudflare PDF Path</strong>
+                                    <span data-document-status>Unavailable</span>
+                                </div>
+                                <div class="recipe-edit-document-actions">
+                                    <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
+                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
+                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="recipe-edit-context-card recipe-edit-restaurant-card" open>
+                        <summary>
+                            <span>Restaurant / Menu Source</span>
+                            <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
+                        </summary>
+                        <div class="recipe-edit-restaurant-summary">
+                            <strong data-restaurant-field="name">No restaurant source</strong>
+                            <span data-restaurant-field="cuisine"></span>
+                            <span data-restaurant-field="address"></span>
+                            <span data-restaurant-field="phone"></span>
+                        </div>
+                        <div class="recipe-edit-restaurant-actions">
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="website" hidden>Open Website</a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="menu" hidden>Open Menu</a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="map" hidden>Open Map</a>
+                            <a href="#" data-restaurant-action="call" hidden>Call</a>
+                        </div>
+                    </details>
+
+                    <details class="recipe-edit-context-card recipe-edit-ingredient-gallery-card" open>
+                        <summary>
+                            <span>Ingredient Gallery</span>
+                            <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
+                        </summary>
+                        <div id="recipeEditIngredientGallery"
+                             class="recipe-edit-ingredient-gallery"
+                             aria-live="polite">
+                            <span class="recipe-edit-context-empty">No ingredient images yet.</span>
+                        </div>
+                    </details>
+
+                    <details class="recipe-edit-context-card recipe-edit-health-card" open>
+                        <summary>
+                            <span>Recipe Health</span>
+                            <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
+                        </summary>
+                        <div id="recipeEditHealthList"
+                             class="recipe-edit-health-list"
+                             aria-live="polite"></div>
+                    </details>
+                </aside>
+            </div>
+
+            <section class="recipe-edit-ai-assistant-card recipe-edit-sticky-action-footer" aria-labelledby="recipeEditAiAssistantTitle">
+                <div class="recipe-edit-ai-assistant-heading">
+                    <h3 id="recipeEditAiAssistantTitle">AI Assistant</h3>
+                    <p>Background jobs start only after you choose an action.</p>
+                </div>
+                <div class="recipe-edit-actions">
                 <label class="recipe-edit-ai-overwrite-toggle">
                     <input type="checkbox" id="recipeEditInferOverwriteAiFields">
                     <span class="recipe-edit-action-text" data-short-label="Overwrite">Overwrite existing AI-inferred fields</span>
@@ -2006,7 +2258,8 @@
                     <span>Delete recipe</span>
                 </button>
                 <button type="button" class="recipe-edit-cancel" onclick="closeRecipeEditor()">Cancel</button>
-            </div>
+                </div>
+            </section>
         </form>
     </div>
 </div>

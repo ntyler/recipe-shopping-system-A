@@ -2890,6 +2890,10 @@ def load_editable_recipe(url):
             "cookbook_name": cookbook_assignment.get("cookbook_name", ""),
             "cookbook_is_unclassified": cookbook_assignment.get("cookbook_is_unclassified", False),
             "recipe_title": recipe_data.get("recipe_title") or "",
+            "description": recipe_info_clean_value(
+                recipe_data.get("description") or recipe_data.get("menu_description"),
+                "description",
+            ),
             "servings": servings,
             "cover_image": cover_image,
             "cover_image_prompt": cover_image_prompt,
@@ -4310,6 +4314,11 @@ def save_editable_recipe(original_url, payload):
         **existing_data,
         "source_url": source_url,
         "recipe_title": str(payload.get("recipe_title") or "").strip(),
+        "description": str(
+            payload.get("description")
+            if "description" in payload
+            else existing_data.get("description") or ""
+        ).strip(),
         "servings": str(payload.get("servings") or "").strip(),
         "level": str(payload.get("level") or "").strip(),
         "total_time": str(payload.get("total_time") or "").strip(),

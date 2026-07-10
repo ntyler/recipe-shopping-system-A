@@ -6,13 +6,68 @@
     <title>Edit Recipe</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
 </head>
-<body class="recipe-edit-standalone-page"
+<body class="app-shell-body recipe-edit-standalone-page"
       data-recipe-edit-page="true"
       data-recipe-edit-url="{{ recipe_url }}">
-<main class="recipe-edit-standalone-shell" aria-label="Recipe editor">
-    {% set recipe_edit_only = true %}
-    {% include "sections/current_recipe_url_log.html" %}
-</main>
+<a class="skip-link" href="#recipeEditModal">Skip to recipe editor</a>
+
+<div class="app-shell recipe-edit-page-shell">
+    <aside class="app-sidebar recipe-edit-page-sidebar" aria-label="Primary navigation">
+        <a class="app-brand" href="{{ url_for('main_bp.index') }}" aria-label="AI Pantry home">
+            <span class="app-brand-mark" aria-hidden="true">AP</span>
+            <span>
+                <strong>AI Pantry</strong>
+                <small>Recipe Shopping List</small>
+            </span>
+        </a>
+        <nav class="app-sidebar-nav" aria-label="App sections">
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}">
+                <span class="app-nav-icon" aria-hidden="true">HM</span>
+                <span class="app-nav-text">Home</span>
+            </a>
+            <a class="app-nav-link is-active" href="{{ url_for('main_bp.index') }}#currentRecipeUrlLogCard">
+                <span class="app-nav-icon" aria-hidden="true">RC</span>
+                <span class="app-nav-text">Recipes</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#cookbooksCard">
+                <span class="app-nav-icon" aria-hidden="true">CB</span>
+                <span class="app-nav-text">Cookbooks</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#shoppingViewsSection">
+                <span class="app-nav-icon" aria-hidden="true">SL</span>
+                <span class="app-nav-text">Shopping Lists</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#aiPantrySection">
+                <span class="app-nav-icon" aria-hidden="true">PN</span>
+                <span class="app-nav-text">Pantry</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#feedbackSupportSection">
+                <span class="app-nav-icon" aria-hidden="true">HP</span>
+                <span class="app-nav-text">Help &amp; Support</span>
+            </a>
+        </nav>
+    </aside>
+    <div class="app-main-shell recipe-edit-page-main-shell">
+        <header class="app-topbar recipe-edit-page-topbar" aria-label="Recipe editor toolbar">
+            <a class="app-topbar-brand" href="{{ url_for('main_bp.index') }}">
+                <span class="app-brand-mark" aria-hidden="true">AP</span>
+                <span>AI Pantry</span>
+            </a>
+            <div class="recipe-edit-page-topbar-title">
+                <strong>Edit Recipe</strong>
+                <span>Recipe workspace</span>
+            </div>
+            <div class="app-toolbar-actions">
+                <a class="app-toolbar-button" href="{{ url_for('main_bp.index') }}#currentRecipeUrlLogCard">Recipes</a>
+                <a class="app-toolbar-button" href="{{ url_for('main_bp.index') }}">Close</a>
+            </div>
+        </header>
+        <main class="recipe-edit-standalone-shell" aria-label="Recipe editor">
+            {% set recipe_edit_only = true %}
+            {% include "sections/current_recipe_url_log.html" %}
+        </main>
+    </div>
+</div>
 
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 <script>
