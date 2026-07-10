@@ -27,6 +27,10 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert "Ctrl + K" in template
     assert 'onsubmit="return submitAppGlobalSearch(this)"' in template
     assert "app-toolbar-primary" in template
+    assert 'class="app-account-avatar-image"' in template
+    assert "current_user.avatar_path" in template
+    assert "current_user.picture" in template
+    assert 'referrerpolicy="no-referrer"' in template
     assert 'data-app-nav-action="ai-pantry"' in template
     assert 'data-app-nav-lazy-section="pantry"' in template
     assert 'data-app-nav-lazy-section="current-recipes"' in template
@@ -40,6 +44,49 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert 'onclick="return collapseAllShoppingListPage()"' in template
     assert 'onclick="return expandAllShoppingListPage()"' in template
     assert 'data-public-workspace="{{ \'1\' if not current_user and not is_guest_demo else \'0\' }}"' in template
+
+
+def test_index_topbar_uses_current_user_profile_image(monkeypatch, tmp_path):
+    from PushShoppingList.app import create_app
+    from PushShoppingList.services import user_account_service as accounts
+
+    users_file = tmp_path / "users.json"
+    monkeypatch.setattr(accounts, "USERS_FILE", users_file)
+    accounts.save_users({
+        "users": [
+            {
+                "user_id": "avatar-user",
+                "first_name": "Nathaniel",
+                "last_name": "Tyler",
+                "username": "nathaniel",
+                "email": "nathaniel@example.com",
+                "auth_provider": "firebase",
+                "picture": "https://example.com/avatar.jpg",
+                "account_status": "active",
+            }
+        ]
+    })
+
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "avatar-user"
+
+        response = client.get("/")
+
+    html = response.get_data(as_text=True)
+    topbar_start = html.index('class="app-toolbar-button app-account-button"')
+    topbar_end = html.index("</a>", topbar_start)
+    topbar_markup = html[topbar_start:topbar_end]
+
+    assert response.status_code == 200
+    assert 'class="app-account-avatar-image"' in topbar_markup
+    assert 'src="https://example.com/avatar.jpg"' in topbar_markup
+    assert 'referrerpolicy="no-referrer"' in topbar_markup
+    assert "Nathaniel Tyler" in topbar_markup
+    assert ">N<" not in topbar_markup
 
 
 def test_app_workspaces_define_mockup_style_individual_pages():
@@ -110,6 +157,7 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert ".app-page-header {" in css
     assert ".app-page-header[hidden]" in css
     assert ".app-mobile-bottom-nav {" in css
+    assert ".app-account-avatar-image" in css
     assert ".app-home-dashboard {" in css
     assert ".app-home-dashboard[hidden]" in css
     assert ".settings-workspace-section" in css

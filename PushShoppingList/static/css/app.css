@@ -26434,6 +26434,14 @@ img[data-deferred-src] {
     font-weight: 900;
 }
 
+.app-account-avatar-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+}
+
 .app-account-label {
     display: grid;
     min-width: 0;
