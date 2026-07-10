@@ -180,6 +180,37 @@ const WORKSPACE_PANEL_TARGETS = {
     recipeMediaUploadForm: "importWorkspaceSection",
     importWorkspaceSection: "importWorkspaceSection",
 };
+const APP_PAGE_TARGETS = {
+    recipesPage: "recipesPage",
+    currentRecipeUrlLogCard: "recipesPage",
+    cookbooksPage: "cookbooksPage",
+    cookbooksCard: "cookbooksPage",
+    shoppingListsPage: "shoppingListsPage",
+    shoppingViewsSection: "shoppingListsPage",
+    sectionView: "shoppingListsPage",
+    storeView: "shoppingListsPage",
+    pantryPage: "pantryPage",
+    aiPantrySection: "pantryPage",
+    aiPantryInventory: "pantryPage",
+    aiPantryUseSoon: "pantryPage",
+    aiPantryAddItems: "pantryPage",
+    aiPantryUploadReceipt: "pantryPage",
+    aiPantryCookWithWhatIHave: "pantryPage",
+    aiPantryCookWhatImFeeling: "pantryPage",
+    aiPantryMissingIngredients: "pantryPage",
+    storesPage: "storesPage",
+    priceComparisonPage: "priceComparisonPage",
+    importPage: "importPage",
+    recipeUrlsTextarea: "importPage",
+    recipeMediaUploadForm: "importPage",
+    importWorkspaceSection: "importPage",
+};
+const APP_PAGE_LAZY_SECTIONS = {
+    recipesPage: "current-recipes",
+    cookbooksPage: "cookbooks",
+    shoppingListsPage: "recipe-view",
+    pantryPage: "pantry",
+};
 
 function getPublicSupportEmail(email) {
     const normalized = (email || "").toLowerCase();
@@ -413,6 +444,109 @@ function appShellScrollToTarget(targetId, options = {}) {
     return true;
 }
 
+function appPageFromTargetId(targetId) {
+    return APP_PAGE_TARGETS[String(targetId || "")] || "";
+}
+
+function setHomeDashboardVisible(visible) {
+    document.querySelectorAll("[data-app-home-dashboard]").forEach(section => {
+        section.hidden = !visible;
+    });
+}
+
+function setHomeHeaderVisible(visible) {
+    document.querySelectorAll("[data-app-home-header]").forEach(header => {
+        header.hidden = !visible;
+    });
+}
+
+function hideAppPageWorkspaces(exceptPage = null) {
+    document.querySelectorAll("[data-app-page-workspace]").forEach(page => {
+        if (page !== exceptPage) {
+            page.hidden = true;
+        }
+    });
+}
+
+function openHomeWorkspace(options = {}) {
+    hideAppPageWorkspaces();
+    setSettingsWorkspaceVisible(false);
+    setHomeHeaderVisible(true);
+    setHomeDashboardVisible(true);
+
+    if (options.updateHash !== false) {
+        appShellUpdateHash("appPageHeader");
+    }
+
+    if (options.scroll !== false) {
+        appShellScrollToTarget("appPageHeader", {
+            focusTarget: false,
+            behavior: options.behavior || "smooth",
+        });
+    }
+
+    return false;
+}
+
+async function openAppPage(pageId, options = {}) {
+    const page = document.getElementById(pageId);
+
+    if (!page) {
+        return false;
+    }
+
+    setHomeDashboardVisible(false);
+    setHomeHeaderVisible(false);
+    setSettingsWorkspaceVisible(false);
+    hideAppPageWorkspaces(page);
+    page.hidden = false;
+
+    const targetId = options.targetId || "";
+    const panelId = WORKSPACE_PANEL_TARGETS[targetId] || "";
+    if (panelId) {
+        const panel = document.getElementById(panelId);
+        if (panel) {
+            panel.hidden = false;
+        }
+    }
+
+    const lazySection = options.skipLazy
+        ? ""
+        : (options.lazySection || lazySectionFromTargetId(targetId) || APP_PAGE_LAZY_SECTIONS[pageId] || "");
+
+    if (lazySection) {
+        const placeholder = lazySectionElement(lazySection);
+        if (placeholder) {
+            placeholder.hidden = false;
+        }
+        await loadLazySection(lazySection, {
+            focus: false,
+            targetId,
+            userInitiated: true,
+        });
+    }
+
+    const target = targetId ? document.getElementById(targetId) : null;
+    const scrollTarget = target || page;
+
+    if (options.updateHash !== false) {
+        appShellUpdateHash(targetId || pageId);
+    }
+
+    if (options.scroll !== false && scrollTarget) {
+        window.requestAnimationFrame(() => {
+            scrollToLazySectionTarget(targetId, page, {
+                focusTarget: Boolean(targetId && target),
+            }) || appShellScrollToTarget(scrollTarget.id || pageId, {
+                focusTarget: Boolean(targetId && target),
+                behavior: options.behavior || "smooth",
+            });
+        });
+    }
+
+    return false;
+}
+
 function settingsSectionFromTargetId(targetId) {
     return SETTINGS_SECTION_TARGETS[String(targetId || "")] || "";
 }
@@ -437,6 +571,10 @@ async function openSettingsSection(sectionKey = "profile", options = {}) {
     if (!workspace) {
         return false;
     }
+
+    setHomeDashboardVisible(false);
+    setHomeHeaderVisible(false);
+    hideAppPageWorkspaces();
 
     const normalizedSection = String(sectionKey || "profile");
     let activePanel = [...workspace.querySelectorAll("[data-settings-panel]")]
@@ -501,6 +639,14 @@ async function openSettingsSection(sectionKey = "profile", options = {}) {
 }
 
 function openWorkspacePanel(panelId, options = {}) {
+    const pageId = appPageFromTargetId(panelId);
+    if (pageId && options.fromAppPage !== true) {
+        return openAppPage(pageId, {
+            ...options,
+            targetId: options.targetId || panelId,
+        });
+    }
+
     const panel = document.getElementById(panelId);
 
     if (!panel) {
@@ -541,6 +687,24 @@ async function openHashTargetWorkspace(hash = window.location.hash, options = {}
 
     if (!targetId) {
         return false;
+    }
+
+    const pageId = appPageFromTargetId(targetId);
+    if (pageId) {
+        if (pageId === "pantryPage" && targetId !== "pantryPage") {
+            await openAiPantryPanel({
+                targetId,
+                updateHash: false,
+                scroll: options.scroll !== false,
+            });
+        } else {
+            await openAppPage(pageId, {
+                targetId: targetId === pageId ? "" : targetId,
+                updateHash: false,
+                scroll: options.scroll !== false,
+            });
+        }
+        return true;
     }
 
     const settingsSection = settingsSectionFromTargetId(targetId);
@@ -585,10 +749,32 @@ async function activateAppShellNavLink(link, options = {}) {
     appShellSetActiveLink(link);
     appShellSetSearchStatus("");
 
+    if (action === "home") {
+        return openHomeWorkspace();
+    }
+
+    if (action === "app-page") {
+        const pageId = String(link.dataset.appPageTarget || "")
+            || appPageFromTargetId(targetId)
+            || "";
+        if (pageId) {
+            appShellUpdateHash(targetId || pageId);
+            await openAppPage(pageId, {
+                targetId,
+                lazySection,
+                updateHash: false,
+            });
+            return false;
+        }
+    }
+
     if (action === "ai-pantry") {
         appShellUpdateHash(targetId || "aiPantrySection");
         if (typeof openAiPantryPanel === "function") {
-            return openAiPantryPanel({ targetId: targetId || "aiPantrySection" });
+            return openAiPantryPanel({
+                targetId: targetId || "aiPantrySection",
+                pageId: String(link.dataset.appPageTarget || "") || "pantryPage",
+            });
         }
         return false;
     }
@@ -638,6 +824,16 @@ async function activateAppShellNavLink(link, options = {}) {
     }
 
     if (lazySection && typeof loadLazySection === "function") {
+        const pageId = appPageFromTargetId(targetId);
+        if (pageId) {
+            appShellUpdateHash(targetId || pageId);
+            await openAppPage(pageId, {
+                targetId,
+                lazySection,
+                updateHash: false,
+            });
+            return false;
+        }
         appShellUpdateHash(targetId);
         await loadLazySection(lazySection, {
             focus: true,
@@ -648,6 +844,15 @@ async function activateAppShellNavLink(link, options = {}) {
     }
 
     if (targetId) {
+        const pageId = appPageFromTargetId(targetId);
+        if (pageId) {
+            appShellUpdateHash(targetId || pageId);
+            await openAppPage(pageId, {
+                targetId: targetId === pageId ? "" : targetId,
+                updateHash: false,
+            });
+            return false;
+        }
         appShellUpdateHash(targetId);
         scrollToLazySectionTarget(targetId, null, {
             focusTarget: options.focusTarget === true,
@@ -3900,6 +4105,16 @@ function initLazySections() {
             return;
         }
 
+        const pageId = appPageFromTargetId(hashTargetId);
+        if (pageId) {
+            openAppPage(pageId, {
+                targetId: hashTargetId,
+                lazySection: hashSection,
+                updateHash: false,
+            });
+            return;
+        }
+
         loadLazySection(hashSection, { focus: true, targetId: hashTargetId });
         return;
     }
@@ -4438,14 +4653,7 @@ function restoreRememberedAccountPanelOpenWithOptions(options = {}) {
     }
 
     if (panelKey === "aiPantry") {
-        loadLazySection("pantry", { focus: false }).then(() => {
-            const pantryPanel = document.querySelector("[data-ai-pantry-panel]");
-            if (pantryPanel) {
-                pantryPanel.hidden = false;
-                rememberAccountPanelElement(pantryPanel, true);
-                expandAiPantryContent();
-            }
-        });
+        openAiPantryPanel({ targetId: "aiPantrySection", scroll: false, updateHash: false });
     }
 
     if (panelKey === "adminSupport") {
@@ -5260,6 +5468,15 @@ function expandJobActivityContent() {
 }
 
 async function openAiPantryPanel(options = {}) {
+    const pantryPageId = options.pageId || "pantryPage";
+
+    await openAppPage(pantryPageId, {
+        targetId: "",
+        updateHash: false,
+        scroll: false,
+        skipLazy: true,
+    });
+
     const panel = document.querySelector("[data-ai-pantry-panel]");
 
     if (!panel) {
@@ -5277,6 +5494,11 @@ async function openAiPantryPanel(options = {}) {
 
     if (panel.dataset.lazySection === "pantry" && panel.dataset.lazyLoaded !== "1") {
         await loadLazySection("pantry", { focus: false, userInitiated: true });
+    }
+
+    const pantryPage = document.getElementById(pantryPageId);
+    if (!pantryPage || pantryPage.hidden) {
+        return false;
     }
 
     const activePanel = document.querySelector("[data-ai-pantry-panel]") || panel;
@@ -5299,6 +5521,10 @@ async function openAiPantryPanel(options = {}) {
             firstControl.focus({ preventScroll: true });
         }
     });
+
+    if (options.updateHash !== false) {
+        appShellUpdateHash(options.targetId || "aiPantrySection");
+    }
 
     return false;
 }

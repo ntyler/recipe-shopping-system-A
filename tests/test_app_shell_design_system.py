@@ -15,7 +15,7 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert "app-shell-body" in template
     assert '<aside class="app-sidebar" aria-label="Primary navigation">' in template
     assert '<header class="app-topbar" aria-label="App toolbar">' in template
-    assert '<header id="appPageHeader" class="app-page-header">' in template
+    assert '<header id="appPageHeader" class="app-page-header" data-app-home-header>' in template
     assert '<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">' in template
     assert 'class="app-nav-section-title">Discover &amp; Plan</div>' in template
     assert 'class="app-nav-section-title">Import</div>' in template
@@ -32,13 +32,36 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert 'data-app-nav-lazy-section="current-recipes"' in template
     assert 'data-app-nav-lazy-section="recipe-view"' in template
     assert '{% include "sections/settings_workspace.html" %}' in template
+    assert '{% include "sections/app_workspaces.html" %}' in template
     assert 'class="app-home-dashboard"' in template
-    assert 'id="importWorkspaceSection"' in template
+    assert 'data-app-home-dashboard' in template
     assert 'data-app-nav-action="settings-section"' in template
-    assert 'data-app-nav-action="workspace-panel"' in template
+    assert 'data-app-nav-action="app-page"' in template
     assert 'onclick="return collapseAllShoppingListPage()"' in template
     assert 'onclick="return expandAllShoppingListPage()"' in template
     assert 'data-public-workspace="{{ \'1\' if not current_user and not is_guest_demo else \'0\' }}"' in template
+
+
+def test_app_workspaces_define_mockup_style_individual_pages():
+    template = read_text("PushShoppingList/templates/sections/app_workspaces.html")
+
+    assert 'id="recipesPage"' in template
+    assert 'id="cookbooksPage"' in template
+    assert 'id="shoppingListsPage"' in template
+    assert 'id="pantryPage"' in template
+    assert 'id="storesPage"' in template
+    assert 'id="priceComparisonPage"' in template
+    assert 'id="importPage"' in template
+    assert 'data-app-page-workspace' in template
+    assert 'id="currentRecipeUrlLogCard"' in template
+    assert 'id="cookbooksCard"' in template
+    assert 'id="shoppingViewsSection"' in template
+    assert 'id="aiPantrySection"' in template
+    assert 'id="importWorkspaceSection"' in template
+    assert 'class="app-page-layout"' in template
+    assert 'class="app-page-rail"' in template
+    assert 'class="app-page-tabs"' in template
+    assert 'class="app-import-method-grid"' in template
 
 
 def test_settings_workspace_groups_moved_sections_without_renaming_behaviors():
@@ -85,11 +108,20 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert ".app-global-search-shortcut" in css
     assert ".app-toolbar-primary" in css
     assert ".app-page-header {" in css
+    assert ".app-page-header[hidden]" in css
     assert ".app-mobile-bottom-nav {" in css
     assert ".app-home-dashboard {" in css
+    assert ".app-home-dashboard[hidden]" in css
     assert ".settings-workspace-section" in css
     assert ".settings-category-button" in css
     assert ".settings-panel" in css
+    assert ".app-page-workspace" in css
+    assert ".app-page-layout" in css
+    assert ".app-page-rail" in css
+    assert ".app-page-actions > *" in css
+    assert ".app-page-tabs button" in css
+    assert "width: auto;" in css
+    assert ".app-import-method-grid" in css
     assert ".app-workspace-panel[hidden]" in css
     assert "@media (max-width: 1099px)" in css
     assert "@media (min-width: 768px) and (max-width: 1099px)" in css
@@ -108,10 +140,19 @@ def test_app_shell_navigation_reuses_existing_lazy_and_account_panel_functions()
     assert "function initAppShellNavigation()" in script
     assert "function submitAppGlobalSearch(form)" in script
     assert "async function activateAppShellNavLink(link" in script
-    assert 'openAiPantryPanel({ targetId: targetId || "aiPantrySection" })' in script
+    assert 'return openAiPantryPanel({' in script
+    assert 'pageId: String(link.dataset.appPageTarget || "") || "pantryPage"' in script
+    assert "const pantryPageId = options.pageId || \"pantryPage\";" in script
+    assert "if (!pantryPage || pantryPage.hidden)" in script
     assert "toggleUsageDashboardPanel(true)" in script
     assert "openFeedbackSupportSection()" in script
     assert "toggleUserProfileEditor(true)" in script
+    assert "async function openAppPage" in script
+    assert "function openHomeWorkspace" in script
+    assert "function setHomeHeaderVisible" in script
+    assert "setHomeHeaderVisible(false)" in script
+    assert "setHomeHeaderVisible(true)" in script
+    assert 'action === "app-page"' in script
     assert "async function openSettingsSection" in script
     assert "function openWorkspacePanel" in script
     assert "async function openHashTargetWorkspace" in script

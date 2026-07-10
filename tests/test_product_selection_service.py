@@ -383,17 +383,23 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
     def test_home_address_and_store_options_move_into_settings_workspace(self):
         index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+        app_workspaces_template = Path("PushShoppingList/templates/sections/app_workspaces.html").read_text(
+            encoding="utf-8"
+        )
         settings_template = Path("PushShoppingList/templates/sections/settings_workspace.html").read_text(
             encoding="utf-8"
         )
 
+        app_workspaces_include_index = index_template.index('{% include "sections/app_workspaces.html" %}')
         settings_include_index = index_template.index('{% include "sections/settings_workspace.html" %}')
-        import_workspace_index = index_template.index('id="importWorkspaceSection"')
+        user_account_include_index = index_template.index('{% include "sections/user_account.html" %}')
         home_address_index = settings_template.index('{% include "sections/home_address.html" %}')
         store_options_index = settings_template.index('id="storeOptionsSection"')
 
-        self.assertGreater(import_workspace_index, settings_include_index)
+        self.assertLess(app_workspaces_include_index, settings_include_index)
+        self.assertLess(settings_include_index, user_account_include_index)
         self.assertGreater(store_options_index, home_address_index)
+        self.assertIn('id="importWorkspaceSection"', app_workspaces_template)
         self.assertNotIn('{% include "sections/store_options.html" %}', index_template)
         self.assertNotIn('{% include "sections/home_address.html" %}', index_template)
         self.assertIn('data-settings-panel="location"', settings_template)
@@ -403,6 +409,9 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
     def test_current_recipes_and_cookbooks_use_compact_home_summaries(self):
         index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+        app_workspaces_template = Path("PushShoppingList/templates/sections/app_workspaces.html").read_text(
+            encoding="utf-8"
+        )
         settings_template = Path("PushShoppingList/templates/sections/settings_workspace.html").read_text(
             encoding="utf-8"
         )
@@ -413,12 +422,14 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn('class="app-home-dashboard"', index_template)
         self.assertIn("Current Recipes</span>", index_template)
         self.assertIn("Cookbooks</span>", index_template)
-        self.assertIn('id="currentRecipeUrlLogCard"', index_template)
-        self.assertIn('id="cookbooksCard"', index_template)
-        self.assertIn('data-lazy-section="current-recipes"', index_template)
-        self.assertIn('data-lazy-section="cookbooks"', index_template)
-        recipe_log_block = index_template[
-            index_template.index('id="currentRecipeUrlLogCard"'):index_template.index('id="cookbooksCard"')
+        self.assertIn('id="currentRecipeUrlLogCard"', app_workspaces_template)
+        self.assertIn('id="cookbooksCard"', app_workspaces_template)
+        self.assertIn('data-lazy-section="current-recipes"', app_workspaces_template)
+        self.assertIn('data-lazy-section="cookbooks"', app_workspaces_template)
+        self.assertIn('id="recipesPage"', app_workspaces_template)
+        self.assertIn('id="cookbooksPage"', app_workspaces_template)
+        recipe_log_block = app_workspaces_template[
+            app_workspaces_template.index('id="currentRecipeUrlLogCard"'):app_workspaces_template.index('id="cookbooksCard"')
         ]
         self.assertIn("hidden>", recipe_log_block)
         self.assertNotIn('id="rulesCard"', index_template)

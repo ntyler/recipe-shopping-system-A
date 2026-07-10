@@ -1,0 +1,533 @@
+{% import "includes/app_shell_macros.html" as shell %}
+
+<section id="recipesPage"
+         class="app-page-workspace app-page-workspace-recipes"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Recipes</h2>
+            <p>Browse, search, and manage imported recipes.</p>
+        </div>
+        <div class="app-page-actions">
+            <a class="app-page-secondary-action"
+               href="#recipeUrlsTextarea"
+               data-app-nav-link
+               data-app-nav-action="app-page"
+               data-app-page-target="importPage"
+               data-app-nav-target="recipeUrlsTextarea">
+                {{ shell.app_icon("link") }}
+                <span>Import</span>
+            </a>
+            <button type="button"
+                    class="app-page-primary-action"
+                    onclick="return createNewRecipe(this)">
+                {{ shell.svg_icon("plus") }}
+                <span>Add Recipe</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="app-page-tabs" aria-label="Recipe filters">
+        <button type="button" class="is-active">All Recipes <span>{{ current_recipe_count | default(0) }}</span></button>
+        <button type="button">Favorites <span>0</span></button>
+        <button type="button">Recently Added</button>
+        <button type="button">My Recipes</button>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <div id="currentRecipeUrlLogCard"
+                 class="app-card lazy-section-placeholder"
+                 data-lazy-section="current-recipes"
+                 data-lazy-url="{{ url_for('main_bp.current_recipes_section') }}"
+                 aria-busy="false"
+                 hidden>
+                <button type="button"
+                        class="card-collapse-toggle recipe-url-log-toggle"
+                        onclick="loadLazySection('current-recipes', { focus: true }); return false;">
+                    <span class="cookbooks-header-title recipe-url-log-header-title">
+                        Current Recipes
+                        <span class="cookbooks-header-count recipe-url-log-header-count">
+                            {{ current_recipe_count | default(0) }}
+                            recipe{% if (current_recipe_count | default(0)) != 1 %}s{% endif %}
+                        </span>
+                    </span>
+                </button>
+                <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+            </div>
+        </div>
+        <aside class="app-page-rail" aria-label="Recipe summary">
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("recipes") }}</span>
+                <h3>Recipe Collection</h3>
+                <strong>{{ current_recipe_count | default(0) }}</strong>
+                <span>Total Recipes</span>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Quick Filters</h3>
+                <ul class="app-page-link-list">
+                    <li><a href="#currentRecipeUrlLogCard">Recently Added <span>{{ current_recipe_count | default(0) }}</span></a></li>
+                    <li><a href="#cookbooksCard" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="cookbooksPage" data-app-nav-target="cookbooksCard">Cookbook Recipes <span>{{ cookbook_recipe_count | default(0) }}</span></a></li>
+                    <li><a href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="recipeUrlsTextarea">Imported URLs</a></li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card app-page-soft-card">
+                <h3>AI Recipe Suggestions</h3>
+                <p>Use pantry items and saved recipes to plan what to cook next.</p>
+                <a href="#aiPantryCookWithWhatIHave"
+                   data-app-nav-link
+                   data-app-nav-action="ai-pantry"
+                   data-app-page-target="pantryPage"
+                   data-app-nav-target="aiPantryCookWithWhatIHave"
+                   data-app-nav-lazy-section="pantry">View Suggestions</a>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="cookbooksPage"
+         class="app-page-workspace app-page-workspace-cookbooks"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Cookbooks</h2>
+            <p>Organize recipes into cookbooks and menu-style collections.</p>
+        </div>
+        <div class="app-page-actions">
+            <a class="app-page-secondary-action"
+               href="#recipeUrlsTextarea"
+               data-app-nav-link
+               data-app-nav-action="app-page"
+               data-app-page-target="importPage"
+               data-app-nav-target="recipeUrlsTextarea">
+                {{ shell.app_icon("link") }}
+                <span>Import</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="app-page-tabs" aria-label="Cookbook filters">
+        <button type="button" class="is-active">All Cookbooks <span>{{ cookbook_count | default(0) }}</span></button>
+        <button type="button">My Cookbooks</button>
+        <button type="button">Favorites</button>
+        <button type="button">Archived</button>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <div id="cookbooksCard"
+                 class="app-card lazy-section-placeholder"
+                 data-lazy-section="cookbooks"
+                 data-lazy-url="{{ url_for('main_bp.cookbooks_section') }}"
+                 aria-busy="false"
+                 hidden>
+                <button type="button"
+                        class="card-collapse-toggle cookbooks-toggle"
+                        onclick="loadLazySection('cookbooks', { focus: true }); return false;">
+                    <span class="cookbooks-header-title">
+                        Cookbooks
+                        <span class="cookbooks-header-count">
+                            {{ cookbook_count | default(0) }}
+                            cookbook{% if (cookbook_count | default(0)) != 1 %}s{% endif %}
+                        </span>
+                    </span>
+                </button>
+                <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+            </div>
+        </div>
+        <aside class="app-page-rail" aria-label="Cookbook summary">
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("cookbooks") }}</span>
+                <h3>Cookbook Overview</h3>
+                <strong>{{ cookbook_count | default(0) }}</strong>
+                <span>Total Cookbooks</span>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Most Recipes</h3>
+                <ul class="app-page-link-list">
+                    {% for cookbook in cookbook_view.cookbooks[:5] %}
+                        <li><a href="#cookbooksCard">{{ cookbook.name }} <span>{{ cookbook.recipes | length }}</span></a></li>
+                    {% else %}
+                        <li><span>No cookbooks yet.</span></li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Recently Updated</h3>
+                <ul class="app-page-media-list">
+                    {% for cookbook in cookbook_view.cookbooks[:5] %}
+                        <li>
+                            <span class="app-page-thumb-icon">{{ shell.app_icon("cookbooks") }}</span>
+                            <span>{{ cookbook.name }}</span>
+                        </li>
+                    {% else %}
+                        <li>No cookbook activity yet.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="shoppingListsPage"
+         class="app-page-workspace app-page-workspace-shopping"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Shopping Lists</h2>
+            <p>Create, manage, and check off your active grocery list.</p>
+        </div>
+        <div class="app-page-actions">
+            <a class="app-page-primary-action" href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="recipeUrlsTextarea">
+                {{ shell.svg_icon("plus") }}
+                <span>Import</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="app-page-tabs" aria-label="Shopping list filters">
+        <button type="button" class="is-active">Active List <span>{{ items | length }}</span></button>
+        <button type="button">Unchecked</button>
+        <button type="button">Store View</button>
+        <button type="button">Archived</button>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            {% include "sections/view_behavior.html" %}
+            <div id="shoppingViewsSection"
+                 class="app-card lazy-section-placeholder"
+                 data-lazy-section="recipe-view"
+                 data-lazy-url="{{ url_for('main_bp.recipe_view_section') }}"
+                 aria-busy="false"
+                 hidden>
+                <button type="button"
+                        class="card-collapse-toggle"
+                        onclick="loadLazySection('recipe-view', { focus: true }); return false;">
+                    <span>Items</span>
+                </button>
+                <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+            </div>
+        </div>
+        <aside class="app-page-rail" aria-label="Shopping summary">
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("shopping") }}</span>
+                <h3>Shopping Summary</h3>
+                <strong>{{ items | length }}</strong>
+                <span>Items Added</span>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>My Stores</h3>
+                <ul class="app-page-media-list">
+                    {% for store_key in enabled_stores[:5] %}
+                        {% set store = available_stores.get(store_key, {}) %}
+                        <li><span class="app-page-thumb-icon">{{ shell.app_icon("stores") }}</span><span>{{ store.label or store_key }}</span></li>
+                    {% else %}
+                        <li>No enabled stores yet.</li>
+                    {% endfor %}
+                </ul>
+                <a class="app-page-rail-link" href="#storesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="storesPage" data-app-nav-target="storesPage">Manage stores</a>
+            </article>
+            <article class="app-page-rail-card app-page-soft-card">
+                <h3>Need Ideas?</h3>
+                <p>AI can suggest list items from your recipes and pantry.</p>
+                <a href="#aiPantryCookWhatImFeeling" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryCookWhatImFeeling" data-app-nav-lazy-section="pantry">Get Suggestions</a>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="pantryPage"
+         class="app-page-workspace app-page-workspace-pantry"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Pantry</h2>
+            <p>Track what you have, reduce waste, and cook from inventory.</p>
+        </div>
+        <div class="app-page-actions">
+            <a class="app-page-primary-action" href="#aiPantryAddItems" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryAddItems" data-app-nav-lazy-section="pantry">
+                {{ shell.svg_icon("plus") }}
+                <span>Add Item</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="app-page-tabs" aria-label="Pantry filters">
+        <button type="button" class="is-active">All Items</button>
+        <button type="button">Running Low</button>
+        <button type="button">Expiring Soon</button>
+        <button type="button">Locations</button>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section id="aiPantrySection"
+                     class="ai-pantry-card user-ai-pantry-panel lazy-section-placeholder"
+                     data-ai-pantry-panel
+                     data-lazy-section="pantry"
+                     data-lazy-url="{{ url_for('main_bp.pantry_section') }}"
+                     aria-busy="false"
+                     hidden>
+                <div class="user-push-panel-header user-ai-pantry-header">
+                    <button type="button"
+                            class="card-collapse-toggle ai-pantry-toggle"
+                            onclick="loadLazySection('pantry', { focus: true }); return false;">
+                        <span>AI Pantry</span>
+                    </button>
+                    <button type="button"
+                            class="secondary user-push-panel-close user-ai-pantry-close"
+                            data-ai-pantry-close
+                            onclick="return closeAiPantryPanel()">
+                        Close
+                    </button>
+                </div>
+                <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Pantry summary">
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("pantry") }}</span>
+                <h3>Pantry Overview</h3>
+                <strong>Live</strong>
+                <span>Inventory workspace</span>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Quick Actions</h3>
+                <ul class="app-page-link-list">
+                    <li><a href="#aiPantryInventory" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryInventory" data-app-nav-lazy-section="pantry">Inventory</a></li>
+                    <li><a href="#aiPantryUseSoon" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryUseSoon" data-app-nav-lazy-section="pantry">Use Soon</a></li>
+                    <li><a href="#aiPantryUploadReceipt" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryUploadReceipt" data-app-nav-lazy-section="pantry">Upload Receipt</a></li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card app-page-soft-card">
+                <h3>Reduce Waste</h3>
+                <p>Use pantry dates and recipe matches to prioritize ingredients.</p>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="storesPage"
+         class="app-page-workspace app-page-workspace-stores"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Stores</h2>
+            <p>Manage favorite stores, delivery options, and store links.</p>
+        </div>
+        <div class="app-page-actions">
+            <a class="app-page-primary-action"
+               href="#storeOptionsSection"
+               data-app-nav-link
+               data-app-nav-action="settings-section"
+               data-settings-section-target="stores-shopping"
+               data-app-nav-target="storeOptionsSection">
+                {{ shell.svg_icon("plus") }}
+                <span>Add Store</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section class="app-page-table-card">
+                <div class="app-page-stat-strip">
+                    <article><strong>{{ available_stores | length }}</strong><span>Saved Stores</span></article>
+                    <article><strong>{{ enabled_stores | length }}</strong><span>Enabled</span></article>
+                    <article><strong>{{ home_address_history | length }}</strong><span>Saved Locations</span></article>
+                    <article><strong>Links</strong><span>Store Actions</span></article>
+                </div>
+                <div class="app-page-table-wrap">
+                    <table class="app-page-table">
+                        <thead>
+                            <tr>
+                                <th>Store</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Favorite</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for store_key, store in available_stores.items() %}
+                                <tr>
+                                    <td>
+                                        <div class="app-page-store-cell">
+                                            <span class="app-page-store-logo">{{ (store.label or store_key)[:1]|upper }}</span>
+                                            <div><strong>{{ store.label or store_key }}</strong><span>{{ store.url or "Store link not configured" }}</span></div>
+                                        </div>
+                                    </td>
+                                    <td>{% if store_key in enabled_stores %}<span class="app-page-pill">Enabled</span>{% else %}<span class="app-page-pill app-page-pill-muted">Saved</span>{% endif %}</td>
+                                    <td>{% if store_key in enabled_stores %}<strong class="app-page-positive">Available</strong>{% else %}<span class="app-page-muted">Inactive</span>{% endif %}</td>
+                                    <td><span class="app-page-star" aria-hidden="true">*</span></td>
+                                    <td><a class="app-page-table-action" href="#storeOptionsSection" data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="stores-shopping" data-app-nav-target="storeOptionsSection">Manage</a></td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="5">No stores configured yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Store summary">
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("stores") }}</span>
+                <h3>Store Summary</h3>
+                <strong>{{ enabled_stores | length }}</strong>
+                <span>Stores Enabled</span>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Tips &amp; Tools</h3>
+                <ul class="app-page-link-list">
+                    <li><a href="#priceComparisonPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="priceComparisonPage" data-app-nav-target="priceComparisonPage">Compare prices</a></li>
+                    <li><a href="#storeOptionsSection" data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="stores-shopping" data-app-nav-target="storeOptionsSection">Store link settings</a></li>
+                </ul>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="priceComparisonPage"
+         class="app-page-workspace app-page-workspace-prices"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Price Comparison</h2>
+            <p>Compare prices across enabled stores and prepare a cheaper list.</p>
+        </div>
+        <div class="app-page-actions">
+            <a class="app-page-secondary-action"
+               href="#shoppingViewsSection"
+               data-app-nav-link
+               data-app-nav-action="app-page"
+               data-app-page-target="shoppingListsPage"
+               data-app-nav-target="shoppingViewsSection"
+               data-app-nav-lazy-section="recipe-view">View Shopping List</a>
+        </div>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section class="app-page-table-card">
+                <div class="app-page-panel-header">
+                    <h3>Compare Items</h3>
+                    <span>{{ items | length }} items</span>
+                </div>
+                <div class="app-page-table-wrap">
+                    <table class="app-page-table app-page-price-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                {% for store_key in enabled_stores[:5] %}
+                                    {% set store = available_stores.get(store_key, {}) %}
+                                    <th>{{ store.label or store_key }}</th>
+                                {% endfor %}
+                                <th>Lowest Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items[:8] %}
+                                <tr>
+                                    <td><strong>{{ item }}</strong><span>Shopping item</span></td>
+                                    {% for store_key in enabled_stores[:5] %}
+                                        <td><span class="app-page-muted">Check store</span></td>
+                                    {% endfor %}
+                                    <td><strong class="app-page-positive">Compare</strong></td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="{{ (enabled_stores[:5] | length) + 2 }}">Add shopping items to compare prices.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Price comparison summary">
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("stores") }}</span>
+                <h3>Comparison Summary</h3>
+                <strong>{{ items | length }}</strong>
+                <span>Items Compared</span>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Best Prices By Store</h3>
+                <ul class="app-page-link-list">
+                    {% for store_key in enabled_stores[:5] %}
+                        {% set store = available_stores.get(store_key, {}) %}
+                        <li><a href="#storeOptionsSection" data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="stores-shopping" data-app-nav-target="storeOptionsSection">{{ store.label or store_key }}</a></li>
+                    {% else %}
+                        <li><span>Enable stores to compare prices.</span></li>
+                    {% endfor %}
+                </ul>
+            </article>
+        </aside>
+    </div>
+</section>
+
+<section id="importPage"
+         class="app-page-workspace app-page-workspace-import"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Import</h2>
+            <p>Bring recipes into AI Pantry from URLs, documents, photos, or barcode workflows.</p>
+        </div>
+    </div>
+
+    <div class="app-import-method-grid" aria-label="Import methods">
+        <a class="app-import-method-card is-active" href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="recipeUrlsTextarea">
+            {{ shell.app_icon("link") }}
+            <strong>Import Recipe URLs</strong>
+            <span>Paste one or more URLs.</span>
+        </a>
+        <a class="app-import-method-card" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="recipeMediaUploadForm">
+            {{ shell.app_icon("document") }}
+            <strong>Import from Document</strong>
+            <span>Upload PDFs, docs, or images.</span>
+        </a>
+        <a class="app-import-method-card" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="recipeMediaUploadForm">
+            {{ shell.app_icon("image") }}
+            <strong>Generate from Image</strong>
+            <span>Extract recipe details from a photo.</span>
+        </a>
+        <a class="app-import-method-card" href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
+            {{ shell.app_icon("barcode") }}
+            <strong>Scan Barcode</strong>
+            <span>Add grocery products to pantry or lists.</span>
+        </a>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section id="importWorkspaceSection" class="app-workspace-panel" data-workspace-panel hidden>
+                {% include "sections/enter_recipe_links.html" %}
+                {% include "sections/edit_items.html" %}
+            </section>
+        </div>
+        <aside class="app-page-rail" aria-label="Import summary">
+            <article class="app-page-rail-card">
+                <h3>Import Tips</h3>
+                <ul class="app-page-bullet-list">
+                    <li>Use the main recipe page URL.</li>
+                    <li>Review extracted details before saving.</li>
+                    <li>One URL per line works best.</li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("recipes") }}</span>
+                <h3>Recent Imports</h3>
+                <strong>{{ current_recipe_count | default(0) }}</strong>
+                <span>Recipes in log</span>
+            </article>
+        </aside>
+    </div>
+</section>

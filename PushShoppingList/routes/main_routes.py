@@ -461,6 +461,7 @@ def shell_context(active_public_user=None):
     items = load_items()
     recipe_urls = recipe_url_rows()
     cookbook_view_data = lightweight_cookbook_view()
+    store_settings = load_store_settings()
 
     return {
         **shared_page_context(active_public_user),
@@ -473,6 +474,8 @@ def shell_context(active_public_user=None):
             len(cookbook.get("recipes", []))
             for cookbook in cookbook_view_data.get("cookbooks", [])
         ),
+        "available_stores": store_settings["stores"],
+        "enabled_stores": store_settings["enabled_stores"],
         "home_address": load_home_address(),
         "home_address_history": load_home_address_history(),
         "pdf_share_view": {"pdfs": []},
