@@ -34,6 +34,7 @@ from PushShoppingList.services.cookbook_service import find_or_create_cookbook
 from PushShoppingList.services.cookbook_service import is_unclassified_cookbook
 from PushShoppingList.services.cookbook_service import load_cookbooks
 from PushShoppingList.services.cookbook_service import cookbook_recipes_for_urls
+from PushShoppingList.services.cookbook_service import cookbook_recipe_index
 from PushShoppingList.services.cookbook_service import CookbookCategoryOverwriteConflict
 from PushShoppingList.services.cookbook_service import CookbookRecipeConflict
 from PushShoppingList.services.cookbook_service import delete_cookbook
@@ -460,10 +461,19 @@ def pantry_context():
 def shell_context(active_public_user=None):
     items = load_items()
     recipe_urls = recipe_url_rows()
+    recipe_ingredient_data = load_recipe_ingredients()
+    recipe_cookbook_index = cookbook_recipe_index()
+    cookbook_assignments = recipe_cookbook_index.get("assignments", {})
+    active_recipe_keys = {
+        normalize_recipe_url_key(recipe.get("url"))
+        for recipe in recipe_urls
+        if isinstance(recipe, dict) and normalize_recipe_url_key(recipe.get("url"))
+    }
     recipe_preview_rows = recipe_url_log_rows(
         recipe_urls[:8],
-        recipe_cookbook_assignments(),
+        cookbook_assignments,
         image_variants=("card", "thumb"),
+        recipe_ingredient_data=recipe_ingredient_data,
     )
     cookbook_view_data = lightweight_cookbook_view()
     store_settings = load_store_settings()
@@ -473,12 +483,19 @@ def shell_context(active_public_user=None):
         "raw_items": "\n".join(items),
         "items": items,
         "recipe_preview_rows": recipe_preview_rows,
+        "recipe_collection_breakdown": recipe_collection_breakdown(
+            recipe_urls,
+            records_by_key=recipe_cookbook_index.get("records_by_key", {}),
+        ),
+        "recipe_top_ingredients": recipe_top_ingredient_rows(
+            recipe_urls,
+            recipe_ingredient_data=recipe_ingredient_data,
+        ),
         "current_recipe_count": len(recipe_urls),
         "cookbook_view": cookbook_view_data,
         "cookbook_count": len(cookbook_view_data.get("cookbooks", [])),
         "cookbook_recipe_count": sum(
-            len(cookbook.get("recipes", []))
-            for cookbook in cookbook_view_data.get("cookbooks", [])
+            1 for recipe_key in active_recipe_keys if recipe_key in cookbook_assignments
         ),
         "available_stores": store_settings["stores"],
         "enabled_stores": store_settings["enabled_stores"],
@@ -1488,6 +1505,7 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
             "inactive_time": recipe_data.get("inactive_time", ""),
             "cook_time": recipe_data.get("cook_time", ""),
             "total_time": recipe_data.get("total_time", ""),
+            "preview_time": recipe_preview_time_label(recipe_data),
             "quantity": recipe_quantity,
             "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
@@ -1666,9 +1684,19 @@ def apply_cookbook_assignments_to_recipe_rows(rows, cookbook_assignments):
     return rows
 
 
-def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None, image_variants=None):
+def recipe_url_log_rows(
+    recipe_urls,
+    cookbook_assignments=None,
+    food_rules=None,
+    image_variants=None,
+    recipe_ingredient_data=None,
+):
     rows = []
-    recipe_ingredient_data = load_recipe_ingredients()
+    recipe_ingredient_data = (
+        recipe_ingredient_data
+        if isinstance(recipe_ingredient_data, dict)
+        else load_recipe_ingredients()
+    )
     cookbook_assignments = cookbook_assignments or {}
 
     for recipe in recipe_urls:
@@ -1725,6 +1753,111 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None,
         })
 
     return rows
+
+
+def recipe_collection_breakdown(recipe_urls, records_by_key=None):
+    records_by_key = records_by_key if isinstance(records_by_key, dict) else {}
+    counts = {
+        "created_by_you": 0,
+        "ai_inferred": 0,
+        "imported": 0,
+    }
+
+    for recipe in recipe_urls or []:
+        if not isinstance(recipe, dict):
+            continue
+
+        recipe_url = str(recipe.get("url") or "").strip()
+        recipe_key = normalize_recipe_url_key(recipe_url)
+        recipe_record = records_by_key.get(recipe_key, {})
+        recipe_record = recipe_record if isinstance(recipe_record, dict) else {}
+
+        if recipe_url_type(recipe_url) == "Manual":
+            counts["created_by_you"] += 1
+        elif (
+            recipe_record.get("ai_inferred")
+            or str(recipe_record.get("source_type") or "").strip().lower() == "menu_item_inferred"
+        ):
+            counts["ai_inferred"] += 1
+        else:
+            counts["imported"] += 1
+
+    return counts
+
+
+def recipe_preview_time_label(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+
+    for key in ("total_time", "cook_time", "prep_time"):
+        value = str(recipe_data.get(key) or "").strip()
+        if not value:
+            continue
+        if re.fullmatch(r"\d+(?:\.\d+)?", value):
+            return f"{value} min"
+        return value
+
+    return "Time TBD"
+
+
+def recipe_top_ingredient_rows(recipe_urls, recipe_ingredient_data=None, limit=5):
+    recipe_ingredient_data = (
+        recipe_ingredient_data
+        if isinstance(recipe_ingredient_data, dict)
+        else load_recipe_ingredients()
+    )
+    ingredient_counts = {}
+    ingredient_labels = {}
+
+    for recipe in recipe_urls or []:
+        if not isinstance(recipe, dict):
+            continue
+
+        recipe_url = str(recipe.get("url") or "").strip()
+        recipe_key = normalize_recipe_url_key(recipe_url)
+        recipe_data = (
+            recipe_ingredient_data.get(recipe_key)
+            or recipe_ingredient_data.get(recipe_url)
+            or {}
+        )
+        if not isinstance(recipe_data, dict):
+            continue
+
+        seen_ingredients = set()
+        for ingredient in recipe_data.get("ingredients", []) or []:
+            if isinstance(ingredient, dict):
+                display_name = str(
+                    ingredient.get("ingredient")
+                    or ingredient.get("name")
+                    or ingredient.get("original_text")
+                    or ""
+                ).strip()
+            else:
+                display_name = str(ingredient or "").strip()
+
+            normalized_name = ingredient_key(display_name)
+            if not normalized_name or normalized_name in seen_ingredients:
+                continue
+
+            seen_ingredients.add(normalized_name)
+            ingredient_counts[normalized_name] = ingredient_counts.get(normalized_name, 0) + 1
+            if normalized_name not in ingredient_labels:
+                ingredient_labels[normalized_name] = (
+                    display_name.title()
+                    if display_name == display_name.lower()
+                    else display_name
+                )
+
+    ranked_ingredients = sorted(
+        ingredient_counts,
+        key=lambda name: (-ingredient_counts[name], ingredient_labels.get(name, name).lower()),
+    )
+    return [
+        {
+            "name": ingredient_labels.get(name, name),
+            "recipe_count": ingredient_counts[name],
+        }
+        for name in ranked_ingredients[:max(0, int(limit or 0))]
+    ]
 
 
 def recipe_cover_image_for_view(recipe_url, recipe_data, recipe_meta=None, variants=None):

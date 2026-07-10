@@ -15498,6 +15498,17 @@ function jumpToRecipeViewRecipe(button, event = null) {
         return false;
     }
 
+    const shoppingListsPage = document.getElementById("shoppingListsPage");
+    if (shoppingListsPage && shoppingListsPage.hidden && typeof openAppPage === "function") {
+        openAppPage("shoppingListsPage", {
+            targetId: "shoppingViewsSection",
+            lazySection: "recipe-view",
+            focusTarget: false,
+            scroll: false,
+        }).then(() => jumpToRecipeViewRecipe(button));
+        return false;
+    }
+
     if (!document.getElementById("recipeView") && lazySectionElement("recipe-view")) {
         loadLazySection("recipe-view").then(() => jumpToRecipeViewRecipe(button));
         return false;

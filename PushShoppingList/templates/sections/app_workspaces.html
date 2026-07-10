@@ -11,55 +11,41 @@
          class="app-page-workspace app-page-workspace-recipes"
          data-app-page-workspace
          hidden>
-    <div class="app-page-heading-row">
-        <div>
-            <h2>Recipes</h2>
-            <p>Browse, search, and manage imported recipes.</p>
-        </div>
-        <div class="app-page-actions">
-            <a class="app-page-secondary-action"
-               href="#recipeUrlsTextarea"
-               data-app-nav-link
-               data-app-nav-action="app-page"
-               data-app-page-target="recipeUrlsPage"
-               data-app-nav-target="recipeUrlsTextarea">
-                {{ shell.app_icon("link") }}
-                <span>Import</span>
-            </a>
-            <button type="button"
-                    class="app-page-primary-action"
-                    onclick="return createNewRecipe(this)">
-                {{ shell.svg_icon("plus") }}
-                <span>Add Recipe</span>
-            </button>
-        </div>
-    </div>
-
-    <div class="app-page-tabs" aria-label="Recipe filters">
-        <button type="button" class="is-active">All Recipes <span>{{ current_recipe_count | default(0) }}</span></button>
-        <button type="button">Favorites <span>0</span></button>
-        <button type="button">Recently Added</button>
-        <button type="button">Recently Cooked</button>
-        <button type="button">My Recipes</button>
-    </div>
-
     <div class="app-page-layout">
         <div class="app-page-main-column">
-            <div class="app-recipes-toolbar" aria-label="Recipe browse controls">
-                <label class="app-recipes-search">
-                    <span class="sr-only">Search recipes</span>
-                    {{ shell.svg_icon("search") }}
-                    <input type="search" placeholder="Search recipes, ingredients, equipment...">
-                </label>
-                <button type="button" aria-label="Filter recipes"><span class="app-recipes-filter-icon" aria-hidden="true"></span> <span>Filter</span></button>
-                <button type="button" aria-label="Sort recipes">{{ shell.svg_icon("settings") }} <span>Sort</span></button>
-                <button type="button" class="is-active" aria-label="Grid view"><span class="app-recipes-grid-icon" aria-hidden="true"></span></button>
+            <div class="app-page-heading-row app-recipes-heading-row">
+                <div>
+                    <h2>Recipes</h2>
+                    <p>Browse, search, and manage all your recipes.</p>
+                </div>
+            </div>
+
+            <div class="app-recipes-command-row">
+                <div class="app-page-tabs" aria-label="Recipe filters">
+                    <button type="button" class="is-active" aria-pressed="true">All Recipes <span>{{ current_recipe_count | default(0) }}</span></button>
+                    <button type="button" aria-pressed="false">Favorites <span>0</span></button>
+                    <button type="button" aria-pressed="false">Recently Added</button>
+                    <button type="button" aria-pressed="false">Recently Cooked</button>
+                    <button type="button" aria-pressed="false">My Recipes</button>
+                </div>
+                <div class="app-recipes-toolbar" aria-label="Recipe browse controls">
+                    <button type="button" aria-label="Filter recipes">{{ shell.svg_icon("filter") }} <span>Filter</span></button>
+                    <button type="button" aria-label="Sort recipes">{{ shell.svg_icon("sort") }} <span>Sort</span></button>
+                    <button type="button" class="is-active" aria-label="Grid view" aria-pressed="true">{{ shell.svg_icon("grid") }}</button>
+                    <button type="button"
+                            class="app-page-primary-action app-recipes-add-action"
+                            onclick="return createNewRecipe(this)">
+                        {{ shell.svg_icon("plus") }}
+                        <span>Add Recipe</span>
+                    </button>
+                </div>
             </div>
 
             <section class="app-recipes-grid" aria-label="Recipe collection">
                 {% for recipe in recipe_preview_rows %}
-                    {% set recipe_time = recipe.total_time or recipe.cook_time or recipe.prep_time or "" %}
-                    <article class="app-recipe-card{% if recipe.cover_image and recipe.cover_image.src %} app-recipe-card-with-image{% endif %}">
+                    <article class="app-recipe-card{% if recipe.cover_image and recipe.cover_image.src %} app-recipe-card-with-image{% endif %}"
+                             data-recipe-preview-card
+                             data-recipe-url="{{ recipe.url }}">
                         <div class="app-recipe-card-media">
                             {% if recipe.cover_image and recipe.cover_image.src %}
                                 <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="
@@ -74,37 +60,32 @@
                             {% else %}
                                 <span class="app-recipe-card-fallback" aria-hidden="true">{{ shell.app_icon("recipes") }}</span>
                             {% endif %}
-                            <button type="button" class="app-recipe-favorite" aria-label="Add {{ recipe.name }} to favorites">
-                                <span aria-hidden="true">&#9825;</span>
+                            <button type="button"
+                                    class="app-recipe-favorite"
+                                    aria-label="Add {{ recipe.name }} to favorites"
+                                    aria-pressed="false">
+                                {{ shell.svg_icon("heart") }}
                             </button>
                         </div>
                         <div class="app-recipe-card-body">
                             <h3>
                                 <a href="#recipeView"
                                    data-recipe-url="{{ recipe.url }}"
+                                   title="{{ recipe.name }}"
                                    onclick="return jumpToRecipeViewRecipe(this, event)">{{ recipe.name }}</a>
                             </h3>
-                            <div class="app-recipe-card-rating" aria-label="{{ recipe.rating }} out of 5 stars">
-                                <span aria-hidden="true">{{ recipe.rating_stars }}</span>
-                                {% if recipe.rating %}<small>({{ recipe.rating }})</small>{% endif %}
-                            </div>
-                            <div class="app-recipe-card-meta">
-                                {% if recipe_time %}
-                                    <span>{{ recipe_time }}</span>
-                                {% else %}
-                                    <span>Time TBD</span>
-                                {% endif %}
-                                {% if recipe.servings %}
-                                    <span>{{ recipe.servings }} servings</span>
-                                {% endif %}
+                            <div class="app-recipe-card-details-row">
+                                <div class="app-recipe-card-rating" aria-label="{{ recipe.rating }} out of 5 stars">
+                                    <span aria-hidden="true">{{ recipe.rating_stars }}</span>
+                                    {% if recipe.rating %}<small>({{ recipe.rating }})</small>{% endif %}
+                                </div>
+                                <div class="app-recipe-card-meta">
+                                    {{ shell.svg_icon("clock") }}
+                                    <span>{{ recipe.preview_time or "Time TBD" }}</span>
+                                </div>
                             </div>
                             <div class="app-recipe-card-tags">
                                 <span>{{ recipe.cookbook_name or "Unclassified" }}</span>
-                                {% if recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}
-                                    <span>AI inferred</span>
-                                {% elif recipe.source_type %}
-                                    <span>{{ recipe.source_type|replace("_", " ")|title }}</span>
-                                {% endif %}
                             </div>
                         </div>
                     </article>
@@ -121,52 +102,87 @@
                 {% endfor %}
             </section>
 
-            <div id="currentRecipeUrlLogCard"
-                 class="app-card lazy-section-placeholder"
-                 data-lazy-section="current-recipes"
-                 data-lazy-url="{{ url_for('main_bp.current_recipes_section') }}"
-                 aria-busy="false"
-                 hidden>
-                <button type="button"
-                        class="card-collapse-toggle recipe-url-log-toggle"
-                        onclick="loadLazySection('current-recipes', { focus: true }); return false;">
-                    <span class="cookbooks-header-title recipe-url-log-header-title">
-                        Current Recipes
-                        <span class="cookbooks-header-count recipe-url-log-header-count">
-                            {{ current_recipe_count | default(0) }}
-                            recipe{% if (current_recipe_count | default(0)) != 1 %}s{% endif %}
-                        </span>
-                    </span>
-                </button>
-                <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+            <div class="app-recipes-results-footer">
+                <span>
+                    Showing
+                    {% if recipe_preview_rows %}1&ndash;{{ recipe_preview_rows|length }}{% else %}0{% endif %}
+                    of {{ current_recipe_count | default(0) }} recipes
+                </span>
+                <a href="#currentRecipeUrlLogCard">Manage full collection <span aria-hidden="true">&rarr;</span></a>
             </div>
         </div>
-        <aside class="app-page-rail" aria-label="Recipe summary">
+        <aside class="app-page-rail app-recipes-rail" aria-label="Recipe summary">
             <article class="app-page-rail-card app-page-metric-card">
-                <span class="app-page-rail-icon">{{ shell.app_icon("recipes") }}</span>
-                <h3>Recipe Collection</h3>
-                <strong>{{ current_recipe_count | default(0) }}</strong>
-                <span>Total Recipes</span>
+                <div class="app-page-metric-heading">
+                    <span class="app-page-rail-icon">{{ shell.app_icon("recipes") }}</span>
+                    <div>
+                        <h3>Recipe Collection</h3>
+                        <strong>{{ current_recipe_count | default(0) }}</strong>
+                        <span>Total Recipes</span>
+                    </div>
+                </div>
+                <ul class="app-page-collection-breakdown">
+                    <li><span>Created by you</span><strong>{{ recipe_collection_breakdown.created_by_you | default(0) }}</strong></li>
+                    <li><span>AI Inferred</span><strong>{{ recipe_collection_breakdown.ai_inferred | default(0) }}</strong></li>
+                    <li><span>Imported</span><strong>{{ recipe_collection_breakdown.imported | default(0) }}</strong></li>
+                </ul>
             </article>
             <article class="app-page-rail-card">
                 <h3>Quick Filters</h3>
                 <ul class="app-page-link-list">
-                    <li><a href="#currentRecipeUrlLogCard">Recently Added <span>{{ current_recipe_count | default(0) }}</span></a></li>
-                    <li><a href="#cookbooksCard" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="cookbooksPage" data-app-nav-target="cookbooksCard">Cookbook Recipes <span>{{ cookbook_recipe_count | default(0) }}</span></a></li>
-                    <li><a href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipeUrlsPage" data-app-nav-target="recipeUrlsTextarea">Imported URLs</a></li>
+                    <li><a href="#currentRecipeUrlLogCard"><span class="app-page-link-label">{{ shell.svg_icon("clock") }} Recently Added</span><strong>{{ current_recipe_count | default(0) }}</strong></a></li>
+                    <li><a href="#cookbooksCard" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="cookbooksPage" data-app-nav-target="cookbooksCard"><span class="app-page-link-label">{{ shell.svg_icon("cookbooks") }} Cookbook Recipes</span><strong>{{ cookbook_recipe_count | default(0) }}</strong></a></li>
+                    <li><a href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipeUrlsPage" data-app-nav-target="recipeUrlsTextarea"><span class="app-page-link-label">{{ shell.svg_icon("link") }} Imported URLs</span><strong>{{ recipe_collection_breakdown.imported | default(0) }}</strong></a></li>
                 </ul>
             </article>
-            <article class="app-page-rail-card app-page-soft-card">
-                <h3>AI Recipe Suggestions</h3>
-                <p>Use pantry items and saved recipes to plan what to cook next.</p>
-                <a href="#aiPantryCookWithWhatIHave"
-                   data-app-nav-link
-                   data-app-nav-action="ai-pantry"
-                   data-app-page-target="pantryPage"
-                   data-app-nav-target="aiPantryCookWithWhatIHave"
-                   data-app-nav-lazy-section="pantry">View Suggestions</a>
-            </article>
+            {% if recipe_top_ingredients %}
+                <article class="app-page-rail-card app-recipes-top-ingredients">
+                    <h3>Top Ingredients</h3>
+                    <ul>
+                        {% for ingredient in recipe_top_ingredients %}
+                            <li>
+                                <span>{{ shell.svg_icon("pantry") }} {{ ingredient.name }}</span>
+                                <small>{{ ingredient.recipe_count }} recipe{% if ingredient.recipe_count != 1 %}s{% endif %}</small>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </article>
+            {% endif %}
         </aside>
+    </div>
+
+    <article class="app-recipes-suggestions-banner">
+        <span class="app-recipes-suggestions-icon" aria-hidden="true">{{ shell.svg_icon("sparkles") }}</span>
+        <div>
+            <h3>AI Recipe Suggestions</h3>
+            <p>Get personalized recipe ideas based on your pantry and preferences.</p>
+        </div>
+        <a href="#aiPantryCookWithWhatIHave"
+           data-app-nav-link
+           data-app-nav-action="ai-pantry"
+           data-app-page-target="pantryPage"
+           data-app-nav-target="aiPantryCookWithWhatIHave"
+           data-app-nav-lazy-section="pantry">View Suggestions {{ shell.svg_icon("sparkles") }}</a>
+    </article>
+
+    <div id="currentRecipeUrlLogCard"
+         class="app-card lazy-section-placeholder"
+         data-lazy-section="current-recipes"
+         data-lazy-url="{{ url_for('main_bp.current_recipes_section') }}"
+         aria-busy="false"
+         hidden>
+        <button type="button"
+                class="card-collapse-toggle recipe-url-log-toggle"
+                onclick="loadLazySection('current-recipes', { focus: true }); return false;">
+            <span class="cookbooks-header-title recipe-url-log-header-title">
+                Current Recipes
+                <span class="cookbooks-header-count recipe-url-log-header-count">
+                    {{ current_recipe_count | default(0) }}
+                    recipe{% if (current_recipe_count | default(0)) != 1 %}s{% endif %}
+                </span>
+            </span>
+        </button>
+        <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
     </div>
 </section>
 
