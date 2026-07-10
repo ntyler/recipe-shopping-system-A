@@ -29,6 +29,7 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert "app-toolbar-primary" in template
     assert 'data-app-page-target="notificationsPage"' in template
     assert 'data-app-nav-action="account-workspace"' in template
+    assert 'href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage"' in template
     assert 'class="app-account-avatar-image"' in template
     assert "current_user.avatar_path" in template
     assert "current_user.picture" in template
@@ -119,6 +120,12 @@ def test_app_workspaces_define_mockup_style_individual_pages():
     assert 'class="app-page-layout"' in template
     assert 'class="app-page-rail"' in template
     assert 'class="app-page-tabs"' in template
+    assert 'class="app-recipes-toolbar"' in template
+    assert 'class="app-recipes-grid"' in template
+    assert "{% for recipe in recipe_preview_rows %}" in template
+    assert 'class="app-recipe-card{% if recipe.cover_image and recipe.cover_image.src %}' in template
+    assert 'data-deferred-src="{{ recipe.cover_image.card_url or recipe.cover_image.thumb_url or recipe.cover_image.src }}"' in template
+    assert 'data-app-page-target="recipeUrlsPage"' in template
     assert "app-import-method-grid" in template
     assert 'class="app-import-flow-card"' in template
     assert 'data-recipe-media-upload-status-mirror' in template
@@ -149,6 +156,15 @@ def test_settings_workspace_groups_moved_sections_without_renaming_behaviors():
     assert 'data-two-factor-open' in template
     assert 'data-push-notifications-open' in template
     assert 'data-delete-account-open' in template
+
+
+def test_app_shell_context_provides_recipe_preview_rows():
+    route = read_text("PushShoppingList/routes/main_routes.py")
+
+    assert "recipe_preview_rows = recipe_url_log_rows(" in route
+    assert "recipe_urls[:8]" in route
+    assert 'image_variants=("card", "thumb")' in route
+    assert '"recipe_preview_rows": recipe_preview_rows' in route
 
 
 def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
@@ -184,8 +200,14 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert ".app-page-workspace" in css
     assert ".app-page-layout" in css
     assert ".app-page-rail" in css
+    assert ".app-recipes-toolbar" in css
+    assert ".app-recipes-grid" in css
+    assert ".app-recipe-card" in css
+    assert ".app-recipe-card-media" in css
     assert ".app-page-actions > *" in css
     assert ".app-page-tabs button" in css
+    assert ".app-page-tabs::-webkit-scrollbar" in css
+    assert "scrollbar-width: none;" in css
     assert "width: auto;" in css
     assert ".app-import-method-grid" in css
     assert ".app-import-flow-card" in css
@@ -229,6 +251,7 @@ def test_app_shell_navigation_reuses_existing_lazy_and_account_panel_functions()
     assert 'pageId: String(link.dataset.appPageTarget || "") || "pantryPage"' in script
     assert "const pantryPageId = options.pageId || \"pantryPage\";" in script
     assert "if (!pantryPage || pantryPage.hidden)" in script
+    assert "initDeferredImages(page);" in script
     assert "toggleUsageDashboardPanel(true)" in script
     assert "function openUserAccountWorkspace" in script
     assert "function setUserAccountWorkspaceVisible" in script

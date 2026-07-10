@@ -590,6 +590,7 @@ async function openAppPage(pageId, options = {}) {
     setUserAccountWorkspaceVisible(false);
     hideAppPageWorkspaces(page);
     page.hidden = false;
+    initDeferredImages(page);
     appShellSetActivePageLink(pageId);
 
     const targetId = options.targetId || "";

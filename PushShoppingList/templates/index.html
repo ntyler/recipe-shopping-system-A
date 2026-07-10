@@ -33,7 +33,7 @@
                 <span class="app-nav-text">Home</span>
             </a>
             <div class="app-nav-section-title">Discover &amp; Plan</div>
-            <a class="app-nav-link" href="#currentRecipeUrlLogCard" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="currentRecipeUrlLogCard" data-app-nav-lazy-section="current-recipes">
+            <a class="app-nav-link" href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage" data-app-nav-lazy-section="current-recipes">
                 {{ shell.app_icon("recipes") }}
                 <span class="app-nav-text">Recipes</span>
             </a>
@@ -333,11 +333,11 @@
                 <small>item{% if (items|length) != 1 %}s{% endif %}</small>
             </a>
             <a class="app-home-summary-card"
-               href="#currentRecipeUrlLogCard"
+               href="#recipesPage"
                data-app-nav-link
                data-app-nav-action="app-page"
                data-app-page-target="recipesPage"
-               data-app-nav-target="currentRecipeUrlLogCard"
+               data-app-nav-target="recipesPage"
                data-app-nav-lazy-section="current-recipes">
                 <span class="app-home-summary-icon">{{ shell.app_icon("recipes") }}</span>
                 <span>Current Recipes</span>
@@ -434,11 +434,11 @@
             <section class="app-home-panel app-home-recipe-preview" aria-label="Recipe and cookbook summary">
                 <div class="app-home-panel-header">
                     <h2>Recipes &amp; Cookbooks</h2>
-                    <a href="#currentRecipeUrlLogCard"
+                    <a href="#recipesPage"
                        data-app-nav-link
                        data-app-nav-action="app-page"
                        data-app-page-target="recipesPage"
-                       data-app-nav-target="currentRecipeUrlLogCard"
+                       data-app-nav-target="recipesPage"
                        data-app-nav-lazy-section="current-recipes">Open recipes</a>
                 </div>
                 <div class="app-home-mini-grid">
@@ -499,7 +499,7 @@
         {{ shell.app_icon("home") }}
         <span>Home</span>
     </a>
-    <a class="app-mobile-nav-link" href="#currentRecipeUrlLogCard" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="currentRecipeUrlLogCard" data-app-nav-lazy-section="current-recipes">
+    <a class="app-mobile-nav-link" href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage" data-app-nav-lazy-section="current-recipes">
         {{ shell.app_icon("recipes") }}
         <span>Recipes</span>
     </a>

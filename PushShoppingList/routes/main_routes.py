@@ -460,6 +460,11 @@ def pantry_context():
 def shell_context(active_public_user=None):
     items = load_items()
     recipe_urls = recipe_url_rows()
+    recipe_preview_rows = recipe_url_log_rows(
+        recipe_urls[:8],
+        recipe_cookbook_assignments(),
+        image_variants=("card", "thumb"),
+    )
     cookbook_view_data = lightweight_cookbook_view()
     store_settings = load_store_settings()
 
@@ -467,6 +472,7 @@ def shell_context(active_public_user=None):
         **shared_page_context(active_public_user),
         "raw_items": "\n".join(items),
         "items": items,
+        "recipe_preview_rows": recipe_preview_rows,
         "current_recipe_count": len(recipe_urls),
         "cookbook_view": cookbook_view_data,
         "cookbook_count": len(cookbook_view_data.get("cookbooks", [])),

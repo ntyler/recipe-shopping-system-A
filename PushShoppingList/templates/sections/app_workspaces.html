@@ -21,7 +21,7 @@
                href="#recipeUrlsTextarea"
                data-app-nav-link
                data-app-nav-action="app-page"
-               data-app-page-target="importPage"
+               data-app-page-target="recipeUrlsPage"
                data-app-nav-target="recipeUrlsTextarea">
                 {{ shell.app_icon("link") }}
                 <span>Import</span>
@@ -39,11 +39,88 @@
         <button type="button" class="is-active">All Recipes <span>{{ current_recipe_count | default(0) }}</span></button>
         <button type="button">Favorites <span>0</span></button>
         <button type="button">Recently Added</button>
+        <button type="button">Recently Cooked</button>
         <button type="button">My Recipes</button>
     </div>
 
     <div class="app-page-layout">
         <div class="app-page-main-column">
+            <div class="app-recipes-toolbar" aria-label="Recipe browse controls">
+                <label class="app-recipes-search">
+                    <span class="sr-only">Search recipes</span>
+                    {{ shell.svg_icon("search") }}
+                    <input type="search" placeholder="Search recipes, ingredients, equipment...">
+                </label>
+                <button type="button" aria-label="Filter recipes"><span class="app-recipes-filter-icon" aria-hidden="true"></span> <span>Filter</span></button>
+                <button type="button" aria-label="Sort recipes">{{ shell.svg_icon("settings") }} <span>Sort</span></button>
+                <button type="button" class="is-active" aria-label="Grid view"><span class="app-recipes-grid-icon" aria-hidden="true"></span></button>
+            </div>
+
+            <section class="app-recipes-grid" aria-label="Recipe collection">
+                {% for recipe in recipe_preview_rows %}
+                    {% set recipe_time = recipe.total_time or recipe.cook_time or recipe.prep_time or "" %}
+                    <article class="app-recipe-card{% if recipe.cover_image and recipe.cover_image.src %} app-recipe-card-with-image{% endif %}">
+                        <div class="app-recipe-card-media">
+                            {% if recipe.cover_image and recipe.cover_image.src %}
+                                <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="
+                                     data-deferred-src="{{ recipe.cover_image.card_url or recipe.cover_image.thumb_url or recipe.cover_image.src }}"
+                                     {% if recipe.cover_image.srcset %}data-deferred-srcset="{{ recipe.cover_image.srcset }}"{% endif %}
+                                     data-full-src="{{ recipe.cover_image.src }}"
+                                     sizes="(max-width: 768px) 92vw, 360px"
+                                     alt="{{ recipe.cover_image.alt or recipe.name }}"
+                                     loading="lazy"
+                                     decoding="async"
+                                     fetchpriority="low">
+                            {% else %}
+                                <span class="app-recipe-card-fallback" aria-hidden="true">{{ shell.app_icon("recipes") }}</span>
+                            {% endif %}
+                            <button type="button" class="app-recipe-favorite" aria-label="Add {{ recipe.name }} to favorites">
+                                <span aria-hidden="true">&#9825;</span>
+                            </button>
+                        </div>
+                        <div class="app-recipe-card-body">
+                            <h3>
+                                <a href="#recipeView"
+                                   data-recipe-url="{{ recipe.url }}"
+                                   onclick="return jumpToRecipeViewRecipe(this, event)">{{ recipe.name }}</a>
+                            </h3>
+                            <div class="app-recipe-card-rating" aria-label="{{ recipe.rating }} out of 5 stars">
+                                <span aria-hidden="true">{{ recipe.rating_stars }}</span>
+                                {% if recipe.rating %}<small>({{ recipe.rating }})</small>{% endif %}
+                            </div>
+                            <div class="app-recipe-card-meta">
+                                {% if recipe_time %}
+                                    <span>{{ recipe_time }}</span>
+                                {% else %}
+                                    <span>Time TBD</span>
+                                {% endif %}
+                                {% if recipe.servings %}
+                                    <span>{{ recipe.servings }} servings</span>
+                                {% endif %}
+                            </div>
+                            <div class="app-recipe-card-tags">
+                                <span>{{ recipe.cookbook_name or "Unclassified" }}</span>
+                                {% if recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}
+                                    <span>AI inferred</span>
+                                {% elif recipe.source_type %}
+                                    <span>{{ recipe.source_type|replace("_", " ")|title }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </article>
+                {% else %}
+                    <div class="app-recipes-empty-card">
+                        <strong>No recipes yet</strong>
+                        <span>Import recipe URLs, upload a document, or generate a recipe from an image.</span>
+                        <a href="#recipeUrlsPage"
+                           data-app-nav-link
+                           data-app-nav-action="app-page"
+                           data-app-page-target="recipeUrlsPage"
+                           data-app-nav-target="recipeUrlsPage">Import recipes</a>
+                    </div>
+                {% endfor %}
+            </section>
+
             <div id="currentRecipeUrlLogCard"
                  class="app-card lazy-section-placeholder"
                  data-lazy-section="current-recipes"
@@ -76,7 +153,7 @@
                 <ul class="app-page-link-list">
                     <li><a href="#currentRecipeUrlLogCard">Recently Added <span>{{ current_recipe_count | default(0) }}</span></a></li>
                     <li><a href="#cookbooksCard" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="cookbooksPage" data-app-nav-target="cookbooksCard">Cookbook Recipes <span>{{ cookbook_recipe_count | default(0) }}</span></a></li>
-                    <li><a href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="recipeUrlsTextarea">Imported URLs</a></li>
+                    <li><a href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipeUrlsPage" data-app-nav-target="recipeUrlsTextarea">Imported URLs</a></li>
                 </ul>
             </article>
             <article class="app-page-rail-card app-page-soft-card">
