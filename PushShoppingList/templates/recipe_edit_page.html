@@ -1,3 +1,4 @@
+{% import "includes/app_shell_macros.html" as shell %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +15,7 @@
 <div class="app-shell recipe-edit-page-shell">
     <aside class="app-sidebar recipe-edit-page-sidebar" aria-label="Primary navigation">
         <a class="app-brand" href="{{ url_for('main_bp.index') }}" aria-label="AI Pantry home">
-            <span class="app-brand-mark" aria-hidden="true">AP</span>
+            {{ shell.brand_mark() }}
             <span>
                 <strong>AI Pantry</strong>
                 <small>Recipe Shopping List</small>
@@ -22,35 +23,48 @@
         </a>
         <nav class="app-sidebar-nav" aria-label="App sections">
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}">
-                <span class="app-nav-icon" aria-hidden="true">HM</span>
+                {{ shell.app_icon("home") }}
                 <span class="app-nav-text">Home</span>
             </a>
+            <div class="app-nav-section-title">Discover &amp; Plan</div>
             <a class="app-nav-link is-active" href="{{ url_for('main_bp.index') }}#currentRecipeUrlLogCard">
-                <span class="app-nav-icon" aria-hidden="true">RC</span>
+                {{ shell.app_icon("recipes") }}
                 <span class="app-nav-text">Recipes</span>
             </a>
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#cookbooksCard">
-                <span class="app-nav-icon" aria-hidden="true">CB</span>
+                {{ shell.app_icon("cookbooks") }}
                 <span class="app-nav-text">Cookbooks</span>
             </a>
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#shoppingViewsSection">
-                <span class="app-nav-icon" aria-hidden="true">SL</span>
+                {{ shell.app_icon("shopping") }}
                 <span class="app-nav-text">Shopping Lists</span>
             </a>
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#aiPantrySection">
-                <span class="app-nav-icon" aria-hidden="true">PN</span>
+                {{ shell.app_icon("pantry") }}
                 <span class="app-nav-text">Pantry</span>
             </a>
+            <div class="app-nav-section-title">Import</div>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#recipeUrlsTextarea">
+                {{ shell.app_icon("import") }}
+                <span class="app-nav-text">Import</span>
+            </a>
+            <div class="app-nav-section-title">Account</div>
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#feedbackSupportSection">
-                <span class="app-nav-icon" aria-hidden="true">HP</span>
+                {{ shell.app_icon("help") }}
                 <span class="app-nav-text">Help &amp; Support</span>
             </a>
         </nav>
+        <aside class="app-sidebar-promo" aria-label="AI Pantry plan">
+            <div class="app-sidebar-promo-icon" aria-hidden="true">{{ shell.svg_icon("plus") }}</div>
+            <strong>Love AI Pantry?</strong>
+            <span>Upgrade your plan to unlock more features.</span>
+            <a href="{{ url_for('main_bp.index') }}#accountUsageDashboardPanel">View Plans</a>
+        </aside>
     </aside>
     <div class="app-main-shell recipe-edit-page-main-shell">
         <header class="app-topbar recipe-edit-page-topbar" aria-label="Recipe editor toolbar">
             <a class="app-topbar-brand" href="{{ url_for('main_bp.index') }}">
-                <span class="app-brand-mark" aria-hidden="true">AP</span>
+                {{ shell.brand_mark() }}
                 <span>AI Pantry</span>
             </a>
             <div class="recipe-edit-page-topbar-title">

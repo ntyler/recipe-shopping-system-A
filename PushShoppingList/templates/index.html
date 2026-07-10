@@ -1,3 +1,4 @@
+{% import "includes/app_shell_macros.html" as shell %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -19,7 +20,7 @@
 <div class="app-shell">
     <aside class="app-sidebar" aria-label="Primary navigation">
         <a class="app-brand" href="{{ url_for('main_bp.index') }}" aria-label="AI Pantry home">
-            <span class="app-brand-mark" aria-hidden="true">AP</span>
+            {{ shell.brand_mark() }}
             <span>
                 <strong>AI Pantry</strong>
                 <small>Recipe Shopping List</small>
@@ -28,89 +29,103 @@
 
         <nav class="app-sidebar-nav" aria-label="App sections">
             <a class="app-nav-link" href="#appPageHeader" data-app-nav-link data-app-nav-target="appPageHeader">
-                <span class="app-nav-icon" aria-hidden="true">HM</span>
+                {{ shell.app_icon("home") }}
                 <span class="app-nav-text">Home</span>
             </a>
+            <div class="app-nav-section-title">Discover &amp; Plan</div>
             <a class="app-nav-link" href="#currentRecipeUrlLogCard" data-app-nav-link data-app-nav-target="currentRecipeUrlLogCard" data-app-nav-lazy-section="current-recipes">
-                <span class="app-nav-icon" aria-hidden="true">RC</span>
+                {{ shell.app_icon("recipes") }}
                 <span class="app-nav-text">Recipes</span>
             </a>
             <a class="app-nav-link" href="{{ url_for('menu_bp.custom_menu_builder_route') }}">
-                <span class="app-nav-icon" aria-hidden="true">MN</span>
+                {{ shell.app_icon("menus") }}
                 <span class="app-nav-text">Menus</span>
             </a>
             <a class="app-nav-link" href="#cookbooksCard" data-app-nav-link data-app-nav-target="cookbooksCard" data-app-nav-lazy-section="cookbooks">
-                <span class="app-nav-icon" aria-hidden="true">CB</span>
+                {{ shell.app_icon("cookbooks") }}
                 <span class="app-nav-text">Cookbooks</span>
             </a>
             <a class="app-nav-link" href="#shoppingViewsSection" data-app-nav-link data-app-nav-target="shoppingViewsSection" data-app-nav-lazy-section="recipe-view">
-                <span class="app-nav-icon" aria-hidden="true">SL</span>
+                {{ shell.app_icon("shopping") }}
                 <span class="app-nav-text">Shopping Lists</span>
             </a>
             <a class="app-nav-link" href="#aiPantrySection" data-app-nav-link data-app-nav-action="ai-pantry" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry">
-                <span class="app-nav-icon" aria-hidden="true">PN</span>
+                {{ shell.app_icon("pantry") }}
                 <span class="app-nav-text">Pantry</span>
             </a>
+            <div class="app-nav-section-title">Shop</div>
             <a class="app-nav-link" href="#storeOptionsSection" data-app-nav-link data-app-nav-target="storeOptionsSection" data-app-nav-lazy-section="store-options">
-                <span class="app-nav-icon" aria-hidden="true">ST</span>
+                {{ shell.app_icon("stores") }}
                 <span class="app-nav-text">Stores / Store Links</span>
             </a>
             <a class="app-nav-link" href="#storeView" data-app-nav-link data-app-nav-target="storeView" data-app-nav-lazy-section="recipe-view">
-                <span class="app-nav-icon" aria-hidden="true">PC</span>
+                {{ shell.app_icon("price") }}
                 <span class="app-nav-text">Price Comparison</span>
             </a>
+            <div class="app-nav-section-title">Import</div>
             <a class="app-nav-link" href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-target="recipeUrlsTextarea">
-                <span class="app-nav-icon" aria-hidden="true">IM</span>
+                {{ shell.app_icon("import") }}
                 <span class="app-nav-text">Import</span>
             </a>
             <a class="app-nav-link" href="#currentRecipeUrlLogCard" data-app-nav-link data-app-nav-target="currentRecipeUrlLogCard" data-app-nav-lazy-section="current-recipes">
-                <span class="app-nav-icon" aria-hidden="true">URL</span>
+                {{ shell.app_icon("link") }}
                 <span class="app-nav-text">Recipe URLs</span>
             </a>
             <a class="app-nav-link" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-target="recipeMediaUploadForm">
-                <span class="app-nav-icon" aria-hidden="true">DOC</span>
+                {{ shell.app_icon("document") }}
                 <span class="app-nav-text">Import From Document</span>
             </a>
             <a class="app-nav-link" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-target="recipeMediaUploadForm">
-                <span class="app-nav-icon" aria-hidden="true">IMG</span>
+                {{ shell.app_icon("image") }}
                 <span class="app-nav-text">Generate From Image</span>
             </a>
             <a class="app-nav-link" href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
-                <span class="app-nav-icon" aria-hidden="true">BC</span>
+                {{ shell.app_icon("barcode") }}
                 <span class="app-nav-text">Scan Barcode</span>
             </a>
+            <div class="app-nav-section-title">Account</div>
             <a class="app-nav-link" href="#userAccountSection" data-app-nav-link data-app-nav-action="account-settings" data-app-nav-target="userAccountSection">
-                <span class="app-nav-icon" aria-hidden="true">SE</span>
+                {{ shell.app_icon("settings") }}
                 <span class="app-nav-text">Settings</span>
             </a>
             <a class="app-nav-link" href="#accountUsageDashboardPanel" data-app-nav-link data-app-nav-action="usage-dashboard" data-app-nav-target="accountUsageDashboardPanel">
-                <span class="app-nav-icon" aria-hidden="true">UB</span>
+                {{ shell.app_icon("billing") }}
                 <span class="app-nav-text">Usage &amp; Billing</span>
             </a>
             <a class="app-nav-link" href="#feedbackSupportSection" data-app-nav-link data-app-nav-action="feedback-support" data-app-nav-target="feedbackSupportSection">
-                <span class="app-nav-icon" aria-hidden="true">HP</span>
+                {{ shell.app_icon("help") }}
                 <span class="app-nav-text">Help &amp; Support</span>
             </a>
         </nav>
+        <aside class="app-sidebar-promo" aria-label="AI Pantry plan">
+            <div class="app-sidebar-promo-icon" aria-hidden="true">{{ shell.svg_icon("plus") }}</div>
+            <strong>Love AI Pantry?</strong>
+            <span>Upgrade your plan to unlock more features.</span>
+            <a href="#accountUsageDashboardPanel"
+               data-app-nav-link
+               data-app-nav-action="usage-dashboard"
+               data-app-nav-target="accountUsageDashboardPanel">View Plans</a>
+        </aside>
     </aside>
 
     <div class="app-main-shell">
         <header class="app-topbar" aria-label="App toolbar">
             <a class="app-topbar-brand" href="{{ url_for('main_bp.index') }}">
-                <span class="app-brand-mark" aria-hidden="true">AP</span>
+                {{ shell.brand_mark() }}
                 <span>AI Pantry</span>
             </a>
             <form class="app-global-search"
                   role="search"
                   onsubmit="return submitAppGlobalSearch(this)">
                 <label class="sr-only" for="appGlobalSearch">Search app sections</label>
+                <span class="app-global-search-icon" aria-hidden="true">{{ shell.svg_icon("search") }}</span>
                 <input id="appGlobalSearch"
                        name="app_search"
                        data-app-global-search
                        list="appGlobalSearchSuggestions"
                        type="search"
                        autocomplete="off"
-                       placeholder="Search recipes, pantry, stores">
+                       placeholder="Search recipes, ingredients, or menus...">
                 <datalist id="appGlobalSearchSuggestions">
                     <option value="Recipes"></option>
                     <option value="Cookbooks"></option>
@@ -121,23 +136,34 @@
                     <option value="Usage Billing"></option>
                     <option value="Help Support"></option>
                 </datalist>
+                <span class="app-global-search-shortcut" aria-hidden="true">Ctrl + K</span>
                 <button type="submit" class="app-search-submit">Search</button>
                 <span class="sr-only" data-app-global-search-status aria-live="polite"></span>
             </form>
             <div class="app-toolbar-actions" aria-label="Quick actions">
+                <a class="app-toolbar-button app-toolbar-primary"
+                   href="#recipeUrlsTextarea"
+                   data-app-nav-link
+                   data-app-nav-target="recipeUrlsTextarea">
+                    {{ shell.svg_icon("plus") }}
+                    <span>Import</span>
+                </a>
                 <button type="button"
                         class="app-toolbar-button app-toolbar-icon-button"
                         data-push-notifications-open
                         aria-controls="accountPushNotificationsPanel"
                         title="Notifications">
-                    Alerts
+                    {{ shell.svg_icon("bell") }}
+                    <span class="sr-only">Notifications</span>
+                    <span class="app-notification-badge" aria-hidden="true">3</span>
                 </button>
                 <button type="button"
-                        class="app-toolbar-button app-toolbar-icon-button"
+                        class="app-toolbar-button app-help-button"
                         onclick="return openFeedbackSupportSection()"
                         aria-controls="feedbackSupportSection"
                         title="Help and support">
-                    Help
+                    {{ shell.svg_icon("help") }}
+                    <span>Help &amp; Support</span>
                 </button>
                 <a class="app-toolbar-button app-account-button"
                    href="#userAccountSection"
@@ -147,7 +173,8 @@
                         {% if current_user %}{{ current_user.display_name[:1]|upper }}{% else %}G{% endif %}
                     </span>
                     <span class="app-account-label">
-                        {% if current_user %}{{ current_user.display_name }}{% elif is_guest_demo %}Guest Demo{% else %}Sign In{% endif %}
+                        <strong>{% if current_user %}{{ current_user.display_name }}{% elif is_guest_demo %}Guest Demo{% else %}Sign In{% endif %}</strong>
+                        <small>{% if current_user %}Pro Plan{% elif is_guest_demo %}Temporary workspace{% else %}AI Pantry account{% endif %}</small>
                     </span>
                 </a>
             </div>
@@ -334,27 +361,27 @@
 
 <nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">
     <a class="app-mobile-nav-link" href="#appPageHeader" data-app-nav-link data-app-nav-target="appPageHeader">
-        <span class="app-nav-icon" aria-hidden="true">HM</span>
+        {{ shell.app_icon("home") }}
         <span>Home</span>
     </a>
     <a class="app-mobile-nav-link" href="#currentRecipeUrlLogCard" data-app-nav-link data-app-nav-target="currentRecipeUrlLogCard" data-app-nav-lazy-section="current-recipes">
-        <span class="app-nav-icon" aria-hidden="true">RC</span>
+        {{ shell.app_icon("recipes") }}
         <span>Recipes</span>
     </a>
     <a class="app-mobile-nav-link" href="#cookbooksCard" data-app-nav-link data-app-nav-target="cookbooksCard" data-app-nav-lazy-section="cookbooks">
-        <span class="app-nav-icon" aria-hidden="true">CB</span>
+        {{ shell.app_icon("cookbooks") }}
         <span>Cookbooks</span>
     </a>
     <a class="app-mobile-nav-link" href="#shoppingViewsSection" data-app-nav-link data-app-nav-target="shoppingViewsSection" data-app-nav-lazy-section="recipe-view">
-        <span class="app-nav-icon" aria-hidden="true">SL</span>
+        {{ shell.app_icon("shopping") }}
         <span>Lists</span>
     </a>
     <a class="app-mobile-nav-link" href="#aiPantrySection" data-app-nav-link data-app-nav-action="ai-pantry" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry">
-        <span class="app-nav-icon" aria-hidden="true">PN</span>
+        {{ shell.app_icon("pantry") }}
         <span>Pantry</span>
     </a>
     <a class="app-mobile-nav-link" href="#userAccountSection" data-app-nav-link data-app-nav-target="userAccountSection">
-        <span class="app-nav-icon" aria-hidden="true">MR</span>
+        {{ shell.app_icon("more") }}
         <span>More</span>
     </a>
 </nav>

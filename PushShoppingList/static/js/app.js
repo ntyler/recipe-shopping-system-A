@@ -464,6 +464,30 @@ function initAppShellNavigation() {
         event.preventDefault();
         activateAppShellNavLink(link);
     });
+
+    document.addEventListener("keydown", event => {
+        if (!event || event.defaultPrevented || event.altKey || event.shiftKey) {
+            return;
+        }
+
+        const isSearchShortcut = (event.ctrlKey || event.metaKey)
+            && String(event.key || "").toLowerCase() === "k";
+
+        if (!isSearchShortcut) {
+            return;
+        }
+
+        const input = document.querySelector("[data-app-global-search]");
+        if (!input || typeof input.focus !== "function") {
+            return;
+        }
+
+        event.preventDefault();
+        input.focus();
+        if (typeof input.select === "function") {
+            input.select();
+        }
+    });
 }
 
 function submitAppGlobalSearch(form) {
