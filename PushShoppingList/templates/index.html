@@ -26,6 +26,14 @@
                 <small>Recipe Shopping List</small>
             </span>
         </a>
+        <button type="button"
+                class="app-sidebar-collapse"
+                data-app-sidebar-collapse
+                aria-label="Collapse sidebar"
+                aria-pressed="false"
+                title="Collapse sidebar">
+            <span aria-hidden="true">&lsaquo;</span>
+        </button>
 
         <nav class="app-sidebar-nav" aria-label="App sections">
             <a class="app-nav-link" href="#appPageHeader" data-app-nav-link data-app-nav-action="home" data-app-nav-target="appPageHeader">
@@ -57,6 +65,10 @@
             <a class="app-nav-link" href="#aiPantrySection" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry">
                 {{ shell.app_icon("pantry") }}
                 <span class="app-nav-text">Pantry</span>
+            </a>
+            <a class="app-nav-link" href="#mealPlannerPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="mealPlannerPage" data-app-nav-target="mealPlannerPage">
+                {{ shell.app_icon("meal") }}
+                <span class="app-nav-text">Meal Planner</span>
             </a>
             <div class="app-nav-section-title">Shop</div>
             <a class="app-nav-link"
@@ -212,7 +224,6 @@
                    title="Notifications">
                     {{ shell.svg_icon("bell") }}
                     <span class="sr-only">Notifications</span>
-                    <span class="app-notification-badge" aria-hidden="true">3</span>
                 </a>
                 <button type="button"
                         class="app-toolbar-button app-help-button"
@@ -262,9 +273,10 @@
 <main id="appContent" class="app-content">
     <header id="appPageHeader" class="app-page-header" data-app-home-header>
         <div>
-            <h1>Welcome back{% if current_user %}, {{ current_user.first_name or current_user.display_name }}{% endif %}</h1>
-            <p>Plan recipes, manage pantry inventory, and build a store-ready shopping list from one workspace.</p>
+            <h1>Welcome back{% if current_user %}, {{ current_user.first_name or current_user.display_name }}{% elif is_guest_demo %}, Guest{% endif %}! <span aria-hidden="true">&#128075;</span></h1>
+            <p>Let's get cooking. Here's what's happening in your kitchen.</p>
         </div>
+        <div class="app-home-hero-media" aria-hidden="true"></div>
         <div class="shopping-global-collapse-controls" data-global-collapse-controls>
             <div class="shopping-global-collapse-actions">
                 <button type="button"
@@ -328,9 +340,9 @@
                data-app-nav-target="shoppingViewsSection"
                data-app-nav-lazy-section="recipe-view">
                 <span class="app-home-summary-icon">{{ shell.app_icon("shopping") }}</span>
-                <span>Shopping List</span>
+                <span>My Shopping List</span>
                 <strong>{{ items|length }}</strong>
-                <small>item{% if (items|length) != 1 %}s{% endif %}</small>
+                <small>item{% if (items|length) != 1 %}s{% endif %} ready to review</small>
             </a>
             <a class="app-home-summary-card"
                href="#recipesPage"
@@ -340,7 +352,7 @@
                data-app-nav-target="recipesPage"
                data-app-nav-lazy-section="current-recipes">
                 <span class="app-home-summary-icon">{{ shell.app_icon("recipes") }}</span>
-                <span>Current Recipes</span>
+                <span>My Recipes</span>
                 <strong>{{ current_recipe_count | default(0) }}</strong>
                 <small>saved recipe{% if (current_recipe_count | default(0)) != 1 %}s{% endif %}</small>
             </a>
@@ -354,7 +366,7 @@
                 <span class="app-home-summary-icon">{{ shell.app_icon("cookbooks") }}</span>
                 <span>Cookbooks</span>
                 <strong>{{ cookbook_count | default(0) }}</strong>
-                <small>{{ cookbook_recipe_count | default(0) }} recipe{% if (cookbook_recipe_count | default(0)) != 1 %}s{% endif %}</small>
+                <small>{{ cookbook_recipe_count | default(0) }} assigned recipe{% if (cookbook_recipe_count | default(0)) != 1 %}s{% endif %}</small>
             </a>
             <a class="app-home-summary-card"
                href="#aiPantrySection"
@@ -364,97 +376,120 @@
                data-app-nav-target="aiPantrySection"
                data-app-nav-lazy-section="pantry">
                 <span class="app-home-summary-icon">{{ shell.app_icon("pantry") }}</span>
-                <span>Pantry</span>
-                <strong>Open</strong>
-                <small>inventory and use-soon items</small>
+                <span>Pantry Items</span>
+                <strong>{{ pantry_summary.total | default(0) }}</strong>
+                <small>{% if pantry_summary.running_low | default(0) %}{{ pantry_summary.running_low }} running low{% else %}inventory ready{% endif %}</small>
             </a>
         </div>
 
-        <div class="app-home-content-grid">
-            <section class="app-home-panel app-home-quick-actions" aria-label="Quick actions">
+        <div class="app-home-primary-grid">
+            <section class="app-home-panel app-home-recent-recipes" aria-label="Recent recipes">
                 <div class="app-home-panel-header">
-                    <h2>Quick Actions</h2>
-                </div>
-                <div class="app-home-action-grid">
-                    <a href="#recipeUrlsTextarea"
-                       data-app-nav-link
-                       data-app-nav-action="app-page"
-                       data-app-page-target="recipeUrlsPage"
-                       data-app-nav-target="recipeUrlsTextarea">
-                        {{ shell.app_icon("link") }}
-                        <span>Import Recipe URLs</span>
-                    </a>
-                    <a href="#importDocumentPage"
-                       data-app-nav-link
-                       data-app-nav-action="app-page"
-                       data-app-page-target="importDocumentPage"
-                       data-app-nav-target="importDocumentPage">
-                        {{ shell.app_icon("document") }}
-                        <span>Import Document</span>
-                    </a>
-                    <a href="#generateImagePage"
-                       data-app-nav-link
-                       data-app-nav-action="app-page"
-                       data-app-page-target="generateImagePage"
-                       data-app-nav-target="generateImagePage">
-                        {{ shell.app_icon("image") }}
-                        <span>Generate From Image</span>
-                    </a>
-                    <a href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
-                        {{ shell.app_icon("barcode") }}
-                        <span>Scan Barcode</span>
-                    </a>
-                </div>
-            </section>
-
-            <section class="app-home-panel app-home-list-preview" aria-label="Current shopping list preview">
-                <div class="app-home-panel-header">
-                    <h2>Current Shopping List</h2>
-                    <a href="#shoppingViewsSection"
-                       data-app-nav-link
-                       data-app-nav-action="app-page"
-                       data-app-page-target="shoppingListsPage"
-                       data-app-nav-target="shoppingViewsSection"
-                       data-app-nav-lazy-section="recipe-view">Open list</a>
-                </div>
-                {% if items %}
-                    <ul class="app-home-preview-list">
-                        {% for item in items[:6] %}
-                            <li><span>{{ item }}</span></li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <div class="app-home-empty-state">
-                        <strong>No shopping items yet.</strong>
-                        <span>Add items from recipes, imports, or the pantry.</span>
-                    </div>
-                {% endif %}
-            </section>
-
-            <section class="app-home-panel app-home-recipe-preview" aria-label="Recipe and cookbook summary">
-                <div class="app-home-panel-header">
-                    <h2>Recipes &amp; Cookbooks</h2>
+                    <h2>Recent Recipes</h2>
                     <a href="#recipesPage"
                        data-app-nav-link
                        data-app-nav-action="app-page"
                        data-app-page-target="recipesPage"
                        data-app-nav-target="recipesPage"
-                       data-app-nav-lazy-section="current-recipes">Open recipes</a>
+                       data-app-nav-lazy-section="current-recipes">View all</a>
                 </div>
-                <div class="app-home-mini-grid">
-                    <article>
-                        <span>Current Recipes</span>
-                        <strong>{{ current_recipe_count | default(0) }}</strong>
-                    </article>
-                    <article>
-                        <span>Cookbooks</span>
-                        <strong>{{ cookbook_count | default(0) }}</strong>
-                    </article>
-                    <article>
-                        <span>Cookbook Recipes</span>
-                        <strong>{{ cookbook_recipe_count | default(0) }}</strong>
-                    </article>
+                {% if recipe_preview_rows %}
+                    <div class="app-home-recipe-grid">
+                        {% for recipe in recipe_preview_rows[:4] %}
+                            <article class="app-home-recipe-card" data-recipe-url="{{ recipe.url }}">
+                                <a class="app-home-recipe-media"
+                                   href="#recipeView"
+                                   data-recipe-url="{{ recipe.url }}"
+                                   onclick="return jumpToRecipeViewRecipe(this, event)">
+                                    {% if recipe.cover_image and recipe.cover_image.src %}
+                                        <img src="{{ recipe.cover_image.card_url or recipe.cover_image.thumb_url or recipe.cover_image.src }}"
+                                             alt="{{ recipe.cover_image.alt or recipe.name }}"
+                                             loading="lazy">
+                                    {% else %}
+                                        {{ shell.app_icon("recipes") }}
+                                    {% endif %}
+                                </a>
+                                <h3><a href="#recipeView" data-recipe-url="{{ recipe.url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ recipe.name }}</a></h3>
+                                <div><span class="app-home-recipe-rating" aria-label="{{ recipe.rating }} out of 5 stars">{{ recipe.rating_stars }}</span><span>{{ recipe.preview_time or "Time TBD" }}</span></div>
+                                <small>{{ recipe.cookbook_name or "Unclassified" }}</small>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="app-home-empty-state">
+                        <strong>No recipes yet.</strong>
+                        <span>Import a recipe URL or create a recipe to see it here.</span>
+                        <a href="#recipeUrlsPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipeUrlsPage" data-app-nav-target="recipeUrlsPage">Import recipe URLs</a>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="app-home-panel app-home-meal-preview" aria-label="Upcoming meal plan">
+                <div class="app-home-panel-header">
+                    <h2>Upcoming Meal Plan</h2>
+                    <a href="#mealPlannerPage"
+                       data-app-nav-link
+                       data-app-nav-action="app-page"
+                       data-app-page-target="mealPlannerPage"
+                       data-app-nav-target="mealPlannerPage">View planner</a>
                 </div>
+                {% if meal_plan.meals %}
+                    <ul class="app-home-meal-list">
+                        {% for meal in meal_plan.meals[:5] %}
+                            <li>
+                                <time datetime="{{ meal.date }}">{{ meal.date }}</time>
+                                <span>{{ meal.meal_type | title }}</span>
+                                <strong>{{ meal.recipe_name }}</strong>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="app-home-empty-state">
+                        <strong>No meals planned for this week.</strong>
+                        <span>Open Meal Planner to add recipes to breakfast, lunch, dinner, or snacks.</span>
+                        <button type="button" onclick="return openMealPlannerPageAndDialog()">Add a meal</button>
+                    </div>
+                {% endif %}
+            </section>
+        </div>
+
+        <div class="app-home-secondary-grid">
+            <section class="app-home-panel app-home-smart-suggestions" aria-label="Smart suggestions">
+                <div class="app-home-panel-header">
+                    <h2>Smart Suggestions</h2>
+                </div>
+                {% if pantry_preview_items %}
+                    {% set pantry_suggestion = pantry_preview_items[0] %}
+                    <div class="app-home-suggestion-row">
+                        <span class="app-home-summary-icon">{{ shell.app_icon("pantry") }}</span>
+                        <div><strong>Review {{ pantry_suggestion.ingredient_name or pantry_suggestion.product_name or "a pantry item" }}</strong><span>Check quantity and freshness before your next trip.</span></div>
+                        <a href="#aiPantryInventory" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryInventory" data-app-nav-lazy-section="pantry">Open Pantry</a>
+                    </div>
+                {% else %}
+                    <div class="app-home-empty-state"><strong>Your pantry is ready to set up.</strong><span>Add pantry items to receive useful, data-backed suggestions.</span></div>
+                {% endif %}
+            </section>
+
+            <section class="app-home-panel app-home-price-preview" aria-label="Price comparison">
+                <div class="app-home-panel-header"><h2>Price Comparison</h2></div>
+                <p>Compare current shopping items across your enabled stores. Prices appear only after a supported lookup.</p>
+                <a class="app-page-secondary-action" href="#priceComparisonPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="priceComparisonPage" data-app-nav-target="priceComparisonPage">Compare prices</a>
+            </section>
+
+            <section class="app-home-panel app-home-recent-imports" aria-label="Recent imports">
+                <div class="app-home-panel-header">
+                    <h2>Recent Imports</h2>
+                    <a href="#importPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="importPage">View all</a>
+                </div>
+                {% if recipe_preview_rows %}
+                    <ul class="app-home-import-list">
+                        {% for recipe in recipe_preview_rows[:3] %}
+                            <li>{{ shell.app_icon("link") }}<a href="#recipeView" data-recipe-url="{{ recipe.url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ recipe.name }}</a><span>{{ recipe.cookbook_name or "Unclassified" }}</span></li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="app-home-empty-state"><strong>No imports yet.</strong><span>Imported recipes will appear here.</span></div>
+                {% endif %}
             </section>
         </div>
     </section>

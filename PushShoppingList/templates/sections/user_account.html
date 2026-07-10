@@ -1,5 +1,8 @@
 <section id="userAccountSection" class="recipe-card user-account-card">
-    <h2 class="user-account-heading">User Account</h2>
+    <div class="app-profile-heading">
+        <h2 class="user-account-heading">{% if current_user %}Profile{% else %}User Account{% endif %}</h2>
+        {% if current_user %}<p>Manage your account information and preferences.</p>{% endif %}
+    </div>
     {% set account_action_token = password_reset_token|default("") or two_factor_recovery_token|default("") or account_delete_token|default("") %}
 
     {% set account_messages = get_flashed_messages(with_categories=true) %}
@@ -517,6 +520,51 @@
                              hidden></div>
                     </div>
                 </details>
+            </div>
+        </div>
+
+        <div class="app-profile-overview" aria-label="Profile overview">
+            {% set profile_usage = openai_usage_dashboard|default({}) %}
+            <section class="app-profile-usage-card">
+                <div class="app-profile-card-header">
+                    <h3>AI Usage This Month</h3>
+                    <button type="button" onclick="return toggleUsageDashboardPanel(true)">View full usage history</button>
+                </div>
+                <div class="app-profile-usage-list">
+                    <div><span>Recipe Imports</span><strong>{{ profile_usage.monthly_recipe_import_count|default(0) }}</strong></div>
+                    <div><span>Pantry Scans</span><strong>{{ profile_usage.monthly_pantry_scan_count|default(0) }}</strong></div>
+                    <div><span>Product Searches</span><strong>{{ profile_usage.monthly_product_search_count|default(0) }}</strong></div>
+                    <div><span>Generated Images</span><strong>{{ profile_usage.monthly_generated_image_count|default(0) }}</strong></div>
+                </div>
+            </section>
+            <section class="app-profile-cost-card">
+                <div class="app-profile-card-header"><h3>Estimated AI Cost</h3></div>
+                {% set profile_cost_label = profile_usage.monthly_estimated_cost_label or "Not available yet" %}
+                <strong{% if "not" in profile_cost_label|lower %} class="is-unavailable"{% endif %}>{{ profile_cost_label }}</strong>
+                <span>Estimated API cost this month</span>
+                <dl>
+                    <div><dt>Requests</dt><dd>{{ profile_usage.monthly_request_count|default(0) }}</dd></div>
+                    <div><dt>Tokens</dt><dd>{{ "{:,}".format(profile_usage.monthly_total_tokens|default(0)) }}</dd></div>
+                </dl>
+                <button type="button" onclick="return toggleUsageDashboardPanel(true)">View billing details</button>
+            </section>
+            <div class="app-profile-action-grid">
+                <button type="button" data-two-factor-open aria-controls="accountTwoFactorPanel">
+                    <span>Security</span><strong>Change password and configure two-factor authentication.</strong>
+                </button>
+                <button type="button" data-push-notifications-open aria-controls="accountPushNotificationsPanel">
+                    <span>Communications</span><strong>Control push notifications and support options.</strong>
+                </button>
+                <button type="button" onclick="return openSettingsSection('sessions', { targetId: 'settingsSessionsPanel' })">
+                    <span>Session</span><strong>Review the current signed-in session and display settings.</strong>
+                </button>
+                <button type="button" class="danger" data-delete-account-open aria-controls="accountDeletePanel">
+                    <span>Danger Zone</span><strong>Open the protected account-deletion flow.</strong>
+                </button>
+            </div>
+            <div class="app-profile-privacy-note">
+                <strong>Your Privacy Matters</strong>
+                <span>Your recipes, lists, and preferences remain scoped to your account.</span>
             </div>
         </div>
 

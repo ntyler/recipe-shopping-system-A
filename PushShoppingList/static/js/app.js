@@ -68,6 +68,7 @@ const USER_ACCOUNT_PANEL_HIDE_SELECTOR = [
 const AUTH_COLLAPSE_PENDING_KEY = "shopping-auth-collapse-all-pending";
 const AUTH_COLLAPSE_ACTIVE_KEY = "shopping-auth-collapse-all-active";
 const GLOBAL_COLLAPSE_STATE_KEY = "shopping-global-collapse-state";
+const APP_SIDEBAR_COLLAPSED_KEY = "ai-pantry-sidebar-collapsed";
 const PERFORMANCE_STARTUP_LAST_OPENED_KEY = "shopping-list-lastPageOpenedAt";
 const PERFORMANCE_STARTUP_STALE_MS = 60 * 60 * 1000;
 const CURRENT_RECIPES_HIDE_AI_INFERRED_BADGE_KEY = "current-recipes-hide-ai-inferred-badge";
@@ -199,6 +200,7 @@ const APP_PAGE_TARGETS = {
     aiPantryCookWithWhatIHave: "pantryPage",
     aiPantryCookWhatImFeeling: "pantryPage",
     aiPantryMissingIngredients: "pantryPage",
+    mealPlannerPage: "mealPlannerPage",
     storesPage: "storesPage",
     priceComparisonPage: "priceComparisonPage",
     importPage: "importPage",
@@ -1011,6 +1013,15 @@ function initAppShellNavigation() {
 
     document.documentElement.dataset.appShellNavigationBound = "1";
 
+    const sidebarCollapseButton = document.querySelector("[data-app-sidebar-collapse]");
+    if (sidebarCollapseButton) {
+        const storedCollapsed = localStorage.getItem(APP_SIDEBAR_COLLAPSED_KEY) === "1";
+        setAppSidebarCollapsed(storedCollapsed, { persist: false });
+        sidebarCollapseButton.addEventListener("click", () => {
+            setAppSidebarCollapsed(!document.body.classList.contains("app-sidebar-collapsed"));
+        });
+    }
+
     document.addEventListener("click", event => {
         const link = event.target && event.target.closest
             ? event.target.closest("[data-app-nav-link]")
@@ -1057,6 +1068,167 @@ function initAppShellNavigation() {
     });
 }
 
+function setAppSidebarCollapsed(collapsed, options = {}) {
+    const isCollapsed = Boolean(collapsed);
+    document.body.classList.toggle("app-sidebar-collapsed", isCollapsed);
+    const button = document.querySelector("[data-app-sidebar-collapse]");
+    if (button) {
+        button.setAttribute("aria-pressed", isCollapsed ? "true" : "false");
+        button.setAttribute("aria-label", isCollapsed ? "Expand sidebar" : "Collapse sidebar");
+        button.setAttribute("title", isCollapsed ? "Expand sidebar" : "Collapse sidebar");
+        const glyph = button.querySelector("span");
+        if (glyph) {
+            glyph.textContent = isCollapsed ? ">" : "<";
+        }
+    }
+    if (options.persist !== false) {
+        localStorage.setItem(APP_SIDEBAR_COLLAPSED_KEY, isCollapsed ? "1" : "0");
+    }
+    return false;
+}
+
+function openMealPlannerPageAndDialog() {
+    openAppPage("mealPlannerPage", { targetId: "mealPlannerPage" }).then(() => {
+        openMealPlannerDialog();
+    });
+    return false;
+}
+
+function setMealPlannerStatus(message, isError = false, selector = "[data-meal-plan-status]") {
+    const status = document.querySelector(selector);
+    if (!status) {
+        return;
+    }
+    status.textContent = message || "";
+    status.classList.toggle("error", Boolean(isError));
+}
+
+function openMealPlannerDialog(dateValue = "", mealType = "") {
+    const dialog = document.getElementById("mealPlannerDialog");
+    if (!dialog || typeof dialog.showModal !== "function") {
+        return false;
+    }
+    const dateInput = dialog.querySelector('[name="date"]');
+    const typeInput = dialog.querySelector('[name="meal_type"]');
+    if (dateInput && dateValue) {
+        dateInput.value = dateValue;
+    }
+    if (typeInput && mealType) {
+        typeInput.value = mealType;
+    }
+    setMealPlannerStatus("");
+    dialog.showModal();
+    const recipeInput = dialog.querySelector('[name="recipe_url"]');
+    (recipeInput || dateInput)?.focus();
+    return false;
+}
+
+function closeMealPlannerDialog() {
+    const dialog = document.getElementById("mealPlannerDialog");
+    if (dialog && dialog.open) {
+        dialog.close();
+    }
+    return false;
+}
+
+async function submitMealPlannerForm(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const submitButton = form.querySelector("[data-meal-plan-submit]");
+    const formData = new FormData(form);
+    const originalLabel = submitButton ? submitButton.textContent : "Add Meal";
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Adding...";
+    }
+    setMealPlannerStatus("Adding meal...");
+    try {
+        const response = await fetch("/api/meal-plan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                date: formData.get("date"),
+                meal_type: formData.get("meal_type"),
+                recipe_url: formData.get("recipe_url"),
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || "The meal could not be added.");
+        }
+        setMealPlannerStatus("Meal added.");
+        const weekValue = formData.get("date");
+        window.location.assign(`/?meal_week=${encodeURIComponent(weekValue)}#mealPlannerPage`);
+    } catch (error) {
+        setMealPlannerStatus(error.message || "The meal could not be added.", true);
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = originalLabel;
+        }
+    }
+    return false;
+}
+
+function openMealPlannerDeleteDialog(button) {
+    const dialog = document.getElementById("mealPlannerDeleteDialog");
+    if (!dialog || typeof dialog.showModal !== "function") {
+        return false;
+    }
+    const mealId = String(button?.dataset.mealId || "");
+    const mealName = String(button?.dataset.mealName || "this meal");
+    const idInput = dialog.querySelector("[data-meal-delete-id]");
+    const copy = dialog.querySelector("[data-meal-delete-copy]");
+    if (idInput) {
+        idInput.value = mealId;
+    }
+    if (copy) {
+        copy.textContent = `Remove ${mealName} from this week? The recipe itself will not be deleted, and you can add the meal again later.`;
+    }
+    setMealPlannerStatus("", false, "[data-meal-delete-status]");
+    dialog.showModal();
+    dialog.querySelector("[data-meal-delete-submit]")?.focus();
+    return false;
+}
+
+function closeMealPlannerDeleteDialog() {
+    const dialog = document.getElementById("mealPlannerDeleteDialog");
+    if (dialog && dialog.open) {
+        dialog.close();
+    }
+    return false;
+}
+
+async function confirmMealPlannerDelete(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const mealId = String(form.querySelector("[data-meal-delete-id]")?.value || "");
+    const submitButton = form.querySelector("[data-meal-delete-submit]");
+    const originalLabel = submitButton ? submitButton.textContent : "Remove Meal";
+    if (!mealId) {
+        setMealPlannerStatus("The planned meal could not be identified.", true, "[data-meal-delete-status]");
+        return false;
+    }
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Removing...";
+    }
+    try {
+        const response = await fetch(`/api/meal-plan/${encodeURIComponent(mealId)}`, { method: "DELETE" });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || "The meal could not be removed.");
+        }
+        window.location.reload();
+    } catch (error) {
+        setMealPlannerStatus(error.message || "The meal could not be removed.", true, "[data-meal-delete-status]");
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = originalLabel;
+        }
+    }
+    return false;
+}
+
 function submitAppGlobalSearch(form) {
     const input = form ? form.querySelector("[data-app-global-search]") : null;
     const query = normalizeAppShellSearchText(input ? input.value : "");
@@ -1086,6 +1258,165 @@ function submitAppGlobalSearch(form) {
 
     appShellSetSearchStatus(`Opening ${match.textContent.trim()}.`);
     activateAppShellNavLink(match);
+    return false;
+}
+
+function recipeBrowseCards() {
+    return [...document.querySelectorAll("#recipesPage [data-recipe-preview-card]")];
+}
+
+function toggleRecipeBrowseFilters(button) {
+    const panel = document.getElementById("recipeBrowseFilters");
+    if (!panel) {
+        return false;
+    }
+    panel.hidden = !panel.hidden;
+    button?.setAttribute("aria-expanded", panel.hidden ? "false" : "true");
+    if (!panel.hidden) {
+        panel.querySelector("input, select")?.focus();
+    }
+    return false;
+}
+
+function applyRecipeBrowseFilters() {
+    const panel = document.getElementById("recipeBrowseFilters");
+    const query = normalizeAppShellSearchText(panel?.querySelector("[data-recipe-browse-search]")?.value || "");
+    const cookbook = normalizeAppShellSearchText(panel?.querySelector("[data-recipe-browse-cookbook]")?.value || "");
+    let visibleCount = 0;
+    recipeBrowseCards().forEach(card => {
+        const searchable = normalizeAppShellSearchText(`${card.dataset.recipeName || ""} ${card.dataset.recipeCookbook || ""}`);
+        const matchesQuery = !query || searchable.includes(query);
+        const matchesCookbook = !cookbook || normalizeAppShellSearchText(card.dataset.recipeCookbook).includes(cookbook);
+        card.hidden = !(matchesQuery && matchesCookbook);
+        if (!card.hidden) {
+            visibleCount += 1;
+        }
+    });
+    const status = panel?.querySelector("[data-recipe-browse-status]");
+    if (status) {
+        status.textContent = `${visibleCount} visible recipe${visibleCount === 1 ? "" : "s"}.`;
+    }
+    return false;
+}
+
+function clearRecipeBrowseFilters() {
+    const panel = document.getElementById("recipeBrowseFilters");
+    const search = panel?.querySelector("[data-recipe-browse-search]");
+    const cookbook = panel?.querySelector("[data-recipe-browse-cookbook]");
+    if (search) {
+        search.value = "";
+    }
+    if (cookbook) {
+        cookbook.value = "";
+    }
+    applyRecipeBrowseFilters();
+    search?.focus();
+    return false;
+}
+
+function openNewCookbookForm() {
+    openAppPage("cookbooksPage", {
+        targetId: "cookbooksCard",
+        lazySection: "cookbooks",
+        scroll: true,
+    }).then(() => {
+        const input = document.getElementById("cookbookNameInput");
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    });
+    return false;
+}
+
+const pantryPageFilters = {
+    category: "",
+    status: "",
+};
+
+function setPantryPageCategory(category, button) {
+    pantryPageFilters.category = normalizeAppShellSearchText(category);
+    document.querySelectorAll("#pantryPage .app-page-chip-row button").forEach(control => {
+        const active = control === button;
+        control.classList.toggle("is-active", active);
+        control.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    applyPantryPageFilters();
+    return false;
+}
+
+function setPantryPageStatusFilter(status, card) {
+    pantryPageFilters.status = normalizeAppShellSearchText(status);
+    document.querySelectorAll("#pantryPage .app-pantry-summary-cards article").forEach(control => {
+        control.classList.toggle("is-active", control === card);
+    });
+    applyPantryPageFilters();
+    return false;
+}
+
+function applyPantryPageFilters() {
+    const search = normalizeAppShellSearchText(document.querySelector("[data-pantry-page-search]")?.value || "");
+    const rows = [...document.querySelectorAll("#pantryPage [data-pantry-inventory-row]")];
+    rows.forEach(row => {
+        const searchable = normalizeAppShellSearchText(row.dataset.pantrySearch || row.textContent);
+        const category = normalizeAppShellSearchText(row.dataset.pantryCategory || "");
+        const status = normalizeAppShellSearchText(row.dataset.pantryStatus || "");
+        const matchesSearch = !search || searchable.includes(search);
+        const matchesCategory = !pantryPageFilters.category || category.includes(pantryPageFilters.category);
+        const matchesStatus = !pantryPageFilters.status || status.includes(pantryPageFilters.status);
+        row.hidden = !(matchesSearch && matchesCategory && matchesStatus);
+    });
+    return false;
+}
+
+function clearPantryPageFilters() {
+    pantryPageFilters.category = "";
+    pantryPageFilters.status = "";
+    const search = document.querySelector("[data-pantry-page-search]");
+    if (search) {
+        search.value = "";
+    }
+    const categoryButtons = [...document.querySelectorAll("#pantryPage .app-page-chip-row button")];
+    categoryButtons.forEach((button, index) => {
+        button.classList.toggle("is-active", index === 0);
+        button.setAttribute("aria-pressed", index === 0 ? "true" : "false");
+    });
+    const summaryCards = [...document.querySelectorAll("#pantryPage .app-pantry-summary-cards article")];
+    summaryCards.forEach((card, index) => card.classList.toggle("is-active", index === 0));
+    applyPantryPageFilters();
+    search?.focus();
+    return false;
+}
+
+function cycleRecipeBrowseSort(button) {
+    const grid = document.querySelector("#recipesPage .app-recipes-grid");
+    if (!grid) {
+        return false;
+    }
+    const cards = recipeBrowseCards();
+    cards.forEach((card, index) => {
+        if (!card.dataset.recipeOriginalIndex) {
+            card.dataset.recipeOriginalIndex = String(index + 1);
+        }
+    });
+    const currentMode = String(button?.dataset.recipeSortMode || "original");
+    const nextMode = currentMode === "original" ? "name-asc" : (currentMode === "name-asc" ? "name-desc" : "original");
+    const sorted = [...cards].sort((left, right) => {
+        if (nextMode === "original") {
+            return Number(left.dataset.recipeOriginalIndex) - Number(right.dataset.recipeOriginalIndex);
+        }
+        const comparison = String(left.dataset.recipeName || "").localeCompare(String(right.dataset.recipeName || ""));
+        return nextMode === "name-desc" ? -comparison : comparison;
+    });
+    sorted.forEach(card => grid.appendChild(card));
+    if (button) {
+        button.dataset.recipeSortMode = nextMode;
+        button.setAttribute("aria-label", nextMode === "original" ? "Sort recipes by name" : `Recipe sort: ${nextMode === "name-asc" ? "name A to Z" : "name Z to A"}`);
+        const label = button.querySelector("span");
+        if (label) {
+            label.textContent = nextMode === "original" ? "Sort" : (nextMode === "name-asc" ? "A-Z" : "Z-A");
+        }
+    }
     return false;
 }
 

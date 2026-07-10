@@ -42,8 +42,11 @@ def test_recipes_page_preserves_real_actions_and_recipe_metadata():
     assert 'data-app-page-target="cookbooksPage"' in recipes_page
     assert 'data-app-page-target="recipeUrlsPage"' in recipes_page
     assert 'data-app-nav-action="ai-pantry"' in recipes_page
-    assert 'aria-pressed="false"' in recipes_page
-    assert 'shell.svg_icon("heart")' in recipes_page
+    assert 'onclick="return toggleRecipeBrowseFilters(this)"' in recipes_page
+    assert 'onclick="return cycleRecipeBrowseSort(this)"' in recipes_page
+    assert 'data-recipe-browse-search' in recipes_page
+    assert 'data-recipe-browse-cookbook' in recipes_page
+    assert 'shell.svg_icon("heart")' not in recipes_page
     assert 'shell.svg_icon("clock")' in recipes_page
 
 

@@ -27781,6 +27781,25 @@ img[data-deferred-src] {
     margin-top: 0;
 }
 
+.app-page-tabs .app-page-tab-label {
+    align-items: center;
+    border: 1px solid var(--app-page-border);
+    border-radius: 9px;
+    color: var(--app-page-muted);
+    display: inline-flex;
+    font-size: 0.8rem;
+    font-weight: 700;
+    gap: 0.45rem;
+    min-height: 36px;
+    padding: 0.55rem 0.85rem;
+}
+
+.app-page-tabs .app-page-tab-label.is-active {
+    background: var(--app-page-green-soft);
+    border-color: color-mix(in srgb, var(--app-page-green) 45%, var(--app-page-border));
+    color: var(--app-page-green);
+}
+
 .app-page-primary-action,
 .app-page-secondary-action,
 .app-page-table-action,
@@ -29440,6 +29459,1414 @@ img[data-deferred-src] {
         right: 8px;
         bottom: 8px;
         left: 8px;
+    }
+}
+
+/* Desktop mockup fidelity pass: shared AI Pantry shell, home, and meal planner. */
+@media (min-width: 1100px) {
+    :root {
+        --app-sidebar-width: 272px;
+        --app-toolbar-height: 78px;
+        --app-content-max: 1310px;
+        --app-control-height: 42px;
+        --app-radius-sm: 7px;
+        --app-radius-md: 9px;
+        --app-radius-lg: 12px;
+        --app-text: #17243a;
+        --app-text-strong: #0d1c31;
+        --app-muted: #5d6a80;
+        --app-border: #e1e7ec;
+        --app-border-strong: #cfd8df;
+        --app-bg: #ffffff;
+        --app-bg-soft: #f7f9fa;
+        --app-surface: #ffffff;
+        --app-surface-soft: #f9fbfa;
+        --app-surface-muted: #eff7f1;
+        --app-primary: #07852f;
+        --app-primary-hover: #056f28;
+        --app-primary-soft: #edf7ef;
+        --app-shadow-sm: 0 1px 2px rgba(12, 31, 48, 0.02), 0 6px 20px rgba(12, 31, 48, 0.035);
+    }
+
+    .app-shell-body {
+        font-family: "Segoe UI Variable Text", Inter, "Segoe UI", Arial, sans-serif;
+        font-size: 14px;
+        letter-spacing: -0.01em;
+    }
+
+    .app-shell {
+        transition: grid-template-columns 180ms ease;
+    }
+
+    .app-sidebar {
+        gap: 7px;
+        padding: 17px 15px 18px;
+        overflow-x: hidden;
+        box-shadow: none;
+    }
+
+    .app-brand {
+        min-height: 58px;
+        padding: 0 10px 8px;
+        gap: 8px;
+    }
+
+    .app-brand-mark {
+        flex-basis: 47px;
+        width: 47px;
+        height: 47px;
+    }
+
+    .app-brand strong {
+        font-size: 29px;
+        font-weight: 740;
+        letter-spacing: -1.3px;
+    }
+
+    .app-brand small {
+        margin-top: 5px;
+        font-size: 9px;
+        font-weight: 750;
+        letter-spacing: 1.45px;
+    }
+
+    .app-sidebar-collapse {
+        position: absolute;
+        top: 70px;
+        right: -12px;
+        z-index: 3;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        min-height: 24px;
+        padding: 0;
+        border: 1px solid var(--app-border);
+        border-radius: 50%;
+        background: var(--app-surface);
+        color: var(--app-muted);
+        font-size: 18px;
+        line-height: 1;
+        box-shadow: var(--app-shadow-sm);
+    }
+
+    .app-sidebar-nav {
+        gap: 1px;
+    }
+
+    .app-nav-link {
+        gap: 11px;
+        min-height: 40px;
+        padding: 8px 11px;
+        font-size: 13px;
+        font-weight: 610;
+    }
+
+    .app-nav-section-title {
+        margin: 14px 10px 5px;
+        padding-top: 14px;
+        border-top: 1px solid var(--app-border);
+        color: #6e7a8d;
+        font-size: 10px;
+        font-weight: 650;
+        letter-spacing: .4px;
+    }
+
+    .app-nav-section-title:first-of-type {
+        display: none;
+    }
+
+    .app-nav-icon {
+        flex-basis: 21px;
+        width: 21px;
+        height: 21px;
+    }
+
+    .app-icon-svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .app-sidebar-promo {
+        gap: 8px;
+        margin: auto 8px 0;
+        padding: 15px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #f5fbf6, #ffffff);
+        box-shadow: none;
+    }
+
+    .app-sidebar-promo strong {
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .app-sidebar-promo span {
+        font-size: 12px;
+        font-weight: 450;
+        line-height: 1.55;
+    }
+
+    .app-sidebar-promo a {
+        min-height: 36px;
+        font-size: 12px;
+        font-weight: 650;
+    }
+
+    .app-topbar {
+        grid-template-columns: minmax(300px, 570px) minmax(0, 1fr) auto;
+        gap: 18px;
+        min-height: 78px;
+        padding: 14px 28px;
+        background: rgba(255, 255, 255, .97);
+    }
+
+    .app-global-search {
+        width: min(100%, 540px);
+    }
+
+    .app-global-search input {
+        min-height: 44px;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 450;
+    }
+
+    .app-global-search-shortcut {
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .app-toolbar-button {
+        min-height: 42px;
+        font-size: 13px;
+        font-weight: 650;
+    }
+
+    .app-toolbar-primary {
+        border-color: #cfe1d4;
+        background: #ffffff;
+        color: var(--app-primary);
+        box-shadow: none;
+    }
+
+    .app-help-button {
+        display: none;
+    }
+
+    .app-account-button {
+        min-width: 188px;
+        padding-right: 2px;
+    }
+
+    .app-account-label strong {
+        font-size: 13px;
+        font-weight: 680;
+    }
+
+    .app-account-label small {
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    .app-content {
+        width: min(var(--app-content-max), calc(100% - 54px));
+        padding: 20px 0 56px;
+    }
+
+    .app-page-header {
+        position: relative;
+        min-height: 146px;
+        margin-bottom: 18px;
+        align-items: start;
+        overflow: hidden;
+    }
+
+    .app-page-header h1 {
+        position: relative;
+        z-index: 2;
+        margin-top: 8px;
+        font-size: 35px;
+        font-weight: 720;
+        letter-spacing: -1.15px;
+    }
+
+    .app-page-header p {
+        position: relative;
+        z-index: 2;
+        font-size: 15px;
+        font-weight: 430;
+    }
+
+    .app-page-header .shopping-global-collapse-controls {
+        display: none;
+    }
+
+    .app-home-hero-media {
+        position: absolute;
+        top: -13px;
+        right: 205px;
+        width: 320px;
+        height: 190px;
+        background: url("../images/ai-pantry-home-hero.png") center / 250px 190px no-repeat;
+        pointer-events: none;
+    }
+
+    .app-home-dashboard {
+        gap: 20px;
+    }
+
+    .app-home-summary-grid {
+        gap: 15px;
+    }
+
+    .app-home-summary-card,
+    .app-home-panel {
+        border-radius: 12px;
+        box-shadow: none;
+    }
+
+    .app-home-summary-card {
+        min-height: 128px;
+        padding: 18px 16px;
+    }
+
+    .app-home-summary-card > span:not(.app-home-summary-icon) {
+        font-size: 12px;
+        font-weight: 650;
+    }
+
+    .app-home-summary-card strong {
+        font-size: 27px;
+        font-weight: 700;
+    }
+
+    .app-home-summary-card small {
+        font-size: 12px;
+        font-weight: 430;
+    }
+
+    .app-home-primary-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(330px, .95fr);
+        gap: 18px;
+    }
+
+    .app-home-secondary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .app-home-panel {
+        gap: 13px;
+        padding: 17px;
+    }
+
+    .app-home-panel-header h2 {
+        font-size: 16px;
+        font-weight: 680;
+    }
+
+    .app-home-panel-header a {
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .app-home-recipe-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .app-home-recipe-card {
+        min-width: 0;
+    }
+
+    .app-home-recipe-media {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        aspect-ratio: 1.24 / 1;
+        overflow: hidden;
+        border-radius: 9px;
+        background: var(--app-primary-soft);
+        color: var(--app-primary);
+    }
+
+    .app-home-recipe-media img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .app-home-recipe-card h3 {
+        margin: 9px 0 5px;
+        font-size: 13px;
+        line-height: 1.22;
+    }
+
+    .app-home-recipe-card h3 a {
+        color: var(--app-text-strong);
+        text-decoration: none;
+    }
+
+    .app-home-recipe-card > div {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        color: var(--app-muted);
+        font-size: 11px;
+    }
+
+    .app-home-recipe-rating {
+        color: #ffaf00;
+        letter-spacing: .5px;
+    }
+
+    .app-home-recipe-card small {
+        display: inline-flex;
+        margin-top: 7px;
+        padding: 3px 7px;
+        border-radius: 5px;
+        background: var(--app-primary-soft);
+        color: var(--app-primary);
+        font-size: 10px;
+    }
+
+    .app-home-meal-list,
+    .app-home-import-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .app-home-meal-list li {
+        display: grid;
+        grid-template-columns: 72px 70px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        min-height: 45px;
+        padding: 0 8px;
+        border-bottom: 1px solid var(--app-border);
+        font-size: 12px;
+    }
+
+    .app-home-meal-list time {
+        color: var(--app-primary);
+        font-weight: 650;
+    }
+
+    .app-home-meal-list span {
+        color: var(--app-muted);
+    }
+
+    .app-home-suggestion-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .app-home-suggestion-row div {
+        display: grid;
+        gap: 3px;
+    }
+
+    .app-home-suggestion-row strong {
+        font-size: 13px;
+    }
+
+    .app-home-suggestion-row div span,
+    .app-home-price-preview p {
+        color: var(--app-muted);
+        font-size: 12px;
+        line-height: 1.45;
+    }
+
+    .app-home-suggestion-row a,
+    .app-home-price-preview > a {
+        color: var(--app-primary);
+        font-size: 12px;
+        font-weight: 650;
+        text-decoration: none;
+    }
+
+    .app-home-import-list li {
+        display: grid;
+        grid-template-columns: 26px minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        min-height: 40px;
+        border-bottom: 1px solid var(--app-border);
+        font-size: 11px;
+    }
+
+    .app-home-import-list a {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--app-text);
+        text-overflow: ellipsis;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .app-home-import-list span {
+        color: var(--app-muted);
+    }
+
+    .app-home-empty-state {
+        min-height: 96px;
+        align-content: center;
+        border-style: solid;
+        background: var(--app-surface-soft);
+    }
+
+    .app-home-empty-state a,
+    .app-home-empty-state button {
+        justify-self: start;
+        min-height: 34px;
+        margin: 0;
+        padding: 0 12px;
+        border: 1px solid #cfe1d4;
+        border-radius: 7px;
+        background: #fff;
+        color: var(--app-primary);
+        font-size: 12px;
+        font-weight: 650;
+        text-decoration: none;
+    }
+
+    .app-page-workspace-meal-planner .app-page-layout {
+        grid-template-columns: minmax(0, 1fr) 286px;
+    }
+
+    .app-meal-planner-toolbar {
+        display: grid;
+        grid-template-columns: 42px auto 42px minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        margin: 0 0 16px;
+    }
+
+    .app-meal-planner-toolbar > a:not(.app-page-secondary-action) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+        border: 1px solid var(--app-border);
+        border-radius: 8px;
+        color: var(--app-text);
+        text-decoration: none;
+    }
+
+    .app-meal-planner-toolbar .app-page-secondary-action {
+        grid-column: 5;
+    }
+
+    .app-meal-planner-grid {
+        display: grid;
+        grid-template-columns: 76px repeat(7, minmax(108px, 1fr));
+        overflow-x: auto;
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        background: var(--app-surface);
+    }
+
+    .app-meal-planner-corner,
+    .app-meal-planner-day,
+    .app-meal-planner-row-label,
+    .app-meal-planner-cell {
+        min-width: 0;
+        border-right: 1px solid var(--app-border);
+        border-bottom: 1px solid var(--app-border);
+    }
+
+    .app-meal-planner-day {
+        display: flex;
+        justify-content: center;
+        gap: 4px;
+        padding: 13px 6px;
+        font-size: 11px;
+    }
+
+    .app-meal-planner-day.is-today {
+        background: var(--app-primary-soft);
+        color: var(--app-primary);
+    }
+
+    .app-meal-planner-row-label {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        color: var(--app-text-strong);
+        font-size: 11px;
+        font-weight: 650;
+    }
+
+    .app-meal-planner-cell {
+        position: relative;
+        min-height: 122px;
+        padding: 6px;
+    }
+
+    .app-meal-card {
+        position: relative;
+        display: grid;
+        gap: 6px;
+        height: 100%;
+        min-height: 108px;
+    }
+
+    .app-meal-card img {
+        width: 100%;
+        height: 64px;
+        border-radius: 7px;
+        object-fit: cover;
+    }
+
+    .app-meal-card > a {
+        color: var(--app-text-strong);
+        font-size: 11px;
+        font-weight: 620;
+        line-height: 1.25;
+        text-decoration: none;
+    }
+
+    .app-meal-remove {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 26px;
+        min-height: 26px;
+        padding: 0;
+        border: 1px solid var(--app-border);
+        border-radius: 50%;
+        background: rgba(255, 255, 255, .94);
+        color: var(--app-danger);
+    }
+
+    .app-meal-add-slot {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        min-height: 108px;
+        padding: 0;
+        border: 1px dashed transparent;
+        background: transparent;
+        color: var(--app-border-strong);
+        font-size: 22px;
+    }
+
+    .app-meal-add-slot:hover:not(:disabled),
+    .app-meal-add-slot:focus-visible:not(:disabled) {
+        border-color: #b9d9c2;
+        background: var(--app-primary-soft);
+        color: var(--app-primary);
+    }
+
+    .app-meal-planner-empty {
+        display: grid;
+        gap: 6px;
+        margin-top: 14px;
+        padding: 18px;
+        border: 1px solid var(--app-border);
+        border-radius: 10px;
+        color: var(--app-muted);
+    }
+
+    .app-meal-planner-empty a {
+        justify-self: start;
+        color: var(--app-primary);
+        font-weight: 650;
+    }
+
+    .app-dialog {
+        width: min(480px, calc(100vw - 32px));
+        padding: 0;
+        border: 0;
+        border-radius: 12px;
+        background: transparent;
+        box-shadow: 0 24px 70px rgba(8, 22, 43, .24);
+    }
+
+    .app-dialog::backdrop {
+        background: rgba(7, 18, 30, .48);
+        backdrop-filter: blur(2px);
+    }
+
+    .app-dialog-card {
+        display: grid;
+        gap: 15px;
+        margin: 0;
+        padding: 22px;
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        background: var(--app-surface);
+    }
+
+    .app-dialog-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+    }
+
+    .app-dialog-header h3,
+    .app-dialog-header p {
+        margin: 0;
+    }
+
+    .app-dialog-header h3 {
+        font-size: 19px;
+    }
+
+    .app-dialog-header p {
+        margin-top: 4px;
+        color: var(--app-muted);
+        font-size: 12px;
+        line-height: 1.45;
+    }
+
+    .app-dialog-close {
+        width: 32px;
+        min-height: 32px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--app-muted);
+        font-size: 22px;
+    }
+
+    .app-dialog-card > label {
+        display: grid;
+        gap: 6px;
+        color: var(--app-text-strong);
+        font-size: 12px;
+        font-weight: 650;
+    }
+
+    .app-dialog-card :where(input, select) {
+        min-height: 42px;
+        padding: 0 11px;
+    }
+
+    .app-dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 9px;
+    }
+
+    .app-page-danger-action {
+        min-height: 40px;
+        padding: 0 14px;
+        border: 1px solid #d4473d;
+        border-radius: 8px;
+        background: #c9342b;
+        color: #fff;
+    }
+
+    .app-dialog-status {
+        min-height: 18px;
+        color: var(--app-primary);
+        font-size: 12px;
+    }
+
+    .app-dialog-status.error {
+        color: var(--app-danger);
+    }
+
+    .app-sidebar-collapsed .app-shell {
+        grid-template-columns: 76px minmax(0, 1fr);
+    }
+
+    .app-sidebar-collapsed .app-sidebar {
+        padding-inline: 10px;
+    }
+
+    .app-sidebar-collapsed .app-brand {
+        justify-content: center;
+        padding-inline: 0;
+    }
+
+    .app-sidebar-collapsed .app-brand > span:not(.app-brand-mark),
+    .app-sidebar-collapsed .app-nav-text,
+    .app-sidebar-collapsed .app-nav-section-title,
+    .app-sidebar-collapsed .app-sidebar-promo {
+        display: none;
+    }
+
+    .app-sidebar-collapsed .app-nav-link {
+        justify-content: center;
+        padding-inline: 0;
+    }
+}
+
+@media (min-width: 1100px) and (max-width: 1320px) {
+    .app-home-recipe-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .app-home-secondary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .app-home-recent-imports {
+        grid-column: 1 / -1;
+    }
+
+    .app-home-hero-media {
+        right: 70px;
+        opacity: .72;
+    }
+}
+
+@media (max-width: 1099px) {
+    .app-sidebar-collapse,
+    .app-home-hero-media {
+        display: none;
+    }
+
+    .app-home-primary-grid,
+    .app-home-secondary-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+    }
+
+    .app-home-recipe-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .app-meal-planner-grid {
+        display: grid;
+        grid-template-columns: 72px repeat(7, minmax(120px, 1fr));
+        overflow-x: auto;
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius-lg);
+    }
+}
+
+@media (max-width: 620px) {
+    .app-home-recipe-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (min-width: 1100px) {
+    .app-page-workspace {
+        gap: 16px;
+    }
+
+    .app-page-heading-row {
+        align-items: end;
+        gap: 18px;
+        margin-bottom: 2px;
+    }
+
+    .app-page-heading-row h2 {
+        font-size: 33px;
+        font-weight: 720;
+        letter-spacing: -1px;
+        line-height: 1.08;
+        text-align: left;
+    }
+
+    .app-page-heading-row p {
+        margin-top: 6px;
+        font-size: 14px;
+        font-weight: 430;
+    }
+
+    .app-page-actions > *,
+    .app-page-primary-action,
+    .app-page-secondary-action,
+    .app-page-table-action,
+    .app-page-rail-link {
+        min-height: 39px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 650;
+    }
+
+    .app-page-tabs {
+        min-height: 42px;
+        gap: 4px;
+        padding-bottom: 0;
+        border-bottom: 1px solid var(--app-border);
+    }
+
+    .app-page-tabs button {
+        min-height: 39px;
+        padding: 0 13px;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+        background: transparent;
+        font-size: 12px;
+        font-weight: 520;
+    }
+
+    .app-page-tabs button.is-active {
+        border-bottom-color: var(--app-primary);
+        background: transparent;
+        color: var(--app-primary);
+    }
+
+    .app-page-layout {
+        grid-template-columns: minmax(0, 1fr) 286px;
+        gap: 24px;
+    }
+
+    .app-page-rail {
+        gap: 14px;
+    }
+
+    .app-page-rail-card,
+    .app-page-table-card,
+    .app-import-method-card,
+    .app-import-flow-card {
+        border-radius: 11px;
+        box-shadow: none;
+    }
+
+    .app-page-rail-card {
+        padding: 17px;
+    }
+
+    .app-page-rail-card h3,
+    .app-page-panel-header h3 {
+        font-size: 14px;
+        font-weight: 680;
+    }
+
+    .app-page-rail-card p,
+    .app-page-bullet-list,
+    .app-page-link-list,
+    .app-page-media-list {
+        font-size: 11px;
+        font-weight: 430;
+        line-height: 1.5;
+    }
+
+    .app-page-metric-card > strong {
+        font-size: 30px;
+        font-weight: 700;
+    }
+
+    .app-page-table th {
+        padding: 12px 14px;
+        font-size: 10px;
+        font-weight: 650;
+        text-transform: none;
+    }
+
+    .app-page-table td {
+        padding: 12px 14px;
+        font-size: 11px;
+    }
+
+    .app-page-table td strong {
+        font-size: 12px;
+        font-weight: 650;
+    }
+
+    .app-page-table td span {
+        font-size: 10px;
+        font-weight: 430;
+    }
+
+    .app-page-stat-strip strong {
+        font-size: 24px;
+        font-weight: 700;
+    }
+
+    .app-page-stat-strip span {
+        font-size: 10px;
+        font-weight: 500;
+    }
+
+    .app-page-chip-row button {
+        min-height: 34px;
+        padding: 0 13px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    .app-page-summary-cards article {
+        min-height: 86px;
+        border-radius: 10px;
+        cursor: pointer;
+    }
+
+    .app-page-summary-cards span:not(.app-nav-icon) {
+        font-size: 11px;
+        font-weight: 560;
+    }
+
+    .app-page-summary-cards strong {
+        font-size: 21px;
+        font-weight: 680;
+    }
+
+    .app-page-filter-card {
+        padding: 11px;
+        border-radius: 10px;
+    }
+
+    .app-page-filter-card input,
+    .app-page-filter-card button {
+        min-height: 38px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    .app-import-method-grid-six {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .app-import-method-card {
+        min-height: 250px;
+        padding: 20px;
+    }
+
+    .app-import-method-card strong {
+        font-size: 14px;
+        font-weight: 680;
+    }
+
+    .app-import-method-card span {
+        font-size: 12px;
+        font-weight: 430;
+        line-height: 1.5;
+    }
+
+    .app-import-method-card small {
+        font-size: 10px;
+        font-weight: 560;
+    }
+
+    .app-recipe-browse-filters {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) minmax(180px, .6fr) auto auto;
+        gap: 10px;
+        align-items: end;
+        padding: 13px;
+        border: 1px solid var(--app-border);
+        border-radius: 9px;
+        background: var(--app-surface-soft);
+    }
+
+    .app-recipe-browse-filters[hidden] {
+        display: none;
+    }
+
+    .app-recipe-browse-filters label {
+        display: grid;
+        gap: 5px;
+        color: var(--app-muted);
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    .app-recipe-browse-filters :where(input, select, button) {
+        min-height: 37px;
+        margin: 0;
+        padding: 0 10px;
+        border: 1px solid var(--app-border);
+        border-radius: 7px;
+        background: #fff;
+        font-size: 11px;
+    }
+
+    .app-recipe-browse-filters > span {
+        align-self: center;
+        color: var(--app-muted);
+        font-size: 11px;
+    }
+
+    .app-profile-heading {
+        margin-bottom: 18px;
+    }
+
+    .app-profile-heading .user-account-heading {
+        margin: 0;
+        font-size: 33px;
+        font-weight: 720;
+        letter-spacing: -1px;
+        text-align: left;
+    }
+
+    .app-profile-heading p {
+        margin: 6px 0 0;
+        color: var(--app-muted);
+        font-size: 14px;
+    }
+
+    .app-shell-body #userAccountSection.user-account-card {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .app-shell-body #userAccountSection .user-account-profile {
+        padding: 18px;
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: none;
+    }
+
+    .app-shell-body #userAccountSection .user-account-name {
+        color: var(--app-text-strong);
+        font-size: 18px;
+        font-weight: 680;
+    }
+
+    .app-shell-body #userAccountSection .user-account-email,
+    .app-shell-body #userAccountSection .user-account-meta,
+    .app-shell-body #userAccountSection .user-account-detail-list {
+        font-size: 11px;
+        font-weight: 430;
+    }
+
+    .app-profile-overview {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+    }
+
+    .app-profile-usage-card,
+    .app-profile-cost-card,
+    .app-profile-action-grid > button,
+    .app-profile-privacy-note {
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: none;
+    }
+
+    .app-profile-usage-card,
+    .app-profile-cost-card {
+        display: grid;
+        gap: 14px;
+        padding: 20px;
+    }
+
+    .app-profile-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .app-profile-card-header h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 680;
+    }
+
+    .app-profile-card-header button,
+    .app-profile-cost-card > button {
+        min-height: 34px;
+        margin: 0;
+        padding: 0 10px;
+        border: 1px solid var(--app-border);
+        border-radius: 7px;
+        background: #fff;
+        color: var(--app-primary);
+        font-size: 11px;
+    }
+
+    .app-profile-usage-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .app-profile-usage-list > div {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        font-size: 12px;
+    }
+
+    .app-profile-usage-list > div::after {
+        grid-column: 1 / -1;
+        content: "";
+        display: block;
+        height: 5px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--app-primary) 42%, #eef1f3 42%);
+    }
+
+    .app-profile-cost-card > strong {
+        color: var(--app-primary);
+        font-size: 38px;
+        font-weight: 700;
+    }
+
+    .app-profile-cost-card > strong.is-unavailable {
+        font-size: 24px;
+        line-height: 1.2;
+    }
+
+    .app-shell-body #userAccountSection .user-account-summary,
+    .app-shell-body #userAccountSection .user-account-detail-list dt,
+    .app-shell-body #userAccountSection .user-account-detail-list dd {
+        color: var(--app-text);
+    }
+
+    .app-profile-cost-card > span {
+        color: var(--app-muted);
+        font-size: 12px;
+    }
+
+    .app-profile-cost-card dl {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin: 0;
+        padding: 14px;
+        border: 1px solid var(--app-border);
+        border-radius: 9px;
+    }
+
+    .app-profile-cost-card dl div {
+        display: grid;
+        gap: 3px;
+    }
+
+    .app-profile-cost-card dt {
+        color: var(--app-muted);
+        font-size: 10px;
+    }
+
+    .app-profile-cost-card dd {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 680;
+    }
+
+    .app-profile-action-grid {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .app-profile-action-grid > button {
+        display: grid;
+        gap: 9px;
+        min-height: 150px;
+        margin: 0;
+        padding: 17px;
+        color: var(--app-text);
+        text-align: left;
+    }
+
+    .app-profile-action-grid > button span {
+        font-size: 14px;
+        font-weight: 680;
+    }
+
+    .app-profile-action-grid > button strong {
+        color: var(--app-muted);
+        font-size: 11px;
+        font-weight: 430;
+        line-height: 1.55;
+    }
+
+    .app-profile-action-grid > button.danger {
+        border-color: #f2d2cf;
+        background: #fffafa;
+        color: var(--app-danger);
+    }
+
+    .app-profile-privacy-note {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 4px 18px;
+        padding: 17px 20px;
+        background: linear-gradient(90deg, var(--app-primary-soft), #fff);
+    }
+
+    .app-profile-privacy-note span {
+        color: var(--app-muted);
+        font-size: 12px;
+    }
+
+    .app-page-workspace-recipe-urls .recipe-url-box,
+    .app-page-workspace-recipe-urls .recipe-import-cookbook-select.recipe-edit-row-menu-btn,
+    .app-page-workspace-cookbooks .cookbooks-content :where(input, select, textarea),
+    .app-page-workspace-cookbooks .cookbook-menu-heading,
+    .app-page-workspace-cookbooks .cookbook-card,
+    .app-page-workspace-cookbooks .cookbook-recipe-card {
+        border-color: var(--app-border);
+        background: #ffffff;
+        color: var(--app-text);
+        box-shadow: none;
+    }
+
+    .app-page-workspace-recipe-urls .recipe-url-box::placeholder {
+        color: #7a8797;
+    }
+
+    .app-page-workspace-recipe-urls .recipe-import-cookbook-field .recipe-edit-cookbook-label,
+    .app-page-workspace-cookbooks .cookbook-create-form label,
+    .app-page-workspace-cookbooks .cookbook-menu-mode-control span,
+    .app-page-workspace-cookbooks .cookbook-category-grid label span,
+    .app-page-workspace-cookbooks .cookbook-menu-heading h3,
+    .app-page-workspace-cookbooks .cookbook-card h3,
+    .app-page-workspace-cookbooks .cookbook-recipe-card {
+        color: var(--app-text-strong);
+    }
+
+    .app-page-workspace-cookbooks .cookbook-menu-heading p,
+    .app-page-workspace-cookbooks .cookbook-card span {
+        color: var(--app-muted);
+    }
+
+    .app-page-workspace-cookbooks .cookbook-add-btn,
+    .app-page-workspace-cookbooks .cookbook-action-btn:not(:disabled) {
+        border-color: var(--app-primary);
+        background: var(--app-primary);
+        color: #ffffff;
+    }
+
+    .app-page-workspace-cookbooks .cookbook-menu-heading {
+        border-radius: 9px;
+    }
+
+    .app-page-workspace-shopping .view-switcher-sticky,
+    .app-page-workspace-shopping .recipe-view-card,
+    .app-page-workspace-shopping .row,
+    .app-page-workspace-shopping .section-header-row,
+    .app-page-workspace-shopping .store-header-row,
+    .app-page-workspace-shopping .store-section-header,
+    .app-page-workspace-pantry #aiPantrySection,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-section,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-location-manager,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-form-surface,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-inventory-row,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-review-row,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-use-soon-row,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-source-filter-group,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-image-panel,
+    .app-page-workspace-pantry #aiPantrySection :where(input, select, textarea) {
+        border: 1px solid var(--app-border);
+        background: #ffffff;
+        color: var(--app-text);
+        box-shadow: none;
+    }
+
+    .app-page-workspace-shopping .view-switcher-sticky {
+        width: 100%;
+        max-width: none;
+        margin-top: 14px;
+        border-radius: 9px;
+    }
+
+    .app-page-workspace-shopping .view-toggle-label,
+    .app-page-workspace-shopping .source-line,
+    .app-page-workspace-shopping .item-text,
+    .app-page-workspace-shopping .items-title {
+        color: var(--app-text);
+    }
+
+    .app-page-workspace-shopping .view-toggle-btn {
+        min-height: 32px;
+        margin: 0;
+        padding: 0 12px;
+        border: 1px solid var(--app-border);
+        background: var(--app-surface-soft);
+        color: var(--app-text);
+    }
+
+    .app-page-workspace-shopping .view-toggle-btn.active,
+    .app-page-workspace-shopping .view-toggle-btn[aria-pressed="true"] {
+        border-color: #a8d5b5;
+        background: var(--app-primary-soft);
+        color: var(--app-primary);
+    }
+
+    .app-page-workspace-pantry #aiPantrySection,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-section,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-location-manager,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-form-surface,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-inventory-row,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-review-row,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-use-soon-row,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-source-filter-group,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-image-panel {
+        border-color: var(--app-border);
+        background: #ffffff;
+        color: var(--app-text);
+        box-shadow: none;
+    }
+
+    .app-page-workspace-pantry #aiPantrySection :where(input, select, textarea) {
+        border-color: var(--app-border);
+        background: #ffffff;
+        color: var(--app-text);
+    }
+
+    .app-page-workspace-pantry #aiPantrySection :where(
+        .ai-pantry-section-header,
+        .recipe-edit-section-title,
+        .ai-pantry-item-main,
+        .ai-pantry-inventory-name-input,
+        .ai-pantry-inventory-product-input,
+        .ai-pantry-item-meta,
+        .ai-pantry-status,
+        .ai-pantry-status-line
+    ) {
+        color: var(--app-text-strong);
+    }
+
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-nav a,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-confidence-toggle,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-inventory-filter-btn,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-location-pill {
+        border-color: var(--app-border);
+        background: var(--app-surface-soft);
+        color: var(--app-text);
+    }
+
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-nav a:hover,
+    .app-page-workspace-pantry #aiPantrySection .ai-pantry-nav a:focus-visible {
+        border-color: #a8d5b5;
+        background: var(--app-primary-soft);
+        color: var(--app-primary);
+    }
+
+    .app-page-workspace-pantry #aiPantrySection :where(
+        .recipe-edit-section-title h3,
+        .recipe-edit-section-title p,
+        .ai-pantry-section-header h3,
+        .ai-pantry-section-header p
+    ) {
+        color: var(--app-text-strong);
+    }
+
+    .app-page-media-list li > span:last-child {
+        display: grid;
+        gap: 2px;
+    }
+
+    .app-page-media-list li small {
+        color: var(--app-muted);
+        font-size: 10px;
+        font-weight: 500;
+        line-height: 1.35;
     }
 }
 

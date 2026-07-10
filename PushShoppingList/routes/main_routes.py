@@ -128,6 +128,9 @@ from PushShoppingList.services.openai_usage_service import openai_usage_dashboar
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.menu_store_service import menu_pdf_logs_by_cookbook
 from PushShoppingList.services.menu_store_service import menus_by_cookbook
+from PushShoppingList.services.meal_plan_service import add_meal
+from PushShoppingList.services.meal_plan_service import delete_meal
+from PushShoppingList.services.meal_plan_service import meal_plan_for_week
 from PushShoppingList.services.user_account_service import SUPPORT_ADMIN_EMAILS
 from PushShoppingList.services.user_account_service import SUPPORT_EMAIL
 from PushShoppingList.services.user_account_service import current_public_user
@@ -175,6 +178,7 @@ def lightweight_cookbook_view():
     view = cookbook_view([])
 
     for cookbook in view.get("cookbooks", []):
+        cookbook["recipe_count"] = len(cookbook.get("recipes", []))
         cookbook["recipes"] = []
         cookbook["menu_sections"] = {}
 
@@ -477,6 +481,41 @@ def shell_context(active_public_user=None):
     )
     cookbook_view_data = lightweight_cookbook_view()
     store_settings = load_store_settings()
+    pantry_items = pantry_items_for_view()
+    meal_plan = meal_plan_for_week(request.args.get("meal_week"))
+    recipe_options = [
+        {
+            "url": str(recipe.get("url") or "").strip(),
+            "name": str(recipe.get("name") or recipe.get("title") or recipe.get("url") or "Recipe").strip(),
+        }
+        for recipe in recipe_urls
+        if str(recipe.get("url") or "").strip()
+    ]
+    recipe_preview_by_url = {
+        str(recipe.get("url") or ""): recipe
+        for recipe in recipe_preview_rows
+    }
+    for meal in meal_plan["meals"]:
+        preview = recipe_preview_by_url.get(meal["recipe_url"], {})
+        meal["cover_image"] = preview.get("cover_image") or {}
+
+    pantry_running_low = [
+        item
+        for item in pantry_items
+        if str(item.get("status") or "").lower() in {"running low", "low", "out of stock"}
+        or item.get("running_low")
+    ]
+    pantry_expiring_soon = [
+        item
+        for item in pantry_items
+        if (item.get("lifecycle_status") or {}).get("urgency")
+        in {"expired", "urgent", "soon"}
+    ]
+    pantry_out_of_stock = [
+        item
+        for item in pantry_items
+        if str(item.get("status") or "").lower() == "out of stock"
+    ]
 
     return {
         **shared_page_context(active_public_user),
@@ -502,6 +541,16 @@ def shell_context(active_public_user=None):
         "home_address": load_home_address(),
         "home_address_history": load_home_address_history(),
         "pdf_share_view": {"pdfs": []},
+        "pantry_preview_items": pantry_items[:5],
+        "pantry_use_soon_items": pantry_expiring_soon[:5],
+        "pantry_summary": {
+            "total": len(pantry_items),
+            "running_low": len(pantry_running_low),
+            "expiring_soon": len(pantry_expiring_soon),
+            "out_of_stock": len(pantry_out_of_stock),
+        },
+        "meal_plan": meal_plan,
+        "meal_plan_recipe_options": recipe_options,
     }
 
 
@@ -3034,6 +3083,45 @@ def build_store_view(items, item_state, available_stores, enabled_stores):
 def index():
     active_public_user = current_public_user()
     return render_template("index.html", **shell_context(active_public_user))
+
+
+@main_bp.route("/api/meal-plan", methods=["POST"])
+def add_meal_plan_entry_route():
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to plan meals."}), 403
+
+    payload = request.get_json(silent=True) or {}
+    recipe_url = str(payload.get("recipe_url") or "").strip()
+    available_recipes = {
+        str(recipe.get("url") or "").strip(): str(
+            recipe.get("name") or recipe.get("title") or recipe.get("url") or "Recipe"
+        ).strip()
+        for recipe in recipe_url_rows()
+        if str(recipe.get("url") or "").strip()
+    }
+    if recipe_url not in available_recipes:
+        return jsonify({"ok": False, "error": "Choose a recipe from your current recipe collection."}), 400
+
+    try:
+        meal = add_meal({
+            "date": payload.get("date"),
+            "meal_type": payload.get("meal_type"),
+            "recipe_url": recipe_url,
+            "recipe_name": available_recipes[recipe_url],
+        })
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+    return jsonify({"ok": True, "meal": meal}), 201
+
+
+@main_bp.route("/api/meal-plan/<meal_id>", methods=["DELETE"])
+def delete_meal_plan_entry_route(meal_id):
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to update meal plans."}), 403
+    if not delete_meal(meal_id):
+        return jsonify({"ok": False, "error": "That planned meal was not found."}), 404
+    return jsonify({"ok": True})
 
 
 @main_bp.route("/sections/current-recipes")

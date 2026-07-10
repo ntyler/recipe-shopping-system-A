@@ -22,16 +22,11 @@
 
             <div class="app-recipes-command-row">
                 <div class="app-page-tabs" aria-label="Recipe filters">
-                    <button type="button" class="is-active" aria-pressed="true">All Recipes <span>{{ current_recipe_count | default(0) }}</span></button>
-                    <button type="button" aria-pressed="false">Favorites <span>0</span></button>
-                    <button type="button" aria-pressed="false">Recently Added</button>
-                    <button type="button" aria-pressed="false">Recently Cooked</button>
-                    <button type="button" aria-pressed="false">My Recipes</button>
+                    <span class="app-page-tab-label is-active">All Recipes <span>{{ current_recipe_count | default(0) }}</span></span>
                 </div>
                 <div class="app-recipes-toolbar" aria-label="Recipe browse controls">
-                    <button type="button" aria-label="Filter recipes">{{ shell.svg_icon("filter") }} <span>Filter</span></button>
-                    <button type="button" aria-label="Sort recipes">{{ shell.svg_icon("sort") }} <span>Sort</span></button>
-                    <button type="button" class="is-active" aria-label="Grid view" aria-pressed="true">{{ shell.svg_icon("grid") }}</button>
+                    <button type="button" aria-label="Filter recipes" aria-expanded="false" aria-controls="recipeBrowseFilters" onclick="return toggleRecipeBrowseFilters(this)">{{ shell.svg_icon("filter") }} <span>Filter</span></button>
+                    <button type="button" aria-label="Sort recipes by name" data-recipe-sort-mode="original" onclick="return cycleRecipeBrowseSort(this)">{{ shell.svg_icon("sort") }} <span>Sort</span></button>
                     <button type="button"
                             class="app-page-primary-action app-recipes-add-action"
                             onclick="return createNewRecipe(this)">
@@ -41,11 +36,25 @@
                 </div>
             </div>
 
+            <div id="recipeBrowseFilters" class="app-recipe-browse-filters" hidden>
+                <label>Search recipes<input type="search" data-recipe-browse-search placeholder="Search recipe names or cookbooks" oninput="return applyRecipeBrowseFilters()"></label>
+                <label>Cookbook
+                    <select data-recipe-browse-cookbook onchange="return applyRecipeBrowseFilters()">
+                        <option value="">All cookbooks</option>
+                        {% for cookbook in cookbook_view.cookbooks %}<option value="{{ cookbook.name | lower }}">{{ cookbook.name }}</option>{% endfor %}
+                    </select>
+                </label>
+                <button type="button" onclick="return clearRecipeBrowseFilters()">Clear filters</button>
+                <span data-recipe-browse-status aria-live="polite"></span>
+            </div>
+
             <section class="app-recipes-grid" aria-label="Recipe collection">
                 {% for recipe in recipe_preview_rows %}
                     <article class="app-recipe-card{% if recipe.cover_image and recipe.cover_image.src %} app-recipe-card-with-image{% endif %}"
                              data-recipe-preview-card
-                             data-recipe-url="{{ recipe.url }}">
+                             data-recipe-url="{{ recipe.url }}"
+                             data-recipe-name="{{ recipe.name | lower }}"
+                             data-recipe-cookbook="{{ (recipe.cookbook_name or 'Unclassified') | lower }}">
                         <div class="app-recipe-card-media">
                             {% if recipe.cover_image and recipe.cover_image.src %}
                                 <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="
@@ -60,12 +69,6 @@
                             {% else %}
                                 <span class="app-recipe-card-fallback" aria-hidden="true">{{ shell.app_icon("recipes") }}</span>
                             {% endif %}
-                            <button type="button"
-                                    class="app-recipe-favorite"
-                                    aria-label="Add {{ recipe.name }} to favorites"
-                                    aria-pressed="false">
-                                {{ shell.svg_icon("heart") }}
-                            </button>
                         </div>
                         <div class="app-recipe-card-body">
                             <h3>
@@ -213,11 +216,8 @@
         </div>
     </div>
 
-    <div class="app-page-tabs" aria-label="Menu filters">
-        <button type="button" class="is-active">All Menus <span>{{ menu_page_summary.count }}</span></button>
-        <button type="button">Imported Menus</button>
-        <button type="button">Cookbook Menus</button>
-        <button type="button">PDF Log <span>{{ menu_page_summary.pdf_count }}</span></button>
+                <div class="app-page-tabs" aria-label="Menu collection">
+                    <span class="app-page-tab-label is-active">All Menus <span>{{ menu_page_summary.count }}</span></span>
     </div>
 
     <div class="app-page-layout">
@@ -260,7 +260,7 @@
                                                 <strong>{{ restaurant_menu.restaurant.restaurant_name or restaurant_menu.menu.menu_title or "Restaurant Menu" }}</strong>
                                                 <span>{{ restaurant_menu.menu.menu_title or cookbook.name }}</span>
                                             </td>
-                                            <td><strong>{{ cookbook.name }}</strong><span>{{ cookbook.recipes|length }} recipes</span></td>
+                                            <td><strong>{{ cookbook.name }}</strong><span>{{ cookbook.recipe_count | default(cookbook.recipes|length) }} recipes</span></td>
                                             <td><span class="app-page-pill">{{ restaurant_menu.menu.source_type or "Menu" }}</span></td>
                                             <td><strong>{{ cookbook.menu_pdf_logs|default([])|length }}</strong><span>PDF log entries</span></td>
                                             <td>
@@ -352,14 +352,15 @@
                 {{ shell.app_icon("link") }}
                 <span>Import</span>
             </a>
+            <button type="button" class="app-page-primary-action" onclick="return openNewCookbookForm()">
+                {{ shell.svg_icon("plus") }}
+                <span>New Cookbook</span>
+            </button>
         </div>
     </div>
 
-    <div class="app-page-tabs" aria-label="Cookbook filters">
-        <button type="button" class="is-active">All Cookbooks <span>{{ cookbook_count | default(0) }}</span></button>
-        <button type="button">My Cookbooks</button>
-        <button type="button">Favorites</button>
-        <button type="button">Archived</button>
+                <div class="app-page-tabs" aria-label="Cookbook collection">
+                    <span class="app-page-tab-label is-active">All Cookbooks <span>{{ cookbook_count | default(0) }}</span></span>
     </div>
 
     <div class="app-page-layout">
@@ -395,7 +396,7 @@
                 <h3>Most Recipes</h3>
                 <ul class="app-page-link-list">
                     {% for cookbook in cookbook_view.cookbooks[:5] %}
-                        <li><a href="#cookbooksCard">{{ cookbook.name }} <span>{{ cookbook.recipes | length }}</span></a></li>
+                        <li><a href="#cookbooksCard">{{ cookbook.name }} <span>{{ cookbook.recipe_count | default(cookbook.recipes|length) }}</span></a></li>
                     {% else %}
                         <li><span>No cookbooks yet.</span></li>
                     {% endfor %}
@@ -435,11 +436,8 @@
         </div>
     </div>
 
-    <div class="app-page-tabs" aria-label="Shopping list filters">
-        <button type="button" class="is-active">Active List <span>{{ items | length }}</span></button>
-        <button type="button">Unchecked</button>
-        <button type="button">Store View</button>
-        <button type="button">Archived</button>
+                <div class="app-page-tabs" aria-label="Shopping list collection">
+                    <span class="app-page-tab-label is-active">Current List <span>{{ items | length }}</span></span>
     </div>
 
     <div class="app-page-layout">
@@ -508,36 +506,35 @@
     </div>
 
     <div class="app-page-summary-cards app-pantry-summary-cards" aria-label="Pantry status">
-        <article class="is-active">
+        <article class="is-active" role="button" tabindex="0" onclick="return setPantryPageStatusFilter('', this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setPantryPageStatusFilter('', this); }">
             {{ shell.app_icon("pantry") }}
             <span>All Items</span>
-            <strong>Live</strong>
+            <strong>{{ pantry_summary.total | default(0) }}</strong>
         </article>
-        <article>
+        <article role="button" tabindex="0" onclick="return setPantryPageStatusFilter('running low', this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setPantryPageStatusFilter('running low', this); }">
             {{ shell.app_icon("import") }}
             <span>Running Low</span>
-            <strong>Track</strong>
+            <strong>{{ pantry_summary.running_low | default(0) }}</strong>
         </article>
-        <article>
+        <article role="button" tabindex="0" onclick="return setPantryPageStatusFilter('expiring soon', this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setPantryPageStatusFilter('expiring soon', this); }">
             {{ shell.app_icon("document") }}
             <span>Expiring Soon</span>
-            <strong>Dates</strong>
+            <strong>{{ pantry_summary.expiring_soon | default(0) }}</strong>
         </article>
-        <article>
+        <article role="button" tabindex="0" onclick="return setPantryPageStatusFilter('out of stock', this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setPantryPageStatusFilter('out of stock', this); }">
             {{ shell.app_icon("menus") }}
             <span>Out of Stock</span>
-            <strong>Restock</strong>
+            <strong>{{ pantry_summary.out_of_stock | default(0) }}</strong>
         </article>
     </div>
 
     <div class="app-page-chip-row" aria-label="Pantry categories">
-        <button type="button" class="is-active">All Categories</button>
-        <button type="button">Baking</button>
-        <button type="button">Beverages</button>
-        <button type="button">Canned Goods</button>
-        <button type="button">Dairy &amp; Eggs</button>
-        <button type="button">Produce</button>
-        <button type="button">More</button>
+        <button type="button" class="is-active" aria-pressed="true" onclick="return setPantryPageCategory('', this)">All Categories</button>
+        <button type="button" aria-pressed="false" onclick="return setPantryPageCategory('baking', this)">Baking</button>
+        <button type="button" aria-pressed="false" onclick="return setPantryPageCategory('beverages', this)">Beverages</button>
+        <button type="button" aria-pressed="false" onclick="return setPantryPageCategory('canned goods', this)">Canned Goods</button>
+        <button type="button" aria-pressed="false" onclick="return setPantryPageCategory('dairy', this)">Dairy &amp; Eggs</button>
+        <button type="button" aria-pressed="false" onclick="return setPantryPageCategory('produce', this)">Produce</button>
     </div>
 
     <div class="app-page-layout">
@@ -546,11 +543,10 @@
                 <label>
                     <span class="sr-only">Search pantry items</span>
                     {{ shell.svg_icon("search") }}
-                    <input type="search" placeholder="Search pantry items...">
+                    <input type="search" placeholder="Search pantry items..." data-pantry-page-search oninput="return applyPantryPageFilters()">
                 </label>
-                <button type="button">{{ shell.svg_icon("settings") }} <span>All Locations</span></button>
-                <button type="button">{{ shell.svg_icon("price") }} <span>Filter</span></button>
-                <button type="button">{{ shell.svg_icon("menus") }} <span>Sort: Category</span></button>
+                <button type="button" onclick="return openAiPantryPanel({ targetId: 'aiPantryLocations', pageId: 'pantryPage' })">{{ shell.svg_icon("settings") }} <span>Locations</span></button>
+                <button type="button" onclick="return clearPantryPageFilters()">{{ shell.svg_icon("filter") }} <span>Clear Filters</span></button>
             </section>
             <section id="aiPantrySection"
                      class="ai-pantry-card user-ai-pantry-panel lazy-section-placeholder"
@@ -579,16 +575,20 @@
             <article class="app-page-rail-card app-page-metric-card">
                 <span class="app-page-rail-icon">{{ shell.app_icon("pantry") }}</span>
                 <h3>Pantry Overview</h3>
-                <strong>Live</strong>
-                <span>Inventory workspace</span>
+                <strong>{{ pantry_summary.total | default(0) }}</strong>
+                <span>Total Items</span>
             </article>
             <article class="app-page-rail-card">
-                <h3>Running Low</h3>
+                <h3>Use Soon</h3>
                 <ul class="app-page-media-list">
-                    <li><span class="app-page-thumb-icon">{{ shell.app_icon("shopping") }}</span><span>Chicken Breast</span></li>
-                    <li><span class="app-page-thumb-icon">{{ shell.app_icon("shopping") }}</span><span>Cheddar Cheese</span></li>
-                    <li><span class="app-page-thumb-icon">{{ shell.app_icon("shopping") }}</span><span>Almond Milk</span></li>
-                    <li><span class="app-page-thumb-icon">{{ shell.app_icon("shopping") }}</span><span>Greek Yogurt</span></li>
+                    {% for item in pantry_use_soon_items %}
+                        <li>
+                            <span class="app-page-thumb-icon">{{ shell.app_icon("shopping") }}</span>
+                            <span>{{ item.ingredient_name or item.product_name or "Pantry item" }}<small>{{ item.lifecycle_status.detail }}</small></span>
+                        </li>
+                    {% else %}
+                        <li>No pantry items need attention.</li>
+                    {% endfor %}
                 </ul>
             </article>
             <article class="app-page-rail-card">
@@ -613,6 +613,151 @@
     </div>
 </section>
 
+<section id="mealPlannerPage"
+         class="app-page-workspace app-page-workspace-meal-planner"
+         data-app-page-workspace
+         hidden>
+    <div class="app-page-heading-row">
+        <div>
+            <h2>Meal Planner</h2>
+            <p>Plan meals for the week using recipes already saved in AI Pantry.</p>
+        </div>
+        <div class="app-page-actions">
+            <button type="button"
+                    class="app-page-primary-action"
+                    onclick="return openMealPlannerDialog()"
+                    {% if not meal_plan_recipe_options %}disabled aria-disabled="true" title="Add a recipe before planning meals"{% endif %}>
+                {{ shell.svg_icon("plus") }}
+                <span>Add Meal</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="app-meal-planner-toolbar" aria-label="Meal planner week controls">
+        <a href="?meal_week={{ meal_plan.previous_week }}#mealPlannerPage" aria-label="Previous week">&larr;</a>
+        <strong>{{ meal_plan.range_label }}</strong>
+        <a href="?meal_week={{ meal_plan.next_week }}#mealPlannerPage" aria-label="Next week">&rarr;</a>
+        <a class="app-page-secondary-action" href="?meal_week={{ meal_plan.today_week }}#mealPlannerPage">Today</a>
+    </div>
+
+    <div class="app-page-layout">
+        <div class="app-page-main-column">
+            <section class="app-meal-planner-grid" aria-label="Weekly meal plan">
+                <div class="app-meal-planner-corner" aria-hidden="true"></div>
+                {% for day in meal_plan.days %}
+                    <div class="app-meal-planner-day{% if day.is_today %} is-today{% endif %}">
+                        <strong>{{ day.weekday }}</strong>
+                        <span>{{ day.day_label }}</span>
+                    </div>
+                {% endfor %}
+
+                {% for meal_type in meal_plan.meal_types %}
+                    <div class="app-meal-planner-row-label">{{ meal_type | title }}</div>
+                    {% for day in meal_plan.days %}
+                        {% set planned_meals = meal_plan.meals_by_day[day.date][meal_type] %}
+                        <div class="app-meal-planner-cell" data-meal-plan-date="{{ day.date }}" data-meal-plan-type="{{ meal_type }}">
+                            {% for meal in planned_meals %}
+                                <article class="app-meal-card" data-meal-plan-id="{{ meal.id }}">
+                                    {% if meal.cover_image and meal.cover_image.src %}
+                                        <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
+                                    {% endif %}
+                                    <a href="#recipeView" data-recipe-url="{{ meal.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ meal.recipe_name }}</a>
+                                    <button type="button"
+                                            class="app-meal-remove"
+                                            aria-label="Remove {{ meal.recipe_name }} from {{ meal_type }}"
+                                            title="Remove planned meal"
+                                            data-meal-id="{{ meal.id }}"
+                                            data-meal-name="{{ meal.recipe_name }}"
+                                            onclick="return openMealPlannerDeleteDialog(this)">&times;</button>
+                                </article>
+                            {% else %}
+                                <button type="button"
+                                        class="app-meal-add-slot"
+                                        onclick="return openMealPlannerDialog('{{ day.date }}', '{{ meal_type }}')"
+                                        {% if not meal_plan_recipe_options %}disabled aria-disabled="true" title="Add a recipe before planning meals"{% endif %}>
+                                    <span aria-hidden="true">+</span>
+                                    <span class="sr-only">Add {{ meal_type }} for {{ day.weekday }} {{ day.day_label }}</span>
+                                </button>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                {% endfor %}
+            </section>
+
+            {% if not meal_plan_recipe_options %}
+                <div class="app-meal-planner-empty">
+                    <strong>Add a recipe before planning meals.</strong>
+                    <span>The planner uses your real recipe collection and does not create placeholder meals.</span>
+                    <a href="#recipeUrlsPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipeUrlsPage" data-app-nav-target="recipeUrlsPage">Import recipes</a>
+                </div>
+            {% endif %}
+        </div>
+        <aside class="app-page-rail" aria-label="Meal plan overview">
+            <article class="app-page-rail-card app-page-metric-card">
+                <span class="app-page-rail-icon">{{ shell.app_icon("meal") }}</span>
+                <h3>Meal Plan Overview</h3>
+                <strong>{{ meal_plan.meal_count }}</strong>
+                <span>Meals Planned This Week</span>
+                <ul class="app-page-collection-breakdown">
+                    <li><span>Unique Recipes</span><strong>{{ meal_plan.unique_recipe_count }}</strong></li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card">
+                <h3>Plan Actions</h3>
+                <ul class="app-page-link-list">
+                    <li><a href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage">Browse Recipes</a></li>
+                    <li><a href="#shoppingListsPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="shoppingListsPage" data-app-nav-target="shoppingListsPage">Open Shopping List</a></li>
+                </ul>
+            </article>
+            <article class="app-page-rail-card app-page-soft-card">
+                <h3>About Auto Plan</h3>
+                <p>Automatic AI planning is not enabled in this build. Meals are added only when you choose a saved recipe.</p>
+            </article>
+        </aside>
+    </div>
+
+    <dialog id="mealPlannerDialog" class="app-dialog" aria-labelledby="mealPlannerDialogTitle">
+        <form method="dialog" class="app-dialog-card" onsubmit="return submitMealPlannerForm(event)">
+            <div class="app-dialog-header">
+                <div><h3 id="mealPlannerDialogTitle">Add Meal</h3><p>Choose a saved recipe, date, and meal type.</p></div>
+                <button type="button" class="app-dialog-close" aria-label="Close add meal dialog" onclick="return closeMealPlannerDialog()">&times;</button>
+            </div>
+            <label>Date<input id="mealPlannerDate" name="date" type="date" required value="{{ meal_plan.week_start }}"></label>
+            <label>Meal Type
+                <select id="mealPlannerType" name="meal_type" required>
+                    {% for meal_type in meal_plan.meal_types %}<option value="{{ meal_type }}">{{ meal_type | title }}</option>{% endfor %}
+                </select>
+            </label>
+            <label>Recipe
+                <select id="mealPlannerRecipe" name="recipe_url" required>
+                    <option value="">Choose a recipe</option>
+                    {% for recipe in meal_plan_recipe_options %}<option value="{{ recipe.url }}">{{ recipe.name }}</option>{% endfor %}
+                </select>
+            </label>
+            <div class="app-dialog-status" data-meal-plan-status aria-live="polite"></div>
+            <div class="app-dialog-actions">
+                <button type="button" class="app-page-secondary-action" onclick="return closeMealPlannerDialog()">Cancel</button>
+                <button type="submit" class="app-page-primary-action" data-meal-plan-submit>Add Meal</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="mealPlannerDeleteDialog" class="app-dialog" aria-labelledby="mealPlannerDeleteTitle">
+        <form method="dialog" class="app-dialog-card app-dialog-card-danger" onsubmit="return confirmMealPlannerDelete(event)">
+            <div class="app-dialog-header">
+                <div><h3 id="mealPlannerDeleteTitle">Remove Planned Meal</h3><p data-meal-delete-copy>This removes the meal from this week. The recipe will not be deleted.</p></div>
+                <button type="button" class="app-dialog-close" aria-label="Close remove meal dialog" onclick="return closeMealPlannerDeleteDialog()">&times;</button>
+            </div>
+            <input type="hidden" data-meal-delete-id>
+            <div class="app-dialog-status" data-meal-delete-status aria-live="polite"></div>
+            <div class="app-dialog-actions">
+                <button type="button" class="app-page-secondary-action" onclick="return closeMealPlannerDeleteDialog()">Cancel</button>
+                <button type="submit" class="app-page-danger-action" data-meal-delete-submit>Remove Meal</button>
+            </div>
+        </form>
+    </dialog>
+</section>
+
 <section id="storesPage"
          class="app-page-workspace app-page-workspace-stores"
          data-app-page-workspace
@@ -620,7 +765,7 @@
     <div class="app-page-heading-row">
         <div>
             <h2>Stores</h2>
-            <p>Manage favorite stores, delivery options, and store links.</p>
+            <p>Manage enabled stores and the store links used by shopping workflows.</p>
         </div>
         <div class="app-page-actions">
             <a class="app-page-primary-action"
@@ -650,8 +795,7 @@
                             <tr>
                                 <th>Store</th>
                                 <th>Type</th>
-                                <th>Status</th>
-                                <th>Favorite</th>
+                                <th>Connection</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -666,12 +810,14 @@
                                         </div>
                                     </td>
                                     <td>{% if store_key in enabled_stores %}<span class="app-page-pill">Enabled</span>{% else %}<span class="app-page-pill app-page-pill-muted">Saved</span>{% endif %}</td>
-                                    <td>{% if store_key in enabled_stores %}<strong class="app-page-positive">Available</strong>{% else %}<span class="app-page-muted">Inactive</span>{% endif %}</td>
-                                    <td><span class="app-page-star" aria-hidden="true">*</span></td>
-                                    <td><a class="app-page-table-action" href="#storeOptionsSection" data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="stores-shopping" data-app-nav-target="storeOptionsSection">Manage</a></td>
+                                    <td>{% if store_key in enabled_stores %}<strong class="app-page-positive">Enabled</strong>{% else %}<span class="app-page-muted">Not enabled</span>{% endif %}</td>
+                                    <td>
+                                        {% if store.url %}<a class="app-page-table-action" href="{{ store.url }}" target="_blank" rel="noopener noreferrer">Open Store</a>{% endif %}
+                                        <a class="app-page-table-action" href="#storeOptionsSection" data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="stores-shopping" data-app-nav-target="storeOptionsSection">Manage</a>
+                                    </td>
                                 </tr>
                             {% else %}
-                                <tr><td colspan="5">No stores configured yet.</td></tr>
+                                <tr><td colspan="4">No stores configured yet.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -876,27 +1022,23 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td><strong>Recipe URLs</strong><span>Website recipes and blogs</span></td>
-                                <td><span class="app-page-pill">URL</span></td>
-                                <td><strong>Cookbooks</strong><span>Selected destination</span></td>
-                                <td><strong>{{ current_recipe_count | default(0) }}</strong><span>recipes in log</span></td>
-                                <td><strong class="app-page-positive">Ready</strong></td>
-                            </tr>
-                            <tr>
-                                <td><strong>Documents &amp; Images</strong><span>PDF, DOCX, TXT, PNG, JPG</span></td>
-                                <td><span class="app-page-pill">File</span></td>
-                                <td><strong>{{ cookbook_count | default(0) }} cookbooks</strong><span>Available destinations</span></td>
-                                <td><strong>AI</strong><span>extracts details</span></td>
-                                <td><strong class="app-page-positive">Ready</strong></td>
-                            </tr>
-                            <tr>
-                                <td><strong>Restaurant Menus</strong><span>Menu URLs and documents</span></td>
-                                <td><span class="app-page-pill">Menu</span></td>
-                                <td><strong>{{ menu_page_summary.count }}</strong><span>saved menus</span></td>
-                                <td><strong>{{ menu_page_summary.pdf_count }}</strong><span>PDF logs</span></td>
-                                <td><strong class="app-page-positive">Ready</strong></td>
-                            </tr>
+                            {% for recipe in recipe_preview_rows[:5] %}
+                                <tr>
+                                    <td><strong>{{ recipe.name }}</strong><span>{{ recipe.source_display_url or recipe.url }}</span></td>
+                                    <td><span class="app-page-pill">{{ recipe.source_type or "Recipe" }}</span></td>
+                                    <td><strong>{{ recipe.cookbook_name or "Unclassified" }}</strong><span>Cookbook</span></td>
+                                    <td><strong>1</strong><span>recipe</span></td>
+                                    <td>
+                                        {% if recipe.import_failure_status and recipe.import_failure_status.failed %}
+                                            <strong class="app-page-danger">Failed</strong>
+                                        {% else %}
+                                            <strong class="app-page-positive">Completed</strong>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="5"><strong>No imports yet.</strong><span>Imported recipes will appear here after a real extraction completes.</span></td></tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -1380,33 +1522,13 @@
             <section class="app-page-table-card">
                 <div class="app-page-panel-header">
                     <h3>Notification Center</h3>
-                    <span>3 unread</span>
+                    <span>0 unread</span>
                 </div>
                 <div class="app-notification-list">
-                    <article>
-                        {{ shell.app_icon("import") }}
-                        <div>
-                            <strong>Import queue ready</strong>
-                            <span>Recipe and menu imports will appear here while they run.</span>
-                        </div>
-                        <small>Now</small>
-                    </article>
-                    <article>
-                        {{ shell.app_icon("pantry") }}
-                        <div>
-                            <strong>Pantry reminder</strong>
-                            <span>Use-soon pantry suggestions are available from the Pantry page.</span>
-                        </div>
-                        <small>Today</small>
-                    </article>
-                    <article>
-                        {{ shell.app_icon("shopping") }}
-                        <div>
-                            <strong>Shopping list status</strong>
-                            <span>Open Shopping Lists to review unchecked items and store-ready lists.</span>
-                        </div>
-                        <small>This week</small>
-                    </article>
+                    <div class="app-home-empty-state">
+                        <strong>No notification events.</strong>
+                        <span>Import progress remains available in Job Activity, and pantry reminders remain on the Pantry page.</span>
+                    </div>
                 </div>
             </section>
             <section class="app-page-action-grid app-notification-action-grid" aria-label="Notification actions">
