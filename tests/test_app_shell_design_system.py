@@ -109,6 +109,8 @@ def test_app_workspaces_define_mockup_style_individual_pages():
     assert 'id="menuDocumentPage"' in template
     assert 'id="notificationsPage"' in template
     assert 'data-app-page-workspace' in template
+    assert 'store-logo-{{ store_key|replace(\'_\', \'-\') }}' in template
+    assert '"kroger": "Kroger"' in template
     assert 'id="currentRecipeUrlLogCard"' in template
     assert 'id="cookbooksCard"' in template
     assert 'id="shoppingViewsSection"' in template
@@ -191,6 +193,8 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert ".app-page-chip-row" in css
     assert ".app-page-filter-card" in css
     assert ".app-page-action-grid" in css
+    assert ".app-page-store-logo.store-logo-kroger" in css
+    assert ".app-page-store-logo.store-logo-walmart" in css
     assert ".app-notification-list" in css
     assert ".user-account-card[hidden]" in css
     assert ".app-workspace-panel[hidden]" in css

@@ -27499,13 +27499,49 @@ img[data-deferred-src] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 42px;
+    width: 58px;
     height: 42px;
+    min-width: 58px;
     border-radius: var(--app-radius-md);
-    background: var(--app-primary-soft);
-    color: var(--app-primary);
-    font-size: 16px;
+    font-size: 11px;
     font-weight: 950;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.app-page-store-logo.store-logo {
+    border-color: color-mix(in srgb, currentColor 38%, transparent);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.app-page-store-logo.store-logo-aldi {
+    background: #0046ad;
+    color: #ffffff;
+}
+
+.app-page-store-logo.store-logo-kroger {
+    background: #ffffff;
+    color: #0b4ea2;
+}
+
+.app-page-store-logo.store-logo-walmart {
+    background: #ffffff;
+    color: #0071ce;
+}
+
+.app-page-store-logo.store-logo-meijer {
+    background: #ffffff;
+    color: #c41230;
+}
+
+.app-page-store-logo.store-logo-target {
+    background: #ffffff;
+    color: #cc0000;
+}
+
+.app-page-store-logo.store-logo-costco {
+    background: #ffffff;
+    color: #005dab;
 }
 
 .app-page-pill {

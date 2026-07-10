@@ -564,10 +564,11 @@
                         </thead>
                         <tbody>
                             {% for store_key, store in available_stores.items() %}
+                                {% set store_logo_text = {"aldi": "ALDI", "kroger": "Kroger", "walmart": "Walmart", "meijer": "meijer", "target": "Target", "costco": "Costco"}.get(store_key, (store.label or store_key)[:2]|upper) %}
                                 <tr>
                                     <td>
                                         <div class="app-page-store-cell">
-                                            <span class="app-page-store-logo">{{ (store.label or store_key)[:1]|upper }}</span>
+                                            <span class="app-page-store-logo store-logo store-logo-{{ store_key|replace('_', '-') }}">{{ store_logo_text }}</span>
                                             <div><strong>{{ store.label or store_key }}</strong><span>{{ store.url or "Store link not configured" }}</span></div>
                                         </div>
                                     </td>
