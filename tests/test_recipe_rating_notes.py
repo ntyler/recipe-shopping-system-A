@@ -153,6 +153,8 @@ def test_recipe_view_notes_render_as_collapsible_detail_section():
     assert recipe_view.index('data-detail-key="instructions|{{ recipe.url }}"') < recipe_view.index('data-detail-key="notes|{{ recipe.url }}"')
     assert recipe_view.index('data-detail-key="notes|{{ recipe.url }}"') < recipe_view.index('data-nutrition-key="nutrition|{{ recipe.url }}"')
     assert "recipe-note-section" in recipe_view
+    assert 'note_section["items"]' in recipe_view
+    assert "note_section.items" not in recipe_view
     assert ".recipe-note-section" in css
     assert "border-bottom: 1px solid #263447;" in css
     assert ".recipe-note-section li:empty" in css

@@ -843,9 +843,9 @@
                                     {% if note_section.heading %}
                                         <h4>{{ note_section.heading }}</h4>
                                     {% endif %}
-                                    {% if note_section.items %}
+                                    {% if note_section["items"] %}
                                         <ul>
-                                            {% for note_item in note_section.items %}
+                                            {% for note_item in note_section["items"] %}
                                                 <li>{{ note_item }}</li>
                                             {% endfor %}
                                         </ul>
