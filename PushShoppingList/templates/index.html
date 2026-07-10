@@ -9,74 +9,217 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/extraction_overlay_old.css') }}">
 </head>
 
-<body class="{% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}"
+<body class="app-shell-body {% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}"
       data-performance-diagnostics="{{ '1' if performance_diagnostics_enabled else '0' }}"
       data-public-workspace="{{ '1' if not current_user and not is_guest_demo else '0' }}"
       data-user-id="{{ current_user.user_id if current_user else '' }}">
 
-<h1>Shopping List</h1>
+<a class="skip-link" href="#appContent">Skip to content</a>
 
-{% if guest_demo %}
-<div class="guest-demo-banner" role="status" aria-live="polite">
-    <div class="guest-demo-banner-content">
-        <strong>Guest Demo Mode</strong>
-        <span>your data is temporary and will be deleted after 24 hours.</span>
-        <span class="guest-demo-expiry">
-            Expires in:
-            <strong data-guest-countdown
-                    data-guest-expires-at="{{ guest_demo.expires_at }}">
-                {{ guest_demo.remaining_label }}
-            </strong>
-        </span>
-    </div>
-    <div class="guest-demo-banner-actions">
-        <a href="#userAccountSection"
-           data-guest-auth-choice="create"
-           aria-label="Create a full account from this guest demo">
-            Create Full Account
+<div class="app-shell">
+    <aside class="app-sidebar" aria-label="Primary navigation">
+        <a class="app-brand" href="{{ url_for('main_bp.index') }}" aria-label="AI Pantry home">
+            <span class="app-brand-mark" aria-hidden="true">AP</span>
+            <span>
+                <strong>AI Pantry</strong>
+                <small>Recipe Shopping List</small>
+            </span>
         </a>
-        <a href="#userAccountSection"
-           class="secondary"
-           data-guest-auth-choice="sign-in"
-           aria-label="Sign in to an existing account from this guest demo">
-            Sign In
-        </a>
-    </div>
-</div>
-{% endif %}
 
-<div class="shopping-global-collapse-controls" data-global-collapse-controls>
-    <div class="shopping-global-collapse-actions">
-        <button type="button"
-                class="shopping-global-collapse-btn"
-                onclick="return collapseAllShoppingListPage()">
-            Collapse All
-        </button>
-        <button type="button"
-                class="shopping-global-collapse-btn secondary"
-                onclick="return expandAllShoppingListPage()">
-            Expand All
-        </button>
-    </div>
-    <div class="shopping-global-collapse-status"
-         data-global-collapse-status
-         aria-live="polite"
-         hidden></div>
-</div>
+        <nav class="app-sidebar-nav" aria-label="App sections">
+            <a class="app-nav-link" href="#appPageHeader" data-app-nav-link data-app-nav-target="appPageHeader">
+                <span class="app-nav-icon" aria-hidden="true">HM</span>
+                <span class="app-nav-text">Home</span>
+            </a>
+            <a class="app-nav-link" href="#currentRecipeUrlLogCard" data-app-nav-link data-app-nav-target="currentRecipeUrlLogCard" data-app-nav-lazy-section="current-recipes">
+                <span class="app-nav-icon" aria-hidden="true">RC</span>
+                <span class="app-nav-text">Recipes</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('menu_bp.custom_menu_builder_route') }}">
+                <span class="app-nav-icon" aria-hidden="true">MN</span>
+                <span class="app-nav-text">Menus</span>
+            </a>
+            <a class="app-nav-link" href="#cookbooksCard" data-app-nav-link data-app-nav-target="cookbooksCard" data-app-nav-lazy-section="cookbooks">
+                <span class="app-nav-icon" aria-hidden="true">CB</span>
+                <span class="app-nav-text">Cookbooks</span>
+            </a>
+            <a class="app-nav-link" href="#shoppingViewsSection" data-app-nav-link data-app-nav-target="shoppingViewsSection" data-app-nav-lazy-section="recipe-view">
+                <span class="app-nav-icon" aria-hidden="true">SL</span>
+                <span class="app-nav-text">Shopping Lists</span>
+            </a>
+            <a class="app-nav-link" href="#aiPantrySection" data-app-nav-link data-app-nav-action="ai-pantry" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry">
+                <span class="app-nav-icon" aria-hidden="true">PN</span>
+                <span class="app-nav-text">Pantry</span>
+            </a>
+            <a class="app-nav-link" href="#storeOptionsSection" data-app-nav-link data-app-nav-target="storeOptionsSection" data-app-nav-lazy-section="store-options">
+                <span class="app-nav-icon" aria-hidden="true">ST</span>
+                <span class="app-nav-text">Stores / Store Links</span>
+            </a>
+            <a class="app-nav-link" href="#storeView" data-app-nav-link data-app-nav-target="storeView" data-app-nav-lazy-section="recipe-view">
+                <span class="app-nav-icon" aria-hidden="true">PC</span>
+                <span class="app-nav-text">Price Comparison</span>
+            </a>
+            <a class="app-nav-link" href="#recipeUrlsTextarea" data-app-nav-link data-app-nav-target="recipeUrlsTextarea">
+                <span class="app-nav-icon" aria-hidden="true">IM</span>
+                <span class="app-nav-text">Import</span>
+            </a>
+            <a class="app-nav-link" href="#currentRecipeUrlLogCard" data-app-nav-link data-app-nav-target="currentRecipeUrlLogCard" data-app-nav-lazy-section="current-recipes">
+                <span class="app-nav-icon" aria-hidden="true">URL</span>
+                <span class="app-nav-text">Recipe URLs</span>
+            </a>
+            <a class="app-nav-link" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-target="recipeMediaUploadForm">
+                <span class="app-nav-icon" aria-hidden="true">DOC</span>
+                <span class="app-nav-text">Import From Document</span>
+            </a>
+            <a class="app-nav-link" href="#recipeMediaUploadForm" data-app-nav-link data-app-nav-target="recipeMediaUploadForm">
+                <span class="app-nav-icon" aria-hidden="true">IMG</span>
+                <span class="app-nav-text">Generate From Image</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
+                <span class="app-nav-icon" aria-hidden="true">BC</span>
+                <span class="app-nav-text">Scan Barcode</span>
+            </a>
+            <a class="app-nav-link" href="#userAccountSection" data-app-nav-link data-app-nav-action="account-settings" data-app-nav-target="userAccountSection">
+                <span class="app-nav-icon" aria-hidden="true">SE</span>
+                <span class="app-nav-text">Settings</span>
+            </a>
+            <a class="app-nav-link" href="#accountUsageDashboardPanel" data-app-nav-link data-app-nav-action="usage-dashboard" data-app-nav-target="accountUsageDashboardPanel">
+                <span class="app-nav-icon" aria-hidden="true">UB</span>
+                <span class="app-nav-text">Usage &amp; Billing</span>
+            </a>
+            <a class="app-nav-link" href="#feedbackSupportSection" data-app-nav-link data-app-nav-action="feedback-support" data-app-nav-target="feedbackSupportSection">
+                <span class="app-nav-icon" aria-hidden="true">HP</span>
+                <span class="app-nav-text">Help &amp; Support</span>
+            </a>
+        </nav>
+    </aside>
 
-{% if current_user and current_user.is_admin %}
-    {% include "sections/screen_settings.html" %}
-{% endif %}
+    <div class="app-main-shell">
+        <header class="app-topbar" aria-label="App toolbar">
+            <a class="app-topbar-brand" href="{{ url_for('main_bp.index') }}">
+                <span class="app-brand-mark" aria-hidden="true">AP</span>
+                <span>AI Pantry</span>
+            </a>
+            <form class="app-global-search"
+                  role="search"
+                  onsubmit="return submitAppGlobalSearch(this)">
+                <label class="sr-only" for="appGlobalSearch">Search app sections</label>
+                <input id="appGlobalSearch"
+                       name="app_search"
+                       data-app-global-search
+                       list="appGlobalSearchSuggestions"
+                       type="search"
+                       autocomplete="off"
+                       placeholder="Search recipes, pantry, stores">
+                <datalist id="appGlobalSearchSuggestions">
+                    <option value="Recipes"></option>
+                    <option value="Cookbooks"></option>
+                    <option value="Shopping Lists"></option>
+                    <option value="Pantry"></option>
+                    <option value="Stores"></option>
+                    <option value="Import"></option>
+                    <option value="Usage Billing"></option>
+                    <option value="Help Support"></option>
+                </datalist>
+                <button type="submit" class="app-search-submit">Search</button>
+                <span class="sr-only" data-app-global-search-status aria-live="polite"></span>
+            </form>
+            <div class="app-toolbar-actions" aria-label="Quick actions">
+                <button type="button"
+                        class="app-toolbar-button app-toolbar-icon-button"
+                        data-push-notifications-open
+                        aria-controls="accountPushNotificationsPanel"
+                        title="Notifications">
+                    Alerts
+                </button>
+                <button type="button"
+                        class="app-toolbar-button app-toolbar-icon-button"
+                        onclick="return openFeedbackSupportSection()"
+                        aria-controls="feedbackSupportSection"
+                        title="Help and support">
+                    Help
+                </button>
+                <a class="app-toolbar-button app-account-button"
+                   href="#userAccountSection"
+                   data-app-nav-link
+                   data-app-nav-target="userAccountSection">
+                    <span class="app-account-avatar" aria-hidden="true">
+                        {% if current_user %}{{ current_user.display_name[:1]|upper }}{% else %}G{% endif %}
+                    </span>
+                    <span class="app-account-label">
+                        {% if current_user %}{{ current_user.display_name }}{% elif is_guest_demo %}Guest Demo{% else %}Sign In{% endif %}
+                    </span>
+                </a>
+            </div>
+        </header>
 
-{% if message %}
-<div class="message">{{ message }}</div>
-{% endif %}
+        {% if current_user and current_user.is_admin %}
+            {% include "sections/screen_settings.html" %}
+        {% endif %}
 
-{% include "sections/extraction_overlay.html" %}
-{% include "sections/products_overlay.html" %}
-{% include "sections/item_qty_modal.html" %}
+        {% include "sections/extraction_overlay.html" %}
+        {% include "sections/products_overlay.html" %}
+        {% include "sections/item_qty_modal.html" %}
 
 <main id="appContent" class="app-content">
+    <header id="appPageHeader" class="app-page-header">
+        <div>
+            <h1>AI Pantry</h1>
+            <p>Plan recipes, manage pantry inventory, and build a store-ready shopping list from one workspace.</p>
+        </div>
+        <div class="shopping-global-collapse-controls" data-global-collapse-controls>
+            <div class="shopping-global-collapse-actions">
+                <button type="button"
+                        class="shopping-global-collapse-btn"
+                        onclick="return collapseAllShoppingListPage()">
+                    Collapse All
+                </button>
+                <button type="button"
+                        class="shopping-global-collapse-btn secondary"
+                        onclick="return expandAllShoppingListPage()">
+                    Expand All
+                </button>
+            </div>
+            <div class="shopping-global-collapse-status"
+                 data-global-collapse-status
+                 aria-live="polite"
+                 hidden></div>
+        </div>
+    </header>
+
+    {% if guest_demo %}
+    <div class="guest-demo-banner" role="status" aria-live="polite">
+        <div class="guest-demo-banner-content">
+            <strong>Guest Demo Mode</strong>
+            <span>your data is temporary and will be deleted after 24 hours.</span>
+            <span class="guest-demo-expiry">
+                Expires in:
+                <strong data-guest-countdown
+                        data-guest-expires-at="{{ guest_demo.expires_at }}">
+                    {{ guest_demo.remaining_label }}
+                </strong>
+            </span>
+        </div>
+        <div class="guest-demo-banner-actions">
+            <a href="#userAccountSection"
+               data-guest-auth-choice="create"
+               aria-label="Create a full account from this guest demo">
+                Create Full Account
+            </a>
+            <a href="#userAccountSection"
+               class="secondary"
+               data-guest-auth-choice="sign-in"
+               aria-label="Sign in to an existing account from this guest demo">
+                Sign In
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if message %}
+    <div class="message">{{ message }}</div>
+    {% endif %}
+
     {% include "sections/user_account.html" %}
     {% if not current_user %}
         {% include "sections/feedback_support.html" %}
@@ -185,6 +328,36 @@
         <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
     </div>
 </main>
+
+    </div>
+</div>
+
+<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">
+    <a class="app-mobile-nav-link" href="#appPageHeader" data-app-nav-link data-app-nav-target="appPageHeader">
+        <span class="app-nav-icon" aria-hidden="true">HM</span>
+        <span>Home</span>
+    </a>
+    <a class="app-mobile-nav-link" href="#currentRecipeUrlLogCard" data-app-nav-link data-app-nav-target="currentRecipeUrlLogCard" data-app-nav-lazy-section="current-recipes">
+        <span class="app-nav-icon" aria-hidden="true">RC</span>
+        <span>Recipes</span>
+    </a>
+    <a class="app-mobile-nav-link" href="#cookbooksCard" data-app-nav-link data-app-nav-target="cookbooksCard" data-app-nav-lazy-section="cookbooks">
+        <span class="app-nav-icon" aria-hidden="true">CB</span>
+        <span>Cookbooks</span>
+    </a>
+    <a class="app-mobile-nav-link" href="#shoppingViewsSection" data-app-nav-link data-app-nav-target="shoppingViewsSection" data-app-nav-lazy-section="recipe-view">
+        <span class="app-nav-icon" aria-hidden="true">SL</span>
+        <span>Lists</span>
+    </a>
+    <a class="app-mobile-nav-link" href="#aiPantrySection" data-app-nav-link data-app-nav-action="ai-pantry" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry">
+        <span class="app-nav-icon" aria-hidden="true">PN</span>
+        <span>Pantry</span>
+    </a>
+    <a class="app-mobile-nav-link" href="#userAccountSection" data-app-nav-link data-app-nav-target="userAccountSection">
+        <span class="app-nav-icon" aria-hidden="true">MR</span>
+        <span>More</span>
+    </a>
+</nav>
 
 <script id="supportPublicConfig" type="application/json">{{ support_public_config|tojson }}</script>
 <script id="firebaseWebConfig" type="application/json">{{ firebase_web_config|tojson }}</script>

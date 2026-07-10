@@ -304,6 +304,200 @@ function scrollToLazySectionTarget(targetId, fallbackTarget = null, options = {}
     return Boolean(target);
 }
 
+function normalizeAppShellSearchText(value) {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+}
+
+function appShellNavTargetId(link) {
+    if (!link) {
+        return "";
+    }
+
+    const explicitTarget = String(link.dataset.appNavTarget || "").replace(/^#/, "");
+    if (explicitTarget) {
+        return explicitTarget;
+    }
+
+    const href = String(link.getAttribute("href") || "");
+    return href.startsWith("#") ? href.slice(1) : "";
+}
+
+function appShellSetActiveLink(activeLink) {
+    const activeTarget = appShellNavTargetId(activeLink);
+    const activeAction = activeLink ? String(activeLink.dataset.appNavAction || "") : "";
+
+    document.querySelectorAll("[data-app-nav-link]").forEach(link => {
+        const sameTarget = activeTarget && appShellNavTargetId(link) === activeTarget;
+        const sameAction = activeAction && String(link.dataset.appNavAction || "") === activeAction;
+        link.classList.toggle("is-active", Boolean(sameTarget || sameAction));
+    });
+}
+
+function appShellSetSearchStatus(message) {
+    const status = document.querySelector("[data-app-global-search-status]");
+
+    if (status) {
+        status.textContent = message || "";
+    }
+}
+
+function appShellUpdateHash(targetId) {
+    if (!targetId || !window.history || !window.history.pushState) {
+        return;
+    }
+
+    const nextHash = `#${targetId}`;
+    if (window.location.hash !== nextHash) {
+        window.history.pushState(null, "", nextHash);
+    }
+}
+
+function appShellScrollToTarget(targetId, options = {}) {
+    const target = targetId ? document.getElementById(targetId) : null;
+
+    if (!target) {
+        return false;
+    }
+
+    target.scrollIntoView({
+        behavior: options.behavior || "smooth",
+        block: options.block || "start",
+    });
+
+    if (options.focusTarget !== false && typeof target.focus === "function") {
+        target.focus({ preventScroll: true });
+    }
+
+    return true;
+}
+
+async function activateAppShellNavLink(link, options = {}) {
+    if (!link) {
+        return false;
+    }
+
+    const action = String(link.dataset.appNavAction || "");
+    const targetId = appShellNavTargetId(link);
+    const lazySection = String(link.dataset.appNavLazySection || "");
+    const href = String(link.getAttribute("href") || "");
+
+    appShellSetActiveLink(link);
+    appShellSetSearchStatus("");
+
+    if (action === "ai-pantry") {
+        appShellUpdateHash(targetId || "aiPantrySection");
+        if (typeof openAiPantryPanel === "function") {
+            return openAiPantryPanel({ targetId: targetId || "aiPantrySection" });
+        }
+        return false;
+    }
+
+    if (action === "usage-dashboard" && typeof toggleUsageDashboardPanel === "function") {
+        appShellUpdateHash(targetId || "accountUsageDashboardPanel");
+        return toggleUsageDashboardPanel(true);
+    }
+
+    if (action === "feedback-support" && typeof openFeedbackSupportSection === "function") {
+        appShellUpdateHash(targetId || "feedbackSupportSection");
+        return openFeedbackSupportSection();
+    }
+
+    if (action === "account-settings" && typeof toggleUserProfileEditor === "function") {
+        appShellUpdateHash(targetId || "userAccountSection");
+        const opened = toggleUserProfileEditor(true);
+        if (opened === false && targetId) {
+            appShellScrollToTarget(targetId);
+        }
+        return false;
+    }
+
+    if (lazySection && typeof loadLazySection === "function") {
+        appShellUpdateHash(targetId);
+        await loadLazySection(lazySection, {
+            focus: true,
+            targetId,
+            userInitiated: true,
+        });
+        return false;
+    }
+
+    if (targetId) {
+        appShellUpdateHash(targetId);
+        scrollToLazySectionTarget(targetId, null, {
+            focusTarget: options.focusTarget === true,
+        }) || appShellScrollToTarget(targetId, {
+            focusTarget: options.focusTarget === true,
+        });
+        return false;
+    }
+
+    if (href && !href.startsWith("#")) {
+        window.location.assign(href);
+    }
+
+    return false;
+}
+
+function initAppShellNavigation() {
+    if (document.documentElement.dataset.appShellNavigationBound === "1") {
+        return;
+    }
+
+    document.documentElement.dataset.appShellNavigationBound = "1";
+
+    document.addEventListener("click", event => {
+        const link = event.target && event.target.closest
+            ? event.target.closest("[data-app-nav-link]")
+            : null;
+
+        if (!link) {
+            return;
+        }
+
+        if (!link.dataset.appNavAction && !link.dataset.appNavTarget && !link.dataset.appNavLazySection) {
+            return;
+        }
+
+        event.preventDefault();
+        activateAppShellNavLink(link);
+    });
+}
+
+function submitAppGlobalSearch(form) {
+    const input = form ? form.querySelector("[data-app-global-search]") : null;
+    const query = normalizeAppShellSearchText(input ? input.value : "");
+
+    if (!query) {
+        appShellSetSearchStatus("Type a section name to search.");
+        if (input) {
+            input.focus();
+        }
+        return false;
+    }
+
+    const links = Array.from(document.querySelectorAll("[data-app-nav-link], .app-sidebar .app-nav-link"));
+    const match = links.find(link => {
+        const label = normalizeAppShellSearchText(link.textContent);
+        const target = normalizeAppShellSearchText(appShellNavTargetId(link));
+        return label.includes(query) || target.includes(query) || query.includes(label);
+    });
+
+    if (!match) {
+        appShellSetSearchStatus("No matching app section found.");
+        if (input) {
+            input.select();
+        }
+        return false;
+    }
+
+    appShellSetSearchStatus(`Opening ${match.textContent.trim()}.`);
+    activateAppShellNavLink(match);
+    return false;
+}
+
 function lazySectionStatusElement(placeholder) {
     return placeholder ? placeholder.querySelector("[data-lazy-section-status]") : null;
 }
@@ -34837,6 +35031,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
         ["initJobActivityPanel", initJobActivityPanel],
         ["initLazySections", initLazySections],
+        ["initAppShellNavigation", initAppShellNavigation],
         ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
         ["initRecipeImageProviderSelector", initRecipeImageProviderSelector],
         ["initRecipeImageThumbnailSizeControls", initRecipeImageThumbnailSizeControls],
