@@ -159,6 +159,7 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert "--app-content-max:" in css
     assert "--app-control-height:" in css
     assert "--app-radius-lg:" in css
+    assert "scrollbar-gutter: stable;" in css
     assert "@media (prefers-color-scheme: dark)" in css
     assert ".app-shell-body {" in css
     assert ".app-sidebar {" in css
@@ -198,6 +199,10 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert "@media (max-width: 767px)" in css
     assert "@media (max-width: 1100px)" in css
     assert "@media (max-width: 768px)" in css
+    assert "width: min(var(--app-content-max), calc(100% - 56px));" in css
+    assert "width: min(var(--app-content-max), calc(100% - 32px));" in css
+    assert "width: calc(100% - 24px);" in css
+    assert "calc(100vw - var(--app-sidebar-width)" not in css
     assert ".app-shell-body .app-card" in css
     assert ".app-shell-body .settings-workspace-section.app-card" in css
     assert ".app-shell-body :where(input, select, textarea)" in css

@@ -5,6 +5,10 @@ body {
             color: white;
         }
 
+        html {
+            scrollbar-gutter: stable;
+        }
+
         body.modal-open {
             overflow: hidden;
         }
@@ -25963,6 +25967,7 @@ img[data-deferred-src] {
     color: var(--app-text);
     color-scheme: light dark;
     font-family: var(--app-font-family);
+    scrollbar-gutter: stable;
 }
 
 .app-shell-body *,
@@ -26007,6 +26012,7 @@ img[data-deferred-src] {
     height: 100vh;
     padding: 20px 16px;
     overflow-y: auto;
+    scrollbar-gutter: stable;
     border-right: 1px solid var(--app-border);
     background: var(--app-surface);
     box-shadow: 1px 0 0 rgba(8, 22, 43, 0.02);
@@ -26470,7 +26476,7 @@ img[data-deferred-src] {
 }
 
 .app-content {
-    width: min(var(--app-content-max), calc(100vw - var(--app-sidebar-width) - 56px));
+    width: min(var(--app-content-max), calc(100% - 56px));
     margin: 0 auto;
     padding: 28px 0 72px;
 }
@@ -28374,7 +28380,7 @@ img[data-deferred-src] {
     }
 
     .app-content {
-        width: min(var(--app-content-max), calc(100vw - 32px));
+        width: min(var(--app-content-max), calc(100% - 32px));
     }
 
     .app-mobile-bottom-nav {
@@ -28450,7 +28456,7 @@ img[data-deferred-src] {
     }
 
     .app-content {
-        width: calc(100vw - 24px);
+        width: calc(100% - 24px);
         padding: 16px 0 92px;
     }
 
@@ -28535,7 +28541,7 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-shell {
-    width: min(1680px, calc(100vw - var(--app-sidebar-width) - 48px));
+    width: min(1680px, calc(100% - 48px));
     margin: 0 auto;
     padding: 24px 0 48px;
 }
