@@ -29775,6 +29775,10 @@ img[data-deferred-src] {
         background: rgba(255, 255, 255, .97);
     }
 
+    .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-topbar {
+        padding-inline: 24px;
+    }
+
     .app-global-search {
         width: min(100%, 540px);
     }
@@ -29829,8 +29833,8 @@ img[data-deferred-src] {
     }
 
     .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-content {
-        width: min(var(--app-content-max), calc(100% - 60px));
-        max-width: var(--app-content-max);
+        width: calc(100% - 48px);
+        max-width: none;
         padding-top: 28px;
     }
 
