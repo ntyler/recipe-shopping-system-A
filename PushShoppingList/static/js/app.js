@@ -22679,6 +22679,10 @@ function populateRecipeEditor(recipe, originalUrl) {
 
     setValue("recipeEditOriginalUrl", originalUrl);
     setValue("recipeEditDisplayName", recipe.display_name || "");
+    const recipeBreadcrumbName = document.getElementById("recipeEditBreadcrumbName");
+    if (recipeBreadcrumbName) {
+        recipeBreadcrumbName.textContent = String(recipe.display_name || recipe.recipe_title || "Recipe").trim() || "Recipe";
+    }
     setValue("recipeEditTitleInput", recipe.recipe_title || "");
     setValue("recipeEditDescription", recipe.description || "");
     setRecipeEditorSourceUrlField(recipe, originalUrl);

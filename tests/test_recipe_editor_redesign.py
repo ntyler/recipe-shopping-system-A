@@ -40,6 +40,8 @@ def test_standalone_recipe_editor_uses_app_shell_navigation():
     assert "recipe-edit-page-main-shell" in template
     assert "recipe-edit-standalone-shell" in template
     assert "{% include \"sections/current_recipe_url_log.html\" %}" in template
+    assert 'document.getElementById("recipeEditImageCardContent")' in template
+    assert "imageCardContent.appendChild(coverField)" in template
 
 
 def test_recipe_editor_redesign_preserves_core_fields_and_actions():
@@ -50,6 +52,8 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "recipe-edit-layout" in template
     assert "recipe-edit-main-workspace" in template
     assert "recipe-edit-context-sidebar" in template
+    assert "recipeEditBreadcrumbName" in template
+    assert "recipeEditImageCardContent" in template
     assert "recipe-edit-tab-list" in template
     assert 'data-recipe-edit-tab="ingredients"' in template
     assert 'data-recipe-edit-tab="instructions"' in template
@@ -110,6 +114,7 @@ def test_recipe_editor_redesign_javascript_wiring():
     assert "data-recipe-edit-health-item" in script
     assert "data-health-status" in script
     assert "data-document-download" in script
+    assert "recipeBreadcrumbName.textContent" in script
     assert "[\"initRecipeEditTabs\", initRecipeEditTabs]" in script
     assert "[\"initRecipeEditContextPanels\", initRecipeEditContextPanels]" in script
     assert 'data-field="section"' in script
@@ -127,6 +132,9 @@ def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     assert ".recipe-edit-document-row {" in css
     assert ".recipe-edit-health-row" in css
     assert ".recipe-edit-ai-assistant-card {" in css
+    assert ".recipe-edit-image-card .recipe-edit-cover-field {" in css
+    assert ".recipe-edit-sticky-action-footer .recipe-edit-save" in css
+    assert "--app-bg: #11171d;" in css
     assert ".recipe-edit-ingredient-row label.recipe-edit-section-label" in css
     assert ".recipe-edit-substitution-row-menu:not([hidden])" in css
     assert "@media (max-width: 1180px)" in css

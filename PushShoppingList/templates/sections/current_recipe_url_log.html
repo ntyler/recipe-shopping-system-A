@@ -561,10 +561,12 @@
                     <nav class="recipe-edit-breadcrumb" aria-label="Breadcrumb">
                         <a href="{{ url_for('main_bp.index') }}#currentRecipeUrlLogCard">Recipes</a>
                         <span aria-hidden="true">/</span>
+                        <span id="recipeEditBreadcrumbName">Recipe</span>
+                        <span aria-hidden="true">/</span>
                         <span>Edit Recipe</span>
                     </nav>
                     <h2 id="recipeEditTitle">Edit Recipe</h2>
-                    <p>Manage recipe details, normalized ingredients, AI enrichment, and source documents.</p>
+                    <p>Make changes to your recipe and save.</p>
                 </div>
                 <div class="recipe-edit-header-actions">
                     <button type="button"
@@ -2091,6 +2093,12 @@
 
                 </div>
                 <aside class="recipe-edit-context-sidebar" aria-label="Recipe context">
+                    <section class="recipe-edit-context-card recipe-edit-image-card" aria-labelledby="recipeEditImageCardTitle">
+                        <div class="recipe-edit-context-card-heading">
+                            <span id="recipeEditImageCardTitle">Recipe Image</span>
+                        </div>
+                        <div id="recipeEditImageCardContent" class="recipe-edit-image-card-content"></div>
+                    </section>
                     <details class="recipe-edit-context-card recipe-edit-source-documents-card" open>
                         <summary>
                             <span>Source &amp; Documents</span>

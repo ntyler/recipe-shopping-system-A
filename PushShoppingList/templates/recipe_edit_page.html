@@ -110,6 +110,12 @@
 <script>
 window.addEventListener("DOMContentLoaded", () => {
     const recipeUrl = document.body ? document.body.dataset.recipeEditUrl || "" : "";
+    const imageCardContent = document.getElementById("recipeEditImageCardContent");
+    const coverField = document.getElementById("recipeEditCoverField");
+
+    if (imageCardContent && coverField) {
+        imageCardContent.appendChild(coverField);
+    }
 
     if (recipeUrl && typeof openRecipeEditor === "function") {
         const pendingOptions = typeof consumeRecipeEditPendingAction === "function"
