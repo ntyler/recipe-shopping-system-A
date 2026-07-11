@@ -1136,6 +1136,81 @@ function openHomeRecipeAction(button, action, event = null) {
     return jumpToRecipeViewRecipe(button, event);
 }
 
+function setRecipeFavoriteButtonState(button, favorite) {
+    if (!button) {
+        return;
+    }
+
+    const isFavorite = Boolean(favorite);
+    const recipeName = button.dataset.recipeName || "recipe";
+    button.setAttribute("aria-pressed", isFavorite ? "true" : "false");
+    button.setAttribute(
+        "aria-label",
+        `${isFavorite ? "Remove" : "Add"} ${recipeName} ${isFavorite ? "from" : "to"} favorites`
+    );
+    button.title = button.getAttribute("aria-label");
+}
+
+function setRecipeFavoriteStateForUrl(recipeUrl, favorite) {
+    if (!recipeUrl) {
+        return;
+    }
+
+    document
+        .querySelectorAll(`[data-recipe-favorite][data-recipe-url="${cssEscape(recipeUrl)}"]`)
+        .forEach(button => setRecipeFavoriteButtonState(button, favorite));
+}
+
+async function toggleRecipeFavorite(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const recipeUrl = button ? button.dataset.recipeUrl || "" : "";
+    if (!recipeUrl || !button) {
+        return false;
+    }
+
+    const wasFavorite = button.getAttribute("aria-pressed") === "true";
+    const nextFavorite = !wasFavorite;
+    setRecipeFavoriteStateForUrl(recipeUrl, nextFavorite);
+    button.disabled = true;
+
+    try {
+        const response = await fetch("/api/recipe_favorite", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                url: recipeUrl,
+                favorite: nextFavorite,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to update favorite.");
+        }
+
+        setRecipeFavoriteStateForUrl(recipeUrl, Boolean(data.favorite));
+    } catch (err) {
+        console.warn("Unable to update recipe favorite.", err);
+        setRecipeFavoriteStateForUrl(recipeUrl, wasFavorite);
+        window.alert(err.message || "Unable to update favorite.");
+    } finally {
+        document
+            .querySelectorAll(`[data-recipe-favorite][data-recipe-url="${cssEscape(recipeUrl)}"]`)
+            .forEach(favoriteButton => {
+                favoriteButton.disabled = false;
+            });
+    }
+
+    return false;
+}
+
 function openHomeRecentImport(jobId = "") {
     const normalizedJobId = String(jobId || "").trim();
     if (normalizedJobId) {

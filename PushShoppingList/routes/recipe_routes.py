@@ -115,6 +115,7 @@ from PushShoppingList.services.recipe_edit_service import generate_recipe_equipm
 from PushShoppingList.services.recipe_edit_service import generate_recipe_ingredient_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_step_image
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
+from PushShoppingList.services.recipe_edit_service import load_recipe_output
 from PushShoppingList.services.recipe_edit_service import log_recipe_pdf_timing
 from PushShoppingList.services.recipe_edit_service import recipe_note_feedback
 from PushShoppingList.services.recipe_edit_service import remove_recipe_cover_image
@@ -123,6 +124,7 @@ from PushShoppingList.services.recipe_edit_service import review_recipe_store_se
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
 from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
+from PushShoppingList.services.recipe_edit_service import save_recipe_output
 from PushShoppingList.services.recipe_edit_service import test_local_title_image_generation
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
 from PushShoppingList.services.recipe_edit_service import ensure_recipe_pdf_cloudflare_link
@@ -4037,6 +4039,30 @@ def api_source_url_pdf_route():
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe_favorite", methods=["POST"])
+def api_recipe_favorite_route():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or data.get("recipe_url") or "").strip()
+
+    if not url:
+        return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+
+    recipe_data = load_recipe_output(url)
+    if not recipe_data:
+        return jsonify({"ok": False, "error": "Recipe was not found."}), 404
+
+    favorite_value = data.get("favorite")
+    favorite = not bool(recipe_data.get("favorite")) if favorite_value is None else bool(favorite_value)
+    recipe_data["favorite"] = favorite
+    save_recipe_output(recipe_data.get("source_url") or url, recipe_data)
+
+    return jsonify({
+        "ok": True,
+        "favorite": favorite,
+        "url": recipe_data.get("source_url") or url,
+    })
 
 
 @recipe_bp.route("/api/recipe_pdf/delete", methods=["POST"])

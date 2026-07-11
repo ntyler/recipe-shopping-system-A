@@ -1,11 +1,19 @@
 from datetime import datetime
 from datetime import timezone
+import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from PIL import Image
 from PIL import ImageChops
 
+from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
+from PushShoppingList.services import recipe_edit_service
+from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service
+from PushShoppingList.services.recipe_extract_service import safe_filename
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +21,53 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def read_text(relative_path):
     return (ROOT / relative_path).read_text(encoding="utf-8")
+
+
+def test_recipe_favorite_route_updates_saved_recipe_state(monkeypatch):
+    app = create_app()
+    app.config.update(TESTING=True)
+    recipe_url = "https://example.com/beans"
+
+    with TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        output_dir = temp_path / "output"
+        output_dir.mkdir()
+        with patch.object(recipe_edit_service, "OUTPUT_FOLDER", output_dir):
+            recipe_edit_service.save_recipe_output(
+                recipe_url,
+                {
+                    "source_url": recipe_url,
+                    "recipe_title": "Beans",
+                    "favorite": False,
+                },
+            )
+
+            with app.test_client() as client:
+                monkeypatch.setattr(storage_service, "USER_DATA_DIR", temp_path / "users")
+                monkeypatch.setattr(user_account_service, "USERS_FILE", temp_path / "users.json")
+                user_account_service.save_users({
+                    "users": [{
+                        "user_id": "favorite-user",
+                        "email": "favorite@example.com",
+                        "username": "favorite",
+                        "account_status": "active",
+                    }],
+                })
+                with client.session_transaction() as session:
+                    session["user_id"] = "favorite-user"
+
+                response = client.post(
+                    "/api/recipe_favorite",
+                    json={"url": recipe_url, "favorite": True},
+                )
+
+            saved = json.loads(
+                (output_dir / f"{safe_filename(recipe_url)}.json").read_text(encoding="utf-8")
+            )
+
+    assert response.status_code == 200
+    assert response.get_json()["favorite"] is True
+    assert saved["favorite"] is True
 
 
 def test_home_recipe_badge_uses_real_metadata_priority():
@@ -115,7 +170,7 @@ def test_home_recent_import_rows_use_real_counts_timestamps_and_statuses():
     ]
 
 
-def test_home_template_has_supported_overflow_and_no_fake_favorite():
+def test_home_template_has_supported_overflow_and_favorite_action():
     template = read_text("PushShoppingList/templates/index.html")
     home_start = template.index('<section class="app-home-dashboard"')
     home_end = template.index("{% include \"sections/app_workspaces.html\" %}")
@@ -133,8 +188,10 @@ def test_home_template_has_supported_overflow_and_no_fake_favorite():
     assert "star_number <= recipe.rating" not in home
     assert "&#9733;" not in home
     assert "Time TBD" not in home
-    assert "favorite" not in home.lower()
-    assert "heart" not in home.lower()
+    assert "data-recipe-favorite" in home
+    assert 'aria-pressed="{% if recipe.favorite %}true{% else %}false{% endif %}"' in home
+    assert 'onclick="return toggleRecipeFavorite(this, event)"' in home
+    assert 'shell.svg_icon("heart")' in home
 
 
 def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
@@ -168,10 +225,12 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert ".app-home-recipe-media img {\n        display: block;" in css
     assert "max-width: 100%;" in css
     assert ".app-home-summary-icon .app-icon-svg" in css
+    assert ".app-home-recipe-favorite" in css
     assert ".app-home-recipe-menu-toggle" in css
     assert ".app-home-recipe-rating .is-unselected" in css
     assert ".app-home-import-status.is-running::before" in css
     assert "(min-width: 1100px) and (prefers-color-scheme: dark)" in css
+    assert "function toggleRecipeFavorite" in script
     assert "function toggleHomeRecipeMenu" in script
     assert "function closeHomeRecipeMenus" in script
     assert "function openHomeRecipeAction" in script

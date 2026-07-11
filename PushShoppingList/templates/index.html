@@ -393,6 +393,16 @@
                             <article class="app-home-recipe-card" data-recipe-url="{{ recipe.url }}">
                                 <div class="app-home-recipe-actions">
                                     <button type="button"
+                                            class="app-home-recipe-favorite"
+                                            data-recipe-favorite
+                                            data-recipe-url="{{ recipe.url }}"
+                                            data-recipe-name="{{ recipe.name }}"
+                                            aria-label="{% if recipe.favorite %}Remove {{ recipe.name }} from favorites{% else %}Add {{ recipe.name }} to favorites{% endif %}"
+                                            aria-pressed="{% if recipe.favorite %}true{% else %}false{% endif %}"
+                                            onclick="return toggleRecipeFavorite(this, event)">
+                                        {{ shell.svg_icon("heart") }}
+                                    </button>
+                                    <button type="button"
                                             class="app-home-recipe-menu-toggle"
                                             aria-label="More actions for {{ recipe.name }}"
                                             aria-haspopup="menu"

@@ -69,6 +69,16 @@
                             {% else %}
                                 <span class="app-recipe-card-fallback" aria-hidden="true">{{ shell.app_icon("recipes") }}</span>
                             {% endif %}
+                            <button type="button"
+                                    class="app-recipe-favorite"
+                                    data-recipe-favorite
+                                    data-recipe-url="{{ recipe.url }}"
+                                    data-recipe-name="{{ recipe.name }}"
+                                    aria-label="{% if recipe.favorite %}Remove {{ recipe.name }} from favorites{% else %}Add {{ recipe.name }} to favorites{% endif %}"
+                                    aria-pressed="{% if recipe.favorite %}true{% else %}false{% endif %}"
+                                    onclick="return toggleRecipeFavorite(this, event)">
+                                {{ shell.svg_icon("heart") }}
+                            </button>
                         </div>
                         <div class="app-recipe-card-body">
                             <h3>

@@ -1586,6 +1586,7 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
             "import_failure_status": recipe_import_failure_status(recipe_data),
             "rating": recipe_rating_for_view(recipe_data),
             "rating_stars": recipe_rating_stars_for_view(recipe_data),
+            "favorite": bool(recipe_data.get("favorite")),
             "base_servings": recipe_data.get("servings"),
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
             "serving_basis": nutrition_summary["serving_basis"],
@@ -1818,6 +1819,7 @@ def recipe_url_log_rows(
             "import_failure_status": recipe_import_failure_status(recipe_data),
             "rating": recipe_rating_for_view(recipe_data),
             "rating_stars": recipe_rating_stars_for_view(recipe_data),
+            "favorite": bool(recipe_data.get("favorite")),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
             "base_servings": recipe_data.get("servings"),
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
@@ -2256,6 +2258,7 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             recipe["import_failure_status"] = recipe_import_failure_status(recipe_data)
             recipe["rating"] = recipe_rating_for_view(recipe_data)
             recipe["rating_stars"] = recipe_rating_stars_for_view(recipe_data)
+            recipe["favorite"] = bool(recipe_data.get("favorite"))
             recipe["pdf_public_url"] = recipe_pdf_public_url(recipe_url)
             recipe["source_pdf_public_url"] = recipe_pdf_public_url(recipe_url, PDF_KIND_WEBPAGE_BACKUP)
             recipe["archive_pdf_available"] = recipe_archive_pdf_exists(recipe_url)

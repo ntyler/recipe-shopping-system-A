@@ -46,7 +46,10 @@ def test_recipes_page_preserves_real_actions_and_recipe_metadata():
     assert 'onclick="return cycleRecipeBrowseSort(this)"' in recipes_page
     assert 'data-recipe-browse-search' in recipes_page
     assert 'data-recipe-browse-cookbook' in recipes_page
-    assert 'shell.svg_icon("heart")' not in recipes_page
+    assert "data-recipe-favorite" in recipes_page
+    assert 'aria-pressed="{% if recipe.favorite %}true{% else %}false{% endif %}"' in recipes_page
+    assert 'onclick="return toggleRecipeFavorite(this, event)"' in recipes_page
+    assert 'shell.svg_icon("heart")' in recipes_page
     assert 'shell.svg_icon("clock")' in recipes_page
 
 
