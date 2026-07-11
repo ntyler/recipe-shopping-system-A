@@ -230,6 +230,33 @@ def test_home_banner_image_asset_exists():
         assert right_handle_pixels > 300
         assert left_wheel_pixels > 40
         assert right_wheel_pixels > 40
+        left_wheel_points = [
+            (x, y)
+            for y in range(315, 360)
+            for x in range(165, 220)
+            if (
+                banner.getpixel((x, y))[3] > 180
+                and banner.getpixel((x, y))[0] < 55
+                and banner.getpixel((x, y))[1] > 55
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[0] * 1.5
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[2] * 1.2
+            )
+        ]
+        right_wheel_points = [
+            (x, y)
+            for y in range(310, 355)
+            for x in range(210, 260)
+            if (
+                banner.getpixel((x, y))[3] > 180
+                and banner.getpixel((x, y))[0] < 55
+                and banner.getpixel((x, y))[1] > 55
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[0] * 1.5
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[2] * 1.2
+            )
+        ]
+        assert sum(y for _, y in right_wheel_points) / len(right_wheel_points) < (
+            sum(y for _, y in left_wheel_points) / len(left_wheel_points)
+        )
 
     with Image.open(image_path) as banner, Image.open(clean_bag_path) as clean_bag:
         diff = ImageChops.difference(banner.convert("RGBA"), clean_bag.convert("RGBA"))
