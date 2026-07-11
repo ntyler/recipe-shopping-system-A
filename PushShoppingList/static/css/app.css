@@ -28188,12 +28188,12 @@ img[data-deferred-src] {
 }
 
 .app-home-recipe-metadata .app-recipe-card-cookbook-line {
-    min-height: 28px;
-    padding: 4px 10px;
-    border-color: color-mix(in srgb, var(--app-muted) 62%, transparent);
+    min-height: 24px;
+    padding: 3px 8px;
+    border-color: color-mix(in srgb, var(--app-muted) 48%, transparent);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--app-surface-soft) 90%, var(--app-muted) 10%);
-    color: color-mix(in srgb, var(--app-text) 78%, var(--app-muted));
+    background: color-mix(in srgb, var(--app-surface-soft) 72%, transparent);
+    color: var(--app-muted);
     font-weight: 550;
 }
 
@@ -28201,6 +28201,7 @@ img[data-deferred-src] {
     border-color: color-mix(in srgb, var(--app-primary) 28%, transparent);
     background: color-mix(in srgb, var(--app-primary) 16%, transparent);
     color: var(--app-primary-hover);
+    font-weight: 650;
 }
 
 .app-home-recipe-metadata :is(.app-recipe-card-cookbook-line, .app-recipe-card-category-line) .app-recipe-card-meta-text {

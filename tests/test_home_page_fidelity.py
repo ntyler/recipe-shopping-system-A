@@ -212,8 +212,9 @@ def test_home_template_has_supported_overflow_and_favorite_action():
     assert "&#127991;&#65039;" not in home
     assert home.index("app-home-recipe-rating") < home.index("recipe.card_cook_time")
     assert home.index("recipe.card_cook_time") < home.index("recipe.card_calories")
-    assert home.index("recipe.card_calories") < home.index("recipe.cookbook_name and not recipe.cookbook_is_unclassified")
-    assert home.index("recipe.cookbook_name and not recipe.cookbook_is_unclassified") < home.index("recipe.home_badge")
+    assert home.index("recipe.card_calories") < home.index("recipe.home_badge")
+    assert home.index("recipe.home_badge") < home.index("recipe.cookbook_name and not recipe.cookbook_is_unclassified")
+    assert 'cookbook_display_name|replace("-", " ")|replace("_", " ")|title' in home
     assert "data-recipe-favorite" in home
     assert 'aria-pressed="{% if recipe.favorite %}true{% else %}false{% endif %}"' in home
     assert 'onclick="return toggleRecipeFavorite(this, event)"' in home
@@ -441,12 +442,13 @@ def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
     assert ".app-home-recipe-metadata .app-recipe-card-cookbook-line,\n.app-home-recipe-metadata .app-recipe-card-category-line {" in css
     assert "width: fit-content;\n    max-width: 100%;" in css
     assert ".app-home-recipe-metadata .app-recipe-card-cookbook-line {" in css
-    assert "min-height: 28px;\n    padding: 4px 10px;" in css
-    assert "border-color: color-mix(in srgb, var(--app-muted) 62%, transparent);" in css
+    assert "min-height: 24px;\n    padding: 3px 8px;" in css
+    assert "border-color: color-mix(in srgb, var(--app-muted) 48%, transparent);" in css
     assert "border-radius: 999px;" in css
-    assert "background: color-mix(in srgb, var(--app-surface-soft) 90%, var(--app-muted) 10%);" in css
+    assert "background: color-mix(in srgb, var(--app-surface-soft) 72%, transparent);" in css
     assert "font-weight: 550;" in css
     assert ".app-home-recipe-metadata .app-recipe-card-category-line {" in css
+    assert "font-weight: 650;" in css
     assert "background: color-mix(in srgb, var(--app-primary) 16%, transparent);" in css
     assert "max-width: 160px;" in css
     assert "@media (max-width: 1099px)" in css
