@@ -506,27 +506,29 @@
         </div>
 
         <div class="app-home-secondary-grid">
-            <section class="app-home-panel app-home-smart-suggestions" aria-label="Smart suggestions">
-                <div class="app-home-panel-header">
-                    <h2 class="app-home-panel-title">{{ shell.svg_icon("sparkles") }} <span>Smart Suggestions</span></h2>
-                </div>
-                {% if pantry_preview_items %}
-                    {% set pantry_suggestion = pantry_preview_items[0] %}
-                    <div class="app-home-suggestion-row">
-                        <span class="app-home-summary-icon">{{ shell.app_icon("pantry") }}</span>
-                        <div><strong>Review {{ pantry_suggestion.ingredient_name or pantry_suggestion.product_name or "a pantry item" }}</strong><span>Check quantity and freshness before your next trip.</span></div>
-                        <a href="#aiPantryInventory" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryInventory" data-app-nav-lazy-section="pantry">Open Pantry</a>
+            <div class="app-home-secondary-left">
+                <section class="app-home-panel app-home-smart-suggestions" aria-label="Smart suggestions">
+                    <div class="app-home-panel-header">
+                        <h2 class="app-home-panel-title">{{ shell.svg_icon("sparkles") }} <span>Smart Suggestions</span></h2>
                     </div>
-                {% else %}
-                    <div class="app-home-empty-state"><strong>Your pantry is ready to set up.</strong><span>Add pantry items to receive useful, data-backed suggestions.</span></div>
-                {% endif %}
-            </section>
+                    {% if pantry_preview_items %}
+                        {% set pantry_suggestion = pantry_preview_items[0] %}
+                        <div class="app-home-suggestion-row">
+                            <span class="app-home-summary-icon">{{ shell.app_icon("pantry") }}</span>
+                            <div><strong>Review {{ pantry_suggestion.ingredient_name or pantry_suggestion.product_name or "a pantry item" }}</strong><span>Check quantity and freshness before your next trip.</span></div>
+                            <a href="#aiPantryInventory" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantryInventory" data-app-nav-lazy-section="pantry">Open Pantry</a>
+                        </div>
+                    {% else %}
+                        <div class="app-home-empty-state"><strong>Your pantry is ready to set up.</strong><span>Add pantry items to receive useful, data-backed suggestions.</span></div>
+                    {% endif %}
+                </section>
 
-            <section class="app-home-panel app-home-price-preview" aria-label="Price comparison">
-                <div class="app-home-panel-header"><h2 class="app-home-panel-title">{{ shell.svg_icon("price") }} <span>Price Comparison</span></h2></div>
-                <p>Compare current shopping items across your enabled stores. Prices appear only after a supported lookup.</p>
-                <a class="app-page-secondary-action" href="#priceComparisonPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="priceComparisonPage" data-app-nav-target="priceComparisonPage">Compare prices</a>
-            </section>
+                <section class="app-home-panel app-home-price-preview" aria-label="Price comparison">
+                    <div class="app-home-panel-header"><h2 class="app-home-panel-title">{{ shell.svg_icon("price") }} <span>Price Comparison</span></h2></div>
+                    <p>Compare current shopping items across your enabled stores. Prices appear only after a supported lookup.</p>
+                    <a class="app-page-secondary-action" href="#priceComparisonPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="priceComparisonPage" data-app-nav-target="priceComparisonPage">Compare prices</a>
+                </section>
+            </div>
 
             <section class="app-home-panel app-home-recent-imports" aria-label="Recent imports">
                 <div class="app-home-panel-header">

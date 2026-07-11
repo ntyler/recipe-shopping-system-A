@@ -395,26 +395,27 @@ def test_home_banner_image_asset_exists():
 
 
 def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
+    template = read_text("PushShoppingList/templates/index.html")
     css = read_text("PushShoppingList/static/css/app.css")
 
     assert "--app-dashboard-gap: clamp(12px, 1.2vw, 20px);" in css
     assert "--app-dashboard-card-padding: clamp(14px, 1vw, 18px);" in css
     assert ".app-home-dashboard {\n    display: grid;" in css
-    assert "grid-template-columns: repeat(12, minmax(0, 1fr));" in css
-    assert ".app-home-summary-grid {\n    display: contents;" in css
+    assert "grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);" in css
+    assert "grid-template-columns: repeat(12, minmax(0, 1fr));" not in css
+    assert ".app-home-summary-grid {\n    display: grid;\n    grid-column: 1 / -1;" in css
     assert ".app-home-primary-grid,\n.app-home-secondary-grid {\n    display: contents;" in css
-    assert ".app-home-summary-grid > .app-home-summary-card {\n    grid-column: span 3;" in css
-    assert ".app-home-recent-recipes {\n    grid-column: span 7;" in css
-    assert ".app-home-meal-preview {\n    grid-column: span 5;" in css
-    assert ".app-home-smart-suggestions,\n.app-home-price-preview,\n.app-home-recent-imports {\n    grid-column: span 4;" in css
+    assert 'class="app-home-secondary-left"' in template
+    assert ".app-home-recent-recipes {\n    grid-column: 1;" in css
+    assert ".app-home-meal-preview {\n    grid-column: 2;" in css
+    assert ".app-home-secondary-left {\n    display: grid;\n    grid-column: 1;" in css
+    assert ".app-home-recent-imports {\n    grid-column: 2;" in css
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in css
     assert ".app-home-meal-preview .app-home-empty-state {\n    min-height: 0;" in css
     assert "@media (max-width: 1099px)" in css
-    assert ".app-home-summary-grid > .app-home-summary-card {\n        grid-column: span 6;" in css
-    assert ".app-home-recent-recipes,\n    .app-home-meal-preview {\n        grid-column: 1 / -1;" in css
-    assert ".app-home-smart-suggestions,\n    .app-home-price-preview {\n        grid-column: span 6;" in css
+    assert ".app-home-summary-grid {\n        grid-template-columns: repeat(2, minmax(0, 1fr));" in css
+    assert ".app-home-recent-recipes,\n    .app-home-meal-preview,\n    .app-home-secondary-left,\n    .app-home-recent-imports {\n        grid-column: 1 / -1;" in css
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
-    assert "@media (max-width: 860px)" in css
     assert "@media (max-width: 620px)" in css
     assert ".app-home-dashboard {\n        --app-dashboard-gap: 12px;\n        --app-dashboard-card-padding: 14px;\n        grid-template-columns: minmax(0, 1fr);" in css
     assert "@media (max-width: 620px)" in css
