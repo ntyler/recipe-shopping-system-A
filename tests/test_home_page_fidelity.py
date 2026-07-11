@@ -3,6 +3,7 @@ from datetime import timezone
 from pathlib import Path
 
 from PIL import Image
+from PIL import ImageChops
 
 from PushShoppingList.routes import main_routes
 
@@ -165,8 +166,10 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
 
 def test_home_banner_image_asset_exists():
     image_path = ROOT / "PushShoppingList/static/images/ai-pantry-home-banner-v4.png"
+    clean_bag_path = ROOT / "PushShoppingList/static/images/ai-pantry-home-banner-v3.png"
 
     assert image_path.is_file()
+    assert clean_bag_path.is_file()
     with Image.open(image_path) as banner:
         assert banner.mode == "RGBA"
         assert banner.size == (620, 394)
@@ -187,6 +190,57 @@ def test_home_banner_image_asset_exists():
             )
         )
         assert dark_green_logo_pixels > 2500
+
+        right_handle_pixels = sum(
+            1
+            for y in range(255, 305)
+            for x in range(250, 310)
+            if (
+                banner.getpixel((x, y))[3] > 180
+                and banner.getpixel((x, y))[0] < 55
+                and banner.getpixel((x, y))[1] > 55
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[0] * 1.5
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[2] * 1.2
+            )
+        )
+        left_wheel_pixels = sum(
+            1
+            for y in range(325, 360)
+            for x in range(165, 215)
+            if (
+                banner.getpixel((x, y))[3] > 180
+                and banner.getpixel((x, y))[0] < 55
+                and banner.getpixel((x, y))[1] > 55
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[0] * 1.5
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[2] * 1.2
+            )
+        )
+        right_wheel_pixels = sum(
+            1
+            for y in range(325, 360)
+            for x in range(205, 255)
+            if (
+                banner.getpixel((x, y))[3] > 180
+                and banner.getpixel((x, y))[0] < 55
+                and banner.getpixel((x, y))[1] > 55
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[0] * 1.5
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[2] * 1.2
+            )
+        )
+        assert right_handle_pixels > 300
+        assert left_wheel_pixels > 40
+        assert right_wheel_pixels > 40
+
+    with Image.open(image_path) as banner, Image.open(clean_bag_path) as clean_bag:
+        diff = ImageChops.difference(banner.convert("RGBA"), clean_bag.convert("RGBA"))
+        changed_points = [
+            (x, y)
+            for y in range(diff.height)
+            for x in range(diff.width)
+            if diff.getpixel((x, y)) != (0, 0, 0, 0)
+        ]
+        assert changed_points
+        assert all(120 <= x <= 320 and 185 <= y <= 365 for x, y in changed_points)
 
 
 def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
