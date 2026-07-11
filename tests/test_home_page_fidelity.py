@@ -2,6 +2,8 @@ from datetime import datetime
 from datetime import timezone
 from pathlib import Path
 
+from PIL import Image
+
 from PushShoppingList.routes import main_routes
 
 
@@ -128,15 +130,18 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-content" in css
     assert "width: calc(100% - 60px);" in css
     assert 'class="app-home-hero-copy"' in template
-    assert "ai-pantry-home-hero.png" in css
-    assert "background-color: #ffffff;" in css
-    assert "background-position: center top;" in css
-    assert "background-size: 100% auto;" in css
-    assert "grid-template-columns: 440px minmax(0, 310px);" in css
-    assert "column-gap: 32px;" in css
+    assert "ai-pantry-home-banner-v3.png" in css
+    assert "background-color: transparent;" in css
+    assert "background-position: center;" in css
+    assert "background-size: contain;" in css
+    assert "grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);" in css
+    assert "column-gap: 24px;" in css
     assert "grid-column: 2;\n        grid-row: 1;" in css
     assert "aspect-ratio: 310 / 197;" in css
-    assert ".app-home-hero-logo {\n        position: absolute;\n        top: 55.84%;\n        left: 26.45%;\n        display: block;" in css
+    assert "align-self: center;\n        justify-self: end;" in css
+    assert "transform: translateX(18px);" in css
+    assert "@media (min-width: 760px) and (max-width: 1099px)" in css
+    assert "@media (max-width: 759px)" in css
     assert ".app-home-summary-icon .app-icon-svg" in css
     assert ".app-home-recipe-menu-toggle" in css
     assert ".app-home-recipe-rating .is-unselected" in css
@@ -148,8 +153,17 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert "function openHomeRecentImport" in script
 
 
-def test_home_banner_source_image_asset_exists():
-    assert (ROOT / "PushShoppingList/static/images/ai-pantry-home-hero.png").is_file()
+def test_home_banner_image_asset_exists():
+    image_path = ROOT / "PushShoppingList/static/images/ai-pantry-home-banner-v3.png"
+
+    assert image_path.is_file()
+    with Image.open(image_path) as banner:
+        assert banner.mode == "RGBA"
+        assert banner.size == (620, 394)
+        assert all(
+            banner.getpixel(point)[3] == 0
+            for point in ((0, 0), (619, 0), (0, 393), (619, 393))
+        )
 
 
 def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
