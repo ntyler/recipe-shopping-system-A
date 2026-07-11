@@ -126,6 +126,8 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
 
     assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-content" in css
     assert "width: calc(100% - 60px);" in css
+    assert "ai-pantry-home-banner.png" in css
+    assert ".app-home-hero-logo {\n        position: absolute;\n        top: 92px;\n        left: 120px;\n        display: none;" in css
     assert ".app-home-summary-icon .app-icon-svg" in css
     assert ".app-home-recipe-menu-toggle" in css
     assert ".app-home-recipe-rating .is-unselected" in css
@@ -135,6 +137,10 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert "function closeHomeRecipeMenus" in script
     assert "function openHomeRecipeAction" in script
     assert "function openHomeRecentImport" in script
+
+
+def test_home_banner_image_asset_exists():
+    assert (ROOT / "PushShoppingList/static/images/ai-pantry-home-banner.png").is_file()
 
 
 def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():

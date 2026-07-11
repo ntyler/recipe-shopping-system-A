@@ -29766,7 +29766,7 @@ img[data-deferred-src] {
         right: clamp(180px, 28vw, 520px);
         width: 320px;
         height: 198px;
-        background: url("../images/ai-pantry-home-hero.png") center / 250px 190px no-repeat;
+        background: url("../images/ai-pantry-home-banner.png") center / contain no-repeat;
         pointer-events: none;
     }
 
@@ -29774,7 +29774,7 @@ img[data-deferred-src] {
         position: absolute;
         top: 92px;
         left: 120px;
-        display: inline-flex;
+        display: none;
         color: #087d35;
         transform: rotate(-1deg);
         filter: drop-shadow(0 1px 1px rgba(61, 35, 12, .16));
@@ -30602,7 +30602,7 @@ img[data-deferred-src] {
 
     .app-home-hero-media {
         right: clamp(180px, 18vw, 260px);
-        opacity: .86;
+        opacity: 1;
     }
 
     .app-home-hero-logo {
