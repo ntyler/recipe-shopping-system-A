@@ -119,6 +119,23 @@ def test_recipe_editor_sidebar_uses_the_same_import_task_groups():
     assert '{{ url_for(\'pantry_bp.pantry_coming_soon_route\') }}' in sidebar
 
 
+def test_brand_mark_uses_chef_hat_check_cart_logo():
+    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
+    brand_start = macros.index("{% macro brand_mark() -%}")
+    brand_end = macros.index("{%- endmacro %}", brand_start)
+    brand_markup = macros[brand_start:brand_end]
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert 'viewBox="0 0 48 48"' in brand_markup
+    assert "M13.6 28.4c-4.1-.6-7.3-4.2-7.3-8.6" in brand_markup
+    assert "M14.2 25.3v9.1h20V25.3" in brand_markup
+    assert "M16.7 38.3h15" in brand_markup
+    assert '<circle cx="17.8" cy="43.1" r="1.8"></circle>' in brand_markup
+    assert '<circle cx="30.2" cy="43.1" r="1.8"></circle>' in brand_markup
+    assert "M17.6 21.7 22.4 26l8.2-8.3" in brand_markup
+    assert "stroke-width: 2.8;" in css
+
+
 def test_sidebar_import_targets_keep_existing_active_state_and_barcode_behavior():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
