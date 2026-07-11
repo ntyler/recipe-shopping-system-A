@@ -27166,6 +27166,70 @@ img[data-deferred-src] {
     grid-column: span 3;
 }
 
+.app-dialog-field {
+    display: grid;
+    gap: 6px;
+    color: var(--app-text-strong);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.app-meal-planner-servings-stepper {
+    display: grid;
+    grid-template-columns: 42px minmax(84px, 112px) 42px;
+    gap: 8px;
+    align-items: center;
+    justify-content: start;
+}
+
+.app-meal-planner-servings-stepper button {
+    display: inline-grid;
+    place-items: center;
+    width: 42px;
+    min-height: 42px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface-soft);
+    color: var(--app-primary);
+    font-size: 20px;
+    font-weight: 750;
+    line-height: 1;
+}
+
+.app-meal-planner-servings-stepper button:hover:not(:disabled),
+.app-meal-planner-servings-stepper button:focus-visible {
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+    outline: none;
+}
+
+.app-meal-planner-servings-stepper button:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+}
+
+.app-meal-planner-servings-stepper input {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+    appearance: textfield;
+}
+
+.app-meal-planner-servings-stepper input::-webkit-inner-spin-button,
+.app-meal-planner-servings-stepper input::-webkit-outer-spin-button {
+    margin: 0;
+    appearance: none;
+}
+
+.app-dialog-helper {
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 430;
+    line-height: 1.4;
+}
+
 /* Multiple recipes share one grouped meal-plan slot. */
 .app-home-meal-list-wrap {
     display: grid;

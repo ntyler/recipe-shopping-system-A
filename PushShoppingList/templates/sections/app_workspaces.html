@@ -755,11 +755,41 @@
                 </select>
             </label>
             <label>Recipe
-                <select id="mealPlannerRecipe" name="recipe_url" required>
-                    <option value="">Choose a recipe</option>
-                    {% for recipe in meal_plan_recipe_options %}<option value="{{ recipe.url }}">{{ recipe.name }}</option>{% endfor %}
+                <select id="mealPlannerRecipe" name="recipe_url" required onchange="return syncMealPlannerServingsFromRecipe()">
+                    <option value="" data-default-servings="1" data-yield-label="">Choose a recipe</option>
+                    {% for recipe in meal_plan_recipe_options %}
+                        <option value="{{ recipe.url }}"
+                                data-default-servings="{{ recipe.default_servings }}"
+                                data-yield-label="{{ recipe.yield_label }}">{{ recipe.name }}</option>
+                    {% endfor %}
                 </select>
             </label>
+            <div class="app-dialog-field app-meal-planner-servings-field">
+                <label for="mealPlannerPlannedServings">Planned Servings</label>
+                <div class="app-meal-planner-servings-stepper" role="group" aria-label="Planned servings controls">
+                    <button type="button"
+                            data-meal-servings-decrease
+                            aria-label="Decrease planned servings"
+                            aria-controls="mealPlannerPlannedServings"
+                            onclick="return adjustMealPlannerServings(-1)">&minus;</button>
+                    <input id="mealPlannerPlannedServings"
+                           name="planned_servings"
+                           type="number"
+                           min="1"
+                           step="any"
+                           data-step="0.5"
+                           value="1"
+                           inputmode="decimal"
+                           required
+                           aria-describedby="mealPlannerServingsHelp"
+                           oninput="return updateMealPlannerServingControls()">
+                    <button type="button"
+                            aria-label="Increase planned servings"
+                            aria-controls="mealPlannerPlannedServings"
+                            onclick="return adjustMealPlannerServings(1)">+</button>
+                </div>
+                <small id="mealPlannerServingsHelp" class="app-dialog-helper" data-meal-servings-help aria-live="polite">Select a recipe to use its default yield.</small>
+            </div>
             <div class="app-dialog-status" data-meal-plan-status aria-live="polite"></div>
             <div class="app-dialog-actions">
                 <button type="button" class="app-page-secondary-action" onclick="return closeMealPlannerDialog()">Cancel</button>

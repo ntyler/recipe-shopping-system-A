@@ -1281,6 +1281,79 @@ function setMealPlannerStatus(message, isError = false, selector = "[data-meal-p
     status.classList.toggle("error", Boolean(isError));
 }
 
+function formatMealPlannerServingNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+        return "1";
+    }
+    if (Number.isInteger(numeric)) {
+        return String(numeric);
+    }
+    return String(Number(numeric.toFixed(4)));
+}
+
+function updateMealPlannerServingControls() {
+    const input = document.getElementById("mealPlannerPlannedServings");
+    const decrease = document.querySelector("[data-meal-servings-decrease]");
+    if (!input) {
+        return false;
+    }
+    const minimum = Number.parseFloat(input.min || "1") || 1;
+    const current = Number.parseFloat(input.value);
+    if (decrease) {
+        decrease.disabled = !Number.isFinite(current) || current <= minimum;
+    }
+    return false;
+}
+
+function syncMealPlannerServingsFromRecipe() {
+    const recipeInput = document.getElementById("mealPlannerRecipe");
+    const servingsInput = document.getElementById("mealPlannerPlannedServings");
+    const helper = document.querySelector("[data-meal-servings-help]");
+    if (!recipeInput || !servingsInput) {
+        return false;
+    }
+
+    const option = recipeInput.selectedOptions && recipeInput.selectedOptions[0];
+    const selectedRecipe = String(option?.value || "").trim();
+    const parsedDefault = Number.parseFloat(option?.dataset.defaultServings || "1");
+    const defaultServings = Number.isFinite(parsedDefault) && parsedDefault >= 1 ? parsedDefault : 1;
+    const yieldLabel = String(option?.dataset.yieldLabel || "").trim().replace(/[.]+$/, "");
+
+    servingsInput.value = formatMealPlannerServingNumber(defaultServings);
+    servingsInput.dataset.defaultServings = servingsInput.value;
+    if (helper) {
+        helper.textContent = selectedRecipe
+            ? (yieldLabel
+                ? `Recipe yields ${yieldLabel}.`
+                : "Recipe yield is unavailable. Planned servings default to 1.")
+            : "Select a recipe to use its default yield.";
+    }
+    updateMealPlannerServingControls();
+    return false;
+}
+
+function adjustMealPlannerServings(delta) {
+    const input = document.getElementById("mealPlannerPlannedServings");
+    if (!input) {
+        return false;
+    }
+
+    const minimum = Number.parseFloat(input.min || "1") || 1;
+    const step = Number.parseFloat(input.dataset.step || "0.5") || 0.5;
+    const current = Number.parseFloat(input.value);
+    const fallback = Number.parseFloat(input.dataset.defaultServings || String(minimum));
+    const base = Number.isFinite(current) ? current : (Number.isFinite(fallback) ? fallback : minimum);
+    const direction = Number(delta) < 0 ? -1 : 1;
+    const next = Math.max(minimum, base + (direction * step));
+
+    input.value = formatMealPlannerServingNumber(next);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    updateMealPlannerServingControls();
+    return false;
+}
+
 function openMealPlannerDialog(dateValue = "", mealType = "") {
     const dialog = document.getElementById("mealPlannerDialog");
     if (!dialog || typeof dialog.showModal !== "function") {
@@ -1295,6 +1368,7 @@ function openMealPlannerDialog(dateValue = "", mealType = "") {
         typeInput.value = mealType;
     }
     setMealPlannerStatus("");
+    syncMealPlannerServingsFromRecipe();
     dialog.showModal();
     const recipeInput = dialog.querySelector('[name="recipe_url"]');
     (recipeInput || dateInput)?.focus();
@@ -1314,6 +1388,13 @@ async function submitMealPlannerForm(event) {
     const form = event.currentTarget;
     const submitButton = form.querySelector("[data-meal-plan-submit]");
     const formData = new FormData(form);
+    const servingsInput = form.querySelector('[name="planned_servings"]');
+    const plannedServings = Number.parseFloat(formData.get("planned_servings"));
+    if (!Number.isFinite(plannedServings) || plannedServings < 1) {
+        setMealPlannerStatus("Planned servings must be a number of 1 or more.", true);
+        servingsInput?.focus();
+        return false;
+    }
     const originalLabel = submitButton ? submitButton.textContent : "Add Meal";
     if (submitButton) {
         submitButton.disabled = true;
@@ -1328,6 +1409,7 @@ async function submitMealPlannerForm(event) {
                 date: formData.get("date"),
                 meal_type: formData.get("meal_type"),
                 recipe_url: formData.get("recipe_url"),
+                planned_servings: plannedServings,
             }),
         });
         const payload = await response.json().catch(() => ({}));

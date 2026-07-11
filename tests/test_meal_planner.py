@@ -56,15 +56,69 @@ def test_meal_plan_rejects_invalid_and_duplicate_entries(isolated_meal_plan):
         "meal_type": "lunch",
         "recipe_url": "recipe://salad",
         "recipe_name": "Salad",
+        "planned_servings": 4,
     }
     meal_plan_service.add_meal(payload)
     with pytest.raises(ValueError, match="already planned"):
-        meal_plan_service.add_meal(payload)
+        meal_plan_service.add_meal(dict(payload, planned_servings=8))
+    assert meal_plan_service.load_meal_plan()["meals"][0]["planned_servings"] == 4
 
     same_recipe_another_slot = dict(payload, meal_type="dinner")
     same_recipe_another_day = dict(payload, date="2026-07-11")
     assert meal_plan_service.add_meal(same_recipe_another_slot)["meal_type"] == "dinner"
     assert meal_plan_service.add_meal(same_recipe_another_day)["date"] == "2026-07-11"
+
+
+def test_meal_plan_persists_numeric_and_fractional_planned_servings(isolated_meal_plan):
+    fractional = meal_plan_service.add_meal({
+        "date": "2026-07-06",
+        "meal_type": "breakfast",
+        "recipe_url": "recipe://toast",
+        "recipe_name": "Toast",
+        "planned_servings": "2.5",
+    })
+    whole = meal_plan_service.add_meal({
+        "date": "2026-07-06",
+        "meal_type": "lunch",
+        "recipe_url": "recipe://soup",
+        "recipe_name": "Soup",
+        "planned_servings": "4",
+    })
+
+    assert fractional["planned_servings"] == 2.5
+    assert whole["planned_servings"] == 4
+    raw_meals = json.loads(isolated_meal_plan.read_text(encoding="utf-8"))["meals"]
+    assert [meal["planned_servings"] for meal in raw_meals] == [2.5, 4]
+    reloaded = meal_plan_service.meal_plan_for_week("2026-07-06")["meals_by_day"]["2026-07-06"]
+    assert reloaded["breakfast"][0]["planned_servings"] == 2.5
+    assert reloaded["lunch"][0]["planned_servings"] == 4
+
+
+@pytest.mark.parametrize("planned_servings", [0, -1, "", "many", True, float("nan"), float("inf")])
+def test_meal_plan_rejects_invalid_explicit_planned_servings(isolated_meal_plan, planned_servings):
+    with pytest.raises(ValueError, match="Planned servings must be a number of 1 or more"):
+        meal_plan_service.add_meal({
+            "date": "2026-07-06",
+            "meal_type": "breakfast",
+            "recipe_url": "recipe://toast",
+            "recipe_name": "Toast",
+            "planned_servings": planned_servings,
+        })
+
+
+@pytest.mark.parametrize(
+    ("recipe_yield", "expected_count", "expected_label"),
+    [
+        ("8 servings", 8, "8 servings"),
+        (2.5, 2.5, "2.5 servings"),
+        ("Makes 1 1/2 servings", 1.5, "Makes 1 1/2 servings"),
+        ("unknown", None, "unknown"),
+        (None, None, ""),
+    ],
+)
+def test_meal_plan_recipe_yield_parsing(recipe_yield, expected_count, expected_label):
+    assert meal_plan_service.planned_servings_from_yield(recipe_yield) == expected_count
+    assert meal_plan_service.meal_plan_yield_label(recipe_yield) == expected_label
 
 
 def test_meal_plan_appends_multiple_recipes_and_removes_only_one(isolated_meal_plan):
@@ -164,6 +218,31 @@ def test_legacy_single_recipe_record_remains_readable(isolated_meal_plan):
     assert len(slot) == 1
     assert slot[0]["recipe_name"] == "Legacy Breakfast"
     assert slot[0]["id"]
+    assert "planned_servings" not in slot[0]
+
+
+def test_meal_plan_recipe_options_use_saved_default_yield(monkeypatch):
+    from PushShoppingList.routes import main_routes
+
+    saved = {
+        "recipe://family": {"servings": "8 servings"},
+        "recipe://fractional": {"servings": 2.5},
+        "recipe://scaled": {"scaling": {"base_servings": "3 1/2 servings"}},
+        "recipe://unknown": {},
+    }
+    monkeypatch.setattr(main_routes, "load_saved_recipe_output", lambda recipe_url: saved[recipe_url])
+    options = main_routes.meal_plan_recipe_option_rows([
+        {"url": recipe_url, "name": recipe_url.rsplit("/", 1)[-1].title()}
+        for recipe_url in saved
+    ], recipe_ingredient_data={})
+
+    assert [option["default_servings"] for option in options] == [8, 2.5, 3.5, 1]
+    assert [option["yield_label"] for option in options] == [
+        "8 servings",
+        "2.5 servings",
+        "3 1/2 servings",
+        "",
+    ]
 
 
 def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_meal_plan):
@@ -195,12 +274,20 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
             for row in rows
         ]
 
+    def fake_saved_recipe_output(recipe_url):
+        if recipe_url == "recipe://soup":
+            return {"servings": "8 servings"}
+        if recipe_url == "recipe://salad":
+            return {"servings": "2.5 servings"}
+        return {}
+
     monkeypatch.setattr(
         main_routes,
         "recipe_url_rows",
         lambda: recipe_rows,
     )
     monkeypatch.setattr(main_routes, "recipe_url_log_rows", fake_recipe_url_log_rows)
+    monkeypatch.setattr(main_routes, "load_saved_recipe_output", fake_saved_recipe_output)
 
     app = create_app()
     app.config.update(TESTING=True)
@@ -214,26 +301,42 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
             "recipe_url": "recipe://soup",
         })
         assert response.status_code == 201
-        soup_id = response.get_json()["meal"]["id"]
+        soup_meal = response.get_json()["meal"]
+        soup_id = soup_meal["id"]
+        assert soup_meal["planned_servings"] == 8
+
+        response = client.post("/api/meal-plan", json={
+            "date": "2026-07-10",
+            "meal_type": "dinner",
+            "recipe_url": "recipe://filler-0",
+            "planned_servings": 0,
+        })
+        assert response.status_code == 400
+        assert "Planned servings" in response.get_json()["error"]
 
         response = client.post("/api/meal-plan", json={
             "date": "2026-07-10",
             "meal_type": "dinner",
             "recipe_url": "recipe://salad",
+            "planned_servings": "2.5",
         })
         assert response.status_code == 201
-        salad_id = response.get_json()["meal"]["id"]
+        salad_meal = response.get_json()["meal"]
+        salad_id = salad_meal["id"]
+        assert salad_meal["planned_servings"] == 2.5
 
         response = client.post("/api/meal-plan", json={
             "date": "2026-07-10",
             "meal_type": "dinner",
             "recipe_url": "recipe://soup",
+            "planned_servings": 4,
         })
         assert response.status_code == 400
         assert "already planned" in response.get_json()["error"]
 
         planned = meal_plan_service.meal_plan_for_week("2026-07-10")["meals_by_day"]["2026-07-10"]["dinner"]
         assert [meal["id"] for meal in planned] == [soup_id, salad_id]
+        assert [meal["planned_servings"] for meal in planned] == [8, 2.5]
 
         page = client.get("/?meal_week=2026-07-10")
         assert page.status_code == 200
@@ -246,6 +349,14 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
         assert "Side Salad" in preview_html
         assert "/static/test/weeknight-soup.jpg" in preview_html
         assert "/static/test/side-salad.jpg" in preview_html
+        soup_option_start = html.index('<option value="recipe://soup"')
+        salad_option_start = html.index('<option value="recipe://salad"')
+        soup_option = html[soup_option_start:html.index("</option>", soup_option_start)]
+        salad_option = html[salad_option_start:html.index("</option>", salad_option_start)]
+        assert 'data-default-servings="8"' in soup_option
+        assert 'data-yield-label="8 servings"' in soup_option
+        assert 'data-default-servings="2.5"' in salad_option
+        assert 'data-yield-label="2.5 servings"' in salad_option
         assert preview_batches[0] == [f"recipe://filler-{index}" for index in range(8)]
         assert preview_batches[1] == ["recipe://soup", "recipe://salad"]
 
@@ -273,6 +384,19 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     card_loop = workspaces.index("{% for meal in planned_meals %}")
     add_action = workspaces.index('class="app-meal-add-slot', card_loop)
     assert workspaces.index("{% endfor %}", card_loop) < add_action
+    recipe_field = workspaces.index('<select id="mealPlannerRecipe"')
+    servings_field = workspaces.index("Planned Servings")
+    assert recipe_field < servings_field
+    assert 'data-default-servings="{{ recipe.default_servings }}"' in workspaces
+    assert 'data-yield-label="{{ recipe.yield_label }}"' in workspaces
+    assert 'name="planned_servings"' in workspaces
+    assert 'type="number"' in workspaces
+    assert 'min="1"' in workspaces
+    assert 'step="any"' in workspaces
+    assert 'data-step="0.5"' in workspaces
+    assert 'aria-label="Decrease planned servings"' in workspaces
+    assert 'aria-label="Increase planned servings"' in workspaces
+    assert 'aria-describedby="mealPlannerServingsHelp"' in workspaces
     assert 'data-app-page-target="mealPlannerPage"' in index
     assert "{% for slot in home_meal_plan.slots %}" in index
     assert "{% for meal in slot.meals %}" in index
@@ -286,6 +410,11 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     assert "async function confirmMealPlannerDelete" in script
     assert "function openHomeMealPlanSlot" in script
     assert "function handleHomeMealPlanSlotKeydown" in script
+    assert "function syncMealPlannerServingsFromRecipe" in script
+    assert "function adjustMealPlannerServings" in script
+    assert "function updateMealPlannerServingControls" in script
+    assert "Recipe yields ${yieldLabel}." in script
+    assert "planned_servings: plannedServings" in script
 
 
 def test_meal_plan_styles_compact_multiple_items_and_keep_mobile_contained():
@@ -296,6 +425,8 @@ def test_meal_plan_styles_compact_multiple_items_and_keep_mobile_contained():
     assert ".app-meal-planner-cell .app-meal-card {" in css
     assert "height: auto;" in css
     assert ".app-meal-planner-cell .app-meal-add-slot {" in css
+    assert ".app-meal-planner-servings-stepper {" in css
+    assert ".app-dialog-helper {" in css
     assert ".app-home-meal-list > .app-home-meal-slot {" in css
     assert ".app-home-meal-recipes {\n    display: grid;" in css
     assert "grid-template-columns: minmax(0, 1fr) 46px;" in css

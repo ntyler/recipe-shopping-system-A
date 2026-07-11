@@ -1,9 +1,12 @@
 import json
+import math
+import re
 import threading
 import uuid
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
+from fractions import Fraction
 
 from PushShoppingList.services.storage_service import scoped_package_path
 
@@ -42,6 +45,67 @@ def numeric_date_label(value):
     return f"{value.month}/{value.day}"
 
 
+def normalize_planned_servings(value):
+    if isinstance(value, bool) or value is None or clean_text(value) == "":
+        raise ValueError("Planned servings must be a number of 1 or more.")
+
+    try:
+        planned_servings = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Planned servings must be a number of 1 or more.") from exc
+
+    if not math.isfinite(planned_servings) or planned_servings < 1:
+        raise ValueError("Planned servings must be a number of 1 or more.")
+
+    if planned_servings.is_integer():
+        return int(planned_servings)
+    return planned_servings
+
+
+def planned_servings_from_yield(value):
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return normalize_planned_servings(value)
+        except ValueError:
+            return None
+
+    yield_text = clean_text(value)
+    if not yield_text:
+        return None
+
+    mixed_fraction = re.search(r"(?<!\d)(\d+)\s+(\d+)/(\d+)(?!\d)", yield_text)
+    fraction = re.search(r"(?<![\d/])(\d+)/(\d+)(?![\d/])", yield_text)
+    decimal = re.search(r"(?<![\d.])\d+(?:\.\d+)?(?![\d.])", yield_text)
+
+    try:
+        if mixed_fraction:
+            whole, numerator, denominator = mixed_fraction.groups()
+            parsed = Fraction(int(whole), 1) + Fraction(int(numerator), int(denominator))
+            return normalize_planned_servings(float(parsed))
+        if fraction:
+            numerator, denominator = fraction.groups()
+            return normalize_planned_servings(float(Fraction(int(numerator), int(denominator))))
+        if decimal:
+            return normalize_planned_servings(decimal.group(0))
+    except (ValueError, ZeroDivisionError):
+        return None
+    return None
+
+
+def meal_plan_yield_label(value):
+    yield_text = clean_text(value).rstrip(".")
+    if not yield_text:
+        return ""
+    if re.fullmatch(r"\d+(?:\.\d+)?", yield_text):
+        try:
+            return f"{normalize_planned_servings(yield_text)} servings"
+        except ValueError:
+            return ""
+    return yield_text
+
+
 def normalize_meal(meal):
     meal_date = parse_date(meal.get("date"))
     meal_type = clean_text(meal.get("meal_type")).lower()
@@ -50,7 +114,7 @@ def normalize_meal(meal):
     if not meal_date or meal_type not in MEAL_TYPES or not recipe_url or not recipe_name:
         return None
 
-    return {
+    normalized = {
         "id": clean_text(meal.get("id")) or uuid.uuid4().hex,
         "date": meal_date.isoformat(),
         "meal_type": meal_type,
@@ -59,6 +123,14 @@ def normalize_meal(meal):
         "created_at": clean_text(meal.get("created_at"))
         or datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
     }
+    if meal.get("planned_servings") not in (None, ""):
+        try:
+            normalized["planned_servings"] = normalize_planned_servings(meal.get("planned_servings"))
+        except ValueError:
+            # Keep legacy/core meal data readable even if an optional serving
+            # value in an older file is malformed.
+            pass
+    return normalized
 
 
 def load_meal_plan():
@@ -97,6 +169,9 @@ def save_meal_plan(payload):
 
 
 def add_meal(meal):
+    meal = dict(meal or {})
+    if "planned_servings" in meal:
+        meal["planned_servings"] = normalize_planned_servings(meal.get("planned_servings"))
     normalized = normalize_meal(meal)
     if not normalized:
         raise ValueError("Choose a valid date, meal type, and recipe.")

@@ -132,8 +132,11 @@ from PushShoppingList.services.menu_store_service import menu_pdf_logs_by_cookbo
 from PushShoppingList.services.menu_store_service import menus_by_cookbook
 from PushShoppingList.services.meal_plan_service import add_meal
 from PushShoppingList.services.meal_plan_service import delete_meal
+from PushShoppingList.services.meal_plan_service import meal_plan_yield_label
 from PushShoppingList.services.meal_plan_service import meal_plan_home_preview
 from PushShoppingList.services.meal_plan_service import meal_plan_for_week
+from PushShoppingList.services.meal_plan_service import normalize_planned_servings
+from PushShoppingList.services.meal_plan_service import planned_servings_from_yield
 from PushShoppingList.services.job_service import job_for_client
 from PushShoppingList.services.job_service import recent_jobs
 from PushShoppingList.services.storage_service import active_guest_session_id
@@ -468,6 +471,55 @@ def pantry_context():
     }
 
 
+def meal_plan_recipe_option_rows(recipe_urls, recipe_ingredient_data=None):
+    recipe_ingredient_data = (
+        recipe_ingredient_data
+        if isinstance(recipe_ingredient_data, dict)
+        else load_recipe_ingredients()
+    )
+    options = []
+
+    for recipe in recipe_urls or []:
+        if not isinstance(recipe, dict):
+            continue
+        recipe_url = str(recipe.get("url") or "").strip()
+        if not recipe_url:
+            continue
+
+        recipe_key = normalize_recipe_url_key(recipe_url)
+        recipe_meta = recipe_ingredient_data.get(recipe_key, {})
+        recipe_meta = recipe_meta if isinstance(recipe_meta, dict) else {}
+        recipe_data = load_saved_recipe_output(recipe_url)
+        scaling = recipe_scaling_from_data(recipe_data, default_to_common=False) or {}
+        raw_scaling = (
+            recipe_data.get("scaling")
+            if isinstance(recipe_data.get("scaling"), dict)
+            else {}
+        )
+        recipe_yield = (
+            recipe_data.get("servings")
+            or raw_scaling.get("base_servings")
+            or scaling.get("base_servings")
+            or recipe_meta.get("base_servings")
+            or recipe_meta.get("servings")
+            or recipe.get("base_servings")
+            or recipe.get("servings")
+        )
+        options.append({
+            "url": recipe_url,
+            "name": str(
+                recipe.get("name")
+                or recipe.get("title")
+                or recipe_url
+                or "Recipe"
+            ).strip(),
+            "default_servings": planned_servings_from_yield(recipe_yield) or 1,
+            "yield_label": meal_plan_yield_label(recipe_yield),
+        })
+
+    return options
+
+
 def shell_context(active_public_user=None):
     items = load_items()
     recipe_urls = recipe_url_rows()
@@ -497,14 +549,10 @@ def shell_context(active_public_user=None):
     store_settings = load_store_settings()
     pantry_items = pantry_items_for_view()
     meal_plan = meal_plan_for_week(request.args.get("meal_week"))
-    recipe_options = [
-        {
-            "url": str(recipe.get("url") or "").strip(),
-            "name": str(recipe.get("name") or recipe.get("title") or recipe.get("url") or "Recipe").strip(),
-        }
-        for recipe in recipe_urls
-        if str(recipe.get("url") or "").strip()
-    ]
+    recipe_options = meal_plan_recipe_option_rows(
+        recipe_urls,
+        recipe_ingredient_data=recipe_ingredient_data,
+    )
     planned_recipe_keys = {
         normalize_recipe_url_key(meal.get("recipe_url"))
         for meal in meal_plan["meals"]
@@ -3337,21 +3385,28 @@ def add_meal_plan_entry_route():
     payload = request.get_json(silent=True) or {}
     recipe_url = str(payload.get("recipe_url") or "").strip()
     available_recipes = {
-        str(recipe.get("url") or "").strip(): str(
-            recipe.get("name") or recipe.get("title") or recipe.get("url") or "Recipe"
-        ).strip()
-        for recipe in recipe_url_rows()
-        if str(recipe.get("url") or "").strip()
+        recipe["url"]: recipe
+        for recipe in meal_plan_recipe_option_rows(recipe_url_rows())
     }
     if recipe_url not in available_recipes:
         return jsonify({"ok": False, "error": "Choose a recipe from your current recipe collection."}), 400
+
+    try:
+        planned_servings = (
+            normalize_planned_servings(payload.get("planned_servings"))
+            if "planned_servings" in payload
+            else available_recipes[recipe_url]["default_servings"]
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
 
     try:
         meal = add_meal({
             "date": payload.get("date"),
             "meal_type": payload.get("meal_type"),
             "recipe_url": recipe_url,
-            "recipe_name": available_recipes[recipe_url],
+            "recipe_name": available_recipes[recipe_url]["name"],
+            "planned_servings": planned_servings,
         })
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
