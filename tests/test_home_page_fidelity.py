@@ -50,6 +50,16 @@ def test_home_recipe_time_uses_requested_priority_without_placeholder():
     assert main_routes.recipe_home_preview_time_label({}) == ""
 
 
+def test_recipe_rating_stars_treat_empty_or_zero_values_as_unrated():
+    for value in (None, "", " ", "not-a-number", float("nan"), 0, "0"):
+        assert main_routes.recipe_rating_for_view({"rating": value}) == 0
+        assert main_routes.recipe_rating_stars_for_view({"rating": value}) == "☆☆☆☆☆"
+
+    assert main_routes.recipe_rating_stars_for_view({"rating": 1}) == "★☆☆☆☆"
+    assert main_routes.recipe_rating_stars_for_view({"rating": 3}) == "★★★☆☆"
+    assert main_routes.recipe_rating_stars_for_view({"rating": 5}) == "★★★★★"
+
+
 def test_relative_time_formatter_is_compact_and_shared_by_import_rows():
     now = datetime(2026, 7, 10, 12, 0, tzinfo=timezone.utc)
     assert main_routes.relative_time_label("2026-07-10T11:59:45Z", now) == "just now"
@@ -118,6 +128,10 @@ def test_home_template_has_supported_overflow_and_no_fake_favorite():
     assert "openHomeRecentImport" in home
     assert "home_recent_imports" in home
     assert "app-home-panel-title" in home
+    assert 'recipe.rating_stars | default("☆☆☆☆☆", true)' in home
+    assert "Unrated recipe" in home
+    assert "star_number <= recipe.rating" not in home
+    assert "&#9733;" not in home
     assert "Time TBD" not in home
     assert "favorite" not in home.lower()
     assert "heart" not in home.lower()

@@ -425,18 +425,16 @@
                                     {% endif %}
                                 </a>
                                 <h3><a href="#recipeView" data-recipe-url="{{ recipe.url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ recipe.name }}</a></h3>
-                                {% if recipe.rating or recipe.home_preview_time %}
-                                    <div class="app-home-recipe-meta-row">
-                                        {% if recipe.rating %}
-                                            <span class="app-home-recipe-rating" aria-label="{{ recipe.rating }} out of 5 stars">
-                                                {% for star_number in range(1, 6) %}<span class="{% if star_number <= recipe.rating %}is-selected{% else %}is-unselected{% endif %}" aria-hidden="true">&#9733;</span>{% endfor %}
-                                            </span>
-                                        {% endif %}
-                                        {% if recipe.home_preview_time %}
-                                            <span class="app-home-recipe-time">{{ shell.svg_icon("clock") }} {{ recipe.home_preview_time }}</span>
-                                        {% endif %}
-                                    </div>
-                                {% endif %}
+                                <div class="app-home-recipe-meta-row">
+                                    {% set recipe_rating = recipe.rating | default(0, true) | int %}
+                                    {% set recipe_rating_stars = recipe.rating_stars | default("☆☆☆☆☆", true) %}
+                                    <span class="app-home-recipe-rating" aria-label="{% if recipe_rating %}{{ recipe_rating }} out of 5 stars{% else %}Unrated recipe{% endif %}">
+                                        {% for star in recipe_rating_stars %}<span class="{% if star == '★' %}is-selected{% else %}is-unselected{% endif %}" aria-hidden="true">{{ star }}</span>{% endfor %}
+                                    </span>
+                                    {% if recipe.home_preview_time %}
+                                        <span class="app-home-recipe-time">{{ shell.svg_icon("clock") }} {{ recipe.home_preview_time }}</span>
+                                    {% endif %}
+                                </div>
                                 {% if recipe.home_badge %}<small class="app-home-recipe-badge">{{ recipe.home_badge }}</small>{% endif %}
                             </article>
                         {% endfor %}
