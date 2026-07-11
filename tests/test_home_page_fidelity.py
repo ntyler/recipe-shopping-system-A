@@ -273,13 +273,20 @@ def test_home_banner_image_asset_exists():
 def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert "--app-dashboard-gap: 18px;" in css
-    assert "--app-dashboard-card-padding: 18px;" in css
-    assert "grid-template-columns: repeat(12, minmax(0, 1fr));" in css
-    assert ".app-home-recent-recipes {\n        grid-column: span 7;" in css
-    assert ".app-home-meal-preview {\n        grid-column: span 5;" in css
-    assert ".app-home-smart-suggestions,\n    .app-home-price-preview,\n    .app-home-recent-imports" in css
+    assert "--app-dashboard-gap: clamp(12px, 1.2vw, 20px);" in css
+    assert "--app-dashboard-card-padding: clamp(14px, 1vw, 18px);" in css
+    assert ".app-home-summary-grid {\n    display: grid;\n    grid-template-columns: repeat(4, minmax(0, 1fr));" in css
+    assert ".app-home-primary-grid {\n    grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);" in css
+    assert ".app-home-secondary-grid {\n    grid-template-columns: repeat(3, minmax(0, 1fr));" in css
+    assert "grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));" in css
+    assert "@media (min-width: 1100px) and (max-width: 1320px)" in css
+    assert ".app-home-summary-grid {\n        grid-template-columns: repeat(2, minmax(0, 1fr));" in css
+    assert ".app-home-recent-imports {\n        grid-column: 1 / -1;" in css
+    assert "@media (max-width: 860px)" in css
+    assert ".app-home-primary-grid,\n    .app-home-secondary-grid {\n        grid-template-columns: minmax(0, 1fr);" in css
+    assert "@media (max-width: 620px)" in css
     assert ".app-home-empty-state button {\n        width: auto;" in css
+    assert ".app-search-submit {\n        min-width: 64px;" not in css
     assert ".app-sidebar-collapse span" in css
     assert ".app-sidebar-collapse span::before" in css
     assert '.app-sidebar-collapse[aria-pressed="true"] span::before' in css
