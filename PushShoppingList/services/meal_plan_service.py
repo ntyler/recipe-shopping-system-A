@@ -41,6 +41,10 @@ def short_date_label(value):
     return f"{value.strftime('%b')} {value.day}"
 
 
+def weekday_short_date_label(value):
+    return f"{value.strftime('%a, %b')} {value.day}"
+
+
 def numeric_date_label(value):
     return f"{value.month}/{value.day}"
 
@@ -275,12 +279,20 @@ def meal_plan_home_preview(
         )
         visible_meals = planned_meals[:visible_count]
         visible_recipe_count += visible_count
+        days_from_reference = (planned_date - reference_day).days
         slots.append({
             "date": planned_date.isoformat(),
             "day_label": (
                 "TODAY"
-                if planned_date == reference_day
+                if days_from_reference == 0
+                else "TOMORROW"
+                if days_from_reference == 1
                 else planned_date.strftime("%a").upper()
+            ),
+            "date_label": (
+                weekday_short_date_label(planned_date)
+                if days_from_reference in {0, 1}
+                else short_date_label(planned_date)
             ),
             "meal_type": meal_type,
             "meal_type_label": meal_type.title(),

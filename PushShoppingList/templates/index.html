@@ -521,11 +521,14 @@
                                 <li class="app-home-meal-slot"
                                     role="link"
                                     tabindex="0"
-                                    aria-label="Open {{ slot.meal_type_label }} for {{ slot.day_label }} in Meal Planner"
+                                    aria-label="Open {{ slot.meal_type_label }} for {{ slot.day_label }}, {{ slot.date_label }} in Meal Planner"
                                     onclick="return openHomeMealPlanSlot(this, event)"
                                     onkeydown="return handleHomeMealPlanSlotKeydown(this, event)">
                                     <div class="app-home-meal-slot-heading">
-                                        <time class="app-home-meal-day" datetime="{{ slot.date }}">{{ slot.day_label }}</time>
+                                        <time class="app-home-meal-day" datetime="{{ slot.date }}">
+                                            <span class="app-home-meal-day-primary">{{ slot.day_label }}</span>
+                                            <span class="app-home-meal-date-exact">{{ slot.date_label }}</span>
+                                        </time>
                                         <span class="app-home-meal-type">{{ slot.meal_type_label }}</span>
                                     </div>
                                     <div class="app-home-meal-recipes">

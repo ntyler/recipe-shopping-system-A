@@ -188,6 +188,52 @@ def test_meal_plan_home_preview_groups_slots_and_caps_visible_recipes(isolated_m
     assert preview["hidden_meal_count"] == 1
 
 
+def test_home_preview_formats_relative_and_exact_local_dates():
+    meal_plan = {
+        "meals": [
+            {
+                "date": planned_date,
+                "meal_type": "breakfast",
+                "recipe_url": f"recipe://date-{index}",
+                "recipe_name": f"Date Recipe {index}",
+            }
+            for index, planned_date in enumerate(
+                ("2026-07-11", "2026-07-12", "2026-07-13")
+            )
+        ],
+    }
+
+    preview = meal_plan_service.meal_plan_home_preview(
+        meal_plan,
+        reference_date="2026-07-11",
+        max_slots=10,
+        max_recipes=10,
+    )
+
+    assert [
+        (slot["day_label"], slot["date_label"])
+        for slot in preview["slots"]
+    ] == [
+        ("TODAY", "Sat, Jul 11"),
+        ("TOMORROW", "Sun, Jul 12"),
+        ("MON", "Jul 13"),
+    ]
+
+    shifted_preview = meal_plan_service.meal_plan_home_preview(
+        meal_plan,
+        reference_date="2026-07-12",
+        max_slots=10,
+        max_recipes=10,
+    )
+    assert [
+        (slot["date"], slot["day_label"], slot["date_label"])
+        for slot in shifted_preview["slots"]
+    ] == [
+        ("2026-07-12", "TODAY", "Sun, Jul 12"),
+        ("2026-07-13", "TOMORROW", "Mon, Jul 13"),
+    ]
+
+
 def test_home_preview_filters_past_and_orders_all_upcoming_meals(isolated_meal_plan):
     stored_meals = [
         ("2026-07-11", "snack", "Future Snack"),
@@ -222,6 +268,11 @@ def test_home_preview_filters_past_and_orders_all_upcoming_meals(isolated_meal_p
         ("2026-07-11", "snack"),
     ]
     assert preview["slots"][0]["day_label"] == "TODAY"
+    assert preview["slots"][0]["date_label"] == "Thu, Jul 9"
+    assert preview["slots"][3]["day_label"] == "TOMORROW"
+    assert preview["slots"][3]["date_label"] == "Fri, Jul 10"
+    assert preview["slots"][4]["day_label"] == "SAT"
+    assert preview["slots"][4]["date_label"] == "Jul 11"
     assert [meal["recipe_name"] for meal in preview["slots"][1]["meals"]] == [
         "Lunch B",
         "Lunch A",
@@ -455,6 +506,10 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
         assert "Side Salad" in preview_html
         assert "Future Filler" in preview_html
         assert "Past Filler" not in preview_html
+        assert '<span class="app-home-meal-day-primary">TODAY</span>' in preview_html
+        assert '<span class="app-home-meal-date-exact">Fri, Jul 10</span>' in preview_html
+        assert '<span class="app-home-meal-day-primary">MON</span>' in preview_html
+        assert '<span class="app-home-meal-date-exact">Jul 13</span>' in preview_html
         assert ">View planner</a>" in preview_html
         assert "View full meal plan" in preview_html
         assert "/static/test/weeknight-soup.jpg" in preview_html
@@ -524,6 +579,9 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     assert "{% for slot in home_meal_plan.slots %}" in index
     assert "{% for meal in slot.meals %}" in index
     assert "slot.remaining_count" in index
+    assert 'class="app-home-meal-day-primary"' in index
+    assert 'class="app-home-meal-date-exact"' in index
+    assert "slot.date_label" in index
     assert 'class="app-home-meal-recipe"' in index
     assert 'onclick="return openHomeMealPlanSlot(this, event)"' in index
     assert "data-app-sidebar-collapse" in index
@@ -578,6 +636,9 @@ def test_meal_plan_styles_compact_multiple_items_and_keep_mobile_contained():
     assert ".app-meal-planner-servings-stepper {" in css
     assert ".app-dialog-helper {" in css
     assert ".app-home-meal-list > .app-home-meal-slot {" in css
+    assert "grid-template-columns: 140px minmax(0, 1fr);" in css
+    assert "grid-template-columns: 64px minmax(0, 1fr);" in css
+    assert ".app-home-meal-slot .app-home-meal-date-exact {" in css
     assert ".app-home-meal-recipes {\n    display: grid;" in css
     assert "grid-template-columns: minmax(0, 1fr) 46px;" in css
     assert "max-width: 100%;" in css
