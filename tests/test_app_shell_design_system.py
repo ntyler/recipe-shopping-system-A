@@ -235,6 +235,15 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert ".app-shell-body :where(table)" in css
 
 
+def test_desktop_sidebar_logo_and_icons_use_readable_scale():
+    css = read_text("PushShoppingList/static/css/app.css")
+    desktop_shell = css[css.index("/* Desktop mockup fidelity pass"):]
+
+    assert ".app-brand-mark {\n        flex-basis: 51px;\n        width: 51px;\n        height: 51px;" in desktop_shell
+    assert ".app-nav-icon {\n        flex-basis: 23px;\n        width: 23px;\n        height: 23px;" in desktop_shell
+    assert ".app-icon-svg {\n        width: 20px;\n        height: 20px;" in desktop_shell
+
+
 def test_app_shell_navigation_reuses_existing_lazy_and_account_panel_functions():
     script = read_text("PushShoppingList/static/js/app.js")
 

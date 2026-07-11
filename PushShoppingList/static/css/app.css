@@ -29510,13 +29510,13 @@ img[data-deferred-src] {
     .app-brand {
         min-height: 58px;
         padding: 0 10px 8px;
-        gap: 8px;
+        gap: 9px;
     }
 
     .app-brand-mark {
-        flex-basis: 47px;
-        width: 47px;
-        height: 47px;
+        flex-basis: 51px;
+        width: 51px;
+        height: 51px;
     }
 
     .app-brand strong {
@@ -29624,14 +29624,14 @@ img[data-deferred-src] {
     }
 
     .app-nav-icon {
-        flex-basis: 21px;
-        width: 21px;
-        height: 21px;
+        flex-basis: 23px;
+        width: 23px;
+        height: 23px;
     }
 
     .app-icon-svg {
-        width: 18px;
-        height: 18px;
+        width: 20px;
+        height: 20px;
     }
 
     .app-sidebar .app-icon-svg :where(path, circle, rect, line, polyline) {
