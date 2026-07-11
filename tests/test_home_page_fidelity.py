@@ -423,7 +423,11 @@ def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
     assert 'class="app-home-meal-thumb"' in template
     assert "View full meal plan" in template
     assert ".app-home-meal-list {\n        width: 100%;\n        overflow: hidden;\n        border: 1px solid var(--app-border);" in css
-    assert "grid-template-columns: 44px 62px minmax(0, 1fr) 50px;" in css
+    assert "grid-template-columns: 44px 62px minmax(0, 1fr) 60px;" in css
+    assert ".app-home-meal-thumb {\n        display: block;\n        width: 60px;\n        height: 60px;" in css
+    assert "grid-template-columns: 44px 62px minmax(0, 1fr) 54px;" in css
+    assert "grid-template-columns: 40px 56px minmax(0, 1fr) 46px;" in css
+    assert ".app-home-meal-thumb {\n        width: 46px;\n        height: 46px;" in css
     assert ".app-home-meal-footer-action {" in css
     assert "--app-type-section: 11px;" in css
     assert "--app-type-meta: 12px;" in css

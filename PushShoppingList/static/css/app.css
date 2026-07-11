@@ -30227,11 +30227,11 @@ img[data-deferred-src] {
 
     .app-home-meal-list li {
         display: grid;
-        grid-template-columns: 44px 62px minmax(0, 1fr) 50px;
-        gap: 8px;
+        grid-template-columns: 44px 62px minmax(0, 1fr) 60px;
+        gap: 10px;
         align-items: center;
-        min-height: 52px;
-        padding: 5px 6px 5px 10px;
+        min-height: 76px;
+        padding: 8px 10px;
         border-bottom: 1px solid var(--app-border);
         font-size: var(--app-type-meta);
     }
@@ -30272,10 +30272,10 @@ img[data-deferred-src] {
 
     .app-home-meal-thumb {
         display: block;
-        width: 50px;
-        height: 40px;
+        width: 60px;
+        height: 60px;
         overflow: hidden;
-        border-radius: 8px;
+        border-radius: 9px;
         background: var(--app-primary-soft);
     }
 
@@ -30841,6 +30841,36 @@ img[data-deferred-src] {
         grid-column: 1 / -1;
     }
 
+    .app-home-meal-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .app-home-meal-list li {
+        display: grid;
+        grid-template-columns: 44px 62px minmax(0, 1fr) 54px;
+        gap: 8px;
+        align-items: center;
+        min-height: 70px;
+        padding: 7px 9px;
+    }
+
+    .app-home-meal-thumb {
+        display: block;
+        width: 54px;
+        height: 54px;
+        overflow: hidden;
+        border-radius: 8px;
+    }
+
+    .app-home-meal-thumb img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
     .app-home-recipe-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -31009,6 +31039,18 @@ img[data-deferred-src] {
 
     .app-home-recipe-grid {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .app-home-meal-list li {
+        grid-template-columns: 40px 56px minmax(0, 1fr) 46px;
+        gap: 6px;
+        min-height: 64px;
+        padding: 7px 8px;
+    }
+
+    .app-home-meal-thumb {
+        width: 46px;
+        height: 46px;
     }
 }
 
