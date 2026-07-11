@@ -1,0 +1,172 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=e3]:
+    - complementary "Primary navigation" [ref=e4]:
+      - link "AI Pantry home" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e13]:
+          - strong [ref=e14]: AI Pantry
+          - generic [ref=e15]: Recipe Shopping List
+      - button "Collapse sidebar" [ref=e16] [cursor=pointer]:
+        - generic [ref=e17]: ‹
+      - navigation "App sections" [ref=e18]:
+        - link "Home" [ref=e19] [cursor=pointer]:
+          - /url: "#appPageHeader"
+        - link "Recipes" [ref=e26] [cursor=pointer]:
+          - /url: "#recipesPage"
+        - link "Menus" [ref=e32] [cursor=pointer]:
+          - /url: "#menusPage"
+        - link "Cookbooks" [ref=e36] [cursor=pointer]:
+          - /url: "#cookbooksCard"
+        - link "Shopping Lists" [ref=e41] [cursor=pointer]:
+          - /url: "#shoppingViewsSection"
+        - link "Pantry" [ref=e46] [cursor=pointer]:
+          - /url: "#aiPantrySection"
+        - link "Meal Planner" [ref=e52] [cursor=pointer]:
+          - /url: "#mealPlannerPage"
+        - generic [ref=e57]: Shop
+        - link "Stores / Store Links" [ref=e58] [cursor=pointer]:
+          - /url: "#storesPage"
+        - link "Price Comparison" [ref=e65] [cursor=pointer]:
+          - /url: "#priceComparisonPage"
+        - generic [ref=e71]: Import
+        - link "Import" [ref=e72] [cursor=pointer]:
+          - /url: "#importPage"
+        - link "Recipe URLs" [ref=e77] [cursor=pointer]:
+          - /url: "#recipeUrlsPage"
+        - link "Import From Document" [ref=e84] [cursor=pointer]:
+          - /url: "#importDocumentPage"
+        - link "Generate From Image" [ref=e90] [cursor=pointer]:
+          - /url: "#generateImagePage"
+        - link "Menu URL" [ref=e96] [cursor=pointer]:
+          - /url: "#menuUrlPage"
+        - link "Import Menu From Document" [ref=e100] [cursor=pointer]:
+          - /url: "#menuDocumentPage"
+        - link "Scan Barcode" [ref=e106] [cursor=pointer]:
+          - /url: /pantry/coming-soon
+        - generic [ref=e110]: Account
+        - link "Settings" [ref=e111] [cursor=pointer]:
+          - /url: "#settingsWorkspaceSection"
+        - link "Usage & Billing" [ref=e120] [cursor=pointer]:
+          - /url: "#accountUsageDashboardPanel"
+        - link "Help & Support" [ref=e125] [cursor=pointer]:
+          - /url: "#feedbackSupportSection"
+      - complementary "AI Pantry plan" [ref=e131]:
+        - strong [ref=e134]: Love AI Pantry?
+        - generic [ref=e135]: Upgrade your plan to unlock more features.
+        - link "View Plans" [ref=e136] [cursor=pointer]:
+          - /url: "#accountUsageDashboardPanel"
+    - generic [ref=e137]:
+      - banner "App toolbar" [ref=e138]:
+        - search [ref=e139]:
+          - generic [ref=e140]: Search app sections
+          - combobox "Search app sections" [ref=e141]
+          - generic: Ctrl + K
+          - button "Search" [ref=e142] [cursor=pointer]
+        - generic "Quick actions" [ref=e144]:
+          - link "Import" [ref=e145] [cursor=pointer]:
+            - /url: "#importPage"
+          - link "Notifications" [ref=e148] [cursor=pointer]:
+            - /url: "#notificationsPage"
+          - link "Sign In AI Pantry account" [ref=e153] [cursor=pointer]:
+            - /url: "#userAccountSection"
+            - generic [ref=e154]: G
+            - generic [ref=e155]:
+              - strong [ref=e156]: Sign In
+              - generic [ref=e157]: AI Pantry account
+      - main [ref=e158]:
+        - generic [ref=e160]:
+          - heading "Welcome back!" [level=1] [ref=e161]: Welcome back! 👋
+          - paragraph [ref=e162]: Let's get cooking. Here's what's happening in your kitchen.
+        - region "Home dashboard" [ref=e163]:
+          - generic [ref=e164]:
+            - link "My Shopping List 38 items ready to review" [ref=e165] [cursor=pointer]:
+              - /url: "#shoppingViewsSection"
+              - generic [ref=e170]: My Shopping List
+              - strong [ref=e171]: "38"
+              - generic [ref=e172]: items ready to review
+            - link "My Recipes 3 saved recipes" [ref=e173] [cursor=pointer]:
+              - /url: "#recipesPage"
+              - generic [ref=e179]: My Recipes
+              - strong [ref=e180]: "3"
+              - generic [ref=e181]: saved recipes
+            - link "Cookbooks 3 3 assigned recipes" [ref=e182] [cursor=pointer]:
+              - /url: "#cookbooksCard"
+              - generic [ref=e187]: Cookbooks
+              - strong [ref=e188]: "3"
+              - generic [ref=e189]: 3 assigned recipes
+            - link "Pantry Items 0 inventory ready" [ref=e190] [cursor=pointer]:
+              - /url: "#aiPantrySection"
+              - generic [ref=e196]: Pantry Items
+              - strong [ref=e197]: "0"
+              - generic [ref=e198]: inventory ready
+          - generic [ref=e199]:
+            - region "Recent recipes" [ref=e200]:
+              - generic [ref=e201]:
+                - heading "Recent Recipes" [level=2] [ref=e202]
+                - link "View all" [ref=e203] [cursor=pointer]:
+                  - /url: "#recipesPage"
+              - generic [ref=e204]:
+                - article [ref=e205]:
+                  - button "More actions for Enchiladas Verde with Jackfruit and White Beans (Vegetarian)" [ref=e207] [cursor=pointer]
+                  - link [ref=e209] [cursor=pointer]:
+                    - /url: "#recipeView"
+                    - img "Enchiladas Verde with Jackfruit and White Beans (Vegetarian)" [ref=e210]
+                  - heading [level=3] [ref=e211]:
+                    - link "Enchiladas Verde with Jackfruit and White Beans (Vegetarian)" [ref=e212] [cursor=pointer]:
+                      - /url: "#recipeView"
+                  - generic [ref=e213]: 45 min
+                - article [ref=e218]:
+                  - button "More actions for Homemade Soft Pretzels" [ref=e220] [cursor=pointer]
+                  - link [ref=e222] [cursor=pointer]:
+                    - /url: "#recipeView"
+                    - img "Homemade Soft Pretzels" [ref=e223]
+                  - heading [level=3] [ref=e224]:
+                    - link "Homemade Soft Pretzels" [ref=e225] [cursor=pointer]:
+                      - /url: "#recipeView"
+                  - generic [ref=e226]: 1 hr 55 min
+                - article [ref=e231]:
+                  - button "More actions for Homemade Ho-Hos" [ref=e233] [cursor=pointer]
+                  - link [ref=e235] [cursor=pointer]:
+                    - /url: "#recipeView"
+                    - img "Homemade Ho-Hos" [ref=e236]
+                  - heading [level=3] [ref=e237]:
+                    - link "Homemade Ho-Hos" [ref=e238] [cursor=pointer]:
+                      - /url: "#recipeView"
+                  - generic [ref=e239]: 3 hr 25 min
+            - region "Upcoming meal plan" [ref=e244]:
+              - generic [ref=e245]:
+                - heading "Upcoming Meal Plan" [level=2] [ref=e246]
+                - link "View planner" [ref=e247] [cursor=pointer]:
+                  - /url: "#mealPlannerPage"
+              - generic [ref=e248]:
+                - strong [ref=e249]: No meals planned for this week.
+                - generic [ref=e250]: Open Meal Planner to add recipes to breakfast, lunch, dinner, or snacks.
+                - button "Add a meal" [ref=e251] [cursor=pointer]
+          - generic [ref=e252]:
+            - region "Smart suggestions" [ref=e253]:
+              - heading "Smart Suggestions" [level=2] [ref=e255]
+              - generic [ref=e260]:
+                - strong [ref=e261]: Your pantry is ready to set up.
+                - generic [ref=e262]: Add pantry items to receive useful, data-backed suggestions.
+            - region "Price comparison" [ref=e263]:
+              - heading "Price Comparison" [level=2] [ref=e265]
+              - paragraph [ref=e270]: Compare current shopping items across your enabled stores. Prices appear only after a supported lookup.
+              - link "Compare prices" [ref=e271] [cursor=pointer]:
+                - /url: "#priceComparisonPage"
+            - region "Recent imports" [ref=e272]:
+              - generic [ref=e273]:
+                - heading "Recent Imports" [level=2] [ref=e274]
+                - link "View all" [ref=e275] [cursor=pointer]:
+                  - /url: "#jobActivitySection"
+              - generic [ref=e276]:
+                - strong [ref=e277]: No recent import jobs.
+                - generic [ref=e278]: Recipe and menu imports will appear here when they run.
+                - link "Start an import" [ref=e279] [cursor=pointer]:
+                  - /url: "#importPage"
+        - text: "> >"
+        - button "💬 Feedback & Support 0 requests" [ref=e281] [cursor=pointer]:
+          - generic [ref=e282]:
+            - generic [ref=e283]: 💬 Feedback & Support
+            - generic [ref=e284]: 0 requests

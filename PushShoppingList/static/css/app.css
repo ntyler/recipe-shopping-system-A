@@ -29469,6 +29469,8 @@ img[data-deferred-src] {
         --app-toolbar-height: 78px;
         --app-content-max: 1310px;
         --app-control-height: 42px;
+        --app-dashboard-gap: 18px;
+        --app-dashboard-card-padding: 18px;
         --app-radius-sm: 7px;
         --app-radius-md: 9px;
         --app-radius-lg: 12px;
@@ -29532,22 +29534,67 @@ img[data-deferred-src] {
 
     .app-sidebar-collapse {
         position: absolute;
-        top: 70px;
-        right: -12px;
+        top: 72px;
+        right: -18px;
         z-index: 3;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 24px;
-        min-height: 24px;
+        width: 36px;
+        height: 36px;
+        min-height: 36px;
+        margin: 0;
         padding: 0;
-        border: 1px solid var(--app-border);
+        border: 1px solid var(--app-border-strong);
         border-radius: 50%;
         background: var(--app-surface);
-        color: var(--app-muted);
-        font-size: 18px;
+        color: var(--app-text-strong);
+        font-size: 0;
         line-height: 1;
-        box-shadow: var(--app-shadow-sm);
+        box-shadow: 0 10px 24px rgba(8, 22, 43, .14);
+        cursor: pointer;
+        transition: background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+    }
+
+    .app-sidebar-collapse:hover,
+    .app-sidebar-collapse:focus-visible {
+        border-color: rgba(7, 133, 47, .42);
+        background: var(--app-primary-soft);
+        color: var(--app-primary-hover);
+        box-shadow: 0 12px 24px rgba(8, 22, 43, .16);
+        outline: none;
+        transform: translateY(-1px);
+    }
+
+    .app-sidebar-collapse:active {
+        transform: scale(.96);
+    }
+
+    .app-sidebar-collapse:focus-visible {
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, .18), 0 10px 24px rgba(8, 22, 43, .14);
+    }
+
+    .app-sidebar-collapse span {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        font-size: 0;
+        font-weight: 900;
+        line-height: 1;
+        transform: translateY(-2px);
+    }
+
+    .app-sidebar-collapse span::before {
+        content: "\2039";
+        font-size: 32px;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    .app-sidebar-collapse[aria-pressed="true"] span::before {
+        content: "\203a";
     }
 
     .app-sidebar-nav {
@@ -29724,11 +29771,12 @@ img[data-deferred-src] {
     }
 
     .app-home-dashboard {
-        gap: 20px;
+        gap: var(--app-dashboard-gap);
     }
 
     .app-home-summary-grid {
-        gap: 15px;
+        gap: var(--app-dashboard-gap);
+        align-items: stretch;
     }
 
     .app-home-summary-card,
@@ -29738,8 +29786,9 @@ img[data-deferred-src] {
     }
 
     .app-home-summary-card {
+        height: 100%;
         min-height: 128px;
-        padding: 18px;
+        padding: var(--app-dashboard-card-padding);
         gap: 4px 16px;
     }
 
@@ -29775,21 +29824,44 @@ img[data-deferred-src] {
         font-weight: 430;
     }
 
-    .app-home-primary-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1.5fr) minmax(330px, .95fr);
-        gap: 18px;
-    }
-
+    .app-home-primary-grid,
     .app-home-secondary-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 18px;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: var(--app-dashboard-gap);
+        align-items: stretch;
+        grid-auto-rows: 1fr;
+    }
+
+    .app-home-primary-grid > .app-home-panel,
+    .app-home-secondary-grid > .app-home-panel {
+        height: 100%;
+        min-height: 100%;
+    }
+
+    .app-home-recent-recipes {
+        grid-column: span 7;
+    }
+
+    .app-home-meal-preview {
+        grid-column: span 5;
+    }
+
+    .app-home-smart-suggestions,
+    .app-home-price-preview,
+    .app-home-recent-imports {
+        grid-column: span 4;
     }
 
     .app-home-panel {
         gap: 13px;
-        padding: 17px;
+        grid-template-rows: auto minmax(0, 1fr);
+        align-items: start;
+        padding: var(--app-dashboard-card-padding);
+    }
+
+    .app-home-price-preview {
+        grid-template-rows: auto minmax(0, 1fr) auto;
     }
 
     .app-home-panel-header h2 {
@@ -30035,8 +30107,8 @@ img[data-deferred-src] {
 
     .app-home-import-list li > button {
         display: grid;
-        grid-template-columns: 30px minmax(0, 1fr) auto;
-        gap: 9px;
+        grid-template-columns: 32px minmax(0, 1fr) max-content;
+        gap: 10px;
         align-items: center;
         width: 100%;
         min-height: 47px;
@@ -30159,6 +30231,7 @@ img[data-deferred-src] {
 
     .app-home-empty-state a,
     .app-home-empty-state button {
+        width: auto;
         justify-self: start;
         min-height: 34px;
         margin: 0;
@@ -30413,11 +30486,11 @@ img[data-deferred-src] {
     }
 
     .app-sidebar-collapsed .app-shell {
-        grid-template-columns: 76px minmax(0, 1fr);
+        grid-template-columns: 82px minmax(0, 1fr);
     }
 
     .app-sidebar-collapsed .app-sidebar {
-        padding-inline: 10px;
+        padding-inline: 13px;
     }
 
     .app-sidebar-collapsed .app-brand {
@@ -30498,7 +30571,12 @@ img[data-deferred-src] {
     }
 
     .app-home-secondary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .app-home-smart-suggestions,
+    .app-home-price-preview {
+        grid-column: span 6;
     }
 
     .app-home-recent-imports {
@@ -30522,6 +30600,14 @@ img[data-deferred-src] {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
         gap: 14px;
+    }
+
+    .app-home-recent-recipes,
+    .app-home-meal-preview,
+    .app-home-smart-suggestions,
+    .app-home-price-preview,
+    .app-home-recent-imports {
+        grid-column: 1 / -1;
     }
 
     .app-home-recipe-grid {

@@ -135,3 +135,19 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert "function closeHomeRecipeMenus" in script
     assert "function openHomeRecipeAction" in script
     assert "function openHomeRecentImport" in script
+
+
+def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert "--app-dashboard-gap: 18px;" in css
+    assert "--app-dashboard-card-padding: 18px;" in css
+    assert "grid-template-columns: repeat(12, minmax(0, 1fr));" in css
+    assert ".app-home-recent-recipes {\n        grid-column: span 7;" in css
+    assert ".app-home-meal-preview {\n        grid-column: span 5;" in css
+    assert ".app-home-smart-suggestions,\n    .app-home-price-preview,\n    .app-home-recent-imports" in css
+    assert ".app-home-empty-state button {\n        width: auto;" in css
+    assert ".app-sidebar-collapse span" in css
+    assert ".app-sidebar-collapse span::before" in css
+    assert '.app-sidebar-collapse[aria-pressed="true"] span::before' in css
+    assert "font-size: 32px;" in css
