@@ -15393,7 +15393,7 @@ body {
 
 .app-page-workspace-recipes .app-recipe-card-body {
     grid-template-rows: auto auto 1fr;
-    gap: 9px;
+    gap: 7px;
     min-height: 122px;
     padding: 12px 12px 13px;
 }
@@ -15409,57 +15409,23 @@ body {
     -webkit-line-clamp: 2;
 }
 
-.app-recipe-card-details-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
 .app-page-workspace-recipes .app-recipe-card-rating {
-    gap: 5px;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1;
 }
 
-.app-page-workspace-recipes .app-recipe-card-rating small {
-    font-size: 10px;
-}
-
-.app-page-workspace-recipes .app-recipe-card-meta {
-    flex-wrap: nowrap;
+.app-page-workspace-recipes .app-recipe-card-metadata {
     gap: 4px;
-    margin-left: auto;
-    white-space: nowrap;
+    font-size: 10.5px;
+    font-weight: 650;
 }
 
-.app-page-workspace-recipes .app-recipe-card-meta .app-icon-svg {
-    width: 13px;
-    height: 13px;
-    color: var(--app-muted);
+.app-page-workspace-recipes .app-recipe-card-meta-line-primary {
+    gap: 3px 10px;
 }
 
-.app-page-workspace-recipes .app-recipe-card-meta span {
-    font-size: 10px;
-    font-weight: 600;
-}
-
-.app-page-workspace-recipes .app-recipe-card-tags {
-    align-self: end;
-    gap: 6px;
-}
-
-.app-page-workspace-recipes .app-recipe-card-tags span {
-    min-height: 21px;
-    padding: 0 7px;
-    border-radius: 5px;
-    font-size: 10px;
-    font-weight: 700;
-}
-
-.app-page-workspace-recipes .app-recipe-card-tags .app-recipe-card-source-tag {
-    background: #f3f6f4;
-    color: var(--app-muted);
+.app-page-workspace-recipes .app-recipe-card-meta-text {
+    max-width: 100%;
 }
 
 .app-recipes-results-footer {
@@ -28140,17 +28106,78 @@ img[data-deferred-src] {
 .app-recipe-card-rating {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: 1px;
     color: #f4a700;
     font-size: 13px;
     font-weight: 900;
     letter-spacing: 0;
+    white-space: nowrap;
+}
+
+.app-recipe-card-rating .is-selected {
+    color: #f4a700;
+}
+
+.app-recipe-card-rating .is-unselected {
+    color: color-mix(in srgb, var(--app-muted) 38%, transparent);
+    -webkit-text-stroke: .5px var(--app-muted);
 }
 
 .app-recipe-card-rating small {
     color: var(--app-muted);
     font-size: 12px;
     font-weight: 750;
+}
+
+.app-recipe-card-metadata {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 750;
+    line-height: 1.25;
+    text-align: left;
+}
+
+.app-recipe-card-meta-line {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    gap: 5px;
+}
+
+.app-recipe-card-meta-line-primary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+}
+
+.app-recipe-card-cookbook-line,
+.app-recipe-card-category-line {
+    width: 100%;
+}
+
+.app-recipe-card-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.app-recipe-card-meta-icon {
+    flex: 0 0 auto;
+    line-height: 1;
+}
+
+.app-recipe-card-meta-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .app-recipe-card-meta,
@@ -29992,20 +30019,18 @@ img[data-deferred-src] {
         text-decoration: none;
     }
 
-    .app-home-recipe-meta-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 6px;
-        color: var(--app-muted);
-        font-size: 11px;
+    .app-home-recipe-metadata {
+        gap: 5px;
+        font-size: 10.5px;
+        font-weight: 620;
+    }
+
+    .app-home-recipe-metadata .app-recipe-card-meta-line-primary {
+        gap: 3px 10px;
     }
 
     .app-home-recipe-rating {
-        display: inline-flex;
-        gap: 2px;
         color: inherit;
-        letter-spacing: 0;
         background: transparent;
     }
 
@@ -30016,29 +30041,6 @@ img[data-deferred-src] {
     .app-home-recipe-rating .is-unselected {
         color: color-mix(in srgb, var(--app-muted) 36%, transparent);
         -webkit-text-stroke: .5px var(--app-muted);
-    }
-
-    .app-home-recipe-time {
-        display: inline-flex;
-        align-items: center;
-        gap: 3px;
-        color: var(--app-muted);
-        white-space: nowrap;
-    }
-
-    .app-home-recipe-time .app-icon-svg {
-        width: 12px;
-        height: 12px;
-    }
-
-    .app-home-recipe-badge {
-        display: inline-flex;
-        margin-top: 7px;
-        padding: 3px 7px;
-        border-radius: 5px;
-        background: var(--app-primary-soft);
-        color: var(--app-primary);
-        font-size: 10px;
     }
 
     .app-home-recipe-actions {
@@ -30774,6 +30776,16 @@ img[data-deferred-src] {
         height: 100%;
         max-width: 100%;
         object-fit: cover;
+    }
+
+    .app-home-recipe-metadata {
+        gap: 5px;
+        font-size: 10.5px;
+        font-weight: 620;
+    }
+
+    .app-home-recipe-metadata .app-recipe-card-meta-line-primary {
+        gap: 3px 10px;
     }
 
     .app-meal-planner-grid {

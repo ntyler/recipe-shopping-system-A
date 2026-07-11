@@ -105,6 +105,17 @@ def test_home_recipe_time_uses_requested_priority_without_placeholder():
     assert main_routes.recipe_home_preview_time_label({}) == ""
 
 
+def test_recipe_card_metadata_labels_use_existing_recipe_fields():
+    assert main_routes.recipe_card_cook_time_label({"cook_time": "55"}) == "55 min"
+    assert main_routes.recipe_card_cook_time_label({"cook_time": "1 hr 20 min"}) == "1 hr 20 min"
+    assert main_routes.recipe_card_cook_time_label({"total_time": "55", "prep_time": "10"}) == ""
+
+    assert main_routes.recipe_card_calories_label("420") == "420 cal"
+    assert main_routes.recipe_card_calories_label("420.0") == "420 cal"
+    assert main_routes.recipe_card_calories_label("420 kcal") == "420 kcal"
+    assert main_routes.recipe_card_calories_label("") == ""
+
+
 def test_recipe_rating_stars_treat_empty_or_zero_values_as_unrated():
     for value in (None, "", " ", "not-a-number", float("nan"), 0, "0"):
         assert main_routes.recipe_rating_for_view({"rating": value}) == 0
@@ -188,6 +199,19 @@ def test_home_template_has_supported_overflow_and_favorite_action():
     assert "star_number <= recipe.rating" not in home
     assert "&#9733;" not in home
     assert "Time TBD" not in home
+    assert "app-recipe-card-metadata app-home-recipe-metadata" in home
+    assert "recipe.card_cook_time" in home
+    assert "recipe.card_calories" in home
+    assert "recipe.cookbook_name and not recipe.cookbook_is_unclassified" in home
+    assert "recipe.home_badge" in home
+    assert "&#9201;" in home
+    assert "&#128293;" in home
+    assert "&#128218;" in home
+    assert "&#127991;&#65039;" in home
+    assert home.index("app-home-recipe-rating") < home.index("recipe.card_cook_time")
+    assert home.index("recipe.card_cook_time") < home.index("recipe.card_calories")
+    assert home.index("recipe.card_calories") < home.index("recipe.cookbook_name and not recipe.cookbook_is_unclassified")
+    assert home.index("recipe.cookbook_name and not recipe.cookbook_is_unclassified") < home.index("recipe.home_badge")
     assert "data-recipe-favorite" in home
     assert 'aria-pressed="{% if recipe.favorite %}true{% else %}false{% endif %}"' in home
     assert 'onclick="return toggleRecipeFavorite(this, event)"' in home
@@ -227,6 +251,10 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert ".app-home-summary-icon .app-icon-svg" in css
     assert ".app-home-recipe-favorite" in css
     assert ".app-home-recipe-menu-toggle" in css
+    assert ".app-recipe-card-metadata" in css
+    assert ".app-recipe-card-meta-text" in css
+    assert "text-overflow: ellipsis;" in css
+    assert ".app-home-recipe-metadata" in css
     assert ".app-home-recipe-rating .is-unselected" in css
     assert ".app-home-import-status.is-running::before" in css
     assert "(min-width: 1100px) and (prefers-color-scheme: dark)" in css

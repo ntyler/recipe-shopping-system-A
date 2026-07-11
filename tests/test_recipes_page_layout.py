@@ -50,7 +50,16 @@ def test_recipes_page_preserves_real_actions_and_recipe_metadata():
     assert 'aria-pressed="{% if recipe.favorite %}true{% else %}false{% endif %}"' in recipes_page
     assert 'onclick="return toggleRecipeFavorite(this, event)"' in recipes_page
     assert 'shell.svg_icon("heart")' in recipes_page
-    assert 'shell.svg_icon("clock")' in recipes_page
+    assert "app-recipe-card-metadata" in recipes_page
+    assert "recipe.card_cook_time" in recipes_page
+    assert "recipe.card_calories" in recipes_page
+    assert "recipe.cookbook_name and not recipe.cookbook_is_unclassified" in recipes_page
+    assert "recipe.home_badge" in recipes_page
+    assert "Time TBD" not in recipes_page
+    assert recipes_page.index("app-recipe-card-rating") < recipes_page.index("recipe.card_cook_time")
+    assert recipes_page.index("recipe.card_cook_time") < recipes_page.index("recipe.card_calories")
+    assert recipes_page.index("recipe.card_calories") < recipes_page.index("recipe.cookbook_name and not recipe.cookbook_is_unclassified")
+    assert recipes_page.index("recipe.cookbook_name and not recipe.cookbook_is_unclassified") < recipes_page.index("recipe.home_badge")
 
 
 def test_recipe_preview_link_opens_its_visible_parent_workspace():

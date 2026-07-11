@@ -490,6 +490,8 @@ def shell_context(active_public_user=None):
         cookbook_record = cookbook_records_by_key.get(recipe_key, {})
         recipe["home_badge"] = recipe_home_badge_label(recipe, cookbook_record)
         recipe["home_preview_time"] = recipe_home_preview_time_label(recipe)
+        recipe["card_cook_time"] = recipe_card_cook_time_label(recipe)
+        recipe["card_calories"] = recipe_card_calories_label(recipe.get("calories"))
     cookbook_view_data = lightweight_cookbook_view()
     store_settings = load_store_settings()
     pantry_items = pantry_items_for_view()
@@ -1901,6 +1903,35 @@ def recipe_home_badge_label(recipe, cookbook_record=None):
         cookbook_record.get("menu_tags"),
     )
     return next((label for label in map(home_label_text, candidates) if label), "")
+
+
+def recipe_card_cook_time_label(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    value = clean_display_text(recipe_data.get("cook_time"))
+    if not value:
+        return ""
+
+    minutes = duration_minutes(value)
+    if minutes is not None:
+        return format_home_duration(minutes)
+    if re.fullmatch(r"\d+(?:\.\d+)?", value):
+        return f"{value} min"
+    return value
+
+
+def recipe_card_calories_label(value):
+    text = clean_display_text(value)
+    if not text:
+        return ""
+
+    lowered = text.lower()
+    if re.search(r"\b(?:cal|kcal|calorie|calories)\b", lowered):
+        return text
+    if re.fullmatch(r"\d+(?:\.\d+)?", text):
+        number = float(text)
+        display_number = str(int(number)) if number.is_integer() else text
+        return f"{display_number} cal"
+    return text
 
 
 def format_home_duration(minutes):

@@ -275,6 +275,8 @@ def test_app_shell_context_provides_recipe_preview_rows():
     assert "recipe_preview_rows = recipe_url_log_rows(" in route
     assert "recipe_urls[:8]" in route
     assert 'image_variants=("card", "thumb")' in route
+    assert 'recipe["card_cook_time"] = recipe_card_cook_time_label(recipe)' in route
+    assert 'recipe["card_calories"] = recipe_card_calories_label(recipe.get("calories"))' in route
     assert '"recipe_preview_rows": recipe_preview_rows' in route
 
 
