@@ -224,7 +224,8 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     script = read_text("PushShoppingList/static/js/app.js")
 
     assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-content" in css
-    assert "width: calc(100% - 60px);" in css
+    assert "width: min(var(--app-content-max), calc(100% - 60px));" in css
+    assert "max-width: var(--app-content-max);" in css
     assert 'class="app-home-hero-copy"' in template
     assert "ai-pantry-home-banner-v4.png" in css
     assert "app-home-hero-logo" not in template
@@ -376,15 +377,24 @@ def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
 
     assert "--app-dashboard-gap: clamp(12px, 1.2vw, 20px);" in css
     assert "--app-dashboard-card-padding: clamp(14px, 1vw, 18px);" in css
-    assert ".app-home-summary-grid {\n    display: grid;\n    grid-template-columns: repeat(4, minmax(0, 1fr));" in css
-    assert ".app-home-primary-grid {\n    grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);" in css
-    assert ".app-home-secondary-grid {\n    grid-template-columns: repeat(3, minmax(0, 1fr));" in css
-    assert "grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));" in css
-    assert "@media (min-width: 1100px) and (max-width: 1320px)" in css
-    assert ".app-home-summary-grid {\n        grid-template-columns: repeat(2, minmax(0, 1fr));" in css
-    assert ".app-home-recent-imports {\n        grid-column: 1 / -1;" in css
+    assert ".app-home-dashboard {\n    display: grid;" in css
+    assert "grid-template-columns: repeat(12, minmax(0, 1fr));" in css
+    assert ".app-home-summary-grid {\n    display: contents;" in css
+    assert ".app-home-primary-grid,\n.app-home-secondary-grid {\n    display: contents;" in css
+    assert ".app-home-summary-grid > .app-home-summary-card {\n    grid-column: span 3;" in css
+    assert ".app-home-recent-recipes {\n    grid-column: span 7;" in css
+    assert ".app-home-meal-preview {\n    grid-column: span 5;" in css
+    assert ".app-home-smart-suggestions,\n.app-home-price-preview,\n.app-home-recent-imports {\n    grid-column: span 4;" in css
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in css
+    assert ".app-home-meal-preview .app-home-empty-state {\n    min-height: 0;" in css
+    assert "@media (max-width: 1099px)" in css
+    assert ".app-home-summary-grid > .app-home-summary-card {\n        grid-column: span 6;" in css
+    assert ".app-home-recent-recipes,\n    .app-home-meal-preview {\n        grid-column: 1 / -1;" in css
+    assert ".app-home-smart-suggestions,\n    .app-home-price-preview {\n        grid-column: span 6;" in css
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "@media (max-width: 860px)" in css
-    assert ".app-home-primary-grid,\n    .app-home-secondary-grid {\n        grid-template-columns: minmax(0, 1fr);" in css
+    assert "@media (max-width: 620px)" in css
+    assert ".app-home-dashboard {\n        --app-dashboard-gap: 12px;\n        --app-dashboard-card-padding: 14px;\n        grid-template-columns: minmax(0, 1fr);" in css
     assert "@media (max-width: 620px)" in css
     assert ".app-home-empty-state button {\n        width: auto;" in css
     assert ".app-search-submit {\n        min-width: 64px;" not in css
