@@ -121,15 +121,22 @@ def test_home_template_has_supported_overflow_and_no_fake_favorite():
 
 
 def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
+    template = read_text("PushShoppingList/templates/index.html")
     css = read_text("PushShoppingList/static/css/app.css")
     script = read_text("PushShoppingList/static/js/app.js")
 
     assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-content" in css
     assert "width: calc(100% - 60px);" in css
+    assert 'class="app-home-hero-copy"' in template
     assert "ai-pantry-home-hero.png" in css
-    assert "background: #ffffff" in css
-    assert "center top / 100% auto no-repeat" in css
-    assert ".app-home-hero-logo {\n        position: absolute;\n        top: 110px;\n        left: 82px;\n        display: block;" in css
+    assert "background-color: #ffffff;" in css
+    assert "background-position: center top;" in css
+    assert "background-size: 100% auto;" in css
+    assert "grid-template-columns: 440px minmax(0, 310px);" in css
+    assert "column-gap: 32px;" in css
+    assert "grid-column: 2;\n        grid-row: 1;" in css
+    assert "aspect-ratio: 310 / 197;" in css
+    assert ".app-home-hero-logo {\n        position: absolute;\n        top: 55.84%;\n        left: 26.45%;\n        display: block;" in css
     assert ".app-home-summary-icon .app-icon-svg" in css
     assert ".app-home-recipe-menu-toggle" in css
     assert ".app-home-recipe-rating .is-unselected" in css

@@ -29734,10 +29734,17 @@ img[data-deferred-src] {
 
     .app-page-header {
         position: relative;
+        grid-template-columns: 440px minmax(0, 310px);
+        column-gap: 32px;
+        justify-content: start;
         min-height: 197px;
         margin-bottom: 18px;
         align-items: start;
         overflow: hidden;
+    }
+
+    .app-home-hero-copy {
+        min-width: 0;
     }
 
     .app-page-header h1 {
@@ -29761,19 +29768,24 @@ img[data-deferred-src] {
     }
 
     .app-home-hero-media {
-        position: absolute;
-        top: 0;
-        right: clamp(180px, 28vw, 520px);
-        width: 310px;
-        height: 197px;
-        background: #ffffff url("../images/ai-pantry-home-hero.png") center top / 100% auto no-repeat;
+        position: relative;
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+        max-width: 310px;
+        aspect-ratio: 310 / 197;
+        background-color: #ffffff;
+        background-image: url("../images/ai-pantry-home-hero.png");
+        background-position: center top;
+        background-size: 100% auto;
+        background-repeat: no-repeat;
         pointer-events: none;
     }
 
     .app-home-hero-logo {
         position: absolute;
-        top: 110px;
-        left: 82px;
+        top: 55.84%;
+        left: 26.45%;
         display: block;
         color: #087d35;
         transform: rotate(-1deg);
@@ -30601,7 +30613,6 @@ img[data-deferred-src] {
     }
 
     .app-home-hero-media {
-        right: clamp(180px, 18vw, 260px);
         opacity: 1;
     }
 
