@@ -126,14 +126,14 @@ def test_brand_mark_uses_chef_hat_check_cart_logo():
     brand_markup = macros[brand_start:brand_end]
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert 'viewBox="0 0 48 48"' in brand_markup
-    assert "M13.6 28.4c-4.1-.6-7.3-4.2-7.3-8.6" in brand_markup
-    assert "M14.2 25.3v9.1h20V25.3" in brand_markup
-    assert "M16.7 38.3h15" in brand_markup
-    assert '<circle cx="17.8" cy="43.1" r="1.8"></circle>' in brand_markup
-    assert '<circle cx="30.2" cy="43.1" r="1.8"></circle>' in brand_markup
-    assert "M17.6 21.7 22.4 26l8.2-8.3" in brand_markup
-    assert "stroke-width: 2.8;" in css
+    assert 'viewBox="0 0 134 147"' in brand_markup
+    assert "M40 64.5C25.2 64.2 14 54.6" in brand_markup
+    assert "M39.4 62.5 44 106.5" in brand_markup
+    assert "M53 94.3h38" in brand_markup
+    assert "m53.2 64.4 12.2 10.5 18-18.7" in brand_markup
+    assert '<circle cx="52.2" cy="133.2" r="6"></circle>' in brand_markup
+    assert '<circle cx="87.4" cy="133.2" r="6"></circle>' in brand_markup
+    assert "stroke-width: 6;" in css
 
 
 def test_sidebar_import_targets_keep_existing_active_state_and_barcode_behavior():
