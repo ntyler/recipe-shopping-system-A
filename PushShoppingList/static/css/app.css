@@ -29836,12 +29836,13 @@ img[data-deferred-src] {
 
     .app-page-header {
         position: relative;
-        grid-template-columns: minmax(0, 1fr) auto;
-        column-gap: clamp(20px, 3vw, 48px);
+        grid-template-columns: minmax(0, 1fr) max-content;
+        column-gap: clamp(24px, 2.5vw, 40px);
         justify-content: stretch;
-        margin-bottom: 18px;
-        align-items: center;
-        padding: clamp(8px, 1.2vw, 18px) 0;
+        width: min(100%, 1120px);
+        margin: 0 0 14px;
+        align-items: start;
+        padding: 0;
     }
 
     .app-home-hero-copy {
@@ -29873,10 +29874,10 @@ img[data-deferred-src] {
         position: relative;
         grid-column: 2;
         grid-row: 1;
-        align-self: center;
+        align-self: start;
         justify-self: end;
-        width: clamp(320px, 30vw, 460px);
-        max-width: min(45vw, 100%);
+        width: clamp(280px, 20vw, 320px);
+        max-width: min(38vw, 100%);
         aspect-ratio: 310 / 197;
         background-color: transparent;
         background-image: url("../images/ai-pantry-home-banner-v4.png");
@@ -30826,9 +30827,9 @@ img[data-deferred-src] {
 
 @media (min-width: 760px) and (max-width: 1099px) {
     .app-page-header {
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) max-content;
         gap: clamp(14px, 3vw, 24px);
-        align-items: center;
+        align-items: start;
         min-height: 0;
         padding: 6px 0;
     }
@@ -30837,7 +30838,7 @@ img[data-deferred-src] {
         position: relative;
         grid-column: 2;
         grid-row: 1;
-        align-self: center;
+        align-self: start;
         justify-self: end;
         display: block;
         width: clamp(240px, 30vw, 320px);

@@ -235,14 +235,16 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert "background-color: transparent;" in css
     assert "background-position: center;" in css
     assert "background-size: contain;" in css
-    assert "grid-template-columns: minmax(0, 1fr) auto;" in css
-    assert "column-gap: clamp(20px, 3vw, 48px);" in css
-    assert "padding: clamp(8px, 1.2vw, 18px) 0;" in css
-    assert "width: clamp(320px, 30vw, 460px);" in css
-    assert "max-width: min(45vw, 100%);" in css
+    assert "grid-template-columns: minmax(0, 1fr) max-content;" in css
+    assert "column-gap: clamp(24px, 2.5vw, 40px);" in css
+    assert "width: min(100%, 1120px);" in css
+    assert "margin: 0 0 14px;" in css
+    assert "align-items: start;" in css
+    assert "width: clamp(280px, 20vw, 320px);" in css
+    assert "max-width: min(38vw, 100%);" in css
     assert "grid-column: 2;\n        grid-row: 1;" in css
     assert "aspect-ratio: 310 / 197;" in css
-    assert "align-self: center;\n        justify-self: end;" in css
+    assert "align-self: start;\n        justify-self: end;" in css
     assert "transform: none;" in css
     assert "min-height: 267px;" not in css
     assert "@media (min-width: 760px) and (max-width: 1099px)" in css
