@@ -27143,7 +27143,7 @@ img[data-deferred-src] {
     display: grid;
     --app-dashboard-gap: clamp(12px, 1.2vw, 20px);
     --app-dashboard-card-padding: clamp(14px, 1vw, 18px);
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: var(--app-dashboard-gap);
     align-items: stretch;
     margin-bottom: 24px;
@@ -27154,10 +27154,7 @@ img[data-deferred-src] {
 }
 
 .app-home-summary-grid {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--app-dashboard-gap);
+    display: contents;
 }
 
 .app-home-primary-grid,
@@ -27166,27 +27163,21 @@ img[data-deferred-src] {
 }
 
 .app-home-summary-grid > .app-home-summary-card {
-    min-width: 0;
+    grid-column: span 3;
 }
 
 .app-home-recent-recipes {
-    grid-column: 1;
+    grid-column: span 7;
 }
 
 .app-home-meal-preview {
-    grid-column: 2;
+    grid-column: span 5;
 }
 
-.app-home-secondary-left {
-    display: grid;
-    grid-column: 1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--app-dashboard-gap);
-    min-width: 0;
-}
-
+.app-home-smart-suggestions,
+.app-home-price-preview,
 .app-home-recent-imports {
-    grid-column: 2;
+    grid-column: span 4;
 }
 
 .app-home-summary-card,
@@ -29582,6 +29573,13 @@ img[data-deferred-src] {
         --app-control-height: 42px;
         --app-dashboard-gap: clamp(12px, 1.2vw, 20px);
         --app-dashboard-card-padding: clamp(14px, 1vw, 18px);
+        --app-type-section: 11px;
+        --app-type-meta: 12px;
+        --app-type-control: 14px;
+        --app-type-item-title: 14px;
+        --app-type-panel-title: 17px;
+        --app-type-hero-title: 34px;
+        --app-type-metric: 28px;
         --app-radius-sm: 7px;
         --app-radius-md: 9px;
         --app-radius-lg: 12px;
@@ -29716,8 +29714,9 @@ img[data-deferred-src] {
         gap: 12px;
         min-height: 43px;
         padding: 9px 11px;
-        font-size: 13px;
+        font-size: var(--app-type-control);
         font-weight: 610;
+        line-height: 1.3;
     }
 
     .app-nav-section-title {
@@ -29725,9 +29724,10 @@ img[data-deferred-src] {
         padding-top: 14px;
         border-top: 1px solid var(--app-border);
         color: #6e7a8d;
-        font-size: 10px;
+        font-size: var(--app-type-section);
         font-weight: 650;
         letter-spacing: .4px;
+        line-height: 1.2;
     }
 
     .app-nav-section-title:first-of-type {
@@ -29795,8 +29795,9 @@ img[data-deferred-src] {
     .app-global-search input {
         min-height: 44px;
         border-radius: 9px;
-        font-size: 13px;
+        font-size: 15px;
         font-weight: 450;
+        line-height: 1.4;
     }
 
     .app-global-search-shortcut {
@@ -29806,8 +29807,9 @@ img[data-deferred-src] {
 
     .app-toolbar-button {
         min-height: 42px;
-        font-size: 13px;
+        font-size: var(--app-type-control);
         font-weight: 650;
+        line-height: 1.2;
     }
 
     .app-toolbar-primary {
@@ -29827,13 +29829,15 @@ img[data-deferred-src] {
     }
 
     .app-account-label strong {
-        font-size: 13px;
+        font-size: var(--app-type-control);
         font-weight: 680;
+        line-height: 1.25;
     }
 
     .app-account-label small {
-        font-size: 10px;
+        font-size: var(--app-type-section);
         font-weight: 600;
+        line-height: 1.2;
     }
 
     .app-content {
@@ -29867,8 +29871,9 @@ img[data-deferred-src] {
         position: relative;
         z-index: 2;
         margin: 0 0 6px;
-        font-size: 35px;
+        font-size: var(--app-type-hero-title);
         font-weight: 720;
+        line-height: 1.15;
         letter-spacing: 0;
     }
 
@@ -29877,6 +29882,7 @@ img[data-deferred-src] {
         z-index: 2;
         font-size: 15px;
         font-weight: 430;
+        line-height: 1.45;
     }
 
     .app-page-header .shopping-global-collapse-controls {
@@ -29902,13 +29908,13 @@ img[data-deferred-src] {
     }
 
     .app-home-dashboard {
-        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        grid-template-columns: repeat(12, minmax(0, 1fr));
         gap: var(--app-dashboard-gap);
         align-items: stretch;
     }
 
     .app-home-summary-grid {
-        display: grid;
+        display: contents;
     }
 
     .app-home-summary-card,
@@ -29942,18 +29948,21 @@ img[data-deferred-src] {
     }
 
     .app-home-summary-card > span:not(.app-home-summary-icon) {
-        font-size: 12px;
+        font-size: var(--app-type-control);
         font-weight: 650;
+        line-height: 1.25;
     }
 
     .app-home-summary-card strong {
-        font-size: 27px;
+        font-size: var(--app-type-metric);
         font-weight: 700;
+        line-height: 1.1;
     }
 
     .app-home-summary-card small {
-        font-size: 12px;
+        font-size: var(--app-type-meta);
         font-weight: 430;
+        line-height: 1.35;
     }
 
     .app-home-primary-grid,
@@ -29966,6 +29975,7 @@ img[data-deferred-src] {
         height: 100%;
         min-height: 100%;
         min-width: 0;
+        align-self: stretch;
     }
 
     .app-home-summary-grid > .app-home-summary-card {
@@ -29973,17 +29983,28 @@ img[data-deferred-src] {
     }
 
     .app-home-recent-recipes {
-        grid-column: span 7;
+        grid-column: 1 / span 8;
+        grid-row: 2;
     }
 
     .app-home-meal-preview {
-        grid-column: span 5;
+        grid-column: 9 / span 4;
+        grid-row: 2;
     }
 
-    .app-home-smart-suggestions,
-    .app-home-price-preview,
+    .app-home-smart-suggestions {
+        grid-column: 1 / span 4;
+        grid-row: 3;
+    }
+
+    .app-home-price-preview {
+        grid-column: 5 / span 4;
+        grid-row: 3;
+    }
+
     .app-home-recent-imports {
-        grid-column: span 4;
+        grid-column: 9 / span 4;
+        grid-row: 3;
     }
 
     .app-home-recent-recipes,
@@ -30007,13 +30028,15 @@ img[data-deferred-src] {
     }
 
     .app-home-panel-header h2 {
-        font-size: 16px;
+        font-size: var(--app-type-panel-title);
         font-weight: 680;
+        line-height: 1.25;
     }
 
     .app-home-panel-header a {
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 600;
+        line-height: 1.3;
     }
 
     .app-home-recipe-grid {
@@ -30050,8 +30073,9 @@ img[data-deferred-src] {
         min-width: 0;
         margin: 0;
         overflow: hidden;
-        font-size: 13px;
-        line-height: 1.22;
+        font-size: var(--app-type-item-title);
+        font-weight: 680;
+        line-height: 1.3;
     }
 
     .app-home-recipe-card h3 a {
@@ -30065,8 +30089,9 @@ img[data-deferred-src] {
 
     .app-home-recipe-metadata {
         gap: 5px;
-        font-size: 10.5px;
+        font-size: var(--app-type-meta);
         font-weight: 620;
+        line-height: 1.35;
     }
 
     .app-home-recipe-metadata .app-recipe-card-meta-line-primary {
@@ -30076,6 +30101,8 @@ img[data-deferred-src] {
     .app-home-recipe-rating {
         color: inherit;
         background: transparent;
+        font-size: 15px;
+        line-height: 1;
     }
 
     .app-home-recipe-rating .is-selected {
@@ -30186,24 +30213,97 @@ img[data-deferred-src] {
         list-style: none;
     }
 
+    .app-home-meal-preview.has-meals {
+        grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .app-home-meal-list {
+        width: 100%;
+        overflow: hidden;
+        border: 1px solid var(--app-border);
+        border-radius: 10px;
+        background: var(--app-surface-soft);
+    }
+
     .app-home-meal-list li {
         display: grid;
-        grid-template-columns: 72px 70px minmax(0, 1fr);
-        gap: 10px;
+        grid-template-columns: 44px 62px minmax(0, 1fr) 50px;
+        gap: 8px;
         align-items: center;
-        min-height: 45px;
-        padding: 0 8px;
+        min-height: 52px;
+        padding: 5px 6px 5px 10px;
         border-bottom: 1px solid var(--app-border);
-        font-size: 12px;
+        font-size: var(--app-type-meta);
     }
 
-    .app-home-meal-list time {
+    .app-home-meal-list li:last-child {
+        border-bottom: 0;
+    }
+
+    .app-home-meal-list .app-home-meal-day {
         color: var(--app-primary);
-        font-weight: 650;
+        font-size: var(--app-type-meta);
+        font-weight: 750;
+        letter-spacing: .15px;
+        line-height: 1.2;
     }
 
-    .app-home-meal-list span {
+    .app-home-meal-list .app-home-meal-type {
+        justify-self: start;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: var(--app-bg-soft);
         color: var(--app-muted);
+        font-size: 11.5px;
+        line-height: 1.15;
+        white-space: nowrap;
+    }
+
+    .app-home-meal-name {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--app-text-strong);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.3;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .app-home-meal-thumb {
+        display: block;
+        width: 50px;
+        height: 40px;
+        overflow: hidden;
+        border-radius: 8px;
+        background: var(--app-primary-soft);
+    }
+
+    .app-home-meal-thumb img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .app-home-meal-footer-action {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        align-self: end;
+        justify-self: center;
+        color: var(--app-primary);
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.3;
+        text-decoration: none;
+    }
+
+    .app-home-meal-footer-action:hover,
+    .app-home-meal-footer-action:focus-visible {
+        color: var(--app-primary-hover);
+        text-decoration: underline;
+        outline: none;
     }
 
     .app-home-suggestion-row {
@@ -30219,28 +30319,30 @@ img[data-deferred-src] {
     }
 
     .app-home-suggestion-row strong {
-        font-size: 13px;
+        font-size: var(--app-type-item-title);
+        line-height: 1.3;
     }
 
     .app-home-suggestion-row div span,
     .app-home-price-preview p {
         color: var(--app-muted);
-        font-size: 12px;
-        line-height: 1.45;
+        font-size: 13px;
+        line-height: 1.5;
     }
 
     .app-home-suggestion-row a,
     .app-home-price-preview > a {
         color: var(--app-primary);
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 650;
+        line-height: 1.3;
         text-decoration: none;
     }
 
     .app-home-import-list li {
         min-height: 48px;
         border-bottom: 1px solid var(--app-border);
-        font-size: 11px;
+        font-size: var(--app-type-meta);
     }
 
     .app-home-import-list li > button {
@@ -30293,8 +30395,9 @@ img[data-deferred-src] {
         min-width: 0;
         overflow: hidden;
         color: var(--app-text);
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 650;
+        line-height: 1.25;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
@@ -30302,7 +30405,8 @@ img[data-deferred-src] {
     .app-home-import-copy small,
     .app-home-import-meta time {
         color: var(--app-muted);
-        font-size: 10px;
+        font-size: var(--app-type-section);
+        line-height: 1.25;
     }
 
     .app-home-import-meta {
@@ -30719,17 +30823,20 @@ img[data-deferred-src] {
         display: none;
     }
 
-    .app-home-dashboard {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .app-home-summary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .app-home-summary-grid > .app-home-summary-card {
+        grid-column: span 6;
     }
 
     .app-home-recent-recipes,
-    .app-home-meal-preview,
-    .app-home-secondary-left,
+    .app-home-meal-preview {
+        grid-column: 1 / -1;
+    }
+
+    .app-home-smart-suggestions,
+    .app-home-price-preview {
+        grid-column: span 6;
+    }
+
     .app-home-recent-imports {
         grid-column: 1 / -1;
     }
@@ -30827,6 +30934,14 @@ img[data-deferred-src] {
     }
 }
 
+@media (max-width: 860px) {
+    .app-home-smart-suggestions,
+    .app-home-price-preview,
+    .app-home-recent-imports {
+        grid-column: 1 / -1;
+    }
+}
+
 @media (min-width: 760px) and (max-width: 1099px) {
     .app-page-header {
         grid-template-columns: minmax(0, 1fr) max-content;
@@ -30883,14 +30998,11 @@ img[data-deferred-src] {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .app-home-summary-grid,
-    .app-home-secondary-left {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
+    .app-home-summary-grid > .app-home-summary-card,
     .app-home-recent-recipes,
     .app-home-meal-preview,
-    .app-home-secondary-left,
+    .app-home-smart-suggestions,
+    .app-home-price-preview,
     .app-home-recent-imports {
         grid-column: 1 / -1;
     }

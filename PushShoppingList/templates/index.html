@@ -476,7 +476,7 @@
                 {% endif %}
             </section>
 
-            <section class="app-home-panel app-home-meal-preview" aria-label="Upcoming meal plan">
+            <section class="app-home-panel app-home-meal-preview{% if meal_plan.meals %} has-meals{% endif %}" aria-label="Upcoming meal plan">
                 <div class="app-home-panel-header">
                     <h2>Upcoming Meal Plan</h2>
                     <a href="#mealPlannerPage"
@@ -488,13 +488,34 @@
                 {% if meal_plan.meals %}
                     <ul class="app-home-meal-list">
                         {% for meal in meal_plan.meals[:5] %}
+                            {% set meal_day = namespace(label=meal.date, is_today=false) %}
+                            {% for day in meal_plan.days %}
+                                {% if day.date == meal.date %}
+                                    {% set meal_day.label = day.weekday | upper %}
+                                    {% set meal_day.is_today = day.is_today %}
+                                {% endif %}
+                            {% endfor %}
                             <li>
-                                <time datetime="{{ meal.date }}">{{ meal.date }}</time>
-                                <span>{{ meal.meal_type | title }}</span>
-                                <strong>{{ meal.recipe_name }}</strong>
+                                <time class="app-home-meal-day" datetime="{{ meal.date }}">{% if meal_day.is_today %}TODAY{% else %}{{ meal_day.label }}{% endif %}</time>
+                                <span class="app-home-meal-type">{{ meal.meal_type | title }}</span>
+                                <strong class="app-home-meal-name">{{ meal.recipe_name }}</strong>
+                                <span class="app-home-meal-thumb" aria-hidden="true">
+                                    {% if meal.cover_image and meal.cover_image.src %}
+                                        <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}"
+                                             alt=""
+                                             loading="lazy"
+                                             decoding="async">
+                                    {% endif %}
+                                </span>
                             </li>
                         {% endfor %}
                     </ul>
+                    <a class="app-home-meal-footer-action"
+                       href="#mealPlannerPage"
+                       data-app-nav-link
+                       data-app-nav-action="app-page"
+                       data-app-page-target="mealPlannerPage"
+                       data-app-nav-target="mealPlannerPage">View full meal plan <span aria-hidden="true">&rarr;</span></a>
                 {% else %}
                     <div class="app-home-empty-state">
                         <strong>No meals planned for this week.</strong>
@@ -506,8 +527,7 @@
         </div>
 
         <div class="app-home-secondary-grid">
-            <div class="app-home-secondary-left">
-                <section class="app-home-panel app-home-smart-suggestions" aria-label="Smart suggestions">
+            <section class="app-home-panel app-home-smart-suggestions" aria-label="Smart suggestions">
                     <div class="app-home-panel-header">
                         <h2 class="app-home-panel-title">{{ shell.svg_icon("sparkles") }} <span>Smart Suggestions</span></h2>
                     </div>
@@ -521,14 +541,13 @@
                     {% else %}
                         <div class="app-home-empty-state"><strong>Your pantry is ready to set up.</strong><span>Add pantry items to receive useful, data-backed suggestions.</span></div>
                     {% endif %}
-                </section>
+            </section>
 
-                <section class="app-home-panel app-home-price-preview" aria-label="Price comparison">
+            <section class="app-home-panel app-home-price-preview" aria-label="Price comparison">
                     <div class="app-home-panel-header"><h2 class="app-home-panel-title">{{ shell.svg_icon("price") }} <span>Price Comparison</span></h2></div>
                     <p>Compare current shopping items across your enabled stores. Prices appear only after a supported lookup.</p>
                     <a class="app-page-secondary-action" href="#priceComparisonPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="priceComparisonPage" data-app-nav-target="priceComparisonPage">Compare prices</a>
-                </section>
-            </div>
+            </section>
 
             <section class="app-home-panel app-home-recent-imports" aria-label="Recent imports">
                 <div class="app-home-panel-header">
