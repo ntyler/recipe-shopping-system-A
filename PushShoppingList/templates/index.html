@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/extraction_overlay_old.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/ai-pantry-logo.svg') }}">
 </head>
 
 <body class="app-shell-body {% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}"

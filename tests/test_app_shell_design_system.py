@@ -125,15 +125,20 @@ def test_brand_mark_uses_chef_hat_check_cart_logo():
     brand_end = macros.index("{%- endmacro %}", brand_start)
     brand_markup = macros[brand_start:brand_end]
     css = read_text("PushShoppingList/static/css/app.css")
+    logo = read_text("PushShoppingList/static/images/ai-pantry-logo.svg")
 
-    assert 'viewBox="0 0 134 147"' in brand_markup
-    assert "M40 64.5C25.2 64.2 14 54.6" in brand_markup
-    assert "M39.4 62.5 44 106.5" in brand_markup
-    assert "M53 94.3h38" in brand_markup
-    assert "m53.2 64.4 12.2 10.5 18-18.7" in brand_markup
-    assert '<circle cx="52.2" cy="133.2" r="6"></circle>' in brand_markup
-    assert '<circle cx="87.4" cy="133.2" r="6"></circle>' in brand_markup
-    assert "stroke-width: 6;" in css
+    assert "images/ai-pantry-logo.svg" in brand_markup
+    assert '<img src="{{ url_for(\'static\', filename=\'images/ai-pantry-logo.svg\') }}"' in brand_markup
+    assert 'width="128" height="142" viewBox="0 0 128 142"' in logo
+    assert 'stroke="#186031"' in logo
+    assert 'stroke-width="9.5"' in logo
+    assert "M36.4 78.2C18.3 77.5 7.4 65.1" in logo
+    assert "M37.4 78.2L42.6 128H92.8L98 78.2" in logo
+    assert "M42.7 65.5L59.3 79.1L88.7 46.7" in logo
+    assert '<circle cx="42.8" cy="135" r="6.7" fill="#186031" stroke="none"/>' in logo
+    assert '<circle cx="92.8" cy="135" r="6.7" fill="#186031" stroke="none"/>' in logo
+    assert ".app-brand-mark img {" in css
+    assert "object-fit: contain;" in css
 
 
 def test_sidebar_import_targets_keep_existing_active_state_and_barcode_behavior():
@@ -292,7 +297,8 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert "@media (prefers-color-scheme: dark)" in css
     assert ".app-shell-body {" in css
     assert ".app-sidebar {" in css
-    assert ".app-brand-mark svg {" in css
+    assert ".app-brand-mark img {" in css
+    assert "object-fit: contain;" in css
     assert ".app-icon-svg" in css
     assert ".app-nav-section-title {" in css
     assert ".app-nav-link-multiline .app-nav-text {" in css
@@ -347,6 +353,15 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert ".app-shell-body .settings-workspace-section.app-card" in css
     assert ".app-shell-body :where(input, select, textarea)" in css
     assert ".app-shell-body :where(table)" in css
+    tablet_shell = css[
+        css.index("@media (min-width: 768px) and (max-width: 1099px)"):
+        css.index("@media (max-width: 767px)")
+    ]
+    assert "grid-template-columns: auto minmax(240px, 1fr) auto;" in tablet_shell
+    assert ".app-topbar-brand {\n        display: inline-flex;" in tablet_shell
+    assert ".app-topbar-brand span:not(.app-brand-mark) {\n        display: none;" in tablet_shell
+    assert ".app-global-search {\n        grid-column: 2;" in tablet_shell
+    assert ".app-toolbar-actions {\n        grid-column: 3;" in tablet_shell
 
 
 def test_desktop_sidebar_logo_and_icons_use_readable_scale():

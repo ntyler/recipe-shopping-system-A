@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="142" viewBox="0 0 128 142" role="img" aria-labelledby="ai-pantry-logo-title ai-pantry-logo-desc">
+    <title id="ai-pantry-logo-title">AI Pantry logo</title>
+    <desc id="ai-pantry-logo-desc">Dark green chef hat, checkmark, cart body, and two wheels from the AI Pantry grocery bag mark.</desc>
+    <g fill="none" stroke="#186031" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M36.4 78.2C18.3 77.5 7.4 65.1 7.4 51.4C7.4 37.1 19.1 25.4 34.4 25.1C40.2 11.4 54.2 4.4 68.7 6.4C84.1 8.5 95.2 18.9 97.5 32.3C110 34 120.8 44.4 120.8 57.1C120.8 69.1 111.3 78.2 97.6 78.2H36.4Z"/>
+        <path d="M37.4 78.2L42.6 128H92.8L98 78.2"/>
+        <path d="M42.7 65.5L59.3 79.1L88.7 46.7"/>
+        <circle cx="42.8" cy="135" r="6.7" fill="#186031" stroke="none"/>
+        <circle cx="92.8" cy="135" r="6.7" fill="#186031" stroke="none"/>
+    </g>
+</svg>

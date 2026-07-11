@@ -12,8 +12,8 @@ self.addEventListener("push", (event) => {
     const title = payload.title || "Recipe Shopping List";
     const options = {
         body: payload.body || payload.message || "You have a new update.",
-        icon: payload.icon || "/static/favicon.ico",
-        badge: payload.badge || "/static/favicon.ico",
+        icon: payload.icon || "/static/images/ai-pantry-logo.svg",
+        badge: payload.badge || "/static/images/ai-pantry-logo.svg",
         data: {
             url: payload.url || "/#userAccountSection"
         }
