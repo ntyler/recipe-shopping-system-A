@@ -29746,23 +29746,23 @@ img[data-deferred-src] {
 
     .app-page-header {
         position: relative;
-        grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
-        column-gap: 24px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: clamp(20px, 3vw, 48px);
         justify-content: stretch;
-        min-height: 267px;
         margin-bottom: 18px;
-        align-items: start;
-        overflow: hidden;
+        align-items: center;
+        padding: clamp(8px, 1.2vw, 18px) 0;
     }
 
     .app-home-hero-copy {
         min-width: 0;
+        max-width: 760px;
     }
 
     .app-page-header h1 {
         position: relative;
         z-index: 2;
-        margin-top: 8px;
+        margin: 0 0 6px;
         font-size: 35px;
         font-weight: 720;
         letter-spacing: 0;
@@ -29785,15 +29785,15 @@ img[data-deferred-src] {
         grid-row: 1;
         align-self: center;
         justify-self: end;
-        width: 100%;
-        max-width: 420px;
+        width: clamp(320px, 30vw, 460px);
+        max-width: min(45vw, 100%);
         aspect-ratio: 310 / 197;
         background-color: transparent;
         background-image: url("../images/ai-pantry-home-banner-v4.png");
         background-position: center;
         background-size: contain;
         background-repeat: no-repeat;
-        transform: translateX(18px);
+        transform: none;
         pointer-events: none;
     }
 
@@ -30642,6 +30642,32 @@ img[data-deferred-src] {
         gap: 10px;
     }
 
+    .app-home-recipe-card {
+        position: relative;
+        min-width: 0;
+    }
+
+    .app-home-recipe-media {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        max-width: 100%;
+        aspect-ratio: 1.24 / 1;
+        overflow: hidden;
+        border-radius: 9px;
+        background: var(--app-primary-soft);
+        color: var(--app-primary);
+    }
+
+    .app-home-recipe-media img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        object-fit: cover;
+    }
+
     .app-meal-planner-grid {
         display: grid;
         grid-template-columns: 72px repeat(7, minmax(120px, 1fr));
@@ -30653,10 +30679,11 @@ img[data-deferred-src] {
 
 @media (min-width: 760px) and (max-width: 1099px) {
     .app-page-header {
-        grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
-        gap: 18px;
-        min-height: 203px;
-        overflow: hidden;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: clamp(14px, 3vw, 24px);
+        align-items: center;
+        min-height: 0;
+        padding: 6px 0;
     }
 
     .app-home-hero-media {
@@ -30666,11 +30693,11 @@ img[data-deferred-src] {
         align-self: center;
         justify-self: end;
         display: block;
-        width: 100%;
-        max-width: 320px;
+        width: clamp(240px, 30vw, 320px);
+        max-width: min(42vw, 100%);
         aspect-ratio: 310 / 197;
         background: transparent url("../images/ai-pantry-home-banner-v4.png") center / contain no-repeat;
-        transform: translateX(12px);
+        transform: none;
         pointer-events: none;
     }
 }
@@ -30680,6 +30707,8 @@ img[data-deferred-src] {
         grid-template-columns: minmax(0, 1fr);
         gap: 12px;
         min-height: 0;
+        align-items: start;
+        padding: 4px 0;
     }
 
     .app-home-hero-media {
@@ -30688,7 +30717,8 @@ img[data-deferred-src] {
         grid-row: 2;
         justify-self: end;
         display: block;
-        width: min(100%, 320px);
+        width: clamp(240px, 72vw, 320px);
+        max-width: 100%;
         aspect-ratio: 310 / 197;
         background: transparent url("../images/ai-pantry-home-banner-v4.png") center / contain no-repeat;
         transform: none;

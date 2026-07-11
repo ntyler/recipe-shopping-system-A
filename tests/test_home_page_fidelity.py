@@ -136,16 +136,22 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert "background-color: transparent;" in css
     assert "background-position: center;" in css
     assert "background-size: contain;" in css
-    assert "grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);" in css
-    assert "column-gap: 24px;" in css
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in css
+    assert "column-gap: clamp(20px, 3vw, 48px);" in css
+    assert "padding: clamp(8px, 1.2vw, 18px) 0;" in css
+    assert "width: clamp(320px, 30vw, 460px);" in css
+    assert "max-width: min(45vw, 100%);" in css
     assert "grid-column: 2;\n        grid-row: 1;" in css
     assert "aspect-ratio: 310 / 197;" in css
     assert "align-self: center;\n        justify-self: end;" in css
-    assert "transform: translateX(18px);" in css
+    assert "transform: none;" in css
+    assert "min-height: 267px;" not in css
     assert "@media (min-width: 760px) and (max-width: 1099px)" in css
     assert "@media (max-width: 759px)" in css
     assert "grid-row: 2;" in css
-    assert "width: min(100%, 320px);" in css
+    assert "width: clamp(240px, 72vw, 320px);" in css
+    assert ".app-home-recipe-media img {\n        display: block;" in css
+    assert "max-width: 100%;" in css
     assert ".app-home-summary-icon .app-icon-svg" in css
     assert ".app-home-recipe-menu-toggle" in css
     assert ".app-home-recipe-rating .is-unselected" in css
