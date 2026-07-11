@@ -43,10 +43,32 @@
                 {{ shell.app_icon("pantry") }}
                 <span class="app-nav-text">Pantry</span>
             </a>
-            <div class="app-nav-section-title">Import</div>
+            <div class="app-nav-section-title">CREATE RECIPES</div>
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#recipeUrlsTextarea">
-                {{ shell.app_icon("import") }}
-                <span class="app-nav-text">Import</span>
+                {{ shell.app_icon("link") }}
+                <span class="app-nav-text">Recipe URLs</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#importDocumentPage">
+                {{ shell.app_icon("document") }}
+                <span class="app-nav-text">Import From Document</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#generateImagePage">
+                {{ shell.app_icon("image") }}
+                <span class="app-nav-text">Generate From Image</span>
+            </a>
+            <div class="app-nav-section-title">IMPORT MENUS</div>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#menuUrlPage">
+                {{ shell.app_icon("menus") }}
+                <span class="app-nav-text">Menu URL</span>
+            </a>
+            <a class="app-nav-link app-nav-link-multiline" href="{{ url_for('main_bp.index') }}#menuDocumentPage">
+                {{ shell.app_icon("document") }}
+                <span class="app-nav-text">Import Menu From Document</span>
+            </a>
+            <div class="app-nav-section-title">PANTRY</div>
+            <a class="app-nav-link" href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
+                {{ shell.app_icon("barcode") }}
+                <span class="app-nav-text">Scan Barcode</span>
             </a>
             <div class="app-nav-section-title">Account</div>
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#feedbackSupportSection">

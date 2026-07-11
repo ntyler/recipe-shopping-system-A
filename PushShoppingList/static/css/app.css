@@ -26793,6 +26793,18 @@ img[data-deferred-src] {
     white-space: nowrap;
 }
 
+.app-nav-link-multiline {
+    height: auto;
+}
+
+.app-nav-link-multiline .app-nav-text {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+}
+
 .app-sidebar-promo {
     display: grid;
     gap: 9px;

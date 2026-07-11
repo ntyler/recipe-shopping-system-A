@@ -18,7 +18,9 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert '<header id="appPageHeader" class="app-page-header" data-app-home-header>' in template
     assert '<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">' in template
     assert 'class="app-nav-section-title">Discover &amp; Plan</div>' in template
-    assert 'class="app-nav-section-title">Import</div>' in template
+    assert 'class="app-nav-section-title">CREATE RECIPES</div>' in template
+    assert 'class="app-nav-section-title">IMPORT MENUS</div>' in template
+    assert 'class="app-nav-section-title">PANTRY</div>' in template
     assert 'class="app-nav-section-title">Account</div>' in template
     assert "app-sidebar-promo" in template
     assert 'data-app-global-search' in template
@@ -47,6 +49,98 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert 'onclick="return collapseAllShoppingListPage()"' in template
     assert 'onclick="return expandAllShoppingListPage()"' in template
     assert 'data-public-workspace="{{ \'1\' if not current_user and not is_guest_demo else \'0\' }}"' in template
+
+
+def test_sidebar_import_actions_are_grouped_by_task_without_duplicate_hub_link():
+    template = read_text("PushShoppingList/templates/index.html")
+    nav_start = template.index('<nav class="app-sidebar-nav" aria-label="App sections">')
+    nav_end = template.index("</nav>", nav_start)
+    sidebar = template[nav_start:nav_end]
+
+    ordered_labels = (
+        'class="app-nav-section-title">CREATE RECIPES</div>',
+        '<span class="app-nav-text">Recipe URLs</span>',
+        '<span class="app-nav-text">Import From Document</span>',
+        '<span class="app-nav-text">Generate From Image</span>',
+        'class="app-nav-section-title">IMPORT MENUS</div>',
+        '<span class="app-nav-text">Menu URL</span>',
+        '<span class="app-nav-text">Import Menu From Document</span>',
+        'class="app-nav-section-title">PANTRY</div>',
+        '<span class="app-nav-text">Scan Barcode</span>',
+    )
+    positions = [sidebar.index(label) for label in ordered_labels]
+
+    assert positions == sorted(positions)
+    assert '<span class="app-nav-text">Import</span>' not in sidebar
+    assert 'data-app-page-target="importPage"' not in sidebar
+    assert sidebar.count('class="app-nav-section-title">CREATE RECIPES</div>') == 1
+    assert sidebar.count('class="app-nav-section-title">IMPORT MENUS</div>') == 1
+    assert sidebar.count('class="app-nav-section-title">PANTRY</div>') == 1
+    assert sidebar.index('<span class="app-nav-text">Pantry</span>') < positions[0]
+
+    for page_target, label in (
+        ("recipeUrlsPage", "Recipe URLs"),
+        ("importDocumentPage", "Import From Document"),
+        ("generateImagePage", "Generate From Image"),
+        ("menuUrlPage", "Menu URL"),
+        ("menuDocumentPage", "Import Menu From Document"),
+    ):
+        label_markup = f'<span class="app-nav-text">{label}</span>'
+        label_position = sidebar.index(label_markup)
+        link_start = sidebar.rfind("<a ", 0, label_position)
+        link_end = sidebar.index("</a>", label_position)
+        link = sidebar[link_start:link_end]
+
+        assert f'href="#{page_target}"' in link
+        assert 'data-app-nav-link' in link
+        assert 'data-app-nav-action="app-page"' in link
+        assert f'data-app-page-target="{page_target}"' in link
+        assert f'data-app-nav-target="{page_target}"' in link
+
+    assert 'class="app-nav-link app-nav-link-multiline"' in sidebar
+    assert 'href="{{ url_for(\'pantry_bp.pantry_coming_soon_route\') }}"' in sidebar
+
+
+def test_recipe_editor_sidebar_uses_the_same_import_task_groups():
+    template = read_text("PushShoppingList/templates/recipe_edit_page.html")
+    nav_start = template.index('<nav class="app-sidebar-nav" aria-label="App sections">')
+    nav_end = template.index("</nav>", nav_start)
+    sidebar = template[nav_start:nav_end]
+
+    assert '<span class="app-nav-text">Import</span>' not in sidebar
+    assert sidebar.count('class="app-nav-section-title">CREATE RECIPES</div>') == 1
+    assert sidebar.count('class="app-nav-section-title">IMPORT MENUS</div>') == 1
+    assert sidebar.count('class="app-nav-section-title">PANTRY</div>') == 1
+    assert '{{ url_for(\'main_bp.index\') }}#recipeUrlsTextarea' in sidebar
+    assert '{{ url_for(\'main_bp.index\') }}#importDocumentPage' in sidebar
+    assert '{{ url_for(\'main_bp.index\') }}#generateImagePage' in sidebar
+    assert '{{ url_for(\'main_bp.index\') }}#menuUrlPage' in sidebar
+    assert '{{ url_for(\'main_bp.index\') }}#menuDocumentPage' in sidebar
+    assert '{{ url_for(\'pantry_bp.pantry_coming_soon_route\') }}' in sidebar
+
+
+def test_sidebar_import_targets_keep_existing_active_state_and_barcode_behavior():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    pantry_routes = read_text("PushShoppingList/routes/pantry_routes.py")
+
+    for page_target in (
+        "recipeUrlsPage",
+        "importDocumentPage",
+        "generateImagePage",
+        "menuUrlPage",
+        "menuDocumentPage",
+    ):
+        assert f'{page_target}: "{page_target}"' in script
+
+    assert "function appShellSetActivePageLink(pageId)" in script
+    assert 'link.classList.toggle("is-active", Boolean(sameLinkKey));' in script
+    assert ".app-nav-link:hover," in css
+    assert ".app-nav-link:focus-visible," in css
+    assert ".app-sidebar-collapsed .app-nav-text," in css
+    assert "overflow-y: auto;" in css
+    assert '@pantry_bp.route("/pantry/coming-soon")' in pantry_routes
+    assert 'redirect(url_for("main_bp.index", _anchor="aiPantrySection"))' in pantry_routes
 
 
 def test_index_topbar_uses_current_user_profile_image(monkeypatch, tmp_path):
@@ -184,6 +278,9 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert ".app-brand-mark svg {" in css
     assert ".app-icon-svg" in css
     assert ".app-nav-section-title {" in css
+    assert ".app-nav-link-multiline .app-nav-text {" in css
+    assert "white-space: normal;" in css
+    assert "overflow-wrap: anywhere;" in css
     assert ".app-sidebar-promo {" in css
     assert ".app-topbar {" in css
     assert ".app-global-search-shortcut" in css
