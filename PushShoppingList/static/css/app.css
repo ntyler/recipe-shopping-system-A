@@ -28173,6 +28173,37 @@ img[data-deferred-src] {
     width: 100%;
 }
 
+.app-home-recipe-metadata .app-recipe-card-cookbook-line,
+.app-home-recipe-metadata .app-recipe-card-category-line {
+    width: fit-content;
+    max-width: 100%;
+    min-height: 24px;
+    justify-self: start;
+    gap: 5px;
+    padding: 3px 8px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    font-size: 11.5px;
+    line-height: 1.2;
+}
+
+.app-home-recipe-metadata .app-recipe-card-cookbook-line {
+    border-color: color-mix(in srgb, var(--app-muted) 42%, transparent);
+    background: color-mix(in srgb, var(--app-surface-soft) 76%, transparent);
+    color: var(--app-muted);
+}
+
+.app-home-recipe-metadata .app-recipe-card-category-line {
+    border-color: color-mix(in srgb, var(--app-primary) 28%, transparent);
+    background: color-mix(in srgb, var(--app-primary) 16%, transparent);
+    color: var(--app-primary-hover);
+}
+
+.app-home-recipe-metadata :is(.app-recipe-card-cookbook-line, .app-recipe-card-category-line) .app-recipe-card-meta-text {
+    flex: 0 1 auto;
+    max-width: 160px;
+}
+
 .app-recipe-card-meta-item {
     display: inline-flex;
     align-items: center;

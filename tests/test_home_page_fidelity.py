@@ -438,6 +438,12 @@ def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
     assert "--app-type-metric: 28px;" in css
     assert ".app-home-recipe-metadata {\n        gap: 5px;\n        font-size: var(--app-type-meta);" in css
     assert ".app-home-import-copy small,\n    .app-home-import-meta time {\n        color: var(--app-muted);\n        font-size: var(--app-type-section);" in css
+    assert ".app-home-recipe-metadata .app-recipe-card-cookbook-line,\n.app-home-recipe-metadata .app-recipe-card-category-line {" in css
+    assert "width: fit-content;\n    max-width: 100%;" in css
+    assert ".app-home-recipe-metadata .app-recipe-card-cookbook-line {" in css
+    assert ".app-home-recipe-metadata .app-recipe-card-category-line {" in css
+    assert "background: color-mix(in srgb, var(--app-primary) 16%, transparent);" in css
+    assert "max-width: 160px;" in css
     assert "@media (max-width: 1099px)" in css
     assert ".app-home-summary-grid > .app-home-summary-card {\n        grid-column: span 6;" in css
     assert ".app-home-recent-recipes,\n    .app-home-meal-preview {\n        grid-column: 1 / -1;" in css
