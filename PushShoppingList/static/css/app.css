@@ -27388,6 +27388,22 @@ img[data-deferred-src] {
     align-content: start;
 }
 
+.app-meal-planner-day.is-past,
+.app-meal-planner-cell.is-past {
+    background: var(--app-bg-soft);
+}
+
+.app-meal-planner-day.is-past,
+.app-meal-planner-cell.is-past .app-meal-card > a,
+.app-meal-planner-cell.is-past .app-meal-add-slot {
+    color: var(--app-muted);
+}
+
+.app-meal-planner-cell.is-today {
+    background: var(--app-primary-soft);
+    box-shadow: inset 0 0 0 1px var(--app-primary);
+}
+
 .app-meal-slot-recipes {
     display: grid;
     gap: 6px;

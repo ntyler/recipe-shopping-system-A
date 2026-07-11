@@ -4,6 +4,33 @@
 <head>
     <title>Shopping List</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>
+        (function syncAppLocalCalendarDate() {
+            var cookieName = "ai_pantry_local_date";
+            var now = new Date();
+            var pad = function (value) { return String(value).padStart(2, "0"); };
+            var localDate = now.getFullYear()
+                + "-" + pad(now.getMonth() + 1)
+                + "-" + pad(now.getDate());
+            var readCookie = function (name) {
+                var prefix = name + "=";
+                var cookie = document.cookie.split("; ").find(function (item) {
+                    return item.indexOf(prefix) === 0;
+                });
+                return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : "";
+            };
+
+            if (readCookie(cookieName) === localDate) {
+                return;
+            }
+
+            document.cookie = cookieName + "=" + encodeURIComponent(localDate)
+                + "; Path=/; Max-Age=31536000; SameSite=Lax";
+            if (readCookie(cookieName) === localDate) {
+                window.location.reload();
+            }
+        }());
+    </script>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">

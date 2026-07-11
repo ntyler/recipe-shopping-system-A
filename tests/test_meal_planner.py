@@ -174,6 +174,7 @@ def test_meal_plan_home_preview_groups_slots_and_caps_visible_recipes(isolated_m
         max_slots=2,
         max_recipes_per_slot=2,
         max_recipes=3,
+        reference_date="2026-07-06",
     )
 
     assert [(slot["date"], slot["meal_type"]) for slot in preview["slots"]] == [
@@ -185,6 +186,97 @@ def test_meal_plan_home_preview_groups_slots_and_caps_visible_recipes(isolated_m
     assert preview["slots"][1]["remaining_count"] == 0
     assert preview["hidden_slot_count"] == 1
     assert preview["hidden_meal_count"] == 1
+
+
+def test_home_preview_filters_past_and_orders_all_upcoming_meals(isolated_meal_plan):
+    stored_meals = [
+        ("2026-07-11", "snack", "Future Snack"),
+        ("2026-07-09", "lunch", "Lunch B"),
+        ("2026-07-08", "dinner", "Past Dinner"),
+        ("2026-07-09", "dinner", "Today Dinner"),
+        ("2026-07-09", "breakfast", "Today Breakfast"),
+        ("2026-07-10", "breakfast", "Future Breakfast"),
+        ("2026-07-09", "lunch", "Lunch A"),
+    ]
+    for index, (planned_date, meal_type, recipe_name) in enumerate(stored_meals):
+        meal_plan_service.add_meal({
+            "date": planned_date,
+            "meal_type": meal_type,
+            "recipe_url": f"recipe://ordered-{index}",
+            "recipe_name": recipe_name,
+        })
+
+    stored_before = isolated_meal_plan.read_bytes()
+    preview = meal_plan_service.meal_plan_home_preview(
+        reference_date="2026-07-09",
+        max_slots=10,
+        max_recipes_per_slot=10,
+        max_recipes=20,
+    )
+
+    assert [(slot["date"], slot["meal_type"]) for slot in preview["slots"]] == [
+        ("2026-07-09", "breakfast"),
+        ("2026-07-09", "lunch"),
+        ("2026-07-09", "dinner"),
+        ("2026-07-10", "breakfast"),
+        ("2026-07-11", "snack"),
+    ]
+    assert preview["slots"][0]["day_label"] == "TODAY"
+    assert [meal["recipe_name"] for meal in preview["slots"][1]["meals"]] == [
+        "Lunch B",
+        "Lunch A",
+    ]
+    assert all(
+        meal["recipe_name"] != "Past Dinner"
+        for slot in preview["slots"]
+        for meal in slot["meals"]
+    )
+    assert preview["hidden_meal_count"] == 0
+    assert isolated_meal_plan.read_bytes() == stored_before
+
+
+def test_home_preview_ignores_past_meals_in_empty_and_overflow_counts(isolated_meal_plan):
+    for index in range(3):
+        meal_plan_service.add_meal({
+            "date": "2026-07-08",
+            "meal_type": "dinner",
+            "recipe_url": f"recipe://past-{index}",
+            "recipe_name": f"Past {index}",
+        })
+
+    preview = meal_plan_service.meal_plan_home_preview(reference_date="2026-07-09")
+
+    assert preview == {
+        "slots": [],
+        "visible_recipe_count": 0,
+        "hidden_meal_count": 0,
+        "hidden_slot_count": 0,
+    }
+    assert len(meal_plan_service.load_meal_plan()["meals"]) == 3
+
+
+def test_full_week_keeps_past_meals_and_marks_local_date_states(isolated_meal_plan):
+    meal_plan_service.add_meal({
+        "date": "2026-07-07",
+        "meal_type": "dinner",
+        "recipe_url": "recipe://past-pasta",
+        "recipe_name": "Past Pasta",
+    })
+
+    context = meal_plan_service.meal_plan_for_week(
+        "2026-07-06",
+        reference_date="2026-07-09",
+    )
+
+    assert len(context["days"]) == 7
+    assert [day["is_past"] for day in context["days"]] == [
+        True, True, True, False, False, False, False,
+    ]
+    assert [day["is_today"] for day in context["days"]] == [
+        False, False, False, True, False, False, False,
+    ]
+    assert context["today_week"] == "2026-07-06"
+    assert context["meals_by_day"]["2026-07-07"]["dinner"][0]["recipe_name"] == "Past Pasta"
 
 
 def test_meal_plan_atomic_adds_preserve_concurrent_assignments(isolated_meal_plan):
@@ -288,6 +380,7 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
     )
     monkeypatch.setattr(main_routes, "recipe_url_log_rows", fake_recipe_url_log_rows)
     monkeypatch.setattr(main_routes, "load_saved_recipe_output", fake_saved_recipe_output)
+    monkeypatch.setattr(main_routes, "request_local_calendar_date", lambda: date(2026, 7, 10))
 
     app = create_app()
     app.config.update(TESTING=True)
@@ -334,6 +427,19 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
         assert response.status_code == 400
         assert "already planned" in response.get_json()["error"]
 
+        meal_plan_service.add_meal({
+            "date": "2026-07-09",
+            "meal_type": "breakfast",
+            "recipe_url": "recipe://filler-1",
+            "recipe_name": "Past Filler",
+        })
+        meal_plan_service.add_meal({
+            "date": "2026-07-13",
+            "meal_type": "snack",
+            "recipe_url": "recipe://filler-0",
+            "recipe_name": "Future Filler",
+        })
+
         planned = meal_plan_service.meal_plan_for_week("2026-07-10")["meals_by_day"]["2026-07-10"]["dinner"]
         assert [meal["id"] for meal in planned] == [soup_id, salad_id]
         assert [meal["planned_servings"] for meal in planned] == [8, 2.5]
@@ -344,11 +450,22 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
         preview_start = html.index('aria-label="Upcoming meal plan"')
         preview_end = html.index("</section>", preview_start)
         preview_html = html[preview_start:preview_end]
-        assert preview_html.count('class="app-home-meal-slot"') == 1
+        assert preview_html.count('class="app-home-meal-slot"') == 2
         assert "Weeknight Soup" in preview_html
         assert "Side Salad" in preview_html
+        assert "Future Filler" in preview_html
+        assert "Past Filler" not in preview_html
+        assert ">View planner</a>" in preview_html
+        assert "View full meal plan" in preview_html
         assert "/static/test/weeknight-soup.jpg" in preview_html
         assert "/static/test/side-salad.jpg" in preview_html
+        assert 'class="app-meal-planner-day is-past"' in html
+        assert 'class="app-meal-planner-day is-today" aria-current="date"' in html
+        assert 'class="app-meal-planner-cell is-past"' in html
+        assert 'class="app-meal-planner-cell is-today"' in html
+        assert "Past Filler" in html
+        assert "openMealPlannerDialog('2026-07-09', 'breakfast')" in html
+        assert 'data-meal-name="Past Filler"' in html
         soup_option_start = html.index('<option value="recipe://soup"')
         salad_option_start = html.index('<option value="recipe://salad"')
         soup_option = html[soup_option_start:html.index("</option>", soup_option_start)]
@@ -379,6 +496,12 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     assert 'onsubmit="return submitMealPlannerForm(event)"' in workspaces
     assert 'onsubmit="return confirmMealPlannerDelete(event)"' in workspaces
     assert 'class="app-meal-slot-recipes"' in workspaces
+    assert 'app-meal-planner-day{% if day.is_past %} is-past{% endif %}{% if day.is_today %} is-today{% endif %}' in workspaces
+    assert 'app-meal-planner-cell{% if day.is_past %} is-past{% endif %}{% if day.is_today %} is-today{% endif %}' in workspaces
+    assert 'aria-current="date"' in workspaces
+    assert "meal_plan.previous_week" in workspaces
+    assert "meal_plan.next_week" in workspaces
+    assert ">Today</a>" in workspaces
     assert 'class="app-meal-add-slot{% if planned_meals %} has-meals{% endif %}"' in workspaces
     assert '<span class="app-meal-add-slot-label">Add recipe</span>' in workspaces
     card_loop = workspaces.index("{% for meal in planned_meals %}")
@@ -417,6 +540,30 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     assert "planned_servings: plannedServings" in script
 
 
+def test_homepage_syncs_browser_local_calendar_date_without_utc_conversion():
+    index = read_text("PushShoppingList/templates/index.html")
+
+    assert 'var cookieName = "ai_pantry_local_date";' in index
+    assert "now.getFullYear()" in index
+    assert "now.getMonth() + 1" in index
+    assert "now.getDate()" in index
+    assert "toISOString()" not in index
+    assert "SameSite=Lax" in index
+    assert "window.location.reload();" in index
+
+
+def test_request_local_calendar_date_uses_browser_cookie():
+    from flask import Flask
+    from PushShoppingList.routes import main_routes
+
+    app = Flask(__name__)
+    with app.test_request_context(
+        "/",
+        headers={"Cookie": "ai_pantry_local_date=2026-07-09"},
+    ):
+        assert main_routes.request_local_calendar_date() == date(2026, 7, 9)
+
+
 def test_meal_plan_styles_compact_multiple_items_and_keep_mobile_contained():
     css = read_text("PushShoppingList/static/css/app.css")
     route = read_text("PushShoppingList/routes/main_routes.py")
@@ -425,6 +572,9 @@ def test_meal_plan_styles_compact_multiple_items_and_keep_mobile_contained():
     assert ".app-meal-planner-cell .app-meal-card {" in css
     assert "height: auto;" in css
     assert ".app-meal-planner-cell .app-meal-add-slot {" in css
+    assert ".app-meal-planner-day.is-past," in css
+    assert ".app-meal-planner-cell.is-past {" in css
+    assert ".app-meal-planner-cell.is-today {" in css
     assert ".app-meal-planner-servings-stepper {" in css
     assert ".app-dialog-helper {" in css
     assert ".app-home-meal-list > .app-home-meal-slot {" in css
@@ -435,6 +585,8 @@ def test_meal_plan_styles_compact_multiple_items_and_keep_mobile_contained():
     assert "planned_recipe_rows = [" in route
     assert "planned_preview_rows = (" in route
     assert "recipe_url_log_rows(" in route
+    assert "home_meal_plan = meal_plan_home_preview(reference_date=local_calendar_date)" in route
+    assert 'for meal in [*meal_plan["meals"], *home_preview_meals]' in route
     assert '"home_meal_plan": home_meal_plan' in route
 
 

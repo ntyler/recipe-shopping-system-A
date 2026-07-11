@@ -669,7 +669,7 @@
             <section class="app-meal-planner-grid" aria-label="Weekly meal plan">
                 <div class="app-meal-planner-corner" aria-hidden="true"></div>
                 {% for day in meal_plan.days %}
-                    <div class="app-meal-planner-day{% if day.is_today %} is-today{% endif %}">
+                    <div class="app-meal-planner-day{% if day.is_past %} is-past{% endif %}{% if day.is_today %} is-today{% endif %}"{% if day.is_today %} aria-current="date"{% endif %}>
                         <strong>{{ day.weekday }}</strong>
                         <span>{{ day.day_label }}</span>
                     </div>
@@ -679,7 +679,7 @@
                     <div class="app-meal-planner-row-label">{{ meal_type | title }}</div>
                     {% for day in meal_plan.days %}
                         {% set planned_meals = meal_plan.meals_by_day[day.date][meal_type] %}
-                        <div class="app-meal-planner-cell" data-meal-plan-date="{{ day.date }}" data-meal-plan-type="{{ meal_type }}">
+                        <div class="app-meal-planner-cell{% if day.is_past %} is-past{% endif %}{% if day.is_today %} is-today{% endif %}" data-meal-plan-date="{{ day.date }}" data-meal-plan-type="{{ meal_type }}">
                             <div class="app-meal-slot-recipes">
                                 {% for meal in planned_meals %}
                                     <article class="app-meal-card{% if meal.cover_image and meal.cover_image.src %} has-image{% endif %}" data-meal-plan-id="{{ meal.id }}">

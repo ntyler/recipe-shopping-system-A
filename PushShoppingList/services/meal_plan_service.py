@@ -210,8 +210,14 @@ def delete_meal(meal_id):
     return True
 
 
-def meal_plan_home_preview(meal_plan, max_slots=3, max_recipes_per_slot=2, max_recipes=4):
-    """Build a compact, chronological homepage view from the weekly slot lists."""
+def meal_plan_home_preview(
+    meal_plan=None,
+    max_slots=3,
+    max_recipes_per_slot=2,
+    max_recipes=4,
+    reference_date=None,
+):
+    """Build a compact homepage view of meals on or after a calendar date."""
     try:
         max_slots = max(1, int(max_slots))
     except (TypeError, ValueError):
@@ -225,50 +231,63 @@ def meal_plan_home_preview(meal_plan, max_slots=3, max_recipes_per_slot=2, max_r
     except (TypeError, ValueError):
         max_recipes = 4
 
-    meal_plan = meal_plan if isinstance(meal_plan, dict) else {}
-    meals_by_day = meal_plan.get("meals_by_day") or {}
-    meal_types = meal_plan.get("meal_types") or MEAL_TYPES
+    meal_plan = meal_plan if isinstance(meal_plan, dict) else load_meal_plan()
+    reference_day = parse_date(reference_date, fallback=date.today())
+    meal_type_order = {meal_type: index for index, meal_type in enumerate(MEAL_TYPES)}
+    upcoming_meals = []
+    for meal in meal_plan.get("meals") or []:
+        if not isinstance(meal, dict):
+            continue
+        planned_date = parse_date(meal.get("date"))
+        meal_type = clean_text(meal.get("meal_type")).lower()
+        if (
+            planned_date is None
+            or planned_date < reference_day
+            or meal_type not in meal_type_order
+        ):
+            continue
+        upcoming_meals.append((planned_date, meal_type_order[meal_type], meal))
+
+    # Python's sort is stable, so recipes in the same date/type slot retain
+    # their persisted order while slots are ordered by date and meal type.
+    upcoming_meals.sort(key=lambda item: (item[0], item[1]))
+    grouped_slots = {}
+    for planned_date, _, meal in upcoming_meals:
+        slot_key = (planned_date, clean_text(meal.get("meal_type")).lower())
+        grouped_slots.setdefault(slot_key, []).append(meal)
+
     slots = []
     visible_recipe_count = 0
     hidden_meal_count = 0
     hidden_slot_count = 0
 
-    for day in meal_plan.get("days") or []:
-        if not isinstance(day, dict):
+    for (planned_date, meal_type), planned_meals in grouped_slots.items():
+        remaining_budget = max_recipes - visible_recipe_count
+        if len(slots) >= max_slots or remaining_budget <= 0:
+            hidden_slot_count += 1
+            hidden_meal_count += len(planned_meals)
             continue
-        day_key = clean_text(day.get("date"))
-        day_slots = meals_by_day.get(day_key) or {}
-        for meal_type in meal_types:
-            planned_meals = list(day_slots.get(meal_type) or [])
-            if not planned_meals:
-                continue
 
-            remaining_budget = max_recipes - visible_recipe_count
-            if len(slots) >= max_slots or remaining_budget <= 0:
-                hidden_slot_count += 1
-                hidden_meal_count += len(planned_meals)
-                continue
-
-            visible_count = min(
-                len(planned_meals),
-                max_recipes_per_slot,
-                remaining_budget,
-            )
-            visible_meals = planned_meals[:visible_count]
-            visible_recipe_count += visible_count
-            slots.append({
-                "date": day_key,
-                "day_label": (
-                    "TODAY"
-                    if day.get("is_today")
-                    else clean_text(day.get("weekday")).upper()
-                ),
-                "meal_type": meal_type,
-                "meal_type_label": clean_text(meal_type).title(),
-                "meals": visible_meals,
-                "remaining_count": len(planned_meals) - visible_count,
-                "total_count": len(planned_meals),
-            })
+        visible_count = min(
+            len(planned_meals),
+            max_recipes_per_slot,
+            remaining_budget,
+        )
+        visible_meals = planned_meals[:visible_count]
+        visible_recipe_count += visible_count
+        slots.append({
+            "date": planned_date.isoformat(),
+            "day_label": (
+                "TODAY"
+                if planned_date == reference_day
+                else planned_date.strftime("%a").upper()
+            ),
+            "meal_type": meal_type,
+            "meal_type_label": meal_type.title(),
+            "meals": visible_meals,
+            "remaining_count": len(planned_meals) - visible_count,
+            "total_count": len(planned_meals),
+        })
 
     return {
         "slots": slots,
@@ -278,8 +297,10 @@ def meal_plan_home_preview(meal_plan, max_slots=3, max_recipes_per_slot=2, max_r
     }
 
 
-def meal_plan_for_week(value=None):
-    days = week_days(value)
+def meal_plan_for_week(value=None, reference_date=None):
+    reference_day = parse_date(reference_date, fallback=date.today())
+    selected_day = parse_date(value, fallback=reference_day)
+    days = week_days(selected_day)
     day_keys = {day.isoformat() for day in days}
     meals = [meal for meal in load_meal_plan()["meals"] if meal["date"] in day_keys]
     meals_by_slot = {}
@@ -294,14 +315,16 @@ def meal_plan_for_week(value=None):
         "week_start": start.isoformat(),
         "previous_week": (start - timedelta(days=7)).isoformat(),
         "next_week": (start + timedelta(days=7)).isoformat(),
-        "today_week": week_start().isoformat(),
+        "today_week": week_start(reference_day).isoformat(),
+        "reference_date": reference_day.isoformat(),
         "range_label": f"{short_date_label(start)} - {short_date_label(end)}, {end.year}",
         "days": [
             {
                 "date": day.isoformat(),
                 "weekday": day.strftime("%a"),
                 "day_label": numeric_date_label(day),
-                "is_today": day == date.today(),
+                "is_past": day < reference_day,
+                "is_today": day == reference_day,
             }
             for day in days
         ],

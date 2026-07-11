@@ -3,6 +3,7 @@ import json
 import os
 import re
 import uuid
+from datetime import date
 from datetime import datetime
 from datetime import timezone
 from fractions import Fraction
@@ -156,6 +157,7 @@ from PushShoppingList.services.device_status_service import record_device_status
 
 main_bp = Blueprint("main_bp", __name__)
 address_openai_client = None
+APP_LOCAL_DATE_COOKIE = "ai_pantry_local_date"
 MASTER_DATA_PAGE_CONFIG = {
     "ingredients": {
         "title": "Ingredient Master Data",
@@ -174,6 +176,16 @@ MASTER_DATA_PAGE_CONFIG = {
         "count_func": recipe_master_data.count_equipment,
     },
 }
+
+
+def request_local_calendar_date():
+    """Return the browser's local calendar date, with a host-local fallback."""
+    if has_request_context():
+        try:
+            return date.fromisoformat(request.cookies.get(APP_LOCAL_DATE_COOKIE, ""))
+        except (TypeError, ValueError):
+            pass
+    return date.today()
 
 
 def static_asset_version(filename):
@@ -548,14 +560,24 @@ def shell_context(active_public_user=None):
     cookbook_view_data = lightweight_cookbook_view()
     store_settings = load_store_settings()
     pantry_items = pantry_items_for_view()
-    meal_plan = meal_plan_for_week(request.args.get("meal_week"))
+    local_calendar_date = request_local_calendar_date()
+    meal_plan = meal_plan_for_week(
+        request.args.get("meal_week"),
+        reference_date=local_calendar_date,
+    )
+    home_meal_plan = meal_plan_home_preview(reference_date=local_calendar_date)
+    home_preview_meals = [
+        meal
+        for slot in home_meal_plan["slots"]
+        for meal in slot["meals"]
+    ]
     recipe_options = meal_plan_recipe_option_rows(
         recipe_urls,
         recipe_ingredient_data=recipe_ingredient_data,
     )
     planned_recipe_keys = {
         normalize_recipe_url_key(meal.get("recipe_url"))
-        for meal in meal_plan["meals"]
+        for meal in [*meal_plan["meals"], *home_preview_meals]
         if normalize_recipe_url_key(meal.get("recipe_url"))
     }
     preview_recipe_keys = {
@@ -584,10 +606,9 @@ def shell_context(active_public_user=None):
         for recipe in [*recipe_preview_rows, *planned_preview_rows]
         if normalize_recipe_url_key(recipe.get("url"))
     }
-    for meal in meal_plan["meals"]:
+    for meal in [*meal_plan["meals"], *home_preview_meals]:
         preview = recipe_preview_by_key.get(normalize_recipe_url_key(meal["recipe_url"]), {})
         meal["cover_image"] = preview.get("cover_image") or {}
-    home_meal_plan = meal_plan_home_preview(meal_plan)
 
     pantry_running_low = [
         item
