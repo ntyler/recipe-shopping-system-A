@@ -130,7 +130,9 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-content" in css
     assert "width: calc(100% - 60px);" in css
     assert 'class="app-home-hero-copy"' in template
-    assert "ai-pantry-home-banner-v3.png" in css
+    assert "ai-pantry-home-banner-v4.png" in css
+    assert "app-home-hero-logo" not in template
+    assert ".app-home-hero-logo" not in css
     assert "background-color: transparent;" in css
     assert "background-position: center;" in css
     assert "background-size: contain;" in css
@@ -142,6 +144,8 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert "transform: translateX(18px);" in css
     assert "@media (min-width: 760px) and (max-width: 1099px)" in css
     assert "@media (max-width: 759px)" in css
+    assert "grid-row: 2;" in css
+    assert "width: min(100%, 320px);" in css
     assert ".app-home-summary-icon .app-icon-svg" in css
     assert ".app-home-recipe-menu-toggle" in css
     assert ".app-home-recipe-rating .is-unselected" in css
@@ -154,7 +158,7 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
 
 
 def test_home_banner_image_asset_exists():
-    image_path = ROOT / "PushShoppingList/static/images/ai-pantry-home-banner-v3.png"
+    image_path = ROOT / "PushShoppingList/static/images/ai-pantry-home-banner-v4.png"
 
     assert image_path.is_file()
     with Image.open(image_path) as banner:
@@ -164,6 +168,19 @@ def test_home_banner_image_asset_exists():
             banner.getpixel(point)[3] == 0
             for point in ((0, 0), (619, 0), (0, 393), (619, 393))
         )
+        dark_green_logo_pixels = sum(
+            1
+            for y in range(190, 365)
+            for x in range(115, 310)
+            if (
+                banner.getpixel((x, y))[3] > 180
+                and banner.getpixel((x, y))[0] < 45
+                and banner.getpixel((x, y))[1] > 45
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[0] * 1.7
+                and banner.getpixel((x, y))[1] > banner.getpixel((x, y))[2] * 1.3
+            )
+        )
+        assert dark_green_logo_pixels > 2500
 
 
 def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():

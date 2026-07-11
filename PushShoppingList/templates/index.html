@@ -269,9 +269,7 @@
             <h1>Welcome back{% if current_user %}, {{ current_user.first_name or current_user.display_name }}{% elif is_guest_demo %}, Guest{% endif %}! <span aria-hidden="true">&#128075;</span></h1>
             <p>Let's get cooking. Here's what's happening in your kitchen.</p>
         </div>
-        <div class="app-home-hero-media" aria-hidden="true">
-            <span class="app-home-hero-logo">{{ shell.brand_mark() }}</span>
-        </div>
+        <div class="app-home-hero-media" aria-hidden="true"></div>
         <div class="shopping-global-collapse-controls" data-global-collapse-controls>
             <div class="shopping-global-collapse-actions">
                 <button type="button"
