@@ -59,18 +59,20 @@ def test_sidebar_import_actions_are_grouped_by_task_without_duplicate_hub_link()
 
     ordered_labels = (
         'class="app-nav-section-title">CREATE RECIPES</div>',
-        '<span class="app-nav-text">Recipe URLs</span>',
-        '<span class="app-nav-text">Import From Document</span>',
-        '<span class="app-nav-text">Generate From Image</span>',
+        '<span class="app-nav-text">Recipe URL</span>',
+        '<span class="app-nav-text">Recipe Document</span>',
+        '<span class="app-nav-text">Recipe Image</span>',
         'class="app-nav-section-title">IMPORT MENUS</div>',
         '<span class="app-nav-text">Menu URL</span>',
-        '<span class="app-nav-text">Import Menu From Document</span>',
+        '<span class="app-nav-text">Menu Document</span>',
         'class="app-nav-section-title">PANTRY</div>',
         '<span class="app-nav-text">Scan Barcode</span>',
     )
     positions = [sidebar.index(label) for label in ordered_labels]
 
     assert positions == sorted(positions)
+    for old_label in ("Recipe URLs", "Import From Document", "Generate From Image", "Import Menu From Document"):
+        assert f'<span class="app-nav-text">{old_label}</span>' not in sidebar
     assert '<span class="app-nav-text">Import</span>' not in sidebar
     assert 'data-app-page-target="importPage"' not in sidebar
     assert sidebar.count('class="app-nav-section-title">CREATE RECIPES</div>') == 1
@@ -79,11 +81,11 @@ def test_sidebar_import_actions_are_grouped_by_task_without_duplicate_hub_link()
     assert sidebar.index('<span class="app-nav-text">Pantry</span>') < positions[0]
 
     for page_target, label in (
-        ("recipeUrlsPage", "Recipe URLs"),
-        ("importDocumentPage", "Import From Document"),
-        ("generateImagePage", "Generate From Image"),
+        ("recipeUrlsPage", "Recipe URL"),
+        ("importDocumentPage", "Recipe Document"),
+        ("generateImagePage", "Recipe Image"),
         ("menuUrlPage", "Menu URL"),
-        ("menuDocumentPage", "Import Menu From Document"),
+        ("menuDocumentPage", "Menu Document"),
     ):
         label_markup = f'<span class="app-nav-text">{label}</span>'
         label_position = sidebar.index(label_markup)
@@ -111,6 +113,10 @@ def test_recipe_editor_sidebar_uses_the_same_import_task_groups():
     assert sidebar.count('class="app-nav-section-title">CREATE RECIPES</div>') == 1
     assert sidebar.count('class="app-nav-section-title">IMPORT MENUS</div>') == 1
     assert sidebar.count('class="app-nav-section-title">PANTRY</div>') == 1
+    for label in ("Recipe URL", "Recipe Document", "Recipe Image", "Menu URL", "Menu Document"):
+        assert f'<span class="app-nav-text">{label}</span>' in sidebar
+    for old_label in ("Recipe URLs", "Import From Document", "Generate From Image", "Import Menu From Document"):
+        assert f'<span class="app-nav-text">{old_label}</span>' not in sidebar
     assert '{{ url_for(\'main_bp.index\') }}#recipeUrlsTextarea' in sidebar
     assert '{{ url_for(\'main_bp.index\') }}#importDocumentPage' in sidebar
     assert '{{ url_for(\'main_bp.index\') }}#generateImagePage' in sidebar
