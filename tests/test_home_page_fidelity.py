@@ -199,6 +199,8 @@ def test_home_template_has_supported_overflow_and_favorite_action():
     assert "star_number <= recipe.rating" not in home
     assert "&#9733;" not in home
     assert "Time TBD" not in home
+    assert '<article class="app-recipe-card app-home-recipe-card"' in home
+    assert '<div class="app-recipe-card-body app-home-recipe-body">' in home
     assert "app-recipe-card-metadata app-home-recipe-metadata" in home
     assert "recipe.card_cook_time" in home
     assert "recipe.card_calories" in home
@@ -252,6 +254,22 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert ".app-home-summary-icon .app-icon-svg" in css
     assert ".app-home-recipe-favorite" in css
     assert ".app-home-recipe-menu-toggle" in css
+    assert (
+        ".app-recipe-card {\n"
+        "    display: grid;\n"
+        "    grid-template-rows: auto 1fr;\n"
+        "    min-width: 0;\n"
+        "    overflow: hidden;\n"
+        "    border: 1px solid var(--app-border);\n"
+        "    border-radius: var(--app-radius-lg);\n"
+        "    background: var(--app-surface);"
+    ) in css
+    assert (
+        ".app-recipe-card-body {\n"
+        "    display: grid;\n"
+        "    gap: 9px;\n"
+        "    padding: 14px 14px 16px;"
+    ) in css
     assert ".app-recipe-card-metadata" in css
     assert ".app-recipe-card-meta-text" in css
     assert "text-overflow: ellipsis;" in css

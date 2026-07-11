@@ -30034,7 +30034,7 @@ img[data-deferred-src] {
 
     .app-home-recipe-card h3 {
         min-width: 0;
-        margin: 9px 0 5px;
+        margin: 0;
         overflow: hidden;
         font-size: 13px;
         line-height: 1.22;

@@ -390,7 +390,7 @@
                 {% if recipe_preview_rows %}
                     <div class="app-home-recipe-grid">
                         {% for recipe in recipe_preview_rows[:4] %}
-                            <article class="app-home-recipe-card" data-recipe-url="{{ recipe.url }}">
+                            <article class="app-recipe-card app-home-recipe-card" data-recipe-url="{{ recipe.url }}">
                                 <div class="app-home-recipe-actions">
                                     <button type="button"
                                             class="app-home-recipe-favorite"
@@ -434,33 +434,35 @@
                                         {{ shell.app_icon("recipes") }}
                                     {% endif %}
                                 </a>
-                                <h3><a href="#recipeView" data-recipe-url="{{ recipe.url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ recipe.name }}</a></h3>
-                                <div class="app-recipe-card-metadata app-home-recipe-metadata">
-                                    <div class="app-recipe-card-meta-line app-recipe-card-meta-line-primary">
-                                        {% set recipe_rating = recipe.rating | default(0, true) | int %}
-                                        {% set recipe_rating_stars = recipe.rating_stars | default("☆☆☆☆☆", true) %}
-                                        <span class="app-recipe-card-rating app-home-recipe-rating" aria-label="{% if recipe_rating %}{{ recipe_rating }} out of 5 stars{% else %}Unrated recipe{% endif %}">
-                                            {% for star in recipe_rating_stars %}<span class="{% if star == '★' %}is-selected{% else %}is-unselected{% endif %}" aria-hidden="true">{{ star }}</span>{% endfor %}
-                                        </span>
-                                        {% if recipe.card_cook_time %}
-                                            <span class="app-recipe-card-meta-item app-home-recipe-time"><span class="app-recipe-card-meta-icon" aria-hidden="true">&#9201;</span>{{ recipe.card_cook_time }}</span>
+                                <div class="app-recipe-card-body app-home-recipe-body">
+                                    <h3><a href="#recipeView" data-recipe-url="{{ recipe.url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ recipe.name }}</a></h3>
+                                    <div class="app-recipe-card-metadata app-home-recipe-metadata">
+                                        <div class="app-recipe-card-meta-line app-recipe-card-meta-line-primary">
+                                            {% set recipe_rating = recipe.rating | default(0, true) | int %}
+                                            {% set recipe_rating_stars = recipe.rating_stars | default("☆☆☆☆☆", true) %}
+                                            <span class="app-recipe-card-rating app-home-recipe-rating" aria-label="{% if recipe_rating %}{{ recipe_rating }} out of 5 stars{% else %}Unrated recipe{% endif %}">
+                                                {% for star in recipe_rating_stars %}<span class="{% if star == '★' %}is-selected{% else %}is-unselected{% endif %}" aria-hidden="true">{{ star }}</span>{% endfor %}
+                                            </span>
+                                            {% if recipe.card_cook_time %}
+                                                <span class="app-recipe-card-meta-item app-home-recipe-time"><span class="app-recipe-card-meta-icon" aria-hidden="true">&#9201;</span>{{ recipe.card_cook_time }}</span>
+                                            {% endif %}
+                                            {% if recipe.card_calories %}
+                                                <span class="app-recipe-card-meta-item app-home-recipe-calories"><span class="app-recipe-card-meta-icon" aria-hidden="true">&#128293;</span>{{ recipe.card_calories }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if recipe.cookbook_name and not recipe.cookbook_is_unclassified %}
+                                            <div class="app-recipe-card-meta-line app-recipe-card-cookbook-line">
+                                                <span class="app-recipe-card-meta-icon" aria-hidden="true">&#128218;</span>
+                                                <span class="app-recipe-card-meta-text" title="{{ recipe.cookbook_name }}">{{ recipe.cookbook_name }}</span>
+                                            </div>
                                         {% endif %}
-                                        {% if recipe.card_calories %}
-                                            <span class="app-recipe-card-meta-item app-home-recipe-calories"><span class="app-recipe-card-meta-icon" aria-hidden="true">&#128293;</span>{{ recipe.card_calories }}</span>
+                                        {% if recipe.home_badge %}
+                                            <div class="app-recipe-card-meta-line app-recipe-card-category-line">
+                                                <span class="app-recipe-card-meta-icon" aria-hidden="true">&#127991;&#65039;</span>
+                                                <span class="app-recipe-card-meta-text">{{ recipe.home_badge }}</span>
+                                            </div>
                                         {% endif %}
                                     </div>
-                                    {% if recipe.cookbook_name and not recipe.cookbook_is_unclassified %}
-                                        <div class="app-recipe-card-meta-line app-recipe-card-cookbook-line">
-                                            <span class="app-recipe-card-meta-icon" aria-hidden="true">&#128218;</span>
-                                            <span class="app-recipe-card-meta-text" title="{{ recipe.cookbook_name }}">{{ recipe.cookbook_name }}</span>
-                                        </div>
-                                    {% endif %}
-                                    {% if recipe.home_badge %}
-                                        <div class="app-recipe-card-meta-line app-recipe-card-category-line">
-                                            <span class="app-recipe-card-meta-icon" aria-hidden="true">&#127991;&#65039;</span>
-                                            <span class="app-recipe-card-meta-text">{{ recipe.home_badge }}</span>
-                                        </div>
-                                    {% endif %}
                                 </div>
                             </article>
                         {% endfor %}
