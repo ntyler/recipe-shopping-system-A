@@ -1250,6 +1250,28 @@ function openMealPlannerPageAndDialog() {
     return false;
 }
 
+function openHomeMealPlanSlot(slot, event = null) {
+    if (eventStartedInNestedInteractive(event, slot)) {
+        return true;
+    }
+    if (event) {
+        event.preventDefault();
+    }
+    openAppPage("mealPlannerPage", { targetId: "mealPlannerPage" });
+    return false;
+}
+
+function handleHomeMealPlanSlotKeydown(slot, event) {
+    if (!event || !["Enter", " "].includes(event.key)) {
+        return true;
+    }
+    if (eventStartedInNestedInteractive(event, slot)) {
+        return true;
+    }
+    event.preventDefault();
+    return openHomeMealPlanSlot(slot);
+}
+
 function setMealPlannerStatus(message, isError = false, selector = "[data-meal-plan-status]") {
     const status = document.querySelector(selector);
     if (!status) {

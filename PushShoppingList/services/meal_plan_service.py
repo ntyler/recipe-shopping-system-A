@@ -101,33 +101,106 @@ def add_meal(meal):
     if not normalized:
         raise ValueError("Choose a valid date, meal type, and recipe.")
 
-    payload = load_meal_plan()
-    duplicate = next(
-        (
-            existing
-            for existing in payload["meals"]
-            if existing["date"] == normalized["date"]
-            and existing["meal_type"] == normalized["meal_type"]
-            and existing["recipe_url"] == normalized["recipe_url"]
-        ),
-        None,
-    )
-    if duplicate:
-        raise ValueError("That recipe is already planned for this meal.")
+    # Keep the complete read/check/append/write operation atomic. Individual
+    # load/save locks are not enough when two recipes are added to one slot at
+    # nearly the same time because the later write could otherwise win.
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        duplicate = next(
+            (
+                existing
+                for existing in payload["meals"]
+                if existing["date"] == normalized["date"]
+                and existing["meal_type"] == normalized["meal_type"]
+                and existing["recipe_url"] == normalized["recipe_url"]
+            ),
+            None,
+        )
+        if duplicate:
+            raise ValueError("That recipe is already planned for this meal.")
 
-    payload["meals"].append(normalized)
-    save_meal_plan(payload)
+        payload["meals"].append(normalized)
+        save_meal_plan(payload)
     return normalized
 
 
 def delete_meal(meal_id):
     meal_id = clean_text(meal_id)
-    payload = load_meal_plan()
-    remaining = [meal for meal in payload["meals"] if meal["id"] != meal_id]
-    if len(remaining) == len(payload["meals"]):
-        return False
-    save_meal_plan({"meals": remaining})
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        remaining = [meal for meal in payload["meals"] if meal["id"] != meal_id]
+        if len(remaining) == len(payload["meals"]):
+            return False
+        save_meal_plan({"meals": remaining})
     return True
+
+
+def meal_plan_home_preview(meal_plan, max_slots=3, max_recipes_per_slot=2, max_recipes=4):
+    """Build a compact, chronological homepage view from the weekly slot lists."""
+    try:
+        max_slots = max(1, int(max_slots))
+    except (TypeError, ValueError):
+        max_slots = 3
+    try:
+        max_recipes_per_slot = max(1, int(max_recipes_per_slot))
+    except (TypeError, ValueError):
+        max_recipes_per_slot = 2
+    try:
+        max_recipes = max(1, int(max_recipes))
+    except (TypeError, ValueError):
+        max_recipes = 4
+
+    meal_plan = meal_plan if isinstance(meal_plan, dict) else {}
+    meals_by_day = meal_plan.get("meals_by_day") or {}
+    meal_types = meal_plan.get("meal_types") or MEAL_TYPES
+    slots = []
+    visible_recipe_count = 0
+    hidden_meal_count = 0
+    hidden_slot_count = 0
+
+    for day in meal_plan.get("days") or []:
+        if not isinstance(day, dict):
+            continue
+        day_key = clean_text(day.get("date"))
+        day_slots = meals_by_day.get(day_key) or {}
+        for meal_type in meal_types:
+            planned_meals = list(day_slots.get(meal_type) or [])
+            if not planned_meals:
+                continue
+
+            remaining_budget = max_recipes - visible_recipe_count
+            if len(slots) >= max_slots or remaining_budget <= 0:
+                hidden_slot_count += 1
+                hidden_meal_count += len(planned_meals)
+                continue
+
+            visible_count = min(
+                len(planned_meals),
+                max_recipes_per_slot,
+                remaining_budget,
+            )
+            visible_meals = planned_meals[:visible_count]
+            visible_recipe_count += visible_count
+            slots.append({
+                "date": day_key,
+                "day_label": (
+                    "TODAY"
+                    if day.get("is_today")
+                    else clean_text(day.get("weekday")).upper()
+                ),
+                "meal_type": meal_type,
+                "meal_type_label": clean_text(meal_type).title(),
+                "meals": visible_meals,
+                "remaining_count": len(planned_meals) - visible_count,
+                "total_count": len(planned_meals),
+            })
+
+    return {
+        "slots": slots,
+        "visible_recipe_count": visible_recipe_count,
+        "hidden_meal_count": hidden_meal_count,
+        "hidden_slot_count": hidden_slot_count,
+    }
 
 
 def meal_plan_for_week(value=None):

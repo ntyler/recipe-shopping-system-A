@@ -680,29 +680,31 @@
                     {% for day in meal_plan.days %}
                         {% set planned_meals = meal_plan.meals_by_day[day.date][meal_type] %}
                         <div class="app-meal-planner-cell" data-meal-plan-date="{{ day.date }}" data-meal-plan-type="{{ meal_type }}">
-                            {% for meal in planned_meals %}
-                                <article class="app-meal-card" data-meal-plan-id="{{ meal.id }}">
-                                    {% if meal.cover_image and meal.cover_image.src %}
-                                        <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
-                                    {% endif %}
-                                    <a href="#recipeView" data-recipe-url="{{ meal.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ meal.recipe_name }}</a>
-                                    <button type="button"
-                                            class="app-meal-remove"
-                                            aria-label="Remove {{ meal.recipe_name }} from {{ meal_type }}"
-                                            title="Remove planned meal"
-                                            data-meal-id="{{ meal.id }}"
-                                            data-meal-name="{{ meal.recipe_name }}"
-                                            onclick="return openMealPlannerDeleteDialog(this)">&times;</button>
-                                </article>
-                            {% else %}
-                                <button type="button"
-                                        class="app-meal-add-slot"
-                                        onclick="return openMealPlannerDialog('{{ day.date }}', '{{ meal_type }}')"
-                                        {% if not meal_plan_recipe_options %}disabled aria-disabled="true" title="Add a recipe before planning meals"{% endif %}>
-                                    <span aria-hidden="true">+</span>
-                                    <span class="sr-only">Add {{ meal_type }} for {{ day.weekday }} {{ day.day_label }}</span>
-                                </button>
-                            {% endfor %}
+                            <div class="app-meal-slot-recipes">
+                                {% for meal in planned_meals %}
+                                    <article class="app-meal-card{% if meal.cover_image and meal.cover_image.src %} has-image{% endif %}" data-meal-plan-id="{{ meal.id }}">
+                                        {% if meal.cover_image and meal.cover_image.src %}
+                                            <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
+                                        {% endif %}
+                                        <a href="#recipeView" data-recipe-url="{{ meal.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ meal.recipe_name }}</a>
+                                        <button type="button"
+                                                class="app-meal-remove"
+                                                aria-label="Remove {{ meal.recipe_name }} from {{ meal_type }}"
+                                                title="Remove planned meal"
+                                                data-meal-id="{{ meal.id }}"
+                                                data-meal-name="{{ meal.recipe_name }}"
+                                                onclick="return openMealPlannerDeleteDialog(this)">&times;</button>
+                                    </article>
+                                {% endfor %}
+                            </div>
+                            <button type="button"
+                                    class="app-meal-add-slot{% if planned_meals %} has-meals{% endif %}"
+                                    onclick="return openMealPlannerDialog('{{ day.date }}', '{{ meal_type }}')"
+                                    aria-label="Add recipe to {{ meal_type }} for {{ day.weekday }} {{ day.day_label }}"
+                                    {% if not meal_plan_recipe_options %}disabled aria-disabled="true" title="Add a recipe before planning meals"{% endif %}>
+                                <span aria-hidden="true">+</span>
+                                <span class="app-meal-add-slot-label">Add recipe</span>
+                            </button>
                         </div>
                     {% endfor %}
                 {% endfor %}

@@ -27166,6 +27166,228 @@ img[data-deferred-src] {
     grid-column: span 3;
 }
 
+/* Multiple recipes share one grouped meal-plan slot. */
+.app-home-meal-list-wrap {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+
+.app-home-meal-list {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    background: var(--app-surface-soft);
+    list-style: none;
+}
+
+.app-home-meal-list > .app-home-meal-slot {
+    display: grid;
+    grid-template-columns: 116px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    min-width: 0;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--app-border);
+    cursor: pointer;
+}
+
+.app-home-meal-list > .app-home-meal-slot:last-child {
+    border-bottom: 0;
+}
+
+.app-home-meal-slot:hover,
+.app-home-meal-slot:focus-visible {
+    background: var(--app-bg-soft);
+}
+
+.app-home-meal-slot:focus-visible,
+.app-home-meal-recipe:focus-visible {
+    border-radius: 6px;
+    outline: 2px solid var(--app-primary);
+    outline-offset: -2px;
+}
+
+.app-home-meal-slot-heading {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+    min-height: 60px;
+}
+
+.app-home-meal-slot .app-home-meal-day {
+    color: var(--app-primary);
+    font-size: var(--app-type-meta);
+    font-weight: 750;
+    line-height: 1.2;
+}
+
+.app-home-meal-slot .app-home-meal-type {
+    justify-self: start;
+    max-width: 100%;
+    padding: 4px 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--app-bg-soft);
+    color: var(--app-muted);
+    font-size: 11.5px;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-home-meal-recipes {
+    display: grid;
+    min-width: 0;
+}
+
+.app-home-meal-recipe {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 60px;
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+    min-height: 68px;
+    padding: 4px 0;
+    color: inherit;
+    text-decoration: none;
+}
+
+.app-home-meal-recipe + .app-home-meal-recipe {
+    border-top: 1px solid var(--app-border);
+}
+
+.app-home-meal-recipe:hover .app-home-meal-name,
+.app-home-meal-recipe:focus-visible .app-home-meal-name {
+    color: var(--app-primary);
+    text-decoration: underline;
+}
+
+.app-home-meal-name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--app-text-strong);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-home-meal-thumb {
+    display: block;
+    width: 60px;
+    height: 60px;
+    overflow: hidden;
+    border-radius: 9px;
+    background: var(--app-primary-soft);
+}
+
+.app-home-meal-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.app-home-meal-more,
+.app-home-meal-overflow {
+    display: inline-flex;
+    justify-self: start;
+    color: var(--app-primary);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.3;
+    text-decoration: none;
+}
+
+.app-home-meal-more {
+    margin: 4px 0 2px;
+}
+
+.app-home-meal-more:hover,
+.app-home-meal-more:focus-visible,
+.app-home-meal-overflow:hover,
+.app-home-meal-overflow:focus-visible {
+    text-decoration: underline;
+}
+
+.app-meal-planner-cell {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+}
+
+.app-meal-slot-recipes {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.app-meal-planner-cell .app-meal-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 26px;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+    min-height: 42px;
+    height: auto;
+    padding: 5px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface-soft);
+}
+
+.app-meal-planner-cell .app-meal-card.has-image {
+    grid-template-columns: 38px minmax(0, 1fr) 26px;
+}
+
+.app-meal-planner-cell .app-meal-card img {
+    width: 38px;
+    height: 38px;
+    border-radius: 7px;
+    object-fit: cover;
+}
+
+.app-meal-planner-cell .app-meal-card > a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.app-meal-planner-cell .app-meal-remove {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--app-surface);
+}
+
+.app-meal-planner-cell .app-meal-add-slot {
+    gap: 5px;
+    width: 100%;
+    min-height: 34px;
+    height: auto;
+    padding: 6px 8px;
+    border-color: var(--app-border);
+    border-radius: 7px;
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 1.2;
+}
+
+.app-meal-planner-cell .app-meal-add-slot > span[aria-hidden="true"] {
+    font-size: 16px;
+    line-height: 1;
+}
+
 .app-home-recent-recipes {
     grid-column: span 7;
 }
@@ -30907,6 +31129,11 @@ img[data-deferred-src] {
         object-fit: cover;
     }
 
+    .app-home-meal-recipe {
+        grid-template-columns: minmax(0, 1fr) 54px;
+        min-height: 62px;
+    }
+
     .app-home-recipe-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -30994,9 +31221,46 @@ img[data-deferred-src] {
     .app-meal-planner-grid {
         display: grid;
         grid-template-columns: 72px repeat(7, minmax(120px, 1fr));
+        max-width: 100%;
         overflow-x: auto;
         border: 1px solid var(--app-border);
         border-radius: var(--app-radius-lg);
+    }
+
+    .app-meal-planner-corner,
+    .app-meal-planner-day,
+    .app-meal-planner-row-label,
+    .app-meal-planner-cell {
+        min-width: 0;
+        border-right: 1px solid var(--app-border);
+        border-bottom: 1px solid var(--app-border);
+    }
+
+    .app-meal-planner-day {
+        display: flex;
+        justify-content: center;
+        gap: 4px;
+        padding: 12px 6px;
+        font-size: 11px;
+    }
+
+    .app-meal-planner-day.is-today {
+        background: var(--app-primary-soft);
+        color: var(--app-primary);
+    }
+
+    .app-meal-planner-row-label {
+        display: flex;
+        align-items: center;
+        padding: 8px;
+        color: var(--app-text-strong);
+        font-size: 11px;
+        font-weight: 650;
+    }
+
+    .app-meal-planner-cell {
+        min-height: 112px;
+        padding: 6px;
     }
 }
 
@@ -31087,6 +31351,37 @@ img[data-deferred-src] {
     .app-home-meal-thumb {
         width: 46px;
         height: 46px;
+    }
+
+    .app-home-meal-list > .app-home-meal-slot {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+        padding: 8px;
+    }
+
+    .app-home-meal-slot-heading {
+        display: flex;
+        gap: 8px;
+        min-height: 0;
+        padding: 2px 0 4px;
+    }
+
+    .app-home-meal-recipe {
+        grid-template-columns: minmax(0, 1fr) 46px;
+        min-height: 54px;
+    }
+
+    .app-meal-planner-grid {
+        grid-template-columns: 68px repeat(7, minmax(106px, 1fr));
+    }
+
+    .app-meal-planner-cell .app-meal-card.has-image {
+        grid-template-columns: 34px minmax(0, 1fr) 26px;
+    }
+
+    .app-meal-planner-cell .app-meal-card img {
+        width: 34px;
+        height: 34px;
     }
 }
 

@@ -132,6 +132,7 @@ from PushShoppingList.services.menu_store_service import menu_pdf_logs_by_cookbo
 from PushShoppingList.services.menu_store_service import menus_by_cookbook
 from PushShoppingList.services.meal_plan_service import add_meal
 from PushShoppingList.services.meal_plan_service import delete_meal
+from PushShoppingList.services.meal_plan_service import meal_plan_home_preview
 from PushShoppingList.services.meal_plan_service import meal_plan_for_week
 from PushShoppingList.services.job_service import job_for_client
 from PushShoppingList.services.job_service import recent_jobs
@@ -504,13 +505,41 @@ def shell_context(active_public_user=None):
         for recipe in recipe_urls
         if str(recipe.get("url") or "").strip()
     ]
-    recipe_preview_by_url = {
-        str(recipe.get("url") or ""): recipe
+    planned_recipe_keys = {
+        normalize_recipe_url_key(meal.get("recipe_url"))
+        for meal in meal_plan["meals"]
+        if normalize_recipe_url_key(meal.get("recipe_url"))
+    }
+    preview_recipe_keys = {
+        normalize_recipe_url_key(recipe.get("url"))
         for recipe in recipe_preview_rows
+        if normalize_recipe_url_key(recipe.get("url"))
+    }
+    missing_planned_recipe_keys = planned_recipe_keys - preview_recipe_keys
+    planned_recipe_rows = [
+        recipe
+        for recipe in recipe_urls
+        if normalize_recipe_url_key(recipe.get("url")) in missing_planned_recipe_keys
+    ]
+    planned_preview_rows = (
+        recipe_url_log_rows(
+            planned_recipe_rows,
+            cookbook_assignments,
+            image_variants=("card", "thumb"),
+            recipe_ingredient_data=recipe_ingredient_data,
+        )
+        if planned_recipe_rows
+        else []
+    )
+    recipe_preview_by_key = {
+        normalize_recipe_url_key(recipe.get("url")): recipe
+        for recipe in [*recipe_preview_rows, *planned_preview_rows]
+        if normalize_recipe_url_key(recipe.get("url"))
     }
     for meal in meal_plan["meals"]:
-        preview = recipe_preview_by_url.get(meal["recipe_url"], {})
+        preview = recipe_preview_by_key.get(normalize_recipe_url_key(meal["recipe_url"]), {})
         meal["cover_image"] = preview.get("cover_image") or {}
+    home_meal_plan = meal_plan_home_preview(meal_plan)
 
     pantry_running_low = [
         item
@@ -576,6 +605,7 @@ def shell_context(active_public_user=None):
             "out_of_stock": len(pantry_out_of_stock),
         },
         "meal_plan": meal_plan,
+        "home_meal_plan": home_meal_plan,
         "meal_plan_recipe_options": recipe_options,
     }
 

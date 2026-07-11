@@ -478,7 +478,7 @@
                 {% endif %}
             </section>
 
-            <section class="app-home-panel app-home-meal-preview{% if meal_plan.meals %} has-meals{% endif %}" aria-label="Upcoming meal plan">
+            <section class="app-home-panel app-home-meal-preview{% if home_meal_plan.slots %} has-meals{% endif %}" aria-label="Upcoming meal plan">
                 <div class="app-home-panel-header">
                     <h2>Upcoming Meal Plan</h2>
                     <a href="#mealPlannerPage"
@@ -487,31 +487,58 @@
                        data-app-page-target="mealPlannerPage"
                        data-app-nav-target="mealPlannerPage">View planner</a>
                 </div>
-                {% if meal_plan.meals %}
-                    <ul class="app-home-meal-list">
-                        {% for meal in meal_plan.meals[:5] %}
-                            {% set meal_day = namespace(label=meal.date, is_today=false) %}
-                            {% for day in meal_plan.days %}
-                                {% if day.date == meal.date %}
-                                    {% set meal_day.label = day.weekday | upper %}
-                                    {% set meal_day.is_today = day.is_today %}
-                                {% endif %}
+                {% if home_meal_plan.slots %}
+                    <div class="app-home-meal-list-wrap">
+                        <ul class="app-home-meal-list">
+                            {% for slot in home_meal_plan.slots %}
+                                <li class="app-home-meal-slot"
+                                    role="link"
+                                    tabindex="0"
+                                    aria-label="Open {{ slot.meal_type_label }} for {{ slot.day_label }} in Meal Planner"
+                                    onclick="return openHomeMealPlanSlot(this, event)"
+                                    onkeydown="return handleHomeMealPlanSlotKeydown(this, event)">
+                                    <div class="app-home-meal-slot-heading">
+                                        <time class="app-home-meal-day" datetime="{{ slot.date }}">{{ slot.day_label }}</time>
+                                        <span class="app-home-meal-type">{{ slot.meal_type_label }}</span>
+                                    </div>
+                                    <div class="app-home-meal-recipes">
+                                        {% for meal in slot.meals %}
+                                            <a class="app-home-meal-recipe"
+                                               href="#recipeView"
+                                               data-recipe-url="{{ meal.recipe_url }}"
+                                               onclick="return jumpToRecipeViewRecipe(this, event)">
+                                                <strong class="app-home-meal-name">{{ meal.recipe_name }}</strong>
+                                                <span class="app-home-meal-thumb" aria-hidden="true">
+                                                    {% if meal.cover_image and meal.cover_image.src %}
+                                                        <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}"
+                                                             alt=""
+                                                             loading="lazy"
+                                                             decoding="async">
+                                                    {% endif %}
+                                                </span>
+                                            </a>
+                                        {% endfor %}
+                                        {% if slot.remaining_count %}
+                                            <a class="app-home-meal-more"
+                                               href="#mealPlannerPage"
+                                               data-app-nav-link
+                                               data-app-nav-action="app-page"
+                                               data-app-page-target="mealPlannerPage"
+                                               data-app-nav-target="mealPlannerPage">+{{ slot.remaining_count }} more</a>
+                                        {% endif %}
+                                    </div>
+                                </li>
                             {% endfor %}
-                            <li>
-                                <time class="app-home-meal-day" datetime="{{ meal.date }}">{% if meal_day.is_today %}TODAY{% else %}{{ meal_day.label }}{% endif %}</time>
-                                <span class="app-home-meal-type">{{ meal.meal_type | title }}</span>
-                                <strong class="app-home-meal-name">{{ meal.recipe_name }}</strong>
-                                <span class="app-home-meal-thumb" aria-hidden="true">
-                                    {% if meal.cover_image and meal.cover_image.src %}
-                                        <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}"
-                                             alt=""
-                                             loading="lazy"
-                                             decoding="async">
-                                    {% endif %}
-                                </span>
-                            </li>
-                        {% endfor %}
-                    </ul>
+                        </ul>
+                        {% if home_meal_plan.hidden_meal_count %}
+                            <a class="app-home-meal-overflow"
+                               href="#mealPlannerPage"
+                               data-app-nav-link
+                               data-app-nav-action="app-page"
+                               data-app-page-target="mealPlannerPage"
+                               data-app-nav-target="mealPlannerPage">+{{ home_meal_plan.hidden_meal_count }} more planned recipe{% if home_meal_plan.hidden_meal_count != 1 %}s{% endif %}</a>
+                        {% endif %}
+                    </div>
                     <a class="app-home-meal-footer-action"
                        href="#mealPlannerPage"
                        data-app-nav-link
