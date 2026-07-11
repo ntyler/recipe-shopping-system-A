@@ -28188,9 +28188,13 @@ img[data-deferred-src] {
 }
 
 .app-home-recipe-metadata .app-recipe-card-cookbook-line {
-    border-color: color-mix(in srgb, var(--app-muted) 42%, transparent);
-    background: color-mix(in srgb, var(--app-surface-soft) 76%, transparent);
-    color: var(--app-muted);
+    min-height: 28px;
+    padding: 4px 10px;
+    border-color: color-mix(in srgb, var(--app-muted) 62%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--app-surface-soft) 90%, var(--app-muted) 10%);
+    color: color-mix(in srgb, var(--app-text) 78%, var(--app-muted));
+    font-weight: 550;
 }
 
 .app-home-recipe-metadata .app-recipe-card-category-line {

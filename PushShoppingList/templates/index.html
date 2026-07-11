@@ -452,13 +452,11 @@
                                         </div>
                                         {% if recipe.cookbook_name and not recipe.cookbook_is_unclassified %}
                                             <div class="app-recipe-card-meta-line app-recipe-card-cookbook-line">
-                                                <span class="app-recipe-card-meta-icon" aria-hidden="true">&#128218;</span>
                                                 <span class="app-recipe-card-meta-text" title="{{ recipe.cookbook_name }}">{{ recipe.cookbook_name }}</span>
                                             </div>
                                         {% endif %}
                                         {% if recipe.home_badge %}
                                             <div class="app-recipe-card-meta-line app-recipe-card-category-line">
-                                                <span class="app-recipe-card-meta-icon" aria-hidden="true">&#127991;&#65039;</span>
                                                 <span class="app-recipe-card-meta-text">{{ recipe.home_badge }}</span>
                                             </div>
                                         {% endif %}

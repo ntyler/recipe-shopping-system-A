@@ -208,8 +208,8 @@ def test_home_template_has_supported_overflow_and_favorite_action():
     assert "recipe.home_badge" in home
     assert "&#9201;" in home
     assert "&#128293;" in home
-    assert "&#128218;" in home
-    assert "&#127991;&#65039;" in home
+    assert "&#128218;" not in home
+    assert "&#127991;&#65039;" not in home
     assert home.index("app-home-recipe-rating") < home.index("recipe.card_cook_time")
     assert home.index("recipe.card_cook_time") < home.index("recipe.card_calories")
     assert home.index("recipe.card_calories") < home.index("recipe.cookbook_name and not recipe.cookbook_is_unclassified")
@@ -441,6 +441,11 @@ def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
     assert ".app-home-recipe-metadata .app-recipe-card-cookbook-line,\n.app-home-recipe-metadata .app-recipe-card-category-line {" in css
     assert "width: fit-content;\n    max-width: 100%;" in css
     assert ".app-home-recipe-metadata .app-recipe-card-cookbook-line {" in css
+    assert "min-height: 28px;\n    padding: 4px 10px;" in css
+    assert "border-color: color-mix(in srgb, var(--app-muted) 62%, transparent);" in css
+    assert "border-radius: 999px;" in css
+    assert "background: color-mix(in srgb, var(--app-surface-soft) 90%, var(--app-muted) 10%);" in css
+    assert "font-weight: 550;" in css
     assert ".app-home-recipe-metadata .app-recipe-card-category-line {" in css
     assert "background: color-mix(in srgb, var(--app-primary) 16%, transparent);" in css
     assert "max-width: 160px;" in css
