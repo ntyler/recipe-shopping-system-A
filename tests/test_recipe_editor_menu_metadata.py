@@ -517,6 +517,27 @@ def test_menu_source_options_dedupe_same_source_records_and_prefer_menu_option(m
     assert options[0]["source_menu_url"] == source_url
 
 
+def test_menu_source_option_exposes_existing_restaurant_logo_and_rating(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    menu_store_service.save_menu_store({
+        "restaurants": [{
+            "id": "restaurant-pisco",
+            "restaurant_name": "Pisco Mar",
+            "logo_url": "https://example.com/pisco-mar-logo.png",
+            "rating": "4.5",
+        }],
+        "menus": [],
+        "sections": [],
+        "items": [],
+        "pdf_logs": [],
+    })
+
+    option = recipe_edit_service.editable_menu_source_options()[0]
+
+    assert option["restaurant_logo_url"] == "https://example.com/pisco-mar-logo.png"
+    assert option["restaurant_rating"] == "4.5"
+
+
 def test_menu_derived_recipe_loads_canonical_source_for_duplicate_source_ids(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"

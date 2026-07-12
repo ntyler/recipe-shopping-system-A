@@ -2296,6 +2296,8 @@ def editable_menu_source_option_from_records(restaurant, menu):
         "source_menu_url": source_menu_url,
         "restaurant_cuisine_tags": recipe_menu_text_list_for_editor(restaurant.get("cuisine_tags")),
         "restaurant_phone": clean_recipe_menu_text(restaurant.get("phone")),
+        "restaurant_logo_url": clean_recipe_menu_text(restaurant.get("logo_url")),
+        "restaurant_rating": clean_recipe_menu_text(restaurant.get("rating")),
         "restaurant_address": first_recipe_menu_text(
             restaurant.get("full_address"),
             restaurant.get("address_line"),

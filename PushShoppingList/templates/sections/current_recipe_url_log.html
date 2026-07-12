@@ -2210,22 +2210,39 @@
                     <details class="recipe-edit-context-card recipe-edit-restaurant-card" open>
                         <summary>
                             <span>Restaurant Source</span>
-                            <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
+                            <button type="button" class="recipe-edit-restaurant-edit" onclick="return editRecipeRestaurantSource(this)">Edit</button>
                         </summary>
                         <div class="recipe-edit-restaurant-summary">
-                            <span class="recipe-edit-restaurant-avatar" data-restaurant-logo aria-hidden="true">R</span>
-                            <div>
+                            <span class="recipe-edit-restaurant-avatar" data-restaurant-logo>
+                                <img src="" alt="" hidden>
+                                <span data-restaurant-logo-fallback>R</span>
+                            </span>
+                            <div class="recipe-edit-restaurant-identity">
                                 <strong data-restaurant-field="name">No restaurant source</strong>
                                 <span data-restaurant-field="cuisine"></span>
-                                <span data-restaurant-field="address"></span>
+                                <span class="recipe-edit-restaurant-rating" data-restaurant-rating hidden>
+                                    {% for _ in range(5) %}<span data-restaurant-rating-star aria-hidden="true">&#9733;</span>{% endfor %}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="recipe-edit-restaurant-details">
+                            <div class="recipe-edit-restaurant-detail" data-restaurant-detail-row="phone" hidden>
+                                <span class="recipe-edit-restaurant-detail-icon" aria-hidden="true">&#9742;</span>
                                 <span data-restaurant-field="phone"></span>
+                            </div>
+                            <a class="recipe-edit-restaurant-detail" data-restaurant-detail="website" href="#" target="_blank" rel="noopener noreferrer" hidden>
+                                <span class="recipe-edit-restaurant-detail-icon" aria-hidden="true">&#9678;</span>
+                                <span data-restaurant-field="website"></span>
+                            </a>
+                            <div class="recipe-edit-restaurant-detail" data-restaurant-detail-row="address" hidden>
+                                <span class="recipe-edit-restaurant-detail-icon" aria-hidden="true">&#9906;</span>
+                                <span data-restaurant-field="address"></span>
                             </div>
                         </div>
                         <div class="recipe-edit-restaurant-actions">
-                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="website" hidden>Open Website</a>
-                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="menu" hidden>Open Menu</a>
-                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="map" hidden>Google Maps</a>
-                            <button type="button" class="recipe-edit-restaurant-edit" onclick="return editRecipeRestaurantSource(this)">Edit</button>
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="website" hidden><span aria-hidden="true">&#8599;</span> Open Website</a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="menu" hidden><span aria-hidden="true">&#9776;</span> Open Menu</a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="map" hidden><span aria-hidden="true">&#9906;</span> Google Maps</a>
                         </div>
                     </details>
 

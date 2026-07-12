@@ -269,6 +269,7 @@ def normalize_restaurant_fields(raw_restaurant, source_url=""):
         "rewards_text": clean_nullable_text(raw_restaurant.get("rewards_text") or raw_restaurant.get("rewards")),
         "promotions": clean_text_list(raw_restaurant.get("promotions")),
         "logo_url": clean_nullable_text(raw_restaurant.get("logo_url")),
+        "rating": clean_nullable_text(raw_restaurant.get("rating")),
         "hero_image_url": clean_nullable_text(raw_restaurant.get("hero_image_url")),
     }
 

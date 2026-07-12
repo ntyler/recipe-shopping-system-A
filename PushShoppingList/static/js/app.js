@@ -22889,6 +22889,8 @@ function recipeMenuSourceOptionsFromRecipe(recipe = {}) {
             source_menu_url: recipe.source_menu_url || "",
             restaurant_cuisine_tags: recipe.restaurant_cuisine_tags || "",
             restaurant_phone: recipe.restaurant_phone || "",
+            restaurant_logo_url: recipe.restaurant_logo_url || "",
+            restaurant_rating: recipe.restaurant_rating || "",
             restaurant_address: recipe.restaurant_address || "",
             restaurant_hours_text: recipe.restaurant_hours_text || "",
             restaurant_current_status: recipe.restaurant_current_status || "",
@@ -24634,6 +24636,11 @@ function updateRecipeEditRestaurantCard() {
     const phone = recipeEditInputValue("recipeEditRestaurantPhone");
     const address = recipeEditInputValue("recipeEditRestaurantAddress");
     const cuisine = recipeEditInputValue("recipeEditRestaurantCuisineTags");
+    const selectedSource = recipeMenuSourceOptionByValue(
+        document.getElementById("recipeEditMenuSourceSelect")?.value || ""
+    ) || {};
+    const logoUrl = recipeMenuMetadataText(selectedSource.restaurant_logo_url);
+    const restaurantRating = Number.parseFloat(recipeMenuMetadataText(selectedSource.restaurant_rating));
     const setText = (selector, value, fallback = "") => {
         const element = document.querySelector(selector);
         if (element) {
@@ -24654,10 +24661,50 @@ function updateRecipeEditRestaurantCard() {
     setText('[data-restaurant-field="cuisine"]', cuisine);
     setText('[data-restaurant-field="address"]', address);
     setText('[data-restaurant-field="phone"]', phone);
+    setText('[data-restaurant-field="website"]', website);
+    const phoneRow = document.querySelector('[data-restaurant-detail-row="phone"]');
+    const addressRow = document.querySelector('[data-restaurant-detail-row="address"]');
+    if (phoneRow) phoneRow.hidden = !phone;
+    if (addressRow) addressRow.hidden = !address;
+
+    const websiteDetail = document.querySelector('[data-restaurant-detail="website"]');
+    if (websiteDetail) {
+        const canOpenWebsite = isLegitimateWebUrl(website);
+        websiteDetail.hidden = !canOpenWebsite;
+        websiteDetail.href = canOpenWebsite ? website : "#";
+        websiteDetail.title = canOpenWebsite ? website : "";
+    }
+
+    const rating = document.querySelector("[data-restaurant-rating]");
+    if (rating) {
+        const normalizedRating = Number.isFinite(restaurantRating)
+            ? Math.max(0, Math.min(5, restaurantRating))
+            : 0;
+        rating.hidden = normalizedRating <= 0;
+        rating.setAttribute("aria-label", normalizedRating > 0 ? `${normalizedRating} out of 5 stars` : "");
+        rating.querySelectorAll("[data-restaurant-rating-star]").forEach((star, index) => {
+            star.classList.toggle("is-filled", index < Math.round(normalizedRating));
+        });
+    }
 
     const logo = document.querySelector("[data-restaurant-logo]");
     if (logo) {
-        logo.textContent = (name || "Restaurant").trim().slice(0, 2).toUpperCase();
+        const image = logo.querySelector("img");
+        const fallback = logo.querySelector("[data-restaurant-logo-fallback]");
+        const initials = (name || "Restaurant").trim().split(/\s+/).slice(0, 2).map(part => part[0] || "").join("").toUpperCase();
+        if (fallback) {
+            fallback.textContent = initials || "R";
+            fallback.hidden = Boolean(logoUrl);
+        }
+        if (image) {
+            image.hidden = !logoUrl;
+            image.src = logoUrl || "";
+            image.alt = logoUrl ? `${name || "Restaurant"} logo` : "";
+            image.onerror = () => {
+                image.hidden = true;
+                if (fallback) fallback.hidden = false;
+            };
+        }
     }
     const editButton = document.querySelector(".recipe-edit-restaurant-edit");
     if (editButton) {
