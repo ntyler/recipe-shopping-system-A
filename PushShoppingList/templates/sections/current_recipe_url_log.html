@@ -2299,10 +2299,11 @@
                             <section class="recipe-edit-restaurant-usage" data-restaurant-usage>
                                 <div>
                                     <h3>Restaurant Usage</h3>
-                                    <p>Used by <strong data-restaurant-usage-recipes>Loading…</strong></p>
+                                    <p class="recipe-edit-restaurant-usage-primary" data-restaurant-usage-recipes>Loading usage…</p>
                                     <p data-restaurant-usage-cookbooks hidden></p>
+                                    <small data-restaurant-usage-note hidden>Includes this recipe when it references this restaurant.</small>
                                 </div>
-                                <button type="button" data-restaurant-usage-view onclick="return openRecipeRestaurantUsagePanel(this)" disabled>View Recipes</button>
+                                <button type="button" data-restaurant-usage-view data-restaurant-usage-mode="loading" onclick="return handleRecipeRestaurantUsageAction(this)" disabled>View Recipes</button>
                             </section>
                             <section class="recipe-edit-restaurant-primary-column">
                             <h3>Primary Restaurant Details</h3>

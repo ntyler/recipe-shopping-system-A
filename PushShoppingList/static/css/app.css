@@ -32877,43 +32877,68 @@ img[data-deferred-src] {
     min-width: 0;
     align-items: center;
     justify-content: space-between;
-    gap: 18px;
-    padding: 12px 14px;
+    gap: 16px;
+    padding: 10px 14px;
     border: 1px solid #59635f;
     border-radius: 9px;
     background: var(--app-bg-soft);
 }
 
 .recipe-edit-restaurant-usage h3 {
-    margin: 0 0 4px;
+    margin: 0 0 3px;
     color: var(--app-text-strong);
     font-size: 14px;
 }
 
 .recipe-edit-restaurant-usage p {
-    display: inline;
-    margin: 0 14px 0 0;
+    display: block;
+    margin: 0;
     color: #aeb8b2;
     font-size: 13px;
 }
 
-.recipe-edit-restaurant-usage strong {
+.recipe-edit-restaurant-usage-primary strong {
+    display: inline-block;
     color: var(--app-text-strong);
+    font-size: 17px;
+    font-weight: 850;
+}
+
+.recipe-edit-restaurant-usage [data-restaurant-usage-cookbooks] {
+    margin-top: 2px;
+    font-size: 12px;
+}
+
+.recipe-edit-restaurant-usage [data-restaurant-usage-note] {
+    display: block;
+    margin-top: 2px;
+    color: #8f9a94;
+    font-size: 11px;
 }
 
 .recipe-edit-restaurant-usage > button {
+    width: auto;
+    flex: 0 0 auto;
     min-height: 40px;
-    padding: 0 16px;
+    padding: 0 14px;
     border: 1px solid var(--app-primary);
     border-radius: 8px;
-    background: var(--app-primary);
-    color: #fff;
+    background: transparent;
+    color: var(--app-primary-hover);
     font-size: 13px;
     font-weight: 800;
 }
 
 .recipe-edit-restaurant-usage > button:disabled {
-    opacity: .5;
+    border-color: var(--app-border);
+    color: var(--app-muted);
+    opacity: .65;
+}
+
+.recipe-edit-restaurant-usage > button[data-restaurant-usage-mode="retry"] {
+    border-color: var(--app-border-strong);
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
 }
 
 .recipe-edit-restaurant-usage-panel {

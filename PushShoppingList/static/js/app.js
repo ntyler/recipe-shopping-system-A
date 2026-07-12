@@ -25200,27 +25200,65 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
 async function loadRecipeRestaurantUsage(restaurantId) {
     const count = document.querySelector("[data-restaurant-usage-recipes]");
     const cookbooks = document.querySelector("[data-restaurant-usage-cookbooks]");
+    const note = document.querySelector("[data-restaurant-usage-note]");
     const view = document.querySelector("[data-restaurant-usage-view]");
     recipeRestaurantUsageRecipes = [];
-    if (count) count.textContent = "Loading…";
-    if (view) view.disabled = true;
+    if (count) count.textContent = "Loading usage…";
+    if (cookbooks) cookbooks.hidden = true;
+    if (note) note.hidden = true;
+    if (view) {
+        view.hidden = false;
+        view.disabled = true;
+        view.textContent = "View Recipes";
+        view.dataset.restaurantUsageMode = "loading";
+        view.dataset.restaurantId = restaurantId || "";
+    }
     try {
         const response = await fetch(`/api/recipe/restaurant-usage?restaurant_id=${encodeURIComponent(restaurantId || "")}`);
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.error || "Unable to load restaurant usage.");
         recipeRestaurantUsageRecipes = Array.isArray(data.recipes) ? data.recipes : [];
-        if (count) count.textContent = `${data.recipe_count || 0} Recipe${Number(data.recipe_count) === 1 ? "" : "s"}`;
-        if (cookbooks) {
-            cookbooks.textContent = `${data.cookbook_count || 0} Cookbook${Number(data.cookbook_count) === 1 ? "" : "s"}`;
-            cookbooks.hidden = false;
+        const recipeCount = Number(data.recipe_count) || 0;
+        const cookbookCount = Number(data.cookbook_count) || 0;
+        if (count) {
+            count.innerHTML = recipeCount > 0
+                ? `Used by <strong>${recipeCount} recipe${recipeCount === 1 ? "" : "s"}</strong>`
+                : "Not currently used by any recipes.";
         }
-        if (view) view.disabled = false;
+        if (cookbooks) {
+            cookbooks.textContent = `Across ${cookbookCount} cookbook${cookbookCount === 1 ? "" : "s"}`;
+            cookbooks.hidden = recipeCount <= 0;
+        }
+        if (note) note.hidden = recipeCount <= 0;
+        if (view) {
+            view.hidden = recipeCount <= 0;
+            view.disabled = recipeCount <= 0;
+            view.textContent = "View Recipes";
+            view.dataset.restaurantUsageMode = "view";
+        }
         const searchWrap = document.querySelector("[data-restaurant-usage-search-wrap]");
         if (searchWrap) searchWrap.hidden = recipeRestaurantUsageRecipes.length <= 20;
         renderRecipeRestaurantUsageList();
     } catch (err) {
-        if (count) count.textContent = "Usage unavailable";
+        if (count) count.textContent = "Usage data unavailable.";
+        if (cookbooks) cookbooks.hidden = true;
+        if (note) note.hidden = true;
+        if (view) {
+            view.hidden = false;
+            view.disabled = false;
+            view.textContent = "Retry";
+            view.dataset.restaurantUsageMode = "retry";
+        }
     }
+}
+
+function handleRecipeRestaurantUsageAction(button) {
+    if (!button || button.disabled) return false;
+    if (button.dataset.restaurantUsageMode === "retry") {
+        loadRecipeRestaurantUsage(button.dataset.restaurantId || "");
+        return false;
+    }
+    return openRecipeRestaurantUsagePanel(button);
 }
 
 function openRecipeRestaurantUsagePanel(button) {
