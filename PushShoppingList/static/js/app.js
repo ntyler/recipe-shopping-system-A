@@ -1130,10 +1130,24 @@ function openHomeRecipeAction(button, action, event = null) {
     }
     closeHomeRecipeMenus();
     if (action === "edit") {
-        window.requestAnimationFrame(() => openRecipeEditor(button));
-        return false;
+        const recipeUrl = button ? button.dataset.recipeUrl || "" : "";
+        return openRecipeEditPageFallback(button, recipeUrl);
     }
     return jumpToRecipeViewRecipe(button, event);
+}
+
+function openHomeRecipeCardEditor(card, event = null) {
+    if (!card || eventStartedInNestedInteractive(event, card)) {
+        return true;
+    }
+
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const recipeUrl = card.dataset.recipeUrl || "";
+    return openRecipeEditPageFallback(card, recipeUrl);
 }
 
 function setRecipeFavoriteButtonState(button, favorite) {

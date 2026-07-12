@@ -30405,6 +30405,7 @@ img[data-deferred-src] {
     .app-home-recipe-card {
         position: relative;
         min-width: 0;
+        cursor: pointer;
     }
 
     .app-home-recipe-media {

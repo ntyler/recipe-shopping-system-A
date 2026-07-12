@@ -200,6 +200,8 @@ def test_home_template_has_supported_overflow_and_favorite_action():
     assert "&#9733;" not in home
     assert "Time TBD" not in home
     assert '<article class="app-recipe-card app-home-recipe-card"' in home
+    assert 'onclick="return openHomeRecipeCardEditor(this, event)"' in home
+    assert home.count('onclick="return openRecipeEditPageFromMenu(this, event)"') >= 2
     assert '<div class="app-recipe-card-body app-home-recipe-body">' in home
     assert "app-recipe-card-metadata app-home-recipe-metadata" in home
     assert "recipe.card_cook_time" in home
@@ -259,6 +261,7 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert ".app-home-summary-icon .app-icon-svg" in css
     assert ".app-home-recipe-favorite" in css
     assert ".app-home-recipe-menu-toggle" in css
+    assert ".app-home-recipe-card {\n        position: relative;\n        min-width: 0;\n        cursor: pointer;" in css
     assert (
         ".app-recipe-card {\n"
         "    display: grid;\n"
@@ -286,6 +289,13 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     assert "function toggleHomeRecipeMenu" in script
     assert "function closeHomeRecipeMenus" in script
     assert "function openHomeRecipeAction" in script
+    assert "function openHomeRecipeCardEditor" in script
+    card_editor = script[
+        script.index("function openHomeRecipeCardEditor"):
+        script.index("function setRecipeFavoriteButtonState")
+    ]
+    assert "eventStartedInNestedInteractive(event, card)" in card_editor
+    assert "openRecipeEditPageFallback(card, recipeUrl)" in card_editor
     assert "function openHomeRecentImport" in script
 
 
