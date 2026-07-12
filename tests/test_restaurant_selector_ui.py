@@ -19,6 +19,8 @@ def test_restaurant_selector_is_searchable_accessible_and_header_scoped():
     assert header.index("recipeEditRestaurantModalTitle") < header.index("data-restaurant-selector")
     assert header.index("data-restaurant-selector") < header.index("recipe-edit-restaurant-modal-close")
     assert 'role="combobox"' in header
+    assert 'type="text"' in header
+    assert 'type="search"' not in header
     assert 'aria-autocomplete="list"' in header
     assert 'aria-controls="recipeEditRestaurantSelectorList"' in header
     assert 'role="listbox"' in header
@@ -34,9 +36,11 @@ def test_restaurant_selector_is_searchable_accessible_and_header_scoped():
     assert 'shell.svg_icon("x")' in header
     assert ".recipe-edit-restaurant-combobox-icon" not in css
     assert "padding: 8px 44px 8px 12px;" in css
+    assert "appearance: none;" in css
+    assert "background-image: none;" in css
     assert ".recipe-edit-restaurant-selector-toggle" not in css
     assert ".recipe-edit-restaurant-selector-clear[hidden]" in css
-    assert "right: 6px;" in css
+    assert "right: 12px;" in css
     assert "width: 32px;" in css
     assert "height: 32px;" in css
     assert ".recipe-edit-restaurant-modal-header {" in css
@@ -63,6 +67,8 @@ def test_restaurant_selector_switch_create_and_recipe_specific_url_behavior():
     assert 'input.value = "";' in clear_handler
     assert 'input.dataset.restaurantSelectorSuppressOpen = "1";' in clear_handler
     assert "updateRecipeRestaurantSelectorClearButton();" in clear_handler
+    assert "const hasSelectedRestaurant = !recipeRestaurantEditCreateMode" in script
+    assert "Boolean(recipeRestaurantRecordId(recipeRestaurantEditSelection))" in script
     assert "toggleRecipeRestaurantSelector" not in script
     selector_keydown = script[
         script.index("function handleRecipeRestaurantSelectorKeydown(input, event)"):
@@ -84,7 +90,7 @@ def test_restaurant_selector_switch_create_and_recipe_specific_url_behavior():
     assert "create_anyway: Boolean(options.createAnyway)" in script
     assert 'field === "menu_item_url"' in script
     assert "recipeRestaurantOriginalMenuItemUrl" in script
-    assert "loadRecipeRestaurantUsage(recipeRestaurantRecordId(record))" in script
+    assert 'loadRecipeRestaurantUsage(recipeRestaurantRecordId(record), { query: "", reviewOnly: false })' in script
     assert "function recipeRestaurantMenuIdForSave(selected)" in script
     assert "selectedRestaurantId === recipeRestaurantOriginalRestaurantId ? recipeRestaurantOriginalMenuId" in script
     assert "function syncRecipeRestaurantMenuSourceSelection(savedRestaurant)" in script

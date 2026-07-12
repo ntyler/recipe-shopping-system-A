@@ -25222,7 +25222,9 @@ function recipeRestaurantSelectorElements() {
 function updateRecipeRestaurantSelectorClearButton() {
     const { input, clear } = recipeRestaurantSelectorElements();
     if (!clear) return;
-    clear.hidden = !String(input?.value || "").trim();
+    const hasSelectedRestaurant = !recipeRestaurantEditCreateMode
+        && Boolean(recipeRestaurantRecordId(recipeRestaurantEditSelection));
+    clear.hidden = !hasSelectedRestaurant || !String(input?.value || "").trim();
     clear.disabled = Boolean(input?.disabled);
 }
 

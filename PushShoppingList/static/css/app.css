@@ -33664,9 +33664,11 @@ img[data-deferred-src] {
     min-width: 0;
     height: 42px;
     padding: 8px 44px 8px 12px;
+    appearance: none;
     border: 1px solid #59635f;
     border-radius: 8px;
     background: var(--app-bg-soft);
+    background-image: none;
     color: var(--app-text-strong);
     font-size: 14px;
     font-weight: 700;
@@ -33683,15 +33685,10 @@ img[data-deferred-src] {
     outline-offset: 1px;
 }
 
-.recipe-edit-restaurant-modal-header .recipe-edit-restaurant-combobox input::-webkit-search-cancel-button {
-    display: none;
-    appearance: none;
-}
-
 .recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-clear {
     position: absolute;
     top: 50%;
-    right: 6px;
+    right: 12px;
     z-index: 2;
     display: grid;
     width: 32px;
