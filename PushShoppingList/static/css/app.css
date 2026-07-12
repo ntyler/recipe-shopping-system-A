@@ -27335,6 +27335,11 @@ img[data-deferred-src] {
     line-height: 1;
 }
 
+.recipe-edit-ai-infer .recipe-edit-button-icon .app-icon-svg {
+    width: 18px;
+    height: 18px;
+}
+
 .app-meal-planner-servings-stepper button:hover:not(:disabled),
 .app-meal-planner-servings-stepper button:focus-visible {
     border-color: var(--app-primary);

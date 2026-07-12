@@ -452,6 +452,19 @@ def test_restaurant_usage_duplicate_review_is_explicit_accessible_and_transactio
     assert '"user_id": _clean(active_user_id())' in service
 
 
+def test_infer_missing_details_uses_shared_sparkles_icon():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+    button_start = template.index('class="recipe-edit-ai-infer"')
+    button_end = template.index("</button>", button_start)
+    button = template[button_start:button_end]
+
+    assert '{{ shell.svg_icon("sparkles") }}' in button
+    assert '>?</span>' not in button
+    assert "Infer Missing Details" in button
+    assert ".recipe-edit-ai-infer .recipe-edit-button-icon .app-icon-svg" in css
+
+
 def test_restaurant_usage_review_toggle_is_accessible_server_filtered_and_paginated():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
