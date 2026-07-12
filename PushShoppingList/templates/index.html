@@ -195,68 +195,18 @@
     </aside>
 
     <div class="app-main-shell">
-        <header class="app-topbar" aria-label="App toolbar">
-            <a class="app-topbar-brand" href="{{ url_for('main_bp.index') }}">
-                {{ shell.brand_mark() }}
-                <span>AI Pantry</span>
-            </a>
-            <form class="app-global-search"
-                  role="search"
-                  onsubmit="return submitAppGlobalSearch(this)">
-                <label class="sr-only" for="appGlobalSearch">Search app sections</label>
-                <span class="app-global-search-icon" aria-hidden="true">{{ shell.svg_icon("search") }}</span>
-                <input id="appGlobalSearch"
-                       name="app_search"
-                       data-app-global-search
-                       list="appGlobalSearchSuggestions"
-                       type="search"
-                       autocomplete="off"
-                       placeholder="Search recipes, ingredients, or menus...">
-                <datalist id="appGlobalSearchSuggestions">
-                    <option value="Recipes"></option>
-                    <option value="Cookbooks"></option>
-                    <option value="Shopping Lists"></option>
-                    <option value="Pantry"></option>
-                    <option value="Stores"></option>
-                    <option value="Import"></option>
-                    <option value="Usage Billing"></option>
-                    <option value="Help Support"></option>
-                </datalist>
-                <span class="app-global-search-shortcut" aria-hidden="true">Ctrl + K</span>
-                <button type="submit" class="app-search-submit">Search</button>
-                <span class="sr-only" data-app-global-search-status aria-live="polite"></span>
-            </form>
-            <div class="app-toolbar-actions" aria-label="Quick actions">
-                <a class="app-toolbar-button app-toolbar-primary"
-                   href="#importPage"
-                   data-app-nav-link
-                   data-app-nav-action="app-page"
-                   data-app-page-target="importPage"
-                   data-app-nav-target="importPage">
-                    {{ shell.svg_icon("plus") }}
-                    <span>Import</span>
-                </a>
-                <a class="app-toolbar-button app-toolbar-icon-button"
-                   href="#notificationsPage"
-                   data-app-nav-link
-                   data-app-nav-action="app-page"
-                   data-app-page-target="notificationsPage"
-                   data-app-nav-target="notificationsPage"
-                   title="Notifications">
-                    {{ shell.svg_icon("bell") }}
-                    <span class="sr-only">Notifications</span>
-                </a>
-                <button type="button"
-                        class="app-toolbar-button app-help-button"
-                        onclick="return openFeedbackSupportSection()"
-                        aria-controls="feedbackSupportSection"
-                        title="Help and support">
-                    {{ shell.svg_icon("help") }}
-                    <span>Help &amp; Support</span>
-                </button>
-                {{ shell.account_control(current_user, is_guest_demo, '#userAccountSection', true) }}
-            </div>
-        </header>
+        {{ shell.app_topbar(
+            current_user,
+            is_guest_demo,
+            url_for('main_bp.index'),
+            'appGlobalSearch',
+            'submitAppGlobalSearch',
+            '#importPage',
+            '#notificationsPage',
+            '#feedbackSupportSection',
+            '#userAccountSection',
+            true
+        ) }}
 
         {% if current_user and current_user.is_admin %}
             {% include "sections/screen_settings.html" %}

@@ -31528,17 +31528,6 @@ img[data-deferred-src] {
     color-scheme: dark;
 }
 
-.recipe-edit-standalone-page .app-topbar {
-    padding-inline: 24px;
-    background: rgba(23, 28, 30, .96);
-}
-
-.recipe-edit-standalone-page .app-toolbar-primary {
-    border-color: var(--app-border-strong);
-    background: var(--app-surface-soft);
-    color: var(--app-primary-hover);
-}
-
 .recipe-edit-standalone-page .app-sidebar-promo {
     border-color: var(--app-border);
     background: linear-gradient(145deg, var(--app-surface-soft), var(--app-surface));
@@ -36612,8 +36601,7 @@ img[data-deferred-src] {
     overflow: hidden;
 }
 
-.recipe-edit-standalone-page .recipe-edit-page-topbar {
-    position: relative;
+.recipe-edit-standalone-page .app-topbar {
     flex: 0 0 auto;
 }
 
@@ -36626,41 +36614,10 @@ img[data-deferred-src] {
     overscroll-behavior: contain;
 }
 
-.recipe-edit-page-topbar {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    border-color: var(--app-border);
-    background: var(--app-surface);
-    color: var(--app-text);
-}
-
-.recipe-edit-page-topbar .app-toolbar-button:not(.app-account-button) {
-    border-color: var(--app-border);
-    background: var(--app-surface-soft);
-    color: var(--app-text-strong);
-}
-
 .recipe-edit-standalone-page .app-sidebar-promo {
     border-color: var(--app-border);
     background: var(--app-surface-soft);
     color: var(--app-text);
-}
-
-.recipe-edit-page-topbar-title {
-    display: grid;
-    min-width: 0;
-    color: var(--app-text);
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.recipe-edit-page-topbar-title strong {
-    color: var(--app-text-strong);
-    font-size: 14px;
-    line-height: 1.15;
-}
-
-.recipe-edit-page-topbar-title span {
-    color: var(--app-muted);
 }
 
 .recipe-edit-standalone-shell {
@@ -37349,14 +37306,6 @@ img[data-deferred-src] {
 }
 
 @media (max-width: 767px) {
-    .recipe-edit-page-topbar {
-        grid-template-columns: auto 1fr auto;
-    }
-
-    .recipe-edit-page-topbar-title {
-        display: none;
-    }
-
     .recipe-edit-standalone-shell {
         width: calc(100vw - 16px);
         padding: 12px 0 92px;

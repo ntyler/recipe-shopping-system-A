@@ -249,3 +249,80 @@
     </span>
 </a>
 {%- endmacro %}
+
+{% macro app_topbar(current_user, is_guest_demo, home_href, search_id, search_submit_handler,
+                    import_href, notifications_href, help_href, account_href,
+                    in_shell=false, search_action="") -%}
+<header class="app-topbar" aria-label="App toolbar">
+    <a class="app-topbar-brand" href="{{ home_href }}">
+        {{ brand_mark() }}
+        <span>AI Pantry</span>
+    </a>
+    <form class="app-global-search"
+          role="search"
+          {% if search_action %}action="{{ search_action }}"{% endif %}
+          onsubmit="return {{ search_submit_handler }}(this)">
+        <label class="sr-only" for="{{ search_id }}">Search app sections</label>
+        <span class="app-global-search-icon" aria-hidden="true">{{ svg_icon("search") }}</span>
+        <input id="{{ search_id }}"
+               name="app_search"
+               data-app-global-search
+               list="{{ search_id }}Suggestions"
+               type="search"
+               autocomplete="off"
+               placeholder="Search recipes, ingredients, or menus...">
+        <datalist id="{{ search_id }}Suggestions">
+            <option value="Recipes"></option>
+            <option value="Cookbooks"></option>
+            <option value="Shopping Lists"></option>
+            <option value="Pantry"></option>
+            <option value="Stores"></option>
+            <option value="Import"></option>
+            <option value="Usage Billing"></option>
+            <option value="Help Support"></option>
+        </datalist>
+        <span class="app-global-search-shortcut" aria-hidden="true">Ctrl + K</span>
+        <button type="submit" class="app-search-submit">Search</button>
+        <span class="sr-only" data-app-global-search-status aria-live="polite"></span>
+    </form>
+    <div class="app-toolbar-actions" aria-label="Quick actions">
+        <a class="app-toolbar-button app-toolbar-primary"
+           href="{{ import_href }}"
+           {% if in_shell %}data-app-nav-link
+           data-app-nav-action="app-page"
+           data-app-page-target="importPage"
+           data-app-nav-target="importPage"{% endif %}>
+            {{ svg_icon("plus") }}
+            <span>Import</span>
+        </a>
+        <a class="app-toolbar-button app-toolbar-icon-button"
+           href="{{ notifications_href }}"
+           {% if in_shell %}data-app-nav-link
+           data-app-nav-action="app-page"
+           data-app-page-target="notificationsPage"
+           data-app-nav-target="notificationsPage"{% endif %}
+           title="Notifications">
+            {{ svg_icon("bell") }}
+            <span class="sr-only">Notifications</span>
+        </a>
+        {% if in_shell %}
+        <button type="button"
+                class="app-toolbar-button app-help-button"
+                onclick="return openFeedbackSupportSection()"
+                aria-controls="feedbackSupportSection"
+                title="Help and support">
+            {{ svg_icon("help") }}
+            <span>Help &amp; Support</span>
+        </button>
+        {% else %}
+        <a class="app-toolbar-button app-help-button"
+           href="{{ help_href }}"
+           title="Help and support">
+            {{ svg_icon("help") }}
+            <span>Help &amp; Support</span>
+        </a>
+        {% endif %}
+        {{ account_control(current_user, is_guest_demo, account_href, in_shell) }}
+    </div>
+</header>
+{%- endmacro %}

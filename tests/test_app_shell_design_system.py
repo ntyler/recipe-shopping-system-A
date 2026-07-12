@@ -15,7 +15,8 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert '{% import "includes/app_shell_macros.html" as shell %}' in template
     assert "app-shell-body" in template
     assert '<aside class="app-sidebar" aria-label="Primary navigation">' in template
-    assert '<header class="app-topbar" aria-label="App toolbar">' in template
+    assert "shell.app_topbar(" in template
+    assert '<header class="app-topbar" aria-label="App toolbar">' in shell_macros
     assert '<header id="appPageHeader" class="app-page-header" data-app-home-header>' in template
     assert '<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">' in template
     assert 'class="app-nav-section-title">Discover &amp; Plan</div>' in template
@@ -24,14 +25,14 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert 'class="app-nav-section-title">PANTRY</div>' in template
     assert 'class="app-nav-section-title">Account</div>' in template
     assert "app-sidebar-promo" in template
-    assert 'data-app-global-search' in template
-    assert "app-global-search-icon" in template
-    assert "app-global-search-shortcut" in template
-    assert "Ctrl + K" in template
-    assert 'onsubmit="return submitAppGlobalSearch(this)"' in template
-    assert "app-toolbar-primary" in template
-    assert 'data-app-page-target="notificationsPage"' in template
-    assert 'data-app-nav-action="account-workspace"' in template
+    assert 'data-app-global-search' in shell_macros
+    assert "app-global-search-icon" in shell_macros
+    assert "app-global-search-shortcut" in shell_macros
+    assert "Ctrl + K" in shell_macros
+    assert "'submitAppGlobalSearch'" in template
+    assert "app-toolbar-primary" in shell_macros
+    assert 'data-app-page-target="notificationsPage"' in shell_macros
+    assert 'data-app-nav-action="account-workspace"' in shell_macros
     assert 'href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage"' in template
     assert 'class="app-account-avatar-image"' in shell_macros
     assert "current_user.avatar_path" in shell_macros
@@ -220,7 +221,7 @@ def test_index_topbar_uses_current_user_profile_image(monkeypatch, tmp_path):
     assert ">N<" not in topbar_markup
 
 
-def test_home_and_recipe_editor_reuse_the_same_account_control():
+def test_home_and_recipe_editor_reuse_the_same_topbar_and_account_control():
     home = read_text("PushShoppingList/templates/index.html")
     recipe_editor = read_text("PushShoppingList/templates/recipe_edit_page.html")
     macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
@@ -228,13 +229,17 @@ def test_home_and_recipe_editor_reuse_the_same_account_control():
     routes = read_text("PushShoppingList/routes/recipe_routes.py")
 
     assert "{% macro account_control(" in macros
+    assert "{% macro app_topbar(" in macros
     assert "current_user.display_name" in macros
     assert "Pro Plan" in macros
-    assert "shell.account_control(current_user, is_guest_demo" in home
-    assert "shell.account_control(current_user, is_guest_demo" in recipe_editor
+    assert "shell.app_topbar(" in home
+    assert "shell.app_topbar(" in recipe_editor
+    assert "{{ account_control(current_user, is_guest_demo, account_href, in_shell) }}" in macros
     assert 'class="app-toolbar-button app-account-button"' not in home
     assert 'class="app-toolbar-button app-account-button"' not in recipe_editor
-    assert ".recipe-edit-page-topbar .app-toolbar-button:not(.app-account-button)" in css
+    assert "recipe-edit-page-topbar" not in recipe_editor
+    assert "recipe-edit-page-topbar" not in css
+    assert "grid-template-columns: minmax(280px, 620px) minmax(0, 1fr) auto;" in css
     assert "from PushShoppingList.services.user_account_service import current_public_user" in routes
     assert "current_user=current_public_user()," in routes
 

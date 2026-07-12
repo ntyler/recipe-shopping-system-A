@@ -118,46 +118,19 @@
         </aside>
     </aside>
     <div class="app-main-shell recipe-edit-page-main-shell">
-        <header class="app-topbar recipe-edit-page-topbar" aria-label="App toolbar">
-            <a class="app-topbar-brand" href="{{ url_for('main_bp.index') }}">
-                {{ shell.brand_mark() }}
-                <span>AI Pantry</span>
-            </a>
-            <form class="app-global-search"
-                  role="search"
-                  action="{{ url_for('main_bp.index') }}"
-                  onsubmit="return submitRecipeEditGlobalSearch(this)">
-                <label class="sr-only" for="recipeEditGlobalSearch">Search app sections</label>
-                <span class="app-global-search-icon" aria-hidden="true">{{ shell.svg_icon("search") }}</span>
-                <input id="recipeEditGlobalSearch"
-                       name="app_search"
-                       type="search"
-                       autocomplete="off"
-                       placeholder="Search recipes, ingredients, or menus...">
-                <span class="app-global-search-shortcut" aria-hidden="true">Ctrl + K</span>
-                <button type="submit" class="app-search-submit">Search</button>
-            </form>
-            <div class="app-toolbar-actions" aria-label="Quick actions">
-                <a class="app-toolbar-button app-toolbar-primary"
-                   href="{{ url_for('main_bp.index') }}#importPage">
-                    {{ shell.svg_icon("plus") }}
-                    <span>Import</span>
-                </a>
-                <a class="app-toolbar-button app-toolbar-icon-button"
-                   href="{{ url_for('main_bp.index') }}#notificationsPage"
-                   title="Notifications">
-                    {{ shell.svg_icon("bell") }}
-                    <span class="sr-only">Notifications</span>
-                </a>
-                <a class="app-toolbar-button app-help-button"
-                   href="{{ url_for('main_bp.index') }}#feedbackSupportSection"
-                   title="Help and support">
-                    {{ shell.svg_icon("help") }}
-                    <span>Help &amp; Support</span>
-                </a>
-                {{ shell.account_control(current_user, is_guest_demo, url_for('main_bp.index') ~ '#userAccountSection') }}
-            </div>
-        </header>
+        {{ shell.app_topbar(
+            current_user,
+            is_guest_demo,
+            url_for('main_bp.index'),
+            'recipeEditGlobalSearch',
+            'submitRecipeEditGlobalSearch',
+            url_for('main_bp.index') ~ '#importPage',
+            url_for('main_bp.index') ~ '#notificationsPage',
+            url_for('main_bp.index') ~ '#feedbackSupportSection',
+            url_for('main_bp.index') ~ '#userAccountSection',
+            false,
+            url_for('main_bp.index')
+        ) }}
         <main id="appContent" class="app-content recipe-edit-standalone-shell" aria-label="Recipe editor">
             {% set recipe_edit_only = true %}
             {% include "sections/current_recipe_url_log.html" %}

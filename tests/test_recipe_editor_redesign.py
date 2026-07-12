@@ -41,7 +41,9 @@ def test_standalone_recipe_editor_uses_app_shell_navigation():
     assert "recipe-edit-standalone-shell" in template
     assert "{% include \"sections/current_recipe_url_log.html\" %}" in template
     assert 'data-app-sidebar-collapse' in template
-    assert 'class="app-global-search"' in template
+    assert "shell.app_topbar(" in template
+    assert "'recipeEditGlobalSearch'" in template
+    assert "'submitRecipeEditGlobalSearch'" in template
     assert "organizeRecipeEditStandaloneWorkspace()" in template
 
 
