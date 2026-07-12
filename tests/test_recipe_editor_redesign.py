@@ -309,7 +309,7 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Permanently Closed" in template
     assert template.count('<option value="">Unknown</option>') >= 2
     assert "cancelRecipeRestaurantSourceEdit" in template
-    assert "async function saveRecipeRestaurantSource(form)" in script
+    assert "async function saveRecipeRestaurantSource(form, options = {})" in script
     assert "function editRecipeRestaurantSource(button, event = null)" in script
     assert "event.stopPropagation();" in script
     assert 'form.querySelector("input:invalid")' in script
@@ -335,7 +335,8 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "function updateRecipeRestaurantStructuredHours(control)" in script
     assert "function toggleRecipeRestaurantSplitHours(button)" in script
     assert 'const restaurantId = recipeEditInputValue("recipeEditRestaurantId")' in script
-    assert 'const selected = currentRecipeRestaurantSourceOption();' in script
+    assert 'const linkedSource = currentRecipeRestaurantSourceOption();' in script
+    assert 'const selected = linkedSource || recipeRestaurantFallbackFromEditor();' in script
     assert 'event.key === "Escape"' in script
     assert 'event.key !== "Tab"' in script
     assert "Discard unsaved restaurant changes?" in script

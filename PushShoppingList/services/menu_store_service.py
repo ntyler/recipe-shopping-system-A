@@ -298,6 +298,10 @@ def upsert_restaurant(payload, raw_restaurant, source_url=""):
     )
 
     if restaurant:
+        restaurant_id = clean_text(restaurant.get("id") or restaurant.get("restaurant_id"))
+        restaurant["id"] = restaurant_id
+        restaurant["restaurant_id"] = restaurant_id
+        restaurant.setdefault("created_at", restaurant.get("imported_at") or now)
         existing_name = clean_text(restaurant.get("restaurant_name"))
         incoming_name = clean_text(normalized.get("restaurant_name"))
         apply_nonempty_fields(restaurant, normalized)
@@ -312,9 +316,12 @@ def upsert_restaurant(payload, raw_restaurant, source_url=""):
         restaurant["last_seen_at"] = now
         return restaurant
 
+    restaurant_id = new_id("restaurant")
     restaurant = {
-        "id": new_id("restaurant"),
+        "id": restaurant_id,
+        "restaurant_id": restaurant_id,
         **normalized,
+        "created_at": now,
         "imported_at": now,
         "updated_at": now,
         "last_seen_at": now,

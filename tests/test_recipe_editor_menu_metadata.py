@@ -1,9 +1,13 @@
 from pathlib import Path
 
+from flask import Flask
+from flask import session
+
 from PushShoppingList.services import menu_store_service
 from PushShoppingList.services import menu_mega_json_service
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
+from PushShoppingList.services import storage_service
 from PushShoppingList.routes import main_routes
 
 
@@ -615,6 +619,7 @@ def test_inline_restaurant_source_update_rejects_unlinked_restaurant(monkeypatch
     url, _detail = seed_menu_derived_recipe()
 
     result = recipe_edit_service.update_editable_restaurant_source(url, {
+        "assign_restaurant": "false",
         "restaurant_id": "another-restaurant",
         "restaurant_name": "Wrong Restaurant",
     })
@@ -642,6 +647,67 @@ def test_source_documents_update_preserves_recipe_identity_and_updates_linked_me
     assert menu["source_url"] == "https://example.com/full-menu"
 
 
+def test_source_documents_update_restaurant_only_normalized_menu_url(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Restaurant Only",
+        "source_menu_url": "https://example.com/old-menu",
+    })
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    url = "https://example.com/restaurant-only-recipe"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "restaurant_id": restaurant_id,
+        "source_menu_url": "https://example.com/old-menu",
+        "menu_item_url": "https://example.com/old-menu?item=one",
+        "recipe_title": "Restaurant Only Dish",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    result = recipe_edit_service.update_editable_source_documents(url, {
+        "document_source_url": url,
+        "source_menu_url": "https://example.com/new-menu",
+        "menu_item_url": "https://example.com/new-menu?item=one",
+    })
+    restaurant = menu_store_service.restaurant_for(menu_store_service.load_menu_store(), restaurant_id)
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert result["ok"] is True
+    assert restaurant["menu_url"] == "https://example.com/new-menu"
+    assert restaurant["source_menu_url"] == "https://example.com/new-menu"
+    assert loaded["source_menu_url"] == "https://example.com/new-menu"
+    assert recipe_edit_service.load_recipe_output(url)["menu_item_url"] == "https://example.com/new-menu?item=one"
+
+
+def test_normalized_restaurant_menu_url_precedes_legacy_recipe_snapshot(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Shared Menu Restaurant",
+        "source_menu_url": "https://example.com/original-menu",
+    })
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    url = "https://example.com/shared-menu-recipe"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "restaurant_id": restaurant_id,
+        "source_menu_url": "https://example.com/stale-embedded-menu",
+        "recipe_title": "Shared Dish",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    result = recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Shared Menu Restaurant",
+        "source_menu_url": "https://example.com/normalized-menu",
+    })
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert result["ok"] is True
+    assert loaded["source_menu_url"] == "https://example.com/normalized-menu"
+    assert recipe_edit_service.load_recipe_output(url)["source_menu_url"] == "https://example.com/stale-embedded-menu"
+
+
 def test_restaurant_usage_is_computed_from_linked_recipes(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     url, detail = seed_menu_derived_recipe()
@@ -652,6 +718,254 @@ def test_restaurant_usage_is_computed_from_linked_recipes(monkeypatch, tmp_path)
     assert result["recipe_count"] == 1
     assert result["recipes"][0]["url"] == url
     assert result["recipes"][0]["title"]
+
+
+def test_restaurant_directory_lists_searches_and_loads_stable_records(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    first = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Pisco Mar",
+        "restaurant_website_url": "https://fromtherestaurant.com",
+        "restaurant_city": "Indianapolis",
+        "restaurant_state": "Indiana",
+    })
+    recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Vel Asian Cuisine",
+        "restaurant_city": "Loveland",
+        "restaurant_state": "Ohio",
+    })
+
+    result = recipe_edit_service.list_editable_restaurants("indianapolis")
+    loaded = recipe_edit_service.get_editable_restaurant(first["restaurant"]["restaurant_id"])
+
+    assert result["ok"] is True
+    assert result["count"] == 1
+    assert result["restaurants"][0]["restaurant_name"] == "Pisco Mar"
+    assert loaded["restaurant"]["id"] == first["restaurant"]["restaurant_id"]
+    assert loaded["restaurant"]["restaurant_id"] == first["restaurant"]["restaurant_id"]
+    assert loaded["restaurant"]["created_at"]
+
+
+def test_restaurant_directory_is_isolated_by_user_and_guest_scope(monkeypatch, tmp_path):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
+    app = Flask(__name__)
+    app.secret_key = "restaurant-scope-test"
+
+    with app.test_request_context("/"):
+        session["user_id"] = "user-a"
+        created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "User A Cafe"})
+        assert created["ok"] is True
+        assert [row["restaurant_name"] for row in recipe_edit_service.list_editable_restaurants()["restaurants"]] == [
+            "User A Cafe",
+        ]
+        stored = menu_store_service.load_menu_store()["restaurants"][0]
+        assert stored["owner_user_id"] == "user-a"
+        assert stored["account_scope"] == "user"
+
+    with app.test_request_context("/"):
+        session["user_id"] = "user-b"
+        assert recipe_edit_service.list_editable_restaurants()["restaurants"] == []
+        recipe_edit_service.create_editable_restaurant({"restaurant_name": "User B Bistro"})
+
+    with app.test_request_context("/"):
+        session["user_id"] = "stale-user"
+        session["is_guest"] = True
+        session["guest_session_id"] = "guest-a"
+        assert recipe_edit_service.list_editable_restaurants()["restaurants"] == []
+        recipe_edit_service.create_editable_restaurant({"restaurant_name": "Guest Grill"})
+        stored = menu_store_service.load_menu_store()["restaurants"][0]
+        assert stored["owner_user_id"] is None
+        assert stored["account_scope"] == "guest:guest-a"
+
+    with app.test_request_context("/"):
+        session["user_id"] = "user-a"
+        assert [row["restaurant_name"] for row in recipe_edit_service.list_editable_restaurants()["restaurants"]] == [
+            "User A Cafe",
+        ]
+
+
+def test_restaurant_source_can_switch_normalized_association_on_save(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_derived_recipe()
+    recipe_data = recipe_edit_service.load_recipe_output(url)
+    recipe_data["menu_item_url"] = "https://velasian.example/menu?item=spring-roll"
+    recipe_data["restaurant_name"] = "Legacy snapshot remains for compatibility"
+    recipe_edit_service.save_recipe_output(url, recipe_data)
+    created = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Pisco Mar",
+        "restaurant_website_url": "https://pisco.example",
+        "restaurant_city": "Indianapolis",
+        "restaurant_state": "Indiana",
+    })
+    restaurant_id = created["restaurant"]["restaurant_id"]
+
+    result = recipe_edit_service.update_editable_restaurant_source(url, {
+        "action": "update",
+        "assign_restaurant": True,
+        "restaurant_id": restaurant_id,
+        "restaurant_name": "Pisco Mar Updated",
+        "restaurant_website_url": "https://pisco.example",
+    })
+    saved_recipe = recipe_edit_service.load_recipe_output(url)
+    store = menu_store_service.load_menu_store()
+
+    assert result["ok"] is True
+    assert result["association_changed"] is True
+    assert saved_recipe["restaurant_id"] == restaurant_id
+    assert "menu_id" not in saved_recipe
+    assert "menu_section_id" not in saved_recipe
+    assert "menu_item_id" not in saved_recipe
+    assert saved_recipe["menu_item_url"] == "https://velasian.example/menu?item=spring-roll"
+    assert saved_recipe["restaurant_name"] == "Legacy snapshot remains for compatibility"
+    assert menu_store_service.restaurant_for(store, restaurant_id)["restaurant_name"] == "Pisco Mar Updated"
+    assert menu_store_service.restaurant_for(store, detail["restaurant"]["id"])
+
+
+def test_restaurant_create_requires_explicit_duplicate_override_and_assigns_atomically(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_derived_recipe()
+    recipe_data = recipe_edit_service.load_recipe_output(url)
+    recipe_data["menu_item_url"] = "https://velasian.example/menu?item=spring-roll"
+    recipe_edit_service.save_recipe_output(url, recipe_data)
+    payload = {
+        "action": "create",
+        "restaurant_name": "Vel Asian Cuisine",
+        "restaurant_phone": "3175550100",
+        "restaurant_website_url": "https://velasian.example",
+    }
+
+    duplicate = recipe_edit_service.update_editable_restaurant_source(url, payload)
+    assert duplicate["ok"] is False
+    assert duplicate["duplicate_detected"] is True
+    assert duplicate["error"] == "A similar restaurant already exists."
+    assert duplicate["duplicates"][0]["restaurant_id"] == detail["restaurant"]["id"]
+    assert len(menu_store_service.load_menu_store()["restaurants"]) == 1
+    assert recipe_edit_service.load_recipe_output(url)["restaurant_id"] == detail["restaurant"]["id"]
+
+    string_false_override = recipe_edit_service.update_editable_restaurant_source(url, {
+        **payload,
+        "create_anyway": "false",
+    })
+    assert string_false_override["duplicate_detected"] is True
+    assert len(menu_store_service.load_menu_store()["restaurants"]) == 1
+
+    created = recipe_edit_service.update_editable_restaurant_source(url, {
+        **payload,
+        "create_anyway": True,
+    })
+    saved_recipe = recipe_edit_service.load_recipe_output(url)
+
+    assert created["ok"] is True
+    assert created["created"] is True
+    assert created["association_changed"] is True
+    assert len(menu_store_service.load_menu_store()["restaurants"]) == 2
+    assert saved_recipe["restaurant_id"] == created["restaurant"]["restaurant_id"]
+    assert saved_recipe["menu_item_url"] == "https://velasian.example/menu?item=spring-roll"
+
+
+def test_restaurant_update_stores_structured_aliases_and_preserves_created_at(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "Hours Cafe"})
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    store = menu_store_service.load_menu_store()
+    store["restaurants"][0]["created_at"] = "2020-01-01T00:00:00Z"
+    store["restaurants"][0]["raw_hours_data"] = "Legacy prose hours"
+    menu_store_service.save_menu_store(store)
+
+    result = recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Hours Cafe",
+        "source_menu_url": "https://hours.example/menu",
+        "restaurant_hours_text": (
+            "Monday: 11:00-21:00, 22:00-23:00\n"
+            "Tuesday: Closed\nNotes: Kitchen closes 30 minutes early"
+        ),
+        "restaurant_online_payment_available": "",
+        "restaurant_delivery_available": "true",
+    })
+    restaurant = menu_store_service.restaurant_for(menu_store_service.load_menu_store(), restaurant_id)
+
+    assert result["ok"] is True
+    assert restaurant["created_at"] == "2020-01-01T00:00:00Z"
+    assert restaurant["menu_url"] == "https://hours.example/menu"
+    assert restaurant["weekly_hours"]["monday"]["ranges"][1] == {"opens": "22:00", "closes": "23:00"}
+    assert restaurant["weekly_hours"]["tuesday"]["closed"] is True
+    assert restaurant["hours_notes"] == "Kitchen closes 30 minutes early"
+    assert restaurant["raw_hours_data"] == "Legacy prose hours"
+    assert restaurant["online_payment"] is None
+    assert restaurant["delivery"] is True
+    assert restaurant["updated_at"]
+
+
+def test_legacy_embedded_restaurant_is_lazily_backfilled_without_deleting_snapshot(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    existing = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Pisco Mar",
+        "restaurant_phone": "317-537-2025",
+        "restaurant_city": "Indianapolis",
+    })
+    url = "https://example.test/legacy-recipe"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Legacy Dish",
+        "restaurant_name": "Pisco Mar",
+        "restaurant_phone": "(317) 537-2025",
+        "menu_item_url": "https://example.test/menu?item=legacy",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert loaded["restaurant_id"] == existing["restaurant"]["restaurant_id"]
+    assert saved["restaurant_id"] == existing["restaurant"]["restaurant_id"]
+    assert saved["restaurant_name"] == "Pisco Mar"
+    assert saved["restaurant_phone"] == "(317) 537-2025"
+    assert saved["menu_item_url"] == "https://example.test/menu?item=legacy"
+
+
+def test_url_only_legacy_recipe_backfills_from_normalized_menu_item(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_recipe_url_match()
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "source_pdf_path": "legacy-menu.pdf",
+        "recipe_title": "Spring Roll",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert loaded["restaurant_id"] == detail["restaurant"]["id"]
+    assert saved["restaurant_id"] == detail["restaurant"]["id"]
+    assert saved["menu_id"] == detail["menu"]["id"]
+    assert saved["menu_item_id"] == detail["items"][0]["id"]
+    assert saved["source_pdf_path"] == "legacy-menu.pdf"
+
+
+def test_legacy_backfill_logs_ambiguous_matches_without_guessing(monkeypatch, tmp_path, capsys):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    for city in ("Indianapolis", "Chicago"):
+        recipe_edit_service.create_editable_restaurant({
+            "restaurant_name": "Shared Name Cafe",
+            "restaurant_city": city,
+        }, create_anyway=True)
+    url = "https://example.test/ambiguous-legacy-recipe"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Ambiguous Dish",
+        "restaurant_name": "Shared Name Cafe",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    recipe_edit_service.load_editable_recipe(url)
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert not saved.get("restaurant_id")
+    assert "[restaurant_backfill] ambiguous" in capsys.readouterr().out
 
 
 def test_menu_derived_recipe_loads_canonical_source_for_duplicate_source_ids(monkeypatch, tmp_path):

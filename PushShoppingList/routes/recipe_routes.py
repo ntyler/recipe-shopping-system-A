@@ -135,6 +135,11 @@ from PushShoppingList.services.recipe_edit_service import update_editable_restau
 from PushShoppingList.services.recipe_edit_service import update_editable_source_documents
 from PushShoppingList.services.recipe_edit_service import editable_restaurant_usage
 from PushShoppingList.services.recipe_edit_service import editable_restaurant_logo_file_path
+from PushShoppingList.services.recipe_edit_service import backfill_editable_restaurant_sources
+from PushShoppingList.services.recipe_edit_service import create_editable_restaurant
+from PushShoppingList.services.recipe_edit_service import get_editable_restaurant
+from PushShoppingList.services.recipe_edit_service import list_editable_restaurants
+from PushShoppingList.services.recipe_edit_service import update_editable_restaurant
 from PushShoppingList.services.cookbook_item_inference_service import infer_missing_details_for_recipe
 from PushShoppingList.services.cookbook_item_inference_service import regenerate_ingredients_for_recipe
 from PushShoppingList.services.cookbook_item_inference_service import regenerate_recipe_notes_for_recipe
@@ -3526,7 +3531,39 @@ def update_recipe_restaurant_source_route():
     if not recipe_url:
         return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
     result = update_editable_restaurant_source(recipe_url, data)
-    return jsonify(result), 200 if result.get("ok") else 400
+    status = 200 if result.get("ok") else (409 if result.get("duplicate_detected") else 400)
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe/restaurants", methods=["GET", "POST"])
+def recipe_restaurants_route():
+    if request.method == "GET":
+        return jsonify(list_editable_restaurants(
+            request.args.get("q", ""),
+            request.args.get("limit", 100),
+        ))
+    data = request.get_json(silent=True) or {}
+    result = create_editable_restaurant(data, create_anyway=data.get("create_anyway"))
+    status = 201 if result.get("ok") else (409 if result.get("duplicate_detected") else 400)
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe/restaurants/<restaurant_id>", methods=["GET", "PATCH"])
+def recipe_restaurant_detail_route(restaurant_id):
+    if request.method == "GET":
+        result = get_editable_restaurant(restaurant_id)
+    else:
+        data = request.get_json(silent=True) or {}
+        result = update_editable_restaurant(restaurant_id, data, menu_id=data.get("menu_id"))
+    status = 200 if result.get("ok") else (
+        404 if "not found" in str(result.get("error") or "").lower() else 400
+    )
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe/restaurants/backfill", methods=["POST"])
+def recipe_restaurants_backfill_route():
+    return jsonify(backfill_editable_restaurant_sources())
 
 
 @recipe_bp.route("/api/recipe/restaurant-usage", methods=["GET"])

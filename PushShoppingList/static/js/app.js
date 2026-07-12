@@ -25116,11 +25116,6 @@ function updateRecipeEditRestaurantCard() {
             };
         }
     }
-    const editButton = document.querySelector(".recipe-edit-restaurant-edit");
-    if (editButton) {
-        editButton.hidden = !name && !website && !menu && !phone && !address;
-    }
-
     setAction("website", isLegitimateWebUrl(website) ? website : "");
     setAction("menu", isLegitimateWebUrl(menu) ? menu : "");
     setAction("map", address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
@@ -25131,8 +25126,233 @@ let recipeRestaurantEditTrigger = null;
 let recipeRestaurantDisplaySource = null;
 let recipeRestaurantModalInertElements = [];
 let recipeRestaurantUsageRecipes = [];
+let recipeRestaurantDirectory = [];
+let recipeRestaurantDirectoryRequest = 0;
+let recipeRestaurantSelectorDebounce = null;
+let recipeRestaurantSelectorActiveIndex = -1;
+let recipeRestaurantEditSelection = null;
+let recipeRestaurantEditCreateMode = false;
+let recipeRestaurantOriginalMenuItemUrl = "";
+let recipeRestaurantOriginalMenuId = "";
+let recipeRestaurantOriginalRestaurantId = "";
+let recipeRestaurantDuplicateCandidates = [];
+
+function recipeRestaurantRecordId(record) {
+    return String(record?.restaurant_id || record?.id || "").trim();
+}
+
+function recipeRestaurantRecordName(record) {
+    return String(record?.restaurant_name || record?.name || "Unnamed restaurant").trim();
+}
+
+function recipeRestaurantRecordValue(record, field) {
+    const aliases = {
+        restaurant_name: ["restaurant_name", "name"],
+        restaurant_logo_url: ["restaurant_logo_url", "logo_url", "logo"],
+        restaurant_rating: ["restaurant_rating", "rating"],
+        restaurant_phone: ["restaurant_phone", "phone"],
+        restaurant_website_url: ["restaurant_website_url", "website_url"],
+        source_menu_url: ["source_menu_url", "menu_url"],
+        restaurant_street_address: ["restaurant_street_address", "street_address"],
+        restaurant_city: ["restaurant_city", "city"],
+        restaurant_state: ["restaurant_state", "state_or_region", "state"],
+        restaurant_postal_code: ["restaurant_postal_code", "postal_code"],
+        restaurant_country: ["restaurant_country", "country"],
+        restaurant_hours_text: ["restaurant_hours_text", "raw_hours_data", "hours"],
+        restaurant_promotions: ["restaurant_promotions", "rewards_promotions"],
+        restaurant_current_status: ["restaurant_current_status", "current_status"],
+        restaurant_online_payment_available: ["restaurant_online_payment_available", "online_payment"],
+        restaurant_delivery_available: ["restaurant_delivery_available", "delivery"],
+        menu_item_url: ["menu_item_url"],
+    };
+    const key = (aliases[field] || [field]).find(candidate => record?.[candidate] !== undefined && record?.[candidate] !== null);
+    const value = key ? record[key] : "";
+    if (typeof value === "boolean") return value ? "true" : "false";
+    return recipeMenuMetadataText(value);
+}
+
+function recipeRestaurantRecordSecondary(record) {
+    const city = recipeRestaurantRecordValue(record, "restaurant_city");
+    const state = recipeRestaurantRecordValue(record, "restaurant_state");
+    const location = [city, state].filter(Boolean).join(", ");
+    if (location) return location;
+    const street = recipeRestaurantRecordValue(record, "restaurant_street_address");
+    if (street) return street;
+    const website = recipeRestaurantRecordValue(record, "restaurant_website_url");
+    try {
+        return website ? new URL(website, window.location.origin).hostname.replace(/^www\./i, "") : "";
+    } catch (err) {
+        return website;
+    }
+}
+
+function recipeRestaurantSelectorElements() {
+    const root = document.querySelector("[data-restaurant-selector]");
+    return {
+        root,
+        input: root?.querySelector("[data-restaurant-selector-input]"),
+        list: root?.querySelector("[data-restaurant-selector-list]"),
+        status: root?.querySelector("[data-restaurant-selector-status]"),
+    };
+}
+
+function setRecipeRestaurantSelectorExpanded(expanded) {
+    const { input, list } = recipeRestaurantSelectorElements();
+    if (!input || !list) return;
+    list.hidden = !expanded;
+    input.setAttribute("aria-expanded", expanded ? "true" : "false");
+    if (!expanded) {
+        input.removeAttribute("aria-activedescendant");
+        recipeRestaurantSelectorActiveIndex = -1;
+    }
+}
+
+function recipeRestaurantSelectorOptions() {
+    return Array.from(recipeRestaurantSelectorElements().list?.querySelectorAll(
+        "[data-restaurant-selector-id], [data-restaurant-selector-create]"
+    ) || []);
+}
+
+function setRecipeRestaurantSelectorActive(index) {
+    const { input } = recipeRestaurantSelectorElements();
+    const options = recipeRestaurantSelectorOptions();
+    if (!options.length) return;
+    recipeRestaurantSelectorActiveIndex = (index + options.length) % options.length;
+    options.forEach((option, optionIndex) => option.classList.toggle("is-active", optionIndex === recipeRestaurantSelectorActiveIndex));
+    const active = options[recipeRestaurantSelectorActiveIndex];
+    input?.setAttribute("aria-activedescendant", active.id);
+    active?.scrollIntoView({ block: "nearest" });
+}
+
+function renderRecipeRestaurantSelector(restaurants = recipeRestaurantDirectory, options = {}) {
+    const { list, status } = recipeRestaurantSelectorElements();
+    if (!list) return;
+    const selectedId = recipeRestaurantRecordId(recipeRestaurantEditSelection);
+    const rows = restaurants.map((restaurant, index) => {
+        const id = recipeRestaurantRecordId(restaurant);
+        const secondary = recipeRestaurantRecordSecondary(restaurant);
+        return `<button type="button"
+                        id="recipeEditRestaurantOption${index}"
+                        class="recipe-edit-restaurant-selector-option"
+                        role="option"
+                        aria-selected="${id && id === selectedId ? "true" : "false"}"
+                        data-restaurant-selector-id="${escapeAttribute(id)}"
+                        onclick="return selectRecipeRestaurantFromSelector(this)">
+                    <strong>${escapeHtml(recipeRestaurantRecordName(restaurant))}</strong>
+                    ${secondary ? `<small>${escapeHtml(secondary)}</small>` : ""}
+                </button>`;
+    });
+    if (!restaurants.length && !options.loading) {
+        rows.push('<span class="recipe-edit-restaurant-selector-empty">No restaurants found</span>');
+    }
+    rows.push(`<button type="button"
+                       id="recipeEditRestaurantCreateOption"
+                       class="recipe-edit-restaurant-selector-create"
+                       role="option"
+                       aria-selected="${recipeRestaurantEditCreateMode ? "true" : "false"}"
+                       data-restaurant-selector-create
+                       onclick="return beginCreateRecipeRestaurant(this)">+ Create New Restaurant</button>`);
+    list.innerHTML = rows.join("");
+    if (status) status.textContent = options.loading
+        ? "Loading restaurants…"
+        : recipeRestaurantEditCreateMode ? "Creating new restaurant" : "";
+    recipeRestaurantSelectorActiveIndex = -1;
+}
+
+async function loadRecipeRestaurantDirectory(query = "") {
+    const requestId = ++recipeRestaurantDirectoryRequest;
+    const { input, status } = recipeRestaurantSelectorElements();
+    if (input) input.setAttribute("aria-busy", "true");
+    if (status) status.textContent = "Loading restaurants…";
+    renderRecipeRestaurantSelector(recipeRestaurantDirectory, { loading: true });
+    try {
+        const response = await fetch(`/api/recipe/restaurants?q=${encodeURIComponent(String(query || "").trim())}`);
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to load restaurants.");
+        if (requestId !== recipeRestaurantDirectoryRequest) return;
+        recipeRestaurantDirectory = Array.isArray(data.restaurants) ? data.restaurants : [];
+        renderRecipeRestaurantSelector();
+    } catch (err) {
+        if (requestId !== recipeRestaurantDirectoryRequest) return;
+        recipeRestaurantDirectory = [];
+        renderRecipeRestaurantSelector();
+        if (status) status.textContent = "Restaurant list unavailable.";
+    } finally {
+        if (requestId === recipeRestaurantDirectoryRequest) input?.removeAttribute("aria-busy");
+    }
+}
+
+function openRecipeRestaurantSelector(input) {
+    setRecipeRestaurantSelectorExpanded(true);
+    if (!recipeRestaurantDirectory.length) {
+        if (input?.getAttribute("aria-busy") !== "true") {
+            const selectedName = recipeRestaurantEditCreateMode ? "" : recipeRestaurantRecordName(recipeRestaurantEditSelection);
+            loadRecipeRestaurantDirectory(input?.value === selectedName ? "" : input?.value || "");
+        }
+        return;
+    }
+    renderRecipeRestaurantSelector();
+}
+
+function toggleRecipeRestaurantSelector(button) {
+    const { input, list } = recipeRestaurantSelectorElements();
+    if (!input || !list) return false;
+    if (list.hidden) {
+        openRecipeRestaurantSelector(input);
+        input.focus();
+    } else {
+        closeRecipeRestaurantSelector({ restoreValue: true });
+    }
+    return false;
+}
+
+function searchRecipeRestaurantSelector(query) {
+    setRecipeRestaurantSelectorExpanded(true);
+    window.clearTimeout(recipeRestaurantSelectorDebounce);
+    recipeRestaurantSelectorDebounce = window.setTimeout(() => loadRecipeRestaurantDirectory(query), 250);
+}
+
+function closeRecipeRestaurantSelector(options = {}) {
+    const { input } = recipeRestaurantSelectorElements();
+    window.clearTimeout(recipeRestaurantSelectorDebounce);
+    setRecipeRestaurantSelectorExpanded(false);
+    if (input && options.restoreValue !== false) {
+        input.value = recipeRestaurantEditCreateMode ? "" : recipeRestaurantRecordName(recipeRestaurantEditSelection);
+    }
+}
+
+function handleRecipeRestaurantSelectorKeydown(input, event) {
+    const options = recipeRestaurantSelectorOptions();
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+        event.preventDefault();
+        if (recipeRestaurantSelectorElements().list?.hidden) openRecipeRestaurantSelector(input);
+        setRecipeRestaurantSelectorActive(recipeRestaurantSelectorActiveIndex + (event.key === "ArrowDown" ? 1 : -1));
+        return false;
+    }
+    if (event.key === "Enter" && recipeRestaurantSelectorActiveIndex >= 0) {
+        event.preventDefault();
+        options[recipeRestaurantSelectorActiveIndex]?.click();
+        return false;
+    }
+    if (event.key === "Escape") {
+        const selectorList = recipeRestaurantSelectorElements().list;
+        if (!selectorList || selectorList.hidden) return true;
+        event.preventDefault();
+        event.stopPropagation();
+        closeRecipeRestaurantSelector({ restoreValue: true });
+        return false;
+    }
+    if (event.key === "Tab") closeRecipeRestaurantSelector({ restoreValue: true });
+    return true;
+}
 
 function currentRecipeRestaurantSourceOption() {
+    const linkedRestaurantId = recipeEditInputValue("recipeEditRestaurantId");
+    if (recipeRestaurantDisplaySource
+        && linkedRestaurantId
+        && recipeRestaurantRecordId(recipeRestaurantDisplaySource) === linkedRestaurantId) {
+        return recipeRestaurantDisplaySource;
+    }
     const selectValue = document.getElementById("recipeEditMenuSourceSelect")?.value || "";
     const selected = recipeMenuSourceOptionByValue(selectValue);
     if (selected) {
@@ -25165,6 +25385,237 @@ function currentRecipeRestaurantSourceOption() {
         restaurant_address: recipeEditInputValue("recipeEditRestaurantAddress"),
     };
     return recipeRestaurantDisplaySource;
+}
+
+function recipeRestaurantFallbackFromEditor() {
+    const menuItemUrl = recipeEditInputValue("recipeEditMenuItemUrl")
+        || recipeEditInputValue("recipeEditDocumentSourceUrl")
+        || recipeEditInputValue("recipeEditSourceUrl")
+        || recipeEditorSourceUrlForOpen();
+    return {
+        value: "|",
+        restaurant_id: "",
+        menu_id: recipeEditInputValue("recipeEditMenuId"),
+        restaurant_name: recipeEditInputValue("recipeEditRestaurantName"),
+        restaurant_phone: recipeEditInputValue("recipeEditRestaurantPhone"),
+        restaurant_website_url: recipeEditInputValue("recipeEditRestaurantWebsiteUrl"),
+        source_menu_url: recipeEditInputValue("recipeEditSourceMenuUrl"),
+        restaurant_street_address: recipeEditInputValue("recipeEditRestaurantAddress"),
+        restaurant_city: "",
+        restaurant_state: "",
+        restaurant_postal_code: "",
+        restaurant_country: "",
+        restaurant_hours_text: recipeEditInputValue("recipeEditRestaurantHoursText"),
+        restaurant_current_status: recipeEditInputValue("recipeEditRestaurantCurrentStatus") || "unknown",
+        restaurant_promotions: recipeEditInputValue("recipeEditRestaurantPromotions"),
+        restaurant_online_payment_available: recipeEditInputValue("recipeEditRestaurantOnlinePaymentAvailable"),
+        restaurant_delivery_available: recipeEditInputValue("recipeEditRestaurantDeliveryAvailable"),
+        menu_item_url: menuItemUrl,
+    };
+}
+
+function recipeRestaurantEditComparableState(form = recipeRestaurantEditForm()) {
+    return {
+        restaurant_id: recipeRestaurantRecordId(recipeRestaurantEditSelection),
+        create_mode: recipeRestaurantEditCreateMode,
+        values: recipeRestaurantEditValues(form),
+    };
+}
+
+function bindRecipeRestaurantEditFields(form) {
+    form?.querySelectorAll("[data-restaurant-edit-field]").forEach(input => {
+        if (input.dataset.restaurantEditBound === "1") return;
+        input.dataset.restaurantEditBound = "1";
+        input.addEventListener("input", () => updateRecipeRestaurantEditState(form));
+    });
+    const logoUrlInput = form?.querySelector('[data-restaurant-edit-field="restaurant_logo_url"]');
+    if (logoUrlInput && logoUrlInput.dataset.restaurantLogoUrlBound !== "1") {
+        logoUrlInput.dataset.restaurantLogoUrlBound = "1";
+        logoUrlInput.addEventListener("input", () => {
+            const action = form.querySelector('[data-restaurant-edit-field="restaurant_logo_action"]');
+            if (action) action.value = "url";
+            const dataInput = form.querySelector('[data-restaurant-edit-field="restaurant_logo_data_url"]');
+            if (dataInput) dataInput.value = "";
+            updateRecipeRestaurantEditState(form);
+        });
+    }
+}
+
+function populateRecipeRestaurantEditForm(record, options = {}) {
+    const form = recipeRestaurantEditForm();
+    if (!form) return;
+    const keepMenuItemUrl = String(options.menuItemUrl ?? recipeRestaurantOriginalMenuItemUrl ?? "").trim();
+    form.querySelectorAll("[data-restaurant-edit-field]").forEach(input => {
+        const field = input.dataset.restaurantEditField;
+        let savedValue = "";
+        if (field === "menu_item_url") savedValue = keepMenuItemUrl;
+        else if (field === "restaurant_logo_data_url") savedValue = "";
+        else if (field === "restaurant_logo_action") savedValue = "keep";
+        else savedValue = recipeRestaurantRecordValue(record, field);
+        if (options.clearShared && field === "restaurant_current_status") savedValue = "unknown";
+        if (input.tagName === "SELECT" && savedValue && !Array.from(input.options).some(option => option.value === savedValue)) {
+            input.querySelector("[data-restaurant-legacy-option]")?.remove();
+            const legacy = document.createElement("option");
+            legacy.value = savedValue;
+            legacy.textContent = `Saved value: ${savedValue}`;
+            legacy.dataset.restaurantLegacyOption = "1";
+            input.prepend(legacy);
+        }
+        input.value = savedValue;
+    });
+    bindRecipeRestaurantEditFields(form);
+    closeRecipeRestaurantLogoChooser(form.querySelector("[data-restaurant-logo-chooser]"));
+    initializeRecipeRestaurantStructuredHours(form);
+    updateRecipeRestaurantEditState(form);
+}
+
+function setRecipeRestaurantUsageEmpty() {
+    recipeRestaurantUsageRecipes = [];
+    const count = document.querySelector("[data-restaurant-usage-recipes]");
+    const cookbooks = document.querySelector("[data-restaurant-usage-cookbooks]");
+    const note = document.querySelector("[data-restaurant-usage-note]");
+    const view = document.querySelector("[data-restaurant-usage-view]");
+    if (count) count.textContent = "Not currently used by any recipes.";
+    if (cookbooks) cookbooks.hidden = true;
+    if (note) note.hidden = true;
+    if (view) view.hidden = true;
+    renderRecipeRestaurantUsageList();
+}
+
+function setRecipeRestaurantEditMode(record, options = {}) {
+    const form = recipeRestaurantEditForm();
+    if (!form) return;
+    recipeRestaurantEditCreateMode = Boolean(options.create);
+    recipeRestaurantEditSelection = recipeRestaurantEditCreateMode ? null : record;
+    populateRecipeRestaurantEditForm(record || {}, {
+        clearShared: recipeRestaurantEditCreateMode,
+        menuItemUrl: recipeRestaurantOriginalMenuItemUrl,
+    });
+    renderRecipeRestaurantSelector();
+    const { input, status } = recipeRestaurantSelectorElements();
+    if (input) {
+        input.value = recipeRestaurantEditCreateMode ? "" : recipeRestaurantRecordName(record);
+        input.placeholder = recipeRestaurantEditCreateMode ? "Creating new restaurant" : "Search restaurants";
+    }
+    if (status) status.textContent = recipeRestaurantEditCreateMode ? "Creating new restaurant" : "";
+    const save = form.querySelector("[data-restaurant-edit-save]");
+    if (save && !form.dataset.saving) save.textContent = recipeRestaurantEditCreateMode ? "Create Restaurant" : "Save Changes";
+    closeRecipeRestaurantDuplicatePanel(form.querySelector("[data-restaurant-duplicate-panel]"));
+    closeRecipeRestaurantUsagePanel();
+    if (recipeRestaurantEditCreateMode) setRecipeRestaurantUsageEmpty();
+    else loadRecipeRestaurantUsage(recipeRestaurantRecordId(record));
+    updateRecipeRestaurantEditState(form);
+}
+
+function recipeRestaurantMenuIdForSave(selected) {
+    if (recipeRestaurantEditCreateMode) return "";
+    const selectedRestaurantId = recipeRestaurantRecordId(selected);
+    const selectedMenuId = String(selected?.menu_id || "").trim();
+    if (selectedMenuId) return selectedMenuId;
+    return selectedRestaurantId === recipeRestaurantOriginalRestaurantId ? recipeRestaurantOriginalMenuId : "";
+}
+
+function syncRecipeRestaurantMenuSourceSelection(savedRestaurant) {
+    const restaurantId = recipeRestaurantRecordId(savedRestaurant);
+    const menuId = String(savedRestaurant?.menu_id || "").trim();
+    const value = recipeMenuSourceOptionValue(restaurantId, menuId);
+    const previousRestaurantId = recipeEditInputValue("recipeEditRestaurantId");
+    const previousMenuId = recipeEditInputValue("recipeEditMenuId");
+    const relationshipChanged = previousRestaurantId !== restaurantId || previousMenuId !== menuId;
+    const normalizedOption = {
+        ...savedRestaurant,
+        restaurant_id: restaurantId,
+        menu_id: menuId,
+        value,
+        label: recipeRestaurantRecordName(savedRestaurant),
+    };
+    const existingIndex = recipeEditMenuSourceOptions.findIndex(option => {
+        return recipeMenuSourceOptionValue(option.restaurant_id, option.menu_id) === value;
+    });
+    if (existingIndex >= 0) recipeEditMenuSourceOptions.splice(existingIndex, 1, normalizedOption);
+    else recipeEditMenuSourceOptions.unshift(normalizedOption);
+
+    const select = document.getElementById("recipeEditMenuSourceSelect");
+    if (select) {
+        let option = Array.from(select.options).find(item => item.value === value);
+        if (!option) {
+            option = document.createElement("option");
+            option.value = value;
+            select.appendChild(option);
+        }
+        option.textContent = normalizedOption.label || "Restaurant Source";
+        select.value = value;
+    }
+    setRecipeMenuRelationFields({
+        restaurant_id: restaurantId,
+        menu_id: menuId,
+        menu_section_id: relationshipChanged ? "" : recipeEditInputValue("recipeEditMenuSectionId"),
+        menu_item_id: relationshipChanged ? "" : recipeEditInputValue("recipeEditMenuItemId"),
+    });
+}
+
+async function switchRecipeRestaurantSelection(restaurantId, options = {}) {
+    const form = recipeRestaurantEditForm();
+    const id = String(restaurantId || "").trim();
+    if (!form || !id || form.dataset.saving) return false;
+    if (!recipeRestaurantEditCreateMode && id === recipeRestaurantRecordId(recipeRestaurantEditSelection)) {
+        closeRecipeRestaurantSelector({ restoreValue: true });
+        return false;
+    }
+    if (!options.skipConfirm && recipeRestaurantEditHasChanges(form)
+        && !window.confirm("You have unsaved restaurant changes. Discard them and switch restaurants?")) {
+        closeRecipeRestaurantSelector({ restoreValue: true });
+        return false;
+    }
+    recipeRestaurantOriginalMenuItemUrl = form.querySelector('[data-restaurant-edit-field="menu_item_url"]')?.value.trim()
+        || recipeRestaurantOriginalMenuItemUrl;
+    const { input, status } = recipeRestaurantSelectorElements();
+    if (input) {
+        input.disabled = true;
+        input.setAttribute("aria-busy", "true");
+    }
+    if (status) status.textContent = "Loading restaurant...";
+    try {
+        const response = await fetch(`/api/recipe/restaurants/${encodeURIComponent(id)}`);
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to load restaurant.");
+        setRecipeRestaurantEditMode(data.restaurant || data, { create: false });
+        closeRecipeRestaurantSelector({ restoreValue: true });
+    } catch (err) {
+        const error = form.querySelector("[data-restaurant-edit-error]");
+        if (error) {
+            error.textContent = err.message || "Unable to load restaurant.";
+            error.hidden = false;
+        }
+        closeRecipeRestaurantSelector({ restoreValue: true });
+    } finally {
+        if (input) {
+            input.disabled = false;
+            input.removeAttribute("aria-busy");
+        }
+        if (status && !recipeRestaurantEditCreateMode) status.textContent = "";
+    }
+    return false;
+}
+
+function selectRecipeRestaurantFromSelector(button) {
+    return switchRecipeRestaurantSelection(button?.dataset.restaurantSelectorId || "");
+}
+
+function beginCreateRecipeRestaurant(button, options = {}) {
+    const form = recipeRestaurantEditForm();
+    if (!form) return false;
+    if (!options.skipConfirm && recipeRestaurantEditHasChanges(form)
+        && !window.confirm("You have unsaved restaurant changes. Discard them and switch restaurants?")) {
+        closeRecipeRestaurantSelector({ restoreValue: true });
+        return false;
+    }
+    recipeRestaurantOriginalMenuItemUrl = form.querySelector('[data-restaurant-edit-field="menu_item_url"]')?.value.trim()
+        || recipeRestaurantOriginalMenuItemUrl;
+    setRecipeRestaurantEditMode(null, { create: true });
+    closeRecipeRestaurantSelector({ restoreValue: false });
+    form.querySelector('[data-restaurant-edit-field="restaurant_name"]')?.focus();
+    return false;
 }
 
 function recipeRestaurantEditForm() {
@@ -25288,7 +25739,7 @@ function filterRecipeRestaurantUsage(value) {
 
 function recipeRestaurantEditHasChanges(form = recipeRestaurantEditForm()) {
     return Boolean(recipeRestaurantEditSnapshot)
-        && JSON.stringify(recipeRestaurantEditValues(form)) !== recipeRestaurantEditSnapshot;
+        && JSON.stringify(recipeRestaurantEditComparableState(form)) !== recipeRestaurantEditSnapshot;
 }
 
 function recipeRestaurantEditValues(form = recipeRestaurantEditForm()) {
@@ -25341,7 +25792,10 @@ function updateRecipeRestaurantEditState(form = recipeRestaurantEditForm()) {
     if (!form) return;
     const save = form.querySelector("[data-restaurant-edit-save]");
     const changed = recipeRestaurantEditHasChanges(form);
-    if (save && !form.dataset.saving) save.disabled = !changed;
+    const canNormalizeFallback = recipeRestaurantEditCreateMode
+        && !recipeRestaurantOriginalRestaurantId
+        && Boolean(form.querySelector('[data-restaurant-edit-field="restaurant_name"]')?.value.trim());
+    if (save && !form.dataset.saving) save.disabled = !changed && !canNormalizeFallback;
     updateRecipeRestaurantEditLogo(form);
     updateRecipeRestaurantRatingEditor(form);
 }
@@ -25353,49 +25807,33 @@ function editRecipeRestaurantSource(button, event = null) {
     }
     const modal = recipeRestaurantEditModal();
     const form = recipeRestaurantEditForm();
-    const selected = currentRecipeRestaurantSourceOption();
-    if (!modal || !form || !selected) return false;
-    form.querySelectorAll("[data-restaurant-edit-field]").forEach(input => {
-        const field = input.dataset.restaurantEditField;
-        const savedValue = field === "restaurant_logo_data_url"
-            ? ""
-            : field === "restaurant_logo_action"
-                ? "keep"
-            : recipeMenuMetadataText(selected[field]);
-        if (input.tagName === "SELECT" && savedValue && !Array.from(input.options).some(option => option.value === savedValue)) {
-            input.querySelector("[data-restaurant-legacy-option]")?.remove();
-            const legacy = document.createElement("option");
-            legacy.value = savedValue;
-            legacy.textContent = `Saved value: ${savedValue}`;
-            legacy.dataset.restaurantLegacyOption = "1";
-            input.prepend(legacy);
-        }
-        input.value = savedValue;
-        if (input.dataset.restaurantEditBound !== "1") {
-            input.dataset.restaurantEditBound = "1";
-            input.addEventListener("input", () => updateRecipeRestaurantEditState(form));
-        }
-    });
-    const menuItemInput = form.querySelector('[data-restaurant-edit-field="menu_item_url"]');
-    if (menuItemInput && !menuItemInput.value) {
-        menuItemInput.value = recipeEditInputValue("recipeEditMenuItemUrl") || recipeEditorSourceUrlForOpen();
+    const linkedSource = currentRecipeRestaurantSourceOption();
+    const selected = linkedSource || recipeRestaurantFallbackFromEditor();
+    const hasNormalizedRestaurant = Boolean(recipeRestaurantRecordId(selected));
+    if (!modal || !form) return false;
+    recipeRestaurantOriginalMenuItemUrl = recipeEditInputValue("recipeEditMenuItemUrl")
+        || recipeRestaurantRecordValue(selected, "menu_item_url")
+        || recipeEditorSourceUrlForOpen();
+    recipeRestaurantOriginalMenuId = String(selected.menu_id || recipeEditInputValue("recipeEditMenuId") || "").trim();
+    recipeRestaurantOriginalRestaurantId = recipeRestaurantRecordId(selected)
+        || recipeEditInputValue("recipeEditRestaurantId");
+    recipeRestaurantEditSelection = hasNormalizedRestaurant ? selected : null;
+    recipeRestaurantEditCreateMode = !hasNormalizedRestaurant;
+    populateRecipeRestaurantEditForm(selected, { menuItemUrl: recipeRestaurantOriginalMenuItemUrl });
+    const { input: selectorInput, status: selectorStatus } = recipeRestaurantSelectorElements();
+    if (selectorInput) {
+        selectorInput.value = hasNormalizedRestaurant ? recipeRestaurantRecordName(selected) : "";
+        selectorInput.placeholder = hasNormalizedRestaurant ? "Search restaurants" : "Creating new restaurant";
     }
-    const logoUrlInput = form.querySelector('[data-restaurant-edit-field="restaurant_logo_url"]');
-    if (logoUrlInput && logoUrlInput.dataset.restaurantLogoUrlBound !== "1") {
-        logoUrlInput.dataset.restaurantLogoUrlBound = "1";
-        logoUrlInput.addEventListener("input", () => {
-            const action = form.querySelector('[data-restaurant-edit-field="restaurant_logo_action"]');
-            if (action) action.value = "url";
-            const dataInput = form.querySelector('[data-restaurant-edit-field="restaurant_logo_data_url"]');
-            if (dataInput) dataInput.value = "";
-            updateRecipeRestaurantEditState(form);
-        });
-    }
-    closeRecipeRestaurantLogoChooser(form.querySelector("[data-restaurant-logo-chooser]"));
-    initializeRecipeRestaurantStructuredHours(form);
+    if (selectorStatus) selectorStatus.textContent = hasNormalizedRestaurant ? "" : "Creating new restaurant";
+    const save = form.querySelector("[data-restaurant-edit-save]");
+    if (save) save.textContent = hasNormalizedRestaurant ? "Save Changes" : "Create Restaurant";
+    recipeRestaurantDirectory = [];
+    loadRecipeRestaurantDirectory();
     closeRecipeRestaurantUsagePanel();
-    loadRecipeRestaurantUsage(selected.restaurant_id || "");
-    recipeRestaurantEditSnapshot = JSON.stringify(recipeRestaurantEditValues(form));
+    if (hasNormalizedRestaurant) loadRecipeRestaurantUsage(recipeRestaurantRecordId(selected));
+    else setRecipeRestaurantUsageEmpty();
+    recipeRestaurantEditSnapshot = JSON.stringify(recipeRestaurantEditComparableState(form));
     recipeRestaurantEditTrigger = button;
     if (modal.parentElement !== document.body) {
         document.body.appendChild(modal);
@@ -25408,6 +25846,7 @@ function editRecipeRestaurantSource(button, event = null) {
     document.body.classList.add("restaurant-source-modal-open");
     const error = form.querySelector("[data-restaurant-edit-error]");
     if (error) error.hidden = true;
+    closeRecipeRestaurantDuplicatePanel(form.querySelector("[data-restaurant-duplicate-panel]"));
     updateRecipeRestaurantEditState(form);
     form.querySelector('[data-restaurant-edit-field="restaurant_name"]')?.focus();
     return false;
@@ -25426,11 +25865,18 @@ function closeRecipeRestaurantSourceModal(options = {}) {
         return false;
     }
     document.querySelector("[data-restaurant-usage-panel]")?.setAttribute("hidden", "");
+    closeRecipeRestaurantSelector({ restoreValue: false });
+    closeRecipeRestaurantDuplicatePanel(form.querySelector("[data-restaurant-duplicate-panel]"));
     modal.hidden = true;
     document.body.classList.remove("restaurant-source-modal-open");
     recipeRestaurantModalInertElements.forEach(item => { item.element.inert = item.wasInert; });
     recipeRestaurantModalInertElements = [];
     recipeRestaurantEditSnapshot = "";
+    recipeRestaurantEditSelection = null;
+    recipeRestaurantEditCreateMode = false;
+    recipeRestaurantOriginalMenuItemUrl = "";
+    recipeRestaurantOriginalMenuId = "";
+    recipeRestaurantOriginalRestaurantId = "";
     const trigger = recipeRestaurantEditTrigger;
     recipeRestaurantEditTrigger = null;
     trigger?.focus({ preventScroll: true });
@@ -25449,6 +25895,12 @@ document.addEventListener("keydown", event => {
     if (!modal || modal.hidden) return;
     if (event.key === "Escape") {
         event.preventDefault();
+        const selectorList = recipeRestaurantSelectorElements().list;
+        if (selectorList && !selectorList.hidden) {
+            closeRecipeRestaurantSelector({ restoreValue: true });
+            recipeRestaurantSelectorElements().input?.focus();
+            return;
+        }
         const usagePanel = document.querySelector("[data-restaurant-usage-panel]");
         if (usagePanel && !usagePanel.hidden) {
             closeRecipeRestaurantUsagePanel();
@@ -25469,6 +25921,12 @@ document.addEventListener("keydown", event => {
         event.preventDefault();
         first.focus();
     }
+});
+
+document.addEventListener("pointerdown", event => {
+    const { root, list } = recipeRestaurantSelectorElements();
+    if (!root || !list || list.hidden || root.contains(event.target)) return;
+    closeRecipeRestaurantSelector({ restoreValue: true });
 });
 
 function toggleRecipeRestaurantLogoChooser(button) {
@@ -25682,7 +26140,56 @@ function toggleRecipeRestaurantSplitHours(button) {
     return false;
 }
 
-async function saveRecipeRestaurantSource(form) {
+function showRecipeRestaurantDuplicatePanel(duplicates) {
+    const form = recipeRestaurantEditForm();
+    const panel = form?.querySelector("[data-restaurant-duplicate-panel]");
+    if (!panel) return;
+    recipeRestaurantDuplicateCandidates = Array.isArray(duplicates) ? duplicates : [];
+    const summary = panel.querySelector("[data-restaurant-duplicate-summary]");
+    if (summary) {
+        const names = recipeRestaurantDuplicateCandidates.slice(0, 3).map(recipeRestaurantRecordName);
+        summary.textContent = names.length ? names.join(", ") : "Choose how to continue.";
+    }
+    const select = panel.querySelector("button");
+    if (select) select.disabled = !recipeRestaurantDuplicateCandidates.length;
+    panel.hidden = false;
+    panel.scrollIntoView({ block: "nearest" });
+    (select && !select.disabled ? select : panel.querySelectorAll("button")[1])?.focus();
+}
+
+function closeRecipeRestaurantDuplicatePanel(button) {
+    const panel = button?.matches?.("[data-restaurant-duplicate-panel]")
+        ? button
+        : button?.closest?.("[data-restaurant-duplicate-panel]");
+    if (panel) panel.hidden = true;
+    recipeRestaurantDuplicateCandidates = [];
+    return false;
+}
+
+function selectExistingDuplicateRestaurant(button) {
+    const duplicates = [...recipeRestaurantDuplicateCandidates];
+    const duplicate = duplicates[0];
+    closeRecipeRestaurantDuplicatePanel(button);
+    if (duplicates.length > 1) {
+        recipeRestaurantDirectory = duplicates;
+        renderRecipeRestaurantSelector(duplicates);
+        const { input, status } = recipeRestaurantSelectorElements();
+        if (input) input.value = "";
+        setRecipeRestaurantSelectorExpanded(true);
+        input?.focus();
+        if (status) status.textContent = "Select a matching restaurant";
+        return false;
+    }
+    return switchRecipeRestaurantSelection(recipeRestaurantRecordId(duplicate), { skipConfirm: true });
+}
+
+function createDuplicateRestaurantAnyway(button) {
+    const form = button?.closest("[data-restaurant-edit-form]");
+    closeRecipeRestaurantDuplicatePanel(button);
+    return saveRecipeRestaurantSource(form, { createAnyway: true });
+}
+
+async function saveRecipeRestaurantSource(form, options = {}) {
     if (!form || form.dataset.saving) return false;
     const values = recipeRestaurantEditValues(form);
     const error = form.querySelector("[data-restaurant-edit-error]");
@@ -25697,8 +26204,9 @@ async function saveRecipeRestaurantSource(form) {
         invalid.focus();
         return false;
     }
-    const selected = currentRecipeRestaurantSourceOption();
-    if (!selected) return false;
+    const selected = recipeRestaurantEditSelection || currentRecipeRestaurantSourceOption() || {};
+    const selectedMenuId = recipeRestaurantMenuIdForSave(selected);
+    if (!recipeRestaurantEditCreateMode && !recipeRestaurantRecordId(selected)) return false;
     form.dataset.saving = "1";
     if (save) { save.disabled = true; save.textContent = "Saving..."; }
     if (error) error.hidden = true;
@@ -25707,27 +26215,46 @@ async function saveRecipeRestaurantSource(form) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+                action: recipeRestaurantEditCreateMode ? "create" : "update",
+                create_anyway: Boolean(options.createAnyway),
+                assign_restaurant: true,
                 recipe_url: recipeEditorSourceUrlForOpen(),
-                restaurant_id: selected.restaurant_id || "",
-                menu_id: selected.menu_id || "",
+                restaurant_id: recipeRestaurantRecordId(selected),
+                menu_id: selectedMenuId,
                 ...values,
             }),
         });
         const data = await response.json();
+        if (response.status === 409 && data.duplicate_detected) {
+            showRecipeRestaurantDuplicatePanel(data.duplicates);
+            return false;
+        }
         if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save restaurant source.");
-        Object.assign(selected, data.restaurant || {});
-        recipeRestaurantDisplaySource = selected;
-        setValue("recipeEditRestaurantName", selected.restaurant_name || "");
-        setValue("recipeEditRestaurantWebsiteUrl", selected.restaurant_website_url || "");
-        setValue("recipeEditSourceMenuUrl", selected.source_menu_url || "");
-        setValue("recipeEditMenuItemUrl", selected.menu_item_url || recipeEditorSourceUrlForOpen());
-        setValue("recipeEditRestaurantPhone", selected.restaurant_phone || "");
-        setValue("recipeEditRestaurantAddress", selected.restaurant_address || "");
-        setValue("recipeEditRestaurantHoursText", selected.restaurant_hours_text || "");
-        setValue("recipeEditRestaurantCurrentStatus", selected.restaurant_current_status || "");
-        setValue("recipeEditRestaurantPromotions", selected.restaurant_promotions || "");
-        setValue("recipeEditRestaurantOnlinePaymentAvailable", selected.restaurant_online_payment_available || "");
-        setValue("recipeEditRestaurantDeliveryAvailable", selected.restaurant_delivery_available || "");
+        const savedRestaurant = { ...selected, ...(data.restaurant || {}) };
+        savedRestaurant.menu_item_url = values.menu_item_url || recipeRestaurantOriginalMenuItemUrl;
+        savedRestaurant.menu_id = savedRestaurant.menu_id || selectedMenuId;
+        recipeRestaurantEditSelection = savedRestaurant;
+        recipeRestaurantDisplaySource = savedRestaurant;
+        syncRecipeRestaurantMenuSourceSelection(savedRestaurant);
+        setValue("recipeEditRestaurantName", recipeRestaurantRecordValue(savedRestaurant, "restaurant_name"));
+        setValue("recipeEditRestaurantWebsiteUrl", recipeRestaurantRecordValue(savedRestaurant, "restaurant_website_url"));
+        setValue("recipeEditSourceMenuUrl", recipeRestaurantRecordValue(savedRestaurant, "source_menu_url"));
+        setValue("recipeEditMenuItemUrl", values.menu_item_url || recipeRestaurantOriginalMenuItemUrl);
+        setValue("recipeEditRestaurantPhone", recipeRestaurantRecordValue(savedRestaurant, "restaurant_phone"));
+        const savedAddress = savedRestaurant.restaurant_address || [
+            recipeRestaurantRecordValue(savedRestaurant, "restaurant_street_address"),
+            recipeRestaurantRecordValue(savedRestaurant, "restaurant_city"),
+            recipeRestaurantRecordValue(savedRestaurant, "restaurant_state"),
+            recipeRestaurantRecordValue(savedRestaurant, "restaurant_postal_code"),
+            recipeRestaurantRecordValue(savedRestaurant, "restaurant_country"),
+        ].filter(Boolean).join(", ");
+        setValue("recipeEditRestaurantAddress", savedAddress);
+        setValue("recipeEditRestaurantHoursText", recipeRestaurantRecordValue(savedRestaurant, "restaurant_hours_text"));
+        setValue("recipeEditRestaurantCurrentStatus", recipeRestaurantRecordValue(savedRestaurant, "restaurant_current_status"));
+        setValue("recipeEditRestaurantPromotions", recipeRestaurantRecordValue(savedRestaurant, "restaurant_promotions"));
+        setValue("recipeEditRestaurantOnlinePaymentAvailable", recipeRestaurantRecordValue(savedRestaurant, "restaurant_online_payment_available"));
+        setValue("recipeEditRestaurantDeliveryAvailable", recipeRestaurantRecordValue(savedRestaurant, "restaurant_delivery_available"));
+        recipeRestaurantDirectory = [];
         bindRecipeMenuMetadataUrlLinks();
         syncRecipeEditDocumentRows();
         delete form.dataset.saving;
@@ -25737,7 +26264,10 @@ async function saveRecipeRestaurantSource(form) {
         if (error) { error.textContent = err.message || "Unable to save restaurant source."; error.hidden = false; }
     } finally {
         delete form.dataset.saving;
-        if (save) { save.textContent = "Save Changes"; updateRecipeRestaurantEditState(form); }
+        if (save) {
+            save.textContent = recipeRestaurantEditCreateMode ? "Create Restaurant" : "Save Changes";
+            updateRecipeRestaurantEditState(form);
+        }
     }
     return false;
 }
