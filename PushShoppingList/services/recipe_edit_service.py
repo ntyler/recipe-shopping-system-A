@@ -2493,6 +2493,48 @@ def update_editable_restaurant_source(recipe_url, values):
     return {"ok": True, "restaurant": option}
 
 
+def update_editable_source_documents(recipe_url, values):
+    values = values if isinstance(values, dict) else {}
+    recipe_url = clean_recipe_menu_text(recipe_url)
+    if not recipe_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+    fields = {
+        "document_source_url": clean_recipe_menu_text(values.get("document_source_url")),
+        "source_menu_url": clean_recipe_menu_text(values.get("source_menu_url")),
+        "menu_item_url": clean_recipe_menu_text(values.get("menu_item_url")),
+    }
+    for field, label in (("document_source_url", "Source URL"), ("source_menu_url", "Source Menu URL"), ("menu_item_url", "Menu Item URL")):
+        value = fields[field]
+        if not value:
+            continue
+        parsed = urlparse(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return {"ok": False, "error": f"{label} must be a valid HTTP or HTTPS URL."}
+
+    recipe_data = load_recipe_output(recipe_url)
+    if not isinstance(recipe_data, dict):
+        return {"ok": False, "error": "Recipe source was not found."}
+    stored_source_url = clean_recipe_menu_text(recipe_data.get("source_url")) or recipe_url
+    for field, value in fields.items():
+        if value:
+            recipe_data[field] = value
+        else:
+            recipe_data.pop(field, None)
+
+    menu_id = clean_recipe_menu_text(recipe_menu_relation_value(recipe_data, "menu_id"))
+    restaurant_id = clean_recipe_menu_text(recipe_menu_relation_value(recipe_data, "restaurant_id"))
+    if menu_id and fields["source_menu_url"]:
+        with menu_store_service.MENU_STORE_LOCK:
+            store = menu_store_service.load_menu_store()
+            menu = menu_store_service.find_menu(store, menu_id)
+            if menu and clean_recipe_menu_text(menu.get("restaurant_id")) == restaurant_id:
+                menu["source_url"] = fields["source_menu_url"]
+                menu["updated_at"] = menu_store_service.utc_now_iso()
+                menu_store_service.save_menu_store(store)
+    save_recipe_output(stored_source_url, recipe_data)
+    return {"ok": True, **fields}
+
+
 def editable_menu_source_option_identity(option):
     option = option if isinstance(option, dict) else {}
     source_menu_url = first_recipe_menu_text(
@@ -3060,6 +3102,7 @@ def load_editable_recipe(url):
         "ok": True,
         "recipe": {
             "source_url": recipe_data.get("source_url") or url,
+            "document_source_url": recipe_data.get("document_source_url") or recipe_data.get("source_url") or url,
             "menu_item_url": recipe_data.get("menu_item_url") or recipe_data.get("source_url") or url,
             "source_display_url": editable_recipe_source_display_url(recipe_data.get("source_url") or url),
             "type": recipe_url_type(url),

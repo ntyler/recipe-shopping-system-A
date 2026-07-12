@@ -623,6 +623,25 @@ def test_inline_restaurant_source_update_rejects_unlinked_restaurant(monkeypatch
     assert "not linked" in result["error"]
 
 
+def test_source_documents_update_preserves_recipe_identity_and_updates_linked_menu(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_derived_recipe()
+
+    result = recipe_edit_service.update_editable_source_documents(url, {
+        "document_source_url": "https://example.com/direct-source",
+        "source_menu_url": "https://example.com/full-menu",
+        "menu_item_url": "https://example.com/full-menu?item=one",
+    })
+    saved = recipe_edit_service.load_recipe_output(url)
+    menu = menu_store_service.find_menu(menu_store_service.load_menu_store(), detail["menu"]["id"])
+
+    assert result["ok"] is True
+    assert saved["source_url"] == url
+    assert saved["document_source_url"] == "https://example.com/direct-source"
+    assert saved["menu_item_url"] == "https://example.com/full-menu?item=one"
+    assert menu["source_url"] == "https://example.com/full-menu"
+
+
 def test_menu_derived_recipe_loads_canonical_source_for_duplicate_source_ids(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"

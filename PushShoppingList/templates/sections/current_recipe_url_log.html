@@ -765,6 +765,7 @@
 
             <input type="hidden" name="original_url" id="recipeEditOriginalUrl">
             <input type="hidden" id="recipeEditMenuItemUrl">
+            <input type="hidden" id="recipeEditDocumentSourceUrl">
             <input type="hidden" name="quantity" id="recipeEditQuantity" value="1">
 
             <div id="recipeEditStatus" class="recipe-edit-status"></div>
@@ -2106,15 +2107,7 @@
                                         onclick="return toggleRecipeSourceDocumentsHelp(this, event)"
                                         onfocus="openRecipeSourceDocumentsHelp(this)">{{ shell.svg_icon("help") }}</button>
                             </span>
-                            <button type="button"
-                                    class="recipe-edit-source-documents-toggle"
-                                    aria-label="Collapse Source and Documents"
-                                    aria-expanded="true"
-                                    aria-controls="recipeEditDocumentList"
-                                    onclick="return toggleRecipeSourceDocumentsCard(this, event)">
-                                <span data-source-documents-chevron-up>{{ shell.svg_icon("chevron-up") }}</span>
-                                <span data-source-documents-chevron-down hidden>{{ shell.svg_icon("chevron-down") }}</span>
-                            </button>
+                            <button type="button" class="recipe-edit-source-documents-edit" onclick="return editRecipeSourceDocuments(this, event)">Edit</button>
                         </div>
                             <aside id="recipeEditSourceDocumentsHelp" class="recipe-edit-source-documents-popover" role="dialog" aria-label="About Source and Documents" hidden>
                                 <strong>Source &amp; Documents</strong>
@@ -2132,7 +2125,7 @@
                         <div id="recipeEditDocumentList" class="recipe-edit-document-list" data-recipe-edit-document-list>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
-                                 data-document-input-id="recipeEditMenuItemUrl"
+                                 data-document-input-id="recipeEditDocumentSourceUrl"
                                  data-document-link-id="recipeEditSourceUrlLink"
                                  data-document-open-source="source-url"
                                  data-document-kind="url">
@@ -2211,6 +2204,51 @@
                             </div>
                         </div>
                     </section>
+
+                    <div class="recipe-edit-source-documents-modal-backdrop" data-source-documents-edit-modal onclick="if (event.target === this) return closeRecipeSourceDocumentsModal({ force: false })" hidden>
+                        <section class="recipe-edit-source-documents-modal" role="dialog" aria-modal="true" aria-labelledby="recipeEditSourceDocumentsModalTitle">
+                            <div class="recipe-edit-source-documents-form" data-source-documents-edit-form role="form">
+                                <header class="recipe-edit-source-documents-modal-header">
+                                    <h2 id="recipeEditSourceDocumentsModalTitle">Edit Source &amp; Documents</h2>
+                                    <button type="button" aria-label="Close Edit Source and Documents" onclick="return closeRecipeSourceDocumentsModal({ force: false })">{{ shell.svg_icon("x") }}</button>
+                                </header>
+                                <div class="recipe-edit-source-documents-modal-body">
+                                    <section class="recipe-edit-source-links-editor">
+                                        <h3>Source Links</h3>
+                                        <label><span>Source URL</span><input type="url" data-source-documents-edit-field="document_source_url"><small>Direct source for this recipe or menu item.</small></label>
+                                        <label><span>Source Menu URL</span><input type="url" data-source-documents-edit-field="source_menu_url"><small>Page containing the full restaurant menu.</small></label>
+                                        <label><span>Menu Item URL</span><input type="url" data-source-documents-edit-field="menu_item_url"><small>Specific deep link for this menu item when separate from Source URL.</small></label>
+                                    </section>
+                                    <section class="recipe-edit-source-document-records">
+                                        <h3>Documents</h3>
+                                        {% for record in (("Source PDF", "recipeEditSourcePdfPath", "source"), ("Generated PDF", "recipeEditGeneratedPdfPath", "generated"), ("Cloudflare Source PDF", "recipeEditSourceCloudflarePdfUrl", "cloud-source"), ("Cloudflare Generated PDF", "recipeEditGeneratedCloudflarePdfUrl", "cloud-generated")) %}
+                                        <div class="recipe-edit-source-document-record" data-source-document-modal-row data-document-input-id="{{ record[1] }}" data-document-modal-kind="{{ record[2] }}">
+                                            <span class="recipe-edit-document-icon" aria-hidden="true">{{ shell.svg_icon("document") }}</span>
+                                            <div><strong>{{ record[0] }}</strong><span data-source-document-modal-status>Unavailable</span></div>
+                                            <a href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-open hidden>Open</a>
+                                            {% if record[2] in ("source", "generated") %}<a href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-download hidden>Download</a>{% endif %}
+                                            {% if record[2] == "generated" %}<button type="button" onclick="return createRecipeEditorPdf(this)">Regenerate PDF</button>{% endif %}
+                                            {% if record[2] == "cloud-source" %}<button type="button" onclick="return uploadRecipeSourcePdfToCloudflare(this)">Refresh Upload</button>{% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </section>
+                                    <details class="recipe-edit-source-documents-advanced">
+                                        <summary>Advanced Document Management</summary>
+                                        <div>
+                                            <button type="button" data-source-documents-copy="document_source_url" onclick="return copyRecipeSourceDocumentsField(this)">Copy Source URL</button>
+                                            <button type="button" data-source-documents-copy="source_menu_url" onclick="return copyRecipeSourceDocumentsField(this)">Copy Menu URL</button>
+                                            <button type="button" data-source-documents-copy="menu_item_url" onclick="return copyRecipeSourceDocumentsField(this)">Copy Menu Item URL</button>
+                                        </div>
+                                    </details>
+                                    <p class="recipe-edit-source-documents-error" data-source-documents-edit-error hidden></p>
+                                </div>
+                                <footer class="recipe-edit-source-documents-modal-footer">
+                                    <button type="button" onclick="return closeRecipeSourceDocumentsModal({ force: false })">Cancel</button>
+                                    <button type="button" class="primary" data-source-documents-edit-save onclick="return saveRecipeSourceDocuments(this.closest('[data-source-documents-edit-form]'))" disabled>Save Changes</button>
+                                </footer>
+                            </div>
+                        </section>
+                    </div>
 
                     <details class="recipe-edit-context-card recipe-edit-restaurant-card" open>
                         <summary>

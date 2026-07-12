@@ -22703,6 +22703,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     updateRecipeEditDescriptionCount();
     setRecipeEditorSourceUrlField(recipe, originalUrl);
     setValue("recipeEditMenuItemUrl", recipe.menu_item_url || recipe.source_url || originalUrl);
+    setValue("recipeEditDocumentSourceUrl", recipe.document_source_url || recipe.source_url || originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
     setValue("recipeEditLevel", recipe.level || "");
@@ -24716,25 +24717,149 @@ function toggleRecipeSourceDocumentsHelp(button, event = null) {
     return openRecipeSourceDocumentsHelp(button);
 }
 
-function toggleRecipeSourceDocumentsCard(button, event = null) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
+let recipeSourceDocumentsSnapshot = "";
+let recipeSourceDocumentsTrigger = null;
+
+function recipeSourceDocumentsForm() {
+    return document.querySelector("[data-source-documents-edit-form]");
+}
+
+function recipeSourceDocumentsValues(form = recipeSourceDocumentsForm()) {
+    const values = {};
+    form?.querySelectorAll("[data-source-documents-edit-field]").forEach(input => {
+        values[input.dataset.sourceDocumentsEditField] = String(input.value || "").trim();
+    });
+    return values;
+}
+
+function updateRecipeSourceDocumentsModalState(form = recipeSourceDocumentsForm()) {
+    const save = form?.querySelector("[data-source-documents-edit-save]");
+    if (save && !form.dataset.saving) {
+        save.disabled = JSON.stringify(recipeSourceDocumentsValues(form)) === recipeSourceDocumentsSnapshot;
     }
-    if (!button) return false;
-    const list = document.getElementById("recipeEditDocumentList");
-    const expanded = button.getAttribute("aria-expanded") === "true";
-    const nextExpanded = !expanded;
-    button.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
-    button.setAttribute("aria-label", nextExpanded
-        ? "Collapse Source and Documents"
-        : "Expand Source and Documents");
-    if (list) list.hidden = !nextExpanded;
-    const up = button.querySelector("[data-source-documents-chevron-up]");
-    const down = button.querySelector("[data-source-documents-chevron-down]");
-    if (up) up.hidden = !nextExpanded;
-    if (down) down.hidden = nextExpanded;
-    if (!nextExpanded) closeRecipeSourceDocumentsHelp();
+}
+
+function syncRecipeSourceDocumentModalRows(form = recipeSourceDocumentsForm()) {
+    const linkIds = {
+        recipeEditSourcePdfPath: "recipeEditSourcePdfPathLink",
+        recipeEditGeneratedPdfPath: "recipeEditGeneratedPdfPathLink",
+        recipeEditSourceCloudflarePdfUrl: "recipeEditSourceCloudflarePdfUrlLink",
+        recipeEditGeneratedCloudflarePdfUrl: "recipeEditGeneratedCloudflarePdfUrlLink",
+    };
+    form?.querySelectorAll("[data-source-document-modal-row]").forEach(row => {
+        const inputId = row.dataset.documentInputId;
+        const value = recipeEditInputValue(inputId);
+        const status = row.querySelector("[data-source-document-modal-status]");
+        const open = row.querySelector("[data-source-document-modal-open]");
+        const download = row.querySelector("[data-source-document-modal-download]");
+        const linked = document.getElementById(linkIds[inputId]);
+        const href = linked && !linked.hidden ? linked.href : "";
+        if (status) {
+            status.textContent = value ? recipeEditDocumentDisplayValue(value, inputId) : "Unavailable";
+            status.title = value || "";
+        }
+        if (open) {
+            open.hidden = !value || !href || href === "#";
+            open.href = !open.hidden ? href : "#";
+        }
+        if (download) {
+            download.hidden = !value || !href || href === "#";
+            download.href = !download.hidden ? href : "#";
+        }
+    });
+}
+
+function editRecipeSourceDocuments(button, event = null) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const modal = document.querySelector("[data-source-documents-edit-modal]");
+    const form = recipeSourceDocumentsForm();
+    if (!modal || !form) return false;
+    const initial = {
+        document_source_url: recipeEditInputValue("recipeEditDocumentSourceUrl") || recipeEditorSourceUrlForOpen(),
+        source_menu_url: recipeEditInputValue("recipeEditSourceMenuUrl"),
+        menu_item_url: recipeEditInputValue("recipeEditMenuItemUrl"),
+    };
+    form.querySelectorAll("[data-source-documents-edit-field]").forEach(input => {
+        input.value = initial[input.dataset.sourceDocumentsEditField] || "";
+        if (input.dataset.sourceDocumentsBound !== "1") {
+            input.dataset.sourceDocumentsBound = "1";
+            input.addEventListener("input", () => updateRecipeSourceDocumentsModalState(form));
+        }
+    });
+    recipeSourceDocumentsSnapshot = JSON.stringify(recipeSourceDocumentsValues(form));
+    recipeSourceDocumentsTrigger = button;
+    if (modal.parentElement !== document.body) document.body.appendChild(modal);
+    modal.hidden = false;
+    document.body.classList.add("source-documents-modal-open");
+    form.querySelector("[data-source-documents-edit-error]").hidden = true;
+    form.querySelector(".recipe-edit-source-documents-advanced").open = false;
+    syncRecipeSourceDocumentModalRows(form);
+    updateRecipeSourceDocumentsModalState(form);
+    form.querySelector("[data-source-documents-edit-field]")?.focus();
+    return false;
+}
+
+function closeRecipeSourceDocumentsModal(options = {}) {
+    const modal = document.querySelector("[data-source-documents-edit-modal]");
+    const form = recipeSourceDocumentsForm();
+    if (!modal || !form || form.dataset.saving) return false;
+    const changed = JSON.stringify(recipeSourceDocumentsValues(form)) !== recipeSourceDocumentsSnapshot;
+    if (!options.force && changed && !window.confirm("Discard unsaved source and document changes?")) return false;
+    modal.hidden = true;
+    document.body.classList.remove("source-documents-modal-open");
+    recipeSourceDocumentsSnapshot = "";
+    const trigger = recipeSourceDocumentsTrigger;
+    recipeSourceDocumentsTrigger = null;
+    trigger?.focus({ preventScroll: true });
+    return false;
+}
+
+function copyRecipeSourceDocumentsField(button) {
+    const form = button?.closest("[data-source-documents-edit-form]");
+    const field = form?.querySelector(`[data-source-documents-edit-field="${button.dataset.sourceDocumentsCopy}"]`);
+    button.dataset.copyValue = String(field?.value || "").trim();
+    return copyRecipeEditorDocumentValue(button);
+}
+
+async function saveRecipeSourceDocuments(form) {
+    if (!form || form.dataset.saving) return false;
+    const invalid = form.querySelector("input:invalid");
+    const error = form.querySelector("[data-source-documents-edit-error]");
+    const save = form.querySelector("[data-source-documents-edit-save]");
+    if (invalid) {
+        error.textContent = invalid.validationMessage || "Enter valid HTTP or HTTPS URLs.";
+        error.hidden = false;
+        invalid.focus();
+        return false;
+    }
+    form.dataset.saving = "1";
+    save.disabled = true;
+    save.textContent = "Saving...";
+    error.hidden = true;
+    try {
+        const response = await fetch("/api/recipe/source-documents", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ recipe_url: recipeEditorSourceUrlForOpen(), ...recipeSourceDocumentsValues(form) }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save source links.");
+        setValue("recipeEditDocumentSourceUrl", data.document_source_url || "");
+        setValue("recipeEditSourceMenuUrl", data.source_menu_url || "");
+        setValue("recipeEditMenuItemUrl", data.menu_item_url || "");
+        bindRecipeMenuMetadataUrlLinks();
+        syncRecipeEditDocumentRows();
+        delete form.dataset.saving;
+        closeRecipeSourceDocumentsModal({ force: true });
+    } catch (err) {
+        error.textContent = err.message || "Unable to save source links.";
+        error.hidden = false;
+    } finally {
+        delete form.dataset.saving;
+        save.textContent = "Save Changes";
+        updateRecipeSourceDocumentsModalState(form);
+    }
     return false;
 }
 
@@ -24753,6 +24878,22 @@ document.addEventListener("focusin", event => {
 });
 
 document.addEventListener("keydown", event => {
+    const sourceModal = document.querySelector("[data-source-documents-edit-modal]");
+    if (sourceModal && !sourceModal.hidden) {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeRecipeSourceDocumentsModal({ force: false });
+            return;
+        }
+        if (event.key === "Tab") {
+            const focusable = Array.from(sourceModal.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href], summary')).filter(element => !element.hidden && element.offsetParent !== null);
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (first && event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (last && !event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+        return;
+    }
     if (event.key === "Escape" && !document.getElementById("recipeEditSourceDocumentsHelp")?.hidden) {
         closeRecipeSourceDocumentsHelp();
         document.querySelector(".recipe-edit-source-documents-help")?.focus();
