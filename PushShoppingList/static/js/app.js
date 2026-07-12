@@ -24769,6 +24769,7 @@ function syncRecipeSourceDocumentModalRows(form = recipeSourceDocumentsForm()) {
         const status = row.querySelector("[data-source-document-modal-status]");
         const open = row.querySelector("[data-source-document-modal-open]");
         const download = row.querySelector("[data-source-document-modal-download]");
+        const actions = row.querySelector("[data-source-document-modal-actions]");
         const linked = document.getElementById(linkIds[inputId]);
         const href = linked && !linked.hidden ? linked.href : "";
         if (status) {
@@ -24782,6 +24783,9 @@ function syncRecipeSourceDocumentModalRows(form = recipeSourceDocumentsForm()) {
         if (download) {
             download.hidden = !value || !href || href === "#";
             download.href = !download.hidden ? href : "#";
+        }
+        if (actions) {
+            actions.hidden = !Array.from(actions.querySelectorAll("a, button")).some(action => !action.hidden);
         }
     });
 }

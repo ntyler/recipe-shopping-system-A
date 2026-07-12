@@ -34737,17 +34737,18 @@ img[data-deferred-src] {
 
 .recipe-edit-source-document-record {
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) auto auto;
-    gap: 8px;
+    grid-template-columns: 28px minmax(0, 1fr) minmax(314px, auto);
+    gap: 10px;
     align-items: center;
     min-width: 0;
-    padding: 9px 0;
+    padding: 10px 0;
     border-bottom: 1px solid var(--app-border);
 }
 
-.recipe-edit-source-document-record > div {
+.recipe-edit-source-document-record > div:not(.recipe-edit-source-document-actions) {
     display: grid;
     min-width: 0;
+    gap: 2px;
 }
 
 .recipe-edit-source-document-record :is(strong, span) {
@@ -34766,17 +34767,74 @@ img[data-deferred-src] {
     font-size: 8px;
 }
 
+.recipe-edit-source-document-actions {
+    display: grid;
+    width: 314px;
+    max-width: 100%;
+    grid-template-columns: 72px 96px 130px;
+    gap: 8px;
+    align-items: center;
+    justify-content: end;
+    justify-self: end;
+}
+
+.recipe-edit-source-document-actions[hidden] {
+    display: none !important;
+}
+
+.recipe-edit-source-document-actions .action-open {
+    grid-column: 1;
+}
+
+.recipe-edit-source-document-actions .action-download {
+    grid-column: 2;
+}
+
+.recipe-edit-source-document-actions .action-management {
+    grid-column: 3;
+}
+
 .recipe-edit-source-document-record :is(a, button),
 .recipe-edit-source-documents-modal-footer button,
 .recipe-edit-source-documents-advanced button {
-    min-height: 30px;
-    padding: 0 9px;
-    border: 1px solid var(--app-border);
-    border-radius: 6px;
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 7px;
     background: var(--app-bg-soft);
-    color: var(--app-text);
-    font-size: 9px;
+    color: var(--app-text-strong);
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1;
     text-decoration: none;
+    white-space: nowrap;
+    transition: border-color .16s ease, background-color .16s ease, color .16s ease;
+}
+
+.recipe-edit-source-document-record :is(a, button):hover,
+.recipe-edit-source-documents-modal-footer button:hover,
+.recipe-edit-source-documents-advanced button:hover {
+    border-color: #78827d;
+    background: var(--app-surface-soft);
+}
+
+.recipe-edit-source-document-record :is(a, button):focus-visible,
+.recipe-edit-source-documents-modal-footer button:focus-visible,
+.recipe-edit-source-documents-advanced button:focus-visible,
+.recipe-edit-source-documents-advanced summary:focus-visible {
+    outline: 2px solid var(--app-primary);
+    outline-offset: 2px;
+}
+
+.recipe-edit-source-document-record :is(a, button):disabled,
+.recipe-edit-source-documents-advanced button:disabled {
+    border-color: var(--app-border);
+    color: var(--app-muted);
+    cursor: not-allowed;
+    opacity: .58;
 }
 
 .recipe-edit-source-documents-advanced {
@@ -34785,9 +34843,13 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-source-documents-advanced summary {
-    padding: 9px 10px;
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    padding: 9px 11px;
     color: var(--app-muted);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 750;
     cursor: pointer;
 }
@@ -34806,19 +34868,38 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-source-documents-modal-footer {
-    justify-content: flex-end;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 16px;
     border-top: 1px solid var(--app-border);
 }
 
+.recipe-edit-source-documents-modal-footer .secondary {
+    grid-column: 1;
+    grid-row: 1;
+}
+
 .recipe-edit-source-documents-modal-footer .primary {
+    grid-column: 2;
+    grid-row: 1;
     border-color: var(--app-primary);
     background: var(--app-primary);
     color: #fff;
 }
 
+.recipe-edit-source-documents-modal-footer .primary:hover {
+    border-color: var(--app-primary-hover);
+    background: var(--app-primary-hover);
+    color: #fff;
+}
+
 .recipe-edit-source-documents-modal-footer button:disabled {
-    opacity: .45;
+    border-color: #24553c;
+    background: #17442f;
+    color: #9bb6a7;
+    cursor: not-allowed;
+    opacity: .72;
 }
 
 @media (max-width: 560px) {
@@ -34826,9 +34907,31 @@ img[data-deferred-src] {
         grid-template-columns: 28px minmax(0, 1fr);
     }
 
-    .recipe-edit-source-document-record > :is(a, button) {
+    .recipe-edit-source-document-actions {
+        display: flex;
+        width: 100%;
         grid-column: 2;
-        justify-self: start;
+        flex-wrap: wrap;
+        justify-self: stretch;
+    }
+
+    .recipe-edit-source-document-actions > :is(a, button) {
+        min-width: 0;
+        flex: 1 1 120px;
+    }
+
+    .recipe-edit-source-documents-modal-footer {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .recipe-edit-source-documents-modal-footer .primary {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .recipe-edit-source-documents-modal-footer .secondary {
+        grid-column: 1;
+        grid-row: 2;
     }
 }
 

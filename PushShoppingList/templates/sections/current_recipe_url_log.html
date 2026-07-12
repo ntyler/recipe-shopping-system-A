@@ -2228,10 +2228,12 @@
                                         <div class="recipe-edit-source-document-record" data-source-document-modal-row data-document-input-id="{{ record[1] }}" data-document-modal-kind="{{ record[2] }}">
                                             <span class="recipe-edit-document-icon" aria-hidden="true">{{ shell.svg_icon("document") }}</span>
                                             <div><strong>{{ record[0] }}</strong><span data-source-document-modal-status>Unavailable</span></div>
-                                            <a href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-open hidden>Open</a>
-                                            {% if record[2] in ("source", "generated") %}<a href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-download hidden>Download</a>{% endif %}
-                                            {% if record[2] == "generated" %}<button type="button" onclick="return createRecipeEditorPdf(this)">Regenerate PDF</button>{% endif %}
-                                            {% if record[2] == "cloud-source" %}<button type="button" onclick="return uploadRecipeSourcePdfToCloudflare(this)">Refresh Upload</button>{% endif %}
+                                            <div class="recipe-edit-source-document-actions" data-source-document-modal-actions>
+                                                <a class="action-open" href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-open hidden>Open</a>
+                                                {% if record[2] in ("source", "generated") %}<a class="action-download" href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-download hidden>Download</a>{% endif %}
+                                                {% if record[2] == "generated" %}<button type="button" class="action-management" onclick="return createRecipeEditorPdf(this)">Regenerate PDF</button>{% endif %}
+                                                {% if record[2] == "cloud-source" %}<button type="button" class="action-management" onclick="return uploadRecipeSourcePdfToCloudflare(this)">Refresh Upload</button>{% endif %}
+                                            </div>
                                         </div>
                                         {% endfor %}
                                     </section>
@@ -2246,8 +2248,8 @@
                                     <p class="recipe-edit-source-documents-error" data-source-documents-edit-error hidden></p>
                                 </div>
                                 <footer class="recipe-edit-source-documents-modal-footer">
-                                    <button type="button" onclick="return closeRecipeSourceDocumentsModal({ force: false })">Cancel</button>
                                     <button type="button" class="primary" data-source-documents-edit-save onclick="return saveRecipeSourceDocuments(this.closest('[data-source-documents-edit-form]'))" disabled>Save Changes</button>
+                                    <button type="button" class="secondary" onclick="return closeRecipeSourceDocumentsModal({ force: false })">Cancel</button>
                                 </footer>
                             </div>
                         </section>

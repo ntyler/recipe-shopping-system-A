@@ -517,6 +517,27 @@ def test_source_documents_card_uses_compact_rows_and_edit_modal():
     assert "function uploadRecipeSourcePdfToCloudflare" in script
     assert 'kind: "webpage_backup"' in script
 
+    modal_start = template.index('<div class="recipe-edit-source-documents-modal-backdrop"')
+    modal_end = template.index('<details class="recipe-edit-context-card recipe-edit-restaurant-card"', modal_start)
+    modal = template[modal_start:modal_end]
+    record_loop_start = modal.index('{% for record in')
+    record_loop_end = modal.index('{% endfor %}', record_loop_start)
+    record_loop = modal[record_loop_start:record_loop_end]
+    assert 'data-source-document-modal-actions' in record_loop
+    assert record_loop.index('data-source-document-modal-open') < record_loop.index('data-source-document-modal-download')
+    assert record_loop.index('data-source-document-modal-download') < record_loop.index('Regenerate PDF')
+    assert 'class="action-management" onclick="return createRecipeEditorPdf(this)"' in record_loop
+    assert 'class="action-management" onclick="return uploadRecipeSourcePdfToCloudflare(this)"' in modal
+    assert 'class="secondary" onclick="return closeRecipeSourceDocumentsModal' in modal
+    assert modal.index('data-source-documents-edit-save') < modal.index('>Cancel</button>')
+    assert 'actions.hidden = !Array.from(actions.querySelectorAll("a, button")).some(action => !action.hidden);' in script
+    assert 'grid-template-columns: 72px 96px 130px;' in css
+    assert 'min-height: 38px;' in css
+    assert 'white-space: nowrap;' in css
+    assert '.recipe-edit-source-documents-modal-footer .secondary {' in css
+    assert '.recipe-edit-source-documents-modal-footer .primary {' in css
+    assert 'grid-row: 2;' in css
+
 def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
