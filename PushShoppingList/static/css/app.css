@@ -33513,6 +33513,249 @@ img[data-deferred-src] {
     background: var(--app-bg-soft);
 }
 
+.recipe-edit-restaurant-advanced-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 10px;
+}
+
+.recipe-edit-restaurant-advanced-header h3 {
+    margin: 0;
+    color: var(--app-text-strong);
+    font-size: 16px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-fetch-button {
+    display: inline-flex;
+    width: auto;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0;
+    padding: 0 13px;
+    border: 1px solid #59635f;
+    border-radius: 7px;
+    background: var(--app-surface);
+    color: var(--app-text-strong);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.recipe-edit-restaurant-fetch-button svg {
+    width: 18px;
+    height: 18px;
+    color: var(--app-primary-hover);
+}
+
+.recipe-edit-restaurant-fetch-button:hover,
+.recipe-edit-restaurant-fetch-button:focus-visible {
+    border-color: var(--app-primary);
+    background: var(--app-surface-soft);
+}
+
+.recipe-edit-restaurant-fetch-button:disabled {
+    opacity: .62;
+    cursor: wait;
+}
+
+.recipe-edit-restaurant-fetch-review {
+    position: absolute;
+    top: 60px;
+    right: 0;
+    bottom: 69px;
+    z-index: 30;
+    display: flex;
+    width: min(820px, 96%);
+    min-height: 0;
+    flex-direction: column;
+    border-left: 1px solid #59635f;
+    background: var(--app-surface);
+    box-shadow: -20px 0 46px rgba(0, 0, 0, .5);
+}
+
+.recipe-edit-restaurant-fetch-review[hidden] {
+    display: none !important;
+}
+
+.recipe-edit-restaurant-fetch-review > header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 15px 18px;
+    border-bottom: 1px solid #59635f;
+}
+
+.recipe-edit-restaurant-fetch-review h3 {
+    margin: 0 0 4px;
+    color: var(--app-text-strong);
+    font-size: 17px;
+}
+
+.recipe-edit-restaurant-fetch-review header p {
+    margin: 0;
+    color: #aeb8b2;
+    font-size: 13px;
+}
+
+.recipe-edit-restaurant-fetch-review header button {
+    display: grid;
+    width: 38px;
+    min-height: 38px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--app-muted);
+}
+
+.recipe-edit-restaurant-fetch-review header button svg {
+    width: 20px;
+    height: 20px;
+}
+
+.recipe-edit-restaurant-fetch-review-head,
+.recipe-edit-restaurant-fetch-row {
+    display: grid;
+    grid-template-columns: 54px minmax(90px, .8fr) minmax(120px, 1fr) minmax(150px, 1.15fr) minmax(120px, .85fr);
+    gap: 10px;
+    align-items: start;
+}
+
+.recipe-edit-restaurant-fetch-review-head {
+    flex: 0 0 auto;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--app-border);
+    color: #aeb8b2;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.recipe-edit-restaurant-fetch-review-list {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.recipe-edit-restaurant-fetch-row {
+    min-width: 0;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--app-border);
+    color: var(--app-text);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.recipe-edit-restaurant-fetch-row.has-conflict {
+    background: rgba(245, 158, 11, .08);
+    box-shadow: inset 3px 0 #d99a22;
+}
+
+.recipe-edit-restaurant-fetch-row.is-not-found {
+    color: var(--app-muted);
+    opacity: .78;
+}
+
+.recipe-edit-restaurant-fetch-accept {
+    display: grid !important;
+    min-height: 32px;
+    place-items: start center;
+}
+
+.recipe-edit-restaurant-fetch-accept input {
+    width: 18px !important;
+    height: 18px !important;
+    min-height: 0 !important;
+    margin: 2px 0 0 !important;
+    accent-color: var(--app-primary);
+}
+
+.recipe-edit-restaurant-fetch-row > strong {
+    color: var(--app-text-strong);
+    font-size: 13px;
+}
+
+.recipe-edit-restaurant-fetch-current,
+.recipe-edit-restaurant-fetch-proposed {
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+}
+
+.recipe-edit-restaurant-fetch-proposed {
+    display: grid;
+    gap: 6px;
+    color: var(--app-text-strong);
+}
+
+.recipe-edit-restaurant-fetch-proposed img {
+    width: 78px;
+    height: 52px;
+    object-fit: cover;
+    border: 1px solid #59635f;
+    border-radius: 6px;
+}
+
+.recipe-edit-restaurant-fetch-evidence {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.recipe-edit-restaurant-fetch-evidence a {
+    overflow: hidden;
+    color: var(--app-primary-hover);
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recipe-edit-restaurant-fetch-evidence small {
+    color: #aeb8b2;
+    font-size: 12px;
+}
+
+.recipe-edit-restaurant-fetch-evidence em {
+    color: #f0b84f;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 750;
+}
+
+.recipe-edit-restaurant-fetch-review > footer {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 13px 16px;
+    border-top: 1px solid #59635f;
+    background: var(--app-surface);
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-fetch-review > footer button {
+    width: auto;
+    min-height: 40px;
+    margin: 0;
+    padding: 0 14px;
+    border: 1px solid #59635f;
+    border-radius: 7px;
+    background: var(--app-bg-soft);
+    color: var(--app-text-strong);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-fetch-review > footer .primary {
+    border-color: var(--app-primary);
+    background: var(--app-primary);
+    color: #fff;
+}
+
 .recipe-edit-restaurant-advanced > summary,
 .recipe-edit-restaurant-raw-hours > summary {
     min-height: 38px;
@@ -33767,6 +34010,47 @@ img[data-deferred-src] {
     .recipe-edit-restaurant-advanced-body > * {
         grid-column: 1;
     }
+
+    .recipe-edit-restaurant-advanced-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .recipe-edit-standalone-page .recipe-edit-restaurant-fetch-button {
+        width: 100%;
+    }
+
+    .recipe-edit-restaurant-fetch-review {
+        top: 0;
+        bottom: 0;
+        width: 100%;
+        border-left: 0;
+    }
+
+    .recipe-edit-restaurant-fetch-review-head {
+        display: none;
+    }
+
+    .recipe-edit-restaurant-fetch-row {
+        grid-template-columns: 36px minmax(0, 1fr);
+        gap: 7px 10px;
+    }
+
+    .recipe-edit-restaurant-fetch-row > :not(.recipe-edit-restaurant-fetch-accept):not(strong) {
+        grid-column: 2;
+    }
+
+    .recipe-edit-restaurant-fetch-row > :is(.recipe-edit-restaurant-fetch-current, .recipe-edit-restaurant-fetch-proposed)::before {
+        display: block;
+        margin-bottom: 2px;
+        color: #aeb8b2;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .recipe-edit-restaurant-fetch-current::before { content: "Current"; }
+    .recipe-edit-restaurant-fetch-proposed::before { content: "Proposed"; }
 
     .recipe-edit-restaurant-hours-row {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

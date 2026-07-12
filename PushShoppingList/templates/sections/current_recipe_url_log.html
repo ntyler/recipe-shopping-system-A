@@ -2373,7 +2373,16 @@
                             <label><span>Country</span><input type="text" data-restaurant-edit-field="restaurant_country"></label>
                             </section>
                             <section class="recipe-edit-restaurant-advanced recipe-edit-restaurant-operational-column">
-                                <h3>Advanced Restaurant Details</h3>
+                                <header class="recipe-edit-restaurant-advanced-header">
+                                    <h3>Advanced Restaurant Details</h3>
+                                    <button type="button"
+                                            class="recipe-edit-restaurant-fetch-button"
+                                            data-restaurant-fetch-button
+                                            onclick="return fetchRecipeRestaurantDetails(this)">
+                                        {{ shell.svg_icon("download") }}
+                                        <span data-restaurant-fetch-label>Fetch Restaurant Details</span>
+                                    </button>
+                                </header>
                                 <div class="recipe-edit-restaurant-advanced-body">
                                     <section class="recipe-edit-restaurant-hours-editor">
                                         <h3>Hours</h3>
@@ -2407,6 +2416,29 @@
                                     </div>
                                 </div>
                             </section>
+                            <aside class="recipe-edit-restaurant-fetch-review"
+                                   data-restaurant-fetch-review
+                                   role="dialog"
+                                   aria-modal="true"
+                                   aria-labelledby="recipeEditRestaurantFetchReviewTitle"
+                                   hidden>
+                                <header>
+                                    <div>
+                                        <h3 id="recipeEditRestaurantFetchReviewTitle">Review Restaurant Details</h3>
+                                        <p data-restaurant-fetch-summary>Choose which public details to copy into this unsaved form.</p>
+                                    </div>
+                                    <button type="button" aria-label="Close restaurant details review" onclick="return closeRecipeRestaurantFetchReview()">{{ shell.svg_icon("x") }}</button>
+                                </header>
+                                <div class="recipe-edit-restaurant-fetch-review-head" aria-hidden="true">
+                                    <span>Accept</span><span>Field</span><span>Current</span><span>Proposed</span><span>Source / confidence</span>
+                                </div>
+                                <div class="recipe-edit-restaurant-fetch-review-list" data-restaurant-fetch-review-list></div>
+                                <footer>
+                                    <button type="button" onclick="return closeRecipeRestaurantFetchReview()">Cancel</button>
+                                    <button type="button" onclick="return applyRecipeRestaurantFetchedDetails(false)">Apply Selected</button>
+                                    <button type="button" class="primary" onclick="return applyRecipeRestaurantFetchedDetails(true)">Apply All</button>
+                                </footer>
+                            </aside>
                             <p class="recipe-edit-restaurant-form-error" data-restaurant-edit-error hidden></p>
                             <section class="recipe-edit-restaurant-duplicate" data-restaurant-duplicate-panel hidden aria-live="assertive">
                                 <div>

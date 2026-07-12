@@ -101,3 +101,40 @@ def test_restaurant_editor_opens_without_an_existing_normalized_source():
     assert "else setRecipeRestaurantUsageEmpty();" in script
     assert "editButton.hidden =" not in script
     assert "canNormalizeFallback" in script
+
+
+def test_restaurant_details_fetch_is_backend_only_and_reviewed_before_form_changes():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    routes = read_text("PushShoppingList/routes/recipe_routes.py")
+
+    assert "Fetch Restaurant Details" in template
+    assert 'data-restaurant-fetch-button' in template
+    assert 'data-restaurant-fetch-review' in template
+    assert "Apply Selected" in template
+    assert "Apply All" in template
+    assert 'aria-labelledby="recipeEditRestaurantFetchReviewTitle"' in template
+    assert 'fetch(`/api/recipe/restaurants/${encodeURIComponent(restaurantId)}/fetch-details`' in script
+    assert 'method: "POST"' in script
+    assert "Fetching details…" in script
+    assert "renderRecipeRestaurantFetchReview(data)" in script
+    assert 'found && !conflict ? "checked"' in script
+    assert "Differs from current value" in script
+    assert "Not found" in script
+    assert "applyRecipeRestaurantFetchedDetails" in script
+    assert "updateRecipeRestaurantEditState(form);" in script
+    assert 'fetch-details", methods=["POST"]' in routes
+
+
+def test_restaurant_details_fetch_review_is_responsive_and_does_not_replace_save():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert "recipe-edit-restaurant-fetch-review-list" in template
+    assert "Save Changes" in template
+    assert ".recipe-edit-restaurant-fetch-review {" in css
+    assert "position: absolute;" in css
+    assert "overflow-y: auto;" in css
+    assert ".recipe-edit-restaurant-fetch-row.has-conflict" in css
+    assert ".recipe-edit-restaurant-fetch-review[hidden]" in css
+    assert "display: none !important;" in css

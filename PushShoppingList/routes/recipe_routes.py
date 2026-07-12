@@ -140,6 +140,7 @@ from PushShoppingList.services.recipe_edit_service import create_editable_restau
 from PushShoppingList.services.recipe_edit_service import get_editable_restaurant
 from PushShoppingList.services.recipe_edit_service import list_editable_restaurants
 from PushShoppingList.services.recipe_edit_service import update_editable_restaurant
+from PushShoppingList.services.restaurant_details_fetch_service import fetch_restaurant_details
 from PushShoppingList.services.cookbook_item_inference_service import infer_missing_details_for_recipe
 from PushShoppingList.services.cookbook_item_inference_service import regenerate_ingredients_for_recipe
 from PushShoppingList.services.cookbook_item_inference_service import regenerate_recipe_notes_for_recipe
@@ -3559,6 +3560,19 @@ def recipe_restaurant_detail_route(restaurant_id):
     status = 200 if result.get("ok") else (
         404 if "not found" in str(result.get("error") or "").lower() else 400
     )
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe/restaurants/<restaurant_id>/fetch-details", methods=["POST"])
+def recipe_restaurant_fetch_details_route(restaurant_id):
+    """Return public metadata proposals without mutating the restaurant record."""
+    selected = get_editable_restaurant(restaurant_id)
+    if not selected.get("ok"):
+        return jsonify(selected), 404
+    result = fetch_restaurant_details(selected.get("restaurant"))
+    if result.get("ok"):
+        return jsonify(result), 200
+    status = 400 if result.get("code") in {"missing_urls", "invalid_url", "blocked_url"} else 502
     return jsonify(result), status
 
 
