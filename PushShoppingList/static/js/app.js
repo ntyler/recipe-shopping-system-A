@@ -24676,6 +24676,28 @@ function toggleRecipeSourceDocumentsHelp(button, event = null) {
     return openRecipeSourceDocumentsHelp(button);
 }
 
+function toggleRecipeSourceDocumentsCard(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!button) return false;
+    const list = document.getElementById("recipeEditDocumentList");
+    const expanded = button.getAttribute("aria-expanded") === "true";
+    const nextExpanded = !expanded;
+    button.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
+    button.setAttribute("aria-label", nextExpanded
+        ? "Collapse Source and Documents"
+        : "Expand Source and Documents");
+    if (list) list.hidden = !nextExpanded;
+    const up = button.querySelector("[data-source-documents-chevron-up]");
+    const down = button.querySelector("[data-source-documents-chevron-down]");
+    if (up) up.hidden = !nextExpanded;
+    if (down) down.hidden = nextExpanded;
+    if (!nextExpanded) closeRecipeSourceDocumentsHelp();
+    return false;
+}
+
 document.addEventListener("pointerdown", event => {
     const popover = document.getElementById("recipeEditSourceDocumentsHelp");
     const button = document.querySelector(".recipe-edit-source-documents-help");

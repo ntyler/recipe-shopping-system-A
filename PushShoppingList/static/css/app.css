@@ -32758,11 +32758,18 @@ img[data-deferred-src] {
     overflow: visible;
 }
 
-.recipe-edit-standalone-page .recipe-edit-source-documents-card > summary {
+.recipe-edit-standalone-page .recipe-edit-source-documents-header {
     position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     overflow: visible;
     min-height: 44px;
     padding: 13px 14px;
+    color: var(--app-text-strong);
+    font-size: 13px;
+    font-weight: 800;
 }
 
 .recipe-edit-standalone-page .recipe-edit-source-documents-title {
@@ -32787,6 +32794,30 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-page .recipe-edit-source-documents-help svg {
+    width: 15px;
+    height: 15px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-toggle {
+    display: grid;
+    width: 26px;
+    min-height: 26px;
+    margin: 0;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-muted);
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-toggle:hover,
+.recipe-edit-standalone-page .recipe-edit-source-documents-toggle:focus-visible {
+    background: var(--app-bg-soft);
+    color: var(--app-primary-hover);
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-toggle svg {
     width: 15px;
     height: 15px;
 }

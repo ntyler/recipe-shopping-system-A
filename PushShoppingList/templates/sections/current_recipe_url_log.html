@@ -2081,8 +2081,8 @@
                         </div>
                         <div id="recipeEditImageCardContent" class="recipe-edit-image-card-content"></div>
                     </section>
-                    <details class="recipe-edit-context-card recipe-edit-source-documents-card" open>
-                        <summary>
+                    <section class="recipe-edit-context-card recipe-edit-source-documents-card" data-source-documents-card>
+                        <div class="recipe-edit-source-documents-header">
                             <span class="recipe-edit-source-documents-title">Source &amp; Documents
                                 <button type="button"
                                         class="recipe-edit-source-documents-help"
@@ -2092,7 +2092,16 @@
                                         onclick="return toggleRecipeSourceDocumentsHelp(this, event)"
                                         onfocus="openRecipeSourceDocumentsHelp(this)">{{ shell.svg_icon("help") }}</button>
                             </span>
-                        </summary>
+                            <button type="button"
+                                    class="recipe-edit-source-documents-toggle"
+                                    aria-label="Collapse Source and Documents"
+                                    aria-expanded="true"
+                                    aria-controls="recipeEditDocumentList"
+                                    onclick="return toggleRecipeSourceDocumentsCard(this, event)">
+                                <span data-source-documents-chevron-up>{{ shell.svg_icon("chevron-up") }}</span>
+                                <span data-source-documents-chevron-down hidden>{{ shell.svg_icon("chevron-down") }}</span>
+                            </button>
+                        </div>
                             <aside id="recipeEditSourceDocumentsHelp" class="recipe-edit-source-documents-popover" role="dialog" aria-label="About Source and Documents" hidden>
                                 <strong>Source &amp; Documents</strong>
                                 <p>These files are associated with this recipe.</p>
@@ -2106,7 +2115,7 @@
                                 </dl>
                                 <p>Use Open to view a document. Additional icons provide download or external-link actions when available.</p>
                             </aside>
-                        <div class="recipe-edit-document-list" data-recipe-edit-document-list>
+                        <div id="recipeEditDocumentList" class="recipe-edit-document-list" data-recipe-edit-document-list>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
                                  data-document-input-id="recipeEditSourceUrl"
@@ -2187,7 +2196,7 @@
                                 <a class="recipe-edit-document-secondary" href="#" target="_blank" rel="noopener noreferrer" data-document-download title="Open Cloudflare generated PDF in a new tab" aria-label="Open Cloudflare generated PDF in a new tab" hidden>{{ shell.svg_icon("external-link") }}</a>
                             </div>
                         </div>
-                    </details>
+                    </section>
 
                     <details class="recipe-edit-context-card recipe-edit-restaurant-card" open>
                         <summary>

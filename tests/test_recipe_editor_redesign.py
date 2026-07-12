@@ -235,12 +235,12 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert template.index("data-restaurant-edit-modal") > card_end
 
 
-def test_source_documents_card_uses_compact_rows_and_context_action_menus():
+def test_source_documents_card_uses_compact_rows_and_dedicated_collapse_button():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
-    card_start = template.index('<details class="recipe-edit-context-card recipe-edit-source-documents-card"')
-    card_end = template.index("</details>\n\n                    <details", card_start)
+    card_start = template.index('<section class="recipe-edit-context-card recipe-edit-source-documents-card"')
+    card_end = template.index("</section>\n\n                    <details", card_start)
     card = template[card_start:card_end]
     expected_labels = (
         "Source URL",
@@ -257,6 +257,12 @@ def test_source_documents_card_uses_compact_rows_and_context_action_menus():
     assert "Original webpage the recipe was imported from." in card
     assert "Use Open to view a document." in card
     assert "recipe-edit-context-chevron" not in card
+    assert "<summary>" not in card
+    assert "recipe-edit-source-documents-toggle" in card
+    assert 'aria-expanded="true"' in card
+    assert 'aria-controls="recipeEditDocumentList"' in card
+    assert 'shell.svg_icon("chevron-up")' in card
+    assert 'shell.svg_icon("chevron-down")' in card
     assert card.count("data-recipe-edit-document-row") == len(expected_labels)
     assert card.count("recipe-edit-document-icon") == len(expected_labels)
     assert card.count("recipe-edit-document-identity") == len(expected_labels)
@@ -279,6 +285,8 @@ def test_source_documents_card_uses_compact_rows_and_context_action_menus():
     assert 'data-document-input-id="recipeEditGeneratedPdfPath"] { order: 4; }' in css
     assert "function recipeEditDocumentSlug(value, fallback = \"document\")" in script
     assert "function toggleRecipeSourceDocumentsHelp" in script
+    assert "function toggleRecipeSourceDocumentsCard" in script
+    assert "if (list) list.hidden = !nextExpanded;" in script
     assert "function uploadRecipeSourcePdfToCloudflare" in script
     assert 'kind: "webpage_backup"' in script
 
