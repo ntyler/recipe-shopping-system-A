@@ -210,7 +210,9 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "data-recipe-edit-cuisine-chips" in script
     assert "renderRecipeEditCuisineChips" in script
     assert "recipe-edit-price-control" in organizer
-    assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        ratingField," in organizer
+    assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer
+    assert "panelHeading.appendChild(ratingField)" in organizer
+    assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
     assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, tagRow, metadataRow, descriptionRow, technicalDetails])" in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer
     assert "technicalDetails.open = false;" in organizer
@@ -221,6 +223,11 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert ".recipe-edit-description-count {" in css
     assert "updateRecipeEditDescriptionCount" in script
     assert 'value.replace(/\\s*(people|persons?|servings?|minutes?|mins?)' in script
+    assert 'valueWrap.className = "recipe-edit-metadata-value"' in script
+    assert 'unitLabel.className = "recipe-edit-metadata-unit"' in script
+    assert "width: 68px;" in css
+    assert "position: static;" in css
+    assert "if (clear) clear.hidden = normalizedRating <= 0;" in script
 
 
 def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():

@@ -31654,7 +31654,46 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     margin-bottom: 14px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-rating {
+    display: flex;
+    margin: 0 0 0 auto;
+    padding: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-rating .recipe-edit-rating-stars {
+    flex-wrap: nowrap;
+    gap: 2px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-rating .recipe-edit-rating-star {
+    width: 26px;
+    min-width: 26px;
+    height: 26px;
+    min-height: 26px;
+    border: 0;
+    background: transparent;
+    font-size: 19px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-rating .recipe-edit-rating-clear {
+    min-width: 0;
+    height: 26px;
+    min-height: 26px;
+    padding: 0 5px;
+    border: 0;
+    background: transparent;
+    color: var(--app-muted);
+    font-size: 9px;
 }
 
 .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-primary-fields {
@@ -31750,7 +31789,7 @@ img[data-deferred-src] {
 
 .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label {
     display: grid;
-    grid-template-columns: 22px minmax(42px, 1fr) auto;
+    grid-template-columns: 22px minmax(0, 1fr);
     grid-template-rows: auto 28px;
     gap: 4px 6px;
     align-items: center;
@@ -31779,26 +31818,38 @@ img[data-deferred-src] {
     stroke-linejoin: round;
 }
 
-.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label > span:not(.recipe-edit-metadata-icon):not(.recipe-edit-unit) {
-    grid-column: 2 / 4;
+.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label > span:not(.recipe-edit-metadata-icon) {
+    grid-column: 2;
     grid-row: 1;
 }
 
-.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip input {
+.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-value {
     grid-column: 2;
     grid-row: 2;
-    width: 100%;
-    min-width: 42px;
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-value input {
+    box-sizing: border-box;
+    width: 68px;
+    min-width: 0;
+    max-width: 68px;
+    flex: 0 1 68px;
     min-height: 28px;
     height: 28px;
     padding: 4px 7px;
+    text-align: left;
 }
 
-.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip .recipe-edit-unit {
-    grid-column: 3;
-    grid-row: 2;
+.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip .recipe-edit-metadata-unit {
+    position: static;
+    flex: 0 0 auto;
     color: var(--app-muted);
     font-size: 8px;
+    pointer-events: auto;
 }
 
 .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-description-row {
@@ -31880,6 +31931,13 @@ img[data-deferred-src] {
 }
 
 @media (min-width: 768px) and (max-width: 1099px) {
+    .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-panel-heading {
+        flex-wrap: wrap;
+    }
+
+    .recipe-edit-standalone-page .recipe-edit-header-rating {
+        flex: 1 0 100%;
+    }
     .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-primary-fields {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -31899,6 +31957,16 @@ img[data-deferred-src] {
 }
 
 @media (max-width: 767px) {
+    .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-panel-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .recipe-edit-standalone-page .recipe-edit-header-rating {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+    }
     .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-primary-fields,
     .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-description-row,
     .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip {

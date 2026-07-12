@@ -24139,10 +24139,17 @@ function addRecipeEditUnit(field, unit) {
         return;
     }
     field.classList.add("recipe-edit-compact-metadata-field");
-    const unitLabel = document.createElement("small");
+    const input = field.querySelector("input");
+    if (!input) return;
+    const valueWrap = document.createElement("div");
+    valueWrap.className = "recipe-edit-metadata-value";
+    input.parentNode.insertBefore(valueWrap, input);
+    valueWrap.appendChild(input);
+    const unitLabel = document.createElement("span");
+    unitLabel.className = "recipe-edit-metadata-unit";
     unitLabel.dataset.recipeEditUnit = unit;
     unitLabel.textContent = unit;
-    field.appendChild(unitLabel);
+    valueWrap.appendChild(unitLabel);
 }
 
 function updateRecipeEditMetadataUnits() {
@@ -24286,6 +24293,7 @@ function organizeRecipeEditInformationCard() {
     const mobilePdfActions = grid.querySelector(".recipe-edit-mobile-pdf-actions");
     const legacyPdfActions = document.getElementById("recipeEditLegacyPdfActions");
     const infoActions = infoPanel.querySelector(".recipe-edit-info-actions");
+    const panelHeading = infoPanel.querySelector(".recipe-edit-panel-heading");
 
     setRecipeEditFieldLabel(nameField, "Recipe Name");
     setRecipeEditFieldLabel(cookbookField, "Cookbook");
@@ -24309,6 +24317,10 @@ function organizeRecipeEditInformationCard() {
     addRecipeEditMetadataIcon(inactiveField, "inactive");
 
     if (infoActions) infoActions.hidden = true;
+    if (ratingField && panelHeading) {
+        ratingField.classList.add("recipe-edit-header-rating");
+        panelHeading.appendChild(ratingField);
+    }
 
     const primaryRow = document.createElement("div");
     primaryRow.className = "recipe-edit-primary-fields";
@@ -24370,7 +24382,6 @@ function organizeRecipeEditInformationCard() {
         technicalDetails.open = false;
     }
     appendRecipeEditWorkspaceChildren(technicalBody, [
-        ratingField,
         titleField,
         scaleField,
         levelField,
@@ -25828,6 +25839,8 @@ function updateRecipeRatingStars(rating) {
         button.setAttribute("aria-checked", value === normalizedRating ? "true" : "false");
         button.textContent = active ? "\u2605" : "\u2606";
     });
+    const clear = document.querySelector("#recipeEditRatingStars .recipe-edit-rating-clear");
+    if (clear) clear.hidden = normalizedRating <= 0;
 }
 
 function setRecipeEditStatus(message, isError = false) {
