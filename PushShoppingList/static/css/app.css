@@ -33080,7 +33080,37 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-page-main-shell {
-    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.recipe-edit-standalone-page {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.recipe-edit-standalone-page .recipe-edit-page-shell {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.recipe-edit-standalone-page .recipe-edit-page-topbar {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.recipe-edit-standalone-page .recipe-edit-standalone-shell {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .recipe-edit-page-topbar {

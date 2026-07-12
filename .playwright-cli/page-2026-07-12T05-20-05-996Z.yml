@@ -1,0 +1,130 @@
+- generic [active] [ref=f1e1]:
+  - link "Skip to content" [ref=f1e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=f1e3]:
+    - complementary "Primary navigation" [ref=f1e4]:
+      - link "AI Pantry home" [ref=f1e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f1e13]:
+          - strong [ref=f1e14]: AI Pantry
+          - generic [ref=f1e15]: Recipe Shopping List
+      - button "Collapse sidebar" [ref=f1e16] [cursor=pointer]:
+        - generic [ref=f1e17]: ‹ <
+      - navigation "App sections" [ref=f1e18]:
+        - link "Home" [ref=f1e19] [cursor=pointer]:
+          - /url: "#appPageHeader"
+        - link "Recipes" [ref=f1e26] [cursor=pointer]:
+          - /url: "#recipesPage"
+        - link "Menus" [ref=f1e32] [cursor=pointer]:
+          - /url: "#menusPage"
+        - link "Cookbooks" [ref=f1e36] [cursor=pointer]:
+          - /url: "#cookbooksCard"
+        - link "Shopping Lists" [ref=f1e41] [cursor=pointer]:
+          - /url: "#shoppingViewsSection"
+        - link "Pantry" [ref=f1e46] [cursor=pointer]:
+          - /url: "#aiPantrySection"
+        - link "Meal Planner" [ref=f1e52] [cursor=pointer]:
+          - /url: "#mealPlannerPage"
+        - generic [ref=f1e57]: Shop
+        - link "Stores / Store Links" [ref=f1e58] [cursor=pointer]:
+          - /url: "#storesPage"
+        - link "Price Comparison" [ref=f1e65] [cursor=pointer]:
+          - /url: "#priceComparisonPage"
+        - generic [ref=f1e71]: CREATE RECIPES
+        - link "Recipe URL" [ref=f1e72] [cursor=pointer]:
+          - /url: "#recipeUrlsPage"
+        - link "Recipe Document" [ref=f1e79] [cursor=pointer]:
+          - /url: "#importDocumentPage"
+        - link "Recipe Image" [ref=f1e85] [cursor=pointer]:
+          - /url: "#generateImagePage"
+        - generic [ref=f1e91]: IMPORT MENUS
+        - link "Menu URL" [ref=f1e92] [cursor=pointer]:
+          - /url: "#menuUrlPage"
+        - link "Menu Document" [ref=f1e96] [cursor=pointer]:
+          - /url: "#menuDocumentPage"
+        - generic [ref=f1e102]: PANTRY
+        - link "Scan Barcode" [ref=f1e103] [cursor=pointer]:
+          - /url: /pantry/coming-soon
+        - generic [ref=f1e107]: Account
+        - link "Settings" [ref=f1e108] [cursor=pointer]:
+          - /url: "#settingsWorkspaceSection"
+        - link "Usage & Billing" [ref=f1e117] [cursor=pointer]:
+          - /url: "#accountUsageDashboardPanel"
+        - link "Help & Support" [ref=f1e122] [cursor=pointer]:
+          - /url: "#feedbackSupportSection"
+      - complementary "AI Pantry plan" [ref=f1e128]:
+        - strong [ref=f1e131]: Love AI Pantry?
+        - generic [ref=f1e132]: Upgrade your plan to unlock more features.
+        - link "View Plans" [ref=f1e133] [cursor=pointer]:
+          - /url: "#accountUsageDashboardPanel"
+    - generic [ref=f1e134]:
+      - banner "App toolbar" [ref=f1e135]:
+        - search [ref=f1e136]:
+          - generic [ref=f1e137]: Search app sections
+          - combobox "Search app sections" [ref=f1e138]
+          - generic: Ctrl + K
+          - button "Search" [ref=f1e139] [cursor=pointer]
+        - generic "Quick actions" [ref=f1e141]:
+          - link "Import" [ref=f1e142] [cursor=pointer]:
+            - /url: "#importPage"
+          - link "Notifications" [ref=f1e145] [cursor=pointer]:
+            - /url: "#notificationsPage"
+          - link "Sign In AI Pantry account" [ref=f1e150] [cursor=pointer]:
+            - /url: "#userAccountSection"
+            - generic [ref=f1e151]: G
+            - generic [ref=f1e152]:
+              - strong [ref=f1e153]: Sign In
+              - generic [ref=f1e154]: AI Pantry account
+      - main [ref=f1e155]:
+        - text: "> >"
+        - generic [ref=f1e156]:
+          - heading "User Account" [level=2] [ref=f1e158]
+          - paragraph [ref=f1e159]: You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
+          - generic [ref=f1e160]:
+            - generic [ref=f1e161]: ✨ Guest Demo
+            - button "Start temporary guest demo session" [ref=f1e162] [cursor=pointer]: Try Demo Without Password
+            - paragraph [ref=f1e163]: Explore with temporary demo data. Nothing is saved permanently.
+          - generic [ref=f1e165]:
+            - generic [ref=f1e166]:
+              - heading "Create Account" [level=3] [ref=f1e167]
+              - paragraph [ref=f1e168]: Create a Firebase account with email and password.
+              - generic [ref=f1e169]:
+                - generic [ref=f1e170]: First Name
+                - textbox "First Name" [ref=f1e171]
+              - generic [ref=f1e172]:
+                - generic [ref=f1e173]: Last Name
+                - textbox "Last Name" [ref=f1e174]
+              - generic [ref=f1e175]:
+                - generic [ref=f1e176]: Username
+                - textbox "Username" [ref=f1e177]
+              - generic [ref=f1e178]:
+                - generic [ref=f1e179]: Email
+                - textbox "Email" [ref=f1e180]
+              - generic [ref=f1e181]:
+                - generic [ref=f1e182]: Password
+                - textbox "Password" [ref=f1e183]
+              - generic [ref=f1e184]:
+                - generic [ref=f1e185]: Confirm Password
+                - textbox "Confirm Password" [ref=f1e186]
+              - generic [ref=f1e187]:
+                - generic [ref=f1e188]: 🔒 Passwords are handled by Firebase Authentication. AI Pantry does not store or see your password.
+                - button "Learn more" [ref=f1e189] [cursor=pointer]
+              - button "Create Account" [ref=f1e190] [cursor=pointer]
+            - generic [ref=f1e191]:
+              - heading "Sign In" [level=3] [ref=f1e192]
+              - generic [ref=f1e193]:
+                - generic [ref=f1e194]: Email
+                - textbox "Email" [ref=f1e195]
+              - generic [ref=f1e196]:
+                - generic [ref=f1e197]: Password
+                - textbox "Password" [ref=f1e198]
+              - generic [ref=f1e199]:
+                - generic [ref=f1e200]: 🔒 Passwords are handled by Firebase Authentication. AI Pantry does not store or see your password.
+                - button "Learn more" [ref=f1e201] [cursor=pointer]
+              - button "Sign In" [ref=f1e202] [cursor=pointer]
+              - button "Sign In With Google" [ref=f1e203] [cursor=pointer]
+              - button "Forgot password?" [ref=f1e204] [cursor=pointer]
+        - button "💬 Feedback & Support 0 requests" [ref=f1e206] [cursor=pointer]:
+          - generic [ref=f1e207]:
+            - generic [ref=f1e208]: 💬 Feedback & Support
+            - generic [ref=f1e209]: 0 requests

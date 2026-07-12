@@ -56,6 +56,33 @@ def test_standalone_recipe_editor_matches_homepage_width_without_a_max_cap():
     assert "width: min(" not in shell_rule
 
 
+def test_standalone_recipe_editor_has_an_independent_main_scroll_region():
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    main_rule_start = css.index(".recipe-edit-page-main-shell {")
+    main_rule = css[main_rule_start:css.index("}", main_rule_start)]
+    page_rule_start = css.index(".recipe-edit-standalone-page {", main_rule_start)
+    page_rule = css[page_rule_start:css.index("}", page_rule_start)]
+    shell_rule_start = css.index(".recipe-edit-standalone-page .recipe-edit-page-shell {", page_rule_start)
+    shell_rule = css[shell_rule_start:css.index("}", shell_rule_start)]
+    content_rule_start = css.index(".recipe-edit-standalone-page .recipe-edit-standalone-shell {", main_rule_start)
+    content_rule = css[content_rule_start:css.index("}", content_rule_start)]
+
+    assert "height: 100vh;" in page_rule
+    assert "overflow: hidden;" in page_rule
+    assert "height: 100vh;" in shell_rule
+    assert "min-height: 0;" in shell_rule
+    assert "display: flex;" in main_rule
+    assert "flex-direction: column;" in main_rule
+    assert "min-height: 0;" in main_rule
+    assert "overflow: hidden;" in main_rule
+    assert "flex: 1 1 auto;" in content_rule
+    assert "min-width: 0;" in content_rule
+    assert "min-height: 0;" in content_rule
+    assert "overflow-x: hidden;" in content_rule
+    assert "overflow-y: auto;" in content_rule
+
+
 def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
 
