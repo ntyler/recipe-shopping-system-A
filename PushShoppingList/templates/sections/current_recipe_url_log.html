@@ -2115,93 +2115,128 @@
                     </section>
                     <details class="recipe-edit-context-card recipe-edit-source-documents-card" open>
                         <summary>
-                            <span>Source &amp; Documents</span>
-                            <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
+                            <span class="recipe-edit-source-documents-title">Source &amp; Documents <span class="recipe-edit-source-documents-help" title="Recipe source links and available PDF documents" aria-label="Recipe source links and available PDF documents">?</span></span>
                         </summary>
                         <div class="recipe-edit-document-list" data-recipe-edit-document-list>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
                                  data-document-input-id="recipeEditSourceUrl"
                                  data-document-link-id="recipeEditSourceUrlLink"
-                                 data-document-open-source="source-url">
-                                <div>
+                                 data-document-open-source="source-url"
+                                 data-document-kind="url">
+                                <span class="recipe-edit-document-icon" aria-hidden="true">&#128279;</span>
+                                <div class="recipe-edit-document-identity">
                                     <strong>Source URL</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
                                     <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
-                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                    <details class="recipe-edit-document-more">
+                                        <summary title="More source actions" aria-label="More source actions">&#8942;</summary>
+                                        <div><button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy URL</button></div>
+                                    </details>
                                 </div>
                             </div>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
                                  data-document-input-id="recipeEditSourceMenuUrl"
-                                 data-document-link-id="recipeEditSourceMenuUrlLink">
-                                <div>
+                                 data-document-link-id="recipeEditSourceMenuUrlLink"
+                                 data-document-kind="url">
+                                <span class="recipe-edit-document-icon" aria-hidden="true">&#128279;</span>
+                                <div class="recipe-edit-document-identity">
                                     <strong>Source Menu URL</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
                                     <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
-                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                    <details class="recipe-edit-document-more">
+                                        <summary title="More source actions" aria-label="More source actions">&#8942;</summary>
+                                        <div><button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy URL</button></div>
+                                    </details>
                                 </div>
                             </div>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
                                  data-document-input-id="recipeEditSourcePdfPath"
-                                 data-document-link-id="recipeEditSourcePdfPathLink">
-                                <div>
+                                 data-document-link-id="recipeEditSourcePdfPathLink"
+                                 data-document-kind="pdf">
+                                <span class="recipe-edit-document-icon" aria-hidden="true">PDF</span>
+                                <div class="recipe-edit-document-identity">
                                     <strong>Source PDF</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
                                     <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
-                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                    <details class="recipe-edit-document-more">
+                                        <summary title="More PDF actions" aria-label="More PDF actions">&#8942;</summary>
+                                        <div>
+                                            <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
+                                            <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy path</button>
+                                        </div>
+                                    </details>
                                 </div>
                             </div>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
                                  data-document-input-id="recipeEditSourceCloudflarePdfUrl"
-                                 data-document-link-id="recipeEditSourceCloudflarePdfUrlLink">
-                                <div>
+                                 data-document-link-id="recipeEditSourceCloudflarePdfUrlLink"
+                                 data-document-kind="cloudflare">
+                                <span class="recipe-edit-document-icon" aria-hidden="true">PDF</span>
+                                <div class="recipe-edit-document-identity">
                                     <strong>Cloudflare Source PDF</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
                                     <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
-                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                    <details class="recipe-edit-document-more">
+                                        <summary title="More Cloudflare actions" aria-label="More Cloudflare actions">&#8942;</summary>
+                                        <div>
+                                            <a href="#" target="_blank" rel="noopener noreferrer" data-document-download hidden>Open externally</a>
+                                            <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy URL</button>
+                                        </div>
+                                    </details>
                                 </div>
                             </div>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
                                  data-document-input-id="recipeEditGeneratedPdfPath"
-                                 data-document-link-id="recipeEditGeneratedPdfPathLink">
-                                <div>
+                                 data-document-link-id="recipeEditGeneratedPdfPathLink"
+                                 data-document-kind="pdf">
+                                <span class="recipe-edit-document-icon" aria-hidden="true">PDF</span>
+                                <div class="recipe-edit-document-identity">
                                     <strong>Generated PDF</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
                                     <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
-                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                    <details class="recipe-edit-document-more">
+                                        <summary title="More PDF actions" aria-label="More PDF actions">&#8942;</summary>
+                                        <div>
+                                            <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
+                                            <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy path</button>
+                                        </div>
+                                    </details>
                                 </div>
                             </div>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
                                  data-document-input-id="recipeEditGeneratedCloudflarePdfUrl"
-                                 data-document-link-id="recipeEditGeneratedCloudflarePdfUrlLink">
-                                <div>
+                                 data-document-link-id="recipeEditGeneratedCloudflarePdfUrlLink"
+                                 data-document-kind="cloudflare">
+                                <span class="recipe-edit-document-icon" aria-hidden="true">PDF</span>
+                                <div class="recipe-edit-document-identity">
                                     <strong>Cloudflare Generated PDF</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
                                     <a href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                    <a href="#" target="_blank" rel="noopener noreferrer" download data-document-download hidden>Download</a>
-                                    <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                    <details class="recipe-edit-document-more">
+                                        <summary title="More Cloudflare actions" aria-label="More Cloudflare actions">&#8942;</summary>
+                                        <div>
+                                            <a href="#" target="_blank" rel="noopener noreferrer" data-document-download hidden>Open externally</a>
+                                            <button type="button" data-document-copy onclick="return copyRecipeEditorDocumentValue(this)">Copy URL</button>
+                                        </div>
+                                    </details>
                                 </div>
                             </div>
                         </div>

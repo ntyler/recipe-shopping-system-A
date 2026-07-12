@@ -111,30 +111,6 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "beginRecipeIngredientReorder(this)" in template
     assert "focusRecipeIngredientGrouping(this)" in template
 
-
-def test_restaurant_source_card_uses_compact_identity_details_and_actions():
-    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
-    script = read_text("PushShoppingList/static/js/app.js")
-    css = read_text("PushShoppingList/static/css/app.css")
-    card_start = template.index('<details class="recipe-edit-context-card recipe-edit-restaurant-card"')
-    card_end = template.index("</details>", card_start)
-    card = template[card_start:card_end]
-
-    assert card.index("Restaurant Source") < card.index("recipe-edit-restaurant-edit")
-    assert card.index("recipe-edit-restaurant-avatar") < card.index("recipe-edit-restaurant-rating")
-    assert card.index('data-restaurant-detail-row="phone"') < card.index("recipe-edit-restaurant-actions")
-    assert card.index('data-restaurant-detail="website"') < card.index("recipe-edit-restaurant-actions")
-    assert card.index('data-restaurant-detail-row="address"') < card.index("recipe-edit-restaurant-actions")
-    assert card.count('data-restaurant-action="') == 3
-    assert card.index('data-restaurant-action="website"') < card.index('data-restaurant-action="menu"')
-    assert card.index('data-restaurant-action="menu"') < card.index('data-restaurant-action="map"')
-    assert card.rfind("recipe-edit-restaurant-edit") < card.index("recipe-edit-restaurant-summary")
-    assert "selectedSource.restaurant_logo_url" in script
-    assert "selectedSource.restaurant_rating" in script
-    assert "encodeURIComponent(address)" in script
-    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
-    assert ".recipe-edit-standalone-page .recipe-edit-restaurant-details {" in css
-
     for field_id in [
         "recipeEditDisplayName",
         "recipeEditTitleInput",
@@ -165,6 +141,62 @@ def test_restaurant_source_card_uses_compact_identity_details_and_actions():
     assert "confirmDeleteRecipeFromEditor(this, event)" in template
     assert 'type="submit" class="recipe-edit-save"' in template
 
+
+def test_restaurant_source_card_uses_compact_identity_details_and_actions():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    card_start = template.index('<details class="recipe-edit-context-card recipe-edit-restaurant-card"')
+    card_end = template.index("</details>", card_start)
+    card = template[card_start:card_end]
+
+    assert card.index("Restaurant Source") < card.index("recipe-edit-restaurant-edit")
+    assert card.index("recipe-edit-restaurant-avatar") < card.index("recipe-edit-restaurant-rating")
+    assert card.index('data-restaurant-detail-row="phone"') < card.index("recipe-edit-restaurant-actions")
+    assert card.index('data-restaurant-detail="website"') < card.index("recipe-edit-restaurant-actions")
+    assert card.index('data-restaurant-detail-row="address"') < card.index("recipe-edit-restaurant-actions")
+    assert card.count('data-restaurant-action="') == 3
+    assert card.index('data-restaurant-action="website"') < card.index('data-restaurant-action="menu"')
+    assert card.index('data-restaurant-action="menu"') < card.index('data-restaurant-action="map"')
+    assert card.rfind("recipe-edit-restaurant-edit") < card.index("recipe-edit-restaurant-summary")
+    assert "selectedSource.restaurant_logo_url" in script
+    assert "selectedSource.restaurant_rating" in script
+    assert "encodeURIComponent(address)" in script
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
+    assert ".recipe-edit-standalone-page .recipe-edit-restaurant-details {" in css
+
+
+def test_source_documents_card_uses_compact_rows_and_context_action_menus():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    card_start = template.index('<details class="recipe-edit-context-card recipe-edit-source-documents-card"')
+    card_end = template.index("</details>\n\n                    <details", card_start)
+    card = template[card_start:card_end]
+    expected_labels = (
+        "Source URL",
+        "Source Menu URL",
+        "Source PDF",
+        "Cloudflare Source PDF",
+        "Generated PDF",
+        "Cloudflare Generated PDF",
+    )
+
+    assert "recipe-edit-source-documents-help" in card
+    assert "recipe-edit-context-chevron" not in card
+    assert card.count("data-recipe-edit-document-row") == len(expected_labels)
+    assert card.count("recipe-edit-document-icon") == len(expected_labels)
+    assert card.count("recipe-edit-document-identity") == len(expected_labels)
+    assert card.count("recipe-edit-document-more") == len(expected_labels)
+    assert card.count("data-document-open hidden") == len(expected_labels)
+    assert all(label in card for label in expected_labels)
+    assert 'row.hidden = !hasValue;' in script
+    assert 'status.title = sourceValue;' in script
+    assert 'open.setAttribute("aria-disabled", canOpen ? "false" : "true");' in script
+    assert ".recipe-edit-standalone-page .recipe-edit-document-row {" in css
+    assert "grid-template-columns: 28px minmax(0, 1fr) auto;" in css
+    assert "text-overflow: ellipsis;" in css
+    assert ".recipe-edit-standalone-page .recipe-edit-document-more > div {" in css
 
 def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")

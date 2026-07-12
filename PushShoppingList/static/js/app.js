@@ -24545,8 +24545,14 @@ function syncRecipeEditDocumentRows() {
         }
 
         if (open) {
-            open.hidden = !canOpen;
-            open.href = canOpen ? href : "#";
+            open.hidden = !hasValue;
+            if (canOpen) {
+                open.href = href;
+            } else {
+                open.removeAttribute("href");
+            }
+            open.setAttribute("aria-disabled", canOpen ? "false" : "true");
+            open.title = canOpen ? `Open ${sourceValue}` : "This source is not currently openable";
         }
 
         if (download) {
@@ -24603,6 +24609,10 @@ function copyRecipeEditorDocumentValue(button) {
     const finish = () => {
         const row = button.closest("[data-recipe-edit-document-row]");
         const status = row ? row.querySelector("[data-document-status]") : null;
+        const menu = button.closest(".recipe-edit-document-more");
+        if (menu) {
+            menu.open = false;
+        }
         if (status) {
             status.textContent = "Copied";
         }
