@@ -34151,6 +34151,10 @@ img[data-deferred-src] {
     box-shadow: inset 3px 0 #d99a22;
 }
 
+.recipe-edit-restaurant-fetch-row.is-no-change {
+    background: color-mix(in srgb, var(--app-success) 4%, transparent);
+}
+
 .recipe-edit-restaurant-fetch-row.is-not-found {
     color: var(--app-muted);
     opacity: .78;
@@ -34205,6 +34209,48 @@ img[data-deferred-src] {
     object-fit: cover;
     border: 1px solid #59635f;
     border-radius: 6px;
+}
+
+.recipe-edit-restaurant-scan-hours summary {
+    color: var(--app-primary-hover);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.recipe-edit-restaurant-scan-hours pre {
+    margin: 6px 0 0;
+    color: var(--app-text);
+    font: inherit;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+.recipe-edit-restaurant-scan-address {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    color: var(--app-text-strong);
+    font-style: normal;
+}
+
+.recipe-edit-restaurant-scan-providers {
+    display: grid;
+    gap: 6px;
+}
+
+.recipe-edit-restaurant-scan-providers > span {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.recipe-edit-restaurant-scan-providers a {
+    overflow: hidden;
+    color: var(--app-primary-hover);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .recipe-edit-restaurant-logo-scan-actions {

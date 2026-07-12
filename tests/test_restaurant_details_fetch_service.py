@@ -1,6 +1,10 @@
 import json
+from pathlib import Path
 
 from PushShoppingList.services import restaurant_details_fetch_service as service
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def restaurant_html():
@@ -223,6 +227,157 @@ def test_open_24_hours_and_multi_period_hours_are_normalized():
     ]
 
 
+def test_fromtherestaurant_nested_edit_url_is_decoded_and_separated():
+    nested = (
+        "http://127.0.0.1:5083/recipe/edit?url="
+        "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd/"
+        "?category%3D1%26menu_item%3Dmenu-item-1-Papa_Potatoe_a_la_Huancaina"
+    )
+
+    result = service.fromtherestaurant_source_urls(nested)
+
+    assert result["menu_url"] == "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd/"
+    assert result["menu_item_url"] == (
+        "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd/"
+        "?category=1&menu_item=menu-item-1-Papa_Potatoe_a_la_Huancaina"
+    )
+
+
+def test_fromtherestaurant_provider_detection_and_footer_extraction(caplog):
+    html = (FIXTURES / "fromtherestaurant_menu.html").read_text(encoding="utf-8")
+    url = "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd/"
+    caplog.set_level("DEBUG", logger=service.__name__)
+
+    result = service.parse_fromtherestaurant_menu_page(
+        html,
+        url,
+        record={"restaurant_name": "Pisco Mar", "restaurant_phone": "+13175372025"},
+        retrieved_at="2026-07-12T12:00:00Z",
+    )
+    fields = {candidate["field"]: candidate for candidate in result["candidates"]}
+
+    assert result["detected"] is True
+    assert result["matched"] is True
+    assert fields["restaurant_name"]["value"] == "Pisco Mar"
+    assert fields["phone"]["value"] == "(317) 537-2025"
+    assert fields["phone"]["normalized_value"] == "+13175372025"
+    assert fields["phone"]["original_display_value"] == "(317) 537-2025"
+    assert fields["street_address"]["value"] == "9546 Allisonville Rd"
+    assert fields["city"]["value"] == "Indianapolis"
+    assert fields["state_or_region"]["value"] == "IN"
+    assert fields["postal_code"]["value"] == "46250"
+    assert fields["country"]["value"] == "US"
+    assert len(fields["weekly_hours"]["value"]) == 7
+    assert fields["weekly_hours"]["value"]["sunday"]["ranges"] == [{"opens": "11:00", "closes": "20:00"}]
+    assert fields["raw_hours_text"]["value"].splitlines()[0] == "Sun 11:00 am - 8:00 pm"
+    assert fields["online_ordering"]["normalized_value"] is False
+    assert "online_payment" not in fields
+    assert fields["ordering_providers"]["value"] == [{
+        "provider_name": "FOX Ordering",
+        "provider_type": "ordering_provider",
+        "website_url": "https://foxordering.com",
+        "source_url": url,
+    }]
+    assert fields["allergy_information_note"]["value"] == "Please call for allergy information."
+    assert fields["restaurant_note"]["value"] == "Please call for allergy information."
+    assert "hours_notes" not in fields
+    assert all(candidate["source_type"] == "official_menu_page" for candidate in fields.values())
+    assert all(candidate["extraction_method"] == "provider_specific_html_parser" for candidate in fields.values())
+    assert "provider detected" in caplog.text
+    assert "weekday hour lines extracted=7" in caplog.text
+
+
+def test_fromtherestaurant_equivalent_menu_phone_and_address_are_no_change(monkeypatch):
+    html = (FIXTURES / "fromtherestaurant_menu.html").read_text(encoding="utf-8")
+    monkeypatch.setattr(service, "fetch_public_restaurant_page", lambda url, force=False: (
+        html,
+        {"url": url, "retrieved_at": "2026-07-12T12:00:00Z", "http_status": 200},
+    ))
+    result = service.scan_restaurant_information({
+        "restaurant_id": "restaurant-1",
+        "restaurant_name": "pisco  mar",
+        "restaurant_phone": "+1 (317) 537-2025",
+        "restaurant_website_url": "https://fromtherestaurant.com",
+        "source_menu_url": "HTTPS://FROMTHERESTAURANT.COM//pisco-mar/menu/9546-Allisonville-Rd/?category=1",
+        "restaurant_street_address": "9546  Allisonville Rd",
+        "restaurant_city": "INDIANAPOLIS",
+        "restaurant_state": "in",
+        "restaurant_postal_code": "46250",
+        "restaurant_country": "us",
+    })
+
+    for field in ("restaurant_name", "menu_url", "phone", "street_address", "city", "state_or_region", "postal_code", "country"):
+        assert result["fields"][field]["changed"] is False
+        assert result["fields"][field]["conflict"] is False
+    assert result["fields"]["online_ordering"]["changed"] is True
+    assert result["fields"]["online_ordering"]["recommended"]["normalized_value"] is False
+    assert result["summary"]["conflicts"] == 0
+    assert "website_url" in result["unresolved_fields"]
+    assert all(field not in result["unresolved_fields"] for field in (
+        "phone", "street_address", "city", "state_or_region", "postal_code", "country", "weekly_hours", "raw_hours_text",
+    ))
+    platform = next(source for source in result["sources"] if source["source_type"] == "platform_website")
+    assert "misclassified platform URL" in platform["classification_warning"]
+
+
+def test_fromtherestaurant_partial_footer_and_layout_variation():
+    html = """
+    <html><body><div role="region" aria-label="Hours and business information">
+      <strong>FromTheRestaurant</strong><a href="https://foxordering.com">FOX Ordering</a>
+      <address aria-label="Business name and address"><span id="foxBusinessName"><strong>Cafe Uno</strong></span>
+      <span>12 Main St<br>Fort Wayne IN 46802</span></address>
+      <div aria-label="Hours">
+        <div>Sunday Closed</div><div>Monday Open 24 Hours</div>
+        <div>Tuesday 11 am - 2 pm, 5 pm - 9 pm</div>
+      </div>
+    </div></body></html>
+    """
+    result = service.parse_fromtherestaurant_menu_page(
+        html,
+        "https://fromtherestaurant.com/cafe-uno/menu/12-Main-St/",
+        record={"restaurant_name": "Cafe Uno"},
+    )
+    fields = {candidate["field"]: candidate["value"] for candidate in result["candidates"]}
+
+    assert fields["street_address"] == "12 Main St"
+    assert "phone" not in fields
+    assert fields["weekly_hours"]["sunday"]["closed"] is True
+    assert fields["weekly_hours"]["monday"]["open_24_hours"] is True
+    assert fields["weekly_hours"]["tuesday"]["ranges"] == [
+        {"opens": "11:00", "closes": "14:00"},
+        {"opens": "17:00", "closes": "21:00"},
+    ]
+
+
+def test_fromtherestaurant_missing_footer_falls_back_to_json_ld():
+    html = """
+    <html><body><strong>FromTheRestaurant</strong><a href="https://foxordering.com">FOX Ordering</a>
+    <script type="application/ld+json">{"@type":"Restaurant","name":"Cafe Uno","telephone":"260-555-0100"}</script>
+    </body></html>
+    """
+    result = service.extract_restaurant_candidates(
+        html,
+        "https://fromtherestaurant.com/cafe-uno/menu/12-Main-St/",
+        record={"restaurant_name": "Cafe Uno"},
+    )
+    fields = {candidate["field"]: candidate for candidate in result["candidates"]}
+
+    assert result["matched"] is True
+    assert fields["phone"]["normalized_value"] == "+12605550100"
+    assert fields["phone"]["extraction_method"] == "json_ld"
+
+
+def test_non_menu_fromtherestaurant_url_is_platform_source_not_official_website():
+    sources = service._discovery_sources({"restaurant_website_url": "https://fromtherestaurant.com"})
+
+    assert sources == [{
+        "url": "https://fromtherestaurant.com",
+        "source_type": "platform_website",
+        "label": "FromTheRestaurant platform website",
+        "classification_warning": "Possible misclassified platform URL; not treated as the restaurant's official website.",
+    }]
+
+
 def test_same_name_different_location_is_rejected():
     html = """
     <script type="application/ld+json">
@@ -440,3 +595,47 @@ def test_apply_selected_persists_audit_locks_and_approved_logo_attribution(monke
     audit = saved["restaurant_information_audit"][0]
     assert audit["user_id"] == "user-42"
     assert {change["field"] for change in audit["changes"]} == {"phone", "image_url"}
+
+
+def test_apply_selected_persists_structured_ordering_provider_and_restaurant_notes(monkeypatch, tmp_path):
+    store_path = tmp_path / "restaurant_menus.json"
+    store = {"restaurants": [{"id": "restaurant-1", "restaurant_id": "restaurant-1", "restaurant_name": "Pisco Mar"}], "menus": [], "sections": [], "items": [], "pdf_logs": []}
+    store_path.write_text(json.dumps(store), encoding="utf-8")
+    monkeypatch.setattr(service.menu_store_service, "MENU_STORE_FILE", store_path)
+    provider_value = [{
+        "provider_name": "FOX Ordering",
+        "provider_type": "ordering_provider",
+        "website_url": "https://foxordering.com",
+        "source_url": "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd/",
+    }]
+    provider = candidate("ordering_providers", provider_value, "provider-1")
+    allergy = candidate("allergy_information_note", "Please call for allergy information.", "allergy-1")
+    ordering = candidate("online_ordering", False, "ordering-1")
+    scan = {
+        "ok": True,
+        "restaurant_id": "restaurant-1",
+        "scan_id": "scan-structured",
+        "scanned_at": "2026-07-12T12:00:00Z",
+        "summary": {},
+        "fields": {
+            "ordering_providers": scan_field("ordering_providers", [], [provider]),
+            "allergy_information_note": scan_field("allergy_information_note", "", [allergy]),
+            "online_ordering": scan_field("online_ordering", None, [ordering]),
+        },
+    }
+
+    result = service.apply_restaurant_information_scan(
+        "restaurant-1",
+        scan,
+        selections={
+            "ordering_providers": "provider-1",
+            "allergy_information_note": "allergy-1",
+            "online_ordering": "ordering-1",
+        },
+    )
+    saved = json.loads(store_path.read_text(encoding="utf-8"))["restaurants"][0]
+
+    assert result["ok"] is True
+    assert saved["ordering_providers"] == provider_value
+    assert saved["allergy_information_note"] == "Please call for allergy information."
+    assert saved["online_ordering_available"] is False

@@ -145,3 +145,22 @@ def test_restaurant_details_fetch_review_is_responsive_and_does_not_replace_save
     assert ".recipe-edit-restaurant-fetch-row.has-conflict" in css
     assert ".recipe-edit-restaurant-fetch-review[hidden]" in css
     assert "display: none !important;" in css
+
+
+def test_restaurant_scan_review_formats_provider_results_and_equivalent_values():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert 'ordering_providers: { label: "Ordering providers" }' in script
+    assert 'allergy_information_note: { label: "Allergy information" }' in script
+    assert 'restaurant_note: { label: "Restaurant note" }' in script
+    assert "function recipeRestaurantFetchCandidateHtml(key, candidate)" in script
+    assert 'key === "weekly_hours"' in script
+    assert 'class="recipe-edit-restaurant-scan-address"' in script
+    assert 'class="recipe-edit-restaurant-scan-providers"' in script
+    assert 'noChange ? "No change"' in script
+    assert 'label: "Possible misclassified platform URL"' in script
+    assert ".recipe-edit-restaurant-scan-hours summary" in css
+    assert ".recipe-edit-restaurant-scan-address" in css
+    assert ".recipe-edit-restaurant-scan-providers" in css
+    assert ".recipe-edit-restaurant-fetch-row.is-no-change" in css

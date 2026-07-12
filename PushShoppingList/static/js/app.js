@@ -26210,6 +26210,9 @@ const recipeRestaurantFetchFieldDefinitions = {
     promotions: { label: "Promotions" },
     social_urls: { label: "Social links" },
     ordering_provider_urls: { label: "Ordering providers" },
+    ordering_providers: { label: "Ordering providers" },
+    allergy_information_note: { label: "Allergy information" },
+    restaurant_note: { label: "Restaurant note" },
 };
 
 function recipeRestaurantFetchReviewPanel() {
@@ -26247,9 +26250,31 @@ function recipeRestaurantFetchDisplayValue(key, value) {
     if (key === "current_status") {
         return String(value).replaceAll("_", " ").replace(/\b\w/g, character => character.toUpperCase());
     }
+    if (key === "ordering_providers" && Array.isArray(value)) {
+        return value.map(provider => [provider?.provider_name, provider?.website_url].filter(Boolean).join(" — ")).filter(Boolean).join("\n");
+    }
     if (Array.isArray(value)) return value.join("\n");
     if (value && typeof value === "object") return JSON.stringify(value, null, 2);
     return String(value);
+}
+
+function recipeRestaurantFetchCandidateHtml(key, candidate) {
+    const value = candidate?.value;
+    if (key === "weekly_hours" && value && typeof value === "object") {
+        const text = recipeRestaurantWeeklyHoursText(value);
+        const dayCount = Object.keys(value).length;
+        return `<details class="recipe-edit-restaurant-scan-hours"><summary>${dayCount} day${dayCount === 1 ? "" : "s"} parsed</summary><pre>${escapeHtml(text)}</pre></details>`;
+    }
+    if (key === "street_address" && candidate?.formatted_address) {
+        const lines = String(candidate.formatted_address).split(/\r?\n/).filter(Boolean);
+        return `<address class="recipe-edit-restaurant-scan-address">${lines.map(line => `<span>${escapeHtml(line)}</span>`).join("")}</address>`;
+    }
+    if (key === "ordering_providers" && Array.isArray(value)) {
+        return `<div class="recipe-edit-restaurant-scan-providers">${value.map(provider => `
+            <span><strong>${escapeHtml(provider?.provider_name || "Ordering provider")}</strong>${provider?.website_url ? `<a href="${escapeAttribute(provider.website_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(provider.website_url)}</a>` : ""}</span>
+        `).join("")}</div>`;
+    }
+    return `<span data-restaurant-scan-value>${escapeHtml(recipeRestaurantFetchDisplayValue(key, value))}</span>`;
 }
 
 function recipeRestaurantScanCandidate(row, candidateId = "") {
@@ -26259,6 +26284,7 @@ function recipeRestaurantScanCandidate(row, candidateId = "") {
 
 function recipeRestaurantScanSourceStatus(source) {
     const status = String(source?.status || "");
+    if (source?.classification_warning) return { icon: "!", label: "Possible misclassified platform URL", className: "is-warning" };
     if (status === "success") return { icon: "✓", label: source.status_label || "Reached and parsed", className: "is-success" };
     if (status === "not_configured") return { icon: "–", label: source.status_label || "Not configured", className: "is-neutral" };
     if (status === "mismatch") return { icon: "!", label: source.status_label || "Restaurant mismatch", className: "is-warning" };
@@ -26290,7 +26316,7 @@ function renderRecipeRestaurantFetchReview(data) {
         sources.innerHTML = (data?.sources || []).map(source => {
             const status = recipeRestaurantScanSourceStatus(source);
             const label = String(source.label || source.source_type || "Source").replaceAll("_", " ");
-            return `<span class="${status.className}" title="${escapeAttribute(source.reason || status.label)}"><b aria-hidden="true">${status.icon}</b><span>${escapeHtml(label)}: ${escapeHtml(status.label)}</span></span>`;
+            return `<span class="${status.className}" title="${escapeAttribute(source.classification_warning || source.reason || status.label)}"><b aria-hidden="true">${status.icon}</b><span>${escapeHtml(label)}: ${escapeHtml(status.label)}</span></span>`;
         }).join("");
     }
     list.innerHTML = fieldRows.length ? fieldRows.map(([key, row]) => {
@@ -26305,17 +26331,18 @@ function renderRecipeRestaurantFetchReview(data) {
             : "";
         const conflictPicker = row.conflict
             ? `<select data-restaurant-scan-candidate aria-label="Choose ${escapeAttribute(definition.label)} candidate" onchange="updateRecipeRestaurantScanCandidate(this)">${row.candidates.map(candidate => `<option value="${escapeAttribute(candidate.candidate_id)}" ${candidate.candidate_id === recommended?.candidate_id ? "selected" : ""}>${escapeHtml(recipeRestaurantFetchDisplayValue(key, candidate.value))}</option>`).join("")}</select>`
-            : `<span data-restaurant-scan-value>${escapeHtml(recipeRestaurantFetchDisplayValue(key, recommended?.value))}</span>`;
+            : recipeRestaurantFetchCandidateHtml(key, recommended);
         const sourceUrl = String(recommended?.source_url || "");
-        return `<article class="recipe-edit-restaurant-fetch-row${row.conflict ? " has-conflict" : ""}${row.locked ? " is-locked" : ""}" data-restaurant-fetch-field="${escapeAttribute(key)}" data-recommended-candidate="${escapeAttribute(recommended?.candidate_id || "")}">
+        const noChange = Boolean(recommended && !row.changed && !row.conflict);
+        return `<article class="recipe-edit-restaurant-fetch-row${row.conflict ? " has-conflict" : ""}${row.locked ? " is-locked" : ""}${noChange ? " is-no-change" : ""}" data-restaurant-fetch-field="${escapeAttribute(key)}" data-recommended-candidate="${escapeAttribute(recommended?.candidate_id || "")}">
                     <label class="recipe-edit-restaurant-fetch-accept"><input type="checkbox" ${defaultAccept ? "checked" : ""} ${row.selectable && !row.locked ? "" : "disabled"} aria-label="Accept ${escapeAttribute(definition.label)}"></label>
                     <strong>${escapeHtml(definition.label)}</strong>
                     <span class="recipe-edit-restaurant-fetch-current">${escapeHtml(recipeRestaurantFetchDisplayValue(key, row.current_value))}</span>
                     <span class="recipe-edit-restaurant-fetch-proposed">${imagePreview}${conflictPicker}${logoActions}</span>
-                    <span class="recipe-edit-restaurant-scan-confidence is-${String(row.confidence_label || "low").toLowerCase()}"><b>${escapeHtml(row.confidence_label || "Low")}</b><small>${Math.round(Number(recommended?.confidence || 0) * 100)}%</small></span>
+                    <span class="recipe-edit-restaurant-scan-confidence is-${String(row.confidence_label || "low").toLowerCase()}"><b>${noChange ? "No change" : escapeHtml(row.confidence_label || "Low")}</b><small>${Math.round(Number(recommended?.confidence || 0) * 100)}%</small></span>
                     <span class="recipe-edit-restaurant-fetch-evidence">
                         ${sourceUrl ? `<a href="${escapeAttribute(sourceUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeAttribute(sourceUrl)}">View source</a>` : "Source unavailable"}
-                        <small data-restaurant-scan-method title="${escapeAttribute(recommended?.evidence || "")}">${escapeHtml(String(recommended?.extraction_method || "").replaceAll("_", " "))}</small>
+                        <small data-restaurant-scan-method title="${escapeAttribute(recommended?.evidence || "")}">${escapeHtml(recommended?.provider ? `${recommended.provider} · ${String(recommended?.extraction_method || "").replaceAll("_", " ")}` : String(recommended?.extraction_method || "").replaceAll("_", " "))}</small>
                         <label class="recipe-edit-restaurant-scan-lock"><input type="checkbox" data-restaurant-scan-lock ${row.locked ? "checked" : ""}> Lock existing</label>
                         ${row.requires_explicit_review ? "<em>Explicit review required</em>" : ""}
                     </span>

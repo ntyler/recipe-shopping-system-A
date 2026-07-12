@@ -10,6 +10,7 @@ import hashlib
 import ipaddress
 import json
 import base64
+import logging
 from pathlib import Path
 import re
 import socket
@@ -17,7 +18,7 @@ import threading
 import time
 import uuid
 from io import BytesIO
-from urllib.parse import quote, urljoin, urlparse, urlunparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urljoin, urlparse, urlunparse
 from urllib.robotparser import RobotFileParser
 
 import requests
@@ -36,6 +37,7 @@ MAX_REDIRECTS = 4
 MAX_SCAN_WORKERS = 3
 MAX_DISCOVERED_LINKS = 6
 CACHE_TTL_SECONDS = 15 * 60
+FROM_THE_RESTAURANT_HOSTS = {"fromtherestaurant.com", "www.fromtherestaurant.com"}
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 DAY_ALIASES = {
     "mo": "monday", "mon": "monday", "monday": "monday",
@@ -52,6 +54,7 @@ FIELD_ORDER = (
     "raw_hours_text", "hours_notes", "current_status", "image_url", "rating", "rating_count",
     "online_payment", "online_ordering", "pickup", "delivery", "reservations",
     "rewards_promotions", "promotions", "social_urls", "ordering_provider_urls",
+    "ordering_providers", "allergy_information_note", "restaurant_note",
 )
 PROPOSAL_FIELDS = (
     "weekly_hours", "raw_hours_text", "hours_notes", "rewards_promotions", "image_url",
@@ -63,13 +66,16 @@ ADDRESS_FIELDS = {"street_address", "city", "state_or_region", "postal_code", "c
 SENSITIVE_APPLY_ALL_FIELDS = {*ADDRESS_FIELDS, "image_url", "current_status"}
 SOURCE_QUALITY = {
     "official_website": 1.0,
+    "official_menu_page": 0.99,
     "official_menu": 0.98,
     "official_menu_item": 0.97,
     "official_discovered": 0.92,
     "saved_source": 0.88,
     "supported_public_source": 0.72,
+    "platform_website": 0.55,
 }
 METHOD_RELIABILITY = {
+    "provider_specific_html_parser": 0.99,
     "json_ld": 0.98,
     "structured_metadata": 0.94,
     "open_graph": 0.83,
@@ -90,22 +96,25 @@ CURRENT_FIELD_KEYS = {
     "country": ("country", "restaurant_country"),
     "latitude": ("latitude",),
     "longitude": ("longitude",),
-    "weekly_hours": ("weekly_hours",),
-    "raw_hours_text": ("raw_hours_data", "hours_text"),
-    "hours_notes": ("hours_notes",),
-    "current_status": ("current_status",),
+    "weekly_hours": ("weekly_hours", "restaurant_weekly_hours"),
+    "raw_hours_text": ("raw_hours_data", "hours_text", "restaurant_raw_hours_data", "restaurant_hours_text"),
+    "hours_notes": ("hours_notes", "restaurant_hours_notes"),
+    "current_status": ("current_status", "restaurant_current_status"),
     "image_url": ("logo_url", "restaurant_logo_url", "logo"),
     "rating": ("rating", "restaurant_rating"),
     "rating_count": ("rating_count",),
-    "online_payment": ("online_payment_available", "online_payment"),
-    "online_ordering": ("online_ordering_available", "online_ordering"),
-    "pickup": ("pickup_available", "pickup"),
-    "delivery": ("delivery_available", "delivery"),
-    "reservations": ("reservation_available", "reservations"),
+    "online_payment": ("online_payment_available", "online_payment", "restaurant_online_payment_available"),
+    "online_ordering": ("online_ordering_available", "online_ordering", "restaurant_online_ordering_available"),
+    "pickup": ("pickup_available", "pickup", "restaurant_pickup_available"),
+    "delivery": ("delivery_available", "delivery", "restaurant_delivery_available"),
+    "reservations": ("reservation_available", "reservations", "restaurant_reservation_available"),
     "rewards_promotions": ("rewards_text", "rewards_promotions"),
     "promotions": ("promotions",),
     "social_urls": ("social_urls",),
-    "ordering_provider_urls": ("ordering_provider_urls",),
+    "ordering_provider_urls": ("ordering_provider_urls", "restaurant_ordering_provider_urls"),
+    "ordering_providers": ("ordering_providers", "restaurant_ordering_providers"),
+    "allergy_information_note": ("allergy_information_note", "restaurant_allergy_information_note"),
+    "restaurant_note": ("restaurant_note", "restaurant_notes", "restaurant_note_text"),
 }
 STORE_FIELD_KEYS = {
     "restaurant_name": "restaurant_name", "website_url": "restaurant_website_url",
@@ -120,12 +129,16 @@ STORE_FIELD_KEYS = {
     "reservations": "reservation_available", "rewards_promotions": "rewards_text",
     "promotions": "promotions", "social_urls": "social_urls",
     "ordering_provider_urls": "ordering_provider_urls",
+    "ordering_providers": "ordering_providers",
+    "allergy_information_note": "allergy_information_note",
+    "restaurant_note": "restaurant_note",
 }
 _PAGE_CACHE = {}
 _ROBOTS_CACHE = {}
 _CACHE_LOCK = threading.RLock()
 _PENDING_LOCK = threading.RLock()
 PENDING_SCAN_FILE = scoped_package_path("restaurant_information_scans.json")
+logger = logging.getLogger(__name__)
 
 
 class RestaurantFetchError(RuntimeError):
@@ -368,10 +381,15 @@ def _time_24(value):
     text = _clean(value)
     if re.fullmatch(r"24:00(?::00)?", text):
         return "24:00"
-    match = re.fullmatch(r"(\d{1,2}):(\d{2})(?::\d{2})?", text)
+    match = re.fullmatch(r"(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*([ap]\.?m\.?)?", text, re.I)
     if not match:
         return ""
-    hour, minute = int(match.group(1)), int(match.group(2))
+    hour, minute = int(match.group(1)), int(match.group(2) or 0)
+    meridiem = re.sub(r"[^apm]", "", (match.group(3) or "").casefold())
+    if meridiem:
+        if not 1 <= hour <= 12:
+            return ""
+        hour = (hour % 12) + (12 if meridiem == "pm" else 0)
     return f"{hour:02d}:{minute:02d}" if 0 <= hour <= 23 and 0 <= minute <= 59 else ""
 
 
@@ -435,22 +453,75 @@ def _hours_from_strings(raw):
             for day in days:
                 weekly[day] = {"closed": False, "open_24_hours": True, "ranges": [{"opens": "00:00", "closes": "24:00"}]}
             continue
-        ranges = re.findall(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", detail)
+        time_value = r"\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?"
+        ranges = re.findall(rf"({time_value})\s*[-\u2013\u2014]\s*({time_value})", detail, re.I)
         for day in days:
             for opens, closes in ranges:
                 _append_hours_range(weekly, day, _time_24(opens), _time_24(closes))
     return weekly
 
 
-def _normalize_url(value):
+def decode_nested_recipe_source_url(value):
+    """Extract a nested recipe source without ever treating the local edit URL as a business URL."""
     text = _clean(value)
+    for _ in range(2):
+        try:
+            parsed = urlparse(text)
+        except ValueError:
+            return ""
+        host = (parsed.hostname or "").casefold()
+        if host not in {"127.0.0.1", "localhost", "::1"} or not parsed.path.rstrip("/").endswith("/recipe/edit"):
+            break
+        nested = (parse_qs(parsed.query, keep_blank_values=True).get("url") or [""])[0]
+        if not nested:
+            return ""
+        text = unquote(nested)
+    return text
+
+
+def fromtherestaurant_source_urls(value):
+    """Return semantically separate canonical menu and item URLs for this provider."""
+    text = decode_nested_recipe_source_url(value)
+    try:
+        parsed = urlparse(text)
+    except ValueError:
+        return {}
+    if (parsed.hostname or "").casefold() not in FROM_THE_RESTAURANT_HOSTS:
+        return {}
+    path = re.sub(r"/{2,}", "/", parsed.path or "/")
+    match = re.match(r"^/([^/]+)/menu/([^/]+)/?", path, re.I)
+    if not match:
+        return {}
+    slug, location = (quote(unquote(part), safe="-._~") for part in match.groups())
+    menu_url = f"https://fromtherestaurant.com/{slug}/menu/{location}/"
+    raw_query = parse_qs(parsed.query, keep_blank_values=False)
+    item_params = []
+    for key in ("category", "menu_item"):
+        for item in raw_query.get(key, []):
+            if _clean(item):
+                item_params.append((key, _clean(item)))
+    menu_item_url = f"{menu_url}?{urlencode(item_params)}" if any(key == "menu_item" for key, _ in item_params) else ""
+    return {
+        "input_url": text,
+        "menu_url": menu_url,
+        "menu_item_url": menu_item_url,
+        "restaurant_slug": unquote(slug),
+        "location_slug": unquote(location),
+    }
+
+
+def _normalize_url(value):
+    text = decode_nested_recipe_source_url(value)
     if not text:
         return ""
     try:
         parsed = urlparse(text)
-        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        if parsed.scheme.casefold() not in {"http", "https"} or not parsed.hostname:
             return ""
-        return urlunparse((parsed.scheme.casefold(), parsed.netloc.casefold(), parsed.path, "", parsed.query, ""))
+        path = re.sub(r"/{2,}", "/", parsed.path or "")
+        if path and path != "/":
+            path = path.rstrip("/")
+        return urlunparse((parsed.scheme.casefold(), parsed.netloc.casefold(), path, "", parsed.query, ""))
     except ValueError:
         return ""
 
@@ -483,11 +554,32 @@ def _structured_boolean(value):
 def _normalize_value(field, value):
     if value in (None, "", [], {}):
         return None
-    if field in {"website_url", "menu_url", "image_url"}:
+    if field == "menu_url":
+        provider_urls = fromtherestaurant_source_urls(value)
+        return provider_urls.get("menu_url") or _normalize_url(value) or None
+    if field in {"website_url", "image_url"}:
         return _normalize_url(value) or None
     if field in {"social_urls", "ordering_provider_urls"}:
         values = value if isinstance(value, list) else [value]
         return sorted({_normalize_url(item) for item in values if _normalize_url(item)}) or None
+    if field == "ordering_providers":
+        providers = value if isinstance(value, list) else [value]
+        normalized = []
+        for provider in providers:
+            if not isinstance(provider, dict):
+                continue
+            name = _clean(provider.get("provider_name"))
+            website = _normalize_url(provider.get("website_url"))
+            source = _normalize_url(provider.get("source_url"))
+            if not name and not website:
+                continue
+            normalized.append({
+                "provider_name": name,
+                "provider_type": _clean(provider.get("provider_type")) or "ordering_provider",
+                "website_url": website,
+                "source_url": source,
+            })
+        return sorted(normalized, key=lambda item: (item["provider_name"].casefold(), item["website_url"])) or None
     if field in BOOLEAN_FIELDS:
         if value is True or _clean(value).casefold() == "true":
             return True
@@ -628,15 +720,224 @@ def _link_candidates(soup, source_url):
     return results
 
 
+def is_fromtherestaurant_menu_page(source_url, soup=None):
+    provider_urls = fromtherestaurant_source_urls(source_url)
+    if not provider_urls:
+        return False
+    if soup is None:
+        return True
+    visible = _clean(soup.get_text(" ", strip=True)).casefold()
+    has_branding = "fromtherestaurant" in visible
+    has_fox = bool(soup.find("a", href=re.compile(r"foxordering\.com", re.I))) or "fox ordering" in visible
+    return has_branding or has_fox
+
+
+def _fromtherestaurant_footer(soup):
+    selectors = (
+        '[role="region"][aria-label*="Hours" i]',
+        'div.footer[role="region"]',
+        'div.footer',
+    )
+    for selector in selectors:
+        node = soup.select_one(selector)
+        if node and re.search(r"\b(?:Sun|Sunday)\b", node.get_text(" ", strip=True), re.I):
+            return node
+    for node in soup.find_all(["footer", "div"]):
+        text = _clean(node.get_text(" ", strip=True))
+        if len(text) <= 2500 and "fromtherestaurant" in text.casefold() and re.search(r"\b(?:Sun|Sunday)\b", text, re.I):
+            return node
+    return None
+
+
+def _fromtherestaurant_hour_lines(hours_node):
+    if not hours_node:
+        return []
+    day_pattern = r"(?:Sun(?:day)?|Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?)"
+    detail_pattern = r"(?:Closed|Open\s+24\s+Hours|.+?(?=\s+(?:" + day_pattern + r")\b|$))"
+    text = _clean(hours_node.get_text(" ", strip=True)).replace("\u2013", "-").replace("\u2014", "-")
+    lines = [
+        _clean(f"{match.group('day')} {match.group('detail')}")
+        for match in re.finditer(
+            rf"(?P<day>{day_pattern})\s+(?P<detail>{detail_pattern})",
+            text,
+            re.I,
+        )
+    ]
+    return lines
+
+
+def parse_fromtherestaurant_menu_page(html, source_url, record=None, retrieved_at=""):
+    """Deterministically parse the provider footer before generic or AI extraction."""
+    soup = BeautifulSoup(html or "", "html.parser")
+    if not is_fromtherestaurant_menu_page(source_url, soup):
+        return {"detected": False, "matched": True, "candidates": [], "canonical_url": "", "rejected": []}
+    provider_urls = fromtherestaurant_source_urls(source_url)
+    canonical_url = provider_urls.get("menu_url", "")
+    logger.debug("FromTheRestaurant parser: provider detected")
+    logger.debug("FromTheRestaurant parser: canonical URL selected: %s", canonical_url)
+    footer = _fromtherestaurant_footer(soup)
+    rejected = []
+    if not footer:
+        logger.debug("FromTheRestaurant parser: footer block not found")
+        return {
+            "detected": True, "matched": True, "candidates": [], "canonical_url": canonical_url,
+            "rejected": ["footer_block: not found"],
+        }
+    logger.debug("FromTheRestaurant parser: footer block found")
+
+    address_node = footer.select_one('address[aria-label*="Business" i], address')
+    business_name_node = footer.select_one("#foxBusinessName strong, #foxBusinessName, address strong")
+    restaurant_name = _clean(business_name_node.get_text(" ", strip=True)) if business_name_node else ""
+    address_strings = [_clean(value) for value in address_node.stripped_strings] if address_node else []
+    phone_display = ""
+    phone_link = address_node.find("a", href=re.compile(r"^tel:", re.I)) if address_node else None
+    if phone_link:
+        phone_display = _clean(phone_link.get_text(" ", strip=True))
+    if not phone_display:
+        phone_match = re.search(r"(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}", " ".join(address_strings))
+        phone_display = _clean(phone_match.group(0)) if phone_match else ""
+
+    street_address = next((
+        value for value in address_strings
+        if re.match(r"^\d{1,8}\s+[A-Za-z]", value)
+        and not re.fullmatch(r"(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}", value)
+    ), "")
+    locality = next((value for value in address_strings if re.match(r"^.+?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?$", value)), "")
+    locality_match = re.match(r"^(?P<city>.+?)\s+(?P<state>[A-Z]{2})\s+(?P<postal>\d{5}(?:-\d{4})?)$", locality)
+    city = _clean(locality_match.group("city")) if locality_match else ""
+    state = _clean(locality_match.group("state")) if locality_match else ""
+    postal_code = _clean(locality_match.group("postal")) if locality_match else ""
+    formatted_address = "\n".join(value for value in (street_address, locality, "US") if value)
+
+    identity_node = {
+        "@type": "Restaurant",
+        "name": restaurant_name,
+        "telephone": phone_display,
+        "address": {
+            "streetAddress": street_address,
+            "addressLocality": city,
+            "addressRegion": state,
+            "postalCode": postal_code,
+            "addressCountry": "US",
+        },
+    }
+    score, reasons = _node_match_score(identity_node, record or {}, canonical_url)
+    record_has_identity = any(_first(record or {}, CURRENT_FIELD_KEYS[field]) for field in (
+        "restaurant_name", "phone", "street_address", "city", "postal_code"
+    ))
+    if record_has_identity and score < 1:
+        logger.debug("FromTheRestaurant parser: fields rejected: restaurant identity mismatch")
+        return {
+            "detected": True, "matched": False, "candidates": [], "canonical_url": canonical_url,
+            "match": {"matched": False, "reason": "FromTheRestaurant footer did not match the saved restaurant location."},
+            "rejected": ["identity: restaurant/location mismatch"],
+        }
+
+    raw_fields = []
+    def add(field, value, evidence, confidence=0.98, metadata=None):
+        if value in (None, "", [], {}):
+            rejected.append(f"{field}: absent or invalid")
+            logger.debug("FromTheRestaurant parser: field rejected: %s (absent or invalid)", field)
+            return
+        candidate = _candidate(
+            field, value, canonical_url, "official_menu_page", "provider_specific_html_parser",
+            confidence, evidence, retrieved_at, metadata={"provider": "FromTheRestaurant", **(metadata or {})},
+        )
+        if candidate:
+            raw_fields.append(candidate)
+
+    add("menu_url", canonical_url, "Canonical FromTheRestaurant restaurant menu URL")
+    add("restaurant_name", restaurant_name, f"Footer business name: {restaurant_name}")
+    logger.debug("FromTheRestaurant parser: restaurant name extracted=%s", bool(restaurant_name))
+    add("phone", phone_display, f"Footer phone: {phone_display}", metadata={"original_display_value": phone_display})
+    logger.debug("FromTheRestaurant parser: phone extracted=%s", bool(phone_display))
+    address_metadata = {"formatted_address": formatted_address}
+    add("street_address", street_address, "Footer street address", metadata=address_metadata)
+    add("city", city, "Footer locality", metadata=address_metadata)
+    add("state_or_region", state, "Footer region", metadata=address_metadata)
+    add("postal_code", postal_code, "Footer postal code", metadata=address_metadata)
+    if street_address and city and state and postal_code:
+        add("country", "US", "Validated US footer address", metadata=address_metadata)
+    logger.debug("FromTheRestaurant parser: address extracted=%s", bool(street_address and city and state and postal_code))
+
+    hours_node = footer.select_one('[aria-label="Hours" i], .hours')
+    hour_lines = _fromtherestaurant_hour_lines(hours_node)
+    weekly_hours = _hours_from_strings(hour_lines)
+    raw_hours = "\n".join(hour_lines)
+    add("weekly_hours", weekly_hours, f"Parsed {len(weekly_hours)} weekday footer hour lines")
+    add("raw_hours_text", raw_hours, "Original footer hours text", confidence=0.96)
+    logger.debug("FromTheRestaurant parser: weekday hour lines extracted=%d", len(weekly_hours))
+
+    visible = _clean(soup.get_text(" ", strip=True))
+    ordering_match = re.search(r"Online ordering currently unavailable\.?", visible, re.I)
+    if ordering_match:
+        evidence = _clean(ordering_match.group(0))
+        add("online_ordering", False, evidence)
+        logger.debug("FromTheRestaurant parser: ordering status extracted=false")
+    else:
+        rejected.append("online_ordering: explicit status absent")
+
+    fox_link = soup.find("a", href=re.compile(r"foxordering\.com", re.I))
+    if fox_link:
+        provider_url = _normalize_url(urljoin(canonical_url, fox_link.get("href")))
+        provider = {
+            "provider_name": _clean(fox_link.get_text(" ", strip=True)) or "FOX Ordering",
+            "provider_type": "ordering_provider",
+            "website_url": provider_url,
+            "source_url": canonical_url,
+        }
+        add("ordering_providers", [provider], "FOX Ordering provider link in the FromTheRestaurant footer")
+        logger.debug("FromTheRestaurant parser: provider link extracted=%s", bool(provider_url))
+    else:
+        rejected.append("ordering_providers: FOX Ordering link absent")
+
+    business_text = _clean((address_node.parent if address_node else footer).get_text(" ", strip=True))
+    allergy_match = re.search(r"Please call for allergy information\.?", business_text, re.I)
+    if allergy_match:
+        allergy_note = _clean(allergy_match.group(0))
+        add("allergy_information_note", allergy_note, "Footer allergy information note")
+        add("restaurant_note", allergy_note, "Footer restaurant note classified as allergy information")
+
+    logger.debug("FromTheRestaurant parser: fields rejected=%s", "; ".join(rejected) if rejected else "none")
+    return {
+        "detected": True,
+        "matched": True,
+        "match": {"matched": True, "score": score, "reasons": reasons, "provider": "FromTheRestaurant"},
+        "candidates": raw_fields,
+        "canonical_url": canonical_url,
+        "rejected": rejected,
+    }
+
+
 def extract_restaurant_candidates(html, source_url, source_type="official_website", record=None, retrieved_at=""):
     soup = BeautifulSoup(html or "", "html.parser")
+    provider_result = parse_fromtherestaurant_menu_page(
+        html, source_url, record=record or {}, retrieved_at=retrieved_at,
+    )
+    if provider_result.get("detected") and not provider_result.get("matched"):
+        return {
+            "matched": False,
+            "match": provider_result.get("match") or {"matched": False, "reason": "Provider footer did not match restaurant."},
+            "candidates": [],
+            "follow_links": [],
+            "provider": "FromTheRestaurant",
+            "canonical_url": provider_result.get("canonical_url", ""),
+        }
     nodes = _json_ld_nodes(soup)
     node, match = _select_restaurant_node(nodes, record or {}, source_url)
-    if not match.get("matched"):
+    if not match.get("matched") and not provider_result.get("detected"):
         return {"matched": False, "match": match, "candidates": [], "follow_links": []}
-    candidates = []
+    if provider_result.get("detected"):
+        match = provider_result.get("match") or match
+    candidates = list(provider_result.get("candidates") or [])
+    provider_fields = {candidate.get("field") for candidate in candidates}
+    provider_suppressed_fields = {
+        "website_url", "menu_url", "online_ordering", "online_payment", "ordering_provider_urls",
+    } if provider_result.get("detected") else set()
 
     def add(field, value, method, confidence, evidence, metadata=None):
+        if field in provider_fields or field in provider_suppressed_fields:
+            return
         candidate = _candidate(field, value, source_url, source_type, method, confidence, evidence, retrieved_at, metadata=metadata)
         if candidate:
             candidates.append(candidate)
@@ -775,6 +1076,9 @@ def extract_restaurant_candidates(html, source_url, source_type="official_websit
     return {
         "matched": True, "match": match, "candidates": list(unique.values()),
         "follow_links": [item[0] for item in links.get("follow", [])[:4]],
+        "provider": "FromTheRestaurant" if provider_result.get("detected") else "",
+        "canonical_url": provider_result.get("canonical_url", ""),
+        "provider_rejected": provider_result.get("rejected", []),
     }
 
 
@@ -814,18 +1118,44 @@ def extract_restaurant_proposals(html, source_url, record=None):
 
 def _discovery_sources(record):
     ordered = []
+    def append(url, source_type, label, **metadata):
+        normalized = _normalize_url(url)
+        if normalized and normalized not in {item["url"] for item in ordered}:
+            ordered.append({"url": normalized, "source_type": source_type, "label": label, **metadata})
+
     for source_type, keys in (
         ("official_website", CURRENT_FIELD_KEYS["website_url"]),
         ("official_menu", CURRENT_FIELD_KEYS["menu_url"]),
         ("official_menu_item", ("menu_item_url", "restaurant_menu_item_url")),
     ):
-        value = _normalize_url(_first(record, keys))
-        if value and value not in {item["url"] for item in ordered}:
-            ordered.append({"url": value, "source_type": source_type, "label": source_type.replace("_", " ").title()})
-    for value in record.get("source_urls", []) if isinstance(record.get("source_urls"), list) else []:
-        value = _normalize_url(value)
-        if value and value not in {item["url"] for item in ordered}:
-            ordered.append({"url": value, "source_type": "saved_source", "label": "Saved source"})
+        raw_value = _first(record, keys)
+        value = _normalize_url(raw_value)
+        provider_urls = fromtherestaurant_source_urls(raw_value)
+        if source_type == "official_website" and value and (urlparse(value).hostname or "").casefold() in FROM_THE_RESTAURANT_HOSTS:
+            append(
+                value, "platform_website", "FromTheRestaurant platform website",
+                classification_warning="Possible misclassified platform URL; not treated as the restaurant's official website.",
+            )
+        elif provider_urls and source_type == "official_menu":
+            append(provider_urls["menu_url"], "official_menu_page", "FromTheRestaurant menu page", provider="FromTheRestaurant")
+        elif provider_urls and source_type == "official_menu_item":
+            append(provider_urls.get("menu_item_url") or provider_urls["menu_url"], "official_menu_item", "FromTheRestaurant menu item", provider="FromTheRestaurant")
+            append(provider_urls["menu_url"], "official_menu_page", "FromTheRestaurant menu page", provider="FromTheRestaurant")
+        else:
+            append(value, source_type, source_type.replace("_", " ").title())
+
+    extra_sources = record.get("source_urls", []) if isinstance(record.get("source_urls"), list) else []
+    for key in ("source_url", "url", "recipe_url", "original_url"):
+        if _clean(record.get(key)):
+            extra_sources.append(record.get(key))
+    for raw_value in extra_sources:
+        provider_urls = fromtherestaurant_source_urls(raw_value)
+        if provider_urls:
+            append(provider_urls["menu_url"], "official_menu_page", "FromTheRestaurant menu page", provider="FromTheRestaurant")
+            if provider_urls.get("menu_item_url"):
+                append(provider_urls["menu_item_url"], "official_menu_item", "FromTheRestaurant menu item", provider="FromTheRestaurant")
+        else:
+            append(raw_value, "saved_source", "Saved source")
     return ordered
 
 
@@ -841,6 +1171,8 @@ def _fetch_source(source, force=False):
             html, metadata["url"], source_type=source["source_type"],
             record=source.get("record") or {}, retrieved_at=metadata.get("retrieved_at") or metadata.get("fetched_at"),
         )
+        if source.get("source_type") == "platform_website":
+            extracted["candidates"] = []
         if not extracted["matched"]:
             return {**source, "status": "mismatch", "status_label": "Source did not match restaurant", "reason": extracted["match"]["reason"], "metadata": metadata, **extracted}
         return {**source, "status": "success", "status_label": "Reached and parsed", "reason": "", "metadata": metadata, **extracted}
@@ -851,6 +1183,10 @@ def _fetch_source(source, force=False):
 
 
 def _normalized_key(value):
+    if isinstance(value, bool):
+        return f"boolean:{str(value).casefold()}"
+    if value is None:
+        return "null"
     if isinstance(value, (dict, list)):
         return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
     return _text_key(value)
@@ -881,6 +1217,8 @@ def _reconcile_field(field, candidates, record, locked_fields):
     ranked.sort(key=lambda item: (item["confidence"], item["retrieved_at"]), reverse=True)
     recommended = ranked[0] if ranked else None
     conflict = len(ranked) > 1
+    if field == "image_url" and ranked and all(candidate.get("fallback") for candidate in ranked):
+        conflict = False
     changed = bool(recommended) and _normalized_key(recommended["normalized_value"]) != _normalized_key(current_normalized)
     locked = field in locked_fields
     explicit = field in SENSITIVE_APPLY_ALL_FIELDS and bool(current not in (None, "", [], {}))
@@ -953,6 +1291,8 @@ def scan_restaurant_information(record, force=False):
         for field, candidates in candidates_by_field.items() if candidates
     }
     unresolved = [field for field in FIELD_ORDER if field not in fields]
+    if "ordering_providers" in fields and "ordering_provider_urls" in unresolved:
+        unresolved.remove("ordering_provider_urls")
     logo_candidates = fields.get("image_url", {}).get("candidates", [])
     if logo_candidates and all(candidate.get("fallback") for candidate in logo_candidates):
         unresolved.append("image_url")
@@ -1215,7 +1555,9 @@ def apply_restaurant_information_scan(restaurant_id, scan, selections=None, mode
                 value = deepcopy(selected["values"][field])
                 if field in BOOLEAN_FIELDS:
                     value = _normalize_value(field, value)
-                if field in {"website_url", "menu_url", "image_url"}:
+                if field == "menu_url":
+                    value = _normalize_value("menu_url", value)
+                elif field in {"website_url", "image_url"}:
                     value = _normalize_url(value)
                 if field == "image_url":
                     stored_logo = _store_approved_logo(candidate, restaurant_id)
