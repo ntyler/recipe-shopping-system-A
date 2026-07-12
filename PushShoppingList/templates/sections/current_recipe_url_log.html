@@ -2205,7 +2205,7 @@
                             <span>Restaurant Source</span>
                             <button type="button" class="recipe-edit-restaurant-edit" onclick="return editRecipeRestaurantSource(this)">Edit</button>
                         </summary>
-                        <div class="recipe-edit-restaurant-summary">
+                        <div class="recipe-edit-restaurant-summary" data-restaurant-readonly>
                             <span class="recipe-edit-restaurant-avatar" data-restaurant-logo>
                                 <img src="" alt="" hidden>
                                 <span data-restaurant-logo-fallback>R</span>
@@ -2218,7 +2218,7 @@
                                 </span>
                             </div>
                         </div>
-                        <div class="recipe-edit-restaurant-details">
+                        <div class="recipe-edit-restaurant-details" data-restaurant-readonly>
                             <div class="recipe-edit-restaurant-detail" data-restaurant-detail-row="phone" hidden>
                                 <span class="recipe-edit-restaurant-detail-icon" aria-hidden="true">&#9742;</span>
                                 <span data-restaurant-field="phone"></span>
@@ -2232,11 +2232,39 @@
                                 <span data-restaurant-field="address"></span>
                             </div>
                         </div>
-                        <div class="recipe-edit-restaurant-actions">
+                        <div class="recipe-edit-restaurant-actions" data-restaurant-readonly>
                             <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="website" hidden><span aria-hidden="true">&#8599;</span> Open Website</a>
                             <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="menu" hidden><span aria-hidden="true">&#9776;</span> Open Menu</a>
                             <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="map" hidden><span aria-hidden="true">&#9906;</span> Google Maps</a>
                         </div>
+                        <form class="recipe-edit-restaurant-form" data-restaurant-edit-form hidden onsubmit="return saveRecipeRestaurantSource(this)">
+                            <div class="recipe-edit-restaurant-form-logo">
+                                <span class="recipe-edit-restaurant-avatar" data-restaurant-edit-logo>
+                                    <img src="" alt="" hidden>
+                                    <span data-restaurant-edit-logo-fallback>R</span>
+                                </span>
+                                <div>
+                                    <button type="button" onclick="return focusRecipeRestaurantLogo(this)">Change Logo</button>
+                                    <button type="button" class="delete" onclick="return removeRecipeRestaurantLogo(this)">Remove</button>
+                                </div>
+                            </div>
+                            <label class="recipe-edit-restaurant-form-wide"><span>Restaurant Name</span><input type="text" data-restaurant-edit-field="restaurant_name" required></label>
+                            <label><span>Rating</span><input type="number" min="0" max="5" step="0.1" data-restaurant-edit-field="restaurant_rating"></label>
+                            <label><span>Phone</span><input type="tel" data-restaurant-edit-field="restaurant_phone"></label>
+                            <label class="recipe-edit-restaurant-form-wide"><span>Logo URL</span><input type="url" data-restaurant-edit-field="restaurant_logo_url"></label>
+                            <label class="recipe-edit-restaurant-form-wide"><span>Website URL</span><input type="url" data-restaurant-edit-field="restaurant_website_url"></label>
+                            <label class="recipe-edit-restaurant-form-wide"><span>Menu URL</span><input type="url" data-restaurant-edit-field="source_menu_url"></label>
+                            <label class="recipe-edit-restaurant-form-wide"><span>Street Address</span><input type="text" data-restaurant-edit-field="restaurant_street_address"></label>
+                            <label><span>City</span><input type="text" data-restaurant-edit-field="restaurant_city"></label>
+                            <label><span>State or Region</span><input type="text" data-restaurant-edit-field="restaurant_state"></label>
+                            <label><span>Postal Code</span><input type="text" data-restaurant-edit-field="restaurant_postal_code"></label>
+                            <label><span>Country</span><input type="text" data-restaurant-edit-field="restaurant_country"></label>
+                            <p class="recipe-edit-restaurant-form-error" data-restaurant-edit-error hidden></p>
+                            <div class="recipe-edit-restaurant-form-actions recipe-edit-restaurant-form-wide">
+                                <button type="button" onclick="return cancelRecipeRestaurantSourceEdit(this)">Cancel</button>
+                                <button type="submit" class="primary" data-restaurant-edit-save disabled>Save Changes</button>
+                            </div>
+                        </form>
                     </details>
 
                     <details class="recipe-edit-context-card recipe-edit-ingredient-gallery-card" open>

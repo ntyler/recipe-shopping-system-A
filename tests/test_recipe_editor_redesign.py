@@ -166,6 +166,29 @@ def test_restaurant_source_card_uses_compact_identity_details_and_actions():
     assert ".recipe-edit-standalone-page .recipe-edit-restaurant-details {" in css
 
 
+def test_restaurant_source_card_has_inline_edit_mode_and_save_wiring():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    route = read_text("PushShoppingList/routes/recipe_routes.py")
+
+    for field in (
+        "restaurant_name", "restaurant_logo_url", "restaurant_rating", "restaurant_phone",
+        "restaurant_website_url", "source_menu_url", "restaurant_street_address",
+        "restaurant_city", "restaurant_state", "restaurant_postal_code", "restaurant_country",
+    ):
+        assert f'data-restaurant-edit-field="{field}"' in template
+    assert "data-restaurant-edit-form" in template
+    assert "Save Changes" in template
+    assert "cancelRecipeRestaurantSourceEdit" in template
+    assert "async function saveRecipeRestaurantSource(form)" in script
+    assert 'fetch("/api/recipe/restaurant-source"' in script
+    assert 'save.textContent = "Saving..."' in script
+    assert "recipeRestaurantEditSnapshot" in script
+    assert '@recipe_bp.route("/api/recipe/restaurant-source", methods=["POST"])' in route
+    assert ".recipe-edit-standalone-page .recipe-edit-restaurant-form {" in css
+
+
 def test_source_documents_card_uses_compact_rows_and_context_action_menus():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")

@@ -131,6 +131,7 @@ from PushShoppingList.services.recipe_edit_service import ensure_recipe_pdf_clou
 from PushShoppingList.services.recipe_edit_service import normalize_pdf_kind
 from PushShoppingList.services.recipe_edit_service import upload_recipe_pdf_to_cloudflare
 from PushShoppingList.services.recipe_edit_service import upload_all_recipe_pdfs_to_cloudflare
+from PushShoppingList.services.recipe_edit_service import update_editable_restaurant_source
 from PushShoppingList.services.cookbook_item_inference_service import infer_missing_details_for_recipe
 from PushShoppingList.services.cookbook_item_inference_service import regenerate_ingredients_for_recipe
 from PushShoppingList.services.cookbook_item_inference_service import regenerate_recipe_notes_for_recipe
@@ -3513,6 +3514,16 @@ def edit_recipe_page_route():
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
     )
+
+
+@recipe_bp.route("/api/recipe/restaurant-source", methods=["POST"])
+def update_recipe_restaurant_source_route():
+    data = request.get_json(silent=True) or {}
+    recipe_url = str(data.get("recipe_url") or "").strip()
+    if not recipe_url:
+        return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+    result = update_editable_restaurant_source(recipe_url, data)
+    return jsonify(result), 200 if result.get("ok") else 400
 
 
 @recipe_bp.route("/api/recipe_quantity", methods=["POST"])

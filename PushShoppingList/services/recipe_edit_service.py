@@ -2321,6 +2321,11 @@ def editable_menu_source_option_from_records(restaurant, menu):
         "restaurant_phone": clean_recipe_menu_text(restaurant.get("phone")),
         "restaurant_logo_url": clean_recipe_menu_text(restaurant.get("logo_url")),
         "restaurant_rating": clean_recipe_menu_text(restaurant.get("rating")),
+        "restaurant_street_address": first_recipe_menu_text(restaurant.get("address_line"), restaurant.get("full_address")),
+        "restaurant_city": clean_recipe_menu_text(restaurant.get("city")),
+        "restaurant_state": clean_recipe_menu_text(restaurant.get("state")),
+        "restaurant_postal_code": clean_recipe_menu_text(restaurant.get("postal_code")),
+        "restaurant_country": clean_recipe_menu_text(restaurant.get("country")),
         "restaurant_address": editable_restaurant_location(restaurant),
         "restaurant_hours_text": clean_recipe_menu_text(restaurant.get("hours_text")),
         "restaurant_current_status": clean_recipe_menu_text(restaurant.get("current_status")),
@@ -2335,6 +2340,72 @@ def editable_menu_source_option_from_records(restaurant, menu):
             restaurant.get("delivery_available") if restaurant else None,
         ),
     }
+
+
+def update_editable_restaurant_source(recipe_url, values):
+    values = values if isinstance(values, dict) else {}
+    restaurant_id = clean_recipe_menu_text(values.get("restaurant_id"))
+    menu_id = clean_recipe_menu_text(values.get("menu_id"))
+    name = clean_recipe_menu_text(values.get("restaurant_name"))
+    if not restaurant_id:
+        return {"ok": False, "error": "Restaurant source is required."}
+    if not name:
+        return {"ok": False, "error": "Restaurant Name is required."}
+
+    rating = clean_recipe_menu_text(values.get("restaurant_rating"))
+    if rating:
+        try:
+            numeric_rating = float(rating)
+        except ValueError:
+            return {"ok": False, "error": "Rating must be a number between 0 and 5."}
+        if numeric_rating < 0 or numeric_rating > 5:
+            return {"ok": False, "error": "Rating must be between 0 and 5."}
+
+    for field, label in (("restaurant_website_url", "Website URL"), ("source_menu_url", "Menu URL"), ("restaurant_logo_url", "Restaurant Logo URL")):
+        value = clean_recipe_menu_text(values.get(field))
+        if value:
+            parsed = urlparse(value)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                return {"ok": False, "error": f"{label} must be a valid http or https URL."}
+
+    loaded = load_editable_recipe(recipe_url).get("recipe", {})
+    if clean_recipe_menu_text(loaded.get("restaurant_id")) != restaurant_id:
+        return {"ok": False, "error": "This restaurant is not linked to the current recipe."}
+
+    with menu_store_service.MENU_STORE_LOCK:
+        store = menu_store_service.load_menu_store()
+        restaurant = menu_store_service.restaurant_for(store, restaurant_id)
+        if not restaurant:
+            return {"ok": False, "error": "Restaurant source was not found."}
+        menu = menu_store_service.find_menu(store, menu_id) if menu_id else {}
+        if menu and clean_recipe_menu_text(menu.get("restaurant_id")) != restaurant_id:
+            return {"ok": False, "error": "The selected menu does not belong to this restaurant."}
+
+        field_map = {
+            "restaurant_name": "restaurant_name",
+            "restaurant_logo_url": "logo_url",
+            "restaurant_rating": "rating",
+            "restaurant_phone": "phone",
+            "restaurant_website_url": "restaurant_website_url",
+            "restaurant_street_address": "address_line",
+            "restaurant_city": "city",
+            "restaurant_state": "state",
+            "restaurant_postal_code": "postal_code",
+            "restaurant_country": "country",
+        }
+        for source_field, store_field in field_map.items():
+            restaurant[store_field] = clean_recipe_menu_text(values.get(source_field)) or None
+        restaurant["full_address"] = None
+        restaurant["updated_at"] = menu_store_service.utc_now_iso()
+        if menu:
+            menu["source_url"] = clean_recipe_menu_text(values.get("source_menu_url")) or None
+            menu["updated_at"] = restaurant["updated_at"]
+        else:
+            restaurant["source_menu_url"] = clean_recipe_menu_text(values.get("source_menu_url")) or None
+        menu_store_service.save_menu_store(store)
+        option = editable_menu_source_option_from_records(restaurant, menu)
+
+    return {"ok": True, "restaurant": option}
 
 
 def editable_menu_source_option_identity(option):

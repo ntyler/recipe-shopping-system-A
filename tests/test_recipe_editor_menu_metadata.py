@@ -561,6 +561,55 @@ def test_menu_source_option_formats_location_from_separate_restaurant_fields(mon
     assert option["restaurant_address"] == "9546 Allisonville Rd, Indianapolis, Indiana 46250, USA"
 
 
+def test_inline_restaurant_source_update_edits_linked_record_without_creating_duplicate(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_derived_recipe()
+    restaurant_id = detail["restaurant"]["id"]
+    menu_id = detail["menu"]["id"]
+
+    result = recipe_edit_service.update_editable_restaurant_source(url, {
+        "restaurant_id": restaurant_id,
+        "menu_id": menu_id,
+        "restaurant_name": "Vel Asian Kitchen",
+        "restaurant_logo_url": "https://velasian.example/logo.png",
+        "restaurant_rating": "4.7",
+        "restaurant_phone": "3175550199",
+        "restaurant_website_url": "https://velasian.example",
+        "source_menu_url": "https://velasian.example/new-menu",
+        "restaurant_street_address": "2 Main St",
+        "restaurant_city": "Indianapolis",
+        "restaurant_state": "Indiana",
+        "restaurant_postal_code": "46250",
+        "restaurant_country": "USA",
+    })
+    store = menu_store_service.load_menu_store()
+    restaurant = menu_store_service.restaurant_for(store, restaurant_id)
+    menu = menu_store_service.find_menu(store, menu_id)
+
+    assert result["ok"] is True
+    assert len(store["restaurants"]) == 1
+    assert restaurant["restaurant_name"] == "Vel Asian Kitchen"
+    assert restaurant["logo_url"] == "https://velasian.example/logo.png"
+    assert restaurant["rating"] == "4.7"
+    assert restaurant["address_line"] == "2 Main St"
+    assert restaurant["city"] == "Indianapolis"
+    assert menu["source_url"] == "https://velasian.example/new-menu"
+    assert result["restaurant"]["restaurant_address"] == "2 Main St, Indianapolis, Indiana 46250, USA"
+
+
+def test_inline_restaurant_source_update_rejects_unlinked_restaurant(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, _detail = seed_menu_derived_recipe()
+
+    result = recipe_edit_service.update_editable_restaurant_source(url, {
+        "restaurant_id": "another-restaurant",
+        "restaurant_name": "Wrong Restaurant",
+    })
+
+    assert result["ok"] is False
+    assert "not linked" in result["error"]
+
+
 def test_menu_derived_recipe_loads_canonical_source_for_duplicate_source_ids(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"

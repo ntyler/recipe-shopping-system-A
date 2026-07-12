@@ -22891,6 +22891,11 @@ function recipeMenuSourceOptionsFromRecipe(recipe = {}) {
             restaurant_phone: recipe.restaurant_phone || "",
             restaurant_logo_url: recipe.restaurant_logo_url || "",
             restaurant_rating: recipe.restaurant_rating || "",
+            restaurant_street_address: recipe.restaurant_street_address || "",
+            restaurant_city: recipe.restaurant_city || "",
+            restaurant_state: recipe.restaurant_state || "",
+            restaurant_postal_code: recipe.restaurant_postal_code || "",
+            restaurant_country: recipe.restaurant_country || "",
             restaurant_address: recipe.restaurant_address || "",
             restaurant_hours_text: recipe.restaurant_hours_text || "",
             restaurant_current_status: recipe.restaurant_current_status || "",
@@ -24701,7 +24706,11 @@ function updateRecipeEditRestaurantCard() {
     setText('[data-restaurant-field="name"]', name, "No restaurant source");
     setText('[data-restaurant-field="cuisine"]', cuisine);
     setText('[data-restaurant-field="address"]', address);
-    setText('[data-restaurant-field="phone"]', phone);
+    const phoneDigits = phone.replace(/\D/g, "");
+    const displayPhone = phoneDigits.length === 10
+        ? `(${phoneDigits.slice(0, 3)}) ${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}`
+        : phone;
+    setText('[data-restaurant-field="phone"]', displayPhone);
     setText('[data-restaurant-field="website"]', website);
     const phoneRow = document.querySelector('[data-restaurant-detail-row="phone"]');
     const addressRow = document.querySelector('[data-restaurant-detail-row="address"]');
@@ -24757,16 +24766,142 @@ function updateRecipeEditRestaurantCard() {
     setAction("map", address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
 }
 
-function editRecipeRestaurantSource(button) {
-    const technical = document.getElementById("recipeEditSourceFilesDetails");
-    const restaurant = document.getElementById("recipeEditRestaurantMenuSourceDetails");
-    if (technical) {
-        technical.open = true;
+let recipeRestaurantEditSnapshot = "";
+
+function recipeRestaurantEditForm() {
+    return document.querySelector("[data-restaurant-edit-form]");
+}
+
+function recipeRestaurantEditValues(form = recipeRestaurantEditForm()) {
+    const values = {};
+    form?.querySelectorAll("[data-restaurant-edit-field]").forEach(input => {
+        values[input.dataset.restaurantEditField] = String(input.value || "").trim();
+    });
+    return values;
+}
+
+function updateRecipeRestaurantEditLogo(form = recipeRestaurantEditForm()) {
+    if (!form) return;
+    const values = recipeRestaurantEditValues(form);
+    const preview = form.querySelector("[data-restaurant-edit-logo]");
+    const image = preview?.querySelector("img");
+    const fallback = preview?.querySelector("[data-restaurant-edit-logo-fallback]");
+    const initials = (values.restaurant_name || "Restaurant").split(/\s+/).slice(0, 2).map(part => part[0] || "").join("").toUpperCase();
+    if (fallback) {
+        fallback.textContent = initials || "R";
+        fallback.hidden = Boolean(values.restaurant_logo_url);
     }
-    if (restaurant) {
-        restaurant.hidden = false;
-        restaurant.open = true;
-        restaurant.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (image) {
+        image.src = values.restaurant_logo_url || "";
+        image.alt = values.restaurant_logo_url ? `${values.restaurant_name || "Restaurant"} logo` : "";
+        image.hidden = !values.restaurant_logo_url;
+        image.onerror = () => {
+            image.hidden = true;
+            if (fallback) fallback.hidden = false;
+        };
+    }
+}
+
+function updateRecipeRestaurantEditState(form = recipeRestaurantEditForm()) {
+    if (!form) return;
+    const save = form.querySelector("[data-restaurant-edit-save]");
+    const changed = JSON.stringify(recipeRestaurantEditValues(form)) !== recipeRestaurantEditSnapshot;
+    if (save && !form.dataset.saving) save.disabled = !changed;
+    updateRecipeRestaurantEditLogo(form);
+}
+
+function editRecipeRestaurantSource(button) {
+    const card = button?.closest(".recipe-edit-restaurant-card");
+    const form = card?.querySelector("[data-restaurant-edit-form]");
+    const selected = recipeMenuSourceOptionByValue(document.getElementById("recipeEditMenuSourceSelect")?.value || "");
+    if (!card || !form || !selected) return false;
+    form.querySelectorAll("[data-restaurant-edit-field]").forEach(input => {
+        input.value = recipeMenuMetadataText(selected[input.dataset.restaurantEditField]);
+        if (input.dataset.restaurantEditBound !== "1") {
+            input.dataset.restaurantEditBound = "1";
+            input.addEventListener("input", () => updateRecipeRestaurantEditState(form));
+        }
+    });
+    recipeRestaurantEditSnapshot = JSON.stringify(recipeRestaurantEditValues(form));
+    card.classList.add("is-editing");
+    form.hidden = false;
+    card.querySelectorAll("[data-restaurant-readonly]").forEach(element => { element.hidden = true; });
+    const error = form.querySelector("[data-restaurant-edit-error]");
+    if (error) error.hidden = true;
+    updateRecipeRestaurantEditState(form);
+    form.querySelector('[data-restaurant-edit-field="restaurant_name"]')?.focus();
+    return false;
+}
+
+function cancelRecipeRestaurantSourceEdit(button) {
+    const card = button?.closest(".recipe-edit-restaurant-card");
+    const form = card?.querySelector("[data-restaurant-edit-form]");
+    if (!card || !form || form.dataset.saving) return false;
+    card.classList.remove("is-editing");
+    form.hidden = true;
+    card.querySelectorAll("[data-restaurant-readonly]").forEach(element => { element.hidden = false; });
+    recipeRestaurantEditSnapshot = "";
+    return false;
+}
+
+function focusRecipeRestaurantLogo(button) {
+    button?.closest("form")?.querySelector('[data-restaurant-edit-field="restaurant_logo_url"]')?.focus();
+    return false;
+}
+
+function removeRecipeRestaurantLogo(button) {
+    const form = button?.closest("form");
+    const input = form?.querySelector('[data-restaurant-edit-field="restaurant_logo_url"]');
+    if (input) {
+        input.value = "";
+        updateRecipeRestaurantEditState(form);
+    }
+    return false;
+}
+
+async function saveRecipeRestaurantSource(form) {
+    if (!form || form.dataset.saving) return false;
+    const values = recipeRestaurantEditValues(form);
+    const error = form.querySelector("[data-restaurant-edit-error]");
+    const save = form.querySelector("[data-restaurant-edit-save]");
+    if (!values.restaurant_name) {
+        if (error) { error.textContent = "Restaurant Name is required."; error.hidden = false; }
+        return false;
+    }
+    const selectedValue = document.getElementById("recipeEditMenuSourceSelect")?.value || "";
+    const selected = recipeMenuSourceOptionByValue(selectedValue);
+    if (!selected) return false;
+    form.dataset.saving = "1";
+    if (save) { save.disabled = true; save.textContent = "Saving..."; }
+    if (error) error.hidden = true;
+    try {
+        const response = await fetch("/api/recipe/restaurant-source", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                recipe_url: recipeEditorSourceUrlForOpen(),
+                restaurant_id: selected.restaurant_id || "",
+                menu_id: selected.menu_id || "",
+                ...values,
+            }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save restaurant source.");
+        Object.assign(selected, data.restaurant || {});
+        setValue("recipeEditRestaurantName", selected.restaurant_name || "");
+        setValue("recipeEditRestaurantWebsiteUrl", selected.restaurant_website_url || "");
+        setValue("recipeEditSourceMenuUrl", selected.source_menu_url || "");
+        setValue("recipeEditRestaurantPhone", selected.restaurant_phone || "");
+        setValue("recipeEditRestaurantAddress", selected.restaurant_address || "");
+        bindRecipeMenuMetadataUrlLinks();
+        delete form.dataset.saving;
+        cancelRecipeRestaurantSourceEdit(form.querySelector('button[type="button"]'));
+        updateRecipeEditRestaurantCard();
+    } catch (err) {
+        if (error) { error.textContent = err.message || "Unable to save restaurant source."; error.hidden = false; }
+    } finally {
+        delete form.dataset.saving;
+        if (save) { save.textContent = "Save Changes"; updateRecipeRestaurantEditState(form); }
     }
     return false;
 }
