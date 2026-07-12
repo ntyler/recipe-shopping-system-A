@@ -112,7 +112,7 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "focusRecipeIngredientGrouping(this)" in template
 
 
-def test_recipe_image_card_matches_light_mockup_without_changing_image_workflows():
+def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
@@ -131,8 +131,11 @@ def test_recipe_image_card_matches_light_mockup_without_changing_image_workflows
     assert 'onclick="return generateRecipeCoverImage(this)"' in cover
     assert '? "Change Image"' in script
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
-    assert "background: #ffffff;" in css
-    assert "bottom: calc(100% + 7px);" in css
+    assert "background: var(--app-surface);" in css
+    assert "top: calc(100% + 8px);" in css
+    assert "function closeRecipeImageChangeActions(options = {})" in script
+    assert 'event.key === "Escape"' in script
+    assert "closeRecipeImageChangeActions();" in script
 
 
 def test_recipe_editor_header_actions_match_the_mockup_order_and_icons():

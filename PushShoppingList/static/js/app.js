@@ -26466,8 +26466,33 @@ function toggleRecipeImageChangeActions(button) {
     return false;
 }
 
+function closeRecipeImageChangeActions(options = {}) {
+    const actions = document.querySelector("[data-recipe-image-change-actions]");
+    const button = document.querySelector(".recipe-edit-image-card .recipe-edit-cover-primary-actions [aria-expanded]");
+    if (actions) actions.hidden = true;
+    if (button) button.setAttribute("aria-expanded", "false");
+    if (options.restoreFocus) button?.focus({ preventScroll: true });
+}
+
+document.addEventListener("pointerdown", event => {
+    const actions = document.querySelector("[data-recipe-image-change-actions]");
+    const toggle = document.querySelector(".recipe-edit-image-card .recipe-edit-cover-primary-actions [aria-expanded]");
+    if (!actions || actions.hidden || actions.contains(event.target) || toggle?.contains(event.target)) return;
+    closeRecipeImageChangeActions();
+});
+
+document.addEventListener("keydown", event => {
+    const actions = document.querySelector("[data-recipe-image-change-actions]");
+    if (event.key === "Escape" && actions && !actions.hidden) {
+        event.preventDefault();
+        closeRecipeImageChangeActions({ restoreFocus: true });
+    }
+});
+
 function openRecipeCoverUpload() {
     const input = document.getElementById("recipeEditCoverUpload");
+
+    closeRecipeImageChangeActions();
 
     if (input) {
         input.click();
@@ -26580,6 +26605,7 @@ async function requestRecipeCoverImageGeneration(payload = {}, signal = null) {
 }
 
 async function generateRecipeCoverImage(button) {
+    closeRecipeImageChangeActions();
     const originalUrl = recipeEditorCurrentUrl();
     const titleInput = document.getElementById("recipeEditTitleInput");
     const displayInput = document.getElementById("recipeEditDisplayName");
