@@ -35703,14 +35703,71 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-page .recipe-edit-header-cancel {
-    min-width: 104px;
+    min-width: 112px;
+    height: 46px;
+    min-height: 46px;
+    padding: 0 22px;
+    border: 1px solid #dfe3e8;
+    border-radius: 9px;
+    background: #f5f6f8;
+    color: #172033;
+    font-size: 14px;
+    font-weight: 800;
 }
 
 .recipe-edit-standalone-page .recipe-edit-header-save {
-    min-width: 138px;
-    border-color: var(--app-primary);
-    background: #087c35;
+    min-width: 150px;
+    height: 46px;
+    min-height: 46px;
+    margin-left: 3px;
+    padding: 0 24px;
+    border: 1px solid #078234;
+    border-radius: 9px;
+    background: #07913e;
     color: #fff;
+    font-size: 14px;
+    font-weight: 850;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-save .app-icon-svg {
+    width: 19px;
+    height: 19px;
+    flex-basis: 19px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-cancel:hover {
+    border-color: #cbd2d9;
+    background: #e9edf1;
+    color: #111827;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-cancel:active {
+    background: #dfe4e9;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-cancel:focus-visible {
+    border-color: var(--app-primary);
+    background: #f5f6f8;
+    color: #172033;
+    outline: 3px solid rgba(46, 182, 111, .32);
+    outline-offset: 2px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-save:hover {
+    border-color: #066f30;
+    background: #078137;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-save:active {
+    border-color: #055f2a;
+    background: #066d30;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-save:focus-visible {
+    border-color: #ffffff;
+    background: #07913e;
+    outline: 3px solid rgba(46, 182, 111, .4);
+    outline-offset: 2px;
 }
 
 .recipe-edit-standalone-page [hidden] {

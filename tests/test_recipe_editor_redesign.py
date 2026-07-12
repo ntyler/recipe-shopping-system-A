@@ -157,7 +157,11 @@ def test_recipe_editor_header_actions_match_the_mockup_order_and_icons():
     assert 'aria-haspopup="menu"' in actions
     assert 'aria-expanded="false"' in actions
     assert "height: 42px;" in css
-    assert "min-width: 138px;" in css
+    assert "height: 46px;" in css
+    assert "min-width: 150px;" in css
+    assert "background: #f5f6f8;" in css
+    assert "background: #07913e;" in css
+    assert "outline: 3px solid rgba(46, 182, 111, .4);" in css
 
     javascript = read_text("PushShoppingList/static/js/app.js")
     assert 'event.key !== "Escape"' in javascript
