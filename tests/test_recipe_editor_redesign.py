@@ -378,6 +378,25 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "function loadMoreRecipeRestaurantUsage(button)" in script
     assert "function backfillUnlinkedRecipeRestaurants(button)" in script
     assert "migration_status" in script
+    assert 'loading="lazy"' in script
+    assert 'decoding="async"' in script
+    assert "handleRecipeRestaurantUsageThumbnailError" in script
+    assert "recipe.total_time" in script
+    assert "recipe.calories_per_serving" in script
+    assert "recipe.category_label" in script
+    assert ".recipe-edit-restaurant-usage-thumbnail {" in css
+    assert "grid-template-columns: 64px minmax(0, 1fr);" in css
+    assert "width: 64px;" in css
+    assert "height: 64px;" in css
+    assert "text-overflow: ellipsis;" in css
+    usage_render = script[
+        script.index("function renderRecipeRestaurantUsageList"):
+        script.index("function applyRecipeRestaurantUsageResponse")
+    ]
+    assert "recipe.cookbook_name" not in usage_render
+    assert "recipe.last_modified" not in usage_render
+    assert 'metadata.length ?' in usage_render
+    assert 'category ?' in usage_render
     assert '@recipe_bp.route("/api/recipe/restaurant-usage", methods=["GET"])' in route
     assert '@recipe_bp.route("/api/recipe/restaurant-usage/backfill", methods=["POST"])' in route
     assert ".recipe-edit-restaurant-usage-panel {" in css

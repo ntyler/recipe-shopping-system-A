@@ -752,6 +752,10 @@ def test_restaurant_usage_counts_complete_normalized_and_clear_legacy_dataset(mo
         "cookbook_id": "book-a" if url in urls[:5] else "book-b",
         "cookbook_name": "Book A" if url in urls[:5] else "Book B",
     })
+    thumbnail_calls = []
+    monkeypatch.setattr(recipe_edit_service, "editable_restaurant_usage_thumbnail", lambda url, data, meta=None: (
+        thumbnail_calls.append(url) or {}
+    ))
 
     result = recipe_edit_service.editable_restaurant_usage(
         restaurant_id,
@@ -771,6 +775,41 @@ def test_restaurant_usage_counts_complete_normalized_and_clear_legacy_dataset(mo
     }
     assert len(result["recipes"]) == 3
     assert result["has_more"] is True
+    assert thumbnail_calls == [row["url"] for row in result["recipes"]]
+
+
+def test_restaurant_usage_row_uses_only_saved_summary_metadata(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://example.test/saved-summary"
+    record = {
+        "url": url,
+        "match_kind": "normalized",
+        "data": {
+            "source_url": url,
+            "recipe_title": "Saved Summary Dish",
+            "total_time": "25",
+            "nutrition": {"serving_basis": "per serving", "calories": "420 kcal"},
+            "menu_section": "APPETIZER",
+            "cover_image": {"url": "https://images.example.test/dish.jpg", "alt": "Saved dish"},
+        },
+    }
+
+    row = recipe_edit_service.editable_restaurant_usage_row(record)
+    empty_row = recipe_edit_service.editable_restaurant_usage_row({
+        "url": "https://example.test/no-summary",
+        "match_kind": "normalized",
+        "data": {"recipe_title": "No Summary", "total_time": "0", "nutrition": {}},
+    })
+
+    assert row["thumbnail_url"] == "https://images.example.test/dish.jpg"
+    assert row["thumbnail_alt"] == "Saved dish"
+    assert row["total_time"] == "25 min"
+    assert row["calories_per_serving"] == "420 cal"
+    assert row["category_label"] == "APPETIZER"
+    assert empty_row["thumbnail_url"] == ""
+    assert empty_row["total_time"] == ""
+    assert empty_row["calories_per_serving"] == ""
+    assert empty_row["category_label"] == ""
 
 
 def test_restaurant_usage_backfill_links_only_clear_matches_and_preserves_recipe_fields(monkeypatch, tmp_path):

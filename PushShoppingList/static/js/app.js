@@ -25649,10 +25649,10 @@ function recipeRestaurantEditModal() {
     return document.querySelector("[data-restaurant-edit-modal]");
 }
 
-function recipeRestaurantUsageDate(value) {
-    if (!value) return "";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
+function handleRecipeRestaurantUsageThumbnailError(image) {
+    const thumbnail = image?.closest(".recipe-edit-restaurant-usage-thumbnail");
+    if (image) image.hidden = true;
+    thumbnail?.classList.add("is-fallback");
 }
 
 function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes) {
@@ -25664,14 +25664,24 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
     }
     list.innerHTML = recipes.map(recipe => {
         const url = String(recipe.url || "").trim();
-        const details = [recipe.cookbook_name || "No cookbook", recipeRestaurantUsageDate(recipe.last_modified)].filter(Boolean).join(" · ");
+        const title = String(recipe.title || "Untitled Recipe").trim();
+        const thumbnailUrl = String(recipe.thumbnail_url || "").trim();
+        const metadata = [recipe.total_time, recipe.calories_per_serving].map(value => String(value || "").trim()).filter(Boolean);
+        const category = String(recipe.category_label || "").trim();
         const relationship = recipe.relationship_status === "legacy_clear"
             ? '<small class="recipe-edit-restaurant-usage-link-status">Needs restaurant link</small>'
             : "";
         return `<article>
-            <a href="/recipe/edit?url=${encodeURIComponent(url)}">${escapeHtml(recipe.title || "Untitled Recipe")}</a>
-            <span>${escapeHtml(details)}</span>
-            ${relationship}
+            <span class="recipe-edit-restaurant-usage-thumbnail${thumbnailUrl ? "" : " is-fallback"}" aria-hidden="true">
+                <span class="recipe-edit-restaurant-usage-thumbnail-placeholder"></span>
+                ${thumbnailUrl ? `<img src="${escapeAttribute(thumbnailUrl)}" alt="" loading="lazy" decoding="async" onerror="handleRecipeRestaurantUsageThumbnailError(this)">` : ""}
+            </span>
+            <a class="recipe-edit-restaurant-usage-summary" href="/recipe/edit?url=${encodeURIComponent(url)}" aria-label="Open ${escapeAttribute(title)}">
+                <strong title="${escapeAttribute(title)}">${escapeHtml(title)}</strong>
+                ${metadata.length ? `<span>${escapeHtml(metadata.join(" · "))}</span>` : ""}
+                ${category ? `<small class="recipe-edit-restaurant-usage-category">${escapeHtml(category)}</small>` : ""}
+                ${relationship}
+            </a>
         </article>`;
     }).join("");
 }

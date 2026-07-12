@@ -33020,22 +33020,106 @@ img[data-deferred-src] {
 
 .recipe-edit-restaurant-usage-list article {
     display: grid;
-    gap: 4px;
-    padding: 12px 16px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    min-height: 80px;
+    gap: 11px;
+    align-items: center;
+    padding: 8px 14px;
     border-bottom: 1px solid var(--app-border);
 }
 
-.recipe-edit-restaurant-usage-list article a {
-    color: var(--app-primary-hover);
-    font-size: 14px;
-    font-weight: 750;
+.recipe-edit-restaurant-usage-list article:hover {
+    background: rgba(255, 255, 255, .025);
+}
+
+.recipe-edit-restaurant-usage-thumbnail {
+    position: relative;
+    display: block;
+    width: 64px;
+    height: 64px;
+    overflow: hidden;
+    border: 1px solid #59635f;
+    border-radius: 8px;
+    background: #1a201e;
+}
+
+.recipe-edit-restaurant-usage-thumbnail-placeholder {
+    position: absolute;
+    inset: 0;
+    display: block;
+    background:
+        radial-gradient(circle at 68% 32%, #69736e 0 5px, transparent 6px),
+        linear-gradient(145deg, transparent 49%, #4d5752 50% 58%, transparent 59%),
+        linear-gradient(35deg, transparent 51%, #3d4742 52% 64%, transparent 65%),
+        #252c29;
+    opacity: .72;
+}
+
+.recipe-edit-restaurant-usage-thumbnail img {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.recipe-edit-restaurant-usage-thumbnail.is-fallback {
+    border-color: var(--app-border);
+}
+
+.recipe-edit-restaurant-usage-summary {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+    align-content: center;
+    color: inherit;
     text-decoration: none;
 }
 
-.recipe-edit-restaurant-usage-list article span,
+.recipe-edit-restaurant-usage-summary strong {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--app-primary-hover);
+    font-size: 14px;
+    font-weight: 750;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recipe-edit-restaurant-usage-summary:hover strong,
+.recipe-edit-restaurant-usage-summary:focus-visible strong {
+    color: #6ee7a7;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.recipe-edit-restaurant-usage-summary:focus-visible {
+    border-radius: 4px;
+    outline: 2px solid var(--app-primary);
+    outline-offset: 3px;
+}
+
+.recipe-edit-restaurant-usage-summary > span,
 .recipe-edit-restaurant-usage-empty {
     color: #aeb8b2;
     font-size: 12px;
+    line-height: 1.25;
+}
+
+.recipe-edit-restaurant-usage-summary .recipe-edit-restaurant-usage-category {
+    width: max-content;
+    max-width: 100%;
+    overflow: hidden;
+    color: #c8d0cc;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    text-transform: capitalize;
+    white-space: nowrap;
 }
 
 .recipe-edit-restaurant-usage-list .recipe-edit-restaurant-usage-link-status {

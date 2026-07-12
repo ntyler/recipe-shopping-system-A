@@ -3224,8 +3224,94 @@ def editable_restaurant_usage_inventory(restaurant_id):
     }
 
 
-def editable_restaurant_usage_row(record):
+def editable_restaurant_usage_time(value):
+    text = clean_recipe_menu_text(value)
+    if not text:
+        return ""
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)\s*(?:min|mins|minutes)?", text, re.I)
+    if not match:
+        return text
+    minutes = float(match.group(1))
+    if minutes <= 0:
+        return ""
+    display = str(int(minutes)) if minutes.is_integer() else str(minutes).rstrip("0").rstrip(".")
+    return f"{display} min"
+
+
+def editable_restaurant_usage_calories(recipe_data):
+    nutrition = recipe_data.get("nutrition") if isinstance(recipe_data, dict) else {}
+    if not isinstance(nutrition, dict):
+        return ""
+    serving_basis = clean_recipe_menu_text(nutrition.get("serving_basis")).casefold()
+    if serving_basis and "serving" not in serving_basis:
+        return ""
+    calories = clean_recipe_menu_text(
+        nutrition.get("calories_per_serving")
+        or nutrition.get("calories")
+    )
+    if not calories:
+        return ""
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)\s*(?:kcal|cal|calories)?", calories, re.I)
+    if not match:
+        return calories
+    numeric = float(match.group(1))
+    if numeric <= 0:
+        return ""
+    display = str(int(numeric)) if numeric.is_integer() else str(numeric).rstrip("0").rstrip(".")
+    return f"{display} cal"
+
+
+def editable_restaurant_usage_category(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    metadata = recipe_menu_source_metadata(recipe_data)
+    value = first_recipe_menu_text(
+        recipe_data.get("meal_type"),
+        recipe_data.get("menu_section"),
+        recipe_data.get("section"),
+        recipe_data.get("category"),
+        recipe_data.get("primary_category"),
+        metadata.get("menu_section"),
+        metadata.get("meal_type"),
+    )
+    if isinstance(value, (list, tuple)):
+        value = next((clean_recipe_menu_text(item) for item in value if clean_recipe_menu_text(item)), "")
+    return clean_recipe_menu_text(value)
+
+
+def editable_restaurant_usage_thumbnail(recipe_url, recipe_data, recipe_meta=None):
+    """Build a lazy thumbnail URL without reading or generating image variants."""
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    recipe_meta = recipe_meta if isinstance(recipe_meta, dict) else {}
+    cover_image = recipe_data.get("cover_image")
+    if not isinstance(cover_image, dict) or not cover_image:
+        cover_image = recipe_meta.get("cover_image")
+    if not isinstance(cover_image, dict) or not cover_image:
+        return {}
+    normalized = normalize_recipe_cover_image(
+        cover_image,
+        base_url=recipe_url,
+        fallback_alt=first_recipe_menu_text(recipe_data.get("recipe_title"), "Recipe image"),
+    )
+    if not normalized:
+        return {}
+    if normalized.get("path") and recipe_url:
+        src = f"/recipe_cover_image?url={quote(recipe_url, safe='')}&variant=thumb"
+    else:
+        src = first_recipe_menu_text(
+            cover_image.get("thumb_url"),
+            cover_image.get("card_url"),
+            normalized.get("url"),
+        )
+    return {
+        "src": src,
+        "alt": first_recipe_menu_text(normalized.get("alt"), cover_image.get("alt")),
+    } if src else {}
+
+
+def editable_restaurant_usage_row(record, recipe_meta=None):
     recipe_data = record.get("data") if isinstance(record, dict) else {}
+    recipe_url = clean_recipe_menu_text(record.get("url"))
+    thumbnail = editable_restaurant_usage_thumbnail(recipe_url, recipe_data, recipe_meta)
     return {
         "title": first_recipe_menu_text(
             recipe_data.get("recipe_title"),
@@ -3233,10 +3319,17 @@ def editable_restaurant_usage_row(record):
             recipe_data.get("display_name"),
             "Untitled Recipe",
         ),
-        "url": clean_recipe_menu_text(record.get("url")),
+        "url": recipe_url,
         "cookbook_name": clean_recipe_menu_text(record.get("cookbook_name")),
         "last_modified": clean_recipe_menu_text(record.get("last_modified")),
         "relationship_status": "linked" if record.get("match_kind") == "normalized" else "legacy_clear",
+        "thumbnail_url": clean_recipe_menu_text(thumbnail.get("src")),
+        "thumbnail_alt": clean_recipe_menu_text(thumbnail.get("alt")),
+        "total_time": editable_restaurant_usage_time(
+            recipe_data.get("total_time") or recipe_data.get("total_time_minutes")
+        ),
+        "calories_per_serving": editable_restaurant_usage_calories(recipe_data),
+        "category_label": editable_restaurant_usage_category(recipe_data),
     }
 
 
@@ -3293,6 +3386,7 @@ def editable_restaurant_usage(restaurant_id, page=1, per_page=50, query="", curr
         per_page,
         sorted(inventory["cookbook_ids"]),
     )
+    recipe_meta_index = load_recipe_ingredients()
     return {
         "ok": True,
         "restaurant_id": restaurant_id,
@@ -3309,7 +3403,13 @@ def editable_restaurant_usage(restaurant_id, page=1, per_page=50, query="", curr
         "per_page": per_page,
         "filtered_recipe_count": len(filtered),
         "has_more": start + len(page_records) < len(filtered),
-        "recipes": [editable_restaurant_usage_row(record) for record in page_records],
+        "recipes": [
+            editable_restaurant_usage_row(
+                record,
+                recipe_meta_index.get(normalize_recipe_url_key(record.get("url")), {}),
+            )
+            for record in page_records
+        ],
     }
 
 
