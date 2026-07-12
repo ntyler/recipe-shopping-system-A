@@ -576,6 +576,7 @@ def test_inline_restaurant_source_update_edits_linked_record_without_creating_du
         "restaurant_phone": "3175550199",
         "restaurant_website_url": "https://velasian.example",
         "source_menu_url": "https://velasian.example/new-menu",
+        "menu_item_url": "https://velasian.example/new-menu?item=spring-roll",
         "restaurant_street_address": "2 Main St",
         "restaurant_city": "Indianapolis",
         "restaurant_state": "Indiana",
@@ -594,6 +595,8 @@ def test_inline_restaurant_source_update_edits_linked_record_without_creating_du
     assert restaurant["address_line"] == "2 Main St"
     assert restaurant["city"] == "Indianapolis"
     assert menu["source_url"] == "https://velasian.example/new-menu"
+    assert result["restaurant"]["menu_item_url"] == "https://velasian.example/new-menu?item=spring-roll"
+    assert recipe_edit_service.load_recipe_output(url)["menu_item_url"] == "https://velasian.example/new-menu?item=spring-roll"
     assert result["restaurant"]["restaurant_address"] == "2 Main St, Indianapolis, Indiana 46250, USA"
 
 

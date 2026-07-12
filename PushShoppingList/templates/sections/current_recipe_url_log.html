@@ -764,6 +764,7 @@
             </div>
 
             <input type="hidden" name="original_url" id="recipeEditOriginalUrl">
+            <input type="hidden" id="recipeEditMenuItemUrl">
             <input type="hidden" name="quantity" id="recipeEditQuantity" value="1">
 
             <div id="recipeEditStatus" class="recipe-edit-status"></div>
@@ -2130,7 +2131,7 @@
                         <div id="recipeEditDocumentList" class="recipe-edit-document-list" data-recipe-edit-document-list>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
-                                 data-document-input-id="recipeEditSourceUrl"
+                                 data-document-input-id="recipeEditMenuItemUrl"
                                  data-document-link-id="recipeEditSourceUrlLink"
                                  data-document-open-source="source-url"
                                  data-document-kind="url">
@@ -2262,16 +2263,37 @@
                                     <span data-restaurant-edit-logo-fallback>R</span>
                                 </span>
                                 <div>
-                                    <button type="button" onclick="return focusRecipeRestaurantLogo(this)">Change Logo</button>
+                                    <button type="button" onclick="return toggleRecipeRestaurantLogoChooser(this)">Change Logo</button>
                                     <button type="button" class="delete" onclick="return removeRecipeRestaurantLogo(this)">Remove</button>
+                                </div>
+                                <div class="recipe-edit-restaurant-logo-chooser" data-restaurant-logo-chooser hidden>
+                                    <button type="button" onclick="return chooseRecipeRestaurantLogoUpload(this)">Upload Image</button>
+                                    <button type="button" onclick="return chooseRecipeRestaurantLogoUrl(this)">Use Image URL</button>
+                                    <button type="button" onclick="return closeRecipeRestaurantLogoChooser(this)">Cancel</button>
+                                    <input type="file" accept="image/png,image/jpeg,image/webp" data-restaurant-logo-file hidden>
+                                    <input type="hidden" data-restaurant-edit-field="restaurant_logo_data_url">
+                                    <input type="hidden" data-restaurant-edit-field="restaurant_logo_action" value="keep">
+                                    <label class="recipe-edit-restaurant-logo-url" data-restaurant-logo-url-panel hidden>
+                                        <span>Logo Image URL</span>
+                                        <input type="url" data-restaurant-edit-field="restaurant_logo_url" placeholder="https://example.com/logo.png">
+                                        <small>Enter a direct PNG, JPG, JPEG, or WebP image URL.</small>
+                                    </label>
+                                    <p class="recipe-edit-restaurant-logo-error" data-restaurant-logo-error hidden></p>
                                 </div>
                             </div>
                             <label class="recipe-edit-restaurant-form-wide"><span>Restaurant Name</span><input type="text" data-restaurant-edit-field="restaurant_name" required></label>
-                            <label><span>Rating</span><input type="number" min="0" max="5" step="0.1" data-restaurant-edit-field="restaurant_rating"></label>
+                            <fieldset class="recipe-edit-restaurant-rating-editor">
+                                <legend>Rating</legend>
+                                <input type="hidden" data-restaurant-edit-field="restaurant_rating">
+                                <div class="recipe-edit-restaurant-rating-buttons" role="radiogroup" aria-label="Restaurant rating">
+                                    {% for rating in range(1, 6) %}<button type="button" data-restaurant-rating-value="{{ rating }}" role="radio" aria-checked="false" aria-label="{{ rating }} star{% if rating != 1 %}s{% endif %}" onclick="return setRecipeRestaurantRating(this, {{ rating }})" onkeydown="return handleRecipeRestaurantRatingKeydown(this, event)">{{ shell.svg_icon("star") }}</button>{% endfor %}
+                                    <button type="button" class="recipe-edit-restaurant-rating-clear" onclick="return clearRecipeRestaurantRating(this)">Clear Rating</button>
+                                </div>
+                            </fieldset>
                             <label><span>Phone</span><input type="tel" data-restaurant-edit-field="restaurant_phone"></label>
-                            <label class="recipe-edit-restaurant-form-wide"><span>Logo URL</span><input type="url" data-restaurant-edit-field="restaurant_logo_url"></label>
-                            <label class="recipe-edit-restaurant-form-wide"><span>Website URL</span><input type="url" data-restaurant-edit-field="restaurant_website_url"></label>
-                            <label class="recipe-edit-restaurant-form-wide"><span>Menu URL</span><input type="url" data-restaurant-edit-field="source_menu_url"></label>
+                            <label class="recipe-edit-restaurant-form-wide"><span>Website URL</span><input type="url" data-restaurant-edit-field="restaurant_website_url"><small>Restaurant's main website.</small></label>
+                            <label class="recipe-edit-restaurant-form-wide"><span>Menu URL</span><input type="url" data-restaurant-edit-field="source_menu_url"><small>Page containing the full restaurant menu.</small></label>
+                            <label class="recipe-edit-restaurant-form-wide"><span>Menu Item URL</span><input type="url" data-restaurant-edit-field="menu_item_url"><small>Direct source page or deep link for this recipe or menu item.</small></label>
                             <label class="recipe-edit-restaurant-form-wide"><span>Street Address</span><input type="text" data-restaurant-edit-field="restaurant_street_address"></label>
                             <label><span>City</span><input type="text" data-restaurant-edit-field="restaurant_city"></label>
                             <label><span>State or Region</span><input type="text" data-restaurant-edit-field="restaurant_state"></label>

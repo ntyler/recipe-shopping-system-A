@@ -162,6 +162,7 @@ NUTRITION_ESTIMATE_FIELDS = [
 STEP_IMAGE_FOLDER = Path(__file__).resolve().parents[1] / "static" / "generated" / "recipe_steps"
 STEP_IMAGE_URL_PREFIX = "/static/generated/recipe_steps"
 COVER_IMAGE_UPLOAD_FOLDER = UPLOAD_FOLDER / "recipe_covers"
+RESTAURANT_LOGO_UPLOAD_FOLDER = UPLOAD_FOLDER / "restaurant_logos"
 COVER_IMAGE_EXTENSIONS = {
     ".avif",
     ".bmp",
@@ -2342,6 +2343,48 @@ def editable_menu_source_option_from_records(restaurant, menu):
     }
 
 
+def editable_restaurant_logo_file_path(restaurant_id):
+    restaurant_id = clean_recipe_menu_text(restaurant_id)
+    if not restaurant_id:
+        return None
+    store = menu_store_service.load_menu_store()
+    restaurant = menu_store_service.restaurant_for(store, restaurant_id)
+    raw_path = clean_recipe_menu_text((restaurant or {}).get("logo_path"))
+    if not raw_path:
+        return None
+    try:
+        path = Path(raw_path).resolve()
+        root = RESTAURANT_LOGO_UPLOAD_FOLDER.resolve()
+    except (OSError, RuntimeError):
+        return None
+    return path if path.is_file() and root in path.parents else None
+
+
+def save_editable_restaurant_logo_data(restaurant_id, data_url):
+    match = re.fullmatch(r"data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)", str(data_url or "").strip())
+    if not match:
+        raise ValueError("Choose a PNG, JPG, JPEG, or WebP logo image.")
+    try:
+        payload = base64.b64decode(match.group(2), validate=True)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("The selected logo image could not be read.") from exc
+    if not payload or len(payload) > 5 * 1024 * 1024:
+        raise ValueError("Restaurant logos must be 5 MB or smaller.")
+    mime_type = match.group(1)
+    valid_signature = (
+        (mime_type == "image/png" and payload.startswith(b"\x89PNG\r\n\x1a\n"))
+        or (mime_type == "image/jpeg" and payload.startswith(b"\xff\xd8\xff"))
+        or (mime_type == "image/webp" and payload.startswith(b"RIFF") and payload[8:12] == b"WEBP")
+    )
+    if not valid_signature:
+        raise ValueError("The selected file is not a valid PNG, JPG, JPEG, or WebP image.")
+    extension = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[mime_type]
+    RESTAURANT_LOGO_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+    path = RESTAURANT_LOGO_UPLOAD_FOLDER / f"{safe_filename(restaurant_id)}_{uuid.uuid4().hex}{extension}"
+    path.write_bytes(payload)
+    return path, f"/restaurant_source_logo?restaurant_id={quote(restaurant_id, safe='')}&v={path.stat().st_mtime_ns}"
+
+
 def update_editable_restaurant_source(recipe_url, values):
     values = values if isinstance(values, dict) else {}
     restaurant_id = clean_recipe_menu_text(values.get("restaurant_id"))
@@ -2358,10 +2401,10 @@ def update_editable_restaurant_source(recipe_url, values):
             numeric_rating = float(rating)
         except ValueError:
             return {"ok": False, "error": "Rating must be a number between 0 and 5."}
-        if numeric_rating < 0 or numeric_rating > 5:
-            return {"ok": False, "error": "Rating must be between 0 and 5."}
+        if numeric_rating < 1 or numeric_rating > 5:
+            return {"ok": False, "error": "Rating must be between 1 and 5."}
 
-    for field, label in (("restaurant_website_url", "Website URL"), ("source_menu_url", "Menu URL"), ("restaurant_logo_url", "Restaurant Logo URL")):
+    for field, label in (("restaurant_website_url", "Website URL"), ("source_menu_url", "Menu URL"), ("menu_item_url", "Menu Item URL"), ("restaurant_logo_url", "Restaurant Logo URL")):
         value = clean_recipe_menu_text(values.get(field))
         if value:
             parsed = urlparse(value)
@@ -2383,7 +2426,6 @@ def update_editable_restaurant_source(recipe_url, values):
 
         field_map = {
             "restaurant_name": "restaurant_name",
-            "restaurant_logo_url": "logo_url",
             "restaurant_rating": "rating",
             "restaurant_phone": "phone",
             "restaurant_website_url": "restaurant_website_url",
@@ -2393,8 +2435,26 @@ def update_editable_restaurant_source(recipe_url, values):
             "restaurant_postal_code": "postal_code",
             "restaurant_country": "country",
         }
+        previous_logo_path = clean_recipe_menu_text(restaurant.get("logo_path"))
         for source_field, store_field in field_map.items():
             restaurant[store_field] = clean_recipe_menu_text(values.get(source_field)) or None
+        logo_data_url = clean_recipe_menu_text(values.get("restaurant_logo_data_url"))
+        logo_action = clean_recipe_menu_text(values.get("restaurant_logo_action")).lower()
+        if not logo_action:
+            logo_action = "url" if "restaurant_logo_url" in values else "keep"
+        if logo_action == "upload" and logo_data_url:
+            try:
+                logo_path, logo_url = save_editable_restaurant_logo_data(restaurant_id, logo_data_url)
+            except ValueError as exc:
+                return {"ok": False, "error": str(exc)}
+            restaurant["logo_path"] = str(logo_path)
+            restaurant["logo_url"] = logo_url
+        elif logo_action == "remove":
+            restaurant["logo_url"] = None
+            restaurant["logo_path"] = None
+        elif logo_action == "url":
+            restaurant["logo_url"] = clean_recipe_menu_text(values.get("restaurant_logo_url")) or None
+            restaurant["logo_path"] = None
         restaurant["full_address"] = None
         restaurant["updated_at"] = menu_store_service.utc_now_iso()
         if menu:
@@ -2404,6 +2464,23 @@ def update_editable_restaurant_source(recipe_url, values):
             restaurant["source_menu_url"] = clean_recipe_menu_text(values.get("source_menu_url")) or None
         menu_store_service.save_menu_store(store)
         option = editable_menu_source_option_from_records(restaurant, menu)
+
+    if previous_logo_path and previous_logo_path != clean_recipe_menu_text(restaurant.get("logo_path")):
+        try:
+            previous_path = Path(previous_logo_path).resolve()
+            if RESTAURANT_LOGO_UPLOAD_FOLDER.resolve() in previous_path.parents:
+                previous_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    recipe_data = load_recipe_output(recipe_url) or loaded
+    menu_item_url = clean_recipe_menu_text(values.get("menu_item_url"))
+    if menu_item_url:
+        recipe_data["menu_item_url"] = menu_item_url
+    else:
+        recipe_data.pop("menu_item_url", None)
+    save_recipe_output(clean_recipe_menu_text(recipe_data.get("source_url")) or recipe_url, recipe_data)
+    option["menu_item_url"] = menu_item_url
 
     return {"ok": True, "restaurant": option}
 
@@ -2975,6 +3052,7 @@ def load_editable_recipe(url):
         "ok": True,
         "recipe": {
             "source_url": recipe_data.get("source_url") or url,
+            "menu_item_url": recipe_data.get("menu_item_url") or recipe_data.get("source_url") or url,
             "source_display_url": editable_recipe_source_display_url(recipe_data.get("source_url") or url),
             "type": recipe_url_type(url),
             "display_name": meta.get("name") or recipe_data.get("display_name") or recipe_data.get("recipe_title") or "",

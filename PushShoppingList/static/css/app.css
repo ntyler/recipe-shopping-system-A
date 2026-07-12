@@ -32722,6 +32722,109 @@ img[data-deferred-src] {
     display: flex;
     gap: 9px;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-form-logo .recipe-edit-restaurant-avatar {
+    width: 58px;
+    height: 58px;
+    flex: 0 0 58px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-form-logo .recipe-edit-restaurant-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-logo-chooser {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 7px;
+    padding: 10px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-bg-soft);
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-logo-chooser[hidden],
+.recipe-edit-standalone-page .recipe-edit-restaurant-logo-url[hidden] {
+    display: none !important;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-logo-url {
+    width: 100%;
+    flex: 1 0 100%;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-logo-error {
+    width: 100%;
+    margin: 0;
+    color: #fca5a5;
+    font-size: 9px;
+}
+
+.recipe-edit-restaurant-rating-editor {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.recipe-edit-restaurant-rating-editor legend {
+    margin-bottom: 5px;
+    color: var(--app-muted);
+    font-size: 8px;
+    font-weight: 750;
+}
+
+.recipe-edit-restaurant-rating-buttons {
+    display: flex;
+    min-height: 31px;
+    align-items: center;
+    gap: 3px;
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] {
+    width: 28px;
+    min-height: 28px;
+    margin: 0;
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: #8f8770;
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg {
+    width: 18px;
+    height: 18px;
+    fill: transparent;
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected {
+    color: #f6b900;
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected svg {
+    fill: currentColor;
+}
+
+.recipe-edit-restaurant-rating-clear {
+    width: auto;
+    min-height: 28px;
+    margin-left: 5px;
+    padding: 0 7px;
+    border: 0;
+    background: transparent;
+    color: var(--app-muted);
+    font-size: 8px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-form label small {
+    color: var(--app-muted);
+    font-size: 8px;
+    font-weight: 500;
 }
 
 .recipe-edit-standalone-page .recipe-edit-restaurant-form-logo > div,

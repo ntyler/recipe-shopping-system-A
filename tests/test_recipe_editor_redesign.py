@@ -231,7 +231,7 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
 
     for field in (
         "restaurant_name", "restaurant_logo_url", "restaurant_rating", "restaurant_phone",
-        "restaurant_website_url", "source_menu_url", "restaurant_street_address",
+        "restaurant_website_url", "source_menu_url", "menu_item_url", "restaurant_street_address",
         "restaurant_city", "restaurant_state", "restaurant_postal_code", "restaurant_country",
     ):
         assert f'data-restaurant-edit-field="{field}"' in template
@@ -245,6 +245,13 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert 'aria-modal="true"' in template
     assert "Edit Restaurant Source" in template
     assert "Save Changes" in template
+    assert "Upload Image" in template
+    assert "Use Image URL" in template
+    assert "Clear Rating" in template
+    assert template.count('data-restaurant-rating-value=') == 1
+    assert "Restaurant's main website." in template
+    assert "Page containing the full restaurant menu." in template
+    assert "Direct source page or deep link for this recipe or menu item." in template
     assert "cancelRecipeRestaurantSourceEdit" in template
     assert "async function saveRecipeRestaurantSource(form)" in script
     assert "function editRecipeRestaurantSource(button, event = null)" in script
@@ -255,6 +262,9 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "recipeRestaurantEditSnapshot" in script
     assert "function recipeRestaurantModalFocusableElements()" in script
     assert "function currentRecipeRestaurantSourceOption()" in script
+    assert "function chooseRecipeRestaurantLogoUpload(button)" in script
+    assert "function setRecipeRestaurantRating(button, rating)" in script
+    assert "function handleRecipeRestaurantRatingKeydown(button, event)" in script
     assert 'const restaurantId = recipeEditInputValue("recipeEditRestaurantId")' in script
     assert 'const selected = currentRecipeRestaurantSourceOption();' in script
     assert 'event.key === "Escape"' in script
