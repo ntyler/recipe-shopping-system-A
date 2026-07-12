@@ -344,8 +344,13 @@ def test_source_documents_card_uses_compact_rows_and_dedicated_collapse_button()
     assert card.count("data-document-open hidden") == len(expected_labels)
     assert card.count("recipe-edit-document-secondary") == 6
     assert card.count('shell.svg_icon("link")') == 2
+    assert card.count('data-document-external title=') == 2
+    assert card.count('shell.svg_icon("external-link")') == 4
+    assert 'aria-label="Open source URL in new tab"' in card
+    assert 'aria-label="Open source menu URL in new tab"' in card
+    assert 'external.href = externalHref || "#";' in script
     assert card.count('shell.svg_icon("document")') == 4
-    assert card.count('shell.svg_icon("external-link")') == 2
+    assert card.count('shell.svg_icon("external-link")') == 4
     assert card.count('shell.svg_icon("download")') == 1
     assert card.count('shell.svg_icon("cloud-upload")') == 1
     assert all(label in card for label in expected_labels)

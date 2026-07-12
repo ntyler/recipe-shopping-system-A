@@ -24623,6 +24623,7 @@ function syncRecipeEditDocumentRows() {
         const status = row.querySelector("[data-document-status]");
         const open = row.querySelector("[data-document-open]");
         const download = row.querySelector("[data-document-download]");
+        const external = row.querySelector("[data-document-external]");
         const cloudUpload = row.querySelector("[data-document-cloud-upload]");
         const copy = row.querySelector("[data-document-copy]");
         const input = document.getElementById(inputId);
@@ -24659,6 +24660,12 @@ function syncRecipeEditDocumentRows() {
             const downloadable = canOpen && !["recipeEditSourceUrl", "recipeEditSourceMenuUrl"].includes(inputId);
             download.hidden = !downloadable;
             download.href = downloadable ? href : "#";
+        }
+
+        if (external) {
+            const externalHref = isLegitimateWebUrl(sourceValue) ? sourceValue : "";
+            external.hidden = !externalHref;
+            external.href = externalHref || "#";
         }
 
         if (cloudUpload) {
