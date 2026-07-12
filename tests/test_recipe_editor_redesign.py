@@ -235,12 +235,19 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert 'event.key !== "Tab"' in script
     assert "Discard unsaved restaurant changes?" in script
     assert 'document.body.classList.add("restaurant-source-modal-open")' in script
+    assert "document.body.appendChild(modal);" in script
+    assert ".map(element => ({ element, wasInert: Boolean(element.inert) }))" in script
+    assert "item.element.inert = true" in script
+    assert "item.element.inert = item.wasInert" in script
     assert 'trigger?.focus({ preventScroll: true })' in script
     assert '@recipe_bp.route("/api/recipe/restaurant-source", methods=["POST"])' in route
     assert ".recipe-edit-standalone-page .recipe-edit-restaurant-form {" in css
     assert ".recipe-edit-restaurant-modal-backdrop {" in css
     assert ".recipe-edit-restaurant-modal-body {" in css
+    assert "max-height: min(820px, calc(100vh - 48px));" in css
+    assert "flex: 1 1 auto;" in css
     assert "overflow-y: auto;" in css
+    assert "overflow-x: hidden;" in css
 
     card_start = template.index('<details class="recipe-edit-context-card recipe-edit-restaurant-card"')
     card_end = template.index("</details>", card_start)

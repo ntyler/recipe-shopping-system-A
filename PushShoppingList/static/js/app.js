@@ -24949,6 +24949,7 @@ function updateRecipeEditRestaurantCard() {
 let recipeRestaurantEditSnapshot = "";
 let recipeRestaurantEditTrigger = null;
 let recipeRestaurantDisplaySource = null;
+let recipeRestaurantModalInertElements = [];
 
 function currentRecipeRestaurantSourceOption() {
     const selectValue = document.getElementById("recipeEditMenuSourceSelect")?.value || "";
@@ -25053,6 +25054,13 @@ function editRecipeRestaurantSource(button, event = null) {
     });
     recipeRestaurantEditSnapshot = JSON.stringify(recipeRestaurantEditValues(form));
     recipeRestaurantEditTrigger = button;
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+    recipeRestaurantModalInertElements = Array.from(document.body.children)
+        .filter(element => element !== modal)
+        .map(element => ({ element, wasInert: Boolean(element.inert) }));
+    recipeRestaurantModalInertElements.forEach(item => { item.element.inert = true; });
     modal.hidden = false;
     document.body.classList.add("restaurant-source-modal-open");
     const error = form.querySelector("[data-restaurant-edit-error]");
@@ -25076,6 +25084,8 @@ function closeRecipeRestaurantSourceModal(options = {}) {
     }
     modal.hidden = true;
     document.body.classList.remove("restaurant-source-modal-open");
+    recipeRestaurantModalInertElements.forEach(item => { item.element.inert = item.wasInert; });
+    recipeRestaurantModalInertElements = [];
     recipeRestaurantEditSnapshot = "";
     const trigger = recipeRestaurantEditTrigger;
     recipeRestaurantEditTrigger = null;
