@@ -674,6 +674,61 @@ def test_recipe_editor_redesign_javascript_wiring():
     assert script.count("setRecipeIngredientsCollapsed(!recipeEditorStandalonePageIsActive());") == 2
 
 
+def test_recipe_health_dashboard_is_compact_and_separate_from_ai_confidence():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    health_start = template.index('class="recipe-edit-context-card recipe-edit-health-card"')
+    confidence_start = template.index('id="recipeEditAiConfidenceCard"')
+    assert health_start < confidence_start
+    assert 'id="recipeEditHealthRing"' in template
+    assert 'role="progressbar"' in template
+    assert 'id="recipeEditHealthLabel"' in template
+    assert '<span>Complete</span>' not in template
+    assert 'id="recipeEditAiConfidenceTrack"' in template
+    assert "Confidence is calculated from source quality, extraction reliability, AI certainty, and user verification." in template
+    assert 'aria-controls="recipeEditAiAnalysisPanel"' in template
+    assert 'role="dialog"' in template
+    assert 'const visibleChecks = checks.filter(([label]) => label !== "Description");' in script
+    assert 'percent >= 90 ? "Excellent"' in script
+    assert 'percent >= 75 ? "Good"' in script
+    assert 'percent >= 50 ? "Fair"' in script
+    assert 'return { label: "AI Inferred", className: "inferred", icon: "warning" };' in script
+    assert 'return { label: "Missing", className: "missing", icon: "x" };' in script
+    assert '.recipe-edit-health-dashboard {' in css
+    assert '.recipe-edit-health-ring-progress {' in css
+    assert '@media (prefers-reduced-motion: reduce)' in css
+
+
+def test_ai_analysis_uses_saved_confidence_evidence_without_health_completeness():
+    script = read_text("PushShoppingList/static/js/app.js")
+    model_start = script.index("function recipeEditAiConfidenceModel(source = {})")
+    model_end = script.index("function updateRecipeEditAiConfidenceCard", model_start)
+    model = script[model_start:model_end]
+
+    for label in (
+        "Source Quality",
+        "Confidence by section",
+        "AI generated fields",
+        "User verified fields",
+        "Estimated fields",
+        "Nutrition confidence",
+        "Ingredient normalization confidence",
+        "Duplicate detection confidence",
+        "Warnings",
+        "Recommended actions",
+    ):
+        assert label in model
+    assert "recipeEditHealthChecks" not in model
+    assert "recipeEditNumericConfidence(source)" in model
+    assert "source_quality_score" in model
+    assert "extraction_confidence_score" in model
+    assert "user_verification_confidence" in model
+    assert "function closeRecipeEditAiAnalysis(options = {})" in script
+    assert 'event.key === "Escape"' in script
+
+
 def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     css = read_text("PushShoppingList/static/css/app.css")
 

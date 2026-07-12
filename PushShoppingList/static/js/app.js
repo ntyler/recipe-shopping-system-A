@@ -21415,6 +21415,7 @@ function escapeAttribute(value) {
 let recipeEditStoreSections = [];
 let recipeEditFoodRules = { require: [], avoid: [] };
 let recipeEditOriginalSnapshot = null;
+let recipeEditAiInsightSource = {};
 let recipeEditScalingOptions = [];
 let recipeEditInferenceContext = {};
 let activeFoodReviewRow = null;
@@ -22631,6 +22632,7 @@ function openIngredientFoodReviewFromRecipeView(button, event = null) {
 
 function closeRecipeEditor() {
     closeRecipeImageChangeActions();
+    closeRecipeEditAiAnalysis({ restoreFocus: false });
     const modal = document.getElementById("recipeEditModal");
 
     if (modal) {
@@ -27136,15 +27138,75 @@ function beginRecipeInstructionReorder(button) {
     return false;
 }
 
-function recipeEditCompletenessStatus(complete) {
+function recipeEditMetadataFields(source, keys = []) {
+    const values = [];
+    keys.forEach(key => {
+        const value = source && source[key];
+        if (Array.isArray(value)) {
+            values.push(...value);
+        } else if (value && typeof value === "object") {
+            values.push(...Object.entries(value).filter(([, enabled]) => Boolean(enabled)).map(([name]) => name));
+        } else if (typeof value === "string") {
+            values.push(...value.split(/[,;\n]/));
+        }
+    });
+    return [...new Set(values.map(value => {
+        if (value && typeof value === "object") {
+            return value.field || value.name || value.label || value.message || "";
+        }
+        return String(value || "");
+    }).map(value => String(value || "").trim()).filter(Boolean))];
+}
+
+function recipeEditHealthSectionKey(label) {
+    return String(label || "").trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function recipeEditCompletenessStatus(label, complete) {
     if (!complete) {
-        return { label: "Missing", className: "missing" };
+        return { label: "Missing", className: "missing", icon: "x" };
     }
 
-    const inferred = Boolean(recipeEditOriginalSnapshot && recipeEditOriginalSnapshot.ai_inferred);
-    return inferred
-        ? { label: "AI inferred", className: "inferred" }
-        : { label: "Complete", className: "confirmed" };
+    const source = recipeEditAiInsightSource || {};
+    const section = recipeEditHealthSectionKey(label);
+    const verifiedFields = recipeEditMetadataFields(source, ["user_verified_fields", "verified_fields", "confirmed_fields"])
+        .map(recipeEditHealthSectionKey);
+    const lockedFields = recipeEditMetadataFields(source, ["locked_fields", "ai_locked_fields", "user_locked_fields"])
+        .map(recipeEditHealthSectionKey);
+    const reviewFields = recipeEditMetadataFields(source, ["needs_review_fields", "review_required_fields", "warning_fields"])
+        .map(recipeEditHealthSectionKey);
+    const inferredFields = recipeEditMetadataFields(source, ["ai_generated_fields", "ai_inferred_fields", "inferred_fields", "cookbook_item_inferred_fields"])
+        .map(recipeEditHealthSectionKey);
+    const ingredients = collectRecipeIngredientRows();
+    const nutrition = collectRecipeNutritionRows();
+    const ingredientNeedsReview = section === "ingredients" && ingredients.some(item => (
+        item.warning || item.food_review?.needs_review || item.food_review?.status === "needs_review"
+    ));
+    const ingredientInferred = section === "ingredients" && ingredients.some(item => recipeIngredientInferredValue(item) === "true");
+    const nutritionInferred = section === "nutrition" && /estimated|ai[_\s-]?inferred/i.test(JSON.stringify({
+        nutrition,
+        serving_basis: source.nutrition_serving_basis || source.serving_basis || "",
+        nutrition_source: source.nutrition_source || "",
+    }));
+
+    if (verifiedFields.includes(section)) {
+        return { label: "Complete", className: "confirmed", icon: "check" };
+    }
+    if (lockedFields.includes(section)) {
+        return { label: "Locked", className: "locked", icon: "lock" };
+    }
+    if (reviewFields.includes(section) || ingredientNeedsReview) {
+        return { label: "Needs Review", className: "needs-review", icon: "bot" };
+    }
+    if (
+        inferredFields.includes(section)
+        || ingredientInferred
+        || nutritionInferred
+        || (Boolean(source.ai_inferred) && inferredFields.length === 0)
+    ) {
+        return { label: "AI Inferred", className: "inferred", icon: "warning" };
+    }
+    return { label: "Complete", className: "confirmed", icon: "check" };
 }
 
 function recipeEditHealthChecks() {
@@ -27169,14 +27231,20 @@ function updateRecipeEditorHealth() {
         return;
     }
 
-    list.innerHTML = checks.map(([label, complete]) => {
-        const status = recipeEditCompletenessStatus(complete);
+    const visibleChecks = checks.filter(([label]) => label !== "Description");
+    list.innerHTML = visibleChecks.map(([label, complete]) => {
+        const status = recipeEditCompletenessStatus(label, complete);
+        const displayLabel = label.replace(/^Recipe image$/i, "Recipe Image")
+            .replace(/^Cookbook assignment$/i, "Cookbook Assignment")
+            .replace(/^Source information$/i, "Source Information");
+        const qualifier = status.className === "confirmed" ? "" : ` <small>(${escapeHtml(status.label)})</small>`;
         return `
             <div class="recipe-edit-health-row ${status.className}"
                  data-recipe-edit-health-item
-                 data-health-status="${escapeAttribute(status.className)}">
-                <span class="recipe-edit-health-label">${escapeHtml(label)}</span>
-                <strong class="recipe-edit-health-status">${escapeHtml(status.label)}</strong>
+                 data-health-status="${escapeAttribute(status.className)}"
+                 aria-label="${escapeAttribute(`${displayLabel}: ${status.label}`)}">
+                ${recipeEditSvgIcon(status.icon)}
+                <span class="recipe-edit-health-label">${escapeHtml(displayLabel)}${qualifier}</span>
             </div>
         `;
     }).join("");
@@ -27184,9 +27252,20 @@ function updateRecipeEditorHealth() {
     const completed = checks.filter(([, complete]) => complete).length;
     const percent = checks.length ? Math.round((completed / checks.length) * 100) : 0;
     const percentElement = document.getElementById("recipeEditHealthPercent");
+    const ring = document.getElementById("recipeEditHealthRing");
+    const ringProgress = document.getElementById("recipeEditHealthRingProgress");
+    const grade = document.getElementById("recipeEditHealthLabel");
     if (percentElement) {
         percentElement.textContent = `${percent}%`;
-        percentElement.style.setProperty("--recipe-health-percent", `${percent * 3.6}deg`);
+    }
+    if (ring) {
+        ring.setAttribute("aria-valuenow", String(percent));
+    }
+    if (ringProgress) {
+        ringProgress.style.strokeDashoffset = String(100 - percent);
+    }
+    if (grade) {
+        grade.textContent = percent >= 90 ? "Excellent" : percent >= 75 ? "Good" : percent >= 50 ? "Fair" : "Needs Attention";
     }
 
     const missingFields = document.getElementById("recipeEditAiMissingFields");
@@ -27222,44 +27301,159 @@ function recipeEditNumericConfidence(recipe) {
     return null;
 }
 
+function recipeEditConfidenceValue(value) {
+    const numeric = recipeEditNumericConfidence({ confidence_score: value });
+    if (numeric != null) {
+        return numeric;
+    }
+    const label = String(value == null ? "" : value).trim().toLowerCase();
+    return label === "high" ? 90 : label === "medium" ? 70 : label === "low" ? 45 : null;
+}
+
+function recipeEditAverageConfidence(items = []) {
+    const values = items.map(item => recipeEditConfidenceValue(item?.confidence ?? item?.confidence_score)).filter(value => value != null);
+    return values.length ? Math.round(values.reduce((total, value) => total + value, 0) / values.length) : null;
+}
+
+function recipeEditAiConfidenceModel(source = {}) {
+    const ingredients = Array.isArray(source.ingredients) ? source.ingredients : [];
+    const instructions = Array.isArray(source.instructions) ? source.instructions : [];
+    const nutrition = Array.isArray(source.nutrition) ? source.nutrition : [];
+    const inferredFields = recipeEditMetadataFields(source, ["ai_generated_fields", "ai_inferred_fields", "inferred_fields", "cookbook_item_inferred_fields"]);
+    const verifiedFields = recipeEditMetadataFields(source, ["user_verified_fields", "verified_fields", "confirmed_fields"]);
+    const estimatedFields = recipeEditMetadataFields(source, ["estimated_fields", "ai_estimated_fields"]);
+    const sourceUrl = String(source.source_url || source.url || source.source_menu_url || "").trim();
+    const sourceType = String(source.source_type || "").trim().toLowerCase();
+    const explicitSourceQuality = recipeEditConfidenceValue(source.source_quality_score ?? source.source_quality_confidence);
+    const sourceQuality = explicitSourceQuality != null
+        ? explicitSourceQuality
+        : isLegitimateWebUrl(sourceUrl) ? 88 : sourceType.includes("manual") ? 70 : sourceType ? 62 : null;
+    const ingredientConfidence = recipeEditAverageConfidence(ingredients);
+    const instructionConfidence = recipeEditAverageConfidence(instructions);
+    const nutritionConfidence = recipeEditConfidenceValue(
+        source.nutrition_confidence_score ?? source.nutrition_confidence ?? source.nutrition?.confidence
+    );
+    const duplicateConfidence = recipeEditConfidenceValue(
+        source.duplicate_detection_confidence ?? source.duplicate_confidence_score
+    );
+    const extractionConfidence = recipeEditConfidenceValue(
+        source.extraction_confidence_score ?? source.inference_confidence_score ?? source.inference_confidence
+    ) ?? ingredientConfidence ?? instructionConfidence;
+    const aiCertainty = recipeEditNumericConfidence(source)
+        ?? recipeEditConfidenceValue(source.ai_certainty ?? source.category_confidence ?? source.ingredients_inference_confidence);
+    const verificationConfidence = recipeEditConfidenceValue(source.user_verification_confidence)
+        ?? (verifiedFields.length ? 95 : null);
+    const weightedSignals = [
+        [sourceQuality, 0.25],
+        [extractionConfidence, 0.25],
+        [aiCertainty, 0.30],
+        [verificationConfidence, 0.20],
+    ].filter(([value]) => value != null);
+    const savedConfidence = recipeEditNumericConfidence(source);
+    const signalWeight = weightedSignals.reduce((total, [, weight]) => total + weight, 0);
+    const hasAiConfidenceEvidence = aiCertainty != null || extractionConfidence != null;
+    const calculatedConfidence = signalWeight && hasAiConfidenceEvidence
+        ? Math.round(weightedSignals.reduce((total, [value, weight]) => total + (value * weight), 0) / signalWeight)
+        : null;
+    const confidence = savedConfidence ?? calculatedConfidence;
+    const fieldList = value => value.length ? value.join(", ") : "Not recorded";
+    const scoreLabel = value => value == null ? "Not scored" : `${value}%`;
+    const sectionScores = [
+        ["Ingredients", ingredientConfidence],
+        ["Instructions", instructionConfidence],
+        ["Nutrition", nutritionConfidence],
+    ].filter(([, value]) => value != null).map(([label, value]) => `${label} ${value}%`);
+    const warnings = recipeEditMetadataFields(source, ["warnings", "ai_warnings", "confidence_warnings"]);
+    ingredients.forEach(item => {
+        if (item?.warning) warnings.push(String(item.warning));
+    });
+    const normalizedWarnings = [...new Set(warnings.map(value => String(value || "").trim()).filter(Boolean))];
+    const recommendations = [];
+    if (sourceQuality == null || sourceQuality < 70) recommendations.push("Verify the recipe source.");
+    if (ingredientConfidence != null && ingredientConfidence < 70) recommendations.push("Review low-confidence ingredient normalization.");
+    if (nutrition.length && nutritionConfidence == null) recommendations.push("Review nutrition values that do not include confidence metadata.");
+    if (normalizedWarnings.length) recommendations.push("Resolve saved AI warnings before publishing.");
+    if (savedConfidence == null && !hasAiConfidenceEvidence) recommendations.push("Add confidence metadata by reviewing or re-running the existing AI analysis workflow.");
+    if (!recommendations.length) recommendations.push("No confidence-specific action is currently required.");
+
+    return {
+        confidence,
+        summary: String(source.ai_analysis || source.inference_analysis || source.ai_confidence_analysis || "").trim(),
+        items: [
+            ["Source Quality", scoreLabel(sourceQuality)],
+            ["Confidence by section", sectionScores.length ? sectionScores.join(" · ") : "No section scores recorded"],
+            ["AI generated fields", fieldList(inferredFields)],
+            ["User verified fields", fieldList(verifiedFields)],
+            ["Estimated fields", fieldList(estimatedFields)],
+            ["Nutrition confidence", scoreLabel(nutritionConfidence)],
+            ["Ingredient normalization confidence", scoreLabel(ingredientConfidence)],
+            ["Duplicate detection confidence", scoreLabel(duplicateConfidence)],
+            ["Warnings", normalizedWarnings.length ? normalizedWarnings.join(" · ") : "No saved warnings"],
+            ["Recommended actions", recommendations.join(" ")],
+        ],
+    };
+}
+
 function updateRecipeEditAiConfidenceCard(recipe = null) {
     const card = document.getElementById("recipeEditAiConfidenceCard");
     if (!card) {
         return;
     }
-    const source = recipe || recipeEditOriginalSnapshot || {};
-    const confidence = recipeEditNumericConfidence(source);
-    card.hidden = confidence == null;
-    if (confidence == null) {
-        return;
+    if (recipe && typeof recipe === "object") {
+        recipeEditAiInsightSource = recipe;
     }
+    const source = recipeEditAiInsightSource || recipeEditOriginalSnapshot || {};
+    const model = recipeEditAiConfidenceModel(source);
+    const confidence = model.confidence;
     const percent = document.getElementById("recipeEditAiConfidencePercent");
     const bar = document.getElementById("recipeEditAiConfidenceBar");
+    const track = document.getElementById("recipeEditAiConfidenceTrack");
     if (percent) {
-        percent.textContent = `${confidence}%`;
+        percent.textContent = confidence == null ? "Not available" : `${confidence}%`;
     }
     if (bar) {
-        bar.style.width = `${confidence}%`;
+        bar.style.width = `${confidence ?? 0}%`;
     }
-    const analysis = String(source.ai_analysis || source.inference_analysis || source.ai_confidence_analysis || "").trim();
-    const analysisButton = document.getElementById("recipeEditAiAnalysisButton");
-    const analysisText = document.getElementById("recipeEditAiAnalysisText");
-    if (analysisButton) {
-        analysisButton.hidden = !analysis;
+    if (track) {
+        track.setAttribute("aria-valuenow", String(confidence ?? 0));
+        track.setAttribute("aria-valuetext", confidence == null ? "AI confidence not available" : `${confidence} percent`);
     }
-    if (analysisText) {
-        analysisText.textContent = analysis;
-        analysisText.hidden = true;
+    const summary = document.getElementById("recipeEditAiAnalysisSummary");
+    const list = document.getElementById("recipeEditAiAnalysisList");
+    if (summary) {
+        summary.textContent = model.summary || "Saved confidence evidence for this recipe.";
+    }
+    if (list) {
+        list.innerHTML = model.items.map(([label, value]) => `
+            <section class="recipe-edit-ai-analysis-item">
+                <strong>${escapeHtml(label)}</strong>
+                <p>${escapeHtml(value)}</p>
+            </section>
+        `).join("");
     }
 }
 
 function openRecipeEditAiAnalysis(button) {
-    const analysis = document.getElementById("recipeEditAiAnalysisText");
-    if (analysis) {
-        analysis.hidden = !analysis.hidden;
-        if (button) {
-            button.textContent = analysis.hidden ? "View AI Analysis" : "Hide AI Analysis";
-        }
+    const panel = document.getElementById("recipeEditAiAnalysisPanel");
+    if (!panel) {
+        return false;
+    }
+    if (!panel.hidden) {
+        return closeRecipeEditAiAnalysis();
+    }
+    panel.hidden = false;
+    if (button) button.setAttribute("aria-expanded", "true");
+    panel.querySelector("button")?.focus({ preventScroll: true });
+    return false;
+}
+
+function closeRecipeEditAiAnalysis(options = {}) {
+    const panel = document.getElementById("recipeEditAiAnalysisPanel");
+    const button = document.getElementById("recipeEditAiAnalysisButton");
+    if (panel) panel.hidden = true;
+    if (button) {
+        button.setAttribute("aria-expanded", "false");
+        if (options.restoreFocus !== false) button.focus({ preventScroll: true });
     }
     return false;
 }
@@ -27290,6 +27484,19 @@ function initRecipeEditContextPanels() {
     document.addEventListener("change", event => {
         if (event.target && event.target.closest && event.target.closest("#recipeEditForm")) {
             updateRecipeEditContextPanels();
+        }
+    });
+    document.addEventListener("click", event => {
+        const panel = document.getElementById("recipeEditAiAnalysisPanel");
+        if (panel && !panel.hidden && !event.target?.closest?.("#recipeEditAiConfidenceCard")) {
+            closeRecipeEditAiAnalysis({ restoreFocus: false });
+        }
+    });
+    document.addEventListener("keydown", event => {
+        const panel = document.getElementById("recipeEditAiAnalysisPanel");
+        if (event.key === "Escape" && panel && !panel.hidden) {
+            event.preventDefault();
+            closeRecipeEditAiAnalysis();
         }
     });
 }
@@ -29029,6 +29236,11 @@ function recipeEditSvgIcon(name) {
         nutrition: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 21c4-4 8-8 8-12a8 8 0 0 0-16 0c0 4 4 8 8 12Z"></path><path d="M12 8v5"></path><path d="M9.5 10.5h5"></path></svg>',
         edit: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20Z"></path><path d="m13.5 6.5 3.5 3.5"></path></svg>',
         trash: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 14h10l1-14"></path><path d="M9 7V4h6v3"></path></svg>',
+        check: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>',
+        warning: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>',
+        x: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m6 6 12 12"></path><path d="m18 6-12 12"></path></svg>',
+        lock: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>',
+        bot: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3"></rect><path d="M12 3v4"></path><path d="M8 12h.01"></path><path d="M16 12h.01"></path><path d="M9 16h6"></path></svg>',
     };
     const icon = icons[name] || icons.basket;
 
