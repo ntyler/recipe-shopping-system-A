@@ -2535,6 +2535,53 @@ def update_editable_source_documents(recipe_url, values):
     return {"ok": True, **fields}
 
 
+def editable_restaurant_usage(restaurant_id):
+    restaurant_id = clean_recipe_menu_text(restaurant_id)
+    if not restaurant_id:
+        return {"ok": False, "error": "Restaurant source is required."}
+    store = menu_store_service.load_menu_store()
+    restaurant = menu_store_service.restaurant_for(store, restaurant_id)
+    if not restaurant:
+        return {"ok": False, "error": "Restaurant source was not found."}
+
+    recipes = []
+    cookbook_ids = set()
+    for recipe_data in recipe_output_index().values():
+        if not isinstance(recipe_data, dict):
+            continue
+        if clean_recipe_menu_text(recipe_menu_relation_value(recipe_data, "restaurant_id")) != restaurant_id:
+            continue
+        recipe_url = clean_recipe_menu_text(recipe_data.get("source_url"))
+        assignment = cookbook_recipe_assignment_for_url(recipe_url) if recipe_url else {}
+        cookbook_id = clean_recipe_menu_text(assignment.get("cookbook_id"))
+        if cookbook_id:
+            cookbook_ids.add(cookbook_id)
+        output_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json" if recipe_url else None
+        modified_at = ""
+        if output_path and output_path.exists():
+            modified_at = datetime.fromtimestamp(output_path.stat().st_mtime, timezone.utc).isoformat()
+        recipes.append({
+            "title": first_recipe_menu_text(
+                recipe_data.get("recipe_title"),
+                recipe_data.get("menu_item_name"),
+                recipe_data.get("display_name"),
+                "Untitled Recipe",
+            ),
+            "url": recipe_url,
+            "cookbook_name": clean_recipe_menu_text(assignment.get("cookbook_name")),
+            "last_modified": modified_at,
+        })
+    recipes.sort(key=lambda item: item["title"].casefold())
+    return {
+        "ok": True,
+        "recipe_count": len(recipes),
+        "cookbook_count": len(cookbook_ids),
+        "created_at": clean_recipe_menu_text(restaurant.get("created_at")),
+        "last_updated": clean_recipe_menu_text(restaurant.get("updated_at")),
+        "recipes": recipes,
+    }
+
+
 def editable_menu_source_option_identity(option):
     option = option if isinstance(option, dict) else {}
     source_menu_url = first_recipe_menu_text(

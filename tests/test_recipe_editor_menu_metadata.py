@@ -642,6 +642,18 @@ def test_source_documents_update_preserves_recipe_identity_and_updates_linked_me
     assert menu["source_url"] == "https://example.com/full-menu"
 
 
+def test_restaurant_usage_is_computed_from_linked_recipes(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_derived_recipe()
+
+    result = recipe_edit_service.editable_restaurant_usage(detail["restaurant"]["id"])
+
+    assert result["ok"] is True
+    assert result["recipe_count"] == 1
+    assert result["recipes"][0]["url"] == url
+    assert result["recipes"][0]["title"]
+
+
 def test_menu_derived_recipe_loads_canonical_source_for_duplicate_source_ids(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"

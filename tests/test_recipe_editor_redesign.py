@@ -353,6 +353,14 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "min-height: 40px;" in css
     assert "width: 40px;" in css
     assert "syncRecipeRestaurantHoursRow(row)" in script
+    assert "Restaurant Usage" in template
+    assert "data-restaurant-usage-view" in template
+    assert "data-restaurant-usage-panel" in template
+    assert "function loadRecipeRestaurantUsage(restaurantId)" in script
+    assert 'fetch(`/api/recipe/restaurant-usage?restaurant_id=' in script
+    assert "recipeRestaurantUsageRecipes.length <= 20" in script
+    assert '@recipe_bp.route("/api/recipe/restaurant-usage", methods=["GET"])' in route
+    assert ".recipe-edit-restaurant-usage-panel {" in css
     assert "flex: 1 1 auto;" in css
     assert "overflow-y: auto;" in css
     assert "overflow-x: hidden;" in css

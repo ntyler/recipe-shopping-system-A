@@ -25113,6 +25113,7 @@ let recipeRestaurantEditSnapshot = "";
 let recipeRestaurantEditTrigger = null;
 let recipeRestaurantDisplaySource = null;
 let recipeRestaurantModalInertElements = [];
+let recipeRestaurantUsageRecipes = [];
 
 function currentRecipeRestaurantSourceOption() {
     const selectValue = document.getElementById("recipeEditMenuSourceSelect")?.value || "";
@@ -25155,6 +25156,79 @@ function recipeRestaurantEditForm() {
 
 function recipeRestaurantEditModal() {
     return document.querySelector("[data-restaurant-edit-modal]");
+}
+
+function recipeRestaurantUsageDate(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
+}
+
+function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes) {
+    const list = document.querySelector("[data-restaurant-usage-list]");
+    if (!list) return;
+    if (!recipes.length) {
+        list.innerHTML = '<p class="recipe-edit-restaurant-usage-empty">No recipes currently reference this restaurant.</p>';
+        return;
+    }
+    list.innerHTML = recipes.map(recipe => {
+        const url = String(recipe.url || "").trim();
+        const details = [recipe.cookbook_name || "No cookbook", recipeRestaurantUsageDate(recipe.last_modified)].filter(Boolean).join(" · ");
+        return `<article>
+            <a href="/recipe/edit?url=${encodeURIComponent(url)}">${escapeHtml(recipe.title || "Untitled Recipe")}</a>
+            <span>${escapeHtml(details)}</span>
+        </article>`;
+    }).join("");
+}
+
+async function loadRecipeRestaurantUsage(restaurantId) {
+    const count = document.querySelector("[data-restaurant-usage-recipes]");
+    const cookbooks = document.querySelector("[data-restaurant-usage-cookbooks]");
+    const view = document.querySelector("[data-restaurant-usage-view]");
+    recipeRestaurantUsageRecipes = [];
+    if (count) count.textContent = "Loading…";
+    if (view) view.disabled = true;
+    try {
+        const response = await fetch(`/api/recipe/restaurant-usage?restaurant_id=${encodeURIComponent(restaurantId || "")}`);
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to load restaurant usage.");
+        recipeRestaurantUsageRecipes = Array.isArray(data.recipes) ? data.recipes : [];
+        if (count) count.textContent = `${data.recipe_count || 0} Recipe${Number(data.recipe_count) === 1 ? "" : "s"}`;
+        if (cookbooks) {
+            cookbooks.textContent = `${data.cookbook_count || 0} Cookbook${Number(data.cookbook_count) === 1 ? "" : "s"}`;
+            cookbooks.hidden = false;
+        }
+        if (view) view.disabled = false;
+        const searchWrap = document.querySelector("[data-restaurant-usage-search-wrap]");
+        if (searchWrap) searchWrap.hidden = recipeRestaurantUsageRecipes.length <= 20;
+        renderRecipeRestaurantUsageList();
+    } catch (err) {
+        if (count) count.textContent = "Usage unavailable";
+    }
+}
+
+function openRecipeRestaurantUsagePanel(button) {
+    const panel = document.querySelector("[data-restaurant-usage-panel]");
+    if (!panel) return false;
+    panel.hidden = false;
+    renderRecipeRestaurantUsageList();
+    const search = panel.querySelector("[data-restaurant-usage-search]");
+    (search && !search.closest("[hidden]") ? search : panel.querySelector("button"))?.focus();
+    return false;
+}
+
+function closeRecipeRestaurantUsagePanel() {
+    const panel = document.querySelector("[data-restaurant-usage-panel]");
+    if (panel) panel.hidden = true;
+    document.querySelector("[data-restaurant-usage-view]")?.focus({ preventScroll: true });
+    return false;
+}
+
+function filterRecipeRestaurantUsage(value) {
+    const query = String(value || "").trim().toLowerCase();
+    renderRecipeRestaurantUsageList(recipeRestaurantUsageRecipes.filter(recipe => {
+        return !query || [recipe.title, recipe.cookbook_name].some(text => String(text || "").toLowerCase().includes(query));
+    }));
 }
 
 function recipeRestaurantEditHasChanges(form = recipeRestaurantEditForm()) {
@@ -25264,6 +25338,8 @@ function editRecipeRestaurantSource(button, event = null) {
     }
     closeRecipeRestaurantLogoChooser(form.querySelector("[data-restaurant-logo-chooser]"));
     initializeRecipeRestaurantStructuredHours(form);
+    closeRecipeRestaurantUsagePanel();
+    loadRecipeRestaurantUsage(selected.restaurant_id || "");
     recipeRestaurantEditSnapshot = JSON.stringify(recipeRestaurantEditValues(form));
     recipeRestaurantEditTrigger = button;
     if (modal.parentElement !== document.body) {
@@ -25294,6 +25370,7 @@ function closeRecipeRestaurantSourceModal(options = {}) {
         && !window.confirm("Discard unsaved restaurant changes?")) {
         return false;
     }
+    document.querySelector("[data-restaurant-usage-panel]")?.setAttribute("hidden", "");
     modal.hidden = true;
     document.body.classList.remove("restaurant-source-modal-open");
     recipeRestaurantModalInertElements.forEach(item => { item.element.inert = item.wasInert; });
@@ -25317,6 +25394,11 @@ document.addEventListener("keydown", event => {
     if (!modal || modal.hidden) return;
     if (event.key === "Escape") {
         event.preventDefault();
+        const usagePanel = document.querySelector("[data-restaurant-usage-panel]");
+        if (usagePanel && !usagePanel.hidden) {
+            closeRecipeRestaurantUsagePanel();
+            return;
+        }
         closeRecipeRestaurantSourceModal({ force: false });
         return;
     }

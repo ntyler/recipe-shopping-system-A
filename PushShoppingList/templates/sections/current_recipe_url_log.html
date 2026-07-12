@@ -2296,6 +2296,14 @@
                                 <button type="button" aria-label="Close Edit Restaurant Source" onclick="return cancelRecipeRestaurantSourceEdit(this)">{{ shell.svg_icon("x") }}</button>
                             </header>
                             <div class="recipe-edit-restaurant-modal-body">
+                            <section class="recipe-edit-restaurant-usage" data-restaurant-usage>
+                                <div>
+                                    <h3>Restaurant Usage</h3>
+                                    <p>Used by <strong data-restaurant-usage-recipes>Loading…</strong></p>
+                                    <p data-restaurant-usage-cookbooks hidden></p>
+                                </div>
+                                <button type="button" data-restaurant-usage-view onclick="return openRecipeRestaurantUsagePanel(this)" disabled>View Recipes</button>
+                            </section>
                             <section class="recipe-edit-restaurant-primary-column">
                             <h3>Primary Restaurant Details</h3>
                             <div class="recipe-edit-restaurant-form-logo">
@@ -2377,6 +2385,14 @@
                             </section>
                             <p class="recipe-edit-restaurant-form-error" data-restaurant-edit-error hidden></p>
                             </div>
+                            <aside class="recipe-edit-restaurant-usage-panel" data-restaurant-usage-panel aria-labelledby="recipeEditRestaurantUsageTitle" hidden>
+                                <header>
+                                    <h3 id="recipeEditRestaurantUsageTitle">Recipes Using This Restaurant</h3>
+                                    <button type="button" aria-label="Close restaurant usage" onclick="return closeRecipeRestaurantUsagePanel()">{{ shell.svg_icon("x") }}</button>
+                                </header>
+                                <label data-restaurant-usage-search-wrap hidden><span>Search recipes</span><input type="search" data-restaurant-usage-search oninput="filterRecipeRestaurantUsage(this.value)"></label>
+                                <div class="recipe-edit-restaurant-usage-list" data-restaurant-usage-list></div>
+                            </aside>
                             <footer class="recipe-edit-restaurant-form-actions">
                                 <button type="button" onclick="return cancelRecipeRestaurantSourceEdit(this)">Cancel</button>
                                 <button type="button" class="primary" data-restaurant-edit-save onclick="return saveRecipeRestaurantSource(this.closest('[data-restaurant-edit-form]'))" disabled>Save Changes</button>
