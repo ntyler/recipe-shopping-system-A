@@ -22,15 +22,27 @@
                 <small>Recipe Shopping List</small>
             </span>
         </a>
+        <button type="button"
+                class="app-sidebar-collapse"
+                data-app-sidebar-collapse
+                aria-label="Collapse sidebar"
+                aria-pressed="false"
+                title="Collapse sidebar">
+            <span aria-hidden="true">&lsaquo;</span>
+        </button>
         <nav class="app-sidebar-nav" aria-label="App sections">
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}">
                 {{ shell.app_icon("home") }}
                 <span class="app-nav-text">Home</span>
             </a>
             <div class="app-nav-section-title">Discover &amp; Plan</div>
-            <a class="app-nav-link is-active" href="{{ url_for('main_bp.index') }}#currentRecipeUrlLogCard">
+            <a class="app-nav-link is-active" href="{{ url_for('main_bp.index') }}#recipesPage">
                 {{ shell.app_icon("recipes") }}
                 <span class="app-nav-text">Recipes</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#menusPage">
+                {{ shell.app_icon("menus") }}
+                <span class="app-nav-text">Menus</span>
             </a>
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#cookbooksCard">
                 {{ shell.app_icon("cookbooks") }}
@@ -44,8 +56,21 @@
                 {{ shell.app_icon("pantry") }}
                 <span class="app-nav-text">Pantry</span>
             </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#mealPlannerPage">
+                {{ shell.app_icon("meal") }}
+                <span class="app-nav-text">Meal Planner</span>
+            </a>
+            <div class="app-nav-section-title">Shop</div>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#storesPage">
+                {{ shell.app_icon("stores") }}
+                <span class="app-nav-text">Stores / Store Links</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#priceComparisonPage">
+                {{ shell.app_icon("price") }}
+                <span class="app-nav-text">Price Comparison</span>
+            </a>
             <div class="app-nav-section-title">CREATE RECIPES</div>
-            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#recipeUrlsTextarea">
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#recipeUrlsPage">
                 {{ shell.app_icon("link") }}
                 <span class="app-nav-text">Recipe URL</span>
             </a>
@@ -72,6 +97,14 @@
                 <span class="app-nav-text">Scan Barcode</span>
             </a>
             <div class="app-nav-section-title">Account</div>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#settingsWorkspaceSection">
+                {{ shell.app_icon("settings") }}
+                <span class="app-nav-text">Settings</span>
+            </a>
+            <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#accountUsageDashboardPanel">
+                {{ shell.app_icon("billing") }}
+                <span class="app-nav-text">Usage &amp; Billing</span>
+            </a>
             <a class="app-nav-link" href="{{ url_for('main_bp.index') }}#feedbackSupportSection">
                 {{ shell.app_icon("help") }}
                 <span class="app-nav-text">Help &amp; Support</span>
@@ -85,36 +118,108 @@
         </aside>
     </aside>
     <div class="app-main-shell recipe-edit-page-main-shell">
-        <header class="app-topbar recipe-edit-page-topbar" aria-label="Recipe editor toolbar">
+        <header class="app-topbar recipe-edit-page-topbar" aria-label="App toolbar">
             <a class="app-topbar-brand" href="{{ url_for('main_bp.index') }}">
                 {{ shell.brand_mark() }}
                 <span>AI Pantry</span>
             </a>
-            <div class="recipe-edit-page-topbar-title">
-                <strong>Edit Recipe</strong>
-                <span>Recipe workspace</span>
-            </div>
-            <div class="app-toolbar-actions">
-                <a class="app-toolbar-button" href="{{ url_for('main_bp.index') }}#currentRecipeUrlLogCard">Recipes</a>
-                <a class="app-toolbar-button" href="{{ url_for('main_bp.index') }}">Close</a>
+            <form class="app-global-search"
+                  role="search"
+                  action="{{ url_for('main_bp.index') }}"
+                  onsubmit="return submitRecipeEditGlobalSearch(this)">
+                <label class="sr-only" for="recipeEditGlobalSearch">Search app sections</label>
+                <span class="app-global-search-icon" aria-hidden="true">{{ shell.svg_icon("search") }}</span>
+                <input id="recipeEditGlobalSearch"
+                       name="app_search"
+                       type="search"
+                       autocomplete="off"
+                       placeholder="Search recipes, ingredients, or menus...">
+                <span class="app-global-search-shortcut" aria-hidden="true">Ctrl + K</span>
+                <button type="submit" class="app-search-submit">Search</button>
+            </form>
+            <div class="app-toolbar-actions" aria-label="Quick actions">
+                <a class="app-toolbar-button app-toolbar-primary"
+                   href="{{ url_for('main_bp.index') }}#importPage">
+                    {{ shell.svg_icon("plus") }}
+                    <span>Import</span>
+                </a>
+                <a class="app-toolbar-button app-toolbar-icon-button"
+                   href="{{ url_for('main_bp.index') }}#notificationsPage"
+                   title="Notifications">
+                    {{ shell.svg_icon("bell") }}
+                    <span class="sr-only">Notifications</span>
+                </a>
+                <a class="app-toolbar-button app-help-button"
+                   href="{{ url_for('main_bp.index') }}#feedbackSupportSection"
+                   title="Help and support">
+                    {{ shell.svg_icon("help") }}
+                    <span>Help &amp; Support</span>
+                </a>
+                <a class="app-toolbar-button app-account-button"
+                   href="{{ url_for('main_bp.index') }}#userAccountSection">
+                    <span class="app-account-avatar" aria-hidden="true">
+                        {% if current_user and current_user.avatar_path %}
+                            <img class="app-account-avatar-image"
+                                 src="{{ url_for('static', filename=current_user.avatar_path) }}"
+                                 alt="">
+                        {% elif current_user and current_user.picture %}
+                            <img class="app-account-avatar-image"
+                                 src="{{ current_user.picture }}"
+                                 alt=""
+                                 referrerpolicy="no-referrer">
+                        {% elif current_user %}
+                            {{ (current_user.display_name|default(current_user.username|default(current_user.email|default('A', true), true), true))[:1]|upper }}
+                        {% else %}
+                            G
+                        {% endif %}
+                    </span>
+                    <span class="app-account-label">
+                        <strong>{% if current_user %}{{ current_user.display_name|default(current_user.username|default(current_user.email|default('Account', true), true), true) }}{% elif is_guest_demo %}Guest Demo{% else %}Sign In{% endif %}</strong>
+                        <small>{% if current_user %}Pro Plan{% elif is_guest_demo %}Temporary workspace{% else %}AI Pantry account{% endif %}</small>
+                    </span>
+                </a>
             </div>
         </header>
-        <main class="recipe-edit-standalone-shell" aria-label="Recipe editor">
+        <main id="appContent" class="app-content recipe-edit-standalone-shell" aria-label="Recipe editor">
             {% set recipe_edit_only = true %}
             {% include "sections/current_recipe_url_log.html" %}
         </main>
     </div>
 </div>
 
+<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">
+    <a class="app-mobile-nav-link" href="{{ url_for('main_bp.index') }}#appPageHeader">
+        {{ shell.app_icon("home") }}
+        <span>Home</span>
+    </a>
+    <a class="app-mobile-nav-link is-active" href="{{ url_for('main_bp.index') }}#recipesPage">
+        {{ shell.app_icon("recipes") }}
+        <span>Recipes</span>
+    </a>
+    <a class="app-mobile-nav-link" href="{{ url_for('main_bp.index') }}#cookbooksCard">
+        {{ shell.app_icon("cookbooks") }}
+        <span>Cookbooks</span>
+    </a>
+    <a class="app-mobile-nav-link" href="{{ url_for('main_bp.index') }}#shoppingViewsSection">
+        {{ shell.app_icon("shopping") }}
+        <span>Lists</span>
+    </a>
+    <a class="app-mobile-nav-link" href="{{ url_for('main_bp.index') }}#aiPantrySection">
+        {{ shell.app_icon("pantry") }}
+        <span>Pantry</span>
+    </a>
+    <a class="app-mobile-nav-link" href="{{ url_for('main_bp.index') }}#userAccountSection">
+        {{ shell.app_icon("more") }}
+        <span>More</span>
+    </a>
+</nav>
+
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 <script>
 window.addEventListener("DOMContentLoaded", () => {
     const recipeUrl = document.body ? document.body.dataset.recipeEditUrl || "" : "";
-    const imageCardContent = document.getElementById("recipeEditImageCardContent");
-    const coverField = document.getElementById("recipeEditCoverField");
-
-    if (imageCardContent && coverField) {
-        imageCardContent.appendChild(coverField);
+    if (typeof organizeRecipeEditStandaloneWorkspace === "function") {
+        organizeRecipeEditStandaloneWorkspace();
     }
 
     if (recipeUrl && typeof openRecipeEditor === "function") {

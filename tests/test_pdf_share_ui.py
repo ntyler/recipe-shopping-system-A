@@ -10,6 +10,7 @@ def read_text(relative_path):
 
 def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     index_template = read_text("PushShoppingList/templates/index.html")
+    app_workspaces_template = read_text("PushShoppingList/templates/sections/app_workspaces.html")
     user_account_template = read_text("PushShoppingList/templates/sections/user_account.html")
     section_template = read_text("PushShoppingList/templates/sections/shared_recipe_pdfs.html")
     admin_support_template = read_text("PushShoppingList/templates/sections/admin_support.html")
@@ -17,7 +18,8 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     css = read_text("PushShoppingList/static/css/app.css")
     js = read_text("PushShoppingList/static/js/app.js")
 
-    assert '{% include "sections/enter_recipe_links.html" %}' in index_template
+    assert '{% include "sections/app_workspaces.html" %}' in index_template
+    assert '{% include "sections/enter_recipe_links.html" %}' in app_workspaces_template
     assert '{% include "sections/shared_recipe_pdfs.html" %}' not in index_template
     assert "RECIPE SHARING" in user_account_template
     assert "data-shared-recipe-pdfs-open" in user_account_template

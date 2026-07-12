@@ -126,9 +126,10 @@ def test_recipe_editor_infer_missing_details_runs_full_ai_followups():
     assert "await decideRecipeEditCategoriesWithChatGPT(null, \"all\", {" in script
     assert "const followupResult = previewOnly ? null : await runRecipeEditorInferenceFollowups();" in script
     assert "Save Recipe to keep nutrition/categories." in script
-    assert "Recipe AI" in template
-    assert "Re-run Recipe Prediction..." in template
+    assert "AI Assistant" in template
+    assert "Regenerate Recipe" in template
     assert "onclick=\"return rerunRecipePredictionFromMenu(this)\"" in template
+    assert 'restoreText: "Re-run Recipe Prediction..."' in script
     assert "function rerunRecipePredictionFromMenu(button)" in script
     assert "previewOnly: true" in script
     assert "overwriteAiFields: true" in script

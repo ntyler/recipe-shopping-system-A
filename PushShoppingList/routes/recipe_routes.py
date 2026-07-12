@@ -3506,6 +3506,7 @@ def edit_recipe_page_route():
         "recipe_edit_page.html",
         recipe_url=recipe_url,
         current_user=current_user(),
+        is_guest_demo=is_guest_session(),
         current_urls=[],
         current_recipe_count=0,
         cookbook_view=recipe_edit_cookbook_view(),

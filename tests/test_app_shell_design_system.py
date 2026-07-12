@@ -117,7 +117,7 @@ def test_recipe_editor_sidebar_uses_the_same_import_task_groups():
         assert f'<span class="app-nav-text">{label}</span>' in sidebar
     for old_label in ("Recipe URLs", "Import From Document", "Generate From Image", "Import Menu From Document"):
         assert f'<span class="app-nav-text">{old_label}</span>' not in sidebar
-    assert '{{ url_for(\'main_bp.index\') }}#recipeUrlsTextarea' in sidebar
+    assert '{{ url_for(\'main_bp.index\') }}#recipeUrlsPage' in sidebar
     assert '{{ url_for(\'main_bp.index\') }}#importDocumentPage' in sidebar
     assert '{{ url_for(\'main_bp.index\') }}#generateImagePage' in sidebar
     assert '{{ url_for(\'main_bp.index\') }}#menuUrlPage' in sidebar

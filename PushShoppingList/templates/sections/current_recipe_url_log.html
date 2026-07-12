@@ -613,8 +613,8 @@
                     <div class="recipe-edit-section-menu-wrap recipe-edit-header-menu-wrap">
                         <button type="button"
                                 class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn recipe-edit-header-menu-btn"
-                                aria-label="Recipe image actions"
-                                title="Recipe image actions"
+                                aria-label="More actions"
+                                title="More actions"
                                 aria-haspopup="true"
                                 aria-expanded="false"
                                 onclick="return toggleRecipeEditSectionMenu(this, event)">
@@ -749,13 +749,6 @@
                                         Reset
                                     </button>
                                 </div>
-                            </div>
-                            <div class="overflow-menu-section">
-                                <div class="overflow-menu-section-title">Recipe AI</div>
-                                <button type="button"
-                                        onclick="return rerunRecipePredictionFromMenu(this)">
-                                    Re-run Recipe Prediction...
-                                </button>
                             </div>
                             <div class="overflow-menu-section">
                                 <div class="overflow-menu-section-title">Recipe</div>
@@ -1656,6 +1649,12 @@
                             <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
                             <span>Add Ingredient</span>
                         </button>
+                        <button type="button" class="recipe-edit-ingredient-utility-action" onclick="return beginRecipeIngredientReorder(this)">
+                            <span>Reorder</span>
+                        </button>
+                        <button type="button" class="recipe-edit-ingredient-utility-action" onclick="return focusRecipeIngredientGrouping(this)">
+                            <span>Group</span>
+                        </button>
                         <button type="button"
                                 data-recipe-ingredients-collapse-toggle
                                 onclick="toggleRecipeIngredientsCollapsed(this)">
@@ -2092,6 +2091,9 @@
             </section>
 
                 </div>
+                <aside id="recipeEditUtilityColumn"
+                       class="recipe-edit-utility-column"
+                       aria-label="Recipe source and AI tools"></aside>
                 <aside class="recipe-edit-context-sidebar" aria-label="Recipe context">
                     <section class="recipe-edit-context-card recipe-edit-image-card" aria-labelledby="recipeEditImageCardTitle">
                         <div class="recipe-edit-context-card-heading">
@@ -2139,7 +2141,7 @@
                                  data-document-input-id="recipeEditSourcePdfPath"
                                  data-document-link-id="recipeEditSourcePdfPathLink">
                                 <div>
-                                    <strong>Source PDF Path</strong>
+                                    <strong>Source PDF</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
@@ -2153,7 +2155,7 @@
                                  data-document-input-id="recipeEditSourceCloudflarePdfUrl"
                                  data-document-link-id="recipeEditSourceCloudflarePdfUrlLink">
                                 <div>
-                                    <strong>Source Cloudflare PDF Path</strong>
+                                    <strong>Cloudflare Source PDF</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
@@ -2167,7 +2169,7 @@
                                  data-document-input-id="recipeEditGeneratedPdfPath"
                                  data-document-link-id="recipeEditGeneratedPdfPathLink">
                                 <div>
-                                    <strong>Generated PDF Path</strong>
+                                    <strong>Generated PDF</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
@@ -2181,7 +2183,7 @@
                                  data-document-input-id="recipeEditGeneratedCloudflarePdfUrl"
                                  data-document-link-id="recipeEditGeneratedCloudflarePdfUrlLink">
                                 <div>
-                                    <strong>Generated Cloudflare PDF Path</strong>
+                                    <strong>Cloudflare Generated PDF</strong>
                                     <span data-document-status>Unavailable</span>
                                 </div>
                                 <div class="recipe-edit-document-actions">
@@ -2195,20 +2197,23 @@
 
                     <details class="recipe-edit-context-card recipe-edit-restaurant-card" open>
                         <summary>
-                            <span>Restaurant / Menu Source</span>
+                            <span>Restaurant Source</span>
                             <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
                         </summary>
                         <div class="recipe-edit-restaurant-summary">
-                            <strong data-restaurant-field="name">No restaurant source</strong>
-                            <span data-restaurant-field="cuisine"></span>
-                            <span data-restaurant-field="address"></span>
-                            <span data-restaurant-field="phone"></span>
+                            <span class="recipe-edit-restaurant-avatar" data-restaurant-logo aria-hidden="true">R</span>
+                            <div>
+                                <strong data-restaurant-field="name">No restaurant source</strong>
+                                <span data-restaurant-field="cuisine"></span>
+                                <span data-restaurant-field="address"></span>
+                                <span data-restaurant-field="phone"></span>
+                            </div>
                         </div>
                         <div class="recipe-edit-restaurant-actions">
                             <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="website" hidden>Open Website</a>
                             <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="menu" hidden>Open Menu</a>
-                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="map" hidden>Open Map</a>
-                            <a href="#" data-restaurant-action="call" hidden>Call</a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="map" hidden>Google Maps</a>
+                            <button type="button" class="recipe-edit-restaurant-edit" onclick="return editRecipeRestaurantSource(this)">Edit</button>
                         </div>
                     </details>
 
@@ -2222,6 +2227,13 @@
                              aria-live="polite">
                             <span class="recipe-edit-context-empty">No ingredient images yet.</span>
                         </div>
+                        <button type="button"
+                                id="recipeEditIngredientGalleryToggle"
+                                class="recipe-edit-gallery-toggle"
+                                aria-expanded="false"
+                                onclick="return toggleRecipeEditIngredientGallery(this)">
+                            Show All Ingredients
+                        </button>
                     </details>
 
                     <details class="recipe-edit-context-card recipe-edit-health-card" open>
@@ -2229,18 +2241,41 @@
                             <span>Recipe Health</span>
                             <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
                         </summary>
+                        <div class="recipe-edit-health-overview">
+                            <strong id="recipeEditHealthPercent">0%</strong>
+                            <span>Complete</span>
+                        </div>
                         <div id="recipeEditHealthList"
                              class="recipe-edit-health-list"
                              aria-live="polite"></div>
                     </details>
+
+                    <section id="recipeEditAiConfidenceCard"
+                             class="recipe-edit-context-card recipe-edit-confidence-card"
+                             aria-labelledby="recipeEditAiConfidenceTitle"
+                             hidden>
+                        <div class="recipe-edit-context-card-heading">
+                            <span id="recipeEditAiConfidenceTitle">AI Confidence</span>
+                            <strong id="recipeEditAiConfidencePercent"></strong>
+                        </div>
+                        <div class="recipe-edit-confidence-body">
+                            <div class="recipe-edit-confidence-track" aria-hidden="true">
+                                <span id="recipeEditAiConfidenceBar"></span>
+                            </div>
+                            <p>AI-inferred content confidence from the saved recipe.</p>
+                            <button type="button" id="recipeEditAiAnalysisButton" onclick="return openRecipeEditAiAnalysis(this)" hidden>View AI Analysis</button>
+                            <p id="recipeEditAiAnalysisText" class="recipe-edit-ai-analysis-text" hidden></p>
+                        </div>
+                    </section>
                 </aside>
             </div>
 
             <section class="recipe-edit-ai-assistant-card recipe-edit-sticky-action-footer" aria-labelledby="recipeEditAiAssistantTitle">
                 <div class="recipe-edit-ai-assistant-heading">
                     <h3 id="recipeEditAiAssistantTitle">AI Assistant</h3>
-                    <p>Background jobs start only after you choose an action.</p>
+                    <p>Complete missing recipe details with the existing AI workflow.</p>
                 </div>
+                <div id="recipeEditAiMissingFields" class="recipe-edit-ai-missing-fields" aria-live="polite"></div>
                 <div class="recipe-edit-actions">
                 <label class="recipe-edit-ai-overwrite-toggle">
                     <input type="checkbox" id="recipeEditInferOverwriteAiFields">
@@ -2256,6 +2291,20 @@
                     <span class="recipe-edit-button-icon" aria-hidden="true">?</span>
                     <span class="recipe-edit-action-text" data-short-label="Infer">Infer Missing Details</span>
                 </button>
+                <button type="button"
+                        class="recipe-edit-ai-secondary"
+                        onclick="return rerunRecipePredictionFromMenu(this)">
+                    Regenerate Recipe
+                </button>
+                <button type="button"
+                        class="recipe-edit-ai-secondary"
+                        onclick="return regenerateRecipeIngredientsSection(this)">
+                    Regenerate Ingredients
+                </button>
+                <details class="recipe-edit-ai-advanced">
+                    <summary>More AI Actions</summary>
+                    <div data-recipe-edit-ai-advanced-content></div>
+                </details>
                 <button type="submit" class="recipe-edit-save">
                     <span class="recipe-edit-button-icon" aria-hidden="true">▣</span>
                     <span>Save Recipe</span>

@@ -40,8 +40,9 @@ def test_standalone_recipe_editor_uses_app_shell_navigation():
     assert "recipe-edit-page-main-shell" in template
     assert "recipe-edit-standalone-shell" in template
     assert "{% include \"sections/current_recipe_url_log.html\" %}" in template
-    assert 'document.getElementById("recipeEditImageCardContent")' in template
-    assert "imageCardContent.appendChild(coverField)" in template
+    assert 'data-app-sidebar-collapse' in template
+    assert 'class="app-global-search"' in template
+    assert "organizeRecipeEditStandaloneWorkspace()" in template
 
 
 def test_recipe_editor_redesign_preserves_core_fields_and_actions():
@@ -51,6 +52,7 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "Preview Recipe" in template
     assert "recipe-edit-layout" in template
     assert "recipe-edit-main-workspace" in template
+    assert "recipeEditUtilityColumn" in template
     assert "recipe-edit-context-sidebar" in template
     assert "recipeEditBreadcrumbName" in template
     assert "recipeEditImageCardContent" in template
@@ -66,6 +68,10 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "recipeEditIngredientGallery" in template
     assert "recipeEditHealthList" in template
     assert "recipe-edit-ai-assistant-card" in template
+    assert "recipeEditAiMissingFields" in template
+    assert "recipeEditAiConfidenceCard" in template
+    assert "beginRecipeIngredientReorder(this)" in template
+    assert "focusRecipeIngredientGrouping(this)" in template
 
     for field_id in [
         "recipeEditDisplayName",
@@ -102,11 +108,21 @@ def test_recipe_editor_redesign_javascript_wiring():
     script = read_text("PushShoppingList/static/js/app.js")
 
     assert "function initRecipeEditTabs()" in script
+    assert "function organizeRecipeEditStandaloneWorkspace()" in script
+    assert "function organizeRecipeEditInformationCard()" in script
+    assert "function organizeRecipeEditIngredientTools()" in script
+    assert "function organizeRecipeEditIngredientRow(row)" in script
+    assert "function organizeRecipeEditHeaderActions()" in script
     assert "function setRecipeEditActiveTab(tabKey, options = {})" in script
     assert "function syncRecipeEditDocumentRows()" in script
     assert "function updateRecipeEditRestaurantCard()" in script
     assert "function updateRecipeEditIngredientGallery()" in script
     assert "function updateRecipeEditorHealth()" in script
+    assert "function recipeEditHealthChecks()" in script
+    assert "row.hidden = !hasValue;" in script
+    assert "function toggleRecipeEditIngredientGallery" in script
+    assert "function beginRecipeIngredientReorder" in script
+    assert "function focusRecipeIngredientGrouping" in script
     assert "function previewRecipeFromEditor()" in script
     assert "function replaceRecipeIngredientWithSubstitution(button)" in script
     assert 'setValue("recipeEditDescription", recipe.description || "")' in script
@@ -119,25 +135,28 @@ def test_recipe_editor_redesign_javascript_wiring():
     assert "[\"initRecipeEditContextPanels\", initRecipeEditContextPanels]" in script
     assert 'data-field="section"' in script
     assert "Replace ingredient with this option" in script
+    assert script.count("setRecipeIngredientsCollapsed(!recipeEditorStandalonePageIsActive());") == 2
 
 
 def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert "Phase 2 recipe editor redesign using the AI Pantry shell tokens" in css
-    assert ".recipe-edit-layout {" in css
-    assert "grid-template-columns: minmax(0, 1fr) minmax(292px, 360px);" in css
+    assert "Recipe workspace v3: target mockup structure with the homepage dark system" in css
+    assert ".recipe-edit-standalone-page .recipe-edit-layout {" in css
+    assert "grid-template-columns: minmax(0, 1.95fr) minmax(250px, 1fr) minmax(240px, .9fr);" in css
     assert ".recipe-edit-context-sidebar {" in css
     assert ".recipe-edit-tab-list {" in css
+    assert ".recipe-edit-ingredient-table-head," in css
+    assert ".recipe-edit-ingredient-advanced-details" in css
     assert ".recipe-edit-document-row {" in css
     assert ".recipe-edit-health-row" in css
     assert ".recipe-edit-ai-assistant-card {" in css
     assert ".recipe-edit-image-card .recipe-edit-cover-field {" in css
-    assert ".recipe-edit-sticky-action-footer .recipe-edit-save" in css
-    assert "--app-bg: #11171d;" in css
+    assert ".recipe-edit-ai-assistant-card :is(" in css
+    assert "--app-bg: #101415;" in css
     assert ".recipe-edit-ingredient-row label.recipe-edit-section-label" in css
     assert ".recipe-edit-substitution-row-menu:not([hidden])" in css
-    assert "@media (max-width: 1180px)" in css
+    assert "@media (max-width: 1499px)" in css
     assert "@media (max-width: 767px)" in css
 
 
