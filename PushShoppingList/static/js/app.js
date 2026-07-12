@@ -25134,6 +25134,9 @@ let recipeRestaurantUsageTotal = 0;
 let recipeRestaurantUsageRestaurantName = "";
 let recipeRestaurantUsageMigrationStatus = {};
 let recipeRestaurantUsageSearchDebounce = null;
+let recipeRestaurantDuplicateReviewData = null;
+let recipeRestaurantDuplicateReviewTrigger = null;
+let recipeRestaurantDuplicatePendingPreview = null;
 let recipeRestaurantDirectory = [];
 let recipeRestaurantDirectoryRequest = 0;
 let recipeRestaurantSelectorDebounce = null;
@@ -25525,6 +25528,7 @@ function setRecipeRestaurantEditMode(record, options = {}) {
     closeRecipeRestaurantDuplicatePanel(form.querySelector("[data-restaurant-duplicate-panel]"));
     closeRecipeRestaurantUsagePanel();
     closeRecipeRestaurantFetchReview({ restoreFocus: false });
+    closeRecipeRestaurantDuplicateReview({ restoreFocus: false });
     if (recipeRestaurantEditCreateMode) setRecipeRestaurantUsageEmpty();
     else loadRecipeRestaurantUsage(recipeRestaurantRecordId(record));
     updateRecipeRestaurantEditState(form);
@@ -25668,6 +25672,8 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
         const thumbnailUrl = String(recipe.thumbnail_url || "").trim();
         const metadata = [recipe.total_time, recipe.calories_per_serving].map(value => String(value || "").trim()).filter(Boolean);
         const category = String(recipe.category_label || "").trim();
+        const duplicateBadge = String(recipe.duplicate_badge || "").trim();
+        const duplicateGroupId = String(recipe.duplicate_group_id || "").trim();
         const relationship = recipe.relationship_status === "legacy_clear"
             ? '<small class="recipe-edit-restaurant-usage-link-status">Needs restaurant link</small>'
             : "";
@@ -25676,12 +25682,15 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
                 <span class="recipe-edit-restaurant-usage-thumbnail-placeholder"></span>
                 ${thumbnailUrl ? `<img src="${escapeAttribute(thumbnailUrl)}" alt="" loading="lazy" decoding="async" onerror="handleRecipeRestaurantUsageThumbnailError(this)">` : ""}
             </span>
-            <a class="recipe-edit-restaurant-usage-summary" href="/recipe/edit?url=${encodeURIComponent(url)}" aria-label="Open ${escapeAttribute(title)}">
-                <strong title="${escapeAttribute(title)}">${escapeHtml(title)}</strong>
+            <div class="recipe-edit-restaurant-usage-summary">
+                <span class="recipe-edit-restaurant-usage-title-row">
+                    <a class="recipe-edit-restaurant-usage-name" href="/recipe/edit?url=${encodeURIComponent(url)}" aria-label="Open ${escapeAttribute(title)}" title="${escapeAttribute(title)}">${escapeHtml(title)}</a>
+                    ${duplicateBadge ? `<button type="button" class="recipe-edit-restaurant-duplicate-badge" data-restaurant-duplicate-group="${escapeAttribute(duplicateGroupId)}" aria-label="Review ${escapeAttribute(duplicateBadge)} recipes named ${escapeAttribute(title)}" title="Compare these recipes" onclick="return openRecipeRestaurantDuplicateReview(this)">${escapeHtml(duplicateBadge)}</button>` : ""}
+                </span>
                 ${metadata.length ? `<span>${escapeHtml(metadata.join(" · "))}</span>` : ""}
                 ${category ? `<small class="recipe-edit-restaurant-usage-category">${escapeHtml(category)}</small>` : ""}
                 ${relationship}
-            </a>
+            </div>
         </article>`;
     }).join("");
 }
@@ -25696,6 +25705,13 @@ function applyRecipeRestaurantUsageResponse(data, options = {}) {
     const loadMore = document.querySelector("[data-restaurant-usage-load-more]");
     const panelTitle = document.querySelector("[data-restaurant-usage-panel-title]");
     const rows = Array.isArray(data.recipes) ? data.recipes : [];
+    if (options.append) {
+        const renderedGroups = new Set(recipeRestaurantUsageRecipes.map(recipe => recipe.duplicate_group_id).filter(Boolean));
+        rows.forEach(recipe => {
+            if (renderedGroups.has(recipe.duplicate_group_id)) delete recipe.duplicate_badge;
+            else if (recipe.duplicate_group_id) renderedGroups.add(recipe.duplicate_group_id);
+        });
+    }
     recipeRestaurantUsageRecipes = options.append ? [...recipeRestaurantUsageRecipes, ...rows] : rows;
     recipeRestaurantUsagePage = Number(data.page) || 1;
     recipeRestaurantUsageHasMore = Boolean(data.has_more);
@@ -25885,6 +25901,277 @@ function filterRecipeRestaurantUsage(value) {
     recipeRestaurantUsageSearchDebounce = window.setTimeout(() => {
         loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query });
     }, 250);
+}
+
+function recipeRestaurantDuplicateReviewPanel() {
+    return recipeRestaurantEditForm()?.querySelector("[data-restaurant-duplicate-review]");
+}
+
+function recipeRestaurantDuplicateDate(value) {
+    const date = new Date(value || "");
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
+}
+
+function setRecipeRestaurantDuplicateError(message = "") {
+    const error = recipeRestaurantDuplicateReviewPanel()?.querySelector("[data-restaurant-duplicate-error]");
+    if (!error) return;
+    error.textContent = message;
+    error.hidden = !message;
+}
+
+function syncRecipeRestaurantDuplicateSelections() {
+    const panel = recipeRestaurantDuplicateReviewPanel();
+    const primary = panel?.querySelector('[data-restaurant-duplicate-primary]:checked')?.value || "";
+    panel?.querySelectorAll("[data-restaurant-duplicate-selected]").forEach(checkbox => {
+        checkbox.disabled = checkbox.value === primary;
+        if (checkbox.disabled) checkbox.checked = false;
+    });
+}
+
+function renderRecipeRestaurantDuplicateReview(data) {
+    const panel = recipeRestaurantDuplicateReviewPanel();
+    const records = panel?.querySelector("[data-restaurant-duplicate-records]");
+    const title = panel?.querySelector("[data-restaurant-duplicate-title]");
+    const confidence = panel?.querySelector("[data-restaurant-duplicate-confidence]");
+    const preview = panel?.querySelector("[data-restaurant-duplicate-preview]");
+    if (!panel || !records) return;
+    recipeRestaurantDuplicateReviewData = data;
+    recipeRestaurantDuplicatePendingPreview = null;
+    if (title) title.textContent = `Compare ${data.count || 0} Possible Duplicates — ${data.display_name || "Recipe"}`;
+    if (confidence) {
+        const label = data.match_type === "exact" ? "Exact duplicate" : `${String(data.match_type || "possible").replace(/^./, char => char.toUpperCase())} match`;
+        const evidence = Array.isArray(data.evidence) && data.evidence.length ? ` based on ${data.evidence.join(", ")}` : "";
+        confidence.textContent = `${label}${evidence}. Review before changing records.`;
+    }
+    records.innerHTML = (data.records || []).map((record, index) => {
+        const url = String(record.source_url || record.url || "").trim();
+        const thumbnail = String(record.thumbnail_url || "").trim();
+        const cookbookNames = (record.cookbooks || []).map(item => item.cookbook_name).filter(Boolean).join(", ");
+        const metadata = [record.total_time, record.calories_per_serving].filter(Boolean).join(" · ");
+        const dates = [
+            record.created_at ? `Created ${recipeRestaurantDuplicateDate(record.created_at)}` : "",
+            record.updated_at ? `Updated ${recipeRestaurantDuplicateDate(record.updated_at)}` : "",
+        ].filter(Boolean).join(" · ");
+        return `<article class="recipe-edit-restaurant-duplicate-record" data-duplicate-record-url="${escapeAttribute(url)}">
+            <div class="recipe-edit-restaurant-duplicate-record-heading">
+                <span class="recipe-edit-restaurant-usage-thumbnail${thumbnail ? "" : " is-fallback"}" aria-hidden="true">
+                    <span class="recipe-edit-restaurant-usage-thumbnail-placeholder"></span>
+                    ${thumbnail ? `<img src="${escapeAttribute(thumbnail)}" alt="" loading="lazy" decoding="async" onerror="handleRecipeRestaurantUsageThumbnailError(this)">` : ""}
+                </span>
+                <div>
+                    <strong>${escapeHtml(record.title || "Untitled Recipe")}</strong>
+                    <span>${escapeHtml([record.restaurant_name, record.menu_section].filter(Boolean).join(" · "))}</span>
+                    ${metadata ? `<span>${escapeHtml(metadata)}</span>` : ""}
+                </div>
+                <div class="recipe-edit-restaurant-duplicate-choices">
+                    <label><input type="radio" name="recipeRestaurantDuplicatePrimary" value="${escapeAttribute(record.record_key)}" data-restaurant-duplicate-primary onchange="syncRecipeRestaurantDuplicateSelections()" ${index === 0 ? "checked" : ""}> Canonical</label>
+                    <label><input type="checkbox" value="${escapeAttribute(record.record_key)}" data-restaurant-duplicate-selected ${index === 0 ? "" : "checked"}> Select</label>
+                </div>
+            </div>
+            <dl>
+                <div><dt>Source</dt><dd title="${escapeAttribute(record.menu_item_url || url)}">${escapeHtml(record.menu_item_url || url)}</dd></div>
+                <div><dt>Cookbooks</dt><dd>${escapeHtml(cookbookNames || "None")}</dd></div>
+                <div><dt>Ingredients</dt><dd>${escapeHtml(record.ingredients_summary || "None saved")}${record.ingredients_count ? ` (${record.ingredients_count})` : ""}</dd></div>
+                <div><dt>Instructions</dt><dd>${escapeHtml(record.instructions_summary || "None saved")}${record.instructions_count ? ` (${record.instructions_count})` : ""}</dd></div>
+                ${dates ? `<div><dt>Dates</dt><dd>${escapeHtml(dates)}</dd></div>` : ""}
+            </dl>
+            <a href="/recipe/edit?url=${encodeURIComponent(url)}">Open Recipe</a>
+        </article>`;
+    }).join("");
+    if (preview) {
+        preview.hidden = true;
+        preview.innerHTML = "";
+    }
+    setRecipeRestaurantDuplicateError();
+    panel.hidden = false;
+    syncRecipeRestaurantDuplicateSelections();
+    panel.querySelector("button")?.focus();
+}
+
+async function openRecipeRestaurantDuplicateReview(button) {
+    const groupId = String(button?.dataset.restaurantDuplicateGroup || "").trim();
+    if (!groupId) return false;
+    recipeRestaurantDuplicateReviewTrigger = button;
+    button.disabled = true;
+    try {
+        const response = await fetch(`/api/recipe/restaurant-duplicates/${encodeURIComponent(groupId)}?restaurant_id=${encodeURIComponent(recipeRestaurantUsageRestaurantId)}`);
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to load duplicate comparison.");
+        renderRecipeRestaurantDuplicateReview(data);
+    } catch (err) {
+        setRecipeRestaurantFetchError(err.message || "Unable to load duplicate comparison.");
+    } finally {
+        button.disabled = false;
+    }
+    return false;
+}
+
+function closeRecipeRestaurantDuplicateReview(options = {}) {
+    const panel = recipeRestaurantDuplicateReviewPanel();
+    if (panel) panel.hidden = true;
+    recipeRestaurantDuplicateReviewData = null;
+    recipeRestaurantDuplicatePendingPreview = null;
+    const trigger = recipeRestaurantDuplicateReviewTrigger;
+    recipeRestaurantDuplicateReviewTrigger = null;
+    if (options.restoreFocus !== false) trigger?.focus({ preventScroll: true });
+    return false;
+}
+
+async function setRecipeRestaurantDuplicateDisposition(disposition) {
+    const groupId = recipeRestaurantDuplicateReviewData?.group_id;
+    if (!groupId) return false;
+    try {
+        const response = await fetch(`/api/recipe/restaurant-duplicates/${encodeURIComponent(groupId)}/disposition`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ restaurant_id: recipeRestaurantUsageRestaurantId, disposition }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save duplicate review.");
+        closeRecipeRestaurantDuplicateReview();
+        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query: recipeRestaurantUsageQuery });
+    } catch (err) {
+        setRecipeRestaurantDuplicateError(err.message || "Unable to save duplicate review.");
+    }
+    return false;
+}
+
+function recipeRestaurantDuplicateSelection() {
+    const panel = recipeRestaurantDuplicateReviewPanel();
+    const primaryRecordKey = panel?.querySelector('[data-restaurant-duplicate-primary]:checked')?.value || "";
+    const secondaryRecordKeys = Array.from(panel?.querySelectorAll('[data-restaurant-duplicate-selected]:checked') || []).map(input => input.value).filter(key => key !== primaryRecordKey);
+    return { primaryRecordKey, secondaryRecordKeys };
+}
+
+function renderRecipeRestaurantDuplicateMergePreview(data) {
+    const preview = recipeRestaurantDuplicateReviewPanel()?.querySelector("[data-restaurant-duplicate-preview]");
+    if (!preview) return;
+    recipeRestaurantDuplicatePendingPreview = { type: "merge", data };
+    const conflicts = (data.conflicts || []).map(conflict => `<label>
+        <span>${escapeHtml(conflict.label)}</span>
+        <select data-restaurant-duplicate-conflict="${escapeAttribute(conflict.field)}">
+            ${(conflict.options || []).map(option => `<option value="${escapeAttribute(option.record_key)}" ${option.record_key === data.primary_record_key ? "selected" : ""}>Keep from ${escapeHtml(option.recipe_title)} — ${escapeHtml(option.display_value)}</option>`).join("")}
+        </select>
+    </label>`).join("");
+    const affectedCookbooks = (data.impacts?.secondaries || []).reduce((total, item) => total + Number(item.cookbook_count || 0), 0);
+    preview.innerHTML = `<h4>Merge Preview</h4>
+        <p>The canonical recipe ID and URL will be preserved. ${data.secondary_urls.length} secondary record${data.secondary_urls.length === 1 ? "" : "s"} and ${affectedCookbooks} cookbook relationship${affectedCookbooks === 1 ? "" : "s"} will be reassigned.</p>
+        ${conflicts ? `<div class="recipe-edit-restaurant-duplicate-conflicts"><h5>Choose conflicting values</h5>${conflicts}</div>` : "<p>No non-empty field conflicts were found.</p>"}
+        <button type="button" class="primary" onclick="return commitRecipeRestaurantDuplicateMerge(this)">Confirm Merge</button>`;
+    preview.hidden = false;
+    preview.scrollIntoView({ block: "nearest" });
+}
+
+async function previewRecipeRestaurantDuplicateMerge(button) {
+    const { primaryRecordKey, secondaryRecordKeys } = recipeRestaurantDuplicateSelection();
+    if (!primaryRecordKey || !secondaryRecordKeys.length) {
+        setRecipeRestaurantDuplicateError("Choose one canonical recipe and at least one different selected duplicate.");
+        return false;
+    }
+    button.disabled = true;
+    try {
+        const response = await fetch(`/api/recipe/restaurant-duplicates/${encodeURIComponent(recipeRestaurantDuplicateReviewData.group_id)}/merge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ restaurant_id: recipeRestaurantUsageRestaurantId, primary_record_key: primaryRecordKey, secondary_record_keys: secondaryRecordKeys }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to preview merge.");
+        renderRecipeRestaurantDuplicateMergePreview(data);
+    } catch (err) {
+        setRecipeRestaurantDuplicateError(err.message || "Unable to preview merge.");
+    } finally {
+        button.disabled = false;
+    }
+    return false;
+}
+
+async function commitRecipeRestaurantDuplicateMerge(button) {
+    const preview = recipeRestaurantDuplicatePendingPreview?.data;
+    if (!preview || button?.disabled) return false;
+    const panel = recipeRestaurantDuplicateReviewPanel();
+    const fieldChoices = {};
+    panel?.querySelectorAll("[data-restaurant-duplicate-conflict]").forEach(select => { fieldChoices[select.dataset.restaurantDuplicateConflict] = select.value; });
+    if (!window.confirm(`Merge ${preview.secondary_urls.length} selected duplicate${preview.secondary_urls.length === 1 ? "" : "s"} into the canonical recipe? This removes secondary records only after every relationship is reassigned.`)) return false;
+    button.disabled = true;
+    try {
+        const response = await fetch(`/api/recipe/restaurant-duplicates/${encodeURIComponent(recipeRestaurantDuplicateReviewData.group_id)}/merge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ restaurant_id: recipeRestaurantUsageRestaurantId, primary_record_key: preview.primary_record_key, secondary_record_keys: preview.secondary_record_keys, field_choices: fieldChoices, commit: true, confirm_merge: true }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to merge duplicate recipes.");
+        closeRecipeRestaurantDuplicateReview();
+        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query: recipeRestaurantUsageQuery });
+    } catch (err) {
+        setRecipeRestaurantDuplicateError(err.message || "Unable to merge duplicate recipes.");
+    } finally {
+        button.disabled = false;
+    }
+    return false;
+}
+
+function renderRecipeRestaurantDuplicateDeletePreview(data) {
+    const preview = recipeRestaurantDuplicateReviewPanel()?.querySelector("[data-restaurant-duplicate-preview]");
+    if (!preview) return;
+    recipeRestaurantDuplicatePendingPreview = { type: "delete", data };
+    const impacts = data.impacts || {};
+    const retainedRelationships = impacts.relationships_retained
+        ? ` Another record uses the same source URL, so its cookbook, menu, and ingredient relationships will be retained.`
+        : "";
+    preview.innerHTML = `<h4>Delete Duplicate Preview</h4>
+        <p>Delete only <strong>${escapeHtml(data.recipe?.title || "this recipe")}</strong>. This affects ${Number(impacts.cookbook_count || 0)} cookbook relationship${Number(impacts.cookbook_count || 0) === 1 ? "" : "s"}, ${Number(impacts.menu_relationship_count || 0)} menu relationship${Number(impacts.menu_relationship_count || 0) === 1 ? "" : "s"}, and ${Number(impacts.ingredient_relationship_count || 0)} saved ingredient relationship${Number(impacts.ingredient_relationship_count || 0) === 1 ? "" : "s"}.${retainedRelationships}</p>
+        <button type="button" class="delete" onclick="return commitRecipeRestaurantDuplicateDelete(this)">Confirm Delete Duplicate</button>`;
+    preview.hidden = false;
+    preview.scrollIntoView({ block: "nearest" });
+}
+
+async function previewRecipeRestaurantDuplicateDelete(button) {
+    const selected = Array.from(recipeRestaurantDuplicateReviewPanel()?.querySelectorAll('[data-restaurant-duplicate-selected]:checked') || []);
+    if (selected.length !== 1) {
+        setRecipeRestaurantDuplicateError("Select exactly one duplicate recipe to delete.");
+        return false;
+    }
+    button.disabled = true;
+    try {
+        const response = await fetch(`/api/recipe/restaurant-duplicates/${encodeURIComponent(recipeRestaurantDuplicateReviewData.group_id)}/delete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ restaurant_id: recipeRestaurantUsageRestaurantId, recipe_record_key: selected[0].value }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to preview duplicate deletion.");
+        renderRecipeRestaurantDuplicateDeletePreview(data);
+    } catch (err) {
+        setRecipeRestaurantDuplicateError(err.message || "Unable to preview duplicate deletion.");
+    } finally {
+        button.disabled = false;
+    }
+    return false;
+}
+
+async function commitRecipeRestaurantDuplicateDelete(button) {
+    const preview = recipeRestaurantDuplicatePendingPreview?.data;
+    if (!preview || button?.disabled) return false;
+    if (!window.confirm(`Permanently delete only ${preview.recipe?.title || "the selected duplicate"}? The restaurant and unrelated recipes will not be changed.`)) return false;
+    button.disabled = true;
+    try {
+        const response = await fetch(`/api/recipe/restaurant-duplicates/${encodeURIComponent(recipeRestaurantDuplicateReviewData.group_id)}/delete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ restaurant_id: recipeRestaurantUsageRestaurantId, recipe_record_key: preview.recipe.record_key, commit: true, confirm_delete: true }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to delete duplicate recipe.");
+        closeRecipeRestaurantDuplicateReview();
+        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query: recipeRestaurantUsageQuery });
+    } catch (err) {
+        setRecipeRestaurantDuplicateError(err.message || "Unable to delete duplicate recipe.");
+    } finally {
+        button.disabled = false;
+    }
+    return false;
 }
 
 const recipeRestaurantFetchFieldDefinitions = {
@@ -26190,6 +26477,7 @@ function editRecipeRestaurantSource(button, event = null) {
     loadRecipeRestaurantDirectory();
     closeRecipeRestaurantUsagePanel();
     closeRecipeRestaurantFetchReview({ restoreFocus: false });
+    closeRecipeRestaurantDuplicateReview({ restoreFocus: false });
     if (hasNormalizedRestaurant) loadRecipeRestaurantUsage(recipeRestaurantRecordId(selected));
     else setRecipeRestaurantUsageEmpty();
     recipeRestaurantEditSnapshot = JSON.stringify(recipeRestaurantEditComparableState(form));
@@ -26226,6 +26514,7 @@ function closeRecipeRestaurantSourceModal(options = {}) {
     document.querySelector("[data-restaurant-usage-panel]")?.setAttribute("hidden", "");
     const fetchReview = recipeRestaurantFetchReviewPanel();
     if (fetchReview) fetchReview.hidden = true;
+    closeRecipeRestaurantDuplicateReview({ restoreFocus: false });
     recipeRestaurantFetchedProposals = {};
     closeRecipeRestaurantSelector({ restoreValue: false });
     closeRecipeRestaurantDuplicatePanel(form.querySelector("[data-restaurant-duplicate-panel]"));
@@ -26247,8 +26536,11 @@ function closeRecipeRestaurantSourceModal(options = {}) {
 
 function recipeRestaurantModalFocusableElements() {
     const modal = recipeRestaurantEditModal();
+    const duplicateReview = recipeRestaurantDuplicateReviewPanel();
     const review = recipeRestaurantFetchReviewPanel();
-    const scope = review && !review.hidden ? review : modal;
+    const scope = duplicateReview && !duplicateReview.hidden
+        ? duplicateReview
+        : (review && !review.hidden ? review : modal);
     return scope ? Array.from(scope.querySelectorAll(
         'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]'
     )).filter(element => !element.hidden && element.offsetParent !== null) : [];
@@ -26263,6 +26555,11 @@ document.addEventListener("keydown", event => {
         if (selectorList && !selectorList.hidden) {
             closeRecipeRestaurantSelector({ restoreValue: true });
             recipeRestaurantSelectorElements().input?.focus();
+            return;
+        }
+        const duplicateReview = recipeRestaurantDuplicateReviewPanel();
+        if (duplicateReview && !duplicateReview.hidden) {
+            closeRecipeRestaurantDuplicateReview();
             return;
         }
         const fetchReview = recipeRestaurantFetchReviewPanel();

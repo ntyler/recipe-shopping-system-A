@@ -414,6 +414,44 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert template.index("data-restaurant-edit-modal") > card_end
 
 
+def test_restaurant_usage_duplicate_review_is_explicit_accessible_and_transactional():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    routes = read_text("PushShoppingList/routes/recipe_routes.py")
+    service = read_text("PushShoppingList/services/restaurant_recipe_duplicate_service.py")
+
+    assert 'data-restaurant-duplicate-review' in template
+    assert 'aria-modal="true"' in template
+    assert "Keep Both" in template
+    assert "Ignore Match" in template
+    assert "Delete Duplicate" in template
+    assert "Merge" in template
+    assert "data-restaurant-duplicate-primary" in script
+    assert "data-restaurant-duplicate-selected" in script
+    assert "Exact duplicate" in script
+    assert "Open Recipe" in script
+    assert "Confirm Merge" in script
+    assert "Confirm Delete Duplicate" in script
+    assert "closeRecipeRestaurantDuplicateReview" in script
+    assert "duplicateReview && !duplicateReview.hidden" in script
+    assert ".recipe-edit-restaurant-duplicate-badge" in css
+    assert "background: rgba(245, 158, 11, .1);" in css
+    assert ".recipe-edit-restaurant-duplicate-review" in css
+    assert '@recipe_bp.route("/api/recipe/restaurant-duplicates/<group_id>", methods=["GET"])' in routes
+    assert '/disposition", methods=["POST"]' in routes
+    assert '/merge", methods=["POST"]' in routes
+    assert '/delete", methods=["POST"]' in routes
+    assert 'data.get("confirm_merge") is not True' in routes
+    assert 'data.get("confirm_delete") is not True' in routes
+    assert 'confirm_merge: true' in script
+    assert 'confirm_delete: true' in script
+    assert 'with workspace_write_lock("restaurant-recipe-duplicates"), DUPLICATE_LOCK:' in service
+    assert '_restore_paths(snapshot)' in service
+    assert '"action": action' in service
+    assert '"user_id": _clean(active_user_id())' in service
+
+
 def test_source_documents_card_uses_compact_rows_and_edit_modal():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")

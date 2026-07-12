@@ -3214,7 +3214,7 @@ def editable_restaurant_usage_inventory(restaurant_id):
             "last_modified": datetime.fromtimestamp(output_path.stat().st_mtime, timezone.utc).isoformat(),
         })
 
-    return {
+    result = {
         "ok": True,
         "restaurant": restaurant,
         "menu": menu,
@@ -3222,6 +3222,13 @@ def editable_restaurant_usage_inventory(restaurant_id):
         "cookbook_ids": cookbook_ids,
         "duplicate_candidates": duplicate_candidates,
     }
+    if has_request_context():
+        cache = getattr(g, "_editable_restaurant_usage_inventories", None)
+        if not isinstance(cache, dict):
+            cache = {}
+            g._editable_restaurant_usage_inventories = cache
+        cache[restaurant_id] = result
+    return result
 
 
 def editable_restaurant_usage_time(value):

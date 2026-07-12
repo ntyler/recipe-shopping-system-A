@@ -142,6 +142,13 @@ from PushShoppingList.services.recipe_edit_service import get_editable_restauran
 from PushShoppingList.services.recipe_edit_service import list_editable_restaurants
 from PushShoppingList.services.recipe_edit_service import update_editable_restaurant
 from PushShoppingList.services.restaurant_details_fetch_service import fetch_restaurant_details
+from PushShoppingList.services.restaurant_recipe_duplicate_service import commit_restaurant_recipe_delete
+from PushShoppingList.services.restaurant_recipe_duplicate_service import commit_restaurant_recipe_merge
+from PushShoppingList.services.restaurant_recipe_duplicate_service import decorate_restaurant_usage_with_duplicates
+from PushShoppingList.services.restaurant_recipe_duplicate_service import restaurant_recipe_delete_preview
+from PushShoppingList.services.restaurant_recipe_duplicate_service import restaurant_recipe_duplicate_group_detail
+from PushShoppingList.services.restaurant_recipe_duplicate_service import restaurant_recipe_merge_preview
+from PushShoppingList.services.restaurant_recipe_duplicate_service import set_restaurant_recipe_duplicate_disposition
 from PushShoppingList.services.cookbook_item_inference_service import infer_missing_details_for_recipe
 from PushShoppingList.services.cookbook_item_inference_service import regenerate_ingredients_for_recipe
 from PushShoppingList.services.cookbook_item_inference_service import regenerate_recipe_notes_for_recipe
@@ -3591,6 +3598,8 @@ def recipe_restaurant_usage_route():
         query=request.args.get("q", ""),
         current_recipe_url=request.args.get("current_recipe_url", ""),
     )
+    if result.get("ok"):
+        result = decorate_restaurant_usage_with_duplicates(result, request.args.get("restaurant_id"))
     return jsonify(result), 200 if result.get("ok") else 404
 
 
@@ -3598,6 +3607,53 @@ def recipe_restaurant_usage_route():
 def backfill_recipe_restaurant_usage_route():
     data = request.get_json(silent=True) or {}
     result = backfill_editable_restaurant_usage(data.get("restaurant_id"))
+    return jsonify(result), 200 if result.get("ok") else 400
+
+
+@recipe_bp.route("/api/recipe/restaurant-duplicates/<group_id>", methods=["GET"])
+def recipe_restaurant_duplicate_group_route(group_id):
+    result = restaurant_recipe_duplicate_group_detail(request.args.get("restaurant_id"), group_id)
+    return jsonify(result), 200 if result.get("ok") else 404
+
+
+@recipe_bp.route("/api/recipe/restaurant-duplicates/<group_id>/disposition", methods=["POST"])
+def recipe_restaurant_duplicate_disposition_route(group_id):
+    data = request.get_json(silent=True) or {}
+    result = set_restaurant_recipe_duplicate_disposition(
+        data.get("restaurant_id"), group_id, str(data.get("disposition") or "").strip()
+    )
+    return jsonify(result), 200 if result.get("ok") else 400
+
+
+@recipe_bp.route("/api/recipe/restaurant-duplicates/<group_id>/merge", methods=["POST"])
+def recipe_restaurant_duplicate_merge_route(group_id):
+    data = request.get_json(silent=True) or {}
+    if data.get("commit") is True and data.get("confirm_merge") is not True:
+        return jsonify({"ok": False, "error": "Confirm the duplicate merge before committing it."}), 400
+    secondary_record_keys = data.get("secondary_record_keys") or []
+    if not isinstance(secondary_record_keys, list):
+        return jsonify({"ok": False, "error": "Duplicate recipe selections are invalid."}), 400
+    field_choices = data.get("field_choices") or {}
+    if not isinstance(field_choices, dict):
+        return jsonify({"ok": False, "error": "Merge field choices are invalid."}), 400
+    args = (
+        data.get("restaurant_id"), group_id, data.get("primary_record_key"), secondary_record_keys
+    )
+    result = (
+        commit_restaurant_recipe_merge(*args, field_choices=field_choices)
+        if data.get("commit") is True
+        else restaurant_recipe_merge_preview(*args)
+    )
+    return jsonify(result), 200 if result.get("ok") else 400
+
+
+@recipe_bp.route("/api/recipe/restaurant-duplicates/<group_id>/delete", methods=["POST"])
+def recipe_restaurant_duplicate_delete_route(group_id):
+    data = request.get_json(silent=True) or {}
+    if data.get("commit") is True and data.get("confirm_delete") is not True:
+        return jsonify({"ok": False, "error": "Confirm duplicate deletion before committing it."}), 400
+    args = (data.get("restaurant_id"), group_id, data.get("recipe_record_key"))
+    result = commit_restaurant_recipe_delete(*args) if data.get("commit") is True else restaurant_recipe_delete_preview(*args)
     return jsonify(result), 200 if result.get("ok") else 400
 
 

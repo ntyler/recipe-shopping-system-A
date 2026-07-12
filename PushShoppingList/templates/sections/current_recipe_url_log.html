@@ -2467,6 +2467,29 @@
                                     <button type="button" data-restaurant-usage-load-more onclick="return loadMoreRecipeRestaurantUsage(this)" hidden>Load More</button>
                                 </footer>
                             </aside>
+                            <aside class="recipe-edit-restaurant-duplicate-review"
+                                   data-restaurant-duplicate-review
+                                   role="dialog"
+                                   aria-modal="true"
+                                   aria-labelledby="recipeRestaurantDuplicateReviewTitle"
+                                   hidden>
+                                <header>
+                                    <div>
+                                        <h3 id="recipeRestaurantDuplicateReviewTitle" data-restaurant-duplicate-title>Compare Possible Duplicates</h3>
+                                        <p data-restaurant-duplicate-confidence></p>
+                                    </div>
+                                    <button type="button" aria-label="Close duplicate comparison" onclick="return closeRecipeRestaurantDuplicateReview()">{{ shell.svg_icon("x") }}</button>
+                                </header>
+                                <div class="recipe-edit-restaurant-duplicate-records" data-restaurant-duplicate-records></div>
+                                <section class="recipe-edit-restaurant-duplicate-preview" data-restaurant-duplicate-preview hidden></section>
+                                <p class="recipe-edit-restaurant-duplicate-error" data-restaurant-duplicate-error hidden></p>
+                                <footer>
+                                    <button type="button" onclick="return setRecipeRestaurantDuplicateDisposition('keep_both')">Keep Both</button>
+                                    <button type="button" onclick="return setRecipeRestaurantDuplicateDisposition('ignore')">Ignore Match</button>
+                                    <button type="button" data-restaurant-duplicate-delete onclick="return previewRecipeRestaurantDuplicateDelete(this)">Delete Duplicate</button>
+                                    <button type="button" class="primary" data-restaurant-duplicate-merge onclick="return previewRecipeRestaurantDuplicateMerge(this)">Merge</button>
+                                </footer>
+                            </aside>
                             <footer class="recipe-edit-restaurant-form-actions">
                                 <button type="button" onclick="return cancelRecipeRestaurantSourceEdit(this)">Cancel</button>
                                 <button type="button" class="primary" data-restaurant-edit-save onclick="return saveRecipeRestaurantSource(this.closest('[data-restaurant-edit-form]'))" disabled>Save Changes</button>
