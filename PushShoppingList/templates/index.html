@@ -254,32 +254,7 @@
                     {{ shell.svg_icon("help") }}
                     <span>Help &amp; Support</span>
                 </button>
-                <a class="app-toolbar-button app-account-button"
-                   href="#userAccountSection"
-                   data-app-nav-link
-                   data-app-nav-action="account-workspace"
-                   data-app-nav-target="userAccountSection">
-                    <span class="app-account-avatar" aria-hidden="true">
-                        {% if current_user and current_user.avatar_path %}
-                            <img class="app-account-avatar-image"
-                                 src="{{ url_for('static', filename=current_user.avatar_path) }}"
-                                 alt="">
-                        {% elif current_user and current_user.picture %}
-                            <img class="app-account-avatar-image"
-                                 src="{{ current_user.picture }}"
-                                 alt=""
-                                 referrerpolicy="no-referrer">
-                        {% elif current_user %}
-                            {{ current_user.display_name[:1]|upper }}
-                        {% else %}
-                            G
-                        {% endif %}
-                    </span>
-                    <span class="app-account-label">
-                        <strong>{% if current_user %}{{ current_user.display_name }}{% elif is_guest_demo %}Guest Demo{% else %}Sign In{% endif %}</strong>
-                        <small>{% if current_user %}Pro Plan{% elif is_guest_demo %}Temporary workspace{% else %}AI Pantry account{% endif %}</small>
-                    </span>
-                </a>
+                {{ shell.account_control(current_user, is_guest_demo, '#userAccountSection', true) }}
             </div>
         </header>
 

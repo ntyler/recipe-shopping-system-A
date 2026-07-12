@@ -35271,7 +35271,7 @@ img[data-deferred-src] {
     color: var(--app-text);
 }
 
-.recipe-edit-page-topbar .app-toolbar-button {
+.recipe-edit-page-topbar .app-toolbar-button:not(.app-account-button) {
     border-color: var(--app-border);
     background: var(--app-surface-soft);
     color: var(--app-text-strong);

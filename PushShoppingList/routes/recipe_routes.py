@@ -188,6 +188,7 @@ from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import workspace_data_root
 from PushShoppingList.services.user_account_service import current_user
+from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import is_admin_user
 
 recipe_bp = Blueprint("recipe_bp", __name__)
@@ -3514,7 +3515,7 @@ def edit_recipe_page_route():
     return render_template(
         "recipe_edit_page.html",
         recipe_url=recipe_url,
-        current_user=current_user(),
+        current_user=current_public_user(),
         is_guest_demo=is_guest_session(),
         current_urls=[],
         current_recipe_count=0,

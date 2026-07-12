@@ -10,6 +10,7 @@ def read_text(relative_path):
 
 def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     template = read_text("PushShoppingList/templates/index.html")
+    shell_macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
 
     assert '{% import "includes/app_shell_macros.html" as shell %}' in template
     assert "app-shell-body" in template
@@ -32,10 +33,10 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert 'data-app-page-target="notificationsPage"' in template
     assert 'data-app-nav-action="account-workspace"' in template
     assert 'href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage"' in template
-    assert 'class="app-account-avatar-image"' in template
-    assert "current_user.avatar_path" in template
-    assert "current_user.picture" in template
-    assert 'referrerpolicy="no-referrer"' in template
+    assert 'class="app-account-avatar-image"' in shell_macros
+    assert "current_user.avatar_path" in shell_macros
+    assert "current_user.picture" in shell_macros
+    assert 'referrerpolicy="no-referrer"' in shell_macros
     assert 'data-app-nav-action="ai-pantry"' in template
     assert 'data-app-nav-lazy-section="pantry"' in template
     assert 'data-app-nav-lazy-section="current-recipes"' in template
@@ -207,6 +208,25 @@ def test_index_topbar_uses_current_user_profile_image(monkeypatch, tmp_path):
     assert 'referrerpolicy="no-referrer"' in topbar_markup
     assert "Nathaniel Tyler" in topbar_markup
     assert ">N<" not in topbar_markup
+
+
+def test_home_and_recipe_editor_reuse_the_same_account_control():
+    home = read_text("PushShoppingList/templates/index.html")
+    recipe_editor = read_text("PushShoppingList/templates/recipe_edit_page.html")
+    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+    routes = read_text("PushShoppingList/routes/recipe_routes.py")
+
+    assert "{% macro account_control(" in macros
+    assert "current_user.display_name" in macros
+    assert "Pro Plan" in macros
+    assert "shell.account_control(current_user, is_guest_demo" in home
+    assert "shell.account_control(current_user, is_guest_demo" in recipe_editor
+    assert 'class="app-toolbar-button app-account-button"' not in home
+    assert 'class="app-toolbar-button app-account-button"' not in recipe_editor
+    assert ".recipe-edit-page-topbar .app-toolbar-button:not(.app-account-button)" in css
+    assert "from PushShoppingList.services.user_account_service import current_public_user" in routes
+    assert "current_user=current_public_user()," in routes
 
 
 def test_app_workspaces_define_mockup_style_individual_pages():

@@ -523,8 +523,11 @@ def test_standalone_recipe_edit_page_renders_editor(monkeypatch, tmp_path):
     user_account_service.save_users({
         "users": [{
             "user_id": "edit-page-user",
-            "email": "editor@example.com",
-            "username": "editor",
+            "first_name": "Nathaniel",
+            "last_name": "Tyler",
+            "email": "ntylerbert@gmail.com",
+            "username": "ntylerbert",
+            "picture": "https://example.com/nathaniel-avatar.jpg",
             "account_status": "active",
         }],
     })
@@ -536,18 +539,32 @@ def test_standalone_recipe_edit_page_renders_editor(monkeypatch, tmp_path):
         with client.session_transaction() as session:
             session["user_id"] = "edit-page-user"
 
+        home_response = client.get("/")
         response = client.get(
             "/recipe/edit",
             query_string={"url": "https://example.com/soup"},
         )
 
+    home_html = home_response.get_data(as_text=True)
     html = response.get_data(as_text=True)
+    home_account_start = home_html.index('<span class="app-account-avatar"')
+    home_account_end = home_html.index("</a>", home_account_start)
+    edit_account_start = html.index('<span class="app-account-avatar"')
+    edit_account_end = html.index("</a>", edit_account_start)
+    home_account = home_html[home_account_start:home_account_end]
+    edit_account = html[edit_account_start:edit_account_end]
 
     assert response.status_code == 200
     assert 'data-recipe-edit-page="true"' in html
     assert 'data-recipe-edit-url="https://example.com/soup"' in html
     assert 'id="recipeEditModal"' in html
     assert 'id="currentRecipeUrlLogCard"' not in html
+    assert home_response.status_code == 200
+    assert home_account == edit_account
+    assert "Nathaniel Tyler" in edit_account
+    assert "Pro Plan" in edit_account
+    assert "ntylerbert@gmail.com" not in edit_account
+    assert 'src="https://example.com/nathaniel-avatar.jpg"' in edit_account
 
 
 def test_recipe_editor_has_store_section_review_controls():
