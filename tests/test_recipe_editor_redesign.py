@@ -233,6 +233,8 @@ def test_restaurant_source_card_uses_compact_identity_details_and_actions():
 def test_recipe_information_card_matches_compact_mockup_structure():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
     organizer_start = script.index("function organizeRecipeEditInformationCard()")
     organizer_end = script.index("function organizeRecipeEditAiAssistant()", organizer_start)
     organizer = script[organizer_start:organizer_end]
@@ -252,6 +254,9 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "recipe-edit-price-control" in organizer
     assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer
     assert "panelHeading.appendChild(ratingField)" in organizer
+    assert 'class="recipe-edit-rating-label">Rating</span>' not in template
+    assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe", show_clear=false)' in template
+    assert "data-rating-toggle-selected=\"{{ 'true' if mode == 'restaurant' or not show_clear else 'false' }}\"" in macros
     assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
     assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, tagRow, metadataRow, descriptionRow, technicalDetails])" in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer
