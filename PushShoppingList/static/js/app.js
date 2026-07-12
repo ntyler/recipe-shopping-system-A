@@ -26169,7 +26169,7 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
 
     if (uploadLabel) {
         uploadLabel.textContent = recipeEditorStandalonePageIsActive()
-            ? (hasImage ? "Change Image" : "Add Image")
+            ? "Change Image"
             : (hasImage ? "Replace title image" : "Upload title image");
     }
 

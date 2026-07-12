@@ -869,7 +869,7 @@
                                         class="recipe-edit-cover-upload-button"
                                         aria-expanded="false"
                                         onclick="return toggleRecipeImageChangeActions(this)">
-                                    <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                                    {{ shell.svg_icon("image-copy") }}
                                     <span id="recipeEditCoverUploadLabel">Upload title image</span>
                                 </button>
                                 <button type="button"
@@ -877,8 +877,8 @@
                                         class="recipe-edit-cover-upload-button recipe-edit-cover-remove-button"
                                         onclick="return removeRecipeCoverImage(this)"
                                         hidden>
-                                    <span class="recipe-edit-button-icon" aria-hidden="true">x</span>
-                                    <span>Remove title image</span>
+                                    {{ shell.svg_icon("trash") }}
+                                    <span>Remove</span>
                                 </button>
                                 <input id="recipeEditCoverUpload"
                                        class="recipe-edit-cover-file-input"
