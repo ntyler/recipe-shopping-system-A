@@ -23095,6 +23095,7 @@ function bindRecipeMenuMetadataUrlLinks() {
 }
 
 function populateRecipeMenuMetadata(recipe = {}) {
+    recipeRestaurantDisplaySource = null;
     setRecipeMenuMetadataPanelVisibility(recipe);
     setRecipeMenuRelationFields(recipe);
     Object.entries(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).forEach(([field, inputId]) => {
@@ -24752,9 +24753,7 @@ function updateRecipeEditRestaurantCard() {
     const phone = recipeEditInputValue("recipeEditRestaurantPhone");
     const address = recipeEditInputValue("recipeEditRestaurantAddress");
     const cuisine = recipeEditInputValue("recipeEditRestaurantCuisineTags");
-    const selectedSource = recipeMenuSourceOptionByValue(
-        document.getElementById("recipeEditMenuSourceSelect")?.value || ""
-    ) || {};
+    const selectedSource = currentRecipeRestaurantSourceOption() || {};
     const logoUrl = recipeMenuMetadataText(selectedSource.restaurant_logo_url);
     const restaurantRating = Number.parseFloat(recipeMenuMetadataText(selectedSource.restaurant_rating));
     const setText = (selector, value, fallback = "") => {
@@ -24838,6 +24837,41 @@ function updateRecipeEditRestaurantCard() {
 
 let recipeRestaurantEditSnapshot = "";
 let recipeRestaurantEditTrigger = null;
+let recipeRestaurantDisplaySource = null;
+
+function currentRecipeRestaurantSourceOption() {
+    const selectValue = document.getElementById("recipeEditMenuSourceSelect")?.value || "";
+    const selected = recipeMenuSourceOptionByValue(selectValue);
+    if (selected) {
+        recipeRestaurantDisplaySource = selected;
+        return selected;
+    }
+    if (recipeRestaurantDisplaySource) {
+        return recipeRestaurantDisplaySource;
+    }
+    const restaurantId = recipeEditInputValue("recipeEditRestaurantId");
+    const menuId = recipeEditInputValue("recipeEditMenuId");
+    const restaurantName = recipeEditInputValue("recipeEditRestaurantName");
+    if (!restaurantId && !restaurantName) return null;
+    recipeRestaurantDisplaySource = {
+        value: recipeMenuSourceOptionValue(restaurantId, menuId),
+        restaurant_id: restaurantId,
+        menu_id: menuId,
+        restaurant_name: restaurantName,
+        restaurant_phone: recipeEditInputValue("recipeEditRestaurantPhone"),
+        restaurant_website_url: recipeEditInputValue("recipeEditRestaurantWebsiteUrl"),
+        source_menu_url: recipeEditInputValue("recipeEditSourceMenuUrl"),
+        restaurant_street_address: recipeEditInputValue("recipeEditRestaurantAddress"),
+        restaurant_city: "",
+        restaurant_state: "",
+        restaurant_postal_code: "",
+        restaurant_country: "",
+        restaurant_logo_url: "",
+        restaurant_rating: "",
+        restaurant_address: recipeEditInputValue("recipeEditRestaurantAddress"),
+    };
+    return recipeRestaurantDisplaySource;
+}
 
 function recipeRestaurantEditForm() {
     return document.querySelector("[data-restaurant-edit-form]");
@@ -24893,7 +24927,7 @@ function updateRecipeRestaurantEditState(form = recipeRestaurantEditForm()) {
 function editRecipeRestaurantSource(button) {
     const modal = recipeRestaurantEditModal();
     const form = recipeRestaurantEditForm();
-    const selected = recipeMenuSourceOptionByValue(document.getElementById("recipeEditMenuSourceSelect")?.value || "");
+    const selected = currentRecipeRestaurantSourceOption();
     if (!modal || !form || !selected) return false;
     form.querySelectorAll("[data-restaurant-edit-field]").forEach(input => {
         input.value = recipeMenuMetadataText(selected[input.dataset.restaurantEditField]);
@@ -24987,8 +25021,7 @@ async function saveRecipeRestaurantSource(form) {
         if (error) { error.textContent = "Restaurant Name is required."; error.hidden = false; }
         return false;
     }
-    const selectedValue = document.getElementById("recipeEditMenuSourceSelect")?.value || "";
-    const selected = recipeMenuSourceOptionByValue(selectedValue);
+    const selected = currentRecipeRestaurantSourceOption();
     if (!selected) return false;
     form.dataset.saving = "1";
     if (save) { save.disabled = true; save.textContent = "Saving..."; }
@@ -25007,6 +25040,7 @@ async function saveRecipeRestaurantSource(form) {
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save restaurant source.");
         Object.assign(selected, data.restaurant || {});
+        recipeRestaurantDisplaySource = selected;
         setValue("recipeEditRestaurantName", selected.restaurant_name || "");
         setValue("recipeEditRestaurantWebsiteUrl", selected.restaurant_website_url || "");
         setValue("recipeEditSourceMenuUrl", selected.source_menu_url || "");

@@ -190,6 +190,9 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert 'save.textContent = "Saving..."' in script
     assert "recipeRestaurantEditSnapshot" in script
     assert "function recipeRestaurantModalFocusableElements()" in script
+    assert "function currentRecipeRestaurantSourceOption()" in script
+    assert 'const restaurantId = recipeEditInputValue("recipeEditRestaurantId")' in script
+    assert 'const selected = currentRecipeRestaurantSourceOption();' in script
     assert 'event.key === "Escape"' in script
     assert 'event.key !== "Tab"' in script
     assert "Discard unsaved restaurant changes?" in script
