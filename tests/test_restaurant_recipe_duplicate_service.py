@@ -56,6 +56,23 @@ def test_usage_rows_show_one_group_badge_and_keep_group_id_on_every_match(monkey
     assert [row.get("duplicate_badge") for row in result["recipes"]] == ["3 similar", None, None]
 
 
+def test_duplicate_index_reuses_group_results_for_review_filtering(monkeypatch, tmp_path):
+    records = [
+        recipe_record(tmp_path / "a.json", "Alfajores", "https://example.test/a"),
+        recipe_record(tmp_path / "b.json", "Alfajores", "https://example.test/b"),
+    ]
+    monkeypatch.setattr(duplicates, "_usage_records", lambda _restaurant_id: ({"ok": True}, records))
+    monkeypatch.setattr(duplicates, "load_duplicate_state", lambda: {"ignored_groups": {}, "audit": []})
+
+    index = duplicates.restaurant_recipe_duplicate_index("restaurant-1")
+    usage = {"ok": True, "recipes": [{"url": record["url"]} for record in records]}
+    result = duplicates.decorate_restaurant_usage_with_duplicates(usage, "restaurant-1", duplicate_index=index)
+
+    assert index["ok"] is True
+    assert set(index["group_by_url"]) == {"https://example.test/a", "https://example.test/b"}
+    assert result["duplicate_group_count"] == 1
+
+
 def test_keep_both_and_ignore_are_persistent_and_user_scoped(monkeypatch, tmp_path):
     state_path = tmp_path / "duplicates.json"
     monkeypatch.setattr(duplicates, "DUPLICATE_STATE_FILE", state_path)

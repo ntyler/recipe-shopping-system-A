@@ -778,6 +778,92 @@ def test_restaurant_usage_counts_complete_normalized_and_clear_legacy_dataset(mo
     assert thumbnail_calls == [row["url"] for row in result["recipes"]]
 
 
+def test_restaurant_usage_review_filter_combines_search_pagination_and_saved_review_signals(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "Pisco Mar"})
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    recipes = [
+        ("Complete Dish", {}),
+        ("Nutrition Review Dish", {"nutrition": {}}),
+        ("AI Review Dish", {"ai_inferred": True, "ai_inferred_fields": ["instructions"]}),
+    ]
+    for index, (title, overrides) in enumerate(recipes):
+        url = f"https://example.test/pisco/review-{index}"
+        payload = {
+            "source_url": url,
+            "recipe_title": title,
+            "restaurant_id": restaurant_id,
+            "ingredients": [{"ingredient": "Potato"}],
+            "instructions": ["Cook until tender."],
+            "equipment": ["Pot"],
+            "nutrition": {"calories": "250", "serving_basis": "per serving"},
+            "cover_image": {"url": f"https://images.example.test/{index}.jpg"},
+            **overrides,
+        }
+        if title == "Nutrition Review Dish":
+            payload["nutrition"] = {}
+        recipe_edit_service.save_recipe_output(url, payload)
+    monkeypatch.setattr(recipe_edit_service, "cookbook_recipe_assignment_for_url", lambda _url: {
+        "cookbook_id": "book-1",
+        "cookbook_name": "Dinner",
+    })
+
+    filtered = recipe_edit_service.editable_restaurant_usage(
+        restaurant_id,
+        page=1,
+        per_page=1,
+        review_only=True,
+    )
+    searched = recipe_edit_service.editable_restaurant_usage(
+        restaurant_id,
+        page=1,
+        per_page=10,
+        query="AI Review",
+        review_only=True,
+    )
+
+    assert filtered["recipe_count"] == 3
+    assert filtered["review_recipe_count"] == 2
+    assert filtered["filtered_recipe_count"] == 2
+    assert filtered["has_more"] is True
+    assert len(filtered["recipes"]) == 1
+    assert filtered["recipes"][0]["review_reason_codes"]
+    assert searched["filtered_recipe_count"] == 1
+    assert searched["recipes"][0]["title"] == "AI Review Dish"
+    assert "ai_inferred_unreviewed" in searched["recipes"][0]["review_reason_codes"]
+
+
+def test_restaurant_usage_review_filter_reuses_duplicate_index(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "Pisco Mar"})
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    url = "https://example.test/pisco/duplicate-review"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Complete But Duplicate",
+        "restaurant_id": restaurant_id,
+        "ingredients": [{"ingredient": "Potato"}],
+        "instructions": ["Cook."],
+        "equipment": ["Pot"],
+        "nutrition": {"calories": "250"},
+        "cover_image": {"url": "https://images.example.test/duplicate.jpg"},
+    })
+    monkeypatch.setattr(recipe_edit_service, "cookbook_recipe_assignment_for_url", lambda _url: {
+        "cookbook_id": "book-1",
+        "cookbook_name": "Dinner",
+    })
+    duplicate_index = {recipe_edit_service.normalize_recipe_url_key(url): {"group_id": "dup-1"}}
+
+    result = recipe_edit_service.editable_restaurant_usage(
+        restaurant_id,
+        review_only=True,
+        duplicate_review_index=duplicate_index,
+    )
+
+    assert result["review_recipe_count"] == 1
+    assert result["recipes"][0]["review_reason_codes"] == ["possible_duplicate"]
+
+
 def test_restaurant_usage_row_uses_only_saved_summary_metadata(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     url = "https://example.test/saved-summary"
@@ -835,7 +921,10 @@ def test_restaurant_usage_backfill_links_only_clear_matches_and_preserves_recipe
         "restaurant_name": "Pisco Mar",
     })
 
-    result = recipe_edit_service.backfill_editable_restaurant_usage(restaurant_id)
+    app = Flask("restaurant-usage-backfill-test")
+    app.secret_key = "test-secret"
+    with app.test_request_context("/api/recipe/restaurant-usage/backfill"):
+        result = recipe_edit_service.backfill_editable_restaurant_usage(restaurant_id)
     clear_recipe = recipe_edit_service.load_recipe_output(clear_url)
     ambiguous_recipe = recipe_edit_service.load_recipe_output(ambiguous_url)
 

@@ -2480,6 +2480,15 @@
                                 <label data-restaurant-usage-search-wrap hidden><span>Search recipes</span><input type="search" data-restaurant-usage-search oninput="filterRecipeRestaurantUsage(this.value)"></label>
                                 <div class="recipe-edit-restaurant-usage-list" data-restaurant-usage-list></div>
                                 <footer class="recipe-edit-restaurant-usage-panel-actions">
+                                    <label class="recipe-edit-restaurant-review-toggle">
+                                        <input type="checkbox"
+                                               role="switch"
+                                               data-restaurant-usage-review-only
+                                               aria-label="Show review items only"
+                                               onchange="return toggleRecipeRestaurantUsageReviewOnly(this)">
+                                        <span class="recipe-edit-restaurant-review-toggle-track" aria-hidden="true"><span></span></span>
+                                        <span data-restaurant-usage-review-label>Review Items Only</span>
+                                    </label>
                                     <button type="button" data-restaurant-usage-backfill onclick="return backfillUnlinkedRecipeRestaurants(this)" hidden>Link Clear Matches</button>
                                     <button type="button" data-restaurant-usage-load-more onclick="return loadMoreRecipeRestaurantUsage(this)" hidden>Load More</button>
                                 </footer>

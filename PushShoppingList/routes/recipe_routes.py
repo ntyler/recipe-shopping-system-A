@@ -148,6 +148,7 @@ from PushShoppingList.services.restaurant_details_fetch_service import store_pen
 from PushShoppingList.services.restaurant_recipe_duplicate_service import commit_restaurant_recipe_delete
 from PushShoppingList.services.restaurant_recipe_duplicate_service import commit_restaurant_recipe_merge
 from PushShoppingList.services.restaurant_recipe_duplicate_service import decorate_restaurant_usage_with_duplicates
+from PushShoppingList.services.restaurant_recipe_duplicate_service import restaurant_recipe_duplicate_index
 from PushShoppingList.services.restaurant_recipe_duplicate_service import restaurant_recipe_delete_preview
 from PushShoppingList.services.restaurant_recipe_duplicate_service import restaurant_recipe_duplicate_group_detail
 from PushShoppingList.services.restaurant_recipe_duplicate_service import restaurant_recipe_merge_preview
@@ -3626,15 +3627,19 @@ def recipe_restaurants_backfill_route():
 
 @recipe_bp.route("/api/recipe/restaurant-usage", methods=["GET"])
 def recipe_restaurant_usage_route():
+    restaurant_id = request.args.get("restaurant_id")
+    duplicate_index = restaurant_recipe_duplicate_index(restaurant_id)
     result = editable_restaurant_usage(
-        request.args.get("restaurant_id"),
+        restaurant_id,
         page=request.args.get("page", 1),
         per_page=request.args.get("per_page", 50),
         query=request.args.get("q", ""),
         current_recipe_url=request.args.get("current_recipe_url", ""),
+        review_only=str(request.args.get("review_only", "")).strip().casefold() in {"1", "true", "yes", "on"},
+        duplicate_review_index=duplicate_index.get("group_by_url") if duplicate_index.get("ok") else None,
     )
     if result.get("ok"):
-        result = decorate_restaurant_usage_with_duplicates(result, request.args.get("restaurant_id"))
+        result = decorate_restaurant_usage_with_duplicates(result, restaurant_id, duplicate_index=duplicate_index)
     return jsonify(result), 200 if result.get("ok") else 404
 
 

@@ -3180,6 +3180,10 @@ def editable_restaurant_usage_inventory(restaurant_id):
     restaurant_id = clean_recipe_menu_text(restaurant_id)
     if not restaurant_id:
         return {"ok": False, "error": "Restaurant source is required."}
+    if has_request_context():
+        cache = getattr(g, "_editable_restaurant_usage_inventories", None)
+        if isinstance(cache, dict) and restaurant_id in cache:
+            return cache[restaurant_id]
     store = menu_store_service.load_menu_store()
     restaurant = menu_store_service.restaurant_for(store, restaurant_id)
     if not restaurant:
@@ -3328,6 +3332,158 @@ def editable_restaurant_usage_thumbnail(recipe_url, recipe_data, recipe_meta=Non
     } if src else {}
 
 
+RESTAURANT_USAGE_REVIEW_LABELS = {
+    "possible_duplicate": "Possible duplicate",
+    "missing_title": "Title missing",
+    "missing_ingredients": "Ingredients missing",
+    "missing_instructions": "Instructions missing",
+    "missing_equipment": "Equipment missing",
+    "missing_nutrition": "Nutrition missing",
+    "missing_image": "Image missing",
+    "missing_cookbook_assignment": "Cookbook missing",
+    "missing_source_information": "Source missing",
+    "invalid_recipe_data": "Invalid data",
+    "ai_inferred_unreviewed": "Needs AI review",
+    "low_confidence": "Low confidence",
+    "validation_warning": "Needs review",
+    "restaurant_link": "Needs restaurant link",
+}
+
+
+def _editable_restaurant_usage_has_items(value):
+    if isinstance(value, dict):
+        return any(_editable_restaurant_usage_has_items(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(_editable_restaurant_usage_has_items(item) for item in value)
+    if isinstance(value, bool):
+        return value
+    return bool(clean_recipe_menu_text(value))
+
+
+def _editable_restaurant_usage_metadata_fields(recipe_data, keys):
+    values = set()
+    for key in keys:
+        raw = recipe_data.get(key)
+        if isinstance(raw, str):
+            raw = raw.split(",")
+        if isinstance(raw, (list, tuple, set)):
+            values.update(clean_recipe_menu_text(item).casefold() for item in raw if clean_recipe_menu_text(item))
+    return values
+
+
+def _editable_restaurant_usage_confidence(value):
+    if isinstance(value, str):
+        normalized = value.strip().casefold().rstrip("%")
+        if normalized in {"low", "poor", "uncertain"}:
+            return 0.0
+        value = normalized
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if numeric > 1:
+        numeric /= 100
+    return max(0.0, min(1.0, numeric))
+
+
+def editable_restaurant_usage_review_reasons(record, recipe_meta=None, duplicate_review=None):
+    """Project saved health/review signals into inexpensive list-filter reason codes."""
+    record = record if isinstance(record, dict) else {}
+    recipe_data = record.get("data") if isinstance(record.get("data"), dict) else {}
+    recipe_meta = recipe_meta if isinstance(recipe_meta, dict) else {}
+    reasons = []
+
+    def add(code):
+        if code not in reasons:
+            reasons.append(code)
+
+    if duplicate_review:
+        add("possible_duplicate")
+    title = first_recipe_menu_text(
+        recipe_data.get("recipe_title"), recipe_data.get("menu_item_name"), recipe_data.get("display_name")
+    )
+    if not title:
+        add("missing_title")
+    if not _editable_restaurant_usage_has_items(recipe_data.get("ingredients") or recipe_meta.get("ingredients")):
+        add("missing_ingredients")
+    if not _editable_restaurant_usage_has_items(recipe_data.get("instructions")):
+        add("missing_instructions")
+    if not _editable_restaurant_usage_has_items(recipe_data.get("equipment")):
+        add("missing_equipment")
+    nutrition = recipe_data.get("nutrition")
+    if isinstance(nutrition, dict):
+        nutrition = {
+            key: value
+            for key, value in nutrition.items()
+            if clean_recipe_menu_text(key).casefold() not in {
+                "serving_basis", "source", "nutrition_source", "confidence", "confidence_score", "ai_inferred"
+            }
+        }
+    if not _editable_restaurant_usage_has_items(nutrition):
+        add("missing_nutrition")
+    cover_image = recipe_data.get("cover_image") or recipe_meta.get("cover_image")
+    has_image = _editable_restaurant_usage_has_items(cover_image) or bool(first_recipe_menu_text(
+        recipe_data.get("cover_image_url"), recipe_data.get("image_url"), recipe_data.get("title_image_url")
+    ))
+    if not has_image:
+        add("missing_image")
+    if not first_recipe_menu_text(record.get("cookbook_id"), record.get("cookbook_name")):
+        add("missing_cookbook_assignment")
+    source_metadata = recipe_menu_source_metadata(recipe_data)
+    if not first_recipe_menu_text(
+        record.get("url"), recipe_data.get("source_url"), recipe_data.get("source_menu_url"),
+        recipe_data.get("source_pdf_path"), recipe_data.get("generated_pdf_path"),
+        source_metadata.get("source_url"), source_metadata.get("source_menu_url"),
+    ):
+        add("missing_source_information")
+    if record.get("match_kind") == "legacy_clear":
+        add("restaurant_link")
+
+    validation_values = [
+        recipe_data.get("validation_errors"), recipe_data.get("invalid_fields"),
+        recipe_data.get("recipe_validation_errors"),
+    ]
+    if recipe_data.get("valid") is False or any(_editable_restaurant_usage_has_items(value) for value in validation_values):
+        add("invalid_recipe_data")
+    warning_values = [
+        recipe_data.get("validation_warnings"), recipe_data.get("warnings"),
+        recipe_data.get("recipe_health_warnings"), recipe_data.get("needs_review_fields"),
+        recipe_data.get("review_required_fields"), recipe_data.get("warning_fields"),
+    ]
+    ingredient_review = any(
+        isinstance(item, dict) and (
+            item.get("warning")
+            or isinstance(item.get("food_review"), dict) and (
+                item["food_review"].get("needs_review")
+                or clean_recipe_menu_text(item["food_review"].get("status")).casefold() == "needs_review"
+            )
+        )
+        for item in (recipe_data.get("ingredients") or [])
+    )
+    if ingredient_review or any(_editable_restaurant_usage_has_items(value) for value in warning_values):
+        add("validation_warning")
+
+    inferred_fields = _editable_restaurant_usage_metadata_fields(recipe_data, (
+        "ai_generated_fields", "ai_inferred_fields", "inferred_fields", "cookbook_item_inferred_fields",
+    ))
+    verified_fields = _editable_restaurant_usage_metadata_fields(recipe_data, (
+        "user_verified_fields", "verified_fields", "confirmed_fields",
+    ))
+    if inferred_fields - verified_fields or (recipe_data.get("ai_inferred") is True and not inferred_fields):
+        add("ai_inferred_unreviewed")
+
+    confidence_values = [
+        recipe_data.get("ai_confidence"), recipe_data.get("ai_confidence_score"),
+        recipe_data.get("inference_confidence_score"), recipe_data.get("confidence_score"),
+        recipe_data.get("extraction_confidence_score"), recipe_data.get("nutrition_confidence_score"),
+        recipe_data.get("duplicate_detection_confidence"),
+    ]
+    confidences = [score for score in (_editable_restaurant_usage_confidence(value) for value in confidence_values) if score is not None]
+    if confidences and min(confidences) < 0.6:
+        add("low_confidence")
+    return reasons
+
+
 def editable_restaurant_usage_row(record, recipe_meta=None):
     recipe_data = record.get("data") if isinstance(record, dict) else {}
     recipe_url = clean_recipe_menu_text(record.get("url"))
@@ -3350,10 +3506,20 @@ def editable_restaurant_usage_row(record, recipe_meta=None):
         ),
         "calories_per_serving": editable_restaurant_usage_calories(recipe_data),
         "category_label": editable_restaurant_usage_category(recipe_data),
+        "review_reason_codes": list(record.get("review_reason_codes") or []),
+        "review_reason_labels": list(record.get("review_reason_labels") or []),
     }
 
 
-def editable_restaurant_usage(restaurant_id, page=1, per_page=50, query="", current_recipe_url=""):
+def editable_restaurant_usage(
+    restaurant_id,
+    page=1,
+    per_page=50,
+    query="",
+    current_recipe_url="",
+    review_only=False,
+    duplicate_review_index=None,
+):
     inventory = editable_restaurant_usage_inventory(restaurant_id)
     if not inventory.get("ok"):
         return inventory
@@ -3375,10 +3541,25 @@ def editable_restaurant_usage(restaurant_id, page=1, per_page=50, query="", curr
         item["data"].get("recipe_title"), item["data"].get("menu_item_name"), "Untitled Recipe"
     ).casefold())
     recipe_count = len(matched_records)
+    duplicate_review_index = duplicate_review_index if isinstance(duplicate_review_index, dict) else {}
+    recipe_meta_index = load_recipe_ingredients()
+    for record in matched_records:
+        recipe_key = normalize_recipe_url_key(record.get("url"))
+        recipe_meta = recipe_meta_index.get(recipe_key, {})
+        reason_codes = editable_restaurant_usage_review_reasons(
+            record,
+            recipe_meta,
+            duplicate_review=duplicate_review_index.get(recipe_key),
+        )
+        record["review_reason_codes"] = reason_codes
+        record["review_reason_labels"] = [RESTAURANT_USAGE_REVIEW_LABELS[code] for code in reason_codes]
+    review_recipe_count = sum(bool(record.get("review_reason_codes")) for record in matched_records)
     query_key = clean_recipe_menu_text(query).casefold()
     filtered = matched_records
+    if review_only:
+        filtered = [record for record in filtered if record.get("review_reason_codes")]
     if query_key:
-        filtered = [record for record in matched_records if query_key in " ".join((
+        filtered = [record for record in filtered if query_key in " ".join((
             first_recipe_menu_text(record["data"].get("recipe_title"), record["data"].get("menu_item_name")),
             clean_recipe_menu_text(record.get("cookbook_name")),
         )).casefold()]
@@ -3406,7 +3587,6 @@ def editable_restaurant_usage(restaurant_id, page=1, per_page=50, query="", curr
         per_page,
         sorted(inventory["cookbook_ids"]),
     )
-    recipe_meta_index = load_recipe_ingredients()
     return {
         "ok": True,
         "restaurant_id": restaurant_id,
@@ -3422,6 +3602,8 @@ def editable_restaurant_usage(restaurant_id, page=1, per_page=50, query="", curr
         "page": page,
         "per_page": per_page,
         "filtered_recipe_count": len(filtered),
+        "review_recipe_count": review_recipe_count,
+        "review_only": bool(review_only),
         "has_more": start + len(page_records) < len(filtered),
         "recipes": [
             editable_restaurant_usage_row(
@@ -3449,6 +3631,9 @@ def backfill_editable_restaurant_usage(restaurant_id):
         updated += 1
     if has_request_context():
         g.pop("_recipe_edit_output_index", None)
+        cache = getattr(g, "_editable_restaurant_usage_inventories", None)
+        if isinstance(cache, dict):
+            cache.pop(clean_recipe_menu_text(restaurant_id), None)
     result = editable_restaurant_usage(restaurant_id, page=1, per_page=50)
     result["backfilled_recipe_count"] = updated
     return result

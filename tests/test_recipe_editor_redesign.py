@@ -452,6 +452,34 @@ def test_restaurant_usage_duplicate_review_is_explicit_accessible_and_transactio
     assert '"user_id": _clean(active_user_id())' in service
 
 
+def test_restaurant_usage_review_toggle_is_accessible_server_filtered_and_paginated():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    routes = read_text("PushShoppingList/routes/recipe_routes.py")
+    service = read_text("PushShoppingList/services/recipe_edit_service.py")
+
+    toolbar_start = template.index('<footer class="recipe-edit-restaurant-usage-panel-actions">')
+    toolbar_end = template.index("</footer>", toolbar_start)
+    toolbar = template[toolbar_start:toolbar_end]
+    assert 'role="switch"' in toolbar
+    assert 'data-restaurant-usage-review-only' in toolbar
+    assert 'aria-label="Show review items only"' in toolbar
+    assert toolbar.index("Review Items Only") < toolbar.index("Load More")
+    assert "function toggleRecipeRestaurantUsageReviewOnly(input)" in script
+    assert 'params.set("review_only", "1")' in script
+    assert "query: recipeRestaurantUsageQuery" in script
+    assert "page: 1" in script
+    assert "No recipes need review" in script
+    assert "No review items match your search" in script
+    assert "review_reason_labels" in script
+    assert ".recipe-edit-restaurant-review-toggle" in css
+    assert "input:checked + .recipe-edit-restaurant-review-toggle-track" in css
+    assert 'request.args.get("review_only"' in routes
+    assert "review_recipe_count" in service
+    assert '"review_reason_codes"' in service
+
+
 def test_source_documents_card_uses_compact_rows_and_edit_modal():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")

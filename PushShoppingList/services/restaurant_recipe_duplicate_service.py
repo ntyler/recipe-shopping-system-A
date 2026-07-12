@@ -241,16 +241,31 @@ def restaurant_recipe_duplicate_groups(restaurant_id, include_ignored=False):
     return {"ok": True, "restaurant_id": _clean(restaurant_id), "groups": groups}
 
 
-def decorate_restaurant_usage_with_duplicates(result, restaurant_id):
-    if not isinstance(result, dict) or not result.get("ok"):
-        return result
+def restaurant_recipe_duplicate_index(restaurant_id):
     grouped = restaurant_recipe_duplicate_groups(restaurant_id)
     if not grouped.get("ok"):
-        return result
+        return grouped
     group_by_url = {}
     for group in grouped["groups"]:
         for record in group["records"]:
-            group_by_url[recipe_url_service.normalize_recipe_url_key(_record_url(record))] = group
+            recipe_key = recipe_url_service.normalize_recipe_url_key(_record_url(record))
+            if recipe_key:
+                group_by_url[recipe_key] = group
+    return {
+        "ok": True,
+        "restaurant_id": _clean(restaurant_id),
+        "groups": grouped["groups"],
+        "group_by_url": group_by_url,
+    }
+
+
+def decorate_restaurant_usage_with_duplicates(result, restaurant_id, duplicate_index=None):
+    if not isinstance(result, dict) or not result.get("ok"):
+        return result
+    duplicate_index = duplicate_index if isinstance(duplicate_index, dict) else restaurant_recipe_duplicate_index(restaurant_id)
+    if not duplicate_index.get("ok"):
+        return result
+    group_by_url = duplicate_index.get("group_by_url") or {}
     visible_groups = set()
     for row in result.get("recipes", []):
         group = group_by_url.get(recipe_url_service.normalize_recipe_url_key(row.get("url")))
@@ -261,7 +276,7 @@ def decorate_restaurant_usage_with_duplicates(result, restaurant_id):
         if group["group_id"] not in visible_groups:
             row["duplicate_badge"] = group["badge_label"]
             visible_groups.add(group["group_id"])
-    result["duplicate_group_count"] = len(grouped["groups"])
+    result["duplicate_group_count"] = len(duplicate_index.get("groups") or [])
     return result
 
 

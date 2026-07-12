@@ -33161,9 +33161,32 @@ img[data-deferred-src] {
     font-weight: 750;
 }
 
+.recipe-edit-restaurant-review-reasons {
+    display: flex;
+    min-width: 0;
+    gap: 5px;
+    overflow: hidden;
+}
+
+.recipe-edit-restaurant-review-reasons small {
+    min-width: 0;
+    overflow: hidden;
+    padding: 2px 6px;
+    border: 1px solid rgba(245, 158, 11, .36);
+    border-radius: 999px;
+    color: #e5b456;
+    font-size: 10px;
+    font-weight: 750;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .recipe-edit-restaurant-usage-panel-actions {
     display: flex;
     flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 16px;
@@ -33188,9 +33211,103 @@ img[data-deferred-src] {
     color: var(--app-primary-hover);
 }
 
+.recipe-edit-restaurant-usage-panel-actions [data-restaurant-usage-load-more] {
+    margin-left: auto;
+}
+
+.recipe-edit-restaurant-review-toggle {
+    position: relative;
+    display: inline-flex;
+    min-height: 32px;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    color: #c8d0cc;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 750;
+    line-height: 1.2;
+    user-select: none;
+}
+
+.recipe-edit-restaurant-review-toggle input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.recipe-edit-restaurant-review-toggle-track {
+    position: relative;
+    display: inline-flex;
+    width: 36px;
+    height: 20px;
+    flex: 0 0 36px;
+    align-items: center;
+    padding: 2px;
+    border: 1px solid #66716c;
+    border-radius: 999px;
+    background: #222926;
+    transition: border-color .16s ease, background-color .16s ease;
+}
+
+.recipe-edit-restaurant-review-toggle-track > span {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #aeb8b2;
+    transition: transform .16s ease, background-color .16s ease;
+}
+
+.recipe-edit-restaurant-review-toggle:hover .recipe-edit-restaurant-review-toggle-track {
+    border-color: #89948f;
+}
+
+.recipe-edit-restaurant-review-toggle input:checked + .recipe-edit-restaurant-review-toggle-track {
+    border-color: var(--app-primary);
+    background: rgba(16, 185, 129, .26);
+}
+
+.recipe-edit-restaurant-review-toggle input:checked + .recipe-edit-restaurant-review-toggle-track > span {
+    background: var(--app-primary-hover);
+    transform: translateX(16px);
+}
+
+.recipe-edit-restaurant-review-toggle input:focus-visible + .recipe-edit-restaurant-review-toggle-track {
+    outline: 2px solid var(--app-primary);
+    outline-offset: 3px;
+}
+
 .recipe-edit-restaurant-usage-empty {
+    display: grid;
+    gap: 6px;
     margin: 0;
     padding: 18px 16px;
+}
+
+.recipe-edit-restaurant-usage-empty strong {
+    color: var(--app-text-strong);
+    font-size: 13px;
+}
+
+.recipe-edit-restaurant-usage-empty span {
+    color: #aeb8b2;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .recipe-edit-restaurant-review-toggle-track,
+    .recipe-edit-restaurant-review-toggle-track > span {
+        transition: none;
+    }
 }
 
 .recipe-edit-restaurant-duplicate-review {

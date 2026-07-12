@@ -25137,9 +25137,12 @@ let recipeRestaurantUsagePage = 1;
 let recipeRestaurantUsageHasMore = false;
 let recipeRestaurantUsageQuery = "";
 let recipeRestaurantUsageTotal = 0;
+let recipeRestaurantUsageReviewOnly = false;
+let recipeRestaurantUsageReviewCount = 0;
 let recipeRestaurantUsageRestaurantName = "";
 let recipeRestaurantUsageMigrationStatus = {};
 let recipeRestaurantUsageSearchDebounce = null;
+let recipeRestaurantUsageRequest = 0;
 let recipeRestaurantDuplicateReviewData = null;
 let recipeRestaurantDuplicateReviewTrigger = null;
 let recipeRestaurantDuplicatePendingPreview = null;
@@ -25522,6 +25525,8 @@ function setRecipeRestaurantUsageEmpty() {
     recipeRestaurantUsageHasMore = false;
     recipeRestaurantUsageQuery = "";
     recipeRestaurantUsageTotal = 0;
+    recipeRestaurantUsageReviewOnly = false;
+    recipeRestaurantUsageReviewCount = 0;
     recipeRestaurantUsageRestaurantName = "";
     recipeRestaurantUsageMigrationStatus = {};
     const count = document.querySelector("[data-restaurant-usage-recipes]");
@@ -25531,6 +25536,8 @@ function setRecipeRestaurantUsageEmpty() {
     const repair = document.querySelector("[data-restaurant-usage-repair]");
     const backfill = document.querySelector("[data-restaurant-usage-backfill]");
     const loadMore = document.querySelector("[data-restaurant-usage-load-more]");
+    const reviewToggle = document.querySelector("[data-restaurant-usage-review-only]");
+    const reviewLabel = document.querySelector("[data-restaurant-usage-review-label]");
     if (count) count.textContent = "Not currently used by any recipes.";
     if (cookbooks) cookbooks.hidden = true;
     if (note) note.hidden = true;
@@ -25538,6 +25545,11 @@ function setRecipeRestaurantUsageEmpty() {
     if (repair) repair.hidden = true;
     if (backfill) backfill.hidden = true;
     if (loadMore) loadMore.hidden = true;
+    if (reviewToggle) {
+        reviewToggle.checked = false;
+        reviewToggle.setAttribute("aria-checked", "false");
+    }
+    if (reviewLabel) reviewLabel.textContent = "Review Items Only";
     renderRecipeRestaurantUsageList();
 }
 
@@ -25566,7 +25578,13 @@ function setRecipeRestaurantEditMode(record, options = {}) {
     closeRecipeRestaurantFetchReview({ restoreFocus: false });
     closeRecipeRestaurantDuplicateReview({ restoreFocus: false });
     if (recipeRestaurantEditCreateMode) setRecipeRestaurantUsageEmpty();
-    else loadRecipeRestaurantUsage(recipeRestaurantRecordId(record));
+    else {
+        recipeRestaurantUsageQuery = "";
+        recipeRestaurantUsageReviewOnly = false;
+        const search = document.querySelector("[data-restaurant-usage-search]");
+        if (search) search.value = "";
+        loadRecipeRestaurantUsage(recipeRestaurantRecordId(record), { query: "", reviewOnly: false });
+    }
     updateRecipeRestaurantEditState(form);
 }
 
@@ -25701,7 +25719,13 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
     const list = document.querySelector("[data-restaurant-usage-list]");
     if (!list) return;
     if (!recipes.length) {
-        list.innerHTML = '<p class="recipe-edit-restaurant-usage-empty">No recipes currently reference this restaurant.</p>';
+        if (recipeRestaurantUsageReviewOnly && recipeRestaurantUsageQuery) {
+            list.innerHTML = '<div class="recipe-edit-restaurant-usage-empty"><strong>No review items match your search</strong></div>';
+        } else if (recipeRestaurantUsageReviewOnly) {
+            list.innerHTML = '<div class="recipe-edit-restaurant-usage-empty"><strong>No recipes need review</strong><span>All recipes using this restaurant currently pass the available review checks.</span></div>';
+        } else {
+            list.innerHTML = '<div class="recipe-edit-restaurant-usage-empty"><strong>No recipes currently reference this restaurant.</strong></div>';
+        }
         return;
     }
     list.innerHTML = recipes.map(recipe => {
@@ -25712,6 +25736,14 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
         const category = String(recipe.category_label || "").trim();
         const duplicateBadge = String(recipe.duplicate_badge || "").trim();
         const duplicateGroupId = String(recipe.duplicate_group_id || "").trim();
+        const reviewLabels = Array.isArray(recipe.review_reason_labels)
+            ? recipe.review_reason_labels.map(value => String(value || "").trim()).filter(Boolean)
+            : [];
+        const visibleReviewLabels = reviewLabels.filter(label => {
+            if (label === "Possible duplicate" && duplicateBadge) return false;
+            if (label === "Needs restaurant link" && recipe.relationship_status === "legacy_clear") return false;
+            return true;
+        }).slice(0, 2);
         const relationship = recipe.relationship_status === "legacy_clear"
             ? '<small class="recipe-edit-restaurant-usage-link-status">Needs restaurant link</small>'
             : "";
@@ -25727,6 +25759,7 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
                 </span>
                 ${metadata.length ? `<span>${escapeHtml(metadata.join(" · "))}</span>` : ""}
                 ${category ? `<small class="recipe-edit-restaurant-usage-category">${escapeHtml(category)}</small>` : ""}
+                ${visibleReviewLabels.length ? `<span class="recipe-edit-restaurant-review-reasons">${visibleReviewLabels.map(label => `<small>${escapeHtml(label)}</small>`).join("")}</span>` : ""}
                 ${relationship}
             </div>
         </article>`;
@@ -25741,6 +25774,8 @@ function applyRecipeRestaurantUsageResponse(data, options = {}) {
     const repair = document.querySelector("[data-restaurant-usage-repair]");
     const backfill = document.querySelector("[data-restaurant-usage-backfill]");
     const loadMore = document.querySelector("[data-restaurant-usage-load-more]");
+    const reviewToggle = document.querySelector("[data-restaurant-usage-review-only]");
+    const reviewLabel = document.querySelector("[data-restaurant-usage-review-label]");
     const panelTitle = document.querySelector("[data-restaurant-usage-panel-title]");
     const rows = Array.isArray(data.recipes) ? data.recipes : [];
     if (options.append) {
@@ -25754,6 +25789,8 @@ function applyRecipeRestaurantUsageResponse(data, options = {}) {
     recipeRestaurantUsagePage = Number(data.page) || 1;
     recipeRestaurantUsageHasMore = Boolean(data.has_more);
     recipeRestaurantUsageTotal = Number(data.recipe_count) || 0;
+    recipeRestaurantUsageReviewOnly = Boolean(data.review_only);
+    recipeRestaurantUsageReviewCount = Number(data.review_recipe_count) || 0;
     recipeRestaurantUsageRestaurantName = String(data.restaurant_name || recipeRestaurantRecordName(recipeRestaurantEditSelection) || "This Restaurant").trim();
     recipeRestaurantUsageMigrationStatus = data.migration_status || {};
     const cookbookCount = Number(data.cookbook_count) || 0;
@@ -25795,6 +25832,11 @@ function applyRecipeRestaurantUsageResponse(data, options = {}) {
         backfill.textContent = `Link ${legacyCount} Clear Match${legacyCount === 1 ? "" : "es"}`;
     }
     if (loadMore) loadMore.hidden = !recipeRestaurantUsageHasMore;
+    if (reviewToggle) {
+        reviewToggle.checked = recipeRestaurantUsageReviewOnly;
+        reviewToggle.setAttribute("aria-checked", String(recipeRestaurantUsageReviewOnly));
+    }
+    if (reviewLabel) reviewLabel.textContent = `Review Items Only (${recipeRestaurantUsageReviewCount})`;
     if (panelTitle) panelTitle.textContent = `Recipes Using ${recipeRestaurantUsageRestaurantName} — ${recipeRestaurantUsageTotal}`;
     const searchWrap = document.querySelector("[data-restaurant-usage-search-wrap]");
     if (searchWrap) searchWrap.hidden = recipeRestaurantUsageTotal <= 20;
@@ -25811,8 +25853,13 @@ async function loadRecipeRestaurantUsage(restaurantId, options = {}) {
     const page = Math.max(1, Number(options.page) || 1);
     const append = Boolean(options.append);
     const query = String(options.query ?? recipeRestaurantUsageQuery ?? "").trim();
+    const reviewOnly = options.reviewOnly === undefined
+        ? recipeRestaurantUsageReviewOnly
+        : Boolean(options.reviewOnly);
+    const requestId = ++recipeRestaurantUsageRequest;
     recipeRestaurantUsageRestaurantId = String(restaurantId || recipeRestaurantUsageRestaurantId || "").trim();
     recipeRestaurantUsageQuery = query;
+    recipeRestaurantUsageReviewOnly = reviewOnly;
     if (!append) recipeRestaurantUsageRecipes = [];
     if (page === 1 && !query) {
         if (count) count.textContent = "Loading usage…";
@@ -25839,11 +25886,14 @@ async function loadRecipeRestaurantUsage(restaurantId, options = {}) {
             current_recipe_url: recipeEditorSourceUrlForOpen() || "",
         });
         if (query) params.set("q", query);
+        if (reviewOnly) params.set("review_only", "1");
         const response = await fetch(`/api/recipe/restaurant-usage?${params.toString()}`);
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.error || "Unable to load restaurant usage.");
+        if (requestId !== recipeRestaurantUsageRequest) return;
         applyRecipeRestaurantUsageResponse(data, { append });
     } catch (err) {
+        if (requestId !== recipeRestaurantUsageRequest) return;
         if (page === 1 && !query && count) count.textContent = "Usage data unavailable.";
         if (page === 1 && !query && cookbooks) cookbooks.hidden = true;
         if (page === 1 && !query && note) note.hidden = true;
@@ -25854,6 +25904,7 @@ async function loadRecipeRestaurantUsage(restaurantId, options = {}) {
             view.dataset.restaurantUsageMode = "retry";
         }
     } finally {
+        if (requestId !== recipeRestaurantUsageRequest) return;
         if (loadMore) {
             loadMore.disabled = false;
             loadMore.textContent = "Load More";
@@ -25906,7 +25957,11 @@ async function backfillUnlinkedRecipeRestaurants(button) {
         recipeRestaurantUsageQuery = "";
         const search = document.querySelector("[data-restaurant-usage-search]");
         if (search) search.value = "";
-        applyRecipeRestaurantUsageResponse(data);
+        await loadRecipeRestaurantUsage(restaurantId, {
+            page: 1,
+            query: "",
+            reviewOnly: recipeRestaurantUsageReviewOnly,
+        });
     } catch (err) {
         setRecipeRestaurantFetchError(err.message || "Unable to link restaurant recipes.");
     } finally {
@@ -25922,6 +25977,7 @@ function loadMoreRecipeRestaurantUsage(button) {
         page: recipeRestaurantUsagePage + 1,
         append: true,
         query: recipeRestaurantUsageQuery,
+        reviewOnly: recipeRestaurantUsageReviewOnly,
     });
     return false;
 }
@@ -25935,10 +25991,26 @@ function closeRecipeRestaurantUsagePanel() {
 
 function filterRecipeRestaurantUsage(value) {
     const query = String(value || "").trim();
+    recipeRestaurantUsageQuery = query;
     window.clearTimeout(recipeRestaurantUsageSearchDebounce);
     recipeRestaurantUsageSearchDebounce = window.setTimeout(() => {
-        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query });
+        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, {
+            page: 1,
+            query,
+            reviewOnly: recipeRestaurantUsageReviewOnly,
+        });
     }, 250);
+}
+
+function toggleRecipeRestaurantUsageReviewOnly(input) {
+    recipeRestaurantUsageReviewOnly = Boolean(input?.checked);
+    input?.setAttribute("aria-checked", String(recipeRestaurantUsageReviewOnly));
+    loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, {
+        page: 1,
+        query: recipeRestaurantUsageQuery,
+        reviewOnly: recipeRestaurantUsageReviewOnly,
+    });
+    return false;
 }
 
 function recipeRestaurantDuplicateReviewPanel() {
@@ -26067,7 +26139,7 @@ async function setRecipeRestaurantDuplicateDisposition(disposition) {
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save duplicate review.");
         closeRecipeRestaurantDuplicateReview();
-        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query: recipeRestaurantUsageQuery });
+        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query: recipeRestaurantUsageQuery, reviewOnly: recipeRestaurantUsageReviewOnly });
     } catch (err) {
         setRecipeRestaurantDuplicateError(err.message || "Unable to save duplicate review.");
     }
@@ -26141,7 +26213,7 @@ async function commitRecipeRestaurantDuplicateMerge(button) {
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.error || "Unable to merge duplicate recipes.");
         closeRecipeRestaurantDuplicateReview();
-        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query: recipeRestaurantUsageQuery });
+        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query: recipeRestaurantUsageQuery, reviewOnly: recipeRestaurantUsageReviewOnly });
     } catch (err) {
         setRecipeRestaurantDuplicateError(err.message || "Unable to merge duplicate recipes.");
     } finally {
@@ -26203,7 +26275,7 @@ async function commitRecipeRestaurantDuplicateDelete(button) {
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.error || "Unable to delete duplicate recipe.");
         closeRecipeRestaurantDuplicateReview();
-        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query: recipeRestaurantUsageQuery });
+        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query: recipeRestaurantUsageQuery, reviewOnly: recipeRestaurantUsageReviewOnly });
     } catch (err) {
         setRecipeRestaurantDuplicateError(err.message || "Unable to delete duplicate recipe.");
     } finally {
