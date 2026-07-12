@@ -24518,6 +24518,7 @@ function syncRecipeEditDocumentRows() {
         const status = row.querySelector("[data-document-status]");
         const open = row.querySelector("[data-document-open]");
         const download = row.querySelector("[data-document-download]");
+        const cloudUpload = row.querySelector("[data-document-cloud-upload]");
         const copy = row.querySelector("[data-document-copy]");
         const input = document.getElementById(inputId);
         const sourceValue = inputId === "recipeEditSourceUrl"
@@ -24555,6 +24556,11 @@ function syncRecipeEditDocumentRows() {
             download.href = downloadable ? href : "#";
         }
 
+        if (cloudUpload) {
+            const cloudflareSource = recipeEditInputValue("recipeEditSourceCloudflarePdfUrl");
+            cloudUpload.hidden = !hasValue || Boolean(cloudflareSource);
+        }
+
         if (copy) {
             copy.disabled = !hasValue;
             copy.dataset.copyValue = sourceValue;
@@ -24573,6 +24579,82 @@ function syncRecipeEditDocumentRows() {
         }
         empty.hidden = rows.some(row => !row.hidden);
     }
+}
+
+function openRecipeSourceDocumentsHelp(button) {
+    const popover = document.getElementById("recipeEditSourceDocumentsHelp");
+    if (!button || !popover) return false;
+    popover.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+    return false;
+}
+
+function closeRecipeSourceDocumentsHelp() {
+    const popover = document.getElementById("recipeEditSourceDocumentsHelp");
+    const button = document.querySelector(".recipe-edit-source-documents-help");
+    if (popover) popover.hidden = true;
+    if (button) button.setAttribute("aria-expanded", "false");
+}
+
+function toggleRecipeSourceDocumentsHelp(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    return openRecipeSourceDocumentsHelp(button);
+}
+
+document.addEventListener("pointerdown", event => {
+    const popover = document.getElementById("recipeEditSourceDocumentsHelp");
+    const button = document.querySelector(".recipe-edit-source-documents-help");
+    if (!popover || popover.hidden || popover.contains(event.target) || button?.contains(event.target)) return;
+    closeRecipeSourceDocumentsHelp();
+});
+
+document.addEventListener("focusin", event => {
+    const popover = document.getElementById("recipeEditSourceDocumentsHelp");
+    const button = document.querySelector(".recipe-edit-source-documents-help");
+    if (!popover || popover.hidden || popover.contains(event.target) || button?.contains(event.target)) return;
+    closeRecipeSourceDocumentsHelp();
+});
+
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !document.getElementById("recipeEditSourceDocumentsHelp")?.hidden) {
+        closeRecipeSourceDocumentsHelp();
+        document.querySelector(".recipe-edit-source-documents-help")?.focus();
+    }
+});
+
+async function uploadRecipeSourcePdfToCloudflare(button) {
+    if (!button || button.disabled) return false;
+    const recipeUrl = recipeEditorSourceUrlForOpen();
+    if (!recipeUrl) return false;
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    try {
+        const response = await fetch("/api/recipe_pdf/cloudflare_upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: recipeUrl, kind: "webpage_backup" }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to upload Source PDF to Cloudflare.");
+        const publicUrl = String(data.source_cloudflare_pdf_url || data.public_url || "").trim();
+        setValue("recipeEditSourceCloudflarePdfUrl", publicUrl);
+        const link = document.getElementById("recipeEditSourceCloudflarePdfUrlLink");
+        if (link) {
+            link.href = publicUrl || "#";
+            link.hidden = !publicUrl;
+        }
+        syncRecipeEditDocumentRows();
+        setRecipeEditStatus("Source PDF uploaded to Cloudflare.");
+    } catch (err) {
+        setRecipeEditStatus(err.message || "Unable to upload Source PDF to Cloudflare.", true);
+    } finally {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+    }
+    return false;
 }
 
 function recipeEditDocumentSlug(value, fallback = "document") {

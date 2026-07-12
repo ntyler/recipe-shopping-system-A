@@ -32502,7 +32502,14 @@ img[data-deferred-src] {
 }
 
 /* Compact Source & Documents list. */
+.recipe-edit-standalone-page .recipe-edit-source-documents-card {
+    position: relative;
+    overflow: visible;
+}
+
 .recipe-edit-standalone-page .recipe-edit-source-documents-card > summary {
+    position: relative;
+    overflow: visible;
     min-height: 44px;
     padding: 13px 14px;
 }
@@ -32518,11 +32525,71 @@ img[data-deferred-src] {
     width: 16px;
     height: 16px;
     place-items: center;
-    border: 1px solid var(--app-border-strong);
+    min-height: 16px;
+    margin: 0;
+    padding: 0;
+    border: 0;
     border-radius: 50%;
     color: var(--app-muted);
-    font-size: 9px;
+    background: transparent;
     line-height: 1;
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-help svg {
+    width: 15px;
+    height: 15px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-popover {
+    position: absolute;
+    top: 40px;
+    left: 12px;
+    z-index: 500;
+    width: min(340px, calc(100vw - 48px));
+    padding: 13px 14px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 9px;
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.46);
+    cursor: default;
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-popover > strong {
+    color: var(--app-text-strong);
+    font-size: 11px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-popover p {
+    margin: 5px 0 9px;
+    color: var(--app-muted);
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-popover p:last-child {
+    margin-bottom: 0;
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-popover dl {
+    display: grid;
+    gap: 2px 8px;
+    grid-template-columns: max-content minmax(0, 1fr);
+    margin: 0;
+    font-size: 8px;
+    line-height: 1.35;
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-popover dt {
+    color: var(--app-text-strong);
+    font-weight: 800;
+}
+
+.recipe-edit-standalone-page .recipe-edit-source-documents-popover dd {
+    min-width: 0;
+    margin: 0;
+    color: var(--app-muted);
 }
 
 .recipe-edit-standalone-page .recipe-edit-document-list {
@@ -32630,6 +32697,7 @@ img[data-deferred-src] {
 .recipe-edit-standalone-page .recipe-edit-document-secondary {
     display: grid;
     min-height: 26px;
+    margin: 0;
     padding: 0;
     place-items: center;
     border: 1px solid var(--app-border);
@@ -32639,6 +32707,11 @@ img[data-deferred-src] {
     font-size: 14px;
     line-height: 1;
     text-decoration: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-document-secondary svg {
+    width: 14px;
+    height: 14px;
 }
 
 .recipe-edit-standalone-page .recipe-edit-document-secondary:hover,

@@ -224,6 +224,10 @@ def test_source_documents_card_uses_compact_rows_and_context_action_menus():
     )
 
     assert "recipe-edit-source-documents-help" in card
+    assert "recipeEditSourceDocumentsHelp" in card
+    assert 'role="dialog"' in card
+    assert "Original webpage the recipe was imported from." in card
+    assert "Use Open to view a document." in card
     assert "recipe-edit-context-chevron" not in card
     assert card.count("data-recipe-edit-document-row") == len(expected_labels)
     assert card.count("recipe-edit-document-icon") == len(expected_labels)
@@ -231,6 +235,11 @@ def test_source_documents_card_uses_compact_rows_and_context_action_menus():
     assert "recipe-edit-document-more" not in card
     assert card.count("data-document-open hidden") == len(expected_labels)
     assert card.count("recipe-edit-document-secondary") == 6
+    assert card.count('shell.svg_icon("link")') == 2
+    assert card.count('shell.svg_icon("document")') == 4
+    assert card.count('shell.svg_icon("external-link")') == 2
+    assert card.count('shell.svg_icon("download")') == 1
+    assert card.count('shell.svg_icon("cloud-upload")') == 1
     assert all(label in card for label in expected_labels)
     assert 'row.hidden = !hasValue;' in script
     assert 'status.title = `${sourceValue} (click to copy)`;' in script
@@ -241,6 +250,9 @@ def test_source_documents_card_uses_compact_rows_and_context_action_menus():
     assert ".recipe-edit-standalone-page .recipe-edit-document-secondary {" in css
     assert 'data-document-input-id="recipeEditGeneratedPdfPath"] { order: 4; }' in css
     assert "function recipeEditDocumentSlug(value, fallback = \"document\")" in script
+    assert "function toggleRecipeSourceDocumentsHelp" in script
+    assert "function uploadRecipeSourcePdfToCloudflare" in script
+    assert 'kind: "webpage_backup"' in script
 
 def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
