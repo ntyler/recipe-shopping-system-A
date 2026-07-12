@@ -166,7 +166,7 @@ def test_restaurant_source_card_uses_compact_identity_details_and_actions():
     assert ".recipe-edit-standalone-page .recipe-edit-restaurant-details {" in css
 
 
-def test_restaurant_source_card_has_inline_edit_mode_and_save_wiring():
+def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
@@ -179,14 +179,32 @@ def test_restaurant_source_card_has_inline_edit_mode_and_save_wiring():
     ):
         assert f'data-restaurant-edit-field="{field}"' in template
     assert "data-restaurant-edit-form" in template
+    assert "data-restaurant-edit-modal" in template
+    assert 'role="dialog"' in template
+    assert 'aria-modal="true"' in template
+    assert "Edit Restaurant Source" in template
     assert "Save Changes" in template
     assert "cancelRecipeRestaurantSourceEdit" in template
     assert "async function saveRecipeRestaurantSource(form)" in script
     assert 'fetch("/api/recipe/restaurant-source"' in script
     assert 'save.textContent = "Saving..."' in script
     assert "recipeRestaurantEditSnapshot" in script
+    assert "function recipeRestaurantModalFocusableElements()" in script
+    assert 'event.key === "Escape"' in script
+    assert 'event.key !== "Tab"' in script
+    assert "Discard unsaved restaurant changes?" in script
+    assert 'document.body.classList.add("restaurant-source-modal-open")' in script
+    assert 'trigger?.focus({ preventScroll: true })' in script
     assert '@recipe_bp.route("/api/recipe/restaurant-source", methods=["POST"])' in route
     assert ".recipe-edit-standalone-page .recipe-edit-restaurant-form {" in css
+    assert ".recipe-edit-restaurant-modal-backdrop {" in css
+    assert ".recipe-edit-restaurant-modal-body {" in css
+    assert "overflow-y: auto;" in css
+
+    card_start = template.index('<details class="recipe-edit-context-card recipe-edit-restaurant-card"')
+    card_end = template.index("</details>", card_start)
+    assert "data-restaurant-edit-field" not in template[card_start:card_end]
+    assert template.index("data-restaurant-edit-modal") > card_end
 
 
 def test_source_documents_card_uses_compact_rows_and_context_action_menus():

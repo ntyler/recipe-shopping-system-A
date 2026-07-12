@@ -2205,7 +2205,15 @@
                             <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="menu" hidden><span aria-hidden="true">&#9776;</span> Open Menu</a>
                             <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="map" hidden><span aria-hidden="true">&#9906;</span> Google Maps</a>
                         </div>
-                        <form class="recipe-edit-restaurant-form" data-restaurant-edit-form hidden onsubmit="return saveRecipeRestaurantSource(this)">
+                    </details>
+                    <div class="recipe-edit-restaurant-modal-backdrop" data-restaurant-edit-modal hidden>
+                        <section class="recipe-edit-restaurant-modal" role="dialog" aria-modal="true" aria-labelledby="recipeEditRestaurantModalTitle">
+                        <form class="recipe-edit-restaurant-form" data-restaurant-edit-form onsubmit="return saveRecipeRestaurantSource(this)">
+                            <header class="recipe-edit-restaurant-modal-header">
+                                <h2 id="recipeEditRestaurantModalTitle">Edit Restaurant Source</h2>
+                                <button type="button" aria-label="Close Edit Restaurant Source" onclick="return cancelRecipeRestaurantSourceEdit(this)">&times;</button>
+                            </header>
+                            <div class="recipe-edit-restaurant-modal-body">
                             <div class="recipe-edit-restaurant-form-logo">
                                 <span class="recipe-edit-restaurant-avatar" data-restaurant-edit-logo>
                                     <img src="" alt="" hidden>
@@ -2228,12 +2236,14 @@
                             <label><span>Postal Code</span><input type="text" data-restaurant-edit-field="restaurant_postal_code"></label>
                             <label><span>Country</span><input type="text" data-restaurant-edit-field="restaurant_country"></label>
                             <p class="recipe-edit-restaurant-form-error" data-restaurant-edit-error hidden></p>
-                            <div class="recipe-edit-restaurant-form-actions recipe-edit-restaurant-form-wide">
+                            </div>
+                            <footer class="recipe-edit-restaurant-form-actions">
                                 <button type="button" onclick="return cancelRecipeRestaurantSourceEdit(this)">Cancel</button>
                                 <button type="submit" class="primary" data-restaurant-edit-save disabled>Save Changes</button>
-                            </div>
+                            </footer>
                         </form>
-                    </details>
+                        </section>
+                    </div>
 
                     <details class="recipe-edit-context-card recipe-edit-ingredient-gallery-card" open>
                         <summary>

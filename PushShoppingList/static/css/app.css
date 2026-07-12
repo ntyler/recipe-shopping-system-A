@@ -32315,15 +32315,74 @@ img[data-deferred-src] {
     color: var(--app-primary-hover);
 }
 
-.recipe-edit-standalone-page .recipe-edit-restaurant-card.is-editing .recipe-edit-restaurant-edit {
-    display: none;
+.restaurant-source-modal-open {
+    overflow: hidden !important;
+}
+
+.recipe-edit-restaurant-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: grid;
+    padding: 16px;
+    place-items: center;
+    background: rgba(2, 6, 8, 0.72);
+    backdrop-filter: blur(3px);
+}
+
+.recipe-edit-restaurant-modal {
+    width: min(740px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    overflow: hidden;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 11px;
+    background: var(--app-surface);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
 }
 
 .recipe-edit-standalone-page .recipe-edit-restaurant-form {
+    display: flex;
+    max-height: calc(100vh - 32px);
+    flex-direction: column;
+}
+
+.recipe-edit-restaurant-modal-header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 52px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-surface);
+}
+
+.recipe-edit-restaurant-modal-header h2 {
+    margin: 0;
+    color: var(--app-text-strong);
+    font-size: 15px;
+    text-align: left;
+}
+
+.recipe-edit-restaurant-modal-header button {
+    width: 30px;
+    min-height: 30px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-muted);
+    font-size: 20px;
+}
+
+.recipe-edit-restaurant-modal-body {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    padding: 4px 12px 12px;
+    min-height: 0;
+    padding: 14px 16px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .recipe-edit-standalone-page .recipe-edit-restaurant-form label {
@@ -32380,8 +32439,11 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-page .recipe-edit-restaurant-form-actions {
+    flex: 0 0 auto;
     justify-content: flex-end;
-    padding-top: 2px;
+    padding: 11px 16px;
+    border-top: 1px solid var(--app-border);
+    background: var(--app-surface);
 }
 
 .recipe-edit-standalone-page .recipe-edit-restaurant-form-actions .primary {
@@ -32406,11 +32468,24 @@ img[data-deferred-src] {
 }
 
 @media (max-width: 760px) {
+    .recipe-edit-restaurant-modal-backdrop {
+        padding: 8px;
+    }
+
+    .recipe-edit-restaurant-modal {
+        width: calc(100vw - 16px);
+        max-height: calc(100vh - 16px);
+    }
+
     .recipe-edit-standalone-page .recipe-edit-restaurant-form {
+        max-height: calc(100vh - 16px);
+    }
+
+    .recipe-edit-restaurant-modal-body {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .recipe-edit-standalone-page .recipe-edit-restaurant-form > * {
+    .recipe-edit-restaurant-modal-body > * {
         grid-column: 1;
     }
 }
