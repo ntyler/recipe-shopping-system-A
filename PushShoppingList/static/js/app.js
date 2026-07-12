@@ -24565,7 +24565,10 @@ function organizeRecipeEditHeaderActions() {
     const headerMenu = actions ? actions.querySelector(".recipe-edit-header-image-menu") : null;
     if (actions && createPdf && menuWrap) {
         createPdf.classList.add("recipe-edit-header-pdf-button", "recipe-edit-header-create-pdf-button");
-        createPdf.textContent = "Recipe PDF";
+        const pdfButton = document.getElementById("recipeEditPdfButton");
+        createPdf.innerHTML = pdfButton
+            ? pdfButton.innerHTML
+            : '<span>Recipe PDF</span>';
         actions.insertBefore(createPdf, menuWrap);
     }
     if (headerMenu && menuOrder) {
@@ -28511,6 +28514,20 @@ function handleRecipeEditRowMenuOutsideClick(event) {
     closeRecipeEditRowMenus();
 }
 
+function handleRecipeEditRowMenuEscape(event) {
+    if (!event || event.key !== "Escape" || !recipeEditRowMenuIsOpen()) {
+        return;
+    }
+
+    const button = document.querySelector(
+        ".recipe-edit-row-menu-btn[aria-expanded=\"true\"], "
+        + ".recipe-edit-section-menu-wrap button[aria-expanded=\"true\"]"
+    );
+    event.preventDefault();
+    closeRecipeEditRowMenus();
+    if (button) button.focus({ preventScroll: true });
+}
+
 function handleRecipeEditRowMenuScrollOrResize() {
     if (!recipeEditRowMenuIsOpen()) {
         return;
@@ -30900,7 +30917,8 @@ async function saveRecipeEditor(event) {
 
     if (saveButton) {
         saveButton.disabled = true;
-        saveButton.textContent = "Saving...";
+        const saveLabel = saveButton.querySelector("span");
+        if (saveLabel) saveLabel.textContent = "Saving...";
     }
 
     setRecipeEditStatus("Saving recipe...");
@@ -31041,7 +31059,8 @@ async function saveRecipeEditor(event) {
     } finally {
         if (saveButton) {
             saveButton.disabled = false;
-            saveButton.textContent = "Save Recipe";
+            const saveLabel = saveButton.querySelector("span");
+            if (saveLabel) saveLabel.textContent = "Save Recipe";
         }
     }
 
@@ -37954,6 +37973,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     document.addEventListener("click", handleRecipeCoverImageClick, true);
     document.addEventListener("click", handleRecipeEditRowMenuOutsideClick);
+    document.addEventListener("keydown", handleRecipeEditRowMenuEscape);
     document.addEventListener("scroll", handleRecipeEditRowMenuScrollOrResize, true);
     document.addEventListener("wheel", handleRecipeEditRowMenuScrollOrResize, { passive: true, capture: true });
     document.addEventListener("touchmove", handleRecipeEditRowMenuScrollOrResize, { passive: true, capture: true });

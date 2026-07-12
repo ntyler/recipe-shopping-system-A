@@ -34875,6 +34875,7 @@ img[data-deferred-src] {
     flex-flow: row nowrap;
     align-items: center;
     justify-content: flex-end;
+    gap: 11px;
 }
 
 .recipe-edit-standalone-page .recipe-edit-header-actions > * {
@@ -34889,7 +34890,63 @@ img[data-deferred-src] {
     .recipe-edit-header-pdf-button
 ) {
     width: auto;
-    min-width: 96px;
+    min-width: 0;
+    height: 42px;
+    min-height: 42px;
+    gap: 9px;
+    padding-inline: 17px;
+    border-color: var(--app-border-strong);
+    border-radius: 9px;
+    background: var(--app-surface);
+    color: var(--app-text-strong);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-actions .app-icon-svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    stroke-width: 1.8;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-actions .recipe-edit-button-icon {
+    display: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-menu-wrap {
+    margin-right: 22px;
+    align-self: center;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-menu-btn {
+    display: inline-flex;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    border-color: var(--app-border-strong);
+    border-radius: 9px;
+    background: var(--app-surface);
+    color: var(--app-text-strong);
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-menu-btn::before {
+    display: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-cancel {
+    min-width: 104px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-header-save {
+    min-width: 138px;
+    border-color: var(--app-primary);
+    background: #087c35;
+    color: #fff;
 }
 
 .recipe-edit-standalone-page [hidden] {
@@ -34910,7 +34967,17 @@ img[data-deferred-src] {
 
 .recipe-edit-standalone-page .recipe-edit-header-create-pdf-button {
     order: 2;
-    min-width: 96px;
+}
+
+@media (max-width: 900px) {
+    .recipe-edit-standalone-page .recipe-edit-header-actions {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+
+    .recipe-edit-standalone-page .recipe-edit-header-menu-wrap {
+        margin-right: 0;
+    }
 }
 
 .recipe-edit-standalone-page .recipe-edit-source-pdf-button {

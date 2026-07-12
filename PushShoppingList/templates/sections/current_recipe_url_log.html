@@ -572,7 +572,8 @@
                     <button type="button"
                             class="recipe-edit-preview-button"
                             onclick="return previewRecipeFromEditor(this)">
-                        Preview Recipe
+                        {{ shell.svg_icon("eye") }}
+                        <span>Preview Recipe</span>
                     </button>
                     <a id="recipeEditPdfButton"
                        class="recipe-edit-pdf-button recipe-edit-header-pdf-button recipe-edit-modal-header-pdf-button"
@@ -583,6 +584,7 @@
                        onclick="return openRecipeEditorPdf(this, event)"
                        hidden>
                         <span class="recipe-edit-button-icon" aria-hidden="true">Ã¢â€ â€œ</span>
+                        {{ shell.svg_icon("document") }}
                         <span>Recipe PDF</span>
                     </a>
                     <a id="recipeEditSourcePdfButton"
@@ -593,7 +595,7 @@
                        aria-label="Open source PDF"
                        onclick="return openRecipeEditorPdf(this, event)"
                        hidden>
-                        <span class="recipe-edit-button-icon" aria-hidden="true">ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Å“</span>
+                        {{ shell.svg_icon("document") }}
                         <span>Source PDF</span>
                     </a>
                     <a id="recipeEditMenuOrderButton"
@@ -615,10 +617,10 @@
                                 class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn recipe-edit-header-menu-btn"
                                 aria-label="More actions"
                                 title="More actions"
-                                aria-haspopup="true"
+                                aria-haspopup="menu"
                                 aria-expanded="false"
                                 onclick="return toggleRecipeEditSectionMenu(this, event)">
-                            <span aria-hidden="true"></span>
+                            {{ shell.svg_icon("more") }}
                         </button>
                         <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-image-generation-menu recipe-edit-header-image-menu" hidden>
                             <div class="overflow-menu-section">
@@ -755,6 +757,7 @@
                     </div>
                     <button type="button" class="recipe-edit-cancel recipe-edit-header-cancel" onclick="closeRecipeEditor()">Cancel</button>
                     <button type="submit" class="recipe-edit-save recipe-edit-header-save">
+                        {{ shell.svg_icon("check") }}
                         <span>Save Recipe</span>
                     </button>
                 </div>

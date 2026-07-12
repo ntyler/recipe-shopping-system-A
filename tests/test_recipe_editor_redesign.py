@@ -111,6 +111,32 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "beginRecipeIngredientReorder(this)" in template
     assert "focusRecipeIngredientGrouping(this)" in template
 
+
+def test_recipe_editor_header_actions_match_the_mockup_order_and_icons():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+    actions = template[
+        template.index('<div class="recipe-edit-header-actions">'):
+        template.index('<input type="hidden" name="original_url"')
+    ]
+
+    assert actions.index("recipe-edit-preview-button") < actions.index("recipeEditPdfButton")
+    assert actions.index("recipeEditPdfButton") < actions.index("recipe-edit-header-menu-wrap")
+    assert actions.index("recipe-edit-header-menu-wrap") < actions.index("recipe-edit-header-cancel")
+    assert actions.index("recipe-edit-header-cancel") < actions.index("recipe-edit-header-save")
+    assert '{{ shell.svg_icon("eye") }}' in actions
+    assert '{{ shell.svg_icon("document") }}' in actions
+    assert '{{ shell.svg_icon("more") }}' in actions
+    assert '{{ shell.svg_icon("check") }}' in actions
+    assert 'aria-haspopup="menu"' in actions
+    assert 'aria-expanded="false"' in actions
+    assert "height: 42px;" in css
+    assert "min-width: 138px;" in css
+
+    javascript = read_text("PushShoppingList/static/js/app.js")
+    assert 'event.key !== "Escape"' in javascript
+    assert 'document.addEventListener("keydown", handleRecipeEditRowMenuEscape)' in javascript
+
     for field_id in [
         "recipeEditDisplayName",
         "recipeEditTitleInput",
