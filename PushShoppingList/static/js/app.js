@@ -25212,7 +25212,15 @@ function recipeRestaurantSelectorElements() {
         input: root?.querySelector("[data-restaurant-selector-input]"),
         list: root?.querySelector("[data-restaurant-selector-list]"),
         status: root?.querySelector("[data-restaurant-selector-status]"),
+        clear: root?.querySelector("[data-restaurant-selector-clear]"),
     };
+}
+
+function updateRecipeRestaurantSelectorClearButton() {
+    const { input, clear } = recipeRestaurantSelectorElements();
+    if (!clear) return;
+    clear.hidden = !String(input?.value || "").trim();
+    clear.disabled = Boolean(input?.disabled);
 }
 
 function setRecipeRestaurantSelectorExpanded(expanded) {
@@ -25276,6 +25284,7 @@ function renderRecipeRestaurantSelector(restaurants = recipeRestaurantDirectory,
         ? "Loading restaurants…"
         : recipeRestaurantEditCreateMode ? "Creating new restaurant" : "";
     recipeRestaurantSelectorActiveIndex = -1;
+    updateRecipeRestaurantSelectorClearButton();
 }
 
 async function loadRecipeRestaurantDirectory(query = "") {
@@ -25302,6 +25311,10 @@ async function loadRecipeRestaurantDirectory(query = "") {
 }
 
 function openRecipeRestaurantSelector(input) {
+    if (input?.dataset.restaurantSelectorSuppressOpen === "1") {
+        delete input.dataset.restaurantSelectorSuppressOpen;
+        return;
+    }
     setRecipeRestaurantSelectorExpanded(true);
     if (!recipeRestaurantDirectory.length) {
         if (input?.getAttribute("aria-busy") !== "true") {
@@ -25313,19 +25326,8 @@ function openRecipeRestaurantSelector(input) {
     renderRecipeRestaurantSelector();
 }
 
-function toggleRecipeRestaurantSelector(button) {
-    const { input, list } = recipeRestaurantSelectorElements();
-    if (!input || !list) return false;
-    if (list.hidden) {
-        openRecipeRestaurantSelector(input);
-        input.focus();
-    } else {
-        closeRecipeRestaurantSelector({ restoreValue: true });
-    }
-    return false;
-}
-
 function searchRecipeRestaurantSelector(query) {
+    updateRecipeRestaurantSelectorClearButton();
     setRecipeRestaurantSelectorExpanded(true);
     window.clearTimeout(recipeRestaurantSelectorDebounce);
     recipeRestaurantSelectorDebounce = window.setTimeout(() => loadRecipeRestaurantDirectory(query), 250);
@@ -25338,6 +25340,31 @@ function closeRecipeRestaurantSelector(options = {}) {
     if (input && options.restoreValue !== false) {
         input.value = recipeRestaurantEditCreateMode ? "" : recipeRestaurantRecordName(recipeRestaurantEditSelection);
     }
+    updateRecipeRestaurantSelectorClearButton();
+}
+
+function clearRecipeRestaurantSelector(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const { input, status } = recipeRestaurantSelectorElements();
+    window.clearTimeout(recipeRestaurantSelectorDebounce);
+    setRecipeRestaurantSelectorExpanded(false);
+    if (input) {
+        input.value = "";
+        input.removeAttribute("aria-activedescendant");
+        input.dataset.restaurantSelectorSuppressOpen = "1";
+        input.focus({ preventScroll: true });
+        window.setTimeout(() => {
+            if (input.dataset.restaurantSelectorSuppressOpen === "1") {
+                delete input.dataset.restaurantSelectorSuppressOpen;
+            }
+        }, 0);
+    }
+    if (status) status.textContent = "";
+    updateRecipeRestaurantSelectorClearButton();
+    return false;
 }
 
 function handleRecipeRestaurantSelectorKeydown(input, event) {
@@ -25529,6 +25556,7 @@ function setRecipeRestaurantEditMode(record, options = {}) {
         input.value = recipeRestaurantEditCreateMode ? "" : recipeRestaurantRecordName(record);
         input.placeholder = recipeRestaurantEditCreateMode ? "Creating new restaurant" : "Search restaurants";
     }
+    updateRecipeRestaurantSelectorClearButton();
     if (status) status.textContent = recipeRestaurantEditCreateMode ? "Creating new restaurant" : "";
     const save = form.querySelector("[data-restaurant-edit-save]");
     if (save && !form.dataset.saving) save.textContent = recipeRestaurantEditCreateMode ? "Create Restaurant" : "Save Changes";
@@ -25609,6 +25637,7 @@ async function switchRecipeRestaurantSelection(restaurantId, options = {}) {
         input.disabled = true;
         input.setAttribute("aria-busy", "true");
     }
+    updateRecipeRestaurantSelectorClearButton();
     if (status) status.textContent = "Loading restaurant...";
     try {
         const response = await fetch(`/api/recipe/restaurants/${encodeURIComponent(id)}`);
@@ -25628,6 +25657,7 @@ async function switchRecipeRestaurantSelection(restaurantId, options = {}) {
             input.disabled = false;
             input.removeAttribute("aria-busy");
         }
+        updateRecipeRestaurantSelectorClearButton();
         if (status && !recipeRestaurantEditCreateMode) status.textContent = "";
     }
     return false;
@@ -26605,6 +26635,7 @@ function editRecipeRestaurantSource(button, event = null) {
         selectorInput.value = hasNormalizedRestaurant ? recipeRestaurantRecordName(selected) : "";
         selectorInput.placeholder = hasNormalizedRestaurant ? "Search restaurants" : "Creating new restaurant";
     }
+    updateRecipeRestaurantSelectorClearButton();
     if (selectorStatus) selectorStatus.textContent = hasNormalizedRestaurant ? "" : "Creating new restaurant";
     const save = form.querySelector("[data-restaurant-edit-save]");
     if (save) save.textContent = hasNormalizedRestaurant ? "Save Changes" : "Create Restaurant";

@@ -33566,28 +33566,55 @@ img[data-deferred-src] {
     outline-offset: 1px;
 }
 
-.recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-toggle {
+.recipe-edit-restaurant-modal-header .recipe-edit-restaurant-combobox input::-webkit-search-cancel-button {
+    display: none;
+    appearance: none;
+}
+
+.recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-clear {
     position: absolute;
-    right: 4px;
+    top: 50%;
+    right: 6px;
+    z-index: 2;
     display: grid;
-    width: 34px;
-    min-height: 34px;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
     padding: 0;
     place-items: center;
     border: 0;
     border-radius: 6px;
     background: transparent;
     color: var(--app-muted);
+    cursor: pointer;
+    transform: translateY(-50%);
 }
 
-.recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-toggle:hover {
+.recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-clear[hidden] {
+    display: none;
+}
+
+.recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-clear:hover {
     background: var(--app-surface-soft);
     color: var(--app-text-strong);
 }
 
-.recipe-edit-restaurant-selector-toggle svg {
-    width: 18px;
-    height: 18px;
+.recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-clear:focus-visible {
+    outline: 2px solid var(--app-primary);
+    outline-offset: 1px;
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
+}
+
+.recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-clear:disabled {
+    cursor: wait;
+    opacity: .5;
+}
+
+.recipe-edit-restaurant-selector-clear svg {
+    width: 14px;
+    height: 14px;
 }
 
 .recipe-edit-restaurant-selector-list {

@@ -25,9 +25,20 @@ def test_restaurant_selector_is_searchable_accessible_and_header_scoped():
     assert 'data-restaurant-selector-status aria-live="polite"' in header
     assert 'recipe-edit-restaurant-combobox-icon' not in header
     assert 'shell.svg_icon("search")' not in header
-    assert 'shell.svg_icon("chevron-down")' in header
+    assert 'shell.svg_icon("chevron-down")' not in header
+    assert 'data-restaurant-selector-clear' in header
+    assert 'aria-label="Clear restaurant selection"' in header
+    assert 'onpointerdown="event.preventDefault(); event.stopPropagation()"' in header
+    assert 'onclick="openRecipeRestaurantSelector(this)"' in header
+    assert 'onclick="return clearRecipeRestaurantSelector(this, event)"' in header
+    assert 'shell.svg_icon("x")' in header
     assert ".recipe-edit-restaurant-combobox-icon" not in css
     assert "padding: 8px 44px 8px 12px;" in css
+    assert ".recipe-edit-restaurant-selector-toggle" not in css
+    assert ".recipe-edit-restaurant-selector-clear[hidden]" in css
+    assert "right: 6px;" in css
+    assert "width: 32px;" in css
+    assert "height: 32px;" in css
     assert ".recipe-edit-restaurant-modal-header {" in css
     assert "grid-template-columns: max-content minmax(320px, 560px) 38px;" in css
     assert 'grid-template-areas:' in css
@@ -42,6 +53,17 @@ def test_restaurant_selector_switch_create_and_recipe_specific_url_behavior():
     assert "No restaurants found" in script
     assert "+ Create New Restaurant" in script
     assert "function handleRecipeRestaurantSelectorKeydown(input, event)" in script
+    assert "function clearRecipeRestaurantSelector(button, event = null)" in script
+    clear_handler = script[
+        script.index("function clearRecipeRestaurantSelector(button, event = null)"):
+        script.index("function handleRecipeRestaurantSelectorKeydown(input, event)")
+    ]
+    assert "event.stopPropagation();" in clear_handler
+    assert "setRecipeRestaurantSelectorExpanded(false);" in clear_handler
+    assert 'input.value = "";' in clear_handler
+    assert 'input.dataset.restaurantSelectorSuppressOpen = "1";' in clear_handler
+    assert "updateRecipeRestaurantSelectorClearButton();" in clear_handler
+    assert "toggleRecipeRestaurantSelector" not in script
     selector_keydown = script[
         script.index("function handleRecipeRestaurantSelectorKeydown(input, event)"):
         script.index("function currentRecipeRestaurantSourceOption()")
