@@ -254,9 +254,10 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "recipe-edit-price-control" in organizer
     assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer
     assert "panelHeading.appendChild(ratingField)" in organizer
-    assert 'class="recipe-edit-rating-label">Rating</span>' not in template
-    assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe", show_clear=false)' in template
-    assert "data-rating-toggle-selected=\"{{ 'true' if mode == 'restaurant' or not show_clear else 'false' }}\"" in macros
+    assert 'class="recipe-edit-rating-label">Rating</span>' in template
+    assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")' in template
+    assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
+    assert 'class="recipe-edit-rating-clear"' in macros
     assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
     assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, tagRow, metadataRow, descriptionRow, technicalDetails])" in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer

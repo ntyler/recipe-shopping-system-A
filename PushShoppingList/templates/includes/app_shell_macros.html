@@ -192,33 +192,31 @@
 </span>
 {%- endmacro %}
 
-{% macro rating_control(control_id, aria_label, mode="recipe", show_clear=true) -%}
+{% macro rating_control(control_id, aria_label, mode="recipe") -%}
 <div id="{{ control_id }}"
      class="recipe-edit-rating-stars"
      role="radiogroup"
      aria-label="{{ aria_label }}"
      data-shared-rating-control
      data-rating-mode="{{ mode }}"
-     data-rating-toggle-selected="{{ 'true' if mode == 'restaurant' or not show_clear else 'false' }}">
+     data-rating-toggle-selected="{{ 'true' if mode == 'restaurant' else 'false' }}">
     {% for rating_value in range(1, 6) %}
         <button type="button"
                 class="recipe-edit-rating-star"
                 data-rating-value="{{ rating_value }}"
                 role="radio"
                 aria-checked="false"
-                aria-label="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}{% if mode == 'restaurant' or not show_clear %}. Click the selected star again to clear the rating.{% endif %}"
-                {% if mode == 'restaurant' or not show_clear %}title="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}; click again to clear"{% endif %}
+                aria-label="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}{% if mode == 'restaurant' %}. Click the selected star again to clear the rating.{% endif %}"
+                {% if mode == 'restaurant' %}title="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}; click again to clear"{% endif %}
                 onclick="return setSharedRatingFromButton(this, {{ rating_value }})"
                 onkeydown="return handleSharedRatingKeydown(this, event)"
                 onpointerenter="previewSharedRating(this, {{ rating_value }})"
                 onpointerleave="clearSharedRatingPreview(this)">&#9734;</button>
     {% endfor %}
-    {% if show_clear %}
-        <button type="button"
-                class="recipe-edit-rating-clear"
-                onclick="return clearSharedRating(this)"
-                hidden>Clear</button>
-    {% endif %}
+    <button type="button"
+            class="recipe-edit-rating-clear"
+            onclick="return clearSharedRating(this)"
+            hidden>Clear</button>
 </div>
 {%- endmacro %}
 

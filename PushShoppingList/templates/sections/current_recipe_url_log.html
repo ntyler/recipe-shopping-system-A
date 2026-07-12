@@ -922,8 +922,9 @@
                         <input type="hidden" id="recipeEditCoverSource">
                     </div>
                     <div class="recipe-edit-rating-field recipe-edit-wide">
+                        <span class="recipe-edit-rating-label">Rating</span>
                         <input type="hidden" id="recipeEditRating" data-rating-input value="0">
-                        {{ shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe", show_clear=false) }}
+                        {{ shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe") }}
                     </div>
                     <div class="recipe-edit-mobile-pdf-actions recipe-edit-wide">
                         <a id="recipeEditPdfButtonMobile"
