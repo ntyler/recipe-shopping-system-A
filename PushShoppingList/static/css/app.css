@@ -27209,12 +27209,15 @@ img[data-deferred-src] {
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-details {
     position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-primary-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0;
+    order: 2;
 }
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-primary-actions .recipe-edit-cover-upload-button {
@@ -27259,21 +27262,18 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-image-change-actions {
-    position: absolute;
-    left: 0;
-    top: calc(100% + 8px);
-    bottom: auto;
-    z-index: 30;
+    position: static;
     display: grid;
     width: min(220px, 100%);
     grid-template-columns: minmax(0, 1fr);
     gap: 5px;
-    margin: 0;
+    margin: 0 0 8px;
     padding: 7px;
     border: 1px solid #59635f;
     border-radius: 8px;
     background: var(--app-surface-soft);
     box-shadow: 0 12px 28px rgba(0, 0, 0, .4);
+    order: 1;
 }
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-image-change-actions[hidden] {
@@ -33047,6 +33047,11 @@ img[data-deferred-src] {
     fill: currentColor;
     stroke: currentColor;
     transition: fill 160ms ease, stroke 160ms ease, transform 160ms ease;
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg path {
+    fill: currentColor;
+    stroke: currentColor;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected {

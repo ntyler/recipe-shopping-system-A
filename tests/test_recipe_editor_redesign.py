@@ -132,7 +132,9 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert '? "Change Image"' in script
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "background: var(--app-surface);" in css
-    assert "top: calc(100% + 8px);" in css
+    assert "position: static;" in css
+    assert "margin: 0 0 8px;" in css
+    assert "order: 1;" in css
     assert "function closeRecipeImageChangeActions(options = {})" in script
     assert 'event.key === "Escape"' in script
     assert "closeRecipeImageChangeActions();" in script
@@ -319,6 +321,7 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "color: #fbbf24;" in css
     assert "color: #9ca3af;" in css
     assert "fill: currentColor;" in css
+    assert ".recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg path {" in css
     assert "function handleRecipeRestaurantRatingKeydown(button, event)" in script
     assert "function updateRecipeRestaurantStructuredHours(control)" in script
     assert "function toggleRecipeRestaurantSplitHours(button)" in script
