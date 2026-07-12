@@ -351,7 +351,9 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "font-size: 18px;" in css
     assert "font-size: 14px;" in css
     assert "min-height: 40px;" in css
-    assert "width: 40px;" in css
+    assert "width: 36px;" in css
+    assert "width: 20px;" in css
+    assert "background: #1a201e;" in css
     assert "syncRecipeRestaurantHoursRow(row)" in script
     assert "Restaurant Usage" in template
     assert "data-restaurant-usage-view" in template

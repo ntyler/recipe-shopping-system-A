@@ -33171,26 +33171,35 @@ img[data-deferred-src] {
     display: flex;
     min-height: 40px;
     align-items: center;
-    gap: 6px;
+    gap: 2px;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] {
-    width: 40px;
-    min-height: 40px;
+    display: grid;
+    width: 36px;
+    min-height: 36px;
     margin: 0;
-    padding: 6px;
-    border: 0;
+    padding: 7px;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 8px;
     background: transparent;
     color: #9ca3af;
     transition: color 160ms ease, transform 160ms ease;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     fill: currentColor;
     stroke: currentColor;
     transition: fill 160ms ease, stroke 160ms ease, transform 160ms ease;
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value]:hover,
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value]:focus-visible {
+    border-color: #3f4744;
+    background: #1a201e;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg path {
@@ -33212,8 +33221,7 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value]:focus-visible {
-    border-radius: 7px;
-    outline: 2px solid var(--app-primary-hover);
+    outline: 2px solid rgba(251, 191, 36, .4);
     outline-offset: 1px;
 }
 
