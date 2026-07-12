@@ -22700,6 +22700,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     }
     setValue("recipeEditTitleInput", recipe.recipe_title || "");
     setValue("recipeEditDescription", recipe.description || "");
+    updateRecipeEditDescriptionCount();
     setRecipeEditorSourceUrlField(recipe, originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
@@ -24147,8 +24148,14 @@ function updateRecipeEditMetadataUnits() {
     document.querySelectorAll("[data-recipe-edit-unit]").forEach(unit => {
         const field = unit.closest("label");
         const input = field ? field.querySelector("input") : null;
-        const value = input ? String(input.value || "").trim() : "";
-        unit.hidden = /[a-z]/i.test(value);
+        let value = input ? String(input.value || "").trim() : "";
+        if (recipeEditorStandalonePageIsActive() && input) {
+            value = value.replace(/\s*(people|persons?|servings?|minutes?|mins?)\s*$/i, "").trim();
+            input.value = value;
+            unit.hidden = false;
+        } else {
+            unit.hidden = /[a-z]/i.test(value);
+        }
     });
 }
 
@@ -24184,23 +24191,18 @@ function renderRecipeEditCuisineChips() {
     const chips = field?.querySelector("[data-recipe-edit-cuisine-chips]");
     if (!select || !chips) return;
     const value = String(select.value || "").trim();
+    const removeIcon = document.querySelector('[data-recipe-metadata-icon="x"]')?.innerHTML || "&times;";
     chips.innerHTML = value ? `
         <span class="recipe-edit-tag-chip">
             <span>${escapeHtml(value)}</span>
-            <button type="button" aria-label="Remove ${escapeAttribute(value)}" onclick="return clearRecipeEditCuisineTag(this)">&times;</button>
+            <button type="button" aria-label="Remove ${escapeAttribute(value)}" onclick="return clearRecipeEditCuisineTag(this)">${removeIcon}</button>
         </span>
     ` : '<span class="recipe-edit-tag-empty">No cuisine tags selected</span>';
 }
 
 function recipeEditMetadataIcon(kind) {
-    const paths = {
-        servings: '<path d="M7 3v8M4 3v5a3 3 0 0 0 6 0V3M7 11v10M16 3c3 2 3 7 0 9v9M16 3v9h3"/>',
-        total: '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
-        prep: '<path d="M5 5h14l-1 8H7zM9 17h6M12 13v4"/>',
-        cook: '<path d="M5 8h14l-1 11H6zM8 8V5h8v3M9 3h6"/>',
-        inactive: '<circle cx="12" cy="13" r="7"/><path d="M12 9v4M9 3h6M12 3v3"/>',
-    };
-    return `<span class="recipe-edit-metadata-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${paths[kind] || paths.total}</svg></span>`;
+    const template = document.querySelector(`[data-recipe-metadata-icon="${kind}"]`);
+    return `<span class="recipe-edit-metadata-icon" aria-hidden="true">${template ? template.innerHTML : ""}</span>`;
 }
 
 function addRecipeEditMetadataIcon(field, kind) {
@@ -24214,6 +24216,12 @@ function normalizeRecipeEditPriceDisplay() {
     if (!input) return;
     const value = String(input.value || "").trim();
     if (value.startsWith("$")) input.value = value.slice(1).trim();
+}
+
+function updateRecipeEditDescriptionCount() {
+    const textarea = document.getElementById("recipeEditDescription");
+    const counter = document.querySelector("[data-recipe-edit-description-count]");
+    if (textarea && counter) counter.textContent = `${String(textarea.value || "").length} characters`;
 }
 
 function organizeRecipeEditImageCard() {
@@ -24309,8 +24317,9 @@ function organizeRecipeEditInformationCard() {
     tagRow.className = "recipe-edit-tag-row";
     const tagActions = document.createElement("div");
     tagActions.className = "recipe-edit-tag-actions";
+    const addTagIcon = document.querySelector('[data-recipe-metadata-icon="plus"]')?.innerHTML || "+";
     tagActions.innerHTML = `
-        <button type="button" class="recipe-edit-tag-add" onclick="return openRecipeEditCuisinePicker(this)">+ Add Tag</button>
+        <button type="button" class="recipe-edit-tag-add" onclick="return openRecipeEditCuisinePicker(this)">${addTagIcon}<span>Add Tag</span></button>
     `;
     if (cuisineField && !cuisineField.querySelector("[data-recipe-edit-cuisine-chips]")) {
         const chips = document.createElement("div");
@@ -24330,10 +24339,19 @@ function organizeRecipeEditInformationCard() {
     const descriptionRow = document.createElement("div");
     descriptionRow.className = "recipe-edit-description-row";
     appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField, priceField]);
+    if (descriptionField && !descriptionField.querySelector("[data-recipe-edit-description-count]")) {
+        const counter = document.createElement("span");
+        counter.className = "recipe-edit-description-count";
+        counter.dataset.recipeEditDescriptionCount = "";
+        descriptionField.appendChild(counter);
+        document.getElementById("recipeEditDescription")?.addEventListener("input", updateRecipeEditDescriptionCount);
+        updateRecipeEditDescriptionCount();
+    }
     if (priceField) {
         priceField.classList.add("recipe-edit-price-field");
         const priceInput = document.getElementById("recipeEditMenuPrice");
         if (priceInput && !priceInput.parentElement.classList.contains("recipe-edit-price-control")) {
+            priceInput.setAttribute("inputmode", "decimal");
             const priceControl = document.createElement("span");
             priceControl.className = "recipe-edit-price-control";
             priceInput.parentNode.insertBefore(priceControl, priceInput);
@@ -25017,7 +25035,11 @@ function updateRecipeRestaurantEditState(form = recipeRestaurantEditForm()) {
     updateRecipeRestaurantEditLogo(form);
 }
 
-function editRecipeRestaurantSource(button) {
+function editRecipeRestaurantSource(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     const modal = recipeRestaurantEditModal();
     const form = recipeRestaurantEditForm();
     const selected = currentRecipeRestaurantSourceOption();
@@ -25091,12 +25113,12 @@ document.addEventListener("keydown", event => {
 });
 
 function focusRecipeRestaurantLogo(button) {
-    button?.closest("form")?.querySelector('[data-restaurant-edit-field="restaurant_logo_url"]')?.focus();
+    button?.closest("[data-restaurant-edit-form]")?.querySelector('[data-restaurant-edit-field="restaurant_logo_url"]')?.focus();
     return false;
 }
 
 function removeRecipeRestaurantLogo(button) {
-    const form = button?.closest("form");
+    const form = button?.closest("[data-restaurant-edit-form]");
     const input = form?.querySelector('[data-restaurant-edit-field="restaurant_logo_url"]');
     if (input) {
         input.value = "";
@@ -25112,6 +25134,12 @@ async function saveRecipeRestaurantSource(form) {
     const save = form.querySelector("[data-restaurant-edit-save]");
     if (!values.restaurant_name) {
         if (error) { error.textContent = "Restaurant Name is required."; error.hidden = false; }
+        return false;
+    }
+    const invalid = form.querySelector("input:invalid");
+    if (invalid) {
+        if (error) { error.textContent = invalid.validationMessage || "Please correct the highlighted field."; error.hidden = false; }
+        invalid.focus();
         return false;
     }
     const selected = currentRecipeRestaurantSourceOption();

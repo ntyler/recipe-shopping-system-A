@@ -178,6 +178,9 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'metadataRow.className = "recipe-edit-metadata-strip"' in organizer
     assert 'descriptionRow.className = "recipe-edit-description-row"' in organizer
     assert "addRecipeEditMetadataIcon(servingsField, \"servings\")" in organizer
+    assert 'data-recipe-metadata-icon="servings"' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    assert 'shell.svg_icon("utensils")' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    assert 'shell.svg_icon("cooking-pot")' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert "data-recipe-edit-cuisine-chips" in script
     assert "renderRecipeEditCuisineChips" in script
     assert "recipe-edit-price-control" in organizer
@@ -189,6 +192,9 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "grid-template-columns: minmax(0, 2fr) minmax(145px, .9fr);" in css
     assert ".recipe-edit-price-prefix {" in css
     assert ".recipe-edit-tag-chip {" in css
+    assert ".recipe-edit-description-count {" in css
+    assert "updateRecipeEditDescriptionCount" in script
+    assert 'value.replace(/\\s*(people|persons?|servings?|minutes?|mins?)' in script
 
 
 def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
@@ -204,6 +210,10 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     ):
         assert f'data-restaurant-edit-field="{field}"' in template
     assert "data-restaurant-edit-form" in template
+    assert '<form class="recipe-edit-restaurant-form"' not in template
+    assert '<div class="recipe-edit-restaurant-form" data-restaurant-edit-form role="form"' in template
+    assert 'onclick="return editRecipeRestaurantSource(this, event)"' in template
+    assert 'type="button" class="primary" data-restaurant-edit-save' in template
     assert "data-restaurant-edit-modal" in template
     assert 'role="dialog"' in template
     assert 'aria-modal="true"' in template
@@ -211,6 +221,9 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Save Changes" in template
     assert "cancelRecipeRestaurantSourceEdit" in template
     assert "async function saveRecipeRestaurantSource(form)" in script
+    assert "function editRecipeRestaurantSource(button, event = null)" in script
+    assert "event.stopPropagation();" in script
+    assert 'form.querySelector("input:invalid")' in script
     assert 'fetch("/api/recipe/restaurant-source"' in script
     assert 'save.textContent = "Saving..."' in script
     assert "recipeRestaurantEditSnapshot" in script
