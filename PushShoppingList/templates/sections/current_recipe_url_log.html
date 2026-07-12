@@ -2383,9 +2383,9 @@
                                     <button type="button"
                                             class="recipe-edit-restaurant-fetch-button"
                                             data-restaurant-fetch-button
-                                            onclick="return fetchRecipeRestaurantDetails(this)">
+                                            onclick="return fetchRecipeRestaurantDetails(this, false)">
                                         {{ shell.svg_icon("download") }}
-                                        <span data-restaurant-fetch-label>Fetch Restaurant Details</span>
+                                        <span data-restaurant-fetch-label>Scan Restaurant Information</span>
                                     </button>
                                 </header>
                                 <div class="recipe-edit-restaurant-advanced-body">
@@ -2429,19 +2429,26 @@
                                    hidden>
                                 <header>
                                     <div>
-                                        <h3 id="recipeEditRestaurantFetchReviewTitle">Review Restaurant Details</h3>
-                                        <p data-restaurant-fetch-summary>Choose which public details to copy into this unsaved form.</p>
+                                        <h3 id="recipeEditRestaurantFetchReviewTitle">Restaurant Information Scan</h3>
+                                        <p data-restaurant-fetch-summary>Review evidence-backed information before applying it.</p>
                                     </div>
-                                    <button type="button" aria-label="Close restaurant details review" onclick="return closeRecipeRestaurantFetchReview()">{{ shell.svg_icon("x") }}</button>
+                                    <button type="button" aria-label="Close restaurant information scan" onclick="return closeRecipeRestaurantFetchReview()">{{ shell.svg_icon("x") }}</button>
                                 </header>
+                                <div class="recipe-edit-restaurant-scan-metrics" data-restaurant-scan-metrics></div>
+                                <div class="recipe-edit-restaurant-scan-sources" data-restaurant-scan-sources></div>
                                 <div class="recipe-edit-restaurant-fetch-review-head" aria-hidden="true">
-                                    <span>Accept</span><span>Field</span><span>Current</span><span>Proposed</span><span>Source / confidence</span>
+                                    <span>Accept</span><span>Field</span><span>Current</span><span>Recommended</span><span>Confidence</span><span>Source</span>
                                 </div>
                                 <div class="recipe-edit-restaurant-fetch-review-list" data-restaurant-fetch-review-list></div>
+                                <details class="recipe-edit-restaurant-scan-unresolved" data-restaurant-scan-unresolved hidden>
+                                    <summary>Unresolved fields</summary>
+                                    <div data-restaurant-scan-unresolved-list></div>
+                                </details>
                                 <footer>
                                     <button type="button" onclick="return closeRecipeRestaurantFetchReview()">Cancel</button>
-                                    <button type="button" onclick="return applyRecipeRestaurantFetchedDetails(false)">Apply Selected</button>
-                                    <button type="button" class="primary" onclick="return applyRecipeRestaurantFetchedDetails(true)">Apply All</button>
+                                    <button type="button" onclick="return fetchRecipeRestaurantDetails(this, true)">Rescan</button>
+                                    <button type="button" onclick="return applyRecipeRestaurantInformationScan(this, 'selected')">Apply Selected</button>
+                                    <button type="button" class="primary" onclick="return applyRecipeRestaurantInformationScan(this, 'high_confidence')">Apply All High Confidence</button>
                                 </footer>
                             </aside>
                             <p class="recipe-edit-restaurant-form-error" data-restaurant-edit-error hidden></p>

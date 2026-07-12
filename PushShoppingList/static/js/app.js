@@ -25152,6 +25152,7 @@ let recipeRestaurantOriginalMenuId = "";
 let recipeRestaurantOriginalRestaurantId = "";
 let recipeRestaurantDuplicateCandidates = [];
 let recipeRestaurantFetchedProposals = {};
+let recipeRestaurantInformationScan = null;
 
 function recipeRestaurantRecordId(record) {
     return String(record?.restaurant_id || record?.id || "").trim();
@@ -25529,6 +25530,7 @@ function setRecipeRestaurantEditMode(record, options = {}) {
     if (status) status.textContent = recipeRestaurantEditCreateMode ? "Creating new restaurant" : "";
     const save = form.querySelector("[data-restaurant-edit-save]");
     if (save && !form.dataset.saving) save.textContent = recipeRestaurantEditCreateMode ? "Create Restaurant" : "Save Changes";
+    updateRecipeRestaurantScanActionLabel(record);
     closeRecipeRestaurantDuplicatePanel(form.querySelector("[data-restaurant-duplicate-panel]"));
     closeRecipeRestaurantUsagePanel();
     closeRecipeRestaurantFetchReview({ restoreFocus: false });
@@ -26179,20 +26181,33 @@ async function commitRecipeRestaurantDuplicateDelete(button) {
 }
 
 const recipeRestaurantFetchFieldDefinitions = {
-    weekly_hours: { label: "Weekly hours", field: "restaurant_hours_text" },
-    raw_hours_text: { label: "Raw hours data", field: "restaurant_hours_text" },
-    hours_notes: { label: "Hours notes", field: "restaurant_hours_text" },
-    rewards_promotions: { label: "Rewards / promotions", field: "restaurant_promotions" },
-    image_url: { label: "Restaurant logo / image", field: "restaurant_logo_url" },
-    current_status: { label: "Current status", field: "restaurant_current_status" },
-    online_payment: { label: "Online payment", field: "restaurant_online_payment_available" },
-    delivery: { label: "Delivery", field: "restaurant_delivery_available" },
+    restaurant_name: { label: "Restaurant name", field: "restaurant_name" },
+    website_url: { label: "Website URL", field: "restaurant_website_url" },
+    menu_url: { label: "Menu URL", field: "source_menu_url" },
     phone: { label: "Phone", field: "restaurant_phone" },
     street_address: { label: "Street address", field: "restaurant_street_address" },
     city: { label: "City", field: "restaurant_city" },
     state_or_region: { label: "State or region", field: "restaurant_state" },
     postal_code: { label: "Postal code", field: "restaurant_postal_code" },
     country: { label: "Country", field: "restaurant_country" },
+    latitude: { label: "Latitude" },
+    longitude: { label: "Longitude" },
+    weekly_hours: { label: "Weekly hours", field: "restaurant_hours_text" },
+    raw_hours_text: { label: "Raw hours data", field: "restaurant_hours_text" },
+    hours_notes: { label: "Hours notes", field: "restaurant_hours_text" },
+    rewards_promotions: { label: "Rewards / promotions", field: "restaurant_promotions" },
+    image_url: { label: "Restaurant logo / image", field: "restaurant_logo_url" },
+    current_status: { label: "Business status", field: "restaurant_current_status" },
+    rating: { label: "Rating", field: "restaurant_rating" },
+    rating_count: { label: "Rating count" },
+    online_payment: { label: "Online payment", field: "restaurant_online_payment_available" },
+    online_ordering: { label: "Online ordering" },
+    pickup: { label: "Pickup" },
+    delivery: { label: "Delivery", field: "restaurant_delivery_available" },
+    reservations: { label: "Reservations" },
+    promotions: { label: "Promotions" },
+    social_urls: { label: "Social links" },
+    ordering_provider_urls: { label: "Ordering providers" },
 };
 
 function recipeRestaurantFetchReviewPanel() {
@@ -26219,76 +26234,121 @@ function recipeRestaurantWeeklyHoursText(weeklyHours, notes = "") {
     return lines.join("\n");
 }
 
-function recipeRestaurantFetchCurrentValue(key, form = recipeRestaurantEditForm()) {
-    if (!form) return "";
-    if (key === "hours_notes") return form.querySelector("[data-hours-notes]")?.value.trim() || "";
-    if (key === "weekly_hours") {
-        return String(form.querySelector('[data-restaurant-edit-field="restaurant_hours_text"]')?.value || "")
-            .split(/\r?\n/).filter(line => !/^Notes:/i.test(line)).join("\n").trim();
-    }
-    const field = recipeRestaurantFetchFieldDefinitions[key]?.field;
-    return field ? String(form.querySelector(`[data-restaurant-edit-field="${field}"]`)?.value || "").trim() : "";
-}
-
-function recipeRestaurantFetchComparableValue(value) {
-    if (value && typeof value === "object") return JSON.stringify(value);
-    return String(value ?? "").trim().toLowerCase();
-}
-
 function recipeRestaurantFetchDisplayValue(key, value) {
-    if (value === null || value === undefined || value === "") return "Not found";
+    if (value === null || value === undefined || value === "" || (Array.isArray(value) && !value.length)) return "Not set";
     if (key === "weekly_hours" && typeof value === "object") return recipeRestaurantWeeklyHoursText(value) || "Not found";
-    if (["online_payment", "delivery"].includes(key)) {
-        if (String(value) === "true") return "Yes";
-        if (String(value) === "false") return "No";
+    if (["online_payment", "online_ordering", "pickup", "delivery", "reservations"].includes(key)) {
+        if (value === true || String(value) === "true") return "Yes";
+        if (value === false || String(value) === "false") return "No";
         return "Unknown";
     }
     if (key === "current_status") {
         return String(value).replaceAll("_", " ").replace(/\b\w/g, character => character.toUpperCase());
     }
+    if (Array.isArray(value)) return value.join("\n");
+    if (value && typeof value === "object") return JSON.stringify(value, null, 2);
     return String(value);
+}
+
+function recipeRestaurantScanCandidate(row, candidateId = "") {
+    const candidates = Array.isArray(row?.candidates) ? row.candidates : [];
+    return candidates.find(candidate => candidate.candidate_id === candidateId) || row?.recommended || candidates[0] || null;
+}
+
+function recipeRestaurantScanSourceStatus(source) {
+    const status = String(source?.status || "");
+    if (status === "success") return { icon: "✓", label: source.status_label || "Reached and parsed", className: "is-success" };
+    if (status === "not_configured") return { icon: "–", label: source.status_label || "Not configured", className: "is-neutral" };
+    if (status === "mismatch") return { icon: "!", label: source.status_label || "Restaurant mismatch", className: "is-warning" };
+    return { icon: "×", label: source.status_label || source?.reason || "Source fetch failed", className: "is-error" };
 }
 
 function renderRecipeRestaurantFetchReview(data) {
     const panel = recipeRestaurantFetchReviewPanel();
     const list = panel?.querySelector("[data-restaurant-fetch-review-list]");
     const summary = panel?.querySelector("[data-restaurant-fetch-summary]");
+    const metrics = panel?.querySelector("[data-restaurant-scan-metrics]");
+    const sources = panel?.querySelector("[data-restaurant-scan-sources]");
+    const unresolved = panel?.querySelector("[data-restaurant-scan-unresolved]");
+    const unresolvedList = panel?.querySelector("[data-restaurant-scan-unresolved-list]");
     if (!panel || !list) return;
+    recipeRestaurantInformationScan = data || {};
     recipeRestaurantFetchedProposals = data?.proposals || {};
-    list.innerHTML = Object.entries(recipeRestaurantFetchFieldDefinitions).map(([key, definition]) => {
-        const proposal = recipeRestaurantFetchedProposals[key] || {};
-        const found = Boolean(proposal.found) && proposal.value !== null && proposal.value !== "";
-        const current = recipeRestaurantFetchCurrentValue(key);
-        const proposedComparable = key === "weekly_hours" ? recipeRestaurantWeeklyHoursText(proposal.value) : proposal.value;
-        const conflict = found && Boolean(current)
-            && recipeRestaurantFetchComparableValue(current) !== recipeRestaurantFetchComparableValue(proposedComparable);
-        const confidence = Number(proposal.confidence);
-        const confidenceText = Number.isFinite(confidence) ? `${Math.round(confidence * 100)}% confidence` : "Confidence unavailable";
-        const source = String(proposal.source_url || "").trim();
-        const imagePreview = key === "image_url" && found
-            ? `<img src="${escapeAttribute(proposal.value)}" alt="Fetched restaurant image preview">`
+    const fieldRows = Object.entries(data?.fields || {});
+    const scanSummary = data?.summary || {};
+    if (metrics) {
+        const values = [
+            ["Sources scanned", scanSummary.sources_scanned], ["Sources reached", scanSummary.sources_reached],
+            ["Fields discovered", scanSummary.fields_discovered], ["High-confidence changes", scanSummary.high_confidence_changes],
+            ["Conflicts", scanSummary.conflicts], ["Unresolved", scanSummary.unresolved],
+        ];
+        metrics.innerHTML = values.map(([label, value]) => `<span><strong>${Number(value) || 0}</strong>${escapeHtml(label)}</span>`).join("");
+    }
+    if (sources) {
+        sources.innerHTML = (data?.sources || []).map(source => {
+            const status = recipeRestaurantScanSourceStatus(source);
+            const label = String(source.label || source.source_type || "Source").replaceAll("_", " ");
+            return `<span class="${status.className}" title="${escapeAttribute(source.reason || status.label)}"><b aria-hidden="true">${status.icon}</b><span>${escapeHtml(label)}: ${escapeHtml(status.label)}</span></span>`;
+        }).join("");
+    }
+    list.innerHTML = fieldRows.length ? fieldRows.map(([key, row]) => {
+        const definition = recipeRestaurantFetchFieldDefinitions[key] || { label: key.replaceAll("_", " ") };
+        const recommended = recipeRestaurantScanCandidate(row);
+        const defaultAccept = row.selectable && row.confidence_label === "High" && !row.conflict && !row.requires_explicit_review;
+        const imagePreview = key === "image_url" && recommended
+            ? `<img src="${escapeAttribute(recommended.value)}" alt="Discovered restaurant logo preview">`
             : "";
-        return `<article class="recipe-edit-restaurant-fetch-row${conflict ? " has-conflict" : ""}${found ? "" : " is-not-found"}" data-restaurant-fetch-field="${key}">
-                    <label class="recipe-edit-restaurant-fetch-accept"><input type="checkbox" ${found && !conflict ? "checked" : ""} ${found ? "" : "disabled"} aria-label="Accept ${escapeAttribute(definition.label)}"></label>
+        const conflictPicker = row.conflict
+            ? `<select data-restaurant-scan-candidate aria-label="Choose ${escapeAttribute(definition.label)} candidate" onchange="updateRecipeRestaurantScanCandidate(this)">${row.candidates.map(candidate => `<option value="${escapeAttribute(candidate.candidate_id)}" ${candidate.candidate_id === recommended?.candidate_id ? "selected" : ""}>${escapeHtml(recipeRestaurantFetchDisplayValue(key, candidate.value))}</option>`).join("")}</select>`
+            : `<span data-restaurant-scan-value>${escapeHtml(recipeRestaurantFetchDisplayValue(key, recommended?.value))}</span>`;
+        const sourceUrl = String(recommended?.source_url || "");
+        return `<article class="recipe-edit-restaurant-fetch-row${row.conflict ? " has-conflict" : ""}${row.locked ? " is-locked" : ""}" data-restaurant-fetch-field="${escapeAttribute(key)}" data-recommended-candidate="${escapeAttribute(recommended?.candidate_id || "")}">
+                    <label class="recipe-edit-restaurant-fetch-accept"><input type="checkbox" ${defaultAccept ? "checked" : ""} ${row.selectable && !row.locked ? "" : "disabled"} aria-label="Accept ${escapeAttribute(definition.label)}"></label>
                     <strong>${escapeHtml(definition.label)}</strong>
-                    <span class="recipe-edit-restaurant-fetch-current">${escapeHtml(current || "Not set")}</span>
-                    <span class="recipe-edit-restaurant-fetch-proposed">${imagePreview}<span>${escapeHtml(recipeRestaurantFetchDisplayValue(key, proposal.value))}</span></span>
+                    <span class="recipe-edit-restaurant-fetch-current">${escapeHtml(recipeRestaurantFetchDisplayValue(key, row.current_value))}</span>
+                    <span class="recipe-edit-restaurant-fetch-proposed">${imagePreview}${conflictPicker}</span>
+                    <span class="recipe-edit-restaurant-scan-confidence is-${String(row.confidence_label || "low").toLowerCase()}"><b>${escapeHtml(row.confidence_label || "Low")}</b><small>${Math.round(Number(recommended?.confidence || 0) * 100)}%</small></span>
                     <span class="recipe-edit-restaurant-fetch-evidence">
-                        ${source ? `<a href="${escapeAttribute(source)}" target="_blank" rel="noopener noreferrer" title="${escapeAttribute(source)}">View source</a>` : "No source"}
-                        <small>${found ? escapeHtml(confidenceText) : "Not found"}</small>
-                        ${conflict ? "<em>Differs from current value</em>" : ""}
+                        ${sourceUrl ? `<a href="${escapeAttribute(sourceUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeAttribute(sourceUrl)}">View source</a>` : "Source unavailable"}
+                        <small data-restaurant-scan-method title="${escapeAttribute(recommended?.evidence || "")}">${escapeHtml(String(recommended?.extraction_method || "").replaceAll("_", " "))}</small>
+                        <label class="recipe-edit-restaurant-scan-lock"><input type="checkbox" data-restaurant-scan-lock ${row.locked ? "checked" : ""}> Lock existing</label>
+                        ${row.requires_explicit_review ? "<em>Explicit review required</em>" : ""}
                     </span>
                 </article>`;
-    }).join("");
-    if (summary) summary.textContent = data?.message || "Choose which public details to copy into this unsaved form.";
+    }).join("") : '<p class="recipe-edit-restaurant-scan-empty">No matching restaurant fields were discovered. Review the source statuses above and try Rescan after correcting the source URLs.</p>';
+    const unresolvedFields = Array.isArray(data?.unresolved_fields) ? data.unresolved_fields : [];
+    if (unresolved && unresolvedList) {
+        unresolved.hidden = !unresolvedFields.length;
+        unresolvedList.innerHTML = unresolvedFields.map(field => `<span>${escapeHtml(recipeRestaurantFetchFieldDefinitions[field]?.label || field.replaceAll("_", " "))}</span>`).join("");
+    }
+    if (summary) summary.textContent = data?.message || "Review evidence-backed restaurant information.";
     panel.hidden = false;
     panel.querySelector('input:not([disabled]), button')?.focus();
+}
+
+function updateRecipeRestaurantScanCandidate(select) {
+    const rowElement = select?.closest("[data-restaurant-fetch-field]");
+    const field = rowElement?.dataset.restaurantFetchField;
+    const row = recipeRestaurantInformationScan?.fields?.[field];
+    const candidate = recipeRestaurantScanCandidate(row, select?.value);
+    if (!rowElement || !candidate) return;
+    const link = rowElement.querySelector(".recipe-edit-restaurant-fetch-evidence a");
+    const method = rowElement.querySelector("[data-restaurant-scan-method]");
+    if (link) {
+        link.href = candidate.source_url || "#";
+        link.title = candidate.source_url || "";
+    }
+    if (method) {
+        method.textContent = String(candidate.extraction_method || "").replaceAll("_", " ");
+        method.title = candidate.evidence || "";
+    }
 }
 
 function closeRecipeRestaurantFetchReview(options = {}) {
     const panel = recipeRestaurantFetchReviewPanel();
     if (panel) panel.hidden = true;
     recipeRestaurantFetchedProposals = {};
+    recipeRestaurantInformationScan = null;
     if (options.restoreFocus !== false) recipeRestaurantEditForm()?.querySelector("[data-restaurant-fetch-button]")?.focus();
     return false;
 }
@@ -26302,7 +26362,14 @@ function setRecipeRestaurantFetchError(message) {
     }
 }
 
-async function fetchRecipeRestaurantDetails(button) {
+function updateRecipeRestaurantScanActionLabel(record = recipeRestaurantEditSelection) {
+    const label = recipeRestaurantEditForm()?.querySelector("[data-restaurant-fetch-label]");
+    if (label) label.textContent = record?.restaurant_information_last_scanned_at
+        ? "Refresh Restaurant Information"
+        : "Scan Restaurant Information";
+}
+
+async function fetchRecipeRestaurantDetails(button, force = false) {
     const form = button?.closest("[data-restaurant-edit-form]") || recipeRestaurantEditForm();
     const restaurantId = recipeRestaurantRecordId(recipeRestaurantEditSelection);
     if (!form || button?.disabled) return false;
@@ -26315,74 +26382,99 @@ async function fetchRecipeRestaurantDetails(button) {
     closeRecipeRestaurantFetchReview({ restoreFocus: false });
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
-    if (label) label.textContent = "Fetching details…";
+    const originalLabel = label?.textContent || button.textContent.trim();
+    if (label) label.textContent = "Scanning restaurant information…";
+    else button.textContent = "Scanning…";
     if (error) error.hidden = true;
     try {
         const response = await fetch(`/api/recipe/restaurants/${encodeURIComponent(restaurantId)}/fetch-details`, {
             method: "POST",
-            headers: { "Accept": "application/json" },
+            headers: { "Accept": "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify({
+                force,
+                restaurant_name: form.querySelector('[data-restaurant-edit-field="restaurant_name"]')?.value || "",
+                restaurant_phone: form.querySelector('[data-restaurant-edit-field="restaurant_phone"]')?.value || "",
+                restaurant_website_url: form.querySelector('[data-restaurant-edit-field="restaurant_website_url"]')?.value || "",
+                source_menu_url: form.querySelector('[data-restaurant-edit-field="source_menu_url"]')?.value || "",
+                menu_item_url: form.querySelector('[data-restaurant-edit-field="menu_item_url"]')?.value || "",
+                restaurant_street_address: form.querySelector('[data-restaurant-edit-field="restaurant_street_address"]')?.value || "",
+                restaurant_city: form.querySelector('[data-restaurant-edit-field="restaurant_city"]')?.value || "",
+                restaurant_state: form.querySelector('[data-restaurant-edit-field="restaurant_state"]')?.value || "",
+                restaurant_postal_code: form.querySelector('[data-restaurant-edit-field="restaurant_postal_code"]')?.value || "",
+                restaurant_country: form.querySelector('[data-restaurant-edit-field="restaurant_country"]')?.value || "",
+            }),
         });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.ok) throw new Error(data.error || "Restaurant details could not be fetched.");
+        if (!response.ok || !data.ok) throw new Error(data.error || "Restaurant information could not be scanned.");
         renderRecipeRestaurantFetchReview(data);
     } catch (err) {
-        setRecipeRestaurantFetchError(err.message || "Restaurant details could not be fetched.");
+        setRecipeRestaurantFetchError(err.message || "Restaurant information could not be scanned.");
     } finally {
         button.disabled = false;
         button.removeAttribute("aria-busy");
-        if (label) label.textContent = "Fetch Restaurant Details";
+        if (label) label.textContent = originalLabel;
+        else button.textContent = originalLabel;
     }
     return false;
 }
 
-function applyRecipeRestaurantFetchedDetails(applyAll = false) {
+async function applyRecipeRestaurantInformationScan(button, mode = "selected") {
     const form = recipeRestaurantEditForm();
     const panel = recipeRestaurantFetchReviewPanel();
-    if (!form || !panel) return false;
-    const accepted = new Set(Array.from(panel.querySelectorAll("[data-restaurant-fetch-field]")).filter(row => {
-        const checkbox = row.querySelector('input[type="checkbox"]');
-        return !checkbox?.disabled && (applyAll || checkbox?.checked);
-    }).map(row => row.dataset.restaurantFetchField));
-    const setField = (key, value) => {
-        const field = recipeRestaurantFetchFieldDefinitions[key]?.field;
-        const input = field ? form.querySelector(`[data-restaurant-edit-field="${field}"]`) : null;
-        if (input) input.value = value == null ? "" : String(value);
-    };
-
-    if (accepted.has("weekly_hours") || accepted.has("hours_notes")) {
-        const existingRaw = form.querySelector('[data-restaurant-edit-field="restaurant_hours_text"]')?.value || "";
-        const existingWeekly = {};
-        Array.from(form.querySelectorAll("[data-restaurant-hours-day]")).forEach(row => {
-            const day = String(row.dataset.restaurantHoursDay || "").toLowerCase();
-            const closed = row.querySelector("[data-hours-state]")?.value === "closed";
-            const ranges = [
-                [row.querySelector("[data-hours-open]")?.value, row.querySelector("[data-hours-close]")?.value],
-                [row.querySelector("[data-hours-open-two]")?.value, row.querySelector("[data-hours-close-two]")?.value],
-            ].filter(range => range[0] && range[1]).map(range => ({ opens: range[0], closes: range[1] }));
-            if (day && (closed || ranges.length)) existingWeekly[day] = { closed, ranges };
-        });
-        const weekly = accepted.has("weekly_hours") ? recipeRestaurantFetchedProposals.weekly_hours?.value : existingWeekly;
-        const existingNotes = form.querySelector("[data-hours-notes]")?.value || "";
-        const notes = accepted.has("hours_notes") ? recipeRestaurantFetchedProposals.hours_notes?.value : existingNotes;
-        setField("weekly_hours", recipeRestaurantWeeklyHoursText(weekly, notes) || existingRaw);
-        initializeRecipeRestaurantStructuredHours(form);
-    }
-
-    accepted.forEach(key => {
-        if (["weekly_hours", "hours_notes"].includes(key)) return;
-        const value = recipeRestaurantFetchedProposals[key]?.value;
-        if (value === null || value === undefined || value === "") return;
-        setField(key, value);
-        if (key === "image_url") {
-            const action = form.querySelector('[data-restaurant-edit-field="restaurant_logo_action"]');
-            const dataInput = form.querySelector('[data-restaurant-edit-field="restaurant_logo_data_url"]');
-            if (action) action.value = "url";
-            if (dataInput) dataInput.value = "";
-        }
+    const restaurantId = recipeRestaurantRecordId(recipeRestaurantEditSelection);
+    if (!form || !panel || !restaurantId || !recipeRestaurantInformationScan?.scan_id || button?.disabled) return false;
+    const selections = {};
+    const lockUpdates = {};
+    panel.querySelectorAll("[data-restaurant-fetch-field]").forEach(row => {
+        const field = row.dataset.restaurantFetchField;
+        const accept = row.querySelector(".recipe-edit-restaurant-fetch-accept input");
+        const candidate = row.querySelector("[data-restaurant-scan-candidate]")?.value || row.dataset.recommendedCandidate;
+        if (accept?.checked && candidate) selections[field] = candidate;
+        const lock = row.querySelector("[data-restaurant-scan-lock]");
+        if (lock) lockUpdates[field] = lock.checked;
     });
-    if (accepted.has("raw_hours_text") && !accepted.has("weekly_hours")) initializeRecipeRestaurantStructuredHours(form);
-    updateRecipeRestaurantEditState(form);
-    closeRecipeRestaurantFetchReview();
+    button.disabled = true;
+    const originalText = button.textContent;
+    button.textContent = "Applying…";
+    try {
+        const response = await fetch(`/api/recipe/restaurants/${encodeURIComponent(restaurantId)}/apply-information-scan`, {
+            method: "POST",
+            headers: { "Accept": "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify({ scan_id: recipeRestaurantInformationScan.scan_id, mode, selections, lock_updates: lockUpdates }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || "Restaurant information could not be applied.");
+        const saved = data.restaurant || {};
+        recipeRestaurantEditSelection = { ...(recipeRestaurantEditSelection || {}), ...saved };
+        recipeRestaurantDisplaySource = { ...(recipeRestaurantDisplaySource || {}), ...saved };
+        const snapshot = JSON.parse(recipeRestaurantEditSnapshot || "{}");
+        snapshot.values = snapshot.values || {};
+        (data.applied_fields || []).forEach(key => {
+            const field = recipeRestaurantFetchFieldDefinitions[key]?.field;
+            if (!field) return;
+            const input = form.querySelector(`[data-restaurant-edit-field="${field}"]`);
+            let value = recipeRestaurantRecordValue(saved, field);
+            if (key === "weekly_hours") {
+                value = recipeRestaurantWeeklyHoursText(saved.restaurant_weekly_hours || {}, saved.restaurant_hours_notes || "");
+            }
+            if (input) {
+                input.value = value == null ? "" : String(value);
+                snapshot.values[field] = input.value;
+            }
+        });
+        recipeRestaurantEditSnapshot = JSON.stringify(snapshot);
+        initializeRecipeRestaurantStructuredHours(form);
+        updateRecipeRestaurantEditLogo(form);
+        updateRecipeRestaurantEditState(form);
+        updateRecipeRestaurantScanActionLabel(saved);
+        updateRecipeEditRestaurantCard();
+        closeRecipeRestaurantFetchReview();
+    } catch (err) {
+        setRecipeRestaurantFetchError(err.message || "Restaurant information could not be applied.");
+    } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+    }
     return false;
 }
 
@@ -26477,6 +26569,7 @@ function editRecipeRestaurantSource(button, event = null) {
     if (selectorStatus) selectorStatus.textContent = hasNormalizedRestaurant ? "" : "Creating new restaurant";
     const save = form.querySelector("[data-restaurant-edit-save]");
     if (save) save.textContent = hasNormalizedRestaurant ? "Save Changes" : "Create Restaurant";
+    updateRecipeRestaurantScanActionLabel(selected);
     recipeRestaurantDirectory = [];
     loadRecipeRestaurantDirectory();
     closeRecipeRestaurantUsagePanel();
@@ -26520,6 +26613,7 @@ function closeRecipeRestaurantSourceModal(options = {}) {
     if (fetchReview) fetchReview.hidden = true;
     closeRecipeRestaurantDuplicateReview({ restoreFocus: false });
     recipeRestaurantFetchedProposals = {};
+    recipeRestaurantInformationScan = null;
     closeRecipeRestaurantSelector({ restoreValue: false });
     closeRecipeRestaurantDuplicatePanel(form.querySelector("[data-restaurant-duplicate-panel]"));
     modal.hidden = true;

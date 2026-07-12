@@ -141,7 +141,10 @@ from PushShoppingList.services.recipe_edit_service import create_editable_restau
 from PushShoppingList.services.recipe_edit_service import get_editable_restaurant
 from PushShoppingList.services.recipe_edit_service import list_editable_restaurants
 from PushShoppingList.services.recipe_edit_service import update_editable_restaurant
-from PushShoppingList.services.restaurant_details_fetch_service import fetch_restaurant_details
+from PushShoppingList.services.restaurant_details_fetch_service import apply_restaurant_information_scan
+from PushShoppingList.services.restaurant_details_fetch_service import load_pending_restaurant_scan
+from PushShoppingList.services.restaurant_details_fetch_service import scan_restaurant_information
+from PushShoppingList.services.restaurant_details_fetch_service import store_pending_restaurant_scan
 from PushShoppingList.services.restaurant_recipe_duplicate_service import commit_restaurant_recipe_delete
 from PushShoppingList.services.restaurant_recipe_duplicate_service import commit_restaurant_recipe_merge
 from PushShoppingList.services.restaurant_recipe_duplicate_service import decorate_restaurant_usage_with_duplicates
@@ -3573,15 +3576,47 @@ def recipe_restaurant_detail_route(restaurant_id):
 
 @recipe_bp.route("/api/recipe/restaurants/<restaurant_id>/fetch-details", methods=["POST"])
 def recipe_restaurant_fetch_details_route(restaurant_id):
-    """Return public metadata proposals without mutating the restaurant record."""
+    """Scan configured public sources and retain an evidence-backed pending review."""
     selected = get_editable_restaurant(restaurant_id)
     if not selected.get("ok"):
         return jsonify(selected), 404
-    result = fetch_restaurant_details(selected.get("restaurant"))
-    if result.get("ok"):
-        return jsonify(result), 200
-    status = 400 if result.get("code") in {"missing_urls", "invalid_url", "blocked_url"} else 502
-    return jsonify(result), status
+    data = request.get_json(silent=True) or {}
+    restaurant = {**(selected.get("restaurant") or {})}
+    discovery_fields = {
+        "restaurant_name": "restaurant_name",
+        "restaurant_phone": "restaurant_phone",
+        "restaurant_street_address": "restaurant_street_address",
+        "restaurant_city": "restaurant_city",
+        "restaurant_state": "restaurant_state",
+        "restaurant_postal_code": "restaurant_postal_code",
+        "restaurant_country": "restaurant_country",
+        "restaurant_website_url": "restaurant_website_url",
+        "source_menu_url": "source_menu_url",
+        "menu_item_url": "menu_item_url",
+    }
+    for payload_key, record_key in discovery_fields.items():
+        if payload_key in data:
+            restaurant[record_key] = data.get(payload_key)
+    result = store_pending_restaurant_scan(
+        scan_restaurant_information(restaurant, force=data.get("force") is True)
+    )
+    return jsonify(result), 200
+
+
+@recipe_bp.route("/api/recipe/restaurants/<restaurant_id>/apply-information-scan", methods=["POST"])
+def recipe_restaurant_apply_information_scan_route(restaurant_id):
+    data = request.get_json(silent=True) or {}
+    scan = load_pending_restaurant_scan(data.get("scan_id"), restaurant_id)
+    if not scan.get("ok"):
+        return jsonify(scan), 404
+    result = apply_restaurant_information_scan(
+        restaurant_id,
+        scan,
+        selections=data.get("selections") or {},
+        mode=str(data.get("mode") or "selected").strip(),
+        lock_updates=data.get("lock_updates") or {},
+    )
+    return jsonify(result), 200 if result.get("ok") else 400
 
 
 @recipe_bp.route("/api/recipe/restaurants/backfill", methods=["POST"])
