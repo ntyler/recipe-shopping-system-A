@@ -27263,7 +27263,7 @@ img[data-deferred-src] {
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-image-change-actions {
     position: static;
-    display: grid;
+    display: none;
     width: min(220px, 100%);
     grid-template-columns: minmax(0, 1fr);
     gap: 5px;
@@ -27274,6 +27274,10 @@ img[data-deferred-src] {
     background: var(--app-surface-soft);
     box-shadow: 0 12px 28px rgba(0, 0, 0, .4);
     order: 1;
+}
+
+.recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-image-change-actions:not([hidden]) {
+    display: grid;
 }
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-image-change-actions[hidden] {

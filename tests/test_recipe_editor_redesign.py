@@ -135,9 +135,12 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert "position: static;" in css
     assert "margin: 0 0 8px;" in css
     assert "order: 1;" in css
+    assert ".recipe-edit-image-change-actions:not([hidden])" in css
     assert "function closeRecipeImageChangeActions(options = {})" in script
     assert 'event.key === "Escape"' in script
     assert "closeRecipeImageChangeActions();" in script
+    assert "if (changeActions) changeActions.hidden = true;" in script
+    assert 'if (upload) upload.setAttribute("aria-expanded", "false");' in script
 
 
 def test_recipe_editor_header_actions_match_the_mockup_order_and_icons():

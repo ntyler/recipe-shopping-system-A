@@ -24270,6 +24270,10 @@ function organizeRecipeEditImageCard() {
         appendRecipeEditWorkspaceChildren(actions, [upload, remove]);
     }
 
+    const changeActions = coverField.querySelector("[data-recipe-image-change-actions]");
+    if (changeActions) changeActions.hidden = true;
+    if (upload) upload.setAttribute("aria-expanded", "false");
+
 }
 
 function organizeRecipeEditInformationCard() {
@@ -26292,6 +26296,8 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
         removeButton.hidden = !hasImage;
         removeButton.disabled = !hasImage;
     }
+
+    closeRecipeImageChangeActions();
 
     setValue("recipeEditCoverPath", normalized.path || "");
     setValue("recipeEditCoverUrl", normalized.url || "");
