@@ -623,13 +623,6 @@
                         <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-image-generation-menu recipe-edit-header-image-menu" hidden>
                             <div class="overflow-menu-section">
                                 <div class="overflow-menu-section-title">Generate Images</div>
-                                <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
-                                    <span>Image Generator</span>
-                                    <select data-recipe-image-provider-select>
-                                        <option value="openai" selected>ChatGPT / OpenAI</option>
-                                        <option value="comfyui">ComfyUI local</option>
-                                    </select>
-                                </label>
                                 <div class="recipe-view-generate-submenu-row">
                                     <button type="button"
                                             class="recipe-view-generate-submenu-toggle"
@@ -857,26 +850,13 @@
                             <span id="recipeEditCoverStatus" class="recipe-edit-cover-status">
                                 Upload or replace the image shown on recipe cards.
                             </span>
-                            <label class="recipe-edit-image-provider-field" for="recipeEditImageProvider">
-                                <span>Image Generator</span>
-                                <select id="recipeEditImageProvider" data-recipe-image-provider-select>
-                                    <option value="openai" selected>ChatGPT / OpenAI</option>
-                                    <option value="comfyui">ComfyUI local</option>
-                                </select>
-                            </label>
                             <div class="recipe-edit-cover-actions">
                                 <button type="button"
                                         class="recipe-edit-cover-upload-button"
-                                        onclick="return openRecipeCoverUpload()">
+                                        aria-expanded="false"
+                                        onclick="return toggleRecipeImageChangeActions(this)">
                                     <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
                                     <span id="recipeEditCoverUploadLabel">Upload title image</span>
-                                </button>
-                                <button type="button"
-                                        id="recipeEditCoverGenerate"
-                                        class="recipe-edit-cover-upload-button recipe-edit-cover-generate-button"
-                                        onclick="return generateRecipeCoverImage(this)">
-                                    <span class="recipe-edit-button-icon" aria-hidden="true">AI</span>
-                                    <span id="recipeEditCoverGenerateLabel">Generate title image</span>
                                 </button>
                                 <button type="button"
                                         id="recipeEditCoverRemove"
@@ -891,6 +871,15 @@
                                        type="file"
                                        accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
                                        onchange="return uploadRecipeCoverImage(this)">
+                            </div>
+                            <div class="recipe-edit-image-change-actions" data-recipe-image-change-actions hidden>
+                                <button type="button" onclick="return openRecipeCoverUpload()">Upload Image</button>
+                                <button type="button"
+                                        id="recipeEditCoverGenerate"
+                                        class="recipe-edit-cover-generate-button"
+                                        onclick="return generateRecipeCoverImage(this)">
+                                    <span id="recipeEditCoverGenerateLabel">Regenerate with AI</span>
+                                </button>
                             </div>
                             <div class="recipe-image-prompt recipe-image-prompt-collapsed recipe-edit-cover-prompt"
                                  id="recipeEditCoverPrompt"
@@ -1674,13 +1663,6 @@
                             <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-ingredients-image-menu" hidden>
                                 <div class="overflow-menu-section">
                                     <div class="overflow-menu-section-title">Generate Images</div>
-                                    <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
-                                        <span>Image Generator</span>
-                                        <select data-recipe-image-provider-select>
-                                            <option value="openai" selected>ChatGPT / OpenAI</option>
-                                            <option value="comfyui">ComfyUI local</option>
-                                        </select>
-                                    </label>
                                     <button type="button"
                                             data-recipe-editor-image-global-btn
                                             onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'ingredients' })">
@@ -1811,13 +1793,6 @@
                             <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-equipment-image-menu" hidden>
                                 <div class="overflow-menu-section">
                                     <div class="overflow-menu-section-title">Generate Images</div>
-                                    <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
-                                        <span>Image Generator</span>
-                                        <select data-recipe-image-provider-select>
-                                            <option value="openai" selected>ChatGPT / OpenAI</option>
-                                            <option value="comfyui">ComfyUI local</option>
-                                        </select>
-                                    </label>
                                     <button type="button"
                                             data-recipe-editor-image-global-btn
                                             onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'equipment' })">
@@ -1920,13 +1895,6 @@
                             <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-instructions-image-menu" hidden>
                                 <div class="overflow-menu-section">
                                     <div class="overflow-menu-section-title">Generate Images</div>
-                                    <label class="recipe-edit-image-provider-field recipe-image-provider-inline-field">
-                                        <span>Image Generator</span>
-                                        <select data-recipe-image-provider-select>
-                                            <option value="openai" selected>ChatGPT / OpenAI</option>
-                                            <option value="comfyui">ComfyUI local</option>
-                                        </select>
-                                    </label>
                                     <button type="button"
                                             data-recipe-editor-image-global-btn
                                             onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'instructions' })">

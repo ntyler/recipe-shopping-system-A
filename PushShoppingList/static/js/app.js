@@ -24182,13 +24182,9 @@ function organizeRecipeEditImageCard() {
     }
 
     imageCardContent.appendChild(coverField);
-    const details = coverField.querySelector(".recipe-edit-cover-details");
     const actions = coverField.querySelector(".recipe-edit-cover-actions");
-    const provider = coverField.querySelector(".recipe-edit-image-provider-field");
     const upload = actions ? actions.querySelector(".recipe-edit-cover-upload-button:not(.recipe-edit-cover-generate-button):not(.recipe-edit-cover-remove-button)") : null;
-    const generate = document.getElementById("recipeEditCoverGenerate");
     const remove = document.getElementById("recipeEditCoverRemove");
-    const prompt = document.getElementById("recipeEditCoverPrompt");
     const uploadLabel = document.getElementById("recipeEditCoverUploadLabel");
     const generateLabel = document.getElementById("recipeEditCoverGenerateLabel");
 
@@ -24196,7 +24192,7 @@ function organizeRecipeEditImageCard() {
         uploadLabel.textContent = "Change Image";
     }
     if (generateLabel) {
-        generateLabel.textContent = "AI Regenerate";
+        generateLabel.textContent = "Regenerate with AI";
     }
 
     if (actions) {
@@ -24204,14 +24200,6 @@ function organizeRecipeEditImageCard() {
         appendRecipeEditWorkspaceChildren(actions, [upload, remove]);
     }
 
-    if (details && !details.querySelector(".recipe-edit-image-settings")) {
-        const settings = document.createElement("details");
-        settings.className = "recipe-edit-image-settings";
-        settings.innerHTML = "<summary>Image generator settings</summary><div></div>";
-        const settingsBody = settings.querySelector("div");
-        appendRecipeEditWorkspaceChildren(settingsBody, [provider, generate, prompt]);
-        details.appendChild(settings);
-    }
 }
 
 function organizeRecipeEditInformationCard() {
@@ -25584,6 +25572,9 @@ function normalizeRecipeImageProvider(value) {
 }
 
 function selectedRecipeImageProvider() {
+    if (recipeEditorStandalonePageIsActive()) {
+        return "openai";
+    }
     const select = document.querySelector("[data-recipe-image-provider-select]")
         || document.getElementById("recipeEditImageProvider");
 
@@ -25746,6 +25737,9 @@ function resetRecipeImageThumbnailSize(button) {
 }
 
 function recipeImageProviderFieldHtml(selectId = "") {
+    if (recipeEditorStandalonePageIsActive()) {
+        return "";
+    }
     const idAttribute = selectId ? ` id="${escapeAttribute(selectId)}"` : "";
     const forAttribute = selectId ? ` for="${escapeAttribute(selectId)}"` : "";
 
@@ -25758,6 +25752,16 @@ function recipeImageProviderFieldHtml(selectId = "") {
             </select>
         </label>
     `;
+}
+
+function toggleRecipeImageChangeActions(button) {
+    const details = button?.closest(".recipe-edit-cover-details");
+    const actions = details?.querySelector("[data-recipe-image-change-actions]");
+    if (actions) {
+        actions.hidden = !actions.hidden;
+        button.setAttribute("aria-expanded", actions.hidden ? "false" : "true");
+    }
+    return false;
 }
 
 function openRecipeCoverUpload() {
@@ -25885,10 +25889,6 @@ async function generateRecipeCoverImage(button) {
 
     if (!originalUrl) {
         setRecipeEditStatus("Unable to generate title image: missing recipe URL.", true);
-        return false;
-    }
-
-    if (hasCoverImage && !window.confirm("Regenerate this recipe title image? This will replace the current title image.")) {
         return false;
     }
 

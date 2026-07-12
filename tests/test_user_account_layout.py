@@ -637,24 +637,26 @@ def test_recipe_editor_has_generate_title_image_action():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
 
-    assert 'id="recipeEditImageProvider"' in template
-    assert '<option value="openai" selected>ChatGPT / OpenAI</option>' in template
-    assert '<option value="comfyui">ComfyUI local</option>' in template
-    assert template.index('<option value="openai" selected>ChatGPT / OpenAI</option>') < template.index(
-        '<option value="comfyui">ComfyUI local</option>'
-    )
+    assert 'id="recipeEditImageProvider"' not in template
+    assert "Image Generator" not in template
+    assert "data-recipe-image-provider-select" not in template
     assert 'id="recipeEditCoverGenerate"' in template
-    assert 'id="recipeEditCoverGenerateLabel">Generate title image' in template
+    assert 'id="recipeEditCoverGenerateLabel">Regenerate with AI' in template
+    assert "data-recipe-image-change-actions" in template
     assert "generateRecipeCoverImage(this)" in template
     assert 'id="recipeEditCoverRemove"' in template
     assert "Remove title image" in template
     assert "removeRecipeCoverImage(this)" in template
     assert "function selectedRecipeImageProvider()" in script
+    assert 'if (recipeEditorStandalonePageIsActive()) {\n        return "openai";' in script
     assert "function recipeImageProviderPayload()" in script
     assert "function removeRecipeCoverImage(button)" in script
     assert "...recipeImageProviderPayload()" in script
     assert '["initRecipeImageProviderSelector", initRecipeImageProviderSelector]' in script
     assert "function generateRecipeCoverImage(button)" in script
+    generate_start = script.index("async function generateRecipeCoverImage(button)")
+    generate_end = script.index("async function removeRecipeCoverImage", generate_start)
+    assert "window.confirm" not in script[generate_start:generate_end]
     assert 'fetch("/api/recipe_cover_image/generate"' in script
     assert 'fetch("/api/recipe_cover_image/remove"' in script
     assert '@recipe_bp.route("/api/recipe_cover_image/generate", methods=["POST"])' in routes
@@ -669,7 +671,8 @@ def test_recipe_image_provider_selector_is_available_for_detail_images():
 
     combined_templates = "\n".join([editor_template, recipe_template, view_behavior_template])
 
-    assert combined_templates.count('data-recipe-image-provider-select') >= 8
+    assert 'data-recipe-image-provider-select' not in editor_template
+    assert combined_templates.count('data-recipe-image-provider-select') >= 5
     assert '<option value="openai" selected>ChatGPT / OpenAI</option>' in combined_templates
     assert '<option value="comfyui">ComfyUI local</option>' in combined_templates
     assert '<option value="comfyui" selected>ComfyUI local</option>' not in combined_templates
