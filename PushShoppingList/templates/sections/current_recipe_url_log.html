@@ -2324,9 +2324,12 @@
                                     <h3>Restaurant Usage</h3>
                                     <p class="recipe-edit-restaurant-usage-primary" data-restaurant-usage-recipes>Loading usage…</p>
                                     <p data-restaurant-usage-cookbooks hidden></p>
-                                    <small data-restaurant-usage-note hidden>Includes this recipe when it references this restaurant.</small>
+                                    <small data-restaurant-usage-note hidden></small>
                                 </div>
-                                <button type="button" data-restaurant-usage-view data-restaurant-usage-mode="loading" onclick="return handleRecipeRestaurantUsageAction(this)" disabled>View Recipes</button>
+                                <div class="recipe-edit-restaurant-usage-actions">
+                                    <button type="button" data-restaurant-usage-repair onclick="return reviewUnlinkedRecipeRestaurants(this)" hidden>Review Unlinked Recipes</button>
+                                    <button type="button" data-restaurant-usage-view data-restaurant-usage-mode="loading" onclick="return handleRecipeRestaurantUsageAction(this)" disabled>View Recipes</button>
+                                </div>
                             </section>
                             <section class="recipe-edit-restaurant-primary-column">
                             <h3>Primary Restaurant Details</h3>
@@ -2454,11 +2457,15 @@
                             </div>
                             <aside class="recipe-edit-restaurant-usage-panel" data-restaurant-usage-panel aria-labelledby="recipeEditRestaurantUsageTitle" hidden>
                                 <header>
-                                    <h3 id="recipeEditRestaurantUsageTitle">Recipes Using This Restaurant</h3>
+                                    <h3 id="recipeEditRestaurantUsageTitle" data-restaurant-usage-panel-title>Recipes Using This Restaurant</h3>
                                     <button type="button" aria-label="Close restaurant usage" onclick="return closeRecipeRestaurantUsagePanel()">{{ shell.svg_icon("x") }}</button>
                                 </header>
                                 <label data-restaurant-usage-search-wrap hidden><span>Search recipes</span><input type="search" data-restaurant-usage-search oninput="filterRecipeRestaurantUsage(this.value)"></label>
                                 <div class="recipe-edit-restaurant-usage-list" data-restaurant-usage-list></div>
+                                <footer class="recipe-edit-restaurant-usage-panel-actions">
+                                    <button type="button" data-restaurant-usage-backfill onclick="return backfillUnlinkedRecipeRestaurants(this)" hidden>Link Clear Matches</button>
+                                    <button type="button" data-restaurant-usage-load-more onclick="return loadMoreRecipeRestaurantUsage(this)" hidden>Load More</button>
+                                </footer>
                             </aside>
                             <footer class="recipe-edit-restaurant-form-actions">
                                 <button type="button" onclick="return cancelRecipeRestaurantSourceEdit(this)">Cancel</button>

@@ -25126,6 +25126,14 @@ let recipeRestaurantEditTrigger = null;
 let recipeRestaurantDisplaySource = null;
 let recipeRestaurantModalInertElements = [];
 let recipeRestaurantUsageRecipes = [];
+let recipeRestaurantUsageRestaurantId = "";
+let recipeRestaurantUsagePage = 1;
+let recipeRestaurantUsageHasMore = false;
+let recipeRestaurantUsageQuery = "";
+let recipeRestaurantUsageTotal = 0;
+let recipeRestaurantUsageRestaurantName = "";
+let recipeRestaurantUsageMigrationStatus = {};
+let recipeRestaurantUsageSearchDebounce = null;
 let recipeRestaurantDirectory = [];
 let recipeRestaurantDirectoryRequest = 0;
 let recipeRestaurantSelectorDebounce = null;
@@ -25472,14 +25480,27 @@ function populateRecipeRestaurantEditForm(record, options = {}) {
 
 function setRecipeRestaurantUsageEmpty() {
     recipeRestaurantUsageRecipes = [];
+    recipeRestaurantUsageRestaurantId = "";
+    recipeRestaurantUsagePage = 1;
+    recipeRestaurantUsageHasMore = false;
+    recipeRestaurantUsageQuery = "";
+    recipeRestaurantUsageTotal = 0;
+    recipeRestaurantUsageRestaurantName = "";
+    recipeRestaurantUsageMigrationStatus = {};
     const count = document.querySelector("[data-restaurant-usage-recipes]");
     const cookbooks = document.querySelector("[data-restaurant-usage-cookbooks]");
     const note = document.querySelector("[data-restaurant-usage-note]");
     const view = document.querySelector("[data-restaurant-usage-view]");
+    const repair = document.querySelector("[data-restaurant-usage-repair]");
+    const backfill = document.querySelector("[data-restaurant-usage-backfill]");
+    const loadMore = document.querySelector("[data-restaurant-usage-load-more]");
     if (count) count.textContent = "Not currently used by any recipes.";
     if (cookbooks) cookbooks.hidden = true;
     if (note) note.hidden = true;
     if (view) view.hidden = true;
+    if (repair) repair.hidden = true;
+    if (backfill) backfill.hidden = true;
+    if (loadMore) loadMore.hidden = true;
     renderRecipeRestaurantUsageList();
 }
 
@@ -25644,64 +25665,135 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
     list.innerHTML = recipes.map(recipe => {
         const url = String(recipe.url || "").trim();
         const details = [recipe.cookbook_name || "No cookbook", recipeRestaurantUsageDate(recipe.last_modified)].filter(Boolean).join(" · ");
+        const relationship = recipe.relationship_status === "legacy_clear"
+            ? '<small class="recipe-edit-restaurant-usage-link-status">Needs restaurant link</small>'
+            : "";
         return `<article>
             <a href="/recipe/edit?url=${encodeURIComponent(url)}">${escapeHtml(recipe.title || "Untitled Recipe")}</a>
             <span>${escapeHtml(details)}</span>
+            ${relationship}
         </article>`;
     }).join("");
 }
 
-async function loadRecipeRestaurantUsage(restaurantId) {
+function applyRecipeRestaurantUsageResponse(data, options = {}) {
     const count = document.querySelector("[data-restaurant-usage-recipes]");
     const cookbooks = document.querySelector("[data-restaurant-usage-cookbooks]");
     const note = document.querySelector("[data-restaurant-usage-note]");
     const view = document.querySelector("[data-restaurant-usage-view]");
-    recipeRestaurantUsageRecipes = [];
-    if (count) count.textContent = "Loading usage…";
-    if (cookbooks) cookbooks.hidden = true;
-    if (note) note.hidden = true;
+    const repair = document.querySelector("[data-restaurant-usage-repair]");
+    const backfill = document.querySelector("[data-restaurant-usage-backfill]");
+    const loadMore = document.querySelector("[data-restaurant-usage-load-more]");
+    const panelTitle = document.querySelector("[data-restaurant-usage-panel-title]");
+    const rows = Array.isArray(data.recipes) ? data.recipes : [];
+    recipeRestaurantUsageRecipes = options.append ? [...recipeRestaurantUsageRecipes, ...rows] : rows;
+    recipeRestaurantUsagePage = Number(data.page) || 1;
+    recipeRestaurantUsageHasMore = Boolean(data.has_more);
+    recipeRestaurantUsageTotal = Number(data.recipe_count) || 0;
+    recipeRestaurantUsageRestaurantName = String(data.restaurant_name || recipeRestaurantRecordName(recipeRestaurantEditSelection) || "This Restaurant").trim();
+    recipeRestaurantUsageMigrationStatus = data.migration_status || {};
+    const cookbookCount = Number(data.cookbook_count) || 0;
+    const legacyCount = Number(recipeRestaurantUsageMigrationStatus.legacy_possible_match_count) || 0;
+    const ambiguousCount = Number(recipeRestaurantUsageMigrationStatus.ambiguous_match_count) || 0;
+    const duplicateCount = Number(data.duplicate_restaurant_count) || 0;
+    if (count) {
+        count.innerHTML = recipeRestaurantUsageTotal > 0
+            ? `Used by <strong>${recipeRestaurantUsageTotal} recipe${recipeRestaurantUsageTotal === 1 ? "" : "s"}</strong>`
+            : "Not currently used by any recipes.";
+    }
+    if (cookbooks) {
+        cookbooks.textContent = `Across ${cookbookCount} cookbook${cookbookCount === 1 ? "" : "s"}`;
+        cookbooks.hidden = recipeRestaurantUsageTotal <= 0;
+    }
+    const notices = [];
+    if (legacyCount > 0) notices.push(`${legacyCount} additional legacy recipe${legacyCount === 1 ? "" : "s"} may need restaurant linking.`);
+    if (ambiguousCount > 0) notices.push(`${ambiguousCount} ambiguous match${ambiguousCount === 1 ? "" : "es"} require review.`);
+    if (duplicateCount > 0) notices.push(`${duplicateCount} possible duplicate restaurant record${duplicateCount === 1 ? "" : "s"} found.`);
+    if (!notices.length && data.included_current_recipe) notices.push("Includes the current recipe.");
+    if (note) {
+        note.textContent = notices.join(" ");
+        note.hidden = !notices.length;
+    }
     if (view) {
         view.hidden = false;
-        view.disabled = true;
+        view.disabled = recipeRestaurantUsageTotal <= 0;
         view.textContent = "View Recipes";
-        view.dataset.restaurantUsageMode = "loading";
-        view.dataset.restaurantId = restaurantId || "";
+        view.dataset.restaurantUsageMode = "view";
+        view.dataset.restaurantId = recipeRestaurantUsageRestaurantId;
     }
-    try {
-        const response = await fetch(`/api/recipe/restaurant-usage?restaurant_id=${encodeURIComponent(restaurantId || "")}`);
-        const data = await response.json();
-        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to load restaurant usage.");
-        recipeRestaurantUsageRecipes = Array.isArray(data.recipes) ? data.recipes : [];
-        const recipeCount = Number(data.recipe_count) || 0;
-        const cookbookCount = Number(data.cookbook_count) || 0;
-        if (count) {
-            count.innerHTML = recipeCount > 0
-                ? `Used by <strong>${recipeCount} recipe${recipeCount === 1 ? "" : "s"}</strong>`
-                : "Not currently used by any recipes.";
-        }
-        if (cookbooks) {
-            cookbooks.textContent = `Across ${cookbookCount} cookbook${cookbookCount === 1 ? "" : "s"}`;
-            cookbooks.hidden = recipeCount <= 0;
-        }
-        if (note) note.hidden = recipeCount <= 0;
-        if (view) {
-            view.hidden = recipeCount <= 0;
-            view.disabled = recipeCount <= 0;
-            view.textContent = "View Recipes";
-            view.dataset.restaurantUsageMode = "view";
-        }
-        const searchWrap = document.querySelector("[data-restaurant-usage-search-wrap]");
-        if (searchWrap) searchWrap.hidden = recipeRestaurantUsageRecipes.length <= 20;
-        renderRecipeRestaurantUsageList();
-    } catch (err) {
-        if (count) count.textContent = "Usage data unavailable.";
+    if (repair) {
+        repair.hidden = legacyCount <= 0 && ambiguousCount <= 0 && duplicateCount <= 0;
+        repair.dataset.restaurantId = recipeRestaurantUsageRestaurantId;
+    }
+    if (backfill) {
+        backfill.hidden = legacyCount <= 0;
+        backfill.dataset.restaurantId = recipeRestaurantUsageRestaurantId;
+        backfill.textContent = `Link ${legacyCount} Clear Match${legacyCount === 1 ? "" : "es"}`;
+    }
+    if (loadMore) loadMore.hidden = !recipeRestaurantUsageHasMore;
+    if (panelTitle) panelTitle.textContent = `Recipes Using ${recipeRestaurantUsageRestaurantName} — ${recipeRestaurantUsageTotal}`;
+    const searchWrap = document.querySelector("[data-restaurant-usage-search-wrap]");
+    if (searchWrap) searchWrap.hidden = recipeRestaurantUsageTotal <= 20;
+    renderRecipeRestaurantUsageList();
+}
+
+async function loadRecipeRestaurantUsage(restaurantId, options = {}) {
+    const count = document.querySelector("[data-restaurant-usage-recipes]");
+    const cookbooks = document.querySelector("[data-restaurant-usage-cookbooks]");
+    const note = document.querySelector("[data-restaurant-usage-note]");
+    const view = document.querySelector("[data-restaurant-usage-view]");
+    const repair = document.querySelector("[data-restaurant-usage-repair]");
+    const loadMore = document.querySelector("[data-restaurant-usage-load-more]");
+    const page = Math.max(1, Number(options.page) || 1);
+    const append = Boolean(options.append);
+    const query = String(options.query ?? recipeRestaurantUsageQuery ?? "").trim();
+    recipeRestaurantUsageRestaurantId = String(restaurantId || recipeRestaurantUsageRestaurantId || "").trim();
+    recipeRestaurantUsageQuery = query;
+    if (!append) recipeRestaurantUsageRecipes = [];
+    if (page === 1 && !query) {
+        if (count) count.textContent = "Loading usage…";
         if (cookbooks) cookbooks.hidden = true;
         if (note) note.hidden = true;
+        if (repair) repair.hidden = true;
+    }
+    try {
+        if (view && page === 1 && !query) {
+            view.hidden = false;
+            view.disabled = true;
+            view.textContent = "View Recipes";
+            view.dataset.restaurantUsageMode = "loading";
+            view.dataset.restaurantId = recipeRestaurantUsageRestaurantId;
+        }
+        if (loadMore) {
+            loadMore.disabled = true;
+            loadMore.textContent = "Loading…";
+        }
+        const params = new URLSearchParams({
+            restaurant_id: recipeRestaurantUsageRestaurantId,
+            page: String(page),
+            per_page: "50",
+            current_recipe_url: recipeEditorSourceUrlForOpen() || "",
+        });
+        if (query) params.set("q", query);
+        const response = await fetch(`/api/recipe/restaurant-usage?${params.toString()}`);
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to load restaurant usage.");
+        applyRecipeRestaurantUsageResponse(data, { append });
+    } catch (err) {
+        if (page === 1 && !query && count) count.textContent = "Usage data unavailable.";
+        if (page === 1 && !query && cookbooks) cookbooks.hidden = true;
+        if (page === 1 && !query && note) note.hidden = true;
         if (view) {
             view.hidden = false;
             view.disabled = false;
             view.textContent = "Retry";
             view.dataset.restaurantUsageMode = "retry";
+        }
+    } finally {
+        if (loadMore) {
+            loadMore.disabled = false;
+            loadMore.textContent = "Load More";
+            loadMore.hidden = !recipeRestaurantUsageHasMore;
         }
     }
 }
@@ -25725,6 +25817,51 @@ function openRecipeRestaurantUsagePanel(button) {
     return false;
 }
 
+function reviewUnlinkedRecipeRestaurants(button) {
+    openRecipeRestaurantUsagePanel(button);
+    document.querySelector("[data-restaurant-usage-backfill]")?.focus();
+    return false;
+}
+
+async function backfillUnlinkedRecipeRestaurants(button) {
+    const restaurantId = String(button?.dataset.restaurantId || recipeRestaurantUsageRestaurantId || "").trim();
+    const count = Number(recipeRestaurantUsageMigrationStatus.legacy_possible_match_count) || 0;
+    if (!restaurantId || count <= 0 || button?.disabled) return false;
+    if (!window.confirm(`Link ${count} clear legacy restaurant match${count === 1 ? "" : "es"} to ${recipeRestaurantUsageRestaurantName}? Ambiguous matches will remain unchanged.`)) return false;
+    button.disabled = true;
+    const originalText = button.textContent;
+    button.textContent = "Linking…";
+    try {
+        const response = await fetch("/api/recipe/restaurant-usage/backfill", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ restaurant_id: restaurantId }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to link restaurant recipes.");
+        recipeRestaurantUsageQuery = "";
+        const search = document.querySelector("[data-restaurant-usage-search]");
+        if (search) search.value = "";
+        applyRecipeRestaurantUsageResponse(data);
+    } catch (err) {
+        setRecipeRestaurantFetchError(err.message || "Unable to link restaurant recipes.");
+    } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+    }
+    return false;
+}
+
+function loadMoreRecipeRestaurantUsage(button) {
+    if (button?.disabled || !recipeRestaurantUsageHasMore) return false;
+    loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, {
+        page: recipeRestaurantUsagePage + 1,
+        append: true,
+        query: recipeRestaurantUsageQuery,
+    });
+    return false;
+}
+
 function closeRecipeRestaurantUsagePanel() {
     const panel = document.querySelector("[data-restaurant-usage-panel]");
     if (panel) panel.hidden = true;
@@ -25733,10 +25870,11 @@ function closeRecipeRestaurantUsagePanel() {
 }
 
 function filterRecipeRestaurantUsage(value) {
-    const query = String(value || "").trim().toLowerCase();
-    renderRecipeRestaurantUsageList(recipeRestaurantUsageRecipes.filter(recipe => {
-        return !query || [recipe.title, recipe.cookbook_name].some(text => String(text || "").toLowerCase().includes(query));
-    }));
+    const query = String(value || "").trim();
+    window.clearTimeout(recipeRestaurantUsageSearchDebounce);
+    recipeRestaurantUsageSearchDebounce = window.setTimeout(() => {
+        loadRecipeRestaurantUsage(recipeRestaurantUsageRestaurantId, { page: 1, query });
+    }, 250);
 }
 
 const recipeRestaurantFetchFieldDefinitions = {

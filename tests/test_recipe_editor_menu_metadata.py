@@ -720,6 +720,129 @@ def test_restaurant_usage_is_computed_from_linked_recipes(monkeypatch, tmp_path)
     assert result["recipes"][0]["title"]
 
 
+def test_restaurant_usage_counts_complete_normalized_and_clear_legacy_dataset(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Pisco Mar",
+        "restaurant_phone": "(317) 537-2025",
+        "source_menu_url": "https://example.test/pisco/menu?category=1",
+    })
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    urls = []
+    for index in range(9):
+        url = f"https://example.test/pisco/menu?category=1&menu_item=item-{index}"
+        urls.append(url)
+        recipe_edit_service.save_recipe_output(url, {
+            "source_url": url,
+            "recipe_title": f"Pisco Dish {index}",
+            "restaurant_id": restaurant_id if index < 2 else "",
+            "restaurant_name": "Pisco Mar",
+            "restaurant_phone": "317-537-2025",
+            "source_menu_url": "https://example.test/pisco/menu?category=1",
+            "menu_item_url": url,
+            "source_pdf_path": f"source-{index}.pdf",
+        })
+    ambiguous_url = "https://other.test/legacy-dish"
+    recipe_edit_service.save_recipe_output(ambiguous_url, {
+        "source_url": ambiguous_url,
+        "recipe_title": "Ambiguous Dish",
+        "restaurant_name": "Pisco Mar",
+    })
+    monkeypatch.setattr(recipe_edit_service, "cookbook_recipe_assignment_for_url", lambda url: {
+        "cookbook_id": "book-a" if url in urls[:5] else "book-b",
+        "cookbook_name": "Book A" if url in urls[:5] else "Book B",
+    })
+
+    result = recipe_edit_service.editable_restaurant_usage(
+        restaurant_id,
+        page=1,
+        per_page=3,
+        current_recipe_url=urls[0],
+    )
+
+    assert result["recipe_count"] == 9
+    assert result["cookbook_count"] == 2
+    assert result["included_current_recipe"] is True
+    assert result["migration_status"] == {
+        "normalized_recipe_count": 2,
+        "legacy_possible_match_count": 7,
+        "ambiguous_match_count": 1,
+        "duplicate_linked_recipe_count": 0,
+    }
+    assert len(result["recipes"]) == 3
+    assert result["has_more"] is True
+
+
+def test_restaurant_usage_backfill_links_only_clear_matches_and_preserves_recipe_fields(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Pisco Mar",
+        "restaurant_phone": "317-537-2025",
+    })
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    clear_url = "https://example.test/pisco-clear"
+    ambiguous_url = "https://example.test/pisco-ambiguous"
+    recipe_edit_service.save_recipe_output(clear_url, {
+        "source_url": clear_url,
+        "recipe_title": "Clear Match",
+        "restaurant_name": "Pisco Mar",
+        "restaurant_phone": "(317) 537-2025",
+        "menu_item_url": "https://example.test/menu?item=clear",
+        "source_pdf_path": "clear-source.pdf",
+    })
+    recipe_edit_service.save_recipe_output(ambiguous_url, {
+        "source_url": ambiguous_url,
+        "recipe_title": "Ambiguous Match",
+        "restaurant_name": "Pisco Mar",
+    })
+
+    result = recipe_edit_service.backfill_editable_restaurant_usage(restaurant_id)
+    clear_recipe = recipe_edit_service.load_recipe_output(clear_url)
+    ambiguous_recipe = recipe_edit_service.load_recipe_output(ambiguous_url)
+
+    assert result["backfilled_recipe_count"] == 1
+    assert result["migration_status"]["normalized_recipe_count"] == 1
+    assert result["migration_status"]["legacy_possible_match_count"] == 0
+    assert result["migration_status"]["ambiguous_match_count"] == 1
+    assert clear_recipe["restaurant_id"] == restaurant_id
+    assert clear_recipe["menu_item_url"] == "https://example.test/menu?item=clear"
+    assert clear_recipe["source_pdf_path"] == "clear-source.pdf"
+    assert not ambiguous_recipe.get("restaurant_id")
+
+
+def test_restaurant_usage_reports_duplicate_records_without_cross_counting(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    selected = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Pisco Mar",
+        "restaurant_phone": "317-537-2025",
+    })
+    duplicate = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Pisco Mar",
+        "restaurant_phone": "317-537-2025",
+    }, create_anyway=True)
+    url = "https://example.test/duplicate-linked-recipe"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Duplicate Linked Dish",
+        "restaurant_id": duplicate["restaurant"]["restaurant_id"],
+    })
+    unlinked_url = "https://example.test/duplicate-ambiguous-recipe"
+    recipe_edit_service.save_recipe_output(unlinked_url, {
+        "source_url": unlinked_url,
+        "recipe_title": "Duplicate Ambiguous Dish",
+        "restaurant_name": "Pisco Mar",
+        "restaurant_phone": "(317) 537-2025",
+    })
+
+    result = recipe_edit_service.editable_restaurant_usage(selected["restaurant"]["restaurant_id"])
+
+    assert result["recipe_count"] == 0
+    assert result["duplicate_restaurant_count"] == 1
+    assert result["migration_status"]["duplicate_linked_recipe_count"] == 1
+    assert result["migration_status"]["legacy_possible_match_count"] == 0
+    assert result["migration_status"]["ambiguous_match_count"] == 1
+
+
 def test_restaurant_directory_lists_searches_and_loads_stable_records(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     first = recipe_edit_service.create_editable_restaurant({

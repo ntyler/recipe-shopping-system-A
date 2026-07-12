@@ -368,11 +368,18 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Restaurant Usage" in template
     assert "data-restaurant-usage-view" in template
     assert "data-restaurant-usage-panel" in template
-    assert "function loadRecipeRestaurantUsage(restaurantId)" in script
+    assert "function loadRecipeRestaurantUsage(restaurantId, options = {})" in script
     assert "function handleRecipeRestaurantUsageAction(button)" in script
-    assert 'fetch(`/api/recipe/restaurant-usage?restaurant_id=' in script
-    assert "recipeRestaurantUsageRecipes.length <= 20" in script
+    assert 'fetch(`/api/recipe/restaurant-usage?${params.toString()}`)' in script
+    assert 'per_page: "50"' in script
+    assert "recipeRestaurantUsageTotal <= 20" in script
+    assert "Review Unlinked Recipes" in template
+    assert "Link Clear Matches" in template
+    assert "function loadMoreRecipeRestaurantUsage(button)" in script
+    assert "function backfillUnlinkedRecipeRestaurants(button)" in script
+    assert "migration_status" in script
     assert '@recipe_bp.route("/api/recipe/restaurant-usage", methods=["GET"])' in route
+    assert '@recipe_bp.route("/api/recipe/restaurant-usage/backfill", methods=["POST"])' in route
     assert ".recipe-edit-restaurant-usage-panel {" in css
     assert "Loading usage…" in template
     assert "Usage data unavailable." in script

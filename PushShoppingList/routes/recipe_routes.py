@@ -134,6 +134,7 @@ from PushShoppingList.services.recipe_edit_service import upload_all_recipe_pdfs
 from PushShoppingList.services.recipe_edit_service import update_editable_restaurant_source
 from PushShoppingList.services.recipe_edit_service import update_editable_source_documents
 from PushShoppingList.services.recipe_edit_service import editable_restaurant_usage
+from PushShoppingList.services.recipe_edit_service import backfill_editable_restaurant_usage
 from PushShoppingList.services.recipe_edit_service import editable_restaurant_logo_file_path
 from PushShoppingList.services.recipe_edit_service import backfill_editable_restaurant_sources
 from PushShoppingList.services.recipe_edit_service import create_editable_restaurant
@@ -3583,8 +3584,21 @@ def recipe_restaurants_backfill_route():
 
 @recipe_bp.route("/api/recipe/restaurant-usage", methods=["GET"])
 def recipe_restaurant_usage_route():
-    result = editable_restaurant_usage(request.args.get("restaurant_id"))
+    result = editable_restaurant_usage(
+        request.args.get("restaurant_id"),
+        page=request.args.get("page", 1),
+        per_page=request.args.get("per_page", 50),
+        query=request.args.get("q", ""),
+        current_recipe_url=request.args.get("current_recipe_url", ""),
+    )
     return jsonify(result), 200 if result.get("ok") else 404
+
+
+@recipe_bp.route("/api/recipe/restaurant-usage/backfill", methods=["POST"])
+def backfill_recipe_restaurant_usage_route():
+    data = request.get_json(silent=True) or {}
+    result = backfill_editable_restaurant_usage(data.get("restaurant_id"))
+    return jsonify(result), 200 if result.get("ok") else 400
 
 
 @recipe_bp.route("/api/recipe/source-documents", methods=["POST"])

@@ -1,6 +1,7 @@
 import base64
 from copy import deepcopy
 import json
+import logging
 import mimetypes
 import os
 import re
@@ -109,6 +110,9 @@ from PushShoppingList.services.recipe_image_progress_service import finish_recip
 from PushShoppingList.services.recipe_image_progress_service import start_recipe_image_progress
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 NUTRITION_FIELDS = [
@@ -3032,7 +3036,134 @@ def update_editable_source_documents(recipe_url, values):
     return {"ok": True, **fields}
 
 
-def editable_restaurant_usage(restaurant_id):
+def editable_restaurant_usage_recipe_records():
+    """Load every distinct recipe output in the active account without UI/page limits."""
+    records = []
+    seen = set()
+    for output_path in OUTPUT_FOLDER.glob("*.json"):
+        if output_path.name == "sorted_ingredients.json":
+            continue
+        recipe_data = _read_recipe_output_json(output_path)
+        if not isinstance(recipe_data, dict):
+            continue
+        metadata = recipe_menu_source_metadata(recipe_data)
+        recipe_url = first_recipe_menu_text(
+            recipe_data.get("source_url"),
+            recipe_data.get("recipe_record_url"),
+            recipe_data.get("url"),
+            metadata.get("source_url"),
+            metadata.get("recipe_record_url"),
+        )
+        stable_id = first_recipe_menu_text(
+            recipe_data.get("recipe_id"),
+            recipe_data.get("id"),
+            metadata.get("recipe_id"),
+        )
+        identity = (
+            f"id:{stable_id}"
+            if stable_id
+            else f"url:{normalize_recipe_url_key(recipe_url)}"
+            if normalize_recipe_url_key(recipe_url)
+            else f"file:{output_path.name.casefold()}"
+        )
+        if identity in seen:
+            continue
+        seen.add(identity)
+        records.append({
+            "identity": identity,
+            "path": output_path,
+            "data": recipe_data,
+            "url": recipe_url,
+        })
+    return records
+
+
+def editable_restaurant_usage_reference_values(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    metadata = recipe_menu_source_metadata(recipe_data)
+    return {
+        "restaurant_name": first_recipe_menu_text(
+            recipe_data.get("restaurant_name"),
+            metadata.get("restaurant_name"),
+        ),
+        "restaurant_website_url": first_recipe_menu_text(
+            recipe_data.get("restaurant_website_url"),
+            recipe_data.get("website_url"),
+            metadata.get("restaurant_website_url"),
+            metadata.get("website_url"),
+        ),
+        "source_menu_url": first_recipe_menu_text(
+            recipe_data.get("source_menu_url"),
+            recipe_data.get("menu_source_url"),
+            metadata.get("source_menu_url"),
+            recipe_menu_source_url_from_candidates(recipe_data),
+        ),
+        "phone": first_recipe_menu_text(recipe_data.get("restaurant_phone"), metadata.get("restaurant_phone")),
+        "address_line": first_recipe_menu_text(
+            recipe_data.get("restaurant_street_address"),
+            recipe_data.get("restaurant_address"),
+            metadata.get("restaurant_street_address"),
+            metadata.get("restaurant_address"),
+        ),
+        "city": first_recipe_menu_text(recipe_data.get("restaurant_city"), metadata.get("restaurant_city")),
+        "state": first_recipe_menu_text(recipe_data.get("restaurant_state"), metadata.get("restaurant_state")),
+    }
+
+
+def editable_restaurant_usage_match(recipe_data, restaurant, menu=None):
+    """Classify only high-confidence legacy links; ambiguous matches remain diagnostics."""
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    restaurant = restaurant if isinstance(restaurant, dict) else {}
+    menu = menu if isinstance(menu, dict) else {}
+    selected_id = clean_recipe_menu_text(restaurant.get("id") or restaurant.get("restaurant_id"))
+    linked_id = clean_recipe_menu_text(recipe_menu_relation_value(recipe_data, "restaurant_id"))
+    if linked_id:
+        return ("normalized", ["restaurant_id"]) if linked_id == selected_id else ("other", [])
+
+    selected_menu_key = menu_store_service.menu_source_identity_key(
+        menu.get("source_url")
+        or restaurant.get("source_menu_url")
+        or restaurant.get("menu_url")
+    )
+    recipe_menu_keys = {
+        menu_store_service.menu_source_identity_key(value)
+        for value in (
+            editable_restaurant_usage_reference_values(recipe_data).get("source_menu_url"),
+            *recipe_menu_source_url_candidates(recipe_data),
+        )
+        if menu_store_service.menu_source_identity_key(value)
+    }
+    if selected_menu_key and selected_menu_key in recipe_menu_keys:
+        return "legacy_clear", ["menu_url"]
+
+    candidate = editable_restaurant_usage_reference_values(recipe_data)
+    reasons = editable_restaurant_duplicate_reasons(candidate, restaurant)
+    reason_set = set(reasons)
+    strong = bool(reason_set & {"phone", "street_address"})
+    strong = strong or "menu_url" in reason_set
+    strong = strong or "restaurant_name" in reason_set and "website_domain" in reason_set
+    if strong:
+        return "legacy_clear", reasons
+    if reason_set & {"restaurant_name", "website_domain", "city_state"}:
+        return "legacy_ambiguous", reasons
+    return "unrelated", []
+
+
+def editable_restaurant_duplicate_candidates_for_usage(store, restaurant):
+    selected_id = clean_recipe_menu_text(restaurant.get("id") or restaurant.get("restaurant_id"))
+    values = {
+        "restaurant_name": restaurant.get("restaurant_name"),
+        "restaurant_website_url": restaurant.get("restaurant_website_url") or restaurant.get("website_url"),
+        "source_menu_url": restaurant.get("source_menu_url") or restaurant.get("menu_url"),
+        "restaurant_phone": restaurant.get("phone"),
+        "restaurant_street_address": restaurant.get("address_line") or restaurant.get("full_address"),
+        "restaurant_city": restaurant.get("city"),
+        "restaurant_state": restaurant.get("state") or restaurant.get("state_or_region"),
+    }
+    return editable_restaurant_duplicate_candidates(store, values, exclude_restaurant_id=selected_id)
+
+
+def editable_restaurant_usage_inventory(restaurant_id):
     restaurant_id = clean_recipe_menu_text(restaurant_id)
     if not restaurant_id:
         return {"ok": False, "error": "Restaurant source is required."}
@@ -3040,44 +3171,167 @@ def editable_restaurant_usage(restaurant_id):
     restaurant = menu_store_service.restaurant_for(store, restaurant_id)
     if not restaurant:
         return {"ok": False, "error": "Restaurant source was not found."}
-
-    recipes = []
+    menu = editable_restaurant_menu_for(store, restaurant_id)
+    buckets = {"normalized": [], "legacy_clear": [], "legacy_ambiguous": [], "duplicate_linked": []}
+    duplicate_candidates = editable_restaurant_duplicate_candidates_for_usage(store, restaurant)
+    duplicate_ids = {clean_recipe_menu_text(item.get("restaurant_id")) for item in duplicate_candidates}
+    duplicate_records = [
+        menu_store_service.restaurant_for(store, duplicate_id)
+        for duplicate_id in duplicate_ids
+        if duplicate_id
+    ]
     cookbook_ids = set()
-    for recipe_data in recipe_output_index().values():
-        if not isinstance(recipe_data, dict):
+    for record in editable_restaurant_usage_recipe_records():
+        recipe_data = record["data"]
+        match_kind, reasons = editable_restaurant_usage_match(recipe_data, restaurant, menu=menu)
+        linked_id = clean_recipe_menu_text(recipe_menu_relation_value(recipe_data, "restaurant_id"))
+        if match_kind == "legacy_clear" and any(
+            editable_restaurant_usage_match(recipe_data, duplicate_record, menu=editable_restaurant_menu_for(
+                store,
+                clean_recipe_menu_text(duplicate_record.get("id") or duplicate_record.get("restaurant_id")),
+            ))[0] == "legacy_clear"
+            for duplicate_record in duplicate_records
+            if isinstance(duplicate_record, dict)
+        ):
+            match_kind = "legacy_ambiguous"
+            reasons = [*reasons, "duplicate_restaurant_candidate"]
+        if match_kind == "other" and linked_id in duplicate_ids:
+            match_kind = "duplicate_linked"
+            reasons = ["duplicate_restaurant_id"]
+        if match_kind not in buckets:
             continue
-        if clean_recipe_menu_text(recipe_menu_relation_value(recipe_data, "restaurant_id")) != restaurant_id:
-            continue
-        recipe_url = clean_recipe_menu_text(recipe_data.get("source_url"))
+        recipe_url = record["url"]
         assignment = cookbook_recipe_assignment_for_url(recipe_url) if recipe_url else {}
         cookbook_id = clean_recipe_menu_text(assignment.get("cookbook_id"))
-        if cookbook_id:
+        if match_kind in {"normalized", "legacy_clear"} and cookbook_id:
             cookbook_ids.add(cookbook_id)
-        output_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json" if recipe_url else None
-        modified_at = ""
-        if output_path and output_path.exists():
-            modified_at = datetime.fromtimestamp(output_path.stat().st_mtime, timezone.utc).isoformat()
-        recipes.append({
-            "title": first_recipe_menu_text(
-                recipe_data.get("recipe_title"),
-                recipe_data.get("menu_item_name"),
-                recipe_data.get("display_name"),
-                "Untitled Recipe",
-            ),
-            "url": recipe_url,
+        output_path = record["path"]
+        buckets[match_kind].append({
+            **record,
+            "match_reasons": reasons,
+            "cookbook_id": cookbook_id,
             "cookbook_name": clean_recipe_menu_text(assignment.get("cookbook_name")),
-            "last_modified": modified_at,
+            "last_modified": datetime.fromtimestamp(output_path.stat().st_mtime, timezone.utc).isoformat(),
         })
-    recipes.sort(key=lambda item: item["title"].casefold())
+
+    return {
+        "ok": True,
+        "restaurant": restaurant,
+        "menu": menu,
+        "buckets": buckets,
+        "cookbook_ids": cookbook_ids,
+        "duplicate_candidates": duplicate_candidates,
+    }
+
+
+def editable_restaurant_usage_row(record):
+    recipe_data = record.get("data") if isinstance(record, dict) else {}
+    return {
+        "title": first_recipe_menu_text(
+            recipe_data.get("recipe_title"),
+            recipe_data.get("menu_item_name"),
+            recipe_data.get("display_name"),
+            "Untitled Recipe",
+        ),
+        "url": clean_recipe_menu_text(record.get("url")),
+        "cookbook_name": clean_recipe_menu_text(record.get("cookbook_name")),
+        "last_modified": clean_recipe_menu_text(record.get("last_modified")),
+        "relationship_status": "linked" if record.get("match_kind") == "normalized" else "legacy_clear",
+    }
+
+
+def editable_restaurant_usage(restaurant_id, page=1, per_page=50, query="", current_recipe_url=""):
+    inventory = editable_restaurant_usage_inventory(restaurant_id)
+    if not inventory.get("ok"):
+        return inventory
+    try:
+        page = max(1, int(page or 1))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        per_page = max(1, min(100, int(per_page or 50)))
+    except (TypeError, ValueError):
+        per_page = 50
+
+    buckets = inventory["buckets"]
+    matched_records = []
+    for match_kind in ("normalized", "legacy_clear"):
+        for record in buckets[match_kind]:
+            matched_records.append({**record, "match_kind": match_kind})
+    matched_records.sort(key=lambda item: first_recipe_menu_text(
+        item["data"].get("recipe_title"), item["data"].get("menu_item_name"), "Untitled Recipe"
+    ).casefold())
+    recipe_count = len(matched_records)
+    query_key = clean_recipe_menu_text(query).casefold()
+    filtered = matched_records
+    if query_key:
+        filtered = [record for record in matched_records if query_key in " ".join((
+            first_recipe_menu_text(record["data"].get("recipe_title"), record["data"].get("menu_item_name")),
+            clean_recipe_menu_text(record.get("cookbook_name")),
+        )).casefold()]
+    start = (page - 1) * per_page
+    page_records = filtered[start:start + per_page]
+    current_key = normalize_recipe_url_key(current_recipe_url)
+    included_current_recipe = bool(current_key) and any(
+        normalize_recipe_url_key(record.get("url")) == current_key for record in matched_records
+    )
+    restaurant = inventory["restaurant"]
+    migration_status = {
+        "normalized_recipe_count": len(buckets["normalized"]),
+        "legacy_possible_match_count": len(buckets["legacy_clear"]),
+        "ambiguous_match_count": len(buckets["legacy_ambiguous"]),
+        "duplicate_linked_recipe_count": len(buckets["duplicate_linked"]),
+    }
+    LOGGER.info(
+        "restaurant_usage restaurant_id=%s account_id=%s normalized=%s legacy_possible=%s ambiguous=%s duplicates=%s per_page=%s cookbook_ids=%s",
+        restaurant_id,
+        clean_recipe_menu_text(active_user_id()) or f"guest:{clean_recipe_menu_text(active_guest_session_id())}" or "legacy",
+        migration_status["normalized_recipe_count"],
+        migration_status["legacy_possible_match_count"],
+        migration_status["ambiguous_match_count"],
+        len(inventory["duplicate_candidates"]),
+        per_page,
+        sorted(inventory["cookbook_ids"]),
+    )
     return {
         "ok": True,
         "restaurant_id": restaurant_id,
-        "recipe_count": len(recipes),
-        "cookbook_count": len(cookbook_ids),
+        "restaurant_name": clean_recipe_menu_text(restaurant.get("restaurant_name")),
+        "recipe_count": recipe_count,
+        "cookbook_count": len(inventory["cookbook_ids"]),
+        "included_current_recipe": included_current_recipe,
+        "migration_status": migration_status,
+        "duplicate_restaurant_count": len(inventory["duplicate_candidates"]),
+        "duplicate_restaurants": inventory["duplicate_candidates"],
         "created_at": clean_recipe_menu_text(restaurant.get("created_at") or restaurant.get("imported_at")),
         "last_updated": clean_recipe_menu_text(restaurant.get("updated_at")),
-        "recipes": recipes,
+        "page": page,
+        "per_page": per_page,
+        "filtered_recipe_count": len(filtered),
+        "has_more": start + len(page_records) < len(filtered),
+        "recipes": [editable_restaurant_usage_row(record) for record in page_records],
     }
+
+
+def backfill_editable_restaurant_usage(restaurant_id):
+    """Persist only deterministic legacy links; ambiguous records remain untouched."""
+    inventory = editable_restaurant_usage_inventory(restaurant_id)
+    if not inventory.get("ok"):
+        return inventory
+    updated = 0
+    for record in inventory["buckets"]["legacy_clear"]:
+        recipe_data = record["data"]
+        recipe_data["restaurant_id"] = clean_recipe_menu_text(restaurant_id)
+        metadata = recipe_data.get("source_metadata")
+        if isinstance(metadata, dict):
+            metadata["restaurant_id"] = clean_recipe_menu_text(restaurant_id)
+        record["path"].write_text(json.dumps(recipe_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        updated += 1
+    if has_request_context():
+        g.pop("_recipe_edit_output_index", None)
+    result = editable_restaurant_usage(restaurant_id, page=1, per_page=50)
+    result["backfilled_recipe_count"] = updated
+    return result
 
 
 def editable_menu_source_option_identity(option):
