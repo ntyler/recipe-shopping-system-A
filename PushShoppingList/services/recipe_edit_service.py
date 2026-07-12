@@ -2434,6 +2434,9 @@ def update_editable_restaurant_source(recipe_url, values):
             "restaurant_state": "state",
             "restaurant_postal_code": "postal_code",
             "restaurant_country": "country",
+            "restaurant_hours_text": "hours_text",
+            "restaurant_current_status": "current_status",
+            "restaurant_promotions": "rewards_text",
         }
         previous_logo_path = clean_recipe_menu_text(restaurant.get("logo_path"))
         for source_field, store_field in field_map.items():
@@ -2456,6 +2459,11 @@ def update_editable_restaurant_source(recipe_url, values):
             restaurant["logo_url"] = clean_recipe_menu_text(values.get("restaurant_logo_url")) or None
             restaurant["logo_path"] = None
         restaurant["full_address"] = None
+        restaurant["promotions"] = split_recipe_menu_text_list(values.get("restaurant_promotions"))
+        if "restaurant_online_payment_available" in values:
+            restaurant["online_payment_available"] = parse_recipe_menu_bool(values.get("restaurant_online_payment_available"))
+        if "restaurant_delivery_available" in values:
+            restaurant["delivery_available"] = parse_recipe_menu_bool(values.get("restaurant_delivery_available"))
         restaurant["updated_at"] = menu_store_service.utc_now_iso()
         if menu:
             menu["source_url"] = clean_recipe_menu_text(values.get("source_menu_url")) or None

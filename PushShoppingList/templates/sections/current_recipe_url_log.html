@@ -2299,6 +2299,39 @@
                             <label><span>State or Region</span><input type="text" data-restaurant-edit-field="restaurant_state"></label>
                             <label><span>Postal Code</span><input type="text" data-restaurant-edit-field="restaurant_postal_code"></label>
                             <label><span>Country</span><input type="text" data-restaurant-edit-field="restaurant_country"></label>
+                            <details class="recipe-edit-restaurant-advanced recipe-edit-restaurant-form-wide">
+                                <summary>Advanced Restaurant Details</summary>
+                                <div class="recipe-edit-restaurant-advanced-body">
+                                    <section class="recipe-edit-restaurant-hours-editor">
+                                        <h3>Hours</h3>
+                                        <p>Set weekly hours here. Existing unstructured hours remain preserved below until you change this schedule.</p>
+                                        <div class="recipe-edit-restaurant-hours-grid" data-restaurant-hours-grid>
+                                            {% for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday") %}
+                                            <div class="recipe-edit-restaurant-hours-row" data-restaurant-hours-day="{{ day }}">
+                                                <strong>{{ day }}</strong>
+                                                <select aria-label="{{ day }} open or closed" data-hours-state onchange="updateRecipeRestaurantStructuredHours(this)"><option value="open">Open</option><option value="closed">Closed</option></select>
+                                                <input type="time" aria-label="{{ day }} opening time" data-hours-open onchange="updateRecipeRestaurantStructuredHours(this)">
+                                                <input type="time" aria-label="{{ day }} closing time" data-hours-close onchange="updateRecipeRestaurantStructuredHours(this)">
+                                                <button type="button" data-hours-add-split onclick="return toggleRecipeRestaurantSplitHours(this)">+ Split hours</button>
+                                                <span class="recipe-edit-restaurant-split-hours" data-hours-split hidden>
+                                                    <input type="time" aria-label="{{ day }} second opening time" data-hours-open-two onchange="updateRecipeRestaurantStructuredHours(this)">
+                                                    <input type="time" aria-label="{{ day }} second closing time" data-hours-close-two onchange="updateRecipeRestaurantStructuredHours(this)">
+                                                </span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <label class="recipe-edit-restaurant-form-wide"><span>Hours Notes</span><input type="text" data-hours-notes placeholder="Holiday hours may vary"></label>
+                                        <details class="recipe-edit-restaurant-raw-hours">
+                                            <summary>Advanced Raw Data</summary>
+                                            <label><span>Original / Raw Hours</span><textarea rows="3" data-restaurant-edit-field="restaurant_hours_text"></textarea></label>
+                                        </details>
+                                    </section>
+                                    <label><span>Current Status</span><select data-restaurant-edit-field="restaurant_current_status"><option value="unknown">Unknown</option><option value="open">Open</option><option value="closed">Closed</option><option value="temporarily_closed">Temporarily Closed</option><option value="permanently_closed">Permanently Closed</option></select><small>This is the saved business status, not a real-time open-now indicator.</small></label>
+                                    <label class="recipe-edit-restaurant-form-wide"><span>Rewards / Promotions</span><textarea rows="4" data-restaurant-edit-field="restaurant_promotions"></textarea><small>Optional rewards programs, discounts, or active promotions.</small></label>
+                                    <label><span>Online Payment Available</span><select data-restaurant-edit-field="restaurant_online_payment_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+                                    <label><span>Delivery Available</span><select data-restaurant-edit-field="restaurant_delivery_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+                                </div>
+                            </details>
                             <p class="recipe-edit-restaurant-form-error" data-restaurant-edit-error hidden></p>
                             </div>
                             <footer class="recipe-edit-restaurant-form-actions">

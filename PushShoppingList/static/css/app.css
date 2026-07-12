@@ -32827,6 +32827,103 @@ img[data-deferred-src] {
     font-weight: 500;
 }
 
+.recipe-edit-restaurant-advanced {
+    margin-top: 4px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-bg-soft);
+}
+
+.recipe-edit-restaurant-advanced > summary,
+.recipe-edit-restaurant-raw-hours > summary {
+    padding: 10px 12px;
+    color: var(--app-text-strong);
+    font-size: 10px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.recipe-edit-restaurant-advanced-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0 12px 12px;
+}
+
+.recipe-edit-restaurant-hours-editor {
+    grid-column: 1 / -1;
+}
+
+.recipe-edit-restaurant-hours-editor h3 {
+    margin: 2px 0 3px;
+    color: var(--app-text-strong);
+    font-size: 10px;
+}
+
+.recipe-edit-restaurant-hours-editor > p {
+    margin: 0 0 8px;
+    color: var(--app-muted);
+    font-size: 8px;
+}
+
+.recipe-edit-restaurant-hours-grid {
+    display: grid;
+    gap: 5px;
+    margin-bottom: 8px;
+}
+
+.recipe-edit-restaurant-hours-row {
+    display: grid;
+    grid-template-columns: 72px 76px minmax(92px, 1fr) minmax(92px, 1fr) auto;
+    gap: 6px;
+    align-items: center;
+}
+
+.recipe-edit-restaurant-hours-row strong {
+    color: var(--app-text);
+    font-size: 9px;
+}
+
+.recipe-edit-restaurant-hours-row > button {
+    width: auto;
+    min-height: 30px;
+    margin: 0;
+    padding: 0 7px;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: var(--app-surface);
+    color: var(--app-muted);
+    font-size: 8px;
+}
+
+.recipe-edit-restaurant-split-hours {
+    grid-column: 3 / 5;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.recipe-edit-restaurant-split-hours[hidden] {
+    display: none !important;
+}
+
+.recipe-edit-restaurant-raw-hours {
+    margin-top: 8px;
+    border-top: 1px solid var(--app-border);
+}
+
+.recipe-edit-restaurant-raw-hours textarea,
+.recipe-edit-restaurant-advanced textarea {
+    width: 100%;
+    min-height: 88px;
+    resize: vertical;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: var(--app-bg-soft);
+    color: var(--app-text-strong);
+    font: inherit;
+}
+
 .recipe-edit-standalone-page .recipe-edit-restaurant-form-logo > div,
 .recipe-edit-standalone-page .recipe-edit-restaurant-form-actions {
     display: flex;
@@ -32896,6 +32993,30 @@ img[data-deferred-src] {
 
     .recipe-edit-restaurant-modal-body > * {
         grid-column: 1;
+    }
+
+    .recipe-edit-restaurant-advanced-body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .recipe-edit-restaurant-advanced-body > * {
+        grid-column: 1;
+    }
+
+    .recipe-edit-restaurant-hours-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .recipe-edit-restaurant-hours-row > strong {
+        grid-column: 1;
+    }
+
+    .recipe-edit-restaurant-hours-row > button {
+        grid-column: 1 / -1;
+    }
+
+    .recipe-edit-restaurant-split-hours {
+        grid-column: 1 / -1;
     }
 }
 

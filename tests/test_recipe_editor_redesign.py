@@ -233,6 +233,8 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
         "restaurant_name", "restaurant_logo_url", "restaurant_rating", "restaurant_phone",
         "restaurant_website_url", "source_menu_url", "menu_item_url", "restaurant_street_address",
         "restaurant_city", "restaurant_state", "restaurant_postal_code", "restaurant_country",
+        "restaurant_hours_text", "restaurant_current_status", "restaurant_promotions",
+        "restaurant_online_payment_available", "restaurant_delivery_available",
     ):
         assert f'data-restaurant-edit-field="{field}"' in template
     assert "data-restaurant-edit-form" in template
@@ -252,6 +254,13 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Restaurant's main website." in template
     assert "Page containing the full restaurant menu." in template
     assert "Direct source page or deep link for this recipe or menu item." in template
+    assert "Advanced Restaurant Details" in template
+    assert "Advanced Raw Data" in template
+    assert 'data-restaurant-hours-day="{{ day }}"' in template
+    assert "Optional rewards programs, discounts, or active promotions." in template
+    assert "Temporarily Closed" in template
+    assert "Permanently Closed" in template
+    assert template.count('<option value="">Unknown</option>') >= 2
     assert "cancelRecipeRestaurantSourceEdit" in template
     assert "async function saveRecipeRestaurantSource(form)" in script
     assert "function editRecipeRestaurantSource(button, event = null)" in script
@@ -265,6 +274,8 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "function chooseRecipeRestaurantLogoUpload(button)" in script
     assert "function setRecipeRestaurantRating(button, rating)" in script
     assert "function handleRecipeRestaurantRatingKeydown(button, event)" in script
+    assert "function updateRecipeRestaurantStructuredHours(control)" in script
+    assert "function toggleRecipeRestaurantSplitHours(button)" in script
     assert 'const restaurantId = recipeEditInputValue("recipeEditRestaurantId")' in script
     assert 'const selected = currentRecipeRestaurantSourceOption();' in script
     assert 'event.key === "Escape"' in script

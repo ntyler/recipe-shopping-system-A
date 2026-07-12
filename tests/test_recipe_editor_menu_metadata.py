@@ -582,6 +582,11 @@ def test_inline_restaurant_source_update_edits_linked_record_without_creating_du
         "restaurant_state": "Indiana",
         "restaurant_postal_code": "46250",
         "restaurant_country": "USA",
+        "restaurant_hours_text": "Monday: 11:00-21:00\nTuesday: Closed\nNotes: Holiday hours may vary",
+        "restaurant_current_status": "temporarily_closed",
+        "restaurant_promotions": "Lunch rewards",
+        "restaurant_online_payment_available": "",
+        "restaurant_delivery_available": "false",
     })
     store = menu_store_service.load_menu_store()
     restaurant = menu_store_service.restaurant_for(store, restaurant_id)
@@ -594,6 +599,11 @@ def test_inline_restaurant_source_update_edits_linked_record_without_creating_du
     assert restaurant["rating"] == "4.7"
     assert restaurant["address_line"] == "2 Main St"
     assert restaurant["city"] == "Indianapolis"
+    assert restaurant["hours_text"].startswith("Monday: 11:00-21:00")
+    assert restaurant["current_status"] == "temporarily_closed"
+    assert restaurant["rewards_text"] == "Lunch rewards"
+    assert restaurant["online_payment_available"] is None
+    assert restaurant["delivery_available"] is False
     assert menu["source_url"] == "https://velasian.example/new-menu"
     assert result["restaurant"]["menu_item_url"] == "https://velasian.example/new-menu?item=spring-roll"
     assert recipe_edit_service.load_recipe_output(url)["menu_item_url"] == "https://velasian.example/new-menu?item=spring-roll"

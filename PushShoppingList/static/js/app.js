@@ -25069,11 +25069,20 @@ function editRecipeRestaurantSource(button, event = null) {
     if (!modal || !form || !selected) return false;
     form.querySelectorAll("[data-restaurant-edit-field]").forEach(input => {
         const field = input.dataset.restaurantEditField;
-        input.value = field === "restaurant_logo_data_url"
+        const savedValue = field === "restaurant_logo_data_url"
             ? ""
             : field === "restaurant_logo_action"
                 ? "keep"
             : recipeMenuMetadataText(selected[field]);
+        if (input.tagName === "SELECT" && savedValue && !Array.from(input.options).some(option => option.value === savedValue)) {
+            input.querySelector("[data-restaurant-legacy-option]")?.remove();
+            const legacy = document.createElement("option");
+            legacy.value = savedValue;
+            legacy.textContent = `Saved value: ${savedValue}`;
+            legacy.dataset.restaurantLegacyOption = "1";
+            input.prepend(legacy);
+        }
+        input.value = savedValue;
         if (input.dataset.restaurantEditBound !== "1") {
             input.dataset.restaurantEditBound = "1";
             input.addEventListener("input", () => updateRecipeRestaurantEditState(form));
@@ -25095,6 +25104,9 @@ function editRecipeRestaurantSource(button, event = null) {
         });
     }
     closeRecipeRestaurantLogoChooser(form.querySelector("[data-restaurant-logo-chooser]"));
+    const advanced = form.querySelector(".recipe-edit-restaurant-advanced");
+    if (advanced) advanced.open = false;
+    initializeRecipeRestaurantStructuredHours(form);
     recipeRestaurantEditSnapshot = JSON.stringify(recipeRestaurantEditValues(form));
     recipeRestaurantEditTrigger = button;
     if (modal.parentElement !== document.body) {
@@ -25269,6 +25281,86 @@ function handleRecipeRestaurantRatingKeydown(button, event) {
     return false;
 }
 
+function recipeRestaurantHoursTimeLabel(value) {
+    const [rawHour, minute] = String(value || "").split(":");
+    const hour = Number.parseInt(rawHour, 10);
+    if (!Number.isFinite(hour) || !minute) return "";
+    const suffix = hour >= 12 ? "PM" : "AM";
+    return `${hour % 12 || 12}:${minute} ${suffix}`;
+}
+
+function initializeRecipeRestaurantStructuredHours(form = recipeRestaurantEditForm()) {
+    const raw = form?.querySelector('[data-restaurant-edit-field="restaurant_hours_text"]')?.value || "";
+    const rows = form ? Array.from(form.querySelectorAll("[data-restaurant-hours-day]")) : [];
+    rows.forEach(row => {
+        row.querySelector("[data-hours-state]").value = "open";
+        row.querySelectorAll('input[type="time"]').forEach(input => { input.value = ""; });
+        const split = row.querySelector("[data-hours-split]");
+        if (split) split.hidden = true;
+        const day = row.dataset.restaurantHoursDay;
+        const line = raw.split(/\r?\n/).find(value => value.toLowerCase().startsWith(`${day.toLowerCase()}:`));
+        if (!line) return;
+        const detail = line.slice(line.indexOf(":") + 1).trim();
+        if (/^closed$/i.test(detail)) {
+            row.querySelector("[data-hours-state]").value = "closed";
+            return;
+        }
+        const ranges = [...detail.matchAll(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/g)];
+        if (ranges[0]) {
+            row.querySelector("[data-hours-open]").value = ranges[0][1];
+            row.querySelector("[data-hours-close]").value = ranges[0][2];
+        }
+        if (ranges[1]) {
+            row.querySelector("[data-hours-open-two]").value = ranges[1][1];
+            row.querySelector("[data-hours-close-two]").value = ranges[1][2];
+            if (split) split.hidden = false;
+        }
+    });
+    const notes = form?.querySelector("[data-hours-notes]");
+    if (notes) {
+        const noteLine = raw.split(/\r?\n/).find(value => /^Notes:/i.test(value));
+        notes.value = noteLine ? noteLine.replace(/^Notes:\s*/i, "") : "";
+        if (notes.dataset.restaurantHoursBound !== "1") {
+            notes.dataset.restaurantHoursBound = "1";
+            notes.addEventListener("input", () => updateRecipeRestaurantStructuredHours(notes));
+        }
+    }
+}
+
+function updateRecipeRestaurantStructuredHours(control) {
+    const form = control?.closest("[data-restaurant-edit-form]");
+    if (!form) return false;
+    const lines = Array.from(form.querySelectorAll("[data-restaurant-hours-day]")).map(row => {
+        const day = row.dataset.restaurantHoursDay;
+        if (row.querySelector("[data-hours-state]").value === "closed") return `${day}: Closed`;
+        const first = [row.querySelector("[data-hours-open]").value, row.querySelector("[data-hours-close]").value];
+        const second = [row.querySelector("[data-hours-open-two]").value, row.querySelector("[data-hours-close-two]").value];
+        const ranges = [first, second].filter(range => range[0] && range[1]).map(range => `${range[0]}-${range[1]}`);
+        return `${day}: ${ranges.join(", ") || "Open"}`;
+    });
+    const notes = form.querySelector("[data-hours-notes]")?.value.trim();
+    if (notes) lines.push(`Notes: ${notes}`);
+    const raw = form.querySelector('[data-restaurant-edit-field="restaurant_hours_text"]');
+    if (raw) raw.value = lines.join("\n");
+    updateRecipeRestaurantEditState(form);
+    return false;
+}
+
+function toggleRecipeRestaurantSplitHours(button) {
+    const row = button?.closest("[data-restaurant-hours-day]");
+    const split = row?.querySelector("[data-hours-split]");
+    if (!split) return false;
+    split.hidden = !split.hidden;
+    button.textContent = split.hidden ? "+ Split hours" : "Remove split";
+    if (split.hidden) {
+        split.querySelectorAll("input").forEach(input => { input.value = ""; });
+        updateRecipeRestaurantStructuredHours(button);
+    } else {
+        split.querySelector("input")?.focus();
+    }
+    return false;
+}
+
 async function saveRecipeRestaurantSource(form) {
     if (!form || form.dataset.saving) return false;
     const values = recipeRestaurantEditValues(form);
@@ -25310,6 +25402,11 @@ async function saveRecipeRestaurantSource(form) {
         setValue("recipeEditMenuItemUrl", selected.menu_item_url || recipeEditorSourceUrlForOpen());
         setValue("recipeEditRestaurantPhone", selected.restaurant_phone || "");
         setValue("recipeEditRestaurantAddress", selected.restaurant_address || "");
+        setValue("recipeEditRestaurantHoursText", selected.restaurant_hours_text || "");
+        setValue("recipeEditRestaurantCurrentStatus", selected.restaurant_current_status || "");
+        setValue("recipeEditRestaurantPromotions", selected.restaurant_promotions || "");
+        setValue("recipeEditRestaurantOnlinePaymentAvailable", selected.restaurant_online_payment_available || "");
+        setValue("recipeEditRestaurantDeliveryAvailable", selected.restaurant_delivery_available || "");
         bindRecipeMenuMetadataUrlLinks();
         syncRecipeEditDocumentRows();
         delete form.dataset.saving;
