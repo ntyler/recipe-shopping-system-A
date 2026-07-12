@@ -31812,22 +31812,54 @@ img[data-deferred-src] {
     gap: 8px;
 }
 
-.recipe-edit-standalone-page .recipe-edit-header-rating .recipe-edit-rating-stars {
+.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-stars {
     flex-wrap: nowrap;
     gap: 2px;
 }
 
-.recipe-edit-standalone-page .recipe-edit-header-rating .recipe-edit-rating-star {
+.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star {
     width: 26px;
     min-width: 26px;
     height: 26px;
     min-height: 26px;
-    border: 0;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
     background: transparent;
     font-size: 19px;
+    transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-.recipe-edit-standalone-page .recipe-edit-header-rating .recipe-edit-rating-clear {
+.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star.active {
+    border-color: transparent;
+    background: transparent;
+    color: #fbbf24;
+}
+
+.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star.is-preview {
+    color: #fcd34d;
+}
+
+.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star[aria-checked="true"] {
+    border-color: rgba(251, 191, 36, .42);
+    background: rgba(251, 191, 36, .08);
+}
+
+.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star:hover {
+    transform: translateY(-1px);
+}
+
+.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star:active {
+    transform: scale(.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star {
+        transition: none;
+    }
+}
+
+.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-clear {
     min-width: 0;
     height: 26px;
     min-height: 26px;
@@ -34003,84 +34035,6 @@ img[data-deferred-src] {
     color: #c8d0cc;
     font-size: 13px;
     font-weight: 700;
-}
-
-.recipe-edit-restaurant-rating-buttons {
-    display: flex;
-    min-height: 40px;
-    align-items: center;
-    gap: 2px;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] {
-    display: grid;
-    width: 36px;
-    min-height: 36px;
-    margin: 0;
-    padding: 7px;
-    place-items: center;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: transparent;
-    color: #9ca3af;
-    transition: color 160ms ease, transform 160ms ease;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg {
-    width: 20px;
-    height: 20px;
-    fill: currentColor;
-    stroke: currentColor;
-    transition: fill 160ms ease, stroke 160ms ease, transform 160ms ease;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value]:hover,
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value]:focus-visible {
-    border-color: #3f4744;
-    background: #1a201e;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg path {
-    fill: none;
-    stroke: currentColor;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected:not(.is-preview-suppressed) svg path,
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview svg path {
-    fill: currentColor;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview-suppressed svg path {
-    fill: none;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected {
-    color: #fbbf24;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview {
-    color: #fcd34d;
-    transform: translateY(-1px);
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview-suppressed {
-    color: #9ca3af;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value]:focus-visible {
-    outline: 2px solid rgba(251, 191, 36, .4);
-    outline-offset: 1px;
-}
-
-.recipe-edit-restaurant-rating-clear {
-    width: auto;
-    min-height: 38px;
-    margin-left: 5px;
-    padding: 0 10px;
-    border: 0;
-    background: transparent;
-    color: var(--app-muted);
-    font-size: 13px;
 }
 
 .recipe-edit-standalone-page .recipe-edit-restaurant-form label small {

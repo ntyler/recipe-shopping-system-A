@@ -923,29 +923,8 @@
                     </div>
                     <div class="recipe-edit-rating-field recipe-edit-wide">
                         <span class="recipe-edit-rating-label">Rating</span>
-                        <input type="hidden" id="recipeEditRating" value="0">
-                        <div id="recipeEditRatingStars"
-                             class="recipe-edit-rating-stars"
-                             role="radiogroup"
-                             aria-label="Recipe rating">
-                            {% for rating_value in range(1, 6) %}
-                                <button type="button"
-                                        class="recipe-edit-rating-star"
-                                        data-rating-value="{{ rating_value }}"
-                                        role="radio"
-                                        aria-checked="false"
-                                        aria-label="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}"
-                                        onclick="return setRecipeRating({{ rating_value }});">
-                                    &#9733;
-                                </button>
-                            {% endfor %}
-                            <button type="button"
-                                    class="recipe-edit-rating-clear"
-                                    hidden
-                                    onclick="return setRecipeRating(0);">
-                                Clear
-                            </button>
-                        </div>
+                        <input type="hidden" id="recipeEditRating" data-rating-input value="0">
+                        {{ shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe") }}
                     </div>
                     <div class="recipe-edit-mobile-pdf-actions recipe-edit-wide">
                         <a id="recipeEditPdfButtonMobile"
@@ -2367,12 +2346,10 @@
                                 </div>
                             </div>
                             <label class="recipe-edit-restaurant-form-wide"><span>Restaurant Name</span><input type="text" data-restaurant-edit-field="restaurant_name" required></label>
-                            <fieldset class="recipe-edit-restaurant-rating-editor">
+                            <fieldset class="recipe-edit-restaurant-rating-editor recipe-edit-rating-field">
                                 <legend>Rating</legend>
-                                <input type="hidden" data-restaurant-edit-field="restaurant_rating">
-                                <div class="recipe-edit-restaurant-rating-buttons" role="radiogroup" aria-label="Restaurant rating">
-                                    {% for rating in range(1, 6) %}<button type="button" data-restaurant-rating-value="{{ rating }}" role="radio" aria-checked="false" aria-label="{{ rating }} star{% if rating != 1 %}s{% endif %}. Click the selected star again to clear the rating." title="{{ rating }} star{% if rating != 1 %}s{% endif %}; click again to clear" onclick="return setRecipeRestaurantRating(this, {{ rating }})" onkeydown="return handleRecipeRestaurantRatingKeydown(this, event)" onpointerenter="previewRecipeRestaurantRating(this, {{ rating }})" onpointerleave="clearRecipeRestaurantRatingPreview(this)">{{ shell.svg_icon("star") }}</button>{% endfor %}
-                                </div>
+                                <input type="hidden" data-rating-input data-restaurant-edit-field="restaurant_rating">
+                                {{ shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant") }}
                             </fieldset>
                             <label><span>Phone</span><input type="tel" data-restaurant-edit-field="restaurant_phone"></label>
                             <label class="recipe-edit-restaurant-form-wide"><span>Website URL</span><input type="url" data-restaurant-edit-field="restaurant_website_url"><small>Restaurant's main website.</small></label>

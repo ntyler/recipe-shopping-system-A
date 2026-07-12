@@ -271,6 +271,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
 
 def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
     route = read_text("PushShoppingList/routes/recipe_routes.py")
@@ -295,9 +296,10 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Save Changes" in template
     assert "Upload Image" in template
     assert "Use Image URL" in template
-    assert "Clear Rating" not in template
-    assert "Click the selected star again to clear the rating." in template
-    assert template.count('data-restaurant-rating-value=') == 1
+    assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
+    assert "Click the selected star again to clear the rating." in macros
+    assert 'class="recipe-edit-rating-clear"' in macros
+    assert macros.count('data-rating-value="{{ rating_value }}"') == 1
     assert "Restaurant's main website." in template
     assert "Page containing the full restaurant menu." in template
     assert "Direct source page or deep link for this recipe or menu item." in template
@@ -319,19 +321,17 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "function recipeRestaurantModalFocusableElements()" in script
     assert "function currentRecipeRestaurantSourceOption()" in script
     assert "function chooseRecipeRestaurantLogoUpload(button)" in script
-    assert "function setRecipeRestaurantRating(button, rating, options = {})" in script
-    assert 'currentRating !== nextRating ? String(nextRating) : ""' in script
-    assert "function previewRecipeRestaurantRating(button, rating)" in script
-    assert "function clearRecipeRestaurantRatingPreview(button)" in script
-    assert 'star.classList.toggle("is-preview-suppressed", !inPreview);' in script
+    assert "function setSharedRatingFromButton(button, rating, options = {})" in script
+    assert 'control?.dataset.ratingToggleSelected === "true"' in script
+    assert "function previewSharedRating(button, rating)" in script
+    assert "function clearSharedRatingPreview(button)" in script
+    assert "function updateSharedRatingControl(source, rating, options = {})" in script
     assert "{ allowToggle: false }" in script
     assert "color: #fbbf24;" in css
     assert "color: #9ca3af;" in css
-    assert "fill: currentColor;" in css
-    assert ".recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg path {" in css
-    assert ".is-selected:not(.is-preview-suppressed) svg path" in css
-    assert ".is-preview-suppressed svg path {" in css
-    assert "function handleRecipeRestaurantRatingKeydown(button, event)" in script
+    assert ':is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star' in css
+    assert '.recipe-edit-rating-star[aria-checked="true"]' in css
+    assert "function handleSharedRatingKeydown(button, event)" in script
     assert "function updateRecipeRestaurantStructuredHours(control)" in script
     assert "function toggleRecipeRestaurantSplitHours(button)" in script
     assert 'const restaurantId = recipeEditInputValue("recipeEditRestaurantId")' in script

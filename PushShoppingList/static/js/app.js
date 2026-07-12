@@ -26662,14 +26662,90 @@ function updateRecipeRestaurantEditLogo(form = recipeRestaurantEditForm()) {
     }
 }
 
-function updateRecipeRestaurantRatingEditor(form = recipeRestaurantEditForm()) {
-    const input = form?.querySelector('[data-restaurant-edit-field="restaurant_rating"]');
-    const rating = Number.parseInt(input?.value || "0", 10) || 0;
-    form?.querySelectorAll("[data-restaurant-rating-value]").forEach(button => {
-        const value = Number.parseInt(button.dataset.restaurantRatingValue || "0", 10);
-        button.classList.toggle("is-selected", value <= rating);
-        button.setAttribute("aria-checked", value === rating ? "true" : "false");
+function sharedRatingControl(source) {
+    if (source?.matches?.("[data-shared-rating-control]")) return source;
+    return source?.closest?.("[data-shared-rating-control]") || null;
+}
+
+function sharedRatingInput(control) {
+    return sharedRatingControl(control)?.parentElement?.querySelector("[data-rating-input]") || null;
+}
+
+function updateSharedRatingControl(source, rating, options = {}) {
+    const control = sharedRatingControl(source);
+    if (!control) return;
+    const normalizedRating = normalizeRecipeRatingValue(rating);
+    const hasPreview = options.previewRating != null;
+    const displayRating = hasPreview ? normalizeRecipeRatingValue(options.previewRating) : normalizedRating;
+    control.querySelectorAll(".recipe-edit-rating-star").forEach(button => {
+        const value = normalizeRecipeRatingValue(button.dataset.ratingValue);
+        const active = value > 0 && value <= displayRating;
+        button.classList.toggle("active", active);
+        button.classList.toggle("is-preview", hasPreview && active);
+        button.setAttribute("aria-checked", value === normalizedRating ? "true" : "false");
+        button.textContent = active ? "\u2605" : "\u2606";
     });
+    const clear = control.querySelector(".recipe-edit-rating-clear");
+    if (clear) clear.hidden = normalizedRating <= 0;
+}
+
+function setSharedRatingValue(source, value, options = {}) {
+    const control = sharedRatingControl(source);
+    const input = sharedRatingInput(control);
+    if (!control || !input) return false;
+    const requestedRating = normalizeRecipeRatingValue(value);
+    const currentRating = normalizeRecipeRatingValue(input.value);
+    const allowToggle = options.allowToggle === true;
+    const nextRating = allowToggle && requestedRating > 0 && currentRating === requestedRating
+        ? 0
+        : requestedRating;
+    input.value = control.dataset.ratingMode === "restaurant" && nextRating === 0 ? "" : String(nextRating);
+    updateSharedRatingControl(control, nextRating);
+    if (control.dataset.ratingMode === "restaurant") {
+        updateRecipeRestaurantEditState(control.closest("[data-restaurant-edit-form]"));
+    }
+    return false;
+}
+
+function setSharedRatingFromButton(button, rating, options = {}) {
+    const control = sharedRatingControl(button);
+    const allowToggle = options.allowToggle === false
+        ? false
+        : control?.dataset.ratingToggleSelected === "true";
+    return setSharedRatingValue(control, rating, { allowToggle });
+}
+
+function clearSharedRating(button) {
+    return setSharedRatingValue(button, 0, { allowToggle: false });
+}
+
+function previewSharedRating(button, rating) {
+    const control = sharedRatingControl(button);
+    const input = sharedRatingInput(control);
+    updateSharedRatingControl(control, input?.value || 0, { previewRating: rating });
+}
+
+function clearSharedRatingPreview(button) {
+    const control = sharedRatingControl(button);
+    updateSharedRatingControl(control, sharedRatingInput(control)?.value || 0);
+}
+
+function handleSharedRatingKeydown(button, event) {
+    if (!event || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return true;
+    event.preventDefault();
+    const current = normalizeRecipeRatingValue(button.dataset.ratingValue) || 1;
+    const next = event.key === "Home" ? 1 : event.key === "End" ? 5
+        : Math.max(1, Math.min(5, current + (["ArrowRight", "ArrowUp"].includes(event.key) ? 1 : -1)));
+    const control = sharedRatingControl(button);
+    const target = control?.querySelector(`[data-rating-value="${next}"]`);
+    setSharedRatingFromButton(target, next, { allowToggle: false });
+    target?.focus();
+    return false;
+}
+
+function updateRecipeRestaurantRatingEditor(form = recipeRestaurantEditForm()) {
+    const control = form?.querySelector('[data-shared-rating-control][data-rating-mode="restaurant"]');
+    updateSharedRatingControl(control, sharedRatingInput(control)?.value || 0);
 }
 
 function updateRecipeRestaurantEditState(form = recipeRestaurantEditForm()) {
@@ -26914,42 +26990,19 @@ function removeRecipeRestaurantLogo(button) {
 }
 
 function setRecipeRestaurantRating(button, rating, options = {}) {
-    const form = button?.closest("[data-restaurant-edit-form]");
-    const input = form?.querySelector('[data-restaurant-edit-field="restaurant_rating"]');
-    const nextRating = Math.max(1, Math.min(5, Number(rating) || 1));
-    const currentRating = Number.parseInt(input?.value || "0", 10) || 0;
-    if (input) input.value = options.allowToggle === false || currentRating !== nextRating ? String(nextRating) : "";
-    updateRecipeRestaurantEditState(form);
-    return false;
+    return setSharedRatingFromButton(button, rating, { allowToggle: options.allowToggle !== false });
 }
 
 function previewRecipeRestaurantRating(button, rating) {
-    const form = button?.closest("[data-restaurant-edit-form]");
-    const preview = Math.max(1, Math.min(5, Number(rating) || 1));
-    form?.querySelectorAll("[data-restaurant-rating-value]").forEach(star => {
-        const inPreview = Number(star.dataset.restaurantRatingValue) <= preview;
-        star.classList.toggle("is-preview", inPreview);
-        star.classList.toggle("is-preview-suppressed", !inPreview);
-    });
+    previewSharedRating(button, rating);
 }
 
 function clearRecipeRestaurantRatingPreview(button) {
-    button?.closest("[data-restaurant-edit-form]")?.querySelectorAll("[data-restaurant-rating-value]").forEach(star => {
-        star.classList.remove("is-preview");
-        star.classList.remove("is-preview-suppressed");
-    });
+    clearSharedRatingPreview(button);
 }
 
 function handleRecipeRestaurantRatingKeydown(button, event) {
-    if (!event || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return true;
-    event.preventDefault();
-    const current = Number.parseInt(button.dataset.restaurantRatingValue || "1", 10);
-    const next = event.key === "Home" ? 1 : event.key === "End" ? 5
-        : Math.max(1, Math.min(5, current + (["ArrowRight", "ArrowUp"].includes(event.key) ? 1 : -1)));
-    const target = button.closest("[data-restaurant-edit-form]")?.querySelector(`[data-restaurant-rating-value="${next}"]`);
-    setRecipeRestaurantRating(target, next, { allowToggle: false });
-    target?.focus();
-    return false;
+    return handleSharedRatingKeydown(button, event);
 }
 
 function recipeRestaurantHoursTimeLabel(value) {
@@ -27771,29 +27824,11 @@ function currentRecipeRating() {
 
 function setRecipeRating(value) {
     const rating = normalizeRecipeRatingValue(value);
-    const input = document.getElementById("recipeEditRating");
-
-    if (input) {
-        input.value = String(rating);
-    }
-
-    updateRecipeRatingStars(rating);
-    return false;
+    return setSharedRatingValue(document.getElementById("recipeEditRatingStars"), rating, { allowToggle: false });
 }
 
 function updateRecipeRatingStars(rating) {
-    const normalizedRating = normalizeRecipeRatingValue(rating);
-
-    document.querySelectorAll("#recipeEditRatingStars .recipe-edit-rating-star").forEach(button => {
-        const value = normalizeRecipeRatingValue(button.dataset.ratingValue);
-        const active = value > 0 && value <= normalizedRating;
-
-        button.classList.toggle("active", active);
-        button.setAttribute("aria-checked", value === normalizedRating ? "true" : "false");
-        button.textContent = active ? "\u2605" : "\u2606";
-    });
-    const clear = document.querySelector("#recipeEditRatingStars .recipe-edit-rating-clear");
-    if (clear) clear.hidden = normalizedRating <= 0;
+    updateSharedRatingControl(document.getElementById("recipeEditRatingStars"), rating);
 }
 
 function setRecipeEditStatus(message, isError = false) {
