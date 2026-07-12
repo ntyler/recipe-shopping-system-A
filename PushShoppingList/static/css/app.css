@@ -33695,6 +33695,7 @@ img[data-deferred-src] {
     min-width: 32px;
     height: 32px;
     min-height: 32px;
+    margin: 0;
     padding: 0;
     place-items: center;
     border: 0;

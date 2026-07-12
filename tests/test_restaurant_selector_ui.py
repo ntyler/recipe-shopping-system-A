@@ -30,6 +30,7 @@ def test_restaurant_selector_is_searchable_accessible_and_header_scoped():
     assert 'shell.svg_icon("chevron-down")' not in header
     assert 'data-restaurant-selector-clear' in header
     assert 'aria-label="Clear restaurant selection"' in header
+    assert 'title="Clear restaurant selection"' not in header
     assert 'onpointerdown="event.preventDefault(); event.stopPropagation()"' in header
     assert 'onclick="openRecipeRestaurantSelector(this)"' in header
     assert 'onclick="return clearRecipeRestaurantSelector(this, event)"' in header
@@ -43,6 +44,11 @@ def test_restaurant_selector_is_searchable_accessible_and_header_scoped():
     assert "right: 12px;" in css
     assert "width: 32px;" in css
     assert "height: 32px;" in css
+    clear_css = css[
+        css.index(".recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-clear {"):
+        css.index(".recipe-edit-restaurant-modal-header .recipe-edit-restaurant-selector-clear[hidden]")
+    ]
+    assert "margin: 0;" in clear_css
     assert ".recipe-edit-restaurant-modal-header {" in css
     assert "grid-template-columns: max-content minmax(320px, 560px) 38px;" in css
     assert 'grid-template-areas:' in css
