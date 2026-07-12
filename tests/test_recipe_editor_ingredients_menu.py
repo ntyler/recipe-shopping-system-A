@@ -469,7 +469,7 @@ def test_recipe_editor_equipment_uses_same_compact_expand_controls_as_ingredient
     assert script.count("setRecipeIngredientsCollapsed(!recipeEditorStandalonePageIsActive());") == 2
     assert "setRecipeEquipmentCollapsed(true);" in script
     assert "addRecipeIngredientRow({}, { expanded: true });" in script
-    assert 'addRecipeEquipmentRow("", { expanded: true });' in script
+    assert 'addRecipeEquipmentRow("", { expanded: false });' in script
     assert "expandRecipeEquipmentRow(row);" in script
     assert "recipe-edit-equipment-collapsed" in script
     assert "Expand equipment" in script

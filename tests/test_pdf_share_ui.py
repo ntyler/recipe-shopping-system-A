@@ -135,6 +135,21 @@ def test_recipe_editor_uses_split_source_and_generated_pdf_fields():
     assert "function recipePdfSaveChoiceForPayload" in js
 
 
+def test_recipe_editor_hides_create_pdf_controls_when_generated_pdf_is_available():
+    js = read_text("PushShoppingList/static/js/app.js")
+    controls_start = js.index("function updateRecipeEditorPdfControls")
+    controls_end = js.index("function syncRecipeEditSourceFilesDetails", controls_start)
+    controls = js[controls_start:controls_end]
+
+    assert 'document.getElementById("recipeEditCreatePdfButton")' in controls
+    assert 'document.getElementById("recipeEditCreatePdfButtonLegacy")' in controls
+    assert "const generatedOpenUrl = generatedCloudflareUrl;" in controls
+    assert "const hasGeneratedPdf = Boolean(generatedCloudflareUrl || generatedArchiveUrl);" in controls
+    assert "button.hidden = Boolean(generatedOpenUrl);" in controls
+    assert "button.disabled = requiresServingEstimate;" in controls
+    assert "deletePdfButton.hidden = !hasGeneratedPdf;" in controls
+
+
 def test_recipe_editor_header_orders_menu_icon_after_source_pdf():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     header_start = template.index('<div class="recipe-edit-header-actions">')

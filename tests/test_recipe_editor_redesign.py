@@ -45,6 +45,17 @@ def test_standalone_recipe_editor_uses_app_shell_navigation():
     assert "organizeRecipeEditStandaloneWorkspace()" in template
 
 
+def test_standalone_recipe_editor_matches_homepage_width_without_a_max_cap():
+    css = read_text("PushShoppingList/static/css/app.css")
+    rule_start = css.index(".recipe-edit-standalone-page .recipe-edit-standalone-shell {")
+    rule_end = css.index("}", rule_start)
+    shell_rule = css[rule_start:rule_end]
+
+    assert "width: calc(100% - 48px);" in shell_rule
+    assert "max-width: none;" in shell_rule
+    assert "width: min(" not in shell_rule
+
+
 def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
 
@@ -102,6 +113,108 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "inferMissingRecipeDetails(this)" in template
     assert "confirmDeleteRecipeFromEditor(this, event)" in template
     assert 'type="submit" class="recipe-edit-save"' in template
+
+
+def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    tab_list_start = template.index('<div class="recipe-edit-tab-list"')
+    tab_list_end = template.index('<div class="recipe-edit-tab-panels">', tab_list_start)
+    tab_list = template[tab_list_start:tab_list_end]
+    expected_tabs = ["ingredients", "instructions", "equipment", "nutrition", "notes"]
+
+    assert tab_list.count('data-recipe-edit-tab="') == len(expected_tabs)
+    assert [tab_list.index(f'data-recipe-edit-tab="{tab}"') for tab in expected_tabs] == sorted(
+        tab_list.index(f'data-recipe-edit-tab="{tab}"') for tab in expected_tabs
+    )
+    assert tab_list.count('aria-selected="true"') == 1
+    assert 'data-recipe-edit-tab="ingredients"' in tab_list[:tab_list.index('aria-selected="false"')]
+
+    v4_css = css[css.index("/* Recipe workspace v4: homepage alignment and compact tab editors. */"):]
+    tab_rule_start = v4_css.index(".recipe-edit-standalone-page .recipe-edit-tab-list {")
+    tab_rule_end = v4_css.index("}", tab_rule_start)
+    tab_rule = v4_css[tab_rule_start:tab_rule_end]
+    panel_rule_start = v4_css.index(".recipe-edit-standalone-page .recipe-edit-tab-panels {")
+    panel_rule_end = v4_css.index("}", panel_rule_start)
+    panel_rule = v4_css[panel_rule_start:panel_rule_end]
+    table_rule_start = v4_css.index(".recipe-edit-standalone-page .recipe-edit-ingredient-table-scroll {")
+    table_rule_end = v4_css.index("}", table_rule_start)
+    table_rule = v4_css[table_rule_start:table_rule_end]
+
+    assert "justify-content: flex-start;" in tab_rule
+    assert "width: 100%;" in tab_rule
+    assert "max-width: 100%;" in tab_rule
+    assert "overflow-x: hidden;" in tab_rule
+    assert "overflow-x: hidden;" in panel_rule
+    assert "overflow-x: auto;" in table_rule
+    assert "overscroll-behavior-inline: contain;" in table_rule
+    assert "min-width: 680px;" in v4_css
+
+    tools_start = script.index("function organizeRecipeEditIngredientTools()")
+    tools_end = script.index("function organizeRecipeEditEquipmentTools()", tools_start)
+    tools_block = script[tools_start:tools_end]
+    assert 'tableScroll.className = "recipe-edit-ingredient-table-scroll";' in tools_block
+    assert "tableScroll.appendChild(tableHead);" in tools_block
+    assert "tableScroll.appendChild(ingredientList);" in tools_block
+
+
+def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    for class_name, labels in (
+        ("recipe-edit-equipment-header", ("Image", "Equipment", "Options", "Edit", "Delete")),
+        ("recipe-edit-instructions-header", ("Step", "Instruction", "Options", "Edit", "Delete")),
+        ("recipe-edit-nutrition-header", ("Nutrient", "Value", "Options", "Edit", "Delete")),
+    ):
+        header_start = template.index(f'class="{class_name}"')
+        header_end = template.index("</div>", header_start)
+        header = template[header_start:header_end]
+        positions = [header.index(f"<span>{label}</span>") for label in labels]
+        assert positions == sorted(positions)
+
+    compact_actions_start = script.index("function organizeRecipeEditCompactRowActions")
+    compact_actions_end = script.index("function focusRecipeEditCompactRow", compact_actions_start)
+    compact_actions = script[compact_actions_start:compact_actions_end]
+    assert 'class="recipe-edit-compact-row-edit"' in compact_actions
+    assert 'class="recipe-edit-compact-row-delete"' in compact_actions
+    assert 'onclick="return focusRecipeEditCompactRow(this)"' in compact_actions
+    assert 'onclick="return removeRecipeEditRow(this)"' in compact_actions
+    for call in (
+        'organizeRecipeEditCompactRowActions(row, \'[data-field="ingredient"]\', "ingredient");',
+        'organizeRecipeEditCompactRowActions(row, \'[data-field="text"]\', "equipment");',
+        'organizeRecipeEditCompactRowActions(row, \'[data-field="text"]\', "step");',
+        'organizeRecipeEditCompactRowActions(row, \'[data-field="key"]\', "nutrition row");',
+    ):
+        assert call in script
+
+    ingredient_tools = script[
+        script.index("function organizeRecipeEditIngredientTools()"):script.index(
+            "function organizeRecipeEditEquipmentTools()"
+        )
+    ]
+    equipment_tools = script[
+        script.index("function organizeRecipeEditEquipmentTools()"):script.index(
+            "function organizeRecipeEditIngredientRow(row)"
+        )
+    ]
+    assert 'viewSection.innerHTML = \'<div class="overflow-menu-section-title">Table View</div>\';' in ingredient_tools
+    assert "viewSection.appendChild(collapseToggle);" in ingredient_tools
+    assert 'viewSection.innerHTML = \'<div class="overflow-menu-section-title">Table View</div>\';' in equipment_tools
+    assert "viewSection.appendChild(collapseToggle);" in equipment_tools
+
+    v4_css = css[css.index("/* Recipe workspace v4: homepage alignment and compact tab editors. */"):]
+    assert ".recipe-edit-standalone-page .recipe-edit-compact-row-actions {" in v4_css
+    assert "display: contents;" in v4_css
+    assert ".recipe-edit-standalone-page .recipe-edit-equipment-header," in v4_css
+    assert ".recipe-edit-standalone-page .recipe-edit-instructions-header," in v4_css
+    assert ".recipe-edit-standalone-page .recipe-edit-nutrition-header," in v4_css
+    assert ".recipe-edit-standalone-page #recipeEditRecipeNotes > .recipe-edit-note-section-row," in v4_css
+    assert "min-height: 0;" in v4_css
+    assert "height: 30px;" in v4_css
 
 
 def test_recipe_editor_redesign_javascript_wiring():
