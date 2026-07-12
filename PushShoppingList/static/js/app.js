@@ -24540,8 +24540,9 @@ function syncRecipeEditDocumentRows() {
         row.dataset.documentValue = sourceValue;
 
         if (status) {
-            status.textContent = recipeEditDocumentDisplayValue(sourceValue);
-            status.title = sourceValue;
+            status.textContent = recipeEditDocumentDisplayValue(sourceValue, inputId);
+            status.title = `${sourceValue} (click to copy)`;
+            status.dataset.copyValue = sourceValue;
         }
 
         if (open) {
@@ -24581,10 +24582,40 @@ function syncRecipeEditDocumentRows() {
     }
 }
 
-function recipeEditDocumentDisplayValue(value) {
+function recipeEditDocumentSlug(value, fallback = "document") {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 64) || fallback;
+}
+
+function recipeEditRestaurantSourceSlug() {
+    const source = recipeEditInputValue("recipeEditSourceMenuUrl") || recipeEditorSourceUrlForOpen();
+    try {
+        const url = new URL(source, window.location.origin);
+        const segments = url.pathname.split("/").filter(Boolean);
+        const menuIndex = segments.findIndex(segment => segment.toLowerCase() === "menu");
+        if (menuIndex > 0) {
+            return recipeEditDocumentSlug(segments[menuIndex - 1], "restaurant");
+        }
+    } catch (err) {
+        // Fall back to the saved restaurant name below.
+    }
+    return recipeEditDocumentSlug(recipeEditInputValue("recipeEditRestaurantName"), "restaurant");
+}
+
+function recipeEditDocumentDisplayValue(value, inputId = "") {
     const text = String(value || "").trim();
     if (!text) {
         return "";
+    }
+    if (["recipeEditSourcePdfPath", "recipeEditSourceCloudflarePdfUrl"].includes(inputId)) {
+        return `${recipeEditRestaurantSourceSlug()}-menu.pdf`;
+    }
+    if (["recipeEditGeneratedPdfPath", "recipeEditGeneratedCloudflarePdfUrl"].includes(inputId)) {
+        const recipeName = recipeEditInputValue("recipeEditTitleInput") || recipeEditInputValue("recipeEditDisplayName");
+        return `${recipeEditDocumentSlug(recipeName, "generated-recipe")}.pdf`;
     }
     try {
         const url = new URL(text, window.location.origin);

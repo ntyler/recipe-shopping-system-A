@@ -187,16 +187,19 @@ def test_source_documents_card_uses_compact_rows_and_context_action_menus():
     assert card.count("data-recipe-edit-document-row") == len(expected_labels)
     assert card.count("recipe-edit-document-icon") == len(expected_labels)
     assert card.count("recipe-edit-document-identity") == len(expected_labels)
-    assert card.count("recipe-edit-document-more") == len(expected_labels)
+    assert "recipe-edit-document-more" not in card
     assert card.count("data-document-open hidden") == len(expected_labels)
+    assert card.count("recipe-edit-document-secondary") == 6
     assert all(label in card for label in expected_labels)
     assert 'row.hidden = !hasValue;' in script
-    assert 'status.title = sourceValue;' in script
+    assert 'status.title = `${sourceValue} (click to copy)`;' in script
     assert 'open.setAttribute("aria-disabled", canOpen ? "false" : "true");' in script
     assert ".recipe-edit-standalone-page .recipe-edit-document-row {" in css
-    assert "grid-template-columns: 28px minmax(0, 1fr) auto;" in css
+    assert "grid-template-columns: 32px minmax(0, 1fr) auto 28px;" in css
     assert "text-overflow: ellipsis;" in css
-    assert ".recipe-edit-standalone-page .recipe-edit-document-more > div {" in css
+    assert ".recipe-edit-standalone-page .recipe-edit-document-secondary {" in css
+    assert 'data-document-input-id="recipeEditGeneratedPdfPath"] { order: 4; }' in css
+    assert "function recipeEditDocumentSlug(value, fallback = \"document\")" in script
 
 def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
