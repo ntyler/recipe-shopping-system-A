@@ -9,12 +9,15 @@ from difflib import SequenceMatcher
 import hashlib
 import ipaddress
 import json
+import base64
 from pathlib import Path
 import re
 import socket
 import threading
 import time
-from urllib.parse import urljoin, urlparse, urlunparse
+import uuid
+from io import BytesIO
+from urllib.parse import quote, urljoin, urlparse, urlunparse
 from urllib.robotparser import RobotFileParser
 
 import requests
@@ -465,6 +468,18 @@ def _normalize_status(value):
     return ""
 
 
+def _structured_boolean(value):
+    """Return an explicit structured boolean without treating missing data as false."""
+    if isinstance(value, bool):
+        return value
+    token = _clean(value).casefold()
+    if token in {"true", "yes", "1", "available"}:
+        return True
+    if token in {"false", "no", "0", "unavailable", "not available"}:
+        return False
+    return None
+
+
 def _normalize_value(field, value):
     if value in (None, "", [], {}):
         return None
@@ -506,10 +521,25 @@ def _normalize_value(field, value):
     return _clean(value) or None
 
 
-def _candidate(field, value, source_url, source_type, method, confidence, evidence, retrieved_at):
+def _candidate(field, value, source_url, source_type, method, confidence, evidence, retrieved_at, metadata=None):
     normalized = _normalize_value(field, value)
     if normalized in (None, "", [], {}):
         return None
+    if field == "image_url" and isinstance(metadata, dict):
+        image_format = _clean(metadata.get("image_format")).casefold()
+        width, height = metadata.get("width"), metadata.get("height")
+        if image_format == "svg":
+            confidence += 0.04
+        elif image_format == "png":
+            confidence += 0.02
+        if width and height:
+            aspect_ratio = float(width) / float(height)
+            if 0.75 <= aspect_ratio <= 1.34:
+                confidence += 0.03
+            elif aspect_ratio > 4 or aspect_ratio < 0.25:
+                confidence -= 0.08
+        if metadata.get("fallback"):
+            confidence = min(confidence, 0.52)
     source_quality = SOURCE_QUALITY.get(source_type, 0.65)
     method_quality = METHOD_RELIABILITY.get(method, 0.6)
     score = max(0.01, min(0.99, float(confidence) * source_quality * method_quality))
@@ -519,6 +549,8 @@ def _candidate(field, value, source_url, source_type, method, confidence, eviden
         "confidence": round(score, 2), "retrieved_at": retrieved_at or _now_iso(),
         "evidence": _clean(evidence)[:280],
     }
+    if isinstance(metadata, dict):
+        payload.update({key: value for key, value in metadata.items() if value not in (None, "")})
     signature = json.dumps([field, normalized, source_url, method], sort_keys=True, default=str)
     payload["candidate_id"] = f"candidate_{hashlib.sha256(signature.encode('utf-8')).hexdigest()[:18]}"
     return payload
@@ -536,9 +568,31 @@ def _first_url(value, base_url):
 
 def _looks_like_brand_logo(url, evidence="", explicit=False):
     text = f"{url} {evidence}".casefold()
-    if any(token in text for token in ("menu-screenshot", "menu_image", "food-photo", "dish-", "meal-", "favicon", "apple-touch-icon")):
+    rejected_tokens = (
+        "menu-screenshot", "menu_image", "menu-image", "recipe-image", "food-photo",
+        "dish-", "meal-", "restaurant-interior", "storefront-photo", "advertisement",
+        "promo-banner", "placeholder", "no-image", "no_image", "default-image",
+        "favicon", "apple-touch-icon",
+    )
+    if any(token in text for token in rejected_tokens):
         return False
     return explicit or any(token in text for token in ("logo", "brand", "wordmark"))
+
+
+def _image_asset_metadata(url, tag=None, fallback=False):
+    suffix = Path(urlparse(_clean(url)).path).suffix.casefold().lstrip(".")
+    image_format = "jpeg" if suffix in {"jpg", "jpeg"} else suffix if suffix in {"png", "webp", "svg", "gif", "ico"} else ""
+    width = _clean(tag.get("width")) if tag else ""
+    height = _clean(tag.get("height")) if tag else ""
+    try:
+        width = int(float(width)) if width else None
+    except ValueError:
+        width = None
+    try:
+        height = int(float(height)) if height else None
+    except ValueError:
+        height = None
+    return {"image_format": image_format, "width": width, "height": height, "fallback": bool(fallback)}
 
 
 def _visible_text(soup):
@@ -582,8 +636,8 @@ def extract_restaurant_candidates(html, source_url, source_type="official_websit
         return {"matched": False, "match": match, "candidates": [], "follow_links": []}
     candidates = []
 
-    def add(field, value, method, confidence, evidence):
-        candidate = _candidate(field, value, source_url, source_type, method, confidence, evidence, retrieved_at)
+    def add(field, value, method, confidence, evidence, metadata=None):
+        candidate = _candidate(field, value, source_url, source_type, method, confidence, evidence, retrieved_at, metadata=metadata)
         if candidate:
             candidates.append(candidate)
 
@@ -603,12 +657,27 @@ def extract_restaurant_candidates(html, source_url, source_type="official_websit
             raw_text = "\n".join(_clean(item) for item in (raw_hours if isinstance(raw_hours, list) else [raw_hours]) if _clean(item))
             add("raw_hours_text", raw_text, "json_ld", 0.56, raw_text)
         add("current_status", node.get("businessStatus") or node.get("status"), "json_ld", 0.96, "Structured permanent business status")
+        structured_booleans = {
+            "online_payment": ("onlinePaymentAvailable",),
+            "online_ordering": ("onlineOrderingAvailable",),
+            "pickup": ("pickupAvailable", "takeoutAvailable"),
+            "delivery": ("deliveryAvailable", "offersDelivery"),
+            "reservations": ("acceptsReservations", "reservationAvailable"),
+        }
+        for field, keys in structured_booleans.items():
+            matched_key = next((key for key in keys if key in node), "")
+            normalized_boolean = _structured_boolean(node.get(matched_key)) if matched_key else None
+            if normalized_boolean is not None:
+                add(
+                    field, normalized_boolean, "json_ld", 0.96,
+                    f"Structured {matched_key} value",
+                )
         rating = node.get("aggregateRating") if isinstance(node.get("aggregateRating"), dict) else {}
         add("rating", rating.get("ratingValue"), "json_ld", 0.96, "Structured AggregateRating value")
         add("rating_count", rating.get("ratingCount") or rating.get("reviewCount"), "json_ld", 0.94, "Structured AggregateRating count")
         logo = _first_url(node.get("logo"), source_url)
         if logo and _looks_like_brand_logo(logo, "structured logo", explicit=True):
-            add("image_url", logo, "json_ld", 0.98, "Explicit structured logo")
+            add("image_url", logo, "json_ld", 0.98, "Explicit schema.org logo for the matched restaurant", _image_asset_metadata(logo))
         menu_url = _first_url(node.get("hasMenu") or node.get("menu"), source_url)
         add("menu_url", menu_url, "json_ld", 0.95, "Structured Menu URL")
         same_as = node.get("sameAs") if isinstance(node.get("sameAs"), list) else [node.get("sameAs")]
@@ -659,7 +728,36 @@ def extract_restaurant_candidates(html, source_url, source_type="official_websit
     if explicit_logo:
         logo_url = urljoin(source_url, _clean(explicit_logo.get("content")))
         if _looks_like_brand_logo(logo_url, "Open Graph logo", explicit=True):
-            add("image_url", logo_url, "open_graph", 0.9, "Open Graph logo")
+            add("image_url", logo_url, "open_graph", 0.9, "Explicit Open Graph logo", _image_asset_metadata(logo_url))
+
+    for image in soup.select("header img[src], nav img[src], [role='banner'] img[src]"):
+        image_url = urljoin(source_url, _clean(image.get("src")))
+        evidence = " ".join(filter(None, (
+            _clean(image.get("alt")), _clean(image.get("class")), _clean(image.get("id")), image_url,
+        )))
+        if _looks_like_brand_logo(image_url, evidence):
+            add(
+                "image_url", image_url, "structured_metadata", 0.92,
+                f"Header or navigation branding: {_clean(image.get('alt')) or 'logo image'}",
+                _image_asset_metadata(image_url, image),
+            )
+
+    og_image = soup.find("meta", attrs={"property": "og:image"})
+    if og_image:
+        image_url = urljoin(source_url, _clean(og_image.get("content")))
+        if _looks_like_brand_logo(image_url, "Open Graph image"):
+            add("image_url", image_url, "open_graph", 0.8, "Open Graph image appears to be a brand mark", _image_asset_metadata(image_url))
+
+    favicon_links = soup.find_all("link", rel=lambda value: value and any("icon" in str(item).casefold() for item in (value if isinstance(value, list) else [value])))
+    for favicon in favicon_links[:2]:
+        image_url = urljoin(source_url, _clean(favicon.get("href")))
+        if not image_url:
+            continue
+        add(
+            "image_url", image_url, "meta_tag", 0.52,
+            "Official site icon used only as a fallback logo candidate",
+            _image_asset_metadata(image_url, favicon, fallback=True),
+        )
 
     visible = _visible_text(soup)
     notes = re.search(r"([^.!?]{0,90}(?:holiday hours|seasonal hours|hours may vary|kitchen closes)[^.!?]{0,150}[.!?]?)", visible, re.I)
@@ -855,6 +953,9 @@ def scan_restaurant_information(record, force=False):
         for field, candidates in candidates_by_field.items() if candidates
     }
     unresolved = [field for field in FIELD_ORDER if field not in fields]
+    logo_candidates = fields.get("image_url", {}).get("candidates", [])
+    if logo_candidates and all(candidate.get("fallback") for candidate in logo_candidates):
+        unresolved.append("image_url")
     proposals = {}
     for field in PROPOSAL_FIELDS:
         recommended = fields.get(field, {}).get("recommended") or {}
@@ -992,14 +1093,105 @@ def _restore_file(path, snapshot):
         path.unlink()
 
 
+def _fetch_approved_logo_bytes(url):
+    current = _public_http_url(url)
+    if not _robots_allowed(current):
+        raise RestaurantFetchError("robots_blocked", "The logo source does not permit automated downloading.")
+    for _ in range(MAX_REDIRECTS + 1):
+        try:
+            response = requests.get(
+                current,
+                headers={**menu_page_request_headers(), "Accept": "image/png,image/webp,image/jpeg,image/svg+xml,image/*;q=0.8"},
+                timeout=FETCH_TIMEOUT,
+                stream=True,
+                allow_redirects=False,
+            )
+        except requests.Timeout as exc:
+            raise RestaurantFetchError("timeout", "The approved logo download timed out.") from exc
+        except requests.RequestException as exc:
+            raise RestaurantFetchError("unreachable", "The approved logo could not be downloaded.") from exc
+        try:
+            if response.is_redirect or response.is_permanent_redirect:
+                location = response.headers.get("location")
+                if not location:
+                    raise RestaurantFetchError("blocked", "The logo source returned an invalid redirect.")
+                current = _public_http_url(urljoin(current, location))
+                continue
+            response.raise_for_status()
+            mime_type = _clean(response.headers.get("content-type")).split(";", 1)[0].casefold()
+            if mime_type not in {"image/png", "image/jpeg", "image/webp", "image/svg+xml"}:
+                raise RestaurantFetchError("invalid_logo", "The approved logo is not a supported PNG, JPEG, WebP, or SVG image.")
+            chunks, size = [], 0
+            for chunk in response.iter_content(chunk_size=65536):
+                if not chunk:
+                    continue
+                size += len(chunk)
+                if size > 5 * 1024 * 1024:
+                    raise RestaurantFetchError("logo_too_large", "The approved logo is larger than 5 MB.")
+                chunks.append(chunk)
+            payload = b"".join(chunks)
+            if not payload:
+                raise RestaurantFetchError("invalid_logo", "The approved logo file was empty.")
+            return payload, mime_type, current
+        except requests.RequestException as exc:
+            raise RestaurantFetchError("request_failed", "The approved logo could not be downloaded.") from exc
+        finally:
+            response.close()
+    raise RestaurantFetchError("redirect_loop", "The approved logo redirected too many times.")
+
+
+def _safe_svg_logo(payload):
+    if len(payload) > 1024 * 1024:
+        raise RestaurantFetchError("logo_too_large", "SVG logos must be 1 MB or smaller.")
+    text = payload.decode("utf-8", errors="strict")
+    lowered = text.casefold()
+    if "<svg" not in lowered or any(token in lowered for token in ("<script", "<foreignobject", "javascript:", "data:text/html")):
+        raise RestaurantFetchError("invalid_logo", "The approved SVG logo contains unsupported active content.")
+    if re.search(r"\son[a-z]+\s*=", lowered) or re.search(r"(?:href|src)\s*=\s*['\"]https?://", lowered):
+        raise RestaurantFetchError("invalid_logo", "The approved SVG logo contains external or interactive content.")
+    return payload
+
+
+def _store_approved_logo(candidate, restaurant_id):
+    payload, mime_type, final_url = _fetch_approved_logo_bytes(candidate.get("value"))
+    from PushShoppingList.services import recipe_edit_service
+    if mime_type == "image/svg+xml":
+        payload = _safe_svg_logo(payload)
+        folder = recipe_edit_service.RESTAURANT_LOGO_UPLOAD_FOLDER
+        folder.mkdir(parents=True, exist_ok=True)
+        safe_id = re.sub(r"[^a-zA-Z0-9_-]+", "_", restaurant_id).strip("_") or "restaurant"
+        path = folder / f"{safe_id}_{uuid.uuid4().hex}.svg"
+        path.write_bytes(payload)
+        logo_url = f"/restaurant_source_logo?restaurant_id={quote(restaurant_id, safe='')}&v={path.stat().st_mtime_ns}"
+        return {"logo_url": logo_url, "logo_path": str(path), "logo_thumbnail_path": str(path), "original_url": final_url}
+    encoded = base64.b64encode(payload).decode("ascii")
+    path, logo_url = recipe_edit_service.save_editable_restaurant_logo_data(
+        restaurant_id, f"data:{mime_type};base64,{encoded}"
+    )
+    thumbnail_path = path.with_name(f"{path.stem}_thumb.webp")
+    try:
+        from PIL import Image
+        with Image.open(BytesIO(payload)) as image:
+            image.thumbnail((256, 256), Image.Resampling.LANCZOS)
+            image.save(thumbnail_path, "WEBP", quality=88, method=6)
+    except Exception:
+        thumbnail_path = path
+    return {"logo_url": logo_url, "logo_path": str(path), "logo_thumbnail_path": str(thumbnail_path), "original_url": final_url}
+
+
 def apply_restaurant_information_scan(restaurant_id, scan, selections=None, mode="selected", lock_updates=None):
     restaurant_id = _clean(restaurant_id)
+    if not isinstance(scan, dict):
+        return {"ok": False, "error": "The pending restaurant information scan is invalid."}
+    if mode not in {"selected", "high_confidence"}:
+        return {"ok": False, "error": "The restaurant information apply mode is invalid."}
     if not restaurant_id or _clean(scan.get("restaurant_id")) != restaurant_id:
         return {"ok": False, "error": "The scan does not belong to this restaurant."}
     lock_updates = lock_updates if isinstance(lock_updates, dict) else {}
     with workspace_write_lock("restaurant-information-scan"), menu_store_service.MENU_STORE_LOCK:
         path = Path(menu_store_service.MENU_STORE_FILE)
         snapshot = _snapshot_file(path)
+        created_logo_paths = []
         try:
             store = menu_store_service.load_menu_store()
             restaurant = menu_store_service.restaurant_for(store, restaurant_id)
@@ -1025,6 +1217,16 @@ def apply_restaurant_information_scan(restaurant_id, scan, selections=None, mode
                     value = _normalize_value(field, value)
                 if field in {"website_url", "menu_url", "image_url"}:
                     value = _normalize_url(value)
+                if field == "image_url":
+                    stored_logo = _store_approved_logo(candidate, restaurant_id)
+                    created_logo_paths.extend([stored_logo.get("logo_path"), stored_logo.get("logo_thumbnail_path")])
+                    value = stored_logo["logo_url"]
+                    restaurant["logo_path"] = stored_logo["logo_path"]
+                    restaurant["logo_thumbnail_path"] = stored_logo["logo_thumbnail_path"]
+                    restaurant["logo_original_source_url"] = stored_logo["original_url"]
+                    restaurant["logo_source_page_url"] = candidate.get("source_url")
+                    restaurant["logo_source_type"] = candidate.get("source_type")
+                    restaurant["logo_source_attribution"] = candidate.get("evidence")
                 restaurant[store_field] = value
                 if field == "website_url":
                     restaurant["website_url"] = value
@@ -1056,6 +1258,11 @@ def apply_restaurant_information_scan(restaurant_id, scan, selections=None, mode
             menu_store_service.save_menu_store(store)
         except Exception as exc:
             _restore_file(path, snapshot)
+            for logo_path in {item for item in created_logo_paths if item}:
+                try:
+                    Path(logo_path).unlink(missing_ok=True)
+                except OSError:
+                    pass
             return {"ok": False, "error": f"Restaurant information changes were rolled back: {exc}"}
     from PushShoppingList.services.recipe_edit_service import get_editable_restaurant
     saved = get_editable_restaurant(restaurant_id)

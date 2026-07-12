@@ -34207,6 +34207,29 @@ img[data-deferred-src] {
     border-radius: 6px;
 }
 
+.recipe-edit-restaurant-logo-scan-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.recipe-edit-restaurant-logo-scan-actions button {
+    width: auto;
+    min-height: 32px;
+    padding: 0 9px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 6px;
+    background: var(--app-bg-soft);
+    color: var(--app-text-strong);
+    font-size: 10px;
+    font-weight: 750;
+}
+
+.recipe-edit-restaurant-logo-scan-actions button:last-child {
+    border-color: var(--app-primary);
+    color: var(--app-primary-hover);
+}
+
 .recipe-edit-restaurant-fetch-evidence {
     display: grid;
     gap: 3px;

@@ -26298,6 +26298,9 @@ function renderRecipeRestaurantFetchReview(data) {
         const imagePreview = key === "image_url" && recommended
             ? `<img src="${escapeAttribute(recommended.value)}" alt="Discovered restaurant logo preview">`
             : "";
+        const logoActions = key === "image_url" && recommended
+            ? `<span class="recipe-edit-restaurant-logo-scan-actions"><button type="button" onclick="return chooseRecipeRestaurantScannedLogo(this, false)">Keep Current Logo</button><button type="button" onclick="return chooseRecipeRestaurantScannedLogo(this, true)">Apply New Logo</button></span>`
+            : "";
         const conflictPicker = row.conflict
             ? `<select data-restaurant-scan-candidate aria-label="Choose ${escapeAttribute(definition.label)} candidate" onchange="updateRecipeRestaurantScanCandidate(this)">${row.candidates.map(candidate => `<option value="${escapeAttribute(candidate.candidate_id)}" ${candidate.candidate_id === recommended?.candidate_id ? "selected" : ""}>${escapeHtml(recipeRestaurantFetchDisplayValue(key, candidate.value))}</option>`).join("")}</select>`
             : `<span data-restaurant-scan-value>${escapeHtml(recipeRestaurantFetchDisplayValue(key, recommended?.value))}</span>`;
@@ -26306,7 +26309,7 @@ function renderRecipeRestaurantFetchReview(data) {
                     <label class="recipe-edit-restaurant-fetch-accept"><input type="checkbox" ${defaultAccept ? "checked" : ""} ${row.selectable && !row.locked ? "" : "disabled"} aria-label="Accept ${escapeAttribute(definition.label)}"></label>
                     <strong>${escapeHtml(definition.label)}</strong>
                     <span class="recipe-edit-restaurant-fetch-current">${escapeHtml(recipeRestaurantFetchDisplayValue(key, row.current_value))}</span>
-                    <span class="recipe-edit-restaurant-fetch-proposed">${imagePreview}${conflictPicker}</span>
+                    <span class="recipe-edit-restaurant-fetch-proposed">${imagePreview}${conflictPicker}${logoActions}</span>
                     <span class="recipe-edit-restaurant-scan-confidence is-${String(row.confidence_label || "low").toLowerCase()}"><b>${escapeHtml(row.confidence_label || "Low")}</b><small>${Math.round(Number(recommended?.confidence || 0) * 100)}%</small></span>
                     <span class="recipe-edit-restaurant-fetch-evidence">
                         ${sourceUrl ? `<a href="${escapeAttribute(sourceUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeAttribute(sourceUrl)}">View source</a>` : "Source unavailable"}
@@ -26342,6 +26345,13 @@ function updateRecipeRestaurantScanCandidate(select) {
         method.textContent = String(candidate.extraction_method || "").replaceAll("_", " ");
         method.title = candidate.evidence || "";
     }
+}
+
+function chooseRecipeRestaurantScannedLogo(button, applyNew) {
+    const row = button?.closest("[data-restaurant-fetch-field]");
+    const accept = row?.querySelector(".recipe-edit-restaurant-fetch-accept input");
+    if (accept && !accept.disabled) accept.checked = Boolean(applyNew);
+    return false;
 }
 
 function closeRecipeRestaurantFetchReview(options = {}) {

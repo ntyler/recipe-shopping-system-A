@@ -103,27 +103,34 @@ def test_restaurant_editor_opens_without_an_existing_normalized_source():
     assert "canNormalizeFallback" in script
 
 
-def test_restaurant_details_fetch_is_backend_only_and_reviewed_before_form_changes():
+def test_restaurant_information_scan_is_evidence_backed_and_explicitly_applied():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     routes = read_text("PushShoppingList/routes/recipe_routes.py")
 
-    assert "Fetch Restaurant Details" in template
+    assert "Scan Restaurant Information" in template
     assert 'data-restaurant-fetch-button' in template
     assert 'data-restaurant-fetch-review' in template
+    assert 'data-restaurant-scan-metrics' in template
+    assert 'data-restaurant-scan-sources' in template
+    assert 'data-restaurant-scan-unresolved' in template
     assert "Apply Selected" in template
-    assert "Apply All" in template
+    assert "Apply All High Confidence" in template
+    assert "Rescan" in template
     assert 'aria-labelledby="recipeEditRestaurantFetchReviewTitle"' in template
     assert 'fetch(`/api/recipe/restaurants/${encodeURIComponent(restaurantId)}/fetch-details`' in script
     assert 'method: "POST"' in script
-    assert "Fetching details…" in script
+    assert "Scanning restaurant information…" in script
     assert "renderRecipeRestaurantFetchReview(data)" in script
-    assert 'found && !conflict ? "checked"' in script
-    assert "Differs from current value" in script
-    assert "Not found" in script
-    assert "applyRecipeRestaurantFetchedDetails" in script
+    assert "row.requires_explicit_review" in script
+    assert "View source" in script
+    assert "Lock existing" in script
+    assert "Keep Current Logo" in script
+    assert "Apply New Logo" in script
+    assert "applyRecipeRestaurantInformationScan" in script
     assert "updateRecipeRestaurantEditState(form);" in script
     assert 'fetch-details", methods=["POST"]' in routes
+    assert 'apply-information-scan", methods=["POST"]' in routes
 
 
 def test_restaurant_details_fetch_review_is_responsive_and_does_not_replace_save():

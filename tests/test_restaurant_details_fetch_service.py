@@ -303,6 +303,16 @@ def test_apply_selected_and_high_confidence_respect_locks_conflicts_and_unchange
     assert {item["reason"] for item in automatic["rejected"]} == {"locked", "empty_or_unchanged"}
 
 
+def test_apply_rejects_unknown_mode_before_writing():
+    result = service.apply_restaurant_information_scan(
+        "restaurant-1",
+        {"restaurant_id": "restaurant-1", "fields": {}},
+        mode="automatic",
+    )
+
+    assert result == {"ok": False, "error": "The restaurant information apply mode is invalid."}
+
+
 def test_logo_candidate_rejects_menu_screenshot_and_food_photo():
     payload = {"@type": "Restaurant", "name": "Pisco Mar", "logo": "/images/menu-screenshot.jpg", "image": "/images/food-photo.jpg"}
     result = service.extract_restaurant_candidates(
@@ -310,6 +320,70 @@ def test_logo_candidate_rejects_menu_screenshot_and_food_photo():
     )
 
     assert not any(item["field"] == "image_url" for item in result["candidates"])
+
+
+def test_logo_candidate_rejects_generic_placeholder_even_when_structured():
+    payload = {"@type": "Restaurant", "name": "Pisco Mar", "logo": "/images/default-image-placeholder.png"}
+    result = service.extract_restaurant_candidates(
+        f'<script type="application/ld+json">{json.dumps(payload)}</script>', "https://example.com"
+    )
+
+    assert not any(item["field"] == "image_url" for item in result["candidates"])
+
+
+def test_header_logo_is_ranked_above_favicon_and_keeps_asset_metadata(monkeypatch):
+    html = """
+    <html><head><link rel="icon" href="/favicon.png"></head>
+    <body><header><img src="/assets/pisco-mar-logo.svg" alt="Pisco Mar logo" width="240" height="120"></header></body></html>
+    """
+    extracted = service.extract_restaurant_candidates(html, "https://example.com", record={})
+    logos = [item for item in extracted["candidates"] if item["field"] == "image_url"]
+
+    assert len(logos) == 2
+    header = max(logos, key=lambda item: item["confidence"])
+    favicon = min(logos, key=lambda item: item["confidence"])
+    assert header["value"] == "https://example.com/assets/pisco-mar-logo.svg"
+    assert header["image_format"] == "svg"
+    assert (header["width"], header["height"]) == (240, 120)
+    assert favicon["fallback"] is True
+    assert header["confidence"] > favicon["confidence"]
+
+
+def test_favicon_only_scan_keeps_logo_unresolved(monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "fetch_public_restaurant_page",
+        lambda url, force=False: (
+            '<html><head><link rel="icon" href="/favicon.png"></head><body>Pisco Mar</body></html>',
+            {"url": url, "retrieved_at": "2026-07-12T12:00:00Z", "http_status": 200},
+        ),
+    )
+    result = service.scan_restaurant_information({
+        "restaurant_id": "restaurant-1",
+        "restaurant_name": "Pisco Mar",
+        "restaurant_website_url": "https://example.com",
+    })
+
+    assert result["fields"]["image_url"]["recommended"]["fallback"] is True
+    assert "image_url" in result["unresolved_fields"]
+
+
+def test_explicit_structured_false_boolean_is_preserved_without_inventing_unknown_values():
+    payload = {
+        "@type": "Restaurant",
+        "name": "Pisco Mar",
+        "deliveryAvailable": False,
+        "takeoutAvailable": "true",
+    }
+    extracted = service.extract_restaurant_candidates(
+        f'<script type="application/ld+json">{json.dumps(payload)}</script>',
+        "https://example.com",
+    )
+    by_field = {item["field"]: item["normalized_value"] for item in extracted["candidates"]}
+
+    assert by_field["delivery"] is False
+    assert by_field["pickup"] is True
+    assert "online_payment" not in by_field
 
 
 def test_apply_transaction_rolls_back_when_store_save_fails(monkeypatch, tmp_path):
@@ -328,3 +402,41 @@ def test_apply_transaction_rolls_back_when_store_save_fails(monkeypatch, tmp_pat
     assert result["ok"] is False
     assert "rolled back" in result["error"]
     assert json.loads(store_path.read_text(encoding="utf-8")) == original
+
+
+def test_apply_selected_persists_audit_locks_and_approved_logo_attribution(monkeypatch, tmp_path):
+    store_path = tmp_path / "restaurant_menus.json"
+    store = {"restaurants": [{"id": "restaurant-1", "restaurant_id": "restaurant-1", "restaurant_name": "Pisco Mar", "phone": "old", "logo_url": "/old-logo.png"}], "menus": [], "sections": [], "items": [], "pdf_logs": []}
+    store_path.write_text(json.dumps(store), encoding="utf-8")
+    monkeypatch.setattr(service.menu_store_service, "MENU_STORE_FILE", store_path)
+    monkeypatch.setattr(service, "active_user_id", lambda: "user-42")
+    monkeypatch.setattr(service, "_store_approved_logo", lambda candidate, restaurant_id: {
+        "logo_url": f"/restaurant_source_logo?restaurant_id={restaurant_id}",
+        "logo_path": str(tmp_path / "logo.png"),
+        "logo_thumbnail_path": str(tmp_path / "logo_thumb.webp"),
+        "original_url": candidate["value"],
+    })
+    phone = candidate("phone", "317-537-2025", "phone-1")
+    logo = candidate("image_url", "https://example.com/brand/logo.png", "logo-1")
+    scan = {
+        "ok": True, "restaurant_id": "restaurant-1", "scan_id": "scan-1", "scanned_at": "2026-07-12T12:00:00Z", "summary": {},
+        "fields": {
+            "phone": scan_field("phone", "old", [phone]),
+            "image_url": scan_field("image_url", "/old-logo.png", [logo], requires_explicit_review=True),
+        },
+    }
+
+    result = service.apply_restaurant_information_scan(
+        "restaurant-1", scan, selections={"phone": "phone-1", "image_url": "logo-1"}, lock_updates={"city": True}
+    )
+    saved = json.loads(store_path.read_text(encoding="utf-8"))["restaurants"][0]
+
+    assert result["ok"] is True
+    assert set(result["applied_fields"]) == {"phone", "image_url"}
+    assert saved["phone"] == "317-537-2025"
+    assert saved["logo_original_source_url"] == "https://example.com/brand/logo.png"
+    assert saved["logo_source_page_url"] == "https://example.com"
+    assert saved["restaurant_information_locked_fields"] == ["city"]
+    audit = saved["restaurant_information_audit"][0]
+    assert audit["user_id"] == "user-42"
+    assert {change["field"] for change in audit["changes"]} == {"phone", "image_url"}
