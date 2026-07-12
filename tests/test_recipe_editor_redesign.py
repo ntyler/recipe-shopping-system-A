@@ -166,6 +166,31 @@ def test_restaurant_source_card_uses_compact_identity_details_and_actions():
     assert ".recipe-edit-standalone-page .recipe-edit-restaurant-details {" in css
 
 
+def test_recipe_information_card_matches_compact_mockup_structure():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    organizer_start = script.index("function organizeRecipeEditInformationCard()")
+    organizer_end = script.index("function organizeRecipeEditAiAssistant()", organizer_start)
+    organizer = script[organizer_start:organizer_end]
+
+    assert 'primaryRow.className = "recipe-edit-primary-fields"' in organizer
+    assert 'tagRow.className = "recipe-edit-tag-row"' in organizer
+    assert 'metadataRow.className = "recipe-edit-metadata-strip"' in organizer
+    assert 'descriptionRow.className = "recipe-edit-description-row"' in organizer
+    assert "addRecipeEditMetadataIcon(servingsField, \"servings\")" in organizer
+    assert "data-recipe-edit-cuisine-chips" in script
+    assert "renderRecipeEditCuisineChips" in script
+    assert "recipe-edit-price-control" in organizer
+    assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        ratingField," in organizer
+    assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, tagRow, metadataRow, descriptionRow, technicalDetails])" in organizer
+    assert "if (infoActions) infoActions.hidden = true;" in organizer
+    assert "technicalDetails.open = false;" in organizer
+    assert "grid-template-columns: repeat(5, minmax(0, 1fr));" in css
+    assert "grid-template-columns: minmax(0, 2fr) minmax(145px, .9fr);" in css
+    assert ".recipe-edit-price-prefix {" in css
+    assert ".recipe-edit-tag-chip {" in css
+
+
 def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
