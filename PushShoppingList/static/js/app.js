@@ -25410,20 +25410,28 @@ function removeRecipeRestaurantLogo(button) {
     return false;
 }
 
-function setRecipeRestaurantRating(button, rating) {
+function setRecipeRestaurantRating(button, rating, options = {}) {
     const form = button?.closest("[data-restaurant-edit-form]");
     const input = form?.querySelector('[data-restaurant-edit-field="restaurant_rating"]');
-    if (input) input.value = String(Math.max(1, Math.min(5, Number(rating) || 1)));
+    const nextRating = Math.max(1, Math.min(5, Number(rating) || 1));
+    const currentRating = Number.parseInt(input?.value || "0", 10) || 0;
+    if (input) input.value = options.allowToggle === false || currentRating !== nextRating ? String(nextRating) : "";
     updateRecipeRestaurantEditState(form);
     return false;
 }
 
-function clearRecipeRestaurantRating(button) {
+function previewRecipeRestaurantRating(button, rating) {
     const form = button?.closest("[data-restaurant-edit-form]");
-    const input = form?.querySelector('[data-restaurant-edit-field="restaurant_rating"]');
-    if (input) input.value = "";
-    updateRecipeRestaurantEditState(form);
-    return false;
+    const preview = Math.max(1, Math.min(5, Number(rating) || 1));
+    form?.querySelectorAll("[data-restaurant-rating-value]").forEach(star => {
+        star.classList.toggle("is-preview", Number(star.dataset.restaurantRatingValue) <= preview);
+    });
+}
+
+function clearRecipeRestaurantRatingPreview(button) {
+    button?.closest("[data-restaurant-edit-form]")?.querySelectorAll("[data-restaurant-rating-value]").forEach(star => {
+        star.classList.remove("is-preview");
+    });
 }
 
 function handleRecipeRestaurantRatingKeydown(button, event) {
@@ -25433,7 +25441,7 @@ function handleRecipeRestaurantRatingKeydown(button, event) {
     const next = event.key === "Home" ? 1 : event.key === "End" ? 5
         : Math.max(1, Math.min(5, current + (["ArrowRight", "ArrowUp"].includes(event.key) ? 1 : -1)));
     const target = button.closest("[data-restaurant-edit-form]")?.querySelector(`[data-restaurant-rating-value="${next}"]`);
-    setRecipeRestaurantRating(target, next);
+    setRecipeRestaurantRating(target, next, { allowToggle: false });
     target?.focus();
     return false;
 }

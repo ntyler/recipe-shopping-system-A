@@ -2327,8 +2327,7 @@
                                 <legend>Rating</legend>
                                 <input type="hidden" data-restaurant-edit-field="restaurant_rating">
                                 <div class="recipe-edit-restaurant-rating-buttons" role="radiogroup" aria-label="Restaurant rating">
-                                    {% for rating in range(1, 6) %}<button type="button" data-restaurant-rating-value="{{ rating }}" role="radio" aria-checked="false" aria-label="{{ rating }} star{% if rating != 1 %}s{% endif %}" onclick="return setRecipeRestaurantRating(this, {{ rating }})" onkeydown="return handleRecipeRestaurantRatingKeydown(this, event)">{{ shell.svg_icon("star") }}</button>{% endfor %}
-                                    <button type="button" class="recipe-edit-restaurant-rating-clear" onclick="return clearRecipeRestaurantRating(this)">Clear Rating</button>
+                                    {% for rating in range(1, 6) %}<button type="button" data-restaurant-rating-value="{{ rating }}" role="radio" aria-checked="false" aria-label="{{ rating }} star{% if rating != 1 %}s{% endif %}. Click the selected star again to clear the rating." title="{{ rating }} star{% if rating != 1 %}s{% endif %}; click again to clear" onclick="return setRecipeRestaurantRating(this, {{ rating }})" onkeydown="return handleRecipeRestaurantRatingKeydown(this, event)" onpointerenter="previewRecipeRestaurantRating(this, {{ rating }})" onpointerleave="clearRecipeRestaurantRatingPreview(this)">{{ shell.svg_icon("star") }}</button>{% endfor %}
                                 </div>
                             </fieldset>
                             <label><span>Phone</span><input type="tel" data-restaurant-edit-field="restaurant_phone"></label>

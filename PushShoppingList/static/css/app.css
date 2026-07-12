@@ -33050,8 +33050,22 @@ img[data-deferred-src] {
     color: #f6b900;
 }
 
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview {
+    color: #ffd24a;
+}
+
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected svg {
     fill: currentColor;
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview svg {
+    fill: rgba(255, 210, 74, .28);
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value]:focus-visible {
+    border-radius: 7px;
+    outline: 2px solid var(--app-primary-hover);
+    outline-offset: 1px;
 }
 
 .recipe-edit-restaurant-rating-clear {
