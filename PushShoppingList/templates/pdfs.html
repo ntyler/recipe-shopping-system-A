@@ -1,16 +1,10 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Shared Recipe PDFs</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = "Shared Recipe PDFs" %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "recipes" %}
+{% set app_search_id = "pdfsGlobalSearch" %}
+{% set app_search_submit_handler = "submitRecipeEditGlobalSearch" %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
-</head>
-<body>
-<main id="appContent" class="app-content">
+{% block app_content %}
     {% include "sections/shared_recipe_pdfs.html" %}
-</main>
-
-<script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
-</body>
-</html>
+{% endblock %}

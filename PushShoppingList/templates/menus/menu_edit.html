@@ -1,15 +1,18 @@
-<!DOCTYPE html>
-<html class="menu-builder-document">
-<head>
-    <title>Edit Menu</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = "Edit Menu" %}
+{% set app_html_class = "menu-builder-document" %}
+{% set app_body_class = "menu-builder-page" %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "menus" %}
+{% set app_search_id = "menuEditGlobalSearch" %}
+{% set app_search_submit_handler = "submitRecipeEditGlobalSearch" %}
+{% set app_content_class = "menu-workspace app-layout-wide-workspace" %}
+{% block app_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
-</head>
-<body class="menu-builder-page">
+{% endblock %}
 {% set menu = menu_detail.menu %}
 {% set restaurant = menu_detail.restaurant %}
-<main class="menu-workspace">
+{% block app_content %}
     <section class="menu-preview-header">
         <div>
             <a class="menu-back-link" href="{{ url_for('menu_bp.menu_view_route', menu_id=menu.id) }}">Back to Menu</a>
@@ -48,6 +51,4 @@
             <button type="submit" class="menu-primary-btn">Save Menu</button>
         </section>
     </form>
-</main>
-</body>
-</html>
+{% endblock %}

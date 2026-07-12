@@ -1070,7 +1070,10 @@ def render_master_data_page(record_type):
     return render_template(
         "master_data.html",
         master_data=master_data_context(record_type),
+        current_user=current_public_user(),
+        is_guest_demo=is_guest_session(),
         app_css_version=static_asset_version("css/app.css"),
+        app_js_version=static_asset_version("js/app.js"),
         master_data_js_version=static_asset_version("js/master-data.js"),
     )
 

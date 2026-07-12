@@ -542,6 +542,7 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
 def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     workspaces = read_text("PushShoppingList/templates/sections/app_workspaces.html")
     index = read_text("PushShoppingList/templates/index.html")
+    sidebar = read_text("PushShoppingList/templates/includes/app_sidebar.html")
     script = read_text("PushShoppingList/static/js/app.js")
 
     assert 'id="mealPlannerPage"' in workspaces
@@ -584,7 +585,8 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     assert "slot.date_label" in index
     assert 'class="app-home-meal-recipe"' in index
     assert 'onclick="return openHomeMealPlanSlot(this, event)"' in index
-    assert "data-app-sidebar-collapse" in index
+    assert '{% extends "layouts/app_layout.html" %}' in index
+    assert "data-app-sidebar-collapse" in sidebar
     assert 'mealPlannerPage: "mealPlannerPage"' in script
     assert "function setAppSidebarCollapsed" in script
     assert "async function submitMealPlannerForm" in script

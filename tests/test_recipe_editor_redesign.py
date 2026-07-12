@@ -34,16 +34,22 @@ def configure_recipe_editor_storage(monkeypatch, tmp_path):
 
 def test_standalone_recipe_editor_uses_app_shell_navigation():
     template = read_text("PushShoppingList/templates/recipe_edit_page.html")
+    layout = read_text("PushShoppingList/templates/layouts/app_layout.html")
+    header = read_text("PushShoppingList/templates/includes/app_header.html")
+    sidebar = read_text("PushShoppingList/templates/includes/app_sidebar.html")
 
-    assert "app-shell-body recipe-edit-standalone-page" in template
-    assert "app-sidebar recipe-edit-page-sidebar" in template
-    assert "recipe-edit-page-main-shell" in template
-    assert "recipe-edit-standalone-shell" in template
+    assert '{% extends "layouts/app_layout.html" %}' in template
+    assert '{% set app_body_class = "recipe-edit-standalone-page" %}' in template
+    assert '{% set app_sidebar_class = "recipe-edit-page-sidebar" %}' in template
+    assert '{% set app_main_shell_class = "recipe-edit-page-main-shell" %}' in template
+    assert '{% set app_content_class = "recipe-edit-standalone-shell" %}' in template
     assert "{% include \"sections/current_recipe_url_log.html\" %}" in template
-    assert 'data-app-sidebar-collapse' in template
-    assert "shell.app_topbar(" in template
-    assert "'recipeEditGlobalSearch'" in template
-    assert "'submitRecipeEditGlobalSearch'" in template
+    assert '{% include "includes/app_sidebar.html" %}' in layout
+    assert '{% include "includes/app_header.html" %}' in layout
+    assert 'data-app-sidebar-collapse' in sidebar
+    assert 'data-app-header' in header
+    assert 'app_search_id = "recipeEditGlobalSearch"' in template
+    assert 'app_search_submit_handler = "submitRecipeEditGlobalSearch"' in template
     assert "organizeRecipeEditStandaloneWorkspace()" in template
 
 

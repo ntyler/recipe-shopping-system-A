@@ -1,15 +1,18 @@
-<!DOCTYPE html>
-<html class="menu-builder-document">
-<head>
-    <title>{{ menu_detail.menu.menu_title or "Restaurant Menu" }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = menu_detail.menu.menu_title or "Restaurant Menu" %}
+{% set app_html_class = "menu-builder-document" %}
+{% set app_body_class = "menu-builder-page" %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "menus" %}
+{% set app_search_id = "menuViewGlobalSearch" %}
+{% set app_search_submit_handler = "submitRecipeEditGlobalSearch" %}
+{% set app_content_class = "restaurant-menu-page app-layout-wide-workspace" %}
+{% block app_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
-</head>
-<body class="menu-builder-page">
+{% endblock %}
 {% set menu = menu_detail.menu %}
 {% set restaurant = menu_detail.restaurant %}
-<main class="restaurant-menu-page">
+{% block app_content %}
     <header class="restaurant-menu-hero">
         <nav class="restaurant-menu-actions" aria-label="Menu actions">
             <a href="{{ url_for('main_bp.index') }}#cookbooksCard">Back to Cookbook</a>
@@ -163,8 +166,9 @@
             <span>Created from cookbook: {{ menu.cookbook_name }}</span>
         {% endif %}
     </footer>
-</main>
+{% endblock %}
 
+{% block app_scripts %}
 <script>
 function setMenuPageRecipeSelection(checked) {
     document.querySelectorAll("[data-menu-page-checkbox]").forEach((box) => {
@@ -187,5 +191,4 @@ function validateMenuPageRecipeSelection() {
     return true;
 }
 </script>
-</body>
-</html>
+{% endblock %}

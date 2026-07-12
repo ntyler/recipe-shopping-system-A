@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{{ master_data.title }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
-</head>
-<body>
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = master_data.title %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "settings" %}
+{% set app_search_id = "masterDataGlobalSearch" %}
+{% set app_search_submit_handler = "submitRecipeEditGlobalSearch" %}
+{% set app_content_class = "master-data-app-content" %}
 {% macro master_data_reference_url(row, master_data) -%}{{ url_for('main_bp.master_data_record_references_route', record_type=master_data.record_type, record_id=row.id) }}{% if master_data.scope == 'all' %}?scope=all{% elif master_data.scope == 'user' and master_data.scope_user_id %}?scope=user&user_id={{ master_data.scope_user_id|urlencode }}{% endif %}{%- endmacro %}
 {% macro render_master_data_row(row, master_data) -%}
     {% set reference_row_id = 'masterDataReferences-' ~ master_data.record_type ~ '-' ~ row.id %}
@@ -93,7 +91,7 @@
         </tr>
     {% endif %}
 {%- endmacro %}
-<main id="appContent" class="app-content master-data-app-content">
+{% block app_content %}
     <section class="master-data-page" aria-labelledby="masterDataTitle">
         <header class="master-data-header">
             <div>
@@ -430,7 +428,7 @@
             {% endif %}
         </div>
     </section>
-</main>
+{% endblock %}
+{% block app_scripts %}
 <script src="{{ url_for('static', filename='js/master-data.js', v=master_data_js_version) }}" defer></script>
-</body>
-</html>
+{% endblock %}

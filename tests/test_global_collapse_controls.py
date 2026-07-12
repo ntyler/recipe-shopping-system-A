@@ -123,7 +123,7 @@ def test_public_workspace_starts_collapsed_before_lazy_sections_load():
 
 def test_auth_collapse_still_allows_manual_lazy_section_open():
     script = read_text("PushShoppingList/static/js/app.js")
-    index_template = read_text("PushShoppingList/templates/index.html")
+    workspace_template = read_text("PushShoppingList/templates/sections/app_workspaces.html")
 
     lazy_load_start = script.index("async function loadLazySection(sectionName, options = {})")
     lazy_load_end = script.index("async function refreshLazySection", lazy_load_start)
@@ -149,8 +149,8 @@ def test_auth_collapse_still_allows_manual_lazy_section_open():
         "                setLazySectionSavedState(sectionName, true);\n"
         "            }"
     ) in lazy_load_block
-    assert 'onclick="loadLazySection(\'current-recipes\', { focus: true }); return false;"' in index_template
-    assert 'onclick="loadLazySection(\'cookbooks\', { focus: true }); return false;"' in index_template
+    assert 'onclick="loadLazySection(\'current-recipes\', { focus: true }); return false;"' in workspace_template
+    assert 'onclick="loadLazySection(\'cookbooks\', { focus: true }); return false;"' in workspace_template
     assert 'await loadLazySection("pantry", { focus: false, userInitiated: true });' in script
     assert 'await loadLazySection("admin-support", { focus: false, userInitiated: true });' in script
     assert 'await loadLazySection("shared-recipe-pdfs", { focus: false, userInitiated: true });' in script
@@ -178,16 +178,16 @@ def test_lazy_section_loader_rejects_auth_redirect_and_full_page_markup():
 
 
 def test_cookbooks_lazy_section_keeps_images_lazy():
-    index_template = read_text("PushShoppingList/templates/index.html")
+    workspace_template = read_text("PushShoppingList/templates/sections/app_workspaces.html")
     cookbooks_template = read_text("PushShoppingList/templates/sections/cookbooks.html")
 
-    cookbooks_start = index_template.index('data-lazy-section="cookbooks"')
-    cookbooks_end = index_template.index('data-lazy-url="{{ url_for(\'main_bp.cookbooks_section\') }}"', cookbooks_start)
-    cookbooks_placeholder = index_template[cookbooks_start:cookbooks_end]
+    cookbooks_start = workspace_template.index('data-lazy-section="cookbooks"')
+    cookbooks_end = workspace_template.index('data-lazy-url="{{ url_for(\'main_bp.cookbooks_section\') }}"', cookbooks_start)
+    cookbooks_placeholder = workspace_template[cookbooks_start:cookbooks_end]
 
-    assert 'class="app-card lazy-section-placeholder"' in index_template
+    assert 'class="app-card lazy-section-placeholder"' in workspace_template
     assert 'data-lazy-section="cookbooks"' in cookbooks_placeholder
-    assert 'onclick="loadLazySection(\'cookbooks\', { focus: true }); return false;"' in index_template
+    assert 'onclick="loadLazySection(\'cookbooks\', { focus: true }); return false;"' in workspace_template
     assert 'data-deferred-src="{{ recipe.cover_image.thumb_url or recipe.cover_image.card_url or recipe.cover_image.src }}"' in cookbooks_template
     assert 'loading="lazy"' in cookbooks_template
 

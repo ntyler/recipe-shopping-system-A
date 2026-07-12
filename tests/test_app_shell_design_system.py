@@ -10,51 +10,57 @@ def read_text(relative_path):
 
 def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     template = read_text("PushShoppingList/templates/index.html")
+    layout = read_text("PushShoppingList/templates/layouts/app_layout.html")
+    header = read_text("PushShoppingList/templates/includes/app_header.html")
+    sidebar = read_text("PushShoppingList/templates/includes/app_sidebar.html")
+    mobile_navigation = read_text("PushShoppingList/templates/includes/app_mobile_navigation.html")
     shell_macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
 
     assert '{% import "includes/app_shell_macros.html" as shell %}' in template
-    assert "app-shell-body" in template
-    assert '<aside class="app-sidebar" aria-label="Primary navigation">' in template
-    assert "shell.app_topbar(" in template
-    assert '<header class="app-topbar" aria-label="App toolbar">' in shell_macros
+    assert '{% extends "layouts/app_layout.html" %}' in template
+    assert "app-shell-body" in layout
+    assert '{% include "includes/app_sidebar.html" %}' in layout
+    assert '{% include "includes/app_header.html" %}' in layout
+    assert '<aside class="app-sidebar' in sidebar
+    assert '<header class="app-topbar" aria-label="App toolbar" data-app-header>' in header
     assert '<header id="appPageHeader" class="app-page-header" data-app-home-header>' in template
-    assert '<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">' in template
-    assert 'class="app-nav-section-title">Discover &amp; Plan</div>' in template
-    assert 'class="app-nav-section-title">CREATE RECIPES</div>' in template
-    assert 'class="app-nav-section-title">IMPORT MENUS</div>' in template
-    assert 'class="app-nav-section-title">PANTRY</div>' in template
-    assert 'class="app-nav-section-title">Account</div>' in template
-    assert "app-sidebar-promo" in template
-    assert 'data-app-global-search' in shell_macros
-    assert "app-global-search-icon" in shell_macros
-    assert "app-global-search-shortcut" in shell_macros
-    assert "Ctrl + K" in shell_macros
-    assert "'submitAppGlobalSearch'" in template
-    assert "app-toolbar-primary" in shell_macros
-    assert 'data-app-page-target="notificationsPage"' in shell_macros
+    assert '<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">' in mobile_navigation
+    assert 'class="app-nav-section-title">Discover &amp; Plan</div>' in sidebar
+    assert 'class="app-nav-section-title">CREATE RECIPES</div>' in sidebar
+    assert 'class="app-nav-section-title">IMPORT MENUS</div>' in sidebar
+    assert 'class="app-nav-section-title">PANTRY</div>' in sidebar
+    assert 'class="app-nav-section-title">Account</div>' in sidebar
+    assert "app-sidebar-promo" in sidebar
+    assert 'data-app-global-search' in header
+    assert "app-global-search-icon" in header
+    assert "app-global-search-shortcut" in header
+    assert "Ctrl + K" in header
+    assert 'app_search_submit_handler = "submitAppGlobalSearch"' in template
+    assert "app-toolbar-primary" in header
+    assert 'data-app-page-target="notificationsPage"' in header
     assert 'data-app-nav-action="account-workspace"' in shell_macros
-    assert 'href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage"' in template
+    assert 'data-app-page-target="recipesPage"' in sidebar
     assert 'class="app-account-avatar-image"' in shell_macros
     assert "current_user.avatar_path" in shell_macros
     assert "current_user.picture" in shell_macros
     assert 'referrerpolicy="no-referrer"' in shell_macros
-    assert 'data-app-nav-action="ai-pantry"' in template
-    assert 'data-app-nav-lazy-section="pantry"' in template
-    assert 'data-app-nav-lazy-section="current-recipes"' in template
-    assert 'data-app-nav-lazy-section="recipe-view"' in template
+    assert 'data-app-nav-action="ai-pantry"' in sidebar
+    assert 'data-app-nav-lazy-section="pantry"' in sidebar
+    assert 'data-app-nav-lazy-section="current-recipes"' in sidebar
+    assert 'data-app-nav-lazy-section="recipe-view"' in sidebar
     assert '{% include "sections/settings_workspace.html" %}' in template
     assert '{% include "sections/app_workspaces.html" %}' in template
     assert 'class="app-home-dashboard"' in template
     assert 'data-app-home-dashboard' in template
-    assert 'data-app-nav-action="settings-section"' in template
-    assert 'data-app-nav-action="app-page"' in template
+    assert 'data-app-nav-action="settings-section"' in sidebar
+    assert 'data-app-nav-action="app-page"' in sidebar
     assert 'onclick="return collapseAllShoppingListPage()"' in template
     assert 'onclick="return expandAllShoppingListPage()"' in template
     assert 'data-public-workspace="{{ \'1\' if not current_user and not is_guest_demo else \'0\' }}"' in template
 
 
 def test_sidebar_import_actions_are_grouped_by_task_without_duplicate_hub_link():
-    template = read_text("PushShoppingList/templates/index.html")
+    template = read_text("PushShoppingList/templates/includes/app_sidebar.html")
     nav_start = template.index('<nav class="app-sidebar-nav" aria-label="App sections">')
     nav_end = template.index("</nav>", nav_start)
     sidebar = template[nav_start:nav_end]
@@ -95,22 +101,26 @@ def test_sidebar_import_actions_are_grouped_by_task_without_duplicate_hub_link()
         link_end = sidebar.index("</a>", label_position)
         link = sidebar[link_start:link_end]
 
-        assert f'href="#{page_target}"' in link
+        assert f"'#{page_target}'" in link
         assert 'data-app-nav-link' in link
         assert 'data-app-nav-action="app-page"' in link
         assert f'data-app-page-target="{page_target}"' in link
         assert f'data-app-nav-target="{page_target}"' in link
 
-    assert 'class="app-nav-link app-nav-link-multiline"' in sidebar
+    assert 'class="app-nav-link app-nav-link-multiline' in sidebar
     assert 'href="{{ url_for(\'pantry_bp.pantry_coming_soon_route\') }}"' in sidebar
 
 
 def test_recipe_editor_sidebar_uses_the_same_import_task_groups():
     template = read_text("PushShoppingList/templates/recipe_edit_page.html")
-    nav_start = template.index('<nav class="app-sidebar-nav" aria-label="App sections">')
-    nav_end = template.index("</nav>", nav_start)
-    sidebar = template[nav_start:nav_end]
+    sidebar_template = read_text("PushShoppingList/templates/includes/app_sidebar.html")
+    nav_start = sidebar_template.index('<nav class="app-sidebar-nav" aria-label="App sections">')
+    nav_end = sidebar_template.index("</nav>", nav_start)
+    sidebar = sidebar_template[nav_start:nav_end]
 
+    assert '{% extends "layouts/app_layout.html" %}' in template
+    assert '{% set app_active_nav_item = "recipes" %}' in template
+    assert '<nav class="app-sidebar-nav"' not in template
     assert '<span class="app-nav-text">Import</span>' not in sidebar
     assert sidebar.count('class="app-nav-section-title">CREATE RECIPES</div>') == 1
     assert sidebar.count('class="app-nav-section-title">IMPORT MENUS</div>') == 1
@@ -119,12 +129,12 @@ def test_recipe_editor_sidebar_uses_the_same_import_task_groups():
         assert f'<span class="app-nav-text">{label}</span>' in sidebar
     for old_label in ("Recipe URLs", "Import From Document", "Generate From Image", "Import Menu From Document"):
         assert f'<span class="app-nav-text">{old_label}</span>' not in sidebar
-    assert '{{ url_for(\'main_bp.index\') }}#recipeUrlsPage' in sidebar
-    assert '{{ url_for(\'main_bp.index\') }}#importDocumentPage' in sidebar
-    assert '{{ url_for(\'main_bp.index\') }}#generateImagePage' in sidebar
-    assert '{{ url_for(\'main_bp.index\') }}#menuUrlPage' in sidebar
-    assert '{{ url_for(\'main_bp.index\') }}#menuDocumentPage' in sidebar
-    assert '{{ url_for(\'pantry_bp.pantry_coming_soon_route\') }}' in sidebar
+    assert "home_href ~ '#recipeUrlsPage'" in sidebar
+    assert "home_href ~ '#importDocumentPage'" in sidebar
+    assert "home_href ~ '#generateImagePage'" in sidebar
+    assert "home_href ~ '#menuUrlPage'" in sidebar
+    assert "home_href ~ '#menuDocumentPage'" in sidebar
+    assert "url_for('pantry_bp.pantry_coming_soon_route')" in sidebar
 
 
 def test_brand_mark_uses_chef_hat_check_cart_logo():
@@ -145,13 +155,16 @@ def test_brand_mark_uses_chef_hat_check_cart_logo():
     assert "stroke-width: 6;" in css
 
 
-def test_recipe_edit_favicon_reuses_shared_brand_mark_only_on_standalone_editor():
+def test_home_and_recipe_editor_reuse_the_shared_logo_asset_from_app_layout():
     recipe_edit = read_text("PushShoppingList/templates/recipe_edit_page.html")
     index = read_text("PushShoppingList/templates/index.html")
+    layout = read_text("PushShoppingList/templates/layouts/app_layout.html")
 
-    assert "shell.brand_mark_svg('#2eb66f')|urlencode" in recipe_edit
-    assert "images/ai-pantry-logo.svg" not in recipe_edit
-    assert "shell.brand_mark_svg('#2eb66f')" not in index
+    assert '{% extends "layouts/app_layout.html" %}' in recipe_edit
+    assert '{% extends "layouts/app_layout.html" %}' in index
+    assert "images/ai-pantry-logo.svg" in layout
+    assert "brand_mark_svg('#2eb66f')|urlencode" not in recipe_edit
+    assert "brand_mark_svg('#2eb66f')|urlencode" not in index
 
 
 def test_sidebar_import_targets_keep_existing_active_state_and_barcode_behavior():
@@ -214,6 +227,8 @@ def test_index_topbar_uses_current_user_profile_image(monkeypatch, tmp_path):
     topbar_markup = html[topbar_start:topbar_end]
 
     assert response.status_code == 200
+    assert html.count('data-app-header') == 1
+    assert html.count('aria-label="Primary navigation"') == 1
     assert 'class="app-account-avatar-image"' in topbar_markup
     assert 'src="https://example.com/avatar.jpg"' in topbar_markup
     assert 'referrerpolicy="no-referrer"' in topbar_markup
@@ -221,20 +236,57 @@ def test_index_topbar_uses_current_user_profile_image(monkeypatch, tmp_path):
     assert ">N<" not in topbar_markup
 
 
-def test_home_and_recipe_editor_reuse_the_same_topbar_and_account_control():
+def test_authenticated_full_page_templates_extend_the_single_app_layout():
+    layout = read_text("PushShoppingList/templates/layouts/app_layout.html")
+    authenticated_pages = (
+        "PushShoppingList/templates/index.html",
+        "PushShoppingList/templates/recipe_edit_page.html",
+        "PushShoppingList/templates/master_data.html",
+        "PushShoppingList/templates/pdfs.html",
+        "PushShoppingList/templates/menus/cookbook_menu_builder.html",
+        "PushShoppingList/templates/menus/menu_builder.html",
+        "PushShoppingList/templates/menus/menu_edit.html",
+        "PushShoppingList/templates/menus/menu_preview.html",
+        "PushShoppingList/templates/menus/menu_recipe_progress.html",
+        "PushShoppingList/templates/menus/menu_view.html",
+    )
+
+    header_components = list((ROOT / "PushShoppingList/templates").rglob("app_header.html"))
+
+    assert len(header_components) == 1
+    assert layout.count('{% include "includes/app_header.html" %}') == 1
+    assert layout.count('{% include "includes/app_sidebar.html" %}') == 1
+    for page_path in authenticated_pages:
+        page = read_text(page_path)
+        assert '{% extends "layouts/app_layout.html" %}' in page
+        assert '<header class="app-topbar"' not in page
+        assert '<aside class="app-sidebar' not in page
+
+
+def test_home_and_recipe_editor_reuse_the_single_app_header_and_account_control():
     home = read_text("PushShoppingList/templates/index.html")
     recipe_editor = read_text("PushShoppingList/templates/recipe_edit_page.html")
+    layout = read_text("PushShoppingList/templates/layouts/app_layout.html")
+    header = read_text("PushShoppingList/templates/includes/app_header.html")
+    sidebar = read_text("PushShoppingList/templates/includes/app_sidebar.html")
     macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
     css = read_text("PushShoppingList/static/css/app.css")
     routes = read_text("PushShoppingList/routes/recipe_routes.py")
 
     assert "{% macro account_control(" in macros
-    assert "{% macro app_topbar(" in macros
     assert "current_user.display_name" in macros
     assert "Pro Plan" in macros
-    assert "shell.app_topbar(" in home
-    assert "shell.app_topbar(" in recipe_editor
-    assert "{{ account_control(current_user, is_guest_demo, account_href, in_shell) }}" in macros
+    assert '{% extends "layouts/app_layout.html" %}' in home
+    assert '{% extends "layouts/app_layout.html" %}' in recipe_editor
+    assert layout.count('{% include "includes/app_header.html" %}') == 1
+    assert layout.count('{% include "includes/app_sidebar.html" %}') == 1
+    assert header.count('<header class="app-topbar"') == 1
+    assert sidebar.count('<aside class="app-sidebar{%') == 1
+    assert "shell.account_control(current_user, is_guest_demo|default(false), account_href, in_shell)" in header
+    assert '<header class="app-topbar"' not in home
+    assert '<header class="app-topbar"' not in recipe_editor
+    assert '<aside class="app-sidebar' not in home
+    assert '<aside class="app-sidebar' not in recipe_editor
     assert 'class="app-toolbar-button app-account-button"' not in home
     assert 'class="app-toolbar-button app-account-button"' not in recipe_editor
     assert "recipe-edit-page-topbar" not in recipe_editor

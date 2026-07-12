@@ -1,0 +1,36 @@
+{% import "includes/app_shell_macros.html" as shell %}
+{% set in_shell = app_shell_mode|default("route") == "spa" %}
+{% set home_href = url_for("main_bp.index") %}
+{% set active_item = app_active_nav_item|default("home") %}
+<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">
+    <a class="app-mobile-nav-link{% if active_item == 'home' %} is-active{% endif %}"
+       href="{{ '#appPageHeader' if in_shell else home_href ~ '#appPageHeader' }}"
+       {% if in_shell %}data-app-nav-link data-app-nav-action="home" data-app-nav-target="appPageHeader"{% endif %}>
+        {{ shell.app_icon("home") }}<span>Home</span>
+    </a>
+    <a class="app-mobile-nav-link{% if active_item == 'recipes' %} is-active{% endif %}"
+       href="{{ '#recipesPage' if in_shell else home_href ~ '#recipesPage' }}"
+       {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage" data-app-nav-lazy-section="current-recipes"{% endif %}>
+        {{ shell.app_icon("recipes") }}<span>Recipes</span>
+    </a>
+    <a class="app-mobile-nav-link{% if active_item == 'cookbooks' %} is-active{% endif %}"
+       href="{{ '#cookbooksCard' if in_shell else home_href ~ '#cookbooksCard' }}"
+       {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="cookbooksPage" data-app-nav-target="cookbooksCard" data-app-nav-lazy-section="cookbooks"{% endif %}>
+        {{ shell.app_icon("cookbooks") }}<span>Cookbooks</span>
+    </a>
+    <a class="app-mobile-nav-link{% if active_item == 'shopping-lists' %} is-active{% endif %}"
+       href="{{ '#shoppingViewsSection' if in_shell else home_href ~ '#shoppingViewsSection' }}"
+       {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="shoppingListsPage" data-app-nav-target="shoppingViewsSection" data-app-nav-lazy-section="recipe-view"{% endif %}>
+        {{ shell.app_icon("shopping") }}<span>Lists</span>
+    </a>
+    <a class="app-mobile-nav-link{% if active_item == 'pantry' %} is-active{% endif %}"
+       href="{{ '#aiPantrySection' if in_shell else home_href ~ '#aiPantrySection' }}"
+       {% if in_shell %}data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry"{% endif %}>
+        {{ shell.app_icon("pantry") }}<span>Pantry</span>
+    </a>
+    <a class="app-mobile-nav-link"
+       href="{{ '#userAccountSection' if in_shell else home_href ~ '#userAccountSection' }}"
+       {% if in_shell %}data-app-nav-link data-app-nav-action="account-workspace" data-app-nav-target="userAccountSection"{% endif %}>
+        {{ shell.app_icon("more") }}<span>More</span>
+    </a>
+</nav>

@@ -1,13 +1,16 @@
-<!DOCTYPE html>
-<html class="menu-builder-document">
-<head>
-    <title>Review Menu Items Before Recipe Generation</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = "Review Menu Items Before Recipe Generation" %}
+{% set app_html_class = "menu-builder-document" %}
+{% set app_body_class = "menu-builder-page" %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "menus" %}
+{% set app_search_id = "menuPreviewGlobalSearch" %}
+{% set app_search_submit_handler = "submitRecipeEditGlobalSearch" %}
+{% set app_content_class = "menu-workspace app-layout-wide-workspace" %}
+{% block app_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
-</head>
-<body class="menu-builder-page">
-<main class="menu-workspace">
+{% endblock %}
+{% block app_content %}
     <section class="menu-preview-header">
         <div>
             <a class="menu-back-link" href="{{ url_for('main_bp.index') }}#recipeUrlsTextarea">Back to AI Pantry</a>
@@ -129,8 +132,9 @@
             </form>
         </section>
     {% endif %}
-</main>
+{% endblock %}
 
+{% block app_scripts %}
 <script>
 function setMenuPreviewSelection(checked) {
     document.querySelectorAll("[data-menu-preview-checkbox]").forEach((box) => {
@@ -153,5 +157,4 @@ function validateMenuPreviewSelection() {
     return true;
 }
 </script>
-</body>
-</html>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% import "includes/app_shell_macros.html" as shell %}
+<!DOCTYPE html>
+<html lang="en"{% if app_html_class|default("") %} class="{{ app_html_class }}"{% endif %}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_page_title|default("AI Pantry") }}</title>
+    {% block app_head %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+    {% block app_styles %}{% endblock %}
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/ai-pantry-logo.svg') }}">
+</head>
+<body class="app-shell-body{% if app_body_class|default("") %} {{ app_body_class }}{% endif %}"
+      data-app-shell-mode="{{ app_shell_mode|default('route') }}"
+      {% block app_body_attributes %}{% endblock %}>
+<a class="skip-link" href="#appContent">Skip to content</a>
+
+<div class="app-shell{% if app_shell_class|default("") %} {{ app_shell_class }}{% endif %}">
+    {% include "includes/app_sidebar.html" %}
+    <div class="app-main-shell{% if app_main_shell_class|default("") %} {{ app_main_shell_class }}{% endif %}">
+        {% include "includes/app_header.html" %}
+        {% block before_app_content %}{% endblock %}
+        <main id="appContent"
+              class="app-content{% if app_content_class|default("") %} {{ app_content_class }}{% endif %}"
+              {% block app_content_attributes %}{% endblock %}>
+            {% block app_content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+{% include "includes/app_mobile_navigation.html" %}
+
+<script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
+{% block app_scripts %}{% endblock %}
+</body>
+</html>

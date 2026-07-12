@@ -111,6 +111,8 @@ def pdfs_route():
     return render_template(
         "pdfs.html",
         pdf_share_view=hydrate_pdf_share_view(),
+        current_user=account_response,
+        is_guest_demo=False,
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
     )

@@ -1011,6 +1011,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
     def test_screen_settings_section_stays_at_top_and_opens_from_account_menu(self):
         index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+        app_layout_template = Path("PushShoppingList/templates/layouts/app_layout.html").read_text(encoding="utf-8")
         account_template = Path("PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
         screen_template = Path("PushShoppingList/templates/sections/screen_settings.html").read_text(encoding="utf-8")
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -1019,8 +1020,9 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("{% if current_user and current_user.is_admin %}", index_template)
         self.assertLess(
             index_template.index('{% include "sections/screen_settings.html" %}'),
-            index_template.index('<main id="appContent"'),
+            index_template.index('{% block app_content %}'),
         )
+        self.assertIn('<main id="appContent"', app_layout_template)
         self.assertNotIn('{% include "sections/screen_settings.html" %}', account_template)
         self.assertIn('aria-controls="screenSettingsCard"', account_template)
         self.assertIn("toggleScreenSettingsPanel()", account_template)

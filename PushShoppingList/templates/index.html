@@ -1,9 +1,13 @@
+{% extends "layouts/app_layout.html" %}
 {% import "includes/app_shell_macros.html" as shell %}
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Shopping List</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+{% set app_page_title = "Shopping List" %}
+{% set app_shell_mode = "spa" %}
+{% set app_active_nav_item = "home" %}
+{% set app_search_id = "appGlobalSearch" %}
+{% set app_search_submit_handler = "submitAppGlobalSearch" %}
+{% set app_body_class = "account-action-token" if password_reset_token|default("") or two_factor_recovery_token|default("") or account_delete_token|default("") else "" %}
+
+{% block app_head %}
     <script>
         (function syncAppLocalCalendarDate() {
             var cookieName = "ai_pantry_local_date";
@@ -31,192 +35,29 @@
             }
         }());
     </script>
+{% endblock %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+{% block app_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/extraction_overlay_old.css') }}">
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/ai-pantry-logo.svg') }}">
-</head>
+{% endblock %}
 
-<body class="app-shell-body {% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}"
-      data-performance-diagnostics="{{ '1' if performance_diagnostics_enabled else '0' }}"
-      data-public-workspace="{{ '1' if not current_user and not is_guest_demo else '0' }}"
-      data-user-id="{{ current_user.user_id if current_user else '' }}">
+{% block app_body_attributes %}
+data-performance-diagnostics="{{ '1' if performance_diagnostics_enabled else '0' }}"
+data-public-workspace="{{ '1' if not current_user and not is_guest_demo else '0' }}"
+data-user-id="{{ current_user.user_id if current_user else '' }}"
+{% endblock %}
 
-<a class="skip-link" href="#appContent">Skip to content</a>
+{% block before_app_content %}
+    {% if current_user and current_user.is_admin %}
+        {% include "sections/screen_settings.html" %}
+    {% endif %}
+    {% include "sections/extraction_overlay.html" %}
+    {% include "sections/products_overlay.html" %}
+    {% include "sections/item_qty_modal.html" %}
+{% endblock %}
 
-<div class="app-shell">
-    <aside class="app-sidebar" aria-label="Primary navigation">
-        <a class="app-brand" href="{{ url_for('main_bp.index') }}" aria-label="AI Pantry home">
-            {{ shell.brand_mark() }}
-            <span>
-                <strong>AI Pantry</strong>
-                <small>Recipe Shopping List</small>
-            </span>
-        </a>
-        <button type="button"
-                class="app-sidebar-collapse"
-                data-app-sidebar-collapse
-                aria-label="Collapse sidebar"
-                aria-pressed="false"
-                title="Collapse sidebar">
-            <span aria-hidden="true">&lsaquo;</span>
-        </button>
-
-        <nav class="app-sidebar-nav" aria-label="App sections">
-            <a class="app-nav-link" href="#appPageHeader" data-app-nav-link data-app-nav-action="home" data-app-nav-target="appPageHeader">
-                {{ shell.app_icon("home") }}
-                <span class="app-nav-text">Home</span>
-            </a>
-            <div class="app-nav-section-title">Discover &amp; Plan</div>
-            <a class="app-nav-link" href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage" data-app-nav-lazy-section="current-recipes">
-                {{ shell.app_icon("recipes") }}
-                <span class="app-nav-text">Recipes</span>
-            </a>
-            <a class="app-nav-link"
-               href="#menusPage"
-               data-app-nav-link
-               data-app-nav-action="app-page"
-               data-app-page-target="menusPage"
-               data-app-nav-target="menusPage">
-                {{ shell.app_icon("menus") }}
-                <span class="app-nav-text">Menus</span>
-            </a>
-            <a class="app-nav-link" href="#cookbooksCard" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="cookbooksPage" data-app-nav-target="cookbooksCard" data-app-nav-lazy-section="cookbooks">
-                {{ shell.app_icon("cookbooks") }}
-                <span class="app-nav-text">Cookbooks</span>
-            </a>
-            <a class="app-nav-link" href="#shoppingViewsSection" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="shoppingListsPage" data-app-nav-target="shoppingViewsSection" data-app-nav-lazy-section="recipe-view">
-                {{ shell.app_icon("shopping") }}
-                <span class="app-nav-text">Shopping Lists</span>
-            </a>
-            <a class="app-nav-link" href="#aiPantrySection" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry">
-                {{ shell.app_icon("pantry") }}
-                <span class="app-nav-text">Pantry</span>
-            </a>
-            <a class="app-nav-link" href="#mealPlannerPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="mealPlannerPage" data-app-nav-target="mealPlannerPage">
-                {{ shell.app_icon("meal") }}
-                <span class="app-nav-text">Meal Planner</span>
-            </a>
-            <div class="app-nav-section-title">Shop</div>
-            <a class="app-nav-link"
-               href="#storesPage"
-               data-app-nav-link
-               data-app-nav-action="app-page"
-               data-app-page-target="storesPage"
-               data-app-nav-target="storesPage">
-                {{ shell.app_icon("stores") }}
-                <span class="app-nav-text">Stores / Store Links</span>
-            </a>
-            <a class="app-nav-link" href="#priceComparisonPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="priceComparisonPage" data-app-nav-target="priceComparisonPage">
-                {{ shell.app_icon("price") }}
-                <span class="app-nav-text">Price Comparison</span>
-            </a>
-            <div class="app-nav-section-title">CREATE RECIPES</div>
-            <a class="app-nav-link"
-               href="#recipeUrlsPage"
-               data-app-nav-link
-               data-app-nav-action="app-page"
-               data-app-page-target="recipeUrlsPage"
-               data-app-nav-target="recipeUrlsPage">
-                {{ shell.app_icon("link") }}
-                <span class="app-nav-text">Recipe URL</span>
-            </a>
-            <a class="app-nav-link"
-               href="#importDocumentPage"
-               data-app-nav-link
-               data-app-nav-action="app-page"
-               data-app-page-target="importDocumentPage"
-               data-app-nav-target="importDocumentPage">
-                {{ shell.app_icon("document") }}
-                <span class="app-nav-text">Recipe Document</span>
-            </a>
-            <a class="app-nav-link"
-               href="#generateImagePage"
-               data-app-nav-link
-               data-app-nav-action="app-page"
-               data-app-page-target="generateImagePage"
-               data-app-nav-target="generateImagePage">
-                {{ shell.app_icon("image") }}
-                <span class="app-nav-text">Recipe Image</span>
-            </a>
-            <div class="app-nav-section-title">IMPORT MENUS</div>
-            <a class="app-nav-link"
-               href="#menuUrlPage"
-               data-app-nav-link
-               data-app-nav-action="app-page"
-               data-app-page-target="menuUrlPage"
-               data-app-nav-target="menuUrlPage">
-                {{ shell.app_icon("menus") }}
-                <span class="app-nav-text">Menu URL</span>
-            </a>
-            <a class="app-nav-link app-nav-link-multiline"
-               href="#menuDocumentPage"
-               data-app-nav-link
-               data-app-nav-action="app-page"
-               data-app-page-target="menuDocumentPage"
-               data-app-nav-target="menuDocumentPage">
-                {{ shell.app_icon("document") }}
-                <span class="app-nav-text">Menu Document</span>
-            </a>
-            <div class="app-nav-section-title">PANTRY</div>
-            <a class="app-nav-link" href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
-                {{ shell.app_icon("barcode") }}
-                <span class="app-nav-text">Scan Barcode</span>
-            </a>
-            <div class="app-nav-section-title">Account</div>
-            <a class="app-nav-link"
-               href="#settingsWorkspaceSection"
-               data-app-nav-link
-               data-app-nav-action="settings-section"
-               data-settings-section-target="profile"
-               data-app-nav-target="settingsWorkspaceSection">
-                {{ shell.app_icon("settings") }}
-                <span class="app-nav-text">Settings</span>
-            </a>
-            <a class="app-nav-link" href="#accountUsageDashboardPanel" data-app-nav-link data-app-nav-action="usage-dashboard" data-app-nav-target="accountUsageDashboardPanel">
-                {{ shell.app_icon("billing") }}
-                <span class="app-nav-text">Usage &amp; Billing</span>
-            </a>
-            <a class="app-nav-link" href="#feedbackSupportSection" data-app-nav-link data-app-nav-action="feedback-support" data-app-nav-target="feedbackSupportSection">
-                {{ shell.app_icon("help") }}
-                <span class="app-nav-text">Help &amp; Support</span>
-            </a>
-        </nav>
-        <aside class="app-sidebar-promo" aria-label="AI Pantry plan">
-            <div class="app-sidebar-promo-icon" aria-hidden="true">{{ shell.svg_icon("plus") }}</div>
-            <strong>Love AI Pantry?</strong>
-            <span>Upgrade your plan to unlock more features.</span>
-            <a href="#accountUsageDashboardPanel"
-               data-app-nav-link
-               data-app-nav-action="usage-dashboard"
-               data-app-nav-target="accountUsageDashboardPanel">View Plans</a>
-        </aside>
-    </aside>
-
-    <div class="app-main-shell">
-        {{ shell.app_topbar(
-            current_user,
-            is_guest_demo,
-            url_for('main_bp.index'),
-            'appGlobalSearch',
-            'submitAppGlobalSearch',
-            '#importPage',
-            '#notificationsPage',
-            '#feedbackSupportSection',
-            '#userAccountSection',
-            true
-        ) }}
-
-        {% if current_user and current_user.is_admin %}
-            {% include "sections/screen_settings.html" %}
-        {% endif %}
-
-        {% include "sections/extraction_overlay.html" %}
-        {% include "sections/products_overlay.html" %}
-        {% include "sections/item_qty_modal.html" %}
-
-<main id="appContent" class="app-content">
+{% block app_content %}
     <header id="appPageHeader" class="app-page-header" data-app-home-header>
         <div class="app-home-hero-copy">
             <h1>Welcome back{% if current_user %}, {{ current_user.first_name or current_user.display_name }}{% elif is_guest_demo %}, Guest{% endif %}! <span aria-hidden="true">&#128075;</span></h1>
@@ -599,42 +440,10 @@
             </dl>
         </section>
     {% endif %}
-</main>
+{% endblock %}
 
-    </div>
-</div>
-
-<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">
-    <a class="app-mobile-nav-link" href="#appPageHeader" data-app-nav-link data-app-nav-action="home" data-app-nav-target="appPageHeader">
-        {{ shell.app_icon("home") }}
-        <span>Home</span>
-    </a>
-    <a class="app-mobile-nav-link" href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage" data-app-nav-lazy-section="current-recipes">
-        {{ shell.app_icon("recipes") }}
-        <span>Recipes</span>
-    </a>
-    <a class="app-mobile-nav-link" href="#cookbooksCard" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="cookbooksPage" data-app-nav-target="cookbooksCard" data-app-nav-lazy-section="cookbooks">
-        {{ shell.app_icon("cookbooks") }}
-        <span>Cookbooks</span>
-    </a>
-    <a class="app-mobile-nav-link" href="#shoppingViewsSection" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="shoppingListsPage" data-app-nav-target="shoppingViewsSection" data-app-nav-lazy-section="recipe-view">
-        {{ shell.app_icon("shopping") }}
-        <span>Lists</span>
-    </a>
-    <a class="app-mobile-nav-link" href="#aiPantrySection" data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry">
-        {{ shell.app_icon("pantry") }}
-        <span>Pantry</span>
-    </a>
-    <a class="app-mobile-nav-link" href="#userAccountSection" data-app-nav-link data-app-nav-action="account-workspace" data-app-nav-target="userAccountSection">
-        {{ shell.app_icon("more") }}
-        <span>More</span>
-    </a>
-</nav>
-
+{% block app_scripts %}
 <script id="supportPublicConfig" type="application/json">{{ support_public_config|tojson }}</script>
 <script id="firebaseWebConfig" type="application/json">{{ firebase_web_config|tojson }}</script>
-<script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/firebase-auth.js', v=firebase_auth_js_version) }}"></script>
-
-</body>
-</html>
+{% endblock %}

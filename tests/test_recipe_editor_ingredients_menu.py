@@ -557,6 +557,10 @@ def test_standalone_recipe_edit_page_renders_editor(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert 'data-recipe-edit-page="true"' in html
     assert 'data-recipe-edit-url="https://example.com/soup"' in html
+    assert html.count('data-app-header') == 1
+    assert html.count('aria-label="Primary navigation"') == 1
+    assert html.count('id="appContent"') == 1
+    assert html.count('class="app-mobile-bottom-nav"') == 1
     assert 'id="recipeEditModal"' in html
     assert 'id="currentRecipeUrlLogCard"' not in html
     assert home_response.status_code == 200

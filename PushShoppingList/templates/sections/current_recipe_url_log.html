@@ -1,3 +1,4 @@
+{% import "includes/app_shell_macros.html" as shell %}
 {% set unclassified_cookbook = namespace(id="", name="unclassified") %}
 {% if cookbook_view and cookbook_view.cookbooks %}
     {% for cookbook in cookbook_view.cookbooks %}

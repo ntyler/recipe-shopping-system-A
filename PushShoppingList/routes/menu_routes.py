@@ -24,6 +24,7 @@ from PushShoppingList.services.cookbook_service import cookbook_menu_sort_option
 from PushShoppingList.services.cookbook_service import load_cookbooks
 from PushShoppingList.services.cookbook_service import resolve_cookbook_destination
 from PushShoppingList.services.extraction_progress_service import load_progress
+from PushShoppingList.services.guest_session_service import is_guest_session
 from PushShoppingList.services.menu_builder_service import cookbook_builder_form_defaults
 from PushShoppingList.services.menu_builder_service import cookbook_builder_stats
 from PushShoppingList.services.menu_builder_service import create_menu_from_cookbook
@@ -70,6 +71,7 @@ def wants_json_response():
 def menu_template_context(**extra):
     return {
         "current_user": current_public_user(),
+        "is_guest_demo": is_guest_session(),
         "app_css_version": static_asset_version("css/app.css"),
         "menu_builder_css_version": static_asset_version("css/menu_builder.css"),
         "app_js_version": static_asset_version("js/app.js"),

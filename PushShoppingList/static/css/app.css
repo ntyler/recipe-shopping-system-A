@@ -27104,6 +27104,12 @@ img[data-deferred-src] {
     padding: 28px 0 72px;
 }
 
+/* Full-page tools share the authenticated shell without measuring against the
+   viewport, which would also count the persistent sidebar. */
+.app-content.app-layout-wide-workspace {
+    width: min(1180px, calc(100% - 56px));
+}
+
 .app-shell-body .app-content [id],
 .app-shell-body #appPageHeader {
     scroll-margin-top: calc(var(--app-toolbar-height) + 18px);
@@ -29940,6 +29946,10 @@ img[data-deferred-src] {
 
     .app-content {
         width: min(var(--app-content-max), calc(100% - 32px));
+    }
+
+    .app-content.app-layout-wide-workspace {
+        width: min(1180px, calc(100% - 32px));
     }
 
     .app-mobile-bottom-nav {
