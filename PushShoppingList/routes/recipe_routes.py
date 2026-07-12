@@ -141,8 +141,8 @@ from PushShoppingList.services.recipe_edit_service import create_editable_restau
 from PushShoppingList.services.recipe_edit_service import get_editable_restaurant
 from PushShoppingList.services.recipe_edit_service import list_editable_restaurants
 from PushShoppingList.services.recipe_edit_service import update_editable_restaurant
-from PushShoppingList.services.restaurant_details_fetch_service import apply_restaurant_information_scan
 from PushShoppingList.services.restaurant_details_fetch_service import load_pending_restaurant_scan
+from PushShoppingList.services.restaurant_details_fetch_service import prepare_restaurant_information_scan_apply
 from PushShoppingList.services.restaurant_details_fetch_service import scan_restaurant_information
 from PushShoppingList.services.restaurant_details_fetch_service import store_pending_restaurant_scan
 from PushShoppingList.services.restaurant_recipe_duplicate_service import commit_restaurant_recipe_delete
@@ -3610,7 +3610,7 @@ def recipe_restaurant_apply_information_scan_route(restaurant_id):
     scan = load_pending_restaurant_scan(data.get("scan_id"), restaurant_id)
     if not scan.get("ok"):
         return jsonify(scan), 404
-    result = apply_restaurant_information_scan(
+    result = prepare_restaurant_information_scan_apply(
         restaurant_id,
         scan,
         selections=data.get("selections") or {},

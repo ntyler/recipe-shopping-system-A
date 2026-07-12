@@ -192,9 +192,97 @@ def test_restaurant_scan_review_formats_provider_results_and_equivalent_values()
     assert 'key === "weekly_hours"' in script
     assert 'class="recipe-edit-restaurant-scan-address"' in script
     assert 'class="recipe-edit-restaurant-scan-providers"' in script
-    assert 'noChange ? "No change"' in script
+    assert 'reviewStatus === "Already saved"' in script
+    assert 'data-restaurant-scan-status' in script
     assert 'label: "Possible misclassified platform URL"' in script
     assert ".recipe-edit-restaurant-scan-hours summary" in css
     assert ".recipe-edit-restaurant-scan-address" in css
     assert ".recipe-edit-restaurant-scan-providers" in css
     assert ".recipe-edit-restaurant-fetch-row.is-no-change" in css
+
+
+def test_restaurant_weekly_hours_use_canonical_hydration_and_separate_raw_data():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    assert 'option value="open_24_hours">Open 24 hours</option>' in template
+    assert 'data-restaurant-edit-field="restaurant_raw_hours_data"' in template
+    assert 'data-restaurant-edit-field="restaurant_hours_text"' not in template
+    assert "function normalizeRecipeRestaurantWeeklyHours(value)" in script
+    assert "function recipeRestaurantWeeklyHoursFromText(value)" in script
+    assert "function recipeRestaurantWeeklyHoursFromForm(form = recipeRestaurantEditForm())" in script
+    assert "function hydrateRecipeRestaurantStructuredHours(form = recipeRestaurantEditForm(), record = {})" in script
+    assert "record?.restaurant_weekly_hours ?? record?.weekly_hours ?? {}" in script
+    assert "Object.keys(persisted).length ? persisted : recipeRestaurantWeeklyHoursFromText(legacyText)" in script
+    assert 'state.value = day?.closed ? "closed" : day?.open_24_hours ? "open_24_hours" : "open";' in script
+    assert 'if (split) split.hidden = !ranges[1];' in script
+    assert 'if (!ranges.length) return;' in script
+    assert 'values.restaurant_weekly_hours = weeklyHours;' in script
+    assert 'values.restaurant_hours_notes = hoursNotes;' in script
+    assert 'values.restaurant_hours_text = recipeRestaurantWeeklyHoursText(weeklyHours, hoursNotes);' in script
+    assert 'restaurant_weekly_hours: recipe.restaurant_weekly_hours || {}' in script
+    assert 'restaurant_raw_hours_data: recipe.restaurant_raw_hours_data || ""' in script
+
+
+def test_restaurant_scan_apply_is_pending_and_keeps_the_review_open():
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    handler = script[
+        script.index('async function applyRecipeRestaurantInformationScan(button, mode = "selected")'):
+        script.index("function recipeRestaurantEditHasChanges", script.index('async function applyRecipeRestaurantInformationScan'))
+    ]
+    assert "data.applied_values" in handler
+    assert "applyRecipeRestaurantScanValuesToForm(form, appliedValues);" in handler
+    assert "markRecipeRestaurantScanRowsApplied(panel, appliedFields);" in handler
+    assert "recipeRestaurantEditSnapshot =" not in handler
+    assert "closeRecipeRestaurantFetchReview()" not in handler
+    assert '!["Already saved", "Unresolved", "Invalid", "Applied"].includes(status)' in handler
+    assert "accept?.checked && !accept.disabled && candidate" in handler
+    assert 'event: "form_fields_updated_after_apply"' in script
+    close_handler = script[
+        script.index("function closeRecipeRestaurantFetchReview(options = {})"):
+        script.index("function setRecipeRestaurantFetchError", script.index("function closeRecipeRestaurantFetchReview"))
+    ]
+    assert "panel.hidden = true" in close_handler
+    assert "populateRecipeRestaurantEditForm" not in close_handler
+    assert "recipeRestaurantEditSnapshot" not in close_handler
+
+
+def test_restaurant_scan_statuses_and_high_confidence_empty_state_are_explicit():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    for status in ("New", "Changed", "Already saved", "Conflict", "Unresolved", "Invalid", "Applied"):
+        assert f'"{status}"' in script
+    assert 'data-restaurant-scan-apply-selected' in template
+    assert 'data-restaurant-scan-apply-high' in template
+    assert 'data-restaurant-scan-apply-message role="status" aria-live="polite"' in template
+    assert 'message.textContent = highCount === 0 ? "No high-confidence changes available" : "";' in script
+    assert "if (highButton) highButton.disabled = highCount === 0;" in script
+    assert 'row.requires_explicit_review && !noChange' in script
+    assert "recipeRestaurantScanRowCanApply(row, reviewStatus, recommended)" in script
+    assert "No reliable source value found." in script
+
+
+def test_restaurant_online_ordering_is_a_separate_three_state_form_value():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    assert '<span>Online Ordering</span><select data-restaurant-edit-field="restaurant_online_ordering_available">' in template
+    assert 'online_ordering: { label: "Online ordering", field: "restaurant_online_ordering_available" }' in script
+    assert 'restaurant_online_ordering_available: ["restaurant_online_ordering_available", "online_ordering"]' in script
+    assert 'restaurant_online_ordering_available: recipe.restaurant_online_ordering_available ?? ""' in script
+    assert 'restaurant_online_payment_available: recipe.restaurant_online_payment_available ?? ""' in script
+    assert 'restaurant_delivery_available: recipe.restaurant_delivery_available ?? ""' in script
+    assert 'restaurant_online_ordering_available: recipeEditInputValue("recipeEditRestaurantOnlineOrderingAvailable")' in script
+    assert '["online_payment", "online_ordering", "delivery"]' in script
+
+
+def test_restaurant_scan_debug_logging_is_structured_and_value_safe():
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    assert 'event: "persisted_weekly_hours_loaded"' in script
+    assert 'event: "weekly_hours_mapped_to_form"' in script
+    assert 'event: mode === "high_confidence" ? "apply_all_high_confidence_selected" : "apply_selected_rows"' in script
+    assert 'event: "form_fields_updated_after_apply"' in script
+    assert 'event: "save_payload_produced"' in script

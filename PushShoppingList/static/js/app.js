@@ -22906,10 +22906,14 @@ function recipeMenuSourceOptionsFromRecipe(recipe = {}) {
             restaurant_country: recipe.restaurant_country || "",
             restaurant_address: recipe.restaurant_address || "",
             restaurant_hours_text: recipe.restaurant_hours_text || "",
+            restaurant_weekly_hours: recipe.restaurant_weekly_hours || {},
+            restaurant_hours_notes: recipe.restaurant_hours_notes || "",
+            restaurant_raw_hours_data: recipe.restaurant_raw_hours_data || "",
             restaurant_current_status: recipe.restaurant_current_status || "",
             restaurant_promotions: recipe.restaurant_promotions || "",
-            restaurant_online_payment_available: recipe.restaurant_online_payment_available || "",
-            restaurant_delivery_available: recipe.restaurant_delivery_available || "",
+            restaurant_online_payment_available: recipe.restaurant_online_payment_available ?? "",
+            restaurant_online_ordering_available: recipe.restaurant_online_ordering_available ?? "",
+            restaurant_delivery_available: recipe.restaurant_delivery_available ?? "",
         },
         ...options,
     ];
@@ -25180,10 +25184,13 @@ function recipeRestaurantRecordValue(record, field) {
         restaurant_state: ["restaurant_state", "state_or_region", "state"],
         restaurant_postal_code: ["restaurant_postal_code", "postal_code"],
         restaurant_country: ["restaurant_country", "country"],
-        restaurant_hours_text: ["restaurant_hours_text", "raw_hours_data", "hours"],
+        restaurant_hours_text: ["restaurant_hours_text", "hours_text", "hours"],
+        restaurant_raw_hours_data: ["restaurant_raw_hours_data", "raw_hours_data"],
+        restaurant_hours_notes: ["restaurant_hours_notes", "hours_notes"],
         restaurant_promotions: ["restaurant_promotions", "rewards_promotions"],
         restaurant_current_status: ["restaurant_current_status", "current_status"],
         restaurant_online_payment_available: ["restaurant_online_payment_available", "online_payment"],
+        restaurant_online_ordering_available: ["restaurant_online_ordering_available", "online_ordering"],
         restaurant_delivery_available: ["restaurant_delivery_available", "delivery"],
         menu_item_url: ["menu_item_url"],
     };
@@ -25432,6 +25439,11 @@ function currentRecipeRestaurantSourceOption() {
         restaurant_country: "",
         restaurant_logo_url: "",
         restaurant_rating: "",
+        restaurant_hours_text: recipeEditInputValue("recipeEditRestaurantHoursText"),
+        restaurant_weekly_hours: recipeRestaurantWeeklyHoursFromText(recipeEditInputValue("recipeEditRestaurantHoursText")),
+        restaurant_hours_notes: "",
+        restaurant_raw_hours_data: recipeEditInputValue("recipeEditRestaurantHoursText"),
+        restaurant_online_ordering_available: recipeEditInputValue("recipeEditRestaurantOnlineOrderingAvailable"),
         menu_item_url: recipeEditInputValue("recipeEditMenuItemUrl") || recipeEditorSourceUrlForOpen(),
         restaurant_address: recipeEditInputValue("recipeEditRestaurantAddress"),
     };
@@ -25443,6 +25455,8 @@ function recipeRestaurantFallbackFromEditor() {
         || recipeEditInputValue("recipeEditDocumentSourceUrl")
         || recipeEditInputValue("recipeEditSourceUrl")
         || recipeEditorSourceUrlForOpen();
+    const hoursText = recipeEditInputValue("recipeEditRestaurantHoursText");
+    const hoursNoteLine = hoursText.split(/\r?\n/).find(value => /^Notes:/i.test(value));
     return {
         value: "|",
         restaurant_id: "",
@@ -25456,10 +25470,14 @@ function recipeRestaurantFallbackFromEditor() {
         restaurant_state: "",
         restaurant_postal_code: "",
         restaurant_country: "",
-        restaurant_hours_text: recipeEditInputValue("recipeEditRestaurantHoursText"),
+        restaurant_hours_text: hoursText,
+        restaurant_weekly_hours: recipeRestaurantWeeklyHoursFromText(hoursText),
+        restaurant_hours_notes: hoursNoteLine ? hoursNoteLine.replace(/^Notes:\s*/i, "") : "",
+        restaurant_raw_hours_data: hoursText,
         restaurant_current_status: recipeEditInputValue("recipeEditRestaurantCurrentStatus") || "unknown",
         restaurant_promotions: recipeEditInputValue("recipeEditRestaurantPromotions"),
         restaurant_online_payment_available: recipeEditInputValue("recipeEditRestaurantOnlinePaymentAvailable"),
+        restaurant_online_ordering_available: recipeEditInputValue("recipeEditRestaurantOnlineOrderingAvailable"),
         restaurant_delivery_available: recipeEditInputValue("recipeEditRestaurantDeliveryAvailable"),
         menu_item_url: menuItemUrl,
     };
@@ -25516,7 +25534,7 @@ function populateRecipeRestaurantEditForm(record, options = {}) {
     });
     bindRecipeRestaurantEditFields(form);
     closeRecipeRestaurantLogoChooser(form.querySelector("[data-restaurant-logo-chooser]"));
-    initializeRecipeRestaurantStructuredHours(form);
+    hydrateRecipeRestaurantStructuredHours(form, record || {});
     updateRecipeRestaurantEditState(form);
 }
 
@@ -26298,16 +26316,16 @@ const recipeRestaurantFetchFieldDefinitions = {
     country: { label: "Country", field: "restaurant_country" },
     latitude: { label: "Latitude" },
     longitude: { label: "Longitude" },
-    weekly_hours: { label: "Weekly hours", field: "restaurant_hours_text" },
-    raw_hours_text: { label: "Raw hours data", field: "restaurant_hours_text" },
-    hours_notes: { label: "Hours notes", field: "restaurant_hours_text" },
+    weekly_hours: { label: "Weekly hours", field: "restaurant_weekly_hours" },
+    raw_hours_text: { label: "Raw hours data", field: "restaurant_raw_hours_data" },
+    hours_notes: { label: "Hours notes", field: "restaurant_hours_notes" },
     rewards_promotions: { label: "Rewards / promotions", field: "restaurant_promotions" },
     image_url: { label: "Restaurant logo / image", field: "restaurant_logo_url" },
     current_status: { label: "Business status", field: "restaurant_current_status" },
     rating: { label: "Rating", field: "restaurant_rating" },
     rating_count: { label: "Rating count" },
     online_payment: { label: "Online payment", field: "restaurant_online_payment_available" },
-    online_ordering: { label: "Online ordering" },
+    online_ordering: { label: "Online ordering", field: "restaurant_online_ordering_available" },
     pickup: { label: "Pickup" },
     delivery: { label: "Delivery", field: "restaurant_delivery_available" },
     reservations: { label: "Reservations" },
@@ -26323,20 +26341,120 @@ function recipeRestaurantFetchReviewPanel() {
     return recipeRestaurantEditForm()?.querySelector("[data-restaurant-fetch-review]");
 }
 
+const recipeRestaurantWeekdays = [
+    ["monday", "Monday"], ["tuesday", "Tuesday"], ["wednesday", "Wednesday"],
+    ["thursday", "Thursday"], ["friday", "Friday"], ["saturday", "Saturday"],
+    ["sunday", "Sunday"],
+];
+
+function recipeRestaurantNormalizeHoursTime(value, options = {}) {
+    const text = String(value || "").trim();
+    if (options.allowEndOfDay && /^24:00(?::00)?$/.test(text)) return "24:00";
+    const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (!match) return "";
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour > 23 || minute > 59) return "";
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function normalizeRecipeRestaurantWeeklyHours(value) {
+    let source = value;
+    if (typeof source === "string") {
+        try {
+            source = JSON.parse(source);
+        } catch (err) {
+            source = {};
+        }
+    }
+    source = source && typeof source === "object" && !Array.isArray(source) ? source : {};
+    const normalized = {};
+    recipeRestaurantWeekdays.forEach(([key]) => {
+        const rawDay = source[key] ?? source[key[0].toUpperCase() + key.slice(1)];
+        if (!rawDay || typeof rawDay !== "object") return;
+        const closed = rawDay.closed === true || String(rawDay.status || "").toLowerCase() === "closed";
+        const rawRanges = Array.isArray(rawDay.ranges) ? rawDay.ranges : [];
+        const ranges = rawRanges.slice(0, 2).map(range => {
+            const opens = recipeRestaurantNormalizeHoursTime(range?.opens);
+            const closes = recipeRestaurantNormalizeHoursTime(range?.closes, { allowEndOfDay: true });
+            return opens && closes ? { opens, closes } : null;
+        }).filter(Boolean);
+        const open24 = !closed && (rawDay.open_24_hours === true
+            || String(rawDay.status || "").toLowerCase() === "open_24_hours"
+            || ranges.some(range => range.opens === "00:00" && ["23:59", "24:00"].includes(range.closes)));
+        normalized[key] = {
+            closed,
+            open_24_hours: open24,
+            ranges: closed ? [] : (open24 ? [{ opens: "00:00", closes: "24:00" }] : ranges),
+        };
+    });
+    return normalized;
+}
+
+function recipeRestaurantWeeklyHoursFromText(value) {
+    const weekly = {};
+    String(value || "").split(/\r?\n/).forEach(line => {
+        const separator = line.indexOf(":");
+        if (separator < 0) return;
+        const rawDay = line.slice(0, separator).trim().toLowerCase();
+        const day = recipeRestaurantWeekdays.find(([, label]) => label.toLowerCase() === rawDay)?.[0];
+        if (!day) return;
+        const detail = line.slice(separator + 1).trim();
+        if (/^closed$/i.test(detail)) {
+            weekly[day] = { closed: true, open_24_hours: false, ranges: [] };
+            return;
+        }
+        if (/open\s+24\s+hours?/i.test(detail)) {
+            weekly[day] = { closed: false, open_24_hours: true, ranges: [{ opens: "00:00", closes: "24:00" }] };
+            return;
+        }
+        const ranges = [...detail.matchAll(/(\d{1,2}:\d{2})\s*[-\u2013\u2014]\s*(\d{1,2}:\d{2}|24:00)/g)]
+            .slice(0, 2)
+            .map(match => ({
+                opens: recipeRestaurantNormalizeHoursTime(match[1]),
+                closes: recipeRestaurantNormalizeHoursTime(match[2], { allowEndOfDay: true }),
+            }))
+            .filter(range => range.opens && range.closes);
+        weekly[day] = { closed: false, open_24_hours: false, ranges };
+    });
+    return normalizeRecipeRestaurantWeeklyHours(weekly);
+}
+
+function recipeRestaurantWeeklyHoursFromForm(form = recipeRestaurantEditForm()) {
+    const weekly = {};
+    form?.querySelectorAll("[data-restaurant-hours-day]").forEach(row => {
+        const day = String(row.dataset.restaurantHoursDay || "").trim().toLowerCase();
+        if (!day) return;
+        const status = row.querySelector("[data-hours-state]")?.value || "open";
+        if (status === "closed") {
+            weekly[day] = { closed: true, open_24_hours: false, ranges: [] };
+            return;
+        }
+        if (status === "open_24_hours") {
+            weekly[day] = { closed: false, open_24_hours: true, ranges: [{ opens: "00:00", closes: "24:00" }] };
+            return;
+        }
+        const ranges = [
+            [row.querySelector("[data-hours-open]")?.value, row.querySelector("[data-hours-close]")?.value],
+            [row.querySelector("[data-hours-open-two]")?.value, row.querySelector("[data-hours-close-two]")?.value],
+        ].map(([opens, closes]) => ({
+            opens: recipeRestaurantNormalizeHoursTime(opens),
+            closes: recipeRestaurantNormalizeHoursTime(closes, { allowEndOfDay: true }),
+        })).filter(range => range.opens && range.closes);
+        if (!ranges.length) return;
+        weekly[day] = { closed: false, open_24_hours: false, ranges };
+    });
+    return normalizeRecipeRestaurantWeeklyHours(weekly);
+}
+
 function recipeRestaurantWeeklyHoursText(weeklyHours, notes = "") {
-    const dayLabels = {
-        monday: "Monday", tuesday: "Tuesday", wednesday: "Wednesday", thursday: "Thursday",
-        friday: "Friday", saturday: "Saturday", sunday: "Sunday",
-    };
-    const lines = Object.entries(dayLabels).map(([key, label]) => {
-        const day = weeklyHours?.[key];
+    const normalized = normalizeRecipeRestaurantWeeklyHours(weeklyHours);
+    const lines = recipeRestaurantWeekdays.map(([key, label]) => {
+        const day = normalized[key];
         if (!day) return "";
         if (day.closed) return `${label}: Closed`;
-        const ranges = Array.isArray(day.ranges) ? day.ranges.slice(0, 2).map(range => {
-            const opens = String(range?.opens || "").trim();
-            const closes = String(range?.closes || "").trim();
-            return opens && closes ? `${opens}-${closes}` : "";
-        }).filter(Boolean) : [];
+        if (day.open_24_hours) return `${label}: Open 24 hours`;
+        const ranges = day.ranges.map(range => `${range.opens}-${range.closes}`);
         return `${label}: ${ranges.join(", ") || "Open"}`;
     }).filter(Boolean);
     if (String(notes || "").trim()) lines.push(`Notes: ${String(notes).trim()}`);
@@ -26395,6 +26513,49 @@ function recipeRestaurantScanSourceStatus(source) {
     return { icon: "×", label: source.status_label || source?.reason || "Source fetch failed", className: "is-error" };
 }
 
+function recipeRestaurantScanReviewStatus(row, recommended) {
+    const backendStatus = String(row?.status || "").trim().toLowerCase().replaceAll("_", " ");
+    const backendLabels = {
+        new: "New", changed: "Changed", "already saved": "Already saved",
+        conflict: "Conflict", unresolved: "Unresolved", invalid: "Invalid", applied: "Applied",
+    };
+    if (backendLabels[backendStatus]) return backendLabels[backendStatus];
+    if (row?.invalid) return "Invalid";
+    if (!recommended) return "Unresolved";
+    if (row?.conflict) return "Conflict";
+    if (!row?.changed) return "Already saved";
+    const current = row?.current_normalized_value ?? row?.current_value;
+    const emptyCurrent = current === null || current === undefined || current === ""
+        || (Array.isArray(current) && !current.length)
+        || (current && typeof current === "object" && !Object.keys(current).length);
+    return emptyCurrent ? "New" : "Changed";
+}
+
+function recipeRestaurantScanRowCanApply(row, status, recommended) {
+    return Boolean(recommended && row?.selectable && !row?.locked
+        && !["Already saved", "Unresolved", "Invalid", "Applied"].includes(status));
+}
+
+function updateRecipeRestaurantScanApplyActions() {
+    const panel = recipeRestaurantFetchReviewPanel();
+    if (!panel) return;
+    const rows = Array.from(panel.querySelectorAll("[data-restaurant-fetch-field]"));
+    const selectedCount = rows.filter(row => {
+        const accept = row.querySelector(".recipe-edit-restaurant-fetch-accept input");
+        return accept?.checked && !accept.disabled
+            && !["Already saved", "Unresolved", "Invalid", "Applied"].includes(row.dataset.scanStatus);
+    }).length;
+    let highCount = rows.filter(row => row.dataset.highConfidenceEligible === "true"
+        && row.dataset.scanStatus !== "Applied").length;
+    if (Number(panel.dataset.highConfidenceChangeCount || 0) === 0) highCount = 0;
+    const selectedButton = panel.querySelector("[data-restaurant-scan-apply-selected]");
+    const highButton = panel.querySelector("[data-restaurant-scan-apply-high]");
+    const message = panel.querySelector("[data-restaurant-scan-apply-message]");
+    if (selectedButton) selectedButton.disabled = selectedCount === 0;
+    if (highButton) highButton.disabled = highCount === 0;
+    if (message) message.textContent = highCount === 0 ? "No high-confidence changes available" : "";
+}
+
 function renderRecipeRestaurantFetchReview(data) {
     const panel = recipeRestaurantFetchReviewPanel();
     const list = panel?.querySelector("[data-restaurant-fetch-review-list]");
@@ -26408,6 +26569,7 @@ function renderRecipeRestaurantFetchReview(data) {
     recipeRestaurantFetchedProposals = data?.proposals || {};
     const fieldRows = Object.entries(data?.fields || {});
     const scanSummary = data?.summary || {};
+    panel.dataset.highConfidenceChangeCount = String(Number(scanSummary.high_confidence_changes) || 0);
     if (metrics) {
         const values = [
             ["Sources scanned", scanSummary.sources_scanned], ["Sources reached", scanSummary.sources_reached],
@@ -26426,7 +26588,11 @@ function renderRecipeRestaurantFetchReview(data) {
     list.innerHTML = fieldRows.length ? fieldRows.map(([key, row]) => {
         const definition = recipeRestaurantFetchFieldDefinitions[key] || { label: key.replaceAll("_", " ") };
         const recommended = recipeRestaurantScanCandidate(row);
-        const defaultAccept = row.selectable && row.confidence_label === "High" && !row.conflict && !row.requires_explicit_review;
+        const reviewStatus = recipeRestaurantScanReviewStatus(row, recommended);
+        const canApply = recipeRestaurantScanRowCanApply(row, reviewStatus, recommended);
+        const highConfidenceEligible = canApply && ["New", "Changed"].includes(reviewStatus)
+            && row.confidence_label === "High" && !row.conflict && !row.requires_explicit_review;
+        const defaultAccept = highConfidenceEligible;
         const imagePreview = key === "image_url" && recommended
             ? `<img src="${escapeAttribute(recommended.value)}" alt="Discovered restaurant logo preview">`
             : "";
@@ -26437,28 +26603,38 @@ function renderRecipeRestaurantFetchReview(data) {
             ? `<select data-restaurant-scan-candidate aria-label="Choose ${escapeAttribute(definition.label)} candidate" onchange="updateRecipeRestaurantScanCandidate(this)">${row.candidates.map(candidate => `<option value="${escapeAttribute(candidate.candidate_id)}" ${candidate.candidate_id === recommended?.candidate_id ? "selected" : ""}>${escapeHtml(recipeRestaurantFetchDisplayValue(key, candidate.value))}</option>`).join("")}</select>`
             : recipeRestaurantFetchCandidateHtml(key, recommended);
         const sourceUrl = String(recommended?.source_url || "");
-        const noChange = Boolean(recommended && !row.changed && !row.conflict);
-        return `<article class="recipe-edit-restaurant-fetch-row${row.conflict ? " has-conflict" : ""}${row.locked ? " is-locked" : ""}${noChange ? " is-no-change" : ""}" data-restaurant-fetch-field="${escapeAttribute(key)}" data-recommended-candidate="${escapeAttribute(recommended?.candidate_id || "")}">
-                    <label class="recipe-edit-restaurant-fetch-accept"><input type="checkbox" ${defaultAccept ? "checked" : ""} ${row.selectable && !row.locked ? "" : "disabled"} aria-label="Accept ${escapeAttribute(definition.label)}"></label>
+        const noChange = reviewStatus === "Already saved";
+        const acceptControl = canApply
+            ? `<label class="recipe-edit-restaurant-fetch-accept"><input type="checkbox" ${defaultAccept ? "checked" : ""} aria-label="Accept ${escapeAttribute(definition.label)}" onchange="updateRecipeRestaurantScanApplyActions()"></label>`
+            : '<span class="recipe-edit-restaurant-fetch-accept" aria-hidden="true"></span>';
+        return `<article class="recipe-edit-restaurant-fetch-row${row.conflict ? " has-conflict" : ""}${row.locked ? " is-locked" : ""}${noChange ? " is-no-change" : ""}" data-restaurant-fetch-field="${escapeAttribute(key)}" data-recommended-candidate="${escapeAttribute(recommended?.candidate_id || "")}" data-scan-status="${escapeAttribute(reviewStatus)}" data-high-confidence-eligible="${highConfidenceEligible ? "true" : "false"}">
+                    ${acceptControl}
                     <strong>${escapeHtml(definition.label)}</strong>
                     <span class="recipe-edit-restaurant-fetch-current">${escapeHtml(recipeRestaurantFetchDisplayValue(key, row.current_value))}</span>
                     <span class="recipe-edit-restaurant-fetch-proposed">${imagePreview}${conflictPicker}${logoActions}</span>
-                    <span class="recipe-edit-restaurant-scan-confidence is-${String(row.confidence_label || "low").toLowerCase()}"><b>${noChange ? "No change" : escapeHtml(row.confidence_label || "Low")}</b><small>${Math.round(Number(recommended?.confidence || 0) * 100)}%</small></span>
+                    <span class="recipe-edit-restaurant-scan-confidence is-${String(row.confidence_label || "low").toLowerCase()}"><b data-restaurant-scan-status>${escapeHtml(reviewStatus)}</b><small>${Math.round(Number(recommended?.confidence || 0) * 100)}%</small></span>
                     <span class="recipe-edit-restaurant-fetch-evidence">
                         ${sourceUrl ? `<a href="${escapeAttribute(sourceUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeAttribute(sourceUrl)}">View source</a>` : "Source unavailable"}
                         <small data-restaurant-scan-method title="${escapeAttribute(recommended?.evidence || "")}">${escapeHtml(recommended?.provider ? `${recommended.provider} · ${String(recommended?.extraction_method || "").replaceAll("_", " ")}` : String(recommended?.extraction_method || "").replaceAll("_", " "))}</small>
                         <label class="recipe-edit-restaurant-scan-lock"><input type="checkbox" data-restaurant-scan-lock ${row.locked ? "checked" : ""}> Lock existing</label>
-                        ${row.requires_explicit_review ? "<em>Explicit review required</em>" : ""}
+                        ${row.requires_explicit_review && !noChange ? "<em>Explicit review required</em>" : ""}
                     </span>
                 </article>`;
     }).join("") : '<p class="recipe-edit-restaurant-scan-empty">No matching restaurant fields were discovered. Review the source statuses above and try Rescan after correcting the source URLs.</p>';
     const unresolvedFields = Array.isArray(data?.unresolved_fields) ? data.unresolved_fields : [];
     if (unresolved && unresolvedList) {
         unresolved.hidden = !unresolvedFields.length;
-        unresolvedList.innerHTML = unresolvedFields.map(field => `<span>${escapeHtml(recipeRestaurantFetchFieldDefinitions[field]?.label || field.replaceAll("_", " "))}</span>`).join("");
+        unresolvedList.innerHTML = unresolvedFields.map(item => {
+            const field = typeof item === "string" ? item : String(item?.field || "");
+            const reason = typeof item === "object"
+                ? String(item?.reason || "No reliable source value found.")
+                : "No reliable source value found.";
+            return `<span><strong>${escapeHtml(recipeRestaurantFetchFieldDefinitions[field]?.label || field.replaceAll("_", " "))}</strong><small>${escapeHtml(reason)}</small></span>`;
+        }).join("");
     }
     if (summary) summary.textContent = data?.message || "Review evidence-backed restaurant information.";
     panel.hidden = false;
+    updateRecipeRestaurantScanApplyActions();
     panel.querySelector('input:not([disabled]), button')?.focus();
 }
 
@@ -26484,6 +26660,7 @@ function chooseRecipeRestaurantScannedLogo(button, applyNew) {
     const row = button?.closest("[data-restaurant-fetch-field]");
     const accept = row?.querySelector(".recipe-edit-restaurant-fetch-accept input");
     if (accept && !accept.disabled) accept.checked = Boolean(applyNew);
+    updateRecipeRestaurantScanApplyActions();
     return false;
 }
 
@@ -26561,6 +26738,82 @@ async function fetchRecipeRestaurantDetails(button, force = false) {
     return false;
 }
 
+function applyRecipeRestaurantScanValuesToForm(form, appliedValues = {}) {
+    const updatedFields = [];
+    const hourFields = ["weekly_hours", "raw_hours_text", "hours_notes"];
+    if (hourFields.some(field => Object.prototype.hasOwnProperty.call(appliedValues, field))) {
+        const weeklyHours = Object.prototype.hasOwnProperty.call(appliedValues, "weekly_hours")
+            ? normalizeRecipeRestaurantWeeklyHours(appliedValues.weekly_hours)
+            : recipeRestaurantWeeklyHoursFromForm(form);
+        const hoursNotes = Object.prototype.hasOwnProperty.call(appliedValues, "hours_notes")
+            ? String(appliedValues.hours_notes || "")
+            : form.querySelector("[data-hours-notes]")?.value || "";
+        const rawHours = Object.prototype.hasOwnProperty.call(appliedValues, "raw_hours_text")
+            ? String(appliedValues.raw_hours_text || "")
+            : form.querySelector('[data-restaurant-edit-field="restaurant_raw_hours_data"]')?.value || "";
+        hydrateRecipeRestaurantStructuredHours(form, {
+            restaurant_weekly_hours: weeklyHours,
+            restaurant_hours_notes: hoursNotes,
+            restaurant_raw_hours_data: rawHours,
+        });
+        hourFields.forEach(field => {
+            if (Object.prototype.hasOwnProperty.call(appliedValues, field)) updatedFields.push(field);
+        });
+    }
+
+    Object.entries(appliedValues).forEach(([key, proposedValue]) => {
+        if (hourFields.includes(key)) return;
+        const field = recipeRestaurantFetchFieldDefinitions[key]?.field;
+        if (!field) return;
+        const input = form.querySelector(`[data-restaurant-edit-field="${field}"]`);
+        if (!input) return;
+        let value = proposedValue;
+        if (["online_payment", "online_ordering", "delivery"].includes(key)) {
+            value = proposedValue === true || String(proposedValue) === "true"
+                ? "true"
+                : proposedValue === false || String(proposedValue) === "false" ? "false" : "";
+        } else if (value && typeof value === "object") {
+            value = JSON.stringify(value);
+        }
+        input.value = value == null ? "" : String(value);
+        if (key === "image_url") {
+            const action = form.querySelector('[data-restaurant-edit-field="restaurant_logo_action"]');
+            const dataInput = form.querySelector('[data-restaurant-edit-field="restaurant_logo_data_url"]');
+            if (action) action.value = "url";
+            if (dataInput) dataInput.value = "";
+        }
+        updatedFields.push(key);
+    });
+    updateRecipeRestaurantEditLogo(form);
+    updateRecipeRestaurantEditState(form);
+    console.debug("restaurant-scan-apply", {
+        event: "form_fields_updated_after_apply",
+        field_count: updatedFields.length,
+        fields: updatedFields,
+        weekly_hours: Object.prototype.hasOwnProperty.call(appliedValues, "weekly_hours")
+            ? recipeRestaurantWeeklyHoursFromForm(form)
+            : undefined,
+    });
+    return updatedFields;
+}
+
+function markRecipeRestaurantScanRowsApplied(panel, appliedFields = []) {
+    appliedFields.forEach(field => {
+        const row = panel?.querySelector(`[data-restaurant-fetch-field="${field}"]`);
+        if (!row) return;
+        row.dataset.scanStatus = "Applied";
+        row.dataset.highConfidenceEligible = "false";
+        row.classList.add("is-applied");
+        const status = row.querySelector("[data-restaurant-scan-status]");
+        if (status) status.textContent = "Applied";
+        const accept = row.querySelector(".recipe-edit-restaurant-fetch-accept input");
+        if (accept) {
+            accept.checked = false;
+            accept.disabled = true;
+        }
+    });
+}
+
 async function applyRecipeRestaurantInformationScan(button, mode = "selected") {
     const form = recipeRestaurantEditForm();
     const panel = recipeRestaurantFetchReviewPanel();
@@ -26572,9 +26825,31 @@ async function applyRecipeRestaurantInformationScan(button, mode = "selected") {
         const field = row.dataset.restaurantFetchField;
         const accept = row.querySelector(".recipe-edit-restaurant-fetch-accept input");
         const candidate = row.querySelector("[data-restaurant-scan-candidate]")?.value || row.dataset.recommendedCandidate;
-        if (accept?.checked && candidate) selections[field] = candidate;
+        const status = row.dataset.scanStatus;
+        const eligible = !["Already saved", "Unresolved", "Invalid", "Applied"].includes(status);
+        if (eligible && accept?.checked && !accept.disabled && candidate) selections[field] = candidate;
         const lock = row.querySelector("[data-restaurant-scan-lock]");
         if (lock) lockUpdates[field] = lock.checked;
+    });
+    const message = panel.querySelector("[data-restaurant-scan-apply-message]");
+    if (mode === "selected" && !Object.keys(selections).length) {
+        if (message) message.textContent = "Select at least one valid change.";
+        updateRecipeRestaurantScanApplyActions();
+        return false;
+    }
+    if (mode === "high_confidence" && button.disabled) {
+        if (message) message.textContent = "No high-confidence changes available";
+        return false;
+    }
+    const selectedFieldKeys = mode === "high_confidence"
+        ? Array.from(panel.querySelectorAll('[data-high-confidence-eligible="true"]'))
+            .filter(row => row.dataset.scanStatus !== "Applied")
+            .map(row => row.dataset.restaurantFetchField)
+        : Object.keys(selections);
+    console.debug("restaurant-scan-apply", {
+        event: mode === "high_confidence" ? "apply_all_high_confidence_selected" : "apply_selected_rows",
+        field_count: selectedFieldKeys.length,
+        fields: selectedFieldKeys,
     });
     button.disabled = true;
     const originalText = button.textContent;
@@ -26587,36 +26862,22 @@ async function applyRecipeRestaurantInformationScan(button, mode = "selected") {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.ok) throw new Error(data.error || "Restaurant information could not be applied.");
-        const saved = data.restaurant || {};
-        recipeRestaurantEditSelection = { ...(recipeRestaurantEditSelection || {}), ...saved };
-        recipeRestaurantDisplaySource = { ...(recipeRestaurantDisplaySource || {}), ...saved };
-        const snapshot = JSON.parse(recipeRestaurantEditSnapshot || "{}");
-        snapshot.values = snapshot.values || {};
-        (data.applied_fields || []).forEach(key => {
-            const field = recipeRestaurantFetchFieldDefinitions[key]?.field;
-            if (!field) return;
-            const input = form.querySelector(`[data-restaurant-edit-field="${field}"]`);
-            let value = recipeRestaurantRecordValue(saved, field);
-            if (key === "weekly_hours") {
-                value = recipeRestaurantWeeklyHoursText(saved.restaurant_weekly_hours || {}, saved.restaurant_hours_notes || "");
-            }
-            if (input) {
-                input.value = value == null ? "" : String(value);
-                snapshot.values[field] = input.value;
-            }
-        });
-        recipeRestaurantEditSnapshot = JSON.stringify(snapshot);
-        initializeRecipeRestaurantStructuredHours(form);
-        updateRecipeRestaurantEditLogo(form);
-        updateRecipeRestaurantEditState(form);
-        updateRecipeRestaurantScanActionLabel(saved);
-        updateRecipeEditRestaurantCard();
-        closeRecipeRestaurantFetchReview();
+        const appliedValues = data.applied_values && typeof data.applied_values === "object"
+            ? data.applied_values
+            : {};
+        const appliedFields = Array.isArray(data.applied_fields) ? data.applied_fields : Object.keys(appliedValues);
+        applyRecipeRestaurantScanValuesToForm(form, appliedValues);
+        markRecipeRestaurantScanRowsApplied(panel, appliedFields);
+        if (message) message.textContent = appliedFields.length
+            ? `${appliedFields.length} change${appliedFields.length === 1 ? "" : "s"} applied to the pending form.`
+            : "No eligible changes were applied.";
+        updateRecipeRestaurantScanApplyActions();
     } catch (err) {
         setRecipeRestaurantFetchError(err.message || "Restaurant information could not be applied.");
     } finally {
         button.disabled = false;
         button.textContent = originalText;
+        updateRecipeRestaurantScanApplyActions();
     }
     return false;
 }
@@ -26631,6 +26892,11 @@ function recipeRestaurantEditValues(form = recipeRestaurantEditForm()) {
     form?.querySelectorAll("[data-restaurant-edit-field]").forEach(input => {
         values[input.dataset.restaurantEditField] = String(input.value || "").trim();
     });
+    const weeklyHours = recipeRestaurantWeeklyHoursFromForm(form);
+    const hoursNotes = form?.querySelector("[data-hours-notes]")?.value.trim() || "";
+    values.restaurant_weekly_hours = weeklyHours;
+    values.restaurant_hours_notes = hoursNotes;
+    values.restaurant_hours_text = recipeRestaurantWeeklyHoursText(weeklyHours, hoursNotes);
     return values;
 }
 
@@ -27013,75 +27279,92 @@ function recipeRestaurantHoursTimeLabel(value) {
     return `${hour % 12 || 12}:${minute} ${suffix}`;
 }
 
-function initializeRecipeRestaurantStructuredHours(form = recipeRestaurantEditForm()) {
-    const raw = form?.querySelector('[data-restaurant-edit-field="restaurant_hours_text"]')?.value || "";
-    const rows = form ? Array.from(form.querySelectorAll("[data-restaurant-hours-day]")) : [];
-    rows.forEach(row => {
-        row.querySelector("[data-hours-state]").value = "open";
-        row.querySelectorAll('input[type="time"]').forEach(input => { input.value = ""; });
+function hydrateRecipeRestaurantStructuredHours(form = recipeRestaurantEditForm(), record = {}) {
+    if (!form) return;
+    const persisted = normalizeRecipeRestaurantWeeklyHours(
+        record?.restaurant_weekly_hours ?? record?.weekly_hours ?? {}
+    );
+    const legacyText = recipeRestaurantRecordValue(record, "restaurant_hours_text")
+        || recipeRestaurantRecordValue(record, "restaurant_raw_hours_data");
+    const weekly = Object.keys(persisted).length ? persisted : recipeRestaurantWeeklyHoursFromText(legacyText);
+    const rawHours = recipeRestaurantRecordValue(record, "restaurant_raw_hours_data");
+    const noteLine = String(legacyText || "").split(/\r?\n/).find(value => /^Notes:/i.test(value));
+    const hoursNotes = recipeRestaurantRecordValue(record, "restaurant_hours_notes")
+        || (noteLine ? noteLine.replace(/^Notes:\s*/i, "") : "");
+    console.debug("restaurant-hours-hydration", {
+        event: "persisted_weekly_hours_loaded",
+        day_count: Object.keys(weekly).length,
+        has_raw_hours: Boolean(rawHours),
+        has_hours_notes: Boolean(hoursNotes),
+        weekly_hours: weekly,
+    });
+
+    form.querySelectorAll("[data-restaurant-hours-day]").forEach(row => {
+        const dayKey = String(row.dataset.restaurantHoursDay || "").toLowerCase();
+        const day = weekly[dayKey];
+        const state = row.querySelector("[data-hours-state]");
         const split = row.querySelector("[data-hours-split]");
-        if (split) split.hidden = true;
         const splitButton = row.querySelector("[data-hours-add-split]");
-        if (splitButton) splitButton.textContent = "+ Split hours";
-        const day = row.dataset.restaurantHoursDay;
-        const line = raw.split(/\r?\n/).find(value => value.toLowerCase().startsWith(`${day.toLowerCase()}:`));
-        if (!line) {
-            syncRecipeRestaurantHoursRow(row);
-            return;
-        }
-        const detail = line.slice(line.indexOf(":") + 1).trim();
-        if (/^closed$/i.test(detail)) {
-            row.querySelector("[data-hours-state]").value = "closed";
-            syncRecipeRestaurantHoursRow(row);
-            return;
-        }
-        const ranges = [...detail.matchAll(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/g)];
+        row.querySelectorAll('input[type="time"]').forEach(input => { input.value = ""; });
+        if (state) state.value = day?.closed ? "closed" : day?.open_24_hours ? "open_24_hours" : "open";
+        const ranges = Array.isArray(day?.ranges) && !day?.open_24_hours ? day.ranges : [];
         if (ranges[0]) {
-            row.querySelector("[data-hours-open]").value = ranges[0][1];
-            row.querySelector("[data-hours-close]").value = ranges[0][2];
+            row.querySelector("[data-hours-open]").value = ranges[0].opens || "";
+            row.querySelector("[data-hours-close]").value = ranges[0].closes === "24:00" ? "" : ranges[0].closes || "";
         }
         if (ranges[1]) {
-            row.querySelector("[data-hours-open-two]").value = ranges[1][1];
-            row.querySelector("[data-hours-close-two]").value = ranges[1][2];
-            if (split) split.hidden = false;
+            row.querySelector("[data-hours-open-two]").value = ranges[1].opens || "";
+            row.querySelector("[data-hours-close-two]").value = ranges[1].closes === "24:00" ? "" : ranges[1].closes || "";
         }
+        if (split) split.hidden = !ranges[1];
+        if (splitButton) splitButton.textContent = ranges[1] ? "Remove split" : "+ Split hours";
         syncRecipeRestaurantHoursRow(row);
     });
-    const notes = form?.querySelector("[data-hours-notes]");
+    const notes = form.querySelector("[data-hours-notes]");
     if (notes) {
-        const noteLine = raw.split(/\r?\n/).find(value => /^Notes:/i.test(value));
-        notes.value = noteLine ? noteLine.replace(/^Notes:\s*/i, "") : "";
+        notes.value = hoursNotes;
         if (notes.dataset.restaurantHoursBound !== "1") {
             notes.dataset.restaurantHoursBound = "1";
             notes.addEventListener("input", () => updateRecipeRestaurantStructuredHours(notes));
         }
     }
+    const raw = form.querySelector('[data-restaurant-edit-field="restaurant_raw_hours_data"]');
+    if (raw) raw.value = rawHours;
+    console.debug("restaurant-hours-hydration", {
+        event: "weekly_hours_mapped_to_form",
+        day_count: form.querySelectorAll("[data-restaurant-hours-day]").length,
+        weekly_hours: recipeRestaurantWeeklyHoursFromForm(form),
+    });
+}
+
+function initializeRecipeRestaurantStructuredHours(form = recipeRestaurantEditForm()) {
+    hydrateRecipeRestaurantStructuredHours(form, {
+        restaurant_weekly_hours: recipeRestaurantWeeklyHoursFromForm(form),
+        restaurant_hours_notes: form?.querySelector("[data-hours-notes]")?.value || "",
+        restaurant_raw_hours_data: form?.querySelector('[data-restaurant-edit-field="restaurant_raw_hours_data"]')?.value || "",
+    });
 }
 
 function syncRecipeRestaurantHoursRow(row) {
     if (!row) return;
-    const closed = row.querySelector("[data-hours-state]")?.value === "closed";
+    const status = row.querySelector("[data-hours-state]")?.value || "open";
+    const closed = status === "closed";
+    const open24 = status === "open_24_hours";
     row.classList.toggle("is-closed", closed);
+    row.classList.toggle("is-open-24-hours", open24);
+    row.querySelectorAll('input[type="time"]').forEach(input => { input.disabled = closed || open24; });
     const splitButton = row.querySelector("[data-hours-add-split]");
-    if (splitButton) splitButton.disabled = closed;
+    if (splitButton) splitButton.disabled = closed || open24;
+    if ((closed || open24) && row.querySelector("[data-hours-split]")) {
+        row.querySelector("[data-hours-split]").hidden = true;
+        if (splitButton) splitButton.textContent = "+ Split hours";
+    }
 }
 
 function updateRecipeRestaurantStructuredHours(control) {
     const form = control?.closest("[data-restaurant-edit-form]");
     if (!form) return false;
-    const lines = Array.from(form.querySelectorAll("[data-restaurant-hours-day]")).map(row => {
-        syncRecipeRestaurantHoursRow(row);
-        const day = row.dataset.restaurantHoursDay;
-        if (row.querySelector("[data-hours-state]").value === "closed") return `${day}: Closed`;
-        const first = [row.querySelector("[data-hours-open]").value, row.querySelector("[data-hours-close]").value];
-        const second = [row.querySelector("[data-hours-open-two]").value, row.querySelector("[data-hours-close-two]").value];
-        const ranges = [first, second].filter(range => range[0] && range[1]).map(range => `${range[0]}-${range[1]}`);
-        return `${day}: ${ranges.join(", ") || "Open"}`;
-    });
-    const notes = form.querySelector("[data-hours-notes]")?.value.trim();
-    if (notes) lines.push(`Notes: ${notes}`);
-    const raw = form.querySelector('[data-restaurant-edit-field="restaurant_hours_text"]');
-    if (raw) raw.value = lines.join("\n");
+    form.querySelectorAll("[data-restaurant-hours-day]").forEach(syncRecipeRestaurantHoursRow);
     updateRecipeRestaurantEditState(form);
     return false;
 }
@@ -27089,7 +27372,7 @@ function updateRecipeRestaurantStructuredHours(control) {
 function toggleRecipeRestaurantSplitHours(button) {
     const row = button?.closest("[data-restaurant-hours-day]");
     const split = row?.querySelector("[data-hours-split]");
-    if (!split) return false;
+    if (!split || row?.querySelector("[data-hours-state]")?.value !== "open") return false;
     split.hidden = !split.hidden;
     button.textContent = split.hidden ? "+ Split hours" : "Remove split";
     if (split.hidden) {
@@ -27171,6 +27454,12 @@ async function saveRecipeRestaurantSource(form, options = {}) {
     form.dataset.saving = "1";
     if (save) { save.disabled = true; save.textContent = "Saving..."; }
     if (error) error.hidden = true;
+    console.debug("restaurant-editor-save", {
+        event: "save_payload_produced",
+        field_count: Object.keys(values).length,
+        fields: Object.keys(values),
+        weekly_hours: values.restaurant_weekly_hours,
+    });
     try {
         const response = await fetch("/api/recipe/restaurant-source", {
             method: "POST",

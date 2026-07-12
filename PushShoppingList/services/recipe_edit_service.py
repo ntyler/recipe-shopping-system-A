@@ -96,6 +96,9 @@ from PushShoppingList.services.recipe_master_data_service import remove_recipe_m
 from PushShoppingList.services.recipe_master_data_service import resolve_ingredient_store_section
 from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.shopping_list_service import add_items
+from PushShoppingList.services.restaurant_hours_service import normalize_weekly_hours
+from PushShoppingList.services.restaurant_hours_service import parse_weekly_hours_text
+from PushShoppingList.services.restaurant_hours_service import weekly_hours_to_text
 from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.recipe_url_service import load_recipe_urls
@@ -110,7 +113,6 @@ from PushShoppingList.services.recipe_image_progress_service import finish_recip
 from PushShoppingList.services.recipe_image_progress_service import start_recipe_image_progress
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -2234,6 +2236,20 @@ def parse_recipe_menu_bool(value):
     return None
 
 
+def normalize_editable_restaurant_status(value):
+    token = re.sub(r"[^a-z]+", "_", clean_recipe_menu_text(value).casefold()).strip("_")
+    aliases = {
+        "open": "operating",
+        "active": "operating",
+        "operating": "operating",
+        "temporarily_closed": "temporarily_closed",
+        "permanently_closed": "permanently_closed",
+        "closed": "unknown",
+        "unknown": "unknown",
+    }
+    return aliases.get(token, "unknown")
+
+
 def split_recipe_menu_text_list(value):
     if isinstance(value, list):
         raw_values = value
@@ -2323,7 +2339,9 @@ def normalize_editable_restaurant_store_metadata(payload):
         restaurant_id = clean_recipe_menu_text(restaurant.get("id") or restaurant.get("restaurant_id"))
         if not restaurant_id:
             continue
-        weekly_hours, hours_notes = editable_restaurant_structured_hours(restaurant.get("hours_text"))
+        legacy_weekly_hours, legacy_hours_notes = editable_restaurant_structured_hours(restaurant.get("hours_text"))
+        weekly_hours = normalize_weekly_hours(restaurant.get("weekly_hours")) or legacy_weekly_hours
+        hours_notes = clean_recipe_menu_text(restaurant.get("hours_notes")) or legacy_hours_notes
         defaults = {
             "id": restaurant_id,
             "restaurant_id": restaurant_id,
@@ -2338,6 +2356,7 @@ def normalize_editable_restaurant_store_metadata(payload):
             "raw_hours_data": restaurant.get("hours_text"),
             "rewards_promotions": restaurant.get("rewards_text"),
             "online_payment": restaurant.get("online_payment_available"),
+            "online_ordering": restaurant.get("online_ordering_available"),
             "delivery": restaurant.get("delivery_available"),
             **owner_fields,
         }
@@ -2358,6 +2377,7 @@ def normalize_editable_restaurant_store_metadata(payload):
             "promotions": [],
             "current_status": None,
             "online_payment_available": None,
+            "online_ordering_available": None,
             "delivery_available": None,
         }.items():
             defaults.setdefault(field, default)
@@ -2365,6 +2385,13 @@ def normalize_editable_restaurant_store_metadata(payload):
             if key not in restaurant:
                 restaurant[key] = value
                 changed = True
+        if restaurant.get("weekly_hours") != weekly_hours:
+            restaurant["weekly_hours"] = weekly_hours
+            changed = True
+        normalized_status = normalize_editable_restaurant_status(restaurant.get("current_status"))
+        if restaurant.get("current_status") != normalized_status:
+            restaurant["current_status"] = normalized_status
+            changed = True
     return changed
 
 
@@ -2392,34 +2419,8 @@ def editable_restaurant_menu_for(payload, restaurant_id, preferred_menu_id=""):
 
 
 def editable_restaurant_structured_hours(value):
-    """Parse the current editor's lossless weekly text into optional structured data."""
-    raw = str(value or "").strip()
-    weekly_hours = {}
-    notes = ""
-    weekdays = {
-        day.casefold(): day.casefold()
-        for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-    }
-    for line in raw.splitlines():
-        label, separator, detail = line.partition(":")
-        if not separator:
-            continue
-        key = label.strip().casefold()
-        detail = detail.strip()
-        if key == "notes":
-            notes = detail
-            continue
-        if key not in weekdays:
-            continue
-        ranges = [
-            {"opens": match.group(1), "closes": match.group(2)}
-            for match in re.finditer(r"(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})", detail)
-        ][:2]
-        weekly_hours[weekdays[key]] = {
-            "closed": detail.casefold() == "closed",
-            "ranges": ranges,
-        }
-    return weekly_hours, notes
+    """Compatibility wrapper around the shared canonical hours codec."""
+    return parse_weekly_hours_text(value)
 
 
 def editable_menu_source_option_from_records(restaurant, menu):
@@ -2438,6 +2439,18 @@ def editable_menu_source_option_from_records(restaurant, menu):
 
     if not restaurant_id and not menu_id:
         return {}
+
+    weekly_hours = normalize_weekly_hours(restaurant.get("weekly_hours"))
+    hours_notes = clean_recipe_menu_text(restaurant.get("hours_notes"))
+    editor_hours_text = weekly_hours_to_text(weekly_hours, hours_notes) if weekly_hours else clean_recipe_menu_text(
+        restaurant.get("hours_text")
+    )
+    LOGGER.debug(
+        "restaurant_hours_hydration restaurant_id=%s persisted_days=%d editor_text=%s",
+        restaurant_id,
+        len(weekly_hours),
+        bool(editor_hours_text),
+    )
 
     return {
         "value": editable_menu_source_option_value(restaurant_id, menu_id),
@@ -2461,11 +2474,11 @@ def editable_menu_source_option_from_records(restaurant, menu):
         "restaurant_postal_code": clean_recipe_menu_text(restaurant.get("postal_code")),
         "restaurant_country": clean_recipe_menu_text(restaurant.get("country")),
         "restaurant_address": editable_restaurant_location(restaurant),
-        "restaurant_hours_text": clean_recipe_menu_text(restaurant.get("hours_text")),
-        "restaurant_weekly_hours": restaurant.get("weekly_hours") if isinstance(restaurant.get("weekly_hours"), dict) else {},
-        "restaurant_hours_notes": clean_recipe_menu_text(restaurant.get("hours_notes")),
+        "restaurant_hours_text": editor_hours_text,
+        "restaurant_weekly_hours": weekly_hours,
+        "restaurant_hours_notes": hours_notes,
         "restaurant_raw_hours_data": clean_recipe_menu_text(restaurant.get("raw_hours_data")),
-        "restaurant_current_status": clean_recipe_menu_text(restaurant.get("current_status")),
+        "restaurant_current_status": normalize_editable_restaurant_status(restaurant.get("current_status")),
         "restaurant_promotions": first_recipe_menu_text(
             restaurant.get("rewards_text"),
             recipe_menu_text_list_for_editor(restaurant.get("promotions")),
@@ -2662,22 +2675,15 @@ def apply_editable_restaurant_values(restaurant, values):
         "restaurant_state": "state",
         "restaurant_postal_code": "postal_code",
         "restaurant_country": "country",
-        "restaurant_hours_text": "hours_text",
-        "restaurant_current_status": "current_status",
         "restaurant_promotions": "rewards_text",
     }
     for source_field, store_field in field_map.items():
         if source_field in values:
             restaurant[store_field] = clean_recipe_menu_text(values.get(source_field)) or None
     if "restaurant_current_status" in values:
-        status_key = re.sub(
-            r"[^a-z]+",
-            "_",
-            clean_recipe_menu_text(values.get("restaurant_current_status")).casefold(),
-        ).strip("_")
-        restaurant["current_status"] = status_key if status_key in {
-            "open", "closed", "temporarily_closed", "permanently_closed", "unknown"
-        } else None
+        restaurant["current_status"] = normalize_editable_restaurant_status(
+            values.get("restaurant_current_status")
+        )
 
     restaurant["full_address"] = None
     restaurant["state_or_region"] = restaurant.get("state")
@@ -2692,18 +2698,52 @@ def apply_editable_restaurant_values(restaurant, values):
 
     if "restaurant_online_payment_available" in values:
         restaurant["online_payment_available"] = parse_recipe_menu_bool(values.get("restaurant_online_payment_available"))
+    if "restaurant_online_ordering_available" in values:
+        restaurant["online_ordering_available"] = parse_recipe_menu_bool(values.get("restaurant_online_ordering_available"))
     if "restaurant_delivery_available" in values:
         restaurant["delivery_available"] = parse_recipe_menu_bool(values.get("restaurant_delivery_available"))
     restaurant["online_payment"] = restaurant.get("online_payment_available")
+    restaurant["online_ordering"] = restaurant.get("online_ordering_available")
     restaurant["delivery"] = restaurant.get("delivery_available")
 
-    if "restaurant_hours_text" in values:
-        raw_hours = clean_recipe_menu_text(values.get("restaurant_hours_text"))
-        weekly_hours, notes = editable_restaurant_structured_hours(values.get("restaurant_hours_text"))
+    structured_hours_supplied = "restaurant_weekly_hours" in values
+    legacy_hours_supplied = "restaurant_hours_text" in values
+    if structured_hours_supplied:
+        weekly_hours = normalize_weekly_hours(values.get("restaurant_weekly_hours"))
+        notes = clean_recipe_menu_text(
+            values.get("restaurant_hours_notes")
+            if "restaurant_hours_notes" in values
+            else restaurant.get("hours_notes")
+        )
         restaurant["weekly_hours"] = weekly_hours
         restaurant["hours_notes"] = notes or None
-        if not clean_recipe_menu_text(restaurant.get("raw_hours_data")):
-            restaurant["raw_hours_data"] = raw_hours or None
+        restaurant["hours_text"] = weekly_hours_to_text(weekly_hours, notes) or None
+    elif legacy_hours_supplied:
+        legacy_hours = str(values.get("restaurant_hours_text") or "").strip()
+        weekly_hours, notes = editable_restaurant_structured_hours(legacy_hours)
+        if weekly_hours:
+            restaurant["weekly_hours"] = weekly_hours
+            restaurant["hours_notes"] = clean_recipe_menu_text(
+                values.get("restaurant_hours_notes") if "restaurant_hours_notes" in values else notes
+            ) or None
+            restaurant["hours_text"] = weekly_hours_to_text(
+                weekly_hours, restaurant.get("hours_notes")
+            ) or None
+        if legacy_hours and not clean_recipe_menu_text(restaurant.get("raw_hours_data")):
+            restaurant["raw_hours_data"] = legacy_hours
+    if "restaurant_raw_hours_data" in values:
+        restaurant["raw_hours_data"] = clean_recipe_menu_text(values.get("restaurant_raw_hours_data")) or None
+
+    LOGGER.debug(
+        "restaurant_save_payload restaurant_id=%s structured_hours=%s legacy_hours=%s status=%s online_ordering=%s online_payment=%s delivery=%s",
+        restaurant_id,
+        structured_hours_supplied,
+        legacy_hours_supplied,
+        "restaurant_current_status" in values,
+        "restaurant_online_ordering_available" in values,
+        "restaurant_online_payment_available" in values,
+        "restaurant_delivery_available" in values,
+    )
 
     previous_logo_path = clean_recipe_menu_text(restaurant.get("logo_path"))
     logo_data_url = clean_recipe_menu_text(values.get("restaurant_logo_data_url"))
@@ -2745,6 +2785,8 @@ def apply_editable_restaurant_values(restaurant, values):
         "current_status": None,
         "online_payment_available": None,
         "online_payment": None,
+        "online_ordering_available": None,
+        "online_ordering": None,
         "delivery_available": None,
         "delivery": None,
     }.items():

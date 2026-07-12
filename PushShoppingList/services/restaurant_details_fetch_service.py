@@ -27,6 +27,8 @@ from bs4 import BeautifulSoup
 from PushShoppingList.services import menu_store_service
 from PushShoppingList.services.file_lock_service import workspace_write_lock
 from PushShoppingList.services.recipe_extract_service import menu_page_request_headers
+from PushShoppingList.services.restaurant_hours_service import normalize_weekly_hours
+from PushShoppingList.services.restaurant_hours_service import weekly_hours_to_text
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import scoped_package_path
 
@@ -432,7 +434,7 @@ def _hours_from_specs(raw):
                 weekly[day] = {"closed": True, "ranges": []}
             elif opens and closes:
                 _append_hours_range(weekly, day, opens, closes)
-    return weekly
+    return normalize_weekly_hours(weekly)
 
 
 def _hours_from_strings(raw):
@@ -458,7 +460,7 @@ def _hours_from_strings(raw):
         for day in days:
             for opens, closes in ranges:
                 _append_hours_range(weekly, day, _time_24(opens), _time_24(closes))
-    return weekly
+    return normalize_weekly_hours(weekly)
 
 
 def decode_nested_recipe_source_url(value):
@@ -606,7 +608,7 @@ def _normalize_value(field, value):
     if field == "current_status":
         return _normalize_status(value) or None
     if field == "weekly_hours":
-        return value if isinstance(value, dict) and value else None
+        return normalize_weekly_hours(value) or None
     if field in {"promotions"}:
         values = value if isinstance(value, list) else [value]
         return [_clean(item) for item in values if _clean(item)] or None
@@ -995,7 +997,6 @@ def extract_restaurant_candidates(html, source_url, source_type="official_websit
                 if target:
                     order_urls.append(target)
                 add("online_ordering", True, "json_ld", 0.94, "Structured OrderAction")
-                add("online_payment", True, "json_ld", 0.79, "Structured online ordering action")
             if action_types & {"reserveaction", "scheduleaction"}:
                 if target:
                     reservation_urls.append(target)
@@ -1205,6 +1206,12 @@ def _confidence_label(score, conflict=False):
 def _reconcile_field(field, candidates, record, locked_fields):
     current = _first(record, CURRENT_FIELD_KEYS[field])
     current_normalized = _normalize_value(field, current)
+    if field == "weekly_hours":
+        logger.debug(
+            "restaurant_scan_hours_compare stored_days=%d stored=%s",
+            len(current_normalized or {}),
+            json.dumps(current_normalized or {}, sort_keys=True),
+        )
     grouped = {}
     for candidate in candidates:
         key = _normalized_key(candidate["normalized_value"])
@@ -1221,10 +1228,24 @@ def _reconcile_field(field, candidates, record, locked_fields):
         conflict = False
     changed = bool(recommended) and _normalized_key(recommended["normalized_value"]) != _normalized_key(current_normalized)
     locked = field in locked_fields
-    explicit = field in SENSITIVE_APPLY_ALL_FIELDS and bool(current not in (None, "", [], {}))
+    explicit = changed and field in SENSITIVE_APPLY_ALL_FIELDS and bool(current not in (None, "", [], {}))
     if field == "current_status" and recommended and recommended["normalized_value"] == "permanently_closed":
-        explicit = True
+        explicit = changed
     selectable = bool(recommended and changed and not locked)
+    status = (
+        "conflict" if conflict
+        else "already_saved" if recommended and not changed
+        else "new" if recommended and current_normalized in (None, "", [], {})
+        else "changed" if recommended
+        else "invalid"
+    )
+    if field == "weekly_hours":
+        logger.debug(
+            "restaurant_scan_hours_candidate candidate_days=%d candidate=%s classification=%s",
+            len((recommended or {}).get("normalized_value") or {}),
+            json.dumps((recommended or {}).get("normalized_value") or {}, sort_keys=True),
+            status,
+        )
     return {
         "field": field,
         "current_value": current,
@@ -1236,6 +1257,7 @@ def _reconcile_field(field, candidates, record, locked_fields):
         "locked": locked,
         "requires_explicit_review": explicit,
         "selectable": selectable,
+        "status": status,
         "confidence_label": _confidence_label(recommended["confidence"] if recommended else 0, conflict=conflict),
     }
 
@@ -1418,6 +1440,80 @@ def select_restaurant_scan_values(scan, selections=None, mode="selected", locked
     return {"ok": True, "values": values, "accepted": accepted, "rejected": rejected}
 
 
+def prepare_restaurant_information_scan_apply(
+    restaurant_id,
+    scan,
+    selections=None,
+    mode="selected",
+    lock_updates=None,
+):
+    """Stage reviewed scan values for the editor without mutating normalized storage."""
+    restaurant_id = _clean(restaurant_id)
+    if not isinstance(scan, dict):
+        return {"ok": False, "error": "The pending restaurant information scan is invalid."}
+    if mode not in {"selected", "high_confidence"}:
+        return {"ok": False, "error": "The restaurant information apply mode is invalid."}
+    if not restaurant_id or _clean(scan.get("restaurant_id")) != restaurant_id:
+        return {"ok": False, "error": "The scan does not belong to this restaurant."}
+
+    store = menu_store_service.load_menu_store()
+    restaurant = menu_store_service.restaurant_for(store, restaurant_id)
+    if not restaurant:
+        return {"ok": False, "error": "Restaurant source was not found."}
+    locked = set(restaurant.get("restaurant_information_locked_fields") or [])
+    for field, value in (lock_updates if isinstance(lock_updates, dict) else {}).items():
+        if field not in FIELD_ORDER:
+            continue
+        if value is True:
+            locked.add(field)
+        elif value is False:
+            locked.discard(field)
+
+    selected = select_restaurant_scan_values(
+        scan,
+        selections=selections,
+        mode=mode,
+        locked_fields=locked,
+    )
+    applied_values = {}
+    for field, value in selected["values"].items():
+        if field == "raw_hours_text":
+            normalized = str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        else:
+            normalized = _normalize_value(field, value)
+        applied_values[field] = normalized
+    applied_values = {
+        field: value
+        for field, value in applied_values.items()
+        if value not in (None, "", [], {})
+    }
+    applied_fields = [
+        item["field"]
+        for item in selected["accepted"]
+        if item["field"] in applied_values
+    ]
+    field_statuses = {
+        field: ("applied" if field in applied_values else row.get("status") or "unresolved")
+        for field, row in (scan.get("fields") or {}).items()
+    }
+    logger.debug(
+        "restaurant_scan_stage mode=%s selected_fields=%s rejected_fields=%s",
+        mode,
+        sorted(applied_fields),
+        sorted(item.get("field") for item in selected["rejected"] if item.get("field")),
+    )
+    return {
+        "ok": True,
+        "restaurant_id": restaurant_id,
+        "applied_values": applied_values,
+        "applied_fields": applied_fields,
+        "rejected": selected["rejected"],
+        "locked_fields": sorted(locked),
+        "field_statuses": field_statuses,
+        "persisted": False,
+    }
+
+
 def _snapshot_file(path):
     path = Path(path)
     return path.exists(), path.read_bytes() if path.exists() else b""
@@ -1553,7 +1649,7 @@ def apply_restaurant_information_scan(restaurant_id, scan, selections=None, mode
                 store_field = STORE_FIELD_KEYS[field]
                 previous = deepcopy(restaurant.get(store_field))
                 value = deepcopy(selected["values"][field])
-                if field in BOOLEAN_FIELDS:
+                if field in BOOLEAN_FIELDS or field in {"weekly_hours", "current_status"}:
                     value = _normalize_value(field, value)
                 if field == "menu_url":
                     value = _normalize_value("menu_url", value)
@@ -1580,6 +1676,8 @@ def apply_restaurant_information_scan(restaurant_id, scan, selections=None, mode
                         menus[0]["updated_at"] = now
                 elif field == "image_url":
                     restaurant["logo"] = value
+                elif field == "weekly_hours":
+                    restaurant["hours_text"] = weekly_hours_to_text(value, restaurant.get("hours_notes")) or None
                 audit_changes.append({
                     "field": field, "previous_value": previous, "new_value": value,
                     "source_url": candidate.get("source_url"), "source_type": candidate.get("source_type"),

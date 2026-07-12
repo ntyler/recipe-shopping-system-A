@@ -282,8 +282,9 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
         "restaurant_name", "restaurant_logo_url", "restaurant_rating", "restaurant_phone",
         "restaurant_website_url", "source_menu_url", "menu_item_url", "restaurant_street_address",
         "restaurant_city", "restaurant_state", "restaurant_postal_code", "restaurant_country",
-        "restaurant_hours_text", "restaurant_current_status", "restaurant_promotions",
-        "restaurant_online_payment_available", "restaurant_delivery_available",
+        "restaurant_raw_hours_data", "restaurant_current_status", "restaurant_promotions",
+        "restaurant_online_payment_available", "restaurant_online_ordering_available",
+        "restaurant_delivery_available",
     ):
         assert f'data-restaurant-edit-field="{field}"' in template
     assert "data-restaurant-edit-form" in template
@@ -308,6 +309,7 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Advanced Restaurant Details" in template
     assert "Advanced Raw Data" in template
     assert 'data-restaurant-hours-day="{{ day }}"' in template
+    assert '<option value="open_24_hours">Open 24 hours</option>' in template
     assert "Optional rewards programs, discounts, or active promotions." in template
     assert "Temporarily Closed" in template
     assert "Permanently Closed" in template

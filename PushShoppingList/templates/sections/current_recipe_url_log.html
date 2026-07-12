@@ -2380,7 +2380,7 @@
                                             {% for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday") %}
                                             <div class="recipe-edit-restaurant-hours-row" data-restaurant-hours-day="{{ day }}">
                                                 <strong>{{ day }}</strong>
-                                                <select aria-label="{{ day }} open or closed" data-hours-state onchange="updateRecipeRestaurantStructuredHours(this)"><option value="open">Open</option><option value="closed">Closed</option></select>
+                                                <select aria-label="{{ day }} hours status" data-hours-state onchange="updateRecipeRestaurantStructuredHours(this)"><option value="open">Open</option><option value="closed">Closed</option><option value="open_24_hours">Open 24 hours</option></select>
                                                 <input type="time" aria-label="{{ day }} opening time" data-hours-open onchange="updateRecipeRestaurantStructuredHours(this)">
                                                 <input type="time" aria-label="{{ day }} closing time" data-hours-close onchange="updateRecipeRestaurantStructuredHours(this)">
                                                 <button type="button" data-hours-add-split onclick="return toggleRecipeRestaurantSplitHours(this)">+ Split hours</button>
@@ -2394,13 +2394,14 @@
                                         <label class="recipe-edit-restaurant-form-wide"><span>Hours Notes</span><input type="text" data-hours-notes placeholder="Holiday hours may vary"></label>
                                         <details class="recipe-edit-restaurant-raw-hours">
                                             <summary>Advanced Raw Data</summary>
-                                            <label><span>Original / Raw Hours</span><textarea rows="3" data-restaurant-edit-field="restaurant_hours_text"></textarea></label>
+                                            <label><span>Original / Raw Hours</span><textarea rows="3" data-restaurant-edit-field="restaurant_raw_hours_data"></textarea></label>
                                         </details>
                                     </section>
                                     <label class="recipe-edit-restaurant-form-wide"><span>Rewards / Promotions</span><textarea rows="4" data-restaurant-edit-field="restaurant_promotions"></textarea><small>Optional rewards programs, discounts, or active promotions.</small></label>
                                     <div class="recipe-edit-restaurant-availability-row recipe-edit-restaurant-form-wide">
                                         <label><span>Current Status</span><select data-restaurant-edit-field="restaurant_current_status"><option value="unknown">Unknown</option><option value="operating">Operating</option><option value="temporarily_closed">Temporarily Closed</option><option value="permanently_closed">Permanently Closed</option></select><small>Permanent business status, not real-time open-now.</small></label>
                                         <label><span>Online Payment</span><select data-restaurant-edit-field="restaurant_online_payment_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+                                        <label><span>Online Ordering</span><select data-restaurant-edit-field="restaurant_online_ordering_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
                                         <label><span>Delivery</span><select data-restaurant-edit-field="restaurant_delivery_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
                                     </div>
                                 </div>
@@ -2431,8 +2432,9 @@
                                 <footer>
                                     <button type="button" onclick="return closeRecipeRestaurantFetchReview()">Cancel</button>
                                     <button type="button" onclick="return fetchRecipeRestaurantDetails(this, true)">Rescan</button>
-                                    <button type="button" onclick="return applyRecipeRestaurantInformationScan(this, 'selected')">Apply Selected</button>
-                                    <button type="button" class="primary" onclick="return applyRecipeRestaurantInformationScan(this, 'high_confidence')">Apply All High Confidence</button>
+                                    <span data-restaurant-scan-apply-message role="status" aria-live="polite"></span>
+                                    <button type="button" data-restaurant-scan-apply-selected onclick="return applyRecipeRestaurantInformationScan(this, 'selected')">Apply Selected</button>
+                                    <button type="button" class="primary" data-restaurant-scan-apply-high onclick="return applyRecipeRestaurantInformationScan(this, 'high_confidence')">Apply All High Confidence</button>
                                 </footer>
                             </aside>
                             <p class="recipe-edit-restaurant-form-error" data-restaurant-edit-error hidden></p>

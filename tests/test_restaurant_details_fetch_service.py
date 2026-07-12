@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from PushShoppingList.services import restaurant_details_fetch_service as service
+from PushShoppingList.services import restaurant_hours_service
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -62,7 +63,7 @@ def test_extract_restaurant_proposals_from_public_structured_data():
     assert proposals["rewards_promotions"]["found"] is True
     assert proposals["image_url"]["value"] == "https://example.com/assets/pisco-mar-logo.png"
     assert proposals["current_status"]["value"] == "temporarily_closed"
-    assert proposals["online_payment"]["value"] == "true"
+    assert proposals["online_payment"]["found"] is False
     assert proposals["delivery"]["value"] == "true"
     assert proposals["phone"]["value"] == "(317) 537-2025"
     assert proposals["city"]["value"] == "Indianapolis"
@@ -639,3 +640,132 @@ def test_apply_selected_persists_structured_ordering_provider_and_restaurant_not
     assert saved["ordering_providers"] == provider_value
     assert saved["allergy_information_note"] == "Please call for allergy information."
     assert saved["online_ordering_available"] is False
+
+
+def test_shared_hours_codec_canonicalizes_split_closed_and_open_24_hours():
+    weekly, notes = restaurant_hours_service.parse_weekly_hours_text(
+        "Monday: 00:00-24:00\n"
+        "Tuesday: 11:00-14:00, 17:00-21:00\n"
+        "Wednesday: Closed\n"
+        "Notes: Kitchen closes early"
+    )
+
+    assert weekly["monday"] == {
+        "closed": False,
+        "open_24_hours": True,
+        "ranges": [{"opens": "00:00", "closes": "24:00"}],
+    }
+    assert weekly["tuesday"]["ranges"] == [
+        {"opens": "11:00", "closes": "14:00"},
+        {"opens": "17:00", "closes": "21:00"},
+    ]
+    assert weekly["wednesday"] == {"closed": True, "ranges": []}
+    assert notes == "Kitchen closes early"
+    assert restaurant_hours_service.weekly_hours_to_text(weekly, notes).startswith("Monday: 00:00-24:00")
+
+
+def test_reconcile_unchanged_hours_is_already_saved_and_not_explicit_review():
+    weekly = service._hours_from_strings(["Monday 11:00 am - 9:00 pm"])
+    row = service._reconcile_field(
+        "weekly_hours",
+        [candidate("weekly_hours", weekly, "hours-1")],
+        {"weekly_hours": weekly},
+        set(),
+    )
+
+    assert row["changed"] is False
+    assert row["selectable"] is False
+    assert row["requires_explicit_review"] is False
+    assert row["status"] == "already_saved"
+
+
+def test_staged_scan_apply_returns_normalized_values_without_mutating_store(monkeypatch, tmp_path):
+    store_path = tmp_path / "restaurant_menus.json"
+    original = {
+        "restaurants": [{
+            "id": "restaurant-1",
+            "restaurant_id": "restaurant-1",
+            "restaurant_name": "Pisco Mar",
+            "weekly_hours": {},
+            "online_ordering_available": None,
+            "online_payment_available": None,
+            "delivery_available": None,
+        }],
+        "menus": [], "sections": [], "items": [], "pdf_logs": [],
+    }
+    store_path.write_text(json.dumps(original), encoding="utf-8")
+    monkeypatch.setattr(service.menu_store_service, "MENU_STORE_FILE", store_path)
+    weekly = service._hours_from_strings(["Monday 11:00 am - 9:00 pm"])
+    hours = candidate("weekly_hours", weekly, "hours-1")
+    raw_hours = candidate("raw_hours_text", "Monday 11 am - 9 pm\nTuesday Closed", "raw-hours-1")
+    ordering = candidate("online_ordering", False, "ordering-1")
+    scan = {
+        "restaurant_id": "restaurant-1",
+        "fields": {
+            "weekly_hours": scan_field("weekly_hours", {}, [hours]),
+            "raw_hours_text": scan_field("raw_hours_text", "", [raw_hours]),
+            "online_ordering": scan_field("online_ordering", None, [ordering]),
+        },
+    }
+
+    result = service.prepare_restaurant_information_scan_apply(
+        "restaurant-1",
+        scan,
+        selections={
+            "weekly_hours": "hours-1",
+            "raw_hours_text": "raw-hours-1",
+            "online_ordering": "ordering-1",
+        },
+    )
+
+    assert result["ok"] is True
+    assert result["persisted"] is False
+    assert result["applied_fields"] == ["weekly_hours", "raw_hours_text", "online_ordering"]
+    assert result["applied_values"]["weekly_hours"] == weekly
+    assert result["applied_values"]["raw_hours_text"] == "Monday 11 am - 9 pm\nTuesday Closed"
+    assert result["applied_values"]["online_ordering"] is False
+    assert result["field_statuses"] == {
+        "weekly_hours": "applied",
+        "raw_hours_text": "applied",
+        "online_ordering": "applied",
+    }
+    assert json.loads(store_path.read_text(encoding="utf-8")) == original
+
+
+def test_staged_high_confidence_apply_excludes_unchanged_conflict_medium_and_locked(monkeypatch, tmp_path):
+    store_path = tmp_path / "restaurant_menus.json"
+    store_path.write_text(json.dumps({
+        "restaurants": [{"id": "restaurant-1", "restaurant_id": "restaurant-1"}],
+        "menus": [], "sections": [], "items": [], "pdf_logs": [],
+    }), encoding="utf-8")
+    monkeypatch.setattr(service.menu_store_service, "MENU_STORE_FILE", store_path)
+    phone = candidate("phone", "317-537-2025", "phone-1")
+    scan = {"restaurant_id": "restaurant-1", "fields": {
+        "phone": scan_field("phone", "317-537-2025", [phone], changed=False, selectable=False, status="already_saved"),
+        "city": scan_field("city", "", [candidate("city", "Indianapolis", "city-1", confidence=0.7)], confidence_label="Medium"),
+        "delivery": scan_field("delivery", None, [candidate("delivery", True, "delivery-1")], locked=True),
+    }}
+
+    result = service.prepare_restaurant_information_scan_apply(
+        "restaurant-1", scan, mode="high_confidence"
+    )
+
+    assert result["ok"] is True
+    assert result["applied_values"] == {}
+    assert result["applied_fields"] == []
+
+
+def test_order_action_does_not_imply_online_payment_without_explicit_evidence():
+    payload = {
+        "@type": "Restaurant",
+        "name": "Pisco Mar",
+        "potentialAction": {"@type": "OrderAction", "target": "https://orders.example.com/pisco"},
+    }
+    result = service.extract_restaurant_candidates(
+        f'<script type="application/ld+json">{json.dumps(payload)}</script>',
+        "https://example.com",
+    )
+    fields = {item["field"]: item["normalized_value"] for item in result["candidates"]}
+
+    assert fields["online_ordering"] is True
+    assert "online_payment" not in fields

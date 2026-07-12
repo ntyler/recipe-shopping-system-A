@@ -461,7 +461,7 @@ def test_menu_derived_recipe_loads_restaurant_and_menu_item_metadata(monkeypatch
     assert loaded["restaurant_phone"] == "317-555-0100"
     assert loaded["restaurant_address"] == "1 Main St, Indianapolis, IN"
     assert loaded["restaurant_hours_text"] == "Mon-Sat 10-9"
-    assert loaded["restaurant_current_status"] == "Open"
+    assert loaded["restaurant_current_status"] == "operating"
     assert loaded["restaurant_online_payment_available"] == "true"
     assert loaded["restaurant_delivery_available"] == "true"
     assert loaded["menu_section"] == "Kitchen Appetizers"
@@ -1147,6 +1147,121 @@ def test_restaurant_update_stores_structured_aliases_and_preserves_created_at(mo
     assert restaurant["updated_at"]
 
 
+def test_normalized_restaurant_hours_round_trip_preserves_split_closed_open_24_notes_and_raw(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "Round Trip Cafe"})
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    store = menu_store_service.load_menu_store()
+    store["restaurants"][0]["raw_hours_data"] = "Legacy prose hours retained for review"
+    menu_store_service.save_menu_store(store)
+    hours_text = (
+        "Monday: 00:00-24:00\n"
+        "Tuesday: 11:00-14:00, 17:00-21:00\n"
+        "Wednesday: Closed\n"
+        "Notes: Kitchen closes 30 minutes early"
+    )
+
+    updated = recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Round Trip Cafe",
+        "restaurant_hours_text": hours_text,
+    })
+    stored = menu_store_service.restaurant_for(menu_store_service.load_menu_store(), restaurant_id)
+    loaded = recipe_edit_service.get_editable_restaurant(restaurant_id)["restaurant"]
+
+    assert updated["ok"] is True
+    assert stored["weekly_hours"]["monday"]["open_24_hours"] is True
+    assert stored["weekly_hours"]["monday"]["ranges"] == [{"opens": "00:00", "closes": "24:00"}]
+    assert stored["weekly_hours"]["tuesday"]["ranges"] == [
+        {"opens": "11:00", "closes": "14:00"},
+        {"opens": "17:00", "closes": "21:00"},
+    ]
+    assert stored["weekly_hours"]["wednesday"]["closed"] is True
+    assert stored["hours_notes"] == "Kitchen closes 30 minutes early"
+    assert stored["raw_hours_data"] == "Legacy prose hours retained for review"
+    assert loaded["restaurant_hours_text"] == hours_text
+    assert loaded["restaurant_weekly_hours"] == stored["weekly_hours"]
+    assert loaded["restaurant_hours_notes"] == "Kitchen closes 30 minutes early"
+    assert loaded["restaurant_raw_hours_data"] == "Legacy prose hours retained for review"
+
+
+def test_normalized_restaurant_status_and_tri_state_services_round_trip_without_conflation(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "Service State Cafe"})
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    store = menu_store_service.load_menu_store()
+    restaurant = menu_store_service.restaurant_for(store, restaurant_id)
+    restaurant["online_ordering_available"] = False
+    restaurant["online_payment_available"] = None
+    restaurant["delivery_available"] = None
+    menu_store_service.save_menu_store(store)
+
+    updated = recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Service State Cafe",
+        "restaurant_current_status": "operating",
+        "restaurant_online_payment_available": "",
+        "restaurant_delivery_available": "",
+    })
+    stored = menu_store_service.restaurant_for(menu_store_service.load_menu_store(), restaurant_id)
+    loaded = recipe_edit_service.get_editable_restaurant(restaurant_id)["restaurant"]
+
+    assert updated["ok"] is True
+    assert stored["current_status"] == "operating"
+    assert stored["online_ordering_available"] is False
+    assert stored["online_payment_available"] is None
+    assert stored["online_payment"] is None
+    assert stored["delivery_available"] is None
+    assert stored["delivery"] is None
+    assert loaded["restaurant_current_status"] == "operating"
+    assert loaded["restaurant_online_ordering_available"] == "false"
+    assert loaded["restaurant_online_payment_available"] == ""
+    assert loaded["restaurant_delivery_available"] == ""
+
+
+def test_structured_restaurant_hours_and_online_ordering_save_without_overwriting_raw(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "Structured Cafe"})
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    store = menu_store_service.load_menu_store()
+    restaurant = menu_store_service.restaurant_for(store, restaurant_id)
+    restaurant["raw_hours_data"] = "Original provider hours"
+    menu_store_service.save_menu_store(store)
+    weekly = {
+        "monday": {"closed": False, "ranges": [{"opens": "11:00", "closes": "21:00"}]},
+        "tuesday": {"closed": True, "ranges": []},
+        "wednesday": {"closed": False, "open_24_hours": True, "ranges": []},
+    }
+
+    result = recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Structured Cafe",
+        "restaurant_weekly_hours": weekly,
+        "restaurant_hours_notes": "Holiday hours may vary",
+        "restaurant_current_status": "operating",
+        "restaurant_online_ordering_available": "false",
+        "restaurant_online_payment_available": "",
+        "restaurant_delivery_available": "",
+    })
+    saved = menu_store_service.restaurant_for(menu_store_service.load_menu_store(), restaurant_id)
+
+    assert result["ok"] is True
+    assert saved["weekly_hours"]["monday"]["ranges"] == [{"opens": "11:00", "closes": "21:00"}]
+    assert saved["weekly_hours"]["tuesday"]["closed"] is True
+    assert saved["weekly_hours"]["wednesday"]["open_24_hours"] is True
+    assert saved["hours_notes"] == "Holiday hours may vary"
+    assert saved["raw_hours_data"] == "Original provider hours"
+    assert saved["current_status"] == "operating"
+    assert saved["online_ordering_available"] is False
+    assert saved["online_payment_available"] is None
+    assert saved["delivery_available"] is None
+
+    recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Structured Cafe Updated",
+        "restaurant_hours_text": "",
+    })
+    preserved = menu_store_service.restaurant_for(menu_store_service.load_menu_store(), restaurant_id)
+    assert preserved["weekly_hours"] == saved["weekly_hours"]
+    assert preserved["raw_hours_data"] == "Original provider hours"
+
+
 def test_legacy_embedded_restaurant_is_lazily_backfilled_without_deleting_snapshot(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     existing = recipe_edit_service.create_editable_restaurant({
@@ -1556,7 +1671,7 @@ def test_saving_menu_derived_recipe_persists_metadata_updates(monkeypatch, tmp_p
     assert restaurant["phone"] == "317-555-0199"
     assert restaurant["full_address"] == "2 Main St, Indianapolis, IN"
     assert restaurant["hours_text"] == "Daily 11-8"
-    assert restaurant["current_status"] == "Open now"
+    assert restaurant["current_status"] == "unknown"
     assert restaurant["online_payment_available"] is False
     assert restaurant["delivery_available"] is True
     assert menu["source_url"] == "https://velasian.example/current-menu"
