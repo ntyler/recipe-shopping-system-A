@@ -538,6 +538,29 @@ def test_menu_source_option_exposes_existing_restaurant_logo_and_rating(monkeypa
     assert option["restaurant_rating"] == "4.5"
 
 
+def test_menu_source_option_formats_location_from_separate_restaurant_fields(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    menu_store_service.save_menu_store({
+        "restaurants": [{
+            "id": "restaurant-pisco",
+            "restaurant_name": "Pisco Mar",
+            "address_line": "9546 Allisonville Rd",
+            "city": "Indianapolis",
+            "state": "Indiana",
+            "postal_code": "46250",
+            "country": "USA",
+        }],
+        "menus": [],
+        "sections": [],
+        "items": [],
+        "pdf_logs": [],
+    })
+
+    option = recipe_edit_service.editable_menu_source_options()[0]
+
+    assert option["restaurant_address"] == "9546 Allisonville Rd, Indianapolis, Indiana 46250, USA"
+
+
 def test_menu_derived_recipe_loads_canonical_source_for_duplicate_source_ids(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"

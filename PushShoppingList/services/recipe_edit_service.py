@@ -2272,6 +2272,29 @@ def editable_menu_source_option_label(restaurant, menu):
     return name
 
 
+def editable_restaurant_location(restaurant):
+    restaurant = restaurant if isinstance(restaurant, dict) else {}
+    full_address = clean_recipe_menu_text(restaurant.get("full_address"))
+    street = clean_recipe_menu_text(restaurant.get("address_line"))
+    city = clean_recipe_menu_text(restaurant.get("city"))
+    state = clean_recipe_menu_text(restaurant.get("state"))
+    postal_code = clean_recipe_menu_text(restaurant.get("postal_code"))
+    country = clean_recipe_menu_text(restaurant.get("country"))
+    primary = full_address or street
+    parts = [primary] if primary else []
+    comparison = primary.casefold()
+
+    if city and city.casefold() not in comparison:
+        parts.append(city)
+    state_postal = " ".join(value for value in (state, postal_code) if value)
+    if state_postal and not all(value.casefold() in comparison for value in (state, postal_code) if value):
+        parts.append(state_postal)
+    if country and country.casefold() not in comparison:
+        parts.append(country)
+
+    return ", ".join(part for part in parts if part)
+
+
 def editable_menu_source_option_from_records(restaurant, menu):
     restaurant = restaurant if isinstance(restaurant, dict) else {}
     menu = menu if isinstance(menu, dict) else {}
@@ -2298,10 +2321,7 @@ def editable_menu_source_option_from_records(restaurant, menu):
         "restaurant_phone": clean_recipe_menu_text(restaurant.get("phone")),
         "restaurant_logo_url": clean_recipe_menu_text(restaurant.get("logo_url")),
         "restaurant_rating": clean_recipe_menu_text(restaurant.get("rating")),
-        "restaurant_address": first_recipe_menu_text(
-            restaurant.get("full_address"),
-            restaurant.get("address_line"),
-        ),
+        "restaurant_address": editable_restaurant_location(restaurant),
         "restaurant_hours_text": clean_recipe_menu_text(restaurant.get("hours_text")),
         "restaurant_current_status": clean_recipe_menu_text(restaurant.get("current_status")),
         "restaurant_promotions": first_recipe_menu_text(

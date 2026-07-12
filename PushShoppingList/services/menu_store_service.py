@@ -262,14 +262,19 @@ def normalize_restaurant_fields(raw_restaurant, source_url=""):
         "city": clean_nullable_text(raw_restaurant.get("city")),
         "state": clean_nullable_text(raw_restaurant.get("state")),
         "postal_code": clean_nullable_text(raw_restaurant.get("postal_code") or raw_restaurant.get("zip")),
+        "country": clean_nullable_text(raw_restaurant.get("country") or raw_restaurant.get("country_name")),
         "hours_text": clean_nullable_text(raw_restaurant.get("hours_text") or raw_restaurant.get("hours")),
         "current_status": clean_nullable_text(raw_restaurant.get("current_status") or raw_restaurant.get("status")),
         "delivery_available": clean_bool(raw_restaurant.get("delivery_available")),
         "online_payment_available": clean_bool(raw_restaurant.get("online_payment_available")),
         "rewards_text": clean_nullable_text(raw_restaurant.get("rewards_text") or raw_restaurant.get("rewards")),
         "promotions": clean_text_list(raw_restaurant.get("promotions")),
-        "logo_url": clean_nullable_text(raw_restaurant.get("logo_url")),
-        "rating": clean_nullable_text(raw_restaurant.get("rating")),
+        "logo_url": clean_nullable_text(raw_restaurant.get("logo_url") or raw_restaurant.get("logo")),
+        "rating": clean_nullable_text(
+            raw_restaurant.get("rating")
+            or raw_restaurant.get("restaurant_rating")
+            or raw_restaurant.get("average_rating")
+        ),
         "hero_image_url": clean_nullable_text(raw_restaurant.get("hero_image_url")),
     }
 
