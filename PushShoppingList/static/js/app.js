@@ -25424,13 +25424,16 @@ function previewRecipeRestaurantRating(button, rating) {
     const form = button?.closest("[data-restaurant-edit-form]");
     const preview = Math.max(1, Math.min(5, Number(rating) || 1));
     form?.querySelectorAll("[data-restaurant-rating-value]").forEach(star => {
-        star.classList.toggle("is-preview", Number(star.dataset.restaurantRatingValue) <= preview);
+        const inPreview = Number(star.dataset.restaurantRatingValue) <= preview;
+        star.classList.toggle("is-preview", inPreview);
+        star.classList.toggle("is-preview-suppressed", !inPreview);
     });
 }
 
 function clearRecipeRestaurantRatingPreview(button) {
     button?.closest("[data-restaurant-edit-form]")?.querySelectorAll("[data-restaurant-rating-value]").forEach(star => {
         star.classList.remove("is-preview");
+        star.classList.remove("is-preview-suppressed");
     });
 }
 

@@ -310,7 +310,11 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert 'currentRating !== nextRating ? String(nextRating) : ""' in script
     assert "function previewRecipeRestaurantRating(button, rating)" in script
     assert "function clearRecipeRestaurantRatingPreview(button)" in script
+    assert 'star.classList.toggle("is-preview-suppressed", !inPreview);' in script
     assert "{ allowToggle: false }" in script
+    assert "color: #fbbf24;" in css
+    assert "color: #9ca3af;" in css
+    assert "fill: currentColor;" in css
     assert "function handleRecipeRestaurantRatingKeydown(button, event)" in script
     assert "function updateRecipeRestaurantStructuredHours(control)" in script
     assert "function toggleRecipeRestaurantSplitHours(button)" in script

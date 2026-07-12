@@ -33027,7 +33027,7 @@ img[data-deferred-src] {
     display: flex;
     min-height: 40px;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] {
@@ -33037,29 +33037,29 @@ img[data-deferred-src] {
     padding: 6px;
     border: 0;
     background: transparent;
-    color: #8f8770;
+    color: #9ca3af;
+    transition: color 160ms ease, transform 160ms ease;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg {
-    width: 27px;
-    height: 27px;
-    fill: transparent;
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+    stroke: currentColor;
+    transition: fill 160ms ease, stroke 160ms ease, transform 160ms ease;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected {
-    color: #f6b900;
+    color: #fbbf24;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview {
-    color: #ffd24a;
+    color: #fcd34d;
+    transform: translateY(-1px);
 }
 
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected svg {
-    fill: currentColor;
-}
-
-.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview svg {
-    fill: rgba(255, 210, 74, .28);
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview-suppressed {
+    color: #9ca3af;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value]:focus-visible {
