@@ -2296,6 +2296,8 @@
                                 <button type="button" aria-label="Close Edit Restaurant Source" onclick="return cancelRecipeRestaurantSourceEdit(this)">{{ shell.svg_icon("x") }}</button>
                             </header>
                             <div class="recipe-edit-restaurant-modal-body">
+                            <section class="recipe-edit-restaurant-primary-column">
+                            <h3>Primary Restaurant Details</h3>
                             <div class="recipe-edit-restaurant-form-logo">
                                 <span class="recipe-edit-restaurant-avatar" data-restaurant-edit-logo>
                                     <img src="" alt="" hidden>
@@ -2338,8 +2340,9 @@
                             <label><span>State or Region</span><input type="text" data-restaurant-edit-field="restaurant_state"></label>
                             <label><span>Postal Code</span><input type="text" data-restaurant-edit-field="restaurant_postal_code"></label>
                             <label><span>Country</span><input type="text" data-restaurant-edit-field="restaurant_country"></label>
-                            <details class="recipe-edit-restaurant-advanced recipe-edit-restaurant-form-wide">
-                                <summary>Advanced Restaurant Details</summary>
+                            </section>
+                            <section class="recipe-edit-restaurant-advanced recipe-edit-restaurant-operational-column">
+                                <h3>Advanced Restaurant Details</h3>
                                 <div class="recipe-edit-restaurant-advanced-body">
                                     <section class="recipe-edit-restaurant-hours-editor">
                                         <h3>Hours</h3>
@@ -2365,12 +2368,14 @@
                                             <label><span>Original / Raw Hours</span><textarea rows="3" data-restaurant-edit-field="restaurant_hours_text"></textarea></label>
                                         </details>
                                     </section>
-                                    <label><span>Current Status</span><select data-restaurant-edit-field="restaurant_current_status"><option value="unknown">Unknown</option><option value="open">Open</option><option value="closed">Closed</option><option value="temporarily_closed">Temporarily Closed</option><option value="permanently_closed">Permanently Closed</option></select><small>This is the saved business status, not a real-time open-now indicator.</small></label>
                                     <label class="recipe-edit-restaurant-form-wide"><span>Rewards / Promotions</span><textarea rows="4" data-restaurant-edit-field="restaurant_promotions"></textarea><small>Optional rewards programs, discounts, or active promotions.</small></label>
-                                    <label><span>Online Payment Available</span><select data-restaurant-edit-field="restaurant_online_payment_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
-                                    <label><span>Delivery Available</span><select data-restaurant-edit-field="restaurant_delivery_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+                                    <div class="recipe-edit-restaurant-availability-row recipe-edit-restaurant-form-wide">
+                                        <label><span>Current Status</span><select data-restaurant-edit-field="restaurant_current_status"><option value="unknown">Unknown</option><option value="open">Open</option><option value="closed">Closed</option><option value="temporarily_closed">Temporarily Closed</option><option value="permanently_closed">Permanently Closed</option></select><small>Saved status, not real-time open-now.</small></label>
+                                        <label><span>Online Payment</span><select data-restaurant-edit-field="restaurant_online_payment_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+                                        <label><span>Delivery</span><select data-restaurant-edit-field="restaurant_delivery_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+                                    </div>
                                 </div>
-                            </details>
+                            </section>
                             <p class="recipe-edit-restaurant-form-error" data-restaurant-edit-error hidden></p>
                             </div>
                             <footer class="recipe-edit-restaurant-form-actions">

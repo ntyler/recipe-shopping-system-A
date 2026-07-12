@@ -25263,8 +25263,6 @@ function editRecipeRestaurantSource(button, event = null) {
         });
     }
     closeRecipeRestaurantLogoChooser(form.querySelector("[data-restaurant-logo-chooser]"));
-    const advanced = form.querySelector(".recipe-edit-restaurant-advanced");
-    if (advanced) advanced.open = false;
     initializeRecipeRestaurantStructuredHours(form);
     recipeRestaurantEditSnapshot = JSON.stringify(recipeRestaurantEditValues(form));
     recipeRestaurantEditTrigger = button;
@@ -25456,12 +25454,18 @@ function initializeRecipeRestaurantStructuredHours(form = recipeRestaurantEditFo
         row.querySelectorAll('input[type="time"]').forEach(input => { input.value = ""; });
         const split = row.querySelector("[data-hours-split]");
         if (split) split.hidden = true;
+        const splitButton = row.querySelector("[data-hours-add-split]");
+        if (splitButton) splitButton.textContent = "+ Split hours";
         const day = row.dataset.restaurantHoursDay;
         const line = raw.split(/\r?\n/).find(value => value.toLowerCase().startsWith(`${day.toLowerCase()}:`));
-        if (!line) return;
+        if (!line) {
+            syncRecipeRestaurantHoursRow(row);
+            return;
+        }
         const detail = line.slice(line.indexOf(":") + 1).trim();
         if (/^closed$/i.test(detail)) {
             row.querySelector("[data-hours-state]").value = "closed";
+            syncRecipeRestaurantHoursRow(row);
             return;
         }
         const ranges = [...detail.matchAll(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/g)];
@@ -25474,6 +25478,7 @@ function initializeRecipeRestaurantStructuredHours(form = recipeRestaurantEditFo
             row.querySelector("[data-hours-close-two]").value = ranges[1][2];
             if (split) split.hidden = false;
         }
+        syncRecipeRestaurantHoursRow(row);
     });
     const notes = form?.querySelector("[data-hours-notes]");
     if (notes) {
@@ -25486,10 +25491,19 @@ function initializeRecipeRestaurantStructuredHours(form = recipeRestaurantEditFo
     }
 }
 
+function syncRecipeRestaurantHoursRow(row) {
+    if (!row) return;
+    const closed = row.querySelector("[data-hours-state]")?.value === "closed";
+    row.classList.toggle("is-closed", closed);
+    const splitButton = row.querySelector("[data-hours-add-split]");
+    if (splitButton) splitButton.disabled = closed;
+}
+
 function updateRecipeRestaurantStructuredHours(control) {
     const form = control?.closest("[data-restaurant-edit-form]");
     if (!form) return false;
     const lines = Array.from(form.querySelectorAll("[data-restaurant-hours-day]")).map(row => {
+        syncRecipeRestaurantHoursRow(row);
         const day = row.dataset.restaurantHoursDay;
         if (row.querySelector("[data-hours-state]").value === "closed") return `${day}: Closed`;
         const first = [row.querySelector("[data-hours-open]").value, row.querySelector("[data-hours-close]").value];

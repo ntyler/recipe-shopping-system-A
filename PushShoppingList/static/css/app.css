@@ -32686,7 +32686,7 @@ img[data-deferred-src] {
     inset: 0;
     z-index: 12000;
     display: grid;
-    padding: 24px 16px;
+    padding: 16px 24px;
     place-items: center;
     background: rgba(2, 6, 8, 0.72);
     backdrop-filter: blur(3px);
@@ -32694,8 +32694,10 @@ img[data-deferred-src] {
 
 .recipe-edit-restaurant-modal {
     display: flex;
-    width: min(740px, calc(100vw - 32px));
-    max-height: min(820px, calc(100vh - 48px));
+    width: min(1400px, calc(100vw - 48px));
+    height: min(900px, calc(100vh - 32px));
+    max-width: none;
+    max-height: none;
     min-height: 0;
     flex-direction: column;
     overflow: hidden;
@@ -32708,7 +32710,8 @@ img[data-deferred-src] {
 .recipe-edit-standalone-page .recipe-edit-restaurant-form {
     display: flex;
     width: 100%;
-    max-height: min(820px, calc(100vh - 48px));
+    height: 100%;
+    max-height: none;
     min-height: 0;
     flex-direction: column;
 }
@@ -32750,13 +32753,38 @@ img[data-deferred-src] {
 .recipe-edit-restaurant-modal-body {
     display: grid;
     flex: 1 1 auto;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);
+    gap: 16px;
     min-height: 0;
-    padding: 14px 16px;
+    padding: 12px 16px;
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
+}
+
+.recipe-edit-restaurant-primary-column,
+.recipe-edit-restaurant-operational-column {
+    min-width: 0;
+}
+
+.recipe-edit-restaurant-primary-column {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 8px 10px;
+}
+
+.recipe-edit-restaurant-primary-column > h3,
+.recipe-edit-restaurant-operational-column > h3 {
+    grid-column: 1 / -1;
+    margin: 0 0 2px;
+    color: var(--app-text-strong);
+    font-size: 11px;
+}
+
+.recipe-edit-restaurant-primary-column > .recipe-edit-restaurant-form-wide,
+.recipe-edit-restaurant-primary-column > .recipe-edit-restaurant-form-logo {
+    grid-column: 1 / -1;
 }
 
 .recipe-edit-standalone-page .recipe-edit-restaurant-form label {
@@ -32896,7 +32924,9 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-restaurant-advanced {
-    margin-top: 4px;
+    margin: 0;
+    min-width: 0;
+    padding: 10px 12px;
     border: 1px solid var(--app-border);
     border-radius: 8px;
     background: var(--app-bg-soft);
@@ -32913,9 +32943,9 @@ img[data-deferred-src] {
 
 .recipe-edit-restaurant-advanced-body {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    padding: 0 12px 12px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 0;
 }
 
 .recipe-edit-restaurant-hours-editor {
@@ -32929,21 +32959,21 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-restaurant-hours-editor > p {
-    margin: 0 0 8px;
+    margin: 0 0 5px;
     color: var(--app-muted);
     font-size: 8px;
 }
 
 .recipe-edit-restaurant-hours-grid {
     display: grid;
-    gap: 5px;
-    margin-bottom: 8px;
+    gap: 3px;
+    margin-bottom: 6px;
 }
 
 .recipe-edit-restaurant-hours-row {
     display: grid;
-    grid-template-columns: 72px 76px minmax(92px, 1fr) minmax(92px, 1fr) auto;
-    gap: 6px;
+    grid-template-columns: 64px 72px minmax(82px, 1fr) minmax(82px, 1fr) 72px;
+    gap: 4px;
     align-items: center;
 }
 
@@ -32954,14 +32984,28 @@ img[data-deferred-src] {
 
 .recipe-edit-restaurant-hours-row > button {
     width: auto;
-    min-height: 30px;
+    min-height: 27px;
     margin: 0;
-    padding: 0 7px;
+    padding: 0 5px;
     border: 1px solid var(--app-border);
     border-radius: 6px;
     background: var(--app-surface);
     color: var(--app-muted);
     font-size: 8px;
+}
+
+.recipe-edit-restaurant-hours-row :is(input, select) {
+    min-height: 27px !important;
+    height: 27px !important;
+    padding-inline: 5px !important;
+}
+
+.recipe-edit-restaurant-hours-row.is-closed > :is([data-hours-open], [data-hours-close], [data-hours-split]) {
+    visibility: hidden;
+}
+
+.recipe-edit-restaurant-hours-row.is-closed > [data-hours-add-split] {
+    opacity: .45;
 }
 
 .recipe-edit-restaurant-split-hours {
@@ -32990,6 +33034,18 @@ img[data-deferred-src] {
     background: var(--app-bg-soft);
     color: var(--app-text-strong);
     font: inherit;
+}
+
+.recipe-edit-restaurant-advanced textarea[data-restaurant-edit-field="restaurant_promotions"] {
+    min-height: 88px;
+    height: 88px;
+}
+
+.recipe-edit-restaurant-availability-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, .8fr));
+    gap: 8px;
+    align-items: start;
 }
 
 .recipe-edit-standalone-page .recipe-edit-restaurant-form-logo > div,
@@ -33048,11 +33104,13 @@ img[data-deferred-src] {
 
     .recipe-edit-restaurant-modal {
         width: calc(100vw - 16px);
-        max-height: calc(100vh - 16px);
+        height: calc(100vh - 16px);
+        max-height: none;
     }
 
     .recipe-edit-standalone-page .recipe-edit-restaurant-form {
-        max-height: calc(100vh - 16px);
+        height: 100%;
+        max-height: none;
     }
 
     .recipe-edit-restaurant-modal-body {
@@ -33060,6 +33118,15 @@ img[data-deferred-src] {
     }
 
     .recipe-edit-restaurant-modal-body > * {
+        grid-column: 1;
+    }
+
+    .recipe-edit-restaurant-primary-column,
+    .recipe-edit-restaurant-availability-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .recipe-edit-restaurant-primary-column > * {
         grid-column: 1;
     }
 
