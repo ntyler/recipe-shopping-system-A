@@ -33103,25 +33103,11 @@ img[data-deferred-src] {
     align-items: center;
 }
 
-.recipe-edit-restaurant-combobox-icon {
-    position: absolute;
-    left: 12px;
-    z-index: 1;
-    display: grid;
-    color: var(--app-muted);
-    pointer-events: none;
-}
-
-.recipe-edit-restaurant-combobox-icon svg {
-    width: 18px;
-    height: 18px;
-}
-
 .recipe-edit-restaurant-modal-header .recipe-edit-restaurant-combobox input {
     width: 100%;
     min-width: 0;
     height: 42px;
-    padding: 8px 44px 8px 40px;
+    padding: 8px 44px 8px 12px;
     border: 1px solid #59635f;
     border-radius: 8px;
     background: var(--app-bg-soft);

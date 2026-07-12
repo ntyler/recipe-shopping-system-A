@@ -23,6 +23,11 @@ def test_restaurant_selector_is_searchable_accessible_and_header_scoped():
     assert 'aria-controls="recipeEditRestaurantSelectorList"' in header
     assert 'role="listbox"' in header
     assert 'data-restaurant-selector-status aria-live="polite"' in header
+    assert 'recipe-edit-restaurant-combobox-icon' not in header
+    assert 'shell.svg_icon("search")' not in header
+    assert 'shell.svg_icon("chevron-down")' in header
+    assert ".recipe-edit-restaurant-combobox-icon" not in css
+    assert "padding: 8px 44px 8px 12px;" in css
     assert ".recipe-edit-restaurant-modal-header {" in css
     assert "grid-template-columns: max-content minmax(320px, 560px) 38px;" in css
     assert 'grid-template-areas:' in css
