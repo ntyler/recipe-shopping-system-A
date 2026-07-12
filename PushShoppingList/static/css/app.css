@@ -27209,15 +27209,12 @@ img[data-deferred-src] {
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-details {
     position: relative;
-    display: flex;
-    flex-direction: column;
 }
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-primary-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0;
-    order: 2;
 }
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-primary-actions .recipe-edit-cover-upload-button {
@@ -27262,22 +27259,20 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-image-change-actions {
-    position: static;
-    display: none;
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 8px);
+    z-index: 30;
+    display: grid;
     width: min(220px, 100%);
     grid-template-columns: minmax(0, 1fr);
     gap: 5px;
-    margin: 0 0 8px;
+    margin: 0;
     padding: 7px;
     border: 1px solid #59635f;
     border-radius: 8px;
     background: var(--app-surface-soft);
     box-shadow: 0 12px 28px rgba(0, 0, 0, .4);
-    order: 1;
-}
-
-.recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-image-change-actions:not([hidden]) {
-    display: grid;
 }
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-image-change-actions[hidden] {
@@ -33244,8 +33239,17 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg path {
-    fill: currentColor;
+    fill: none;
     stroke: currentColor;
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected:not(.is-preview-suppressed) svg path,
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview svg path {
+    fill: currentColor;
+}
+
+.recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-preview-suppressed svg path {
+    fill: none;
 }
 
 .recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value].is-selected {

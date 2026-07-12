@@ -21425,6 +21425,7 @@ let recipeEditPdfRefreshTimer = null;
 let recipeEditPdfRefreshToken = 0;
 let recipeEditReturnState = null;
 let recipeEditorPrefetchBound = false;
+let recipeCoverImageGenerationPending = false;
 const RECIPE_EDITOR_CACHE_TTL_MS = 60 * 1000;
 const recipeEditorDataCache = new Map();
 const RECIPE_EDIT_MENU_SECTION_FIELD_NAME = "menu_section";
@@ -22629,6 +22630,7 @@ function openIngredientFoodReviewFromRecipeView(button, event = null) {
 }
 
 function closeRecipeEditor() {
+    closeRecipeImageChangeActions();
     const modal = document.getElementById("recipeEditModal");
 
     if (modal) {
@@ -24270,8 +24272,7 @@ function organizeRecipeEditImageCard() {
         appendRecipeEditWorkspaceChildren(actions, [upload, remove]);
     }
 
-    const changeActions = coverField.querySelector("[data-recipe-image-change-actions]");
-    if (changeActions) changeActions.hidden = true;
+    closeRecipeImageChangeActions();
     if (upload) upload.setAttribute("aria-expanded", "false");
 
 }
@@ -26606,11 +26607,24 @@ function recipeImageProviderFieldHtml(selectId = "") {
 }
 
 function toggleRecipeImageChangeActions(button) {
-    const details = button?.closest(".recipe-edit-cover-details");
-    const actions = details?.querySelector("[data-recipe-image-change-actions]");
+    const wrapper = button?.closest(".recipe-edit-cover-details");
+    const openMenu = wrapper?.querySelector("[data-recipe-image-change-actions]");
+    if (openMenu) {
+        closeRecipeImageChangeActions({ restoreFocus: true });
+        return false;
+    }
+    closeRecipeImageChangeActions();
+    const template = wrapper?.querySelector("[data-recipe-image-change-menu-template]");
+    const actions = template?.content.firstElementChild?.cloneNode(true);
     if (actions) {
-        actions.hidden = !actions.hidden;
-        button.setAttribute("aria-expanded", actions.hidden ? "false" : "true");
+        wrapper.appendChild(actions);
+        const generateButton = actions.querySelector("#recipeEditCoverGenerate");
+        if (generateButton && recipeCoverImageGenerationPending) {
+            generateButton.disabled = true;
+            generateButton.querySelector("span").textContent = "Generating...";
+        }
+        button.setAttribute("aria-expanded", "true");
+        actions.querySelector("button")?.focus();
     }
     return false;
 }
@@ -26618,7 +26632,7 @@ function toggleRecipeImageChangeActions(button) {
 function closeRecipeImageChangeActions(options = {}) {
     const actions = document.querySelector("[data-recipe-image-change-actions]");
     const button = document.querySelector(".recipe-edit-image-card .recipe-edit-cover-primary-actions [aria-expanded]");
-    if (actions) actions.hidden = true;
+    if (actions) actions.remove();
     if (button) button.setAttribute("aria-expanded", "false");
     if (options.restoreFocus) button?.focus({ preventScroll: true });
 }
@@ -26626,13 +26640,13 @@ function closeRecipeImageChangeActions(options = {}) {
 document.addEventListener("pointerdown", event => {
     const actions = document.querySelector("[data-recipe-image-change-actions]");
     const toggle = document.querySelector(".recipe-edit-image-card .recipe-edit-cover-primary-actions [aria-expanded]");
-    if (!actions || actions.hidden || actions.contains(event.target) || toggle?.contains(event.target)) return;
+    if (!actions || actions.contains(event.target) || toggle?.contains(event.target)) return;
     closeRecipeImageChangeActions();
 });
 
 document.addEventListener("keydown", event => {
     const actions = document.querySelector("[data-recipe-image-change-actions]");
-    if (event.key === "Escape" && actions && !actions.hidden) {
+    if (event.key === "Escape" && actions) {
         event.preventDefault();
         closeRecipeImageChangeActions({ restoreFocus: true });
     }
@@ -26754,6 +26768,7 @@ async function requestRecipeCoverImageGeneration(payload = {}, signal = null) {
 }
 
 async function generateRecipeCoverImage(button) {
+    if (recipeCoverImageGenerationPending) return false;
     closeRecipeImageChangeActions();
     const originalUrl = recipeEditorCurrentUrl();
     const titleInput = document.getElementById("recipeEditTitleInput");
@@ -26768,6 +26783,7 @@ async function generateRecipeCoverImage(button) {
         setRecipeEditStatus("Unable to generate title image: missing recipe URL.", true);
         return false;
     }
+    recipeCoverImageGenerationPending = true;
 
     const buttonLabel = document.getElementById("recipeEditCoverGenerateLabel");
     const originalText = buttonLabel
@@ -26819,6 +26835,7 @@ async function generateRecipeCoverImage(button) {
         console.warn("Unable to generate recipe title image.", err);
         setRecipeEditStatus(message, true);
     } finally {
+        recipeCoverImageGenerationPending = false;
         window.clearTimeout(timeout);
         if (button) {
             button.disabled = false;

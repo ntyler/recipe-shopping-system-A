@@ -886,15 +886,18 @@
                                        accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
                                        onchange="return uploadRecipeCoverImage(this)">
                             </div>
-                            <div class="recipe-edit-image-change-actions" data-recipe-image-change-actions hidden>
-                                <button type="button" onclick="return openRecipeCoverUpload()">Upload Image</button>
-                                <button type="button"
-                                        id="recipeEditCoverGenerate"
-                                        class="recipe-edit-cover-generate-button"
-                                        onclick="return generateRecipeCoverImage(this)">
-                                    <span id="recipeEditCoverGenerateLabel">Regenerate with AI</span>
-                                </button>
-                            </div>
+                            <template data-recipe-image-change-menu-template>
+                                <div class="recipe-edit-image-change-actions" data-recipe-image-change-actions role="menu">
+                                    <button type="button" role="menuitem" onclick="return openRecipeCoverUpload()">Upload Image</button>
+                                    <button type="button"
+                                            id="recipeEditCoverGenerate"
+                                            class="recipe-edit-cover-generate-button"
+                                            role="menuitem"
+                                            onclick="return generateRecipeCoverImage(this)">
+                                        <span id="recipeEditCoverGenerateLabel">AI Regenerate</span>
+                                    </button>
+                                </div>
+                            </template>
                             <div class="recipe-image-prompt recipe-image-prompt-collapsed recipe-edit-cover-prompt"
                                  id="recipeEditCoverPrompt"
                                  data-title-image-prompt

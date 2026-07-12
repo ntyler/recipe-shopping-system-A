@@ -125,21 +125,22 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert '<span>Remove</span>' in cover
     assert 'aria-expanded="false"' in cover
     assert "Upload Image" in cover
-    assert "Regenerate with AI" in cover
+    assert "AI Regenerate" in cover
+    assert "data-recipe-image-change-menu-template" in cover
+    assert '<template data-recipe-image-change-menu-template>' in cover
     assert 'onclick="return toggleRecipeImageChangeActions(this)"' in cover
     assert 'onclick="return removeRecipeCoverImage(this)"' in cover
     assert 'onclick="return generateRecipeCoverImage(this)"' in cover
     assert '? "Change Image"' in script
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "background: var(--app-surface);" in css
-    assert "position: static;" in css
-    assert "margin: 0 0 8px;" in css
-    assert "order: 1;" in css
-    assert ".recipe-edit-image-change-actions:not([hidden])" in css
+    assert "position: absolute;" in css
+    assert "bottom: calc(100% + 8px);" in css
     assert "function closeRecipeImageChangeActions(options = {})" in script
     assert 'event.key === "Escape"' in script
     assert "closeRecipeImageChangeActions();" in script
-    assert "if (changeActions) changeActions.hidden = true;" in script
+    assert "template?.content.firstElementChild?.cloneNode(true)" in script
+    assert "if (actions) actions.remove();" in script
     assert 'if (upload) upload.setAttribute("aria-expanded", "false");' in script
 
 
@@ -328,6 +329,8 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "color: #9ca3af;" in css
     assert "fill: currentColor;" in css
     assert ".recipe-edit-restaurant-rating-buttons [data-restaurant-rating-value] svg path {" in css
+    assert ".is-selected:not(.is-preview-suppressed) svg path" in css
+    assert ".is-preview-suppressed svg path {" in css
     assert "function handleRecipeRestaurantRatingKeydown(button, event)" in script
     assert "function updateRecipeRestaurantStructuredHours(control)" in script
     assert "function toggleRecipeRestaurantSplitHours(button)" in script
