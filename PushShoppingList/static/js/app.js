@@ -24220,6 +24220,17 @@ function addRecipeEditMetadataIcon(field, kind) {
     }
 }
 
+function organizeRecipeEditMetadataField(field) {
+    if (!field || field.querySelector(".recipe-edit-metadata-heading")) return;
+    const icon = field.querySelector(":scope > .recipe-edit-metadata-icon");
+    const label = Array.from(field.children).find(child => child.tagName === "SPAN" && !child.classList.contains("recipe-edit-metadata-icon"));
+    if (!icon || !label) return;
+    const heading = document.createElement("div");
+    heading.className = "recipe-edit-metadata-heading";
+    field.insertBefore(heading, field.firstChild);
+    heading.append(icon, label);
+}
+
 function normalizeRecipeEditPriceDisplay() {
     const input = document.getElementById("recipeEditMenuPrice");
     if (!input) return;
@@ -24316,6 +24327,7 @@ function organizeRecipeEditInformationCard() {
     addRecipeEditMetadataIcon(prepField, "prep");
     addRecipeEditMetadataIcon(cookField, "cook");
     addRecipeEditMetadataIcon(inactiveField, "inactive");
+    [servingsField, totalField, prepField, cookField, inactiveField].forEach(organizeRecipeEditMetadataField);
 
     if (infoActions) infoActions.hidden = true;
     if (ratingField && panelHeading) {

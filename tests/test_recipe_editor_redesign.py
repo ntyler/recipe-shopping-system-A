@@ -236,6 +236,8 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'metadataRow.className = "recipe-edit-metadata-strip"' in organizer
     assert 'descriptionRow.className = "recipe-edit-description-row"' in organizer
     assert "addRecipeEditMetadataIcon(servingsField, \"servings\")" in organizer
+    assert "[servingsField, totalField, prepField, cookField, inactiveField].forEach(organizeRecipeEditMetadataField)" in organizer
+    assert 'heading.className = "recipe-edit-metadata-heading"' in script
     assert 'data-recipe-metadata-icon="servings"' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert 'shell.svg_icon("utensils")' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert 'shell.svg_icon("cooking-pot")' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
@@ -249,6 +251,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "if (infoActions) infoActions.hidden = true;" in organizer
     assert "technicalDetails.open = false;" in organizer
     assert "grid-template-columns: repeat(5, minmax(0, 1fr));" in css
+    assert ".recipe-edit-info-panel-organized .recipe-edit-metadata-heading {" in css
     assert "grid-template-columns: minmax(0, 2fr) minmax(145px, .9fr);" in css
     assert ".recipe-edit-price-prefix {" in css
     assert ".recipe-edit-tag-chip {" in css
