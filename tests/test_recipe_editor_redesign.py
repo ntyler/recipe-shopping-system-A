@@ -321,13 +321,18 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert ".recipe-edit-standalone-page .recipe-edit-restaurant-form {" in css
     assert ".recipe-edit-restaurant-modal-backdrop {" in css
     assert ".recipe-edit-restaurant-modal-body {" in css
-    assert "width: min(1400px, calc(100vw - 48px));" in css
-    assert "height: min(900px, calc(100vh - 32px));" in css
+    assert "width: min(96vw, 1440px);" in css
+    assert "height: min(900px, 94vh);" in css
+    assert "max-height: 94vh;" in css
     assert "grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);" in css
     assert "recipe-edit-restaurant-primary-column" in template
     assert "recipe-edit-restaurant-operational-column" in template
     assert "recipe-edit-restaurant-availability-row" in template
-    assert "grid-template-columns: 64px 72px minmax(82px, 1fr) minmax(82px, 1fr) 72px;" in css
+    assert "grid-template-columns: 92px 92px minmax(120px, 1fr) minmax(120px, 1fr) 102px;" in css
+    assert "font-size: 18px;" in css
+    assert "font-size: 14px;" in css
+    assert "min-height: 40px;" in css
+    assert "width: 40px;" in css
     assert "syncRecipeRestaurantHoursRow(row)" in script
     assert "flex: 1 1 auto;" in css
     assert "overflow-y: auto;" in css
