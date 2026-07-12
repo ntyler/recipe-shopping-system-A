@@ -128,7 +128,7 @@ def test_recipe_editor_sidebar_uses_the_same_import_task_groups():
 
 def test_brand_mark_uses_chef_hat_check_cart_logo():
     macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
-    brand_start = macros.index("{% macro brand_mark() -%}")
+    brand_start = macros.index("{% macro brand_mark_svg(color=\"currentColor\") -%}")
     brand_end = macros.index("{%- endmacro %}", brand_start)
     brand_markup = macros[brand_start:brand_end]
     css = read_text("PushShoppingList/static/css/app.css")
@@ -140,7 +140,17 @@ def test_brand_mark_uses_chef_hat_check_cart_logo():
     assert "m53.2 64.4 12.2 10.5 18-18.7" in brand_markup
     assert '<circle cx="52.2" cy="133.2" r="6"></circle>' in brand_markup
     assert '<circle cx="87.4" cy="133.2" r="6"></circle>' in brand_markup
+    assert 'stroke="{{ color }}"' in brand_markup
     assert "stroke-width: 6;" in css
+
+
+def test_recipe_edit_favicon_reuses_shared_brand_mark_only_on_standalone_editor():
+    recipe_edit = read_text("PushShoppingList/templates/recipe_edit_page.html")
+    index = read_text("PushShoppingList/templates/index.html")
+
+    assert "shell.brand_mark_svg('#2eb66f')|urlencode" in recipe_edit
+    assert "images/ai-pantry-logo.svg" not in recipe_edit
+    assert "shell.brand_mark_svg('#2eb66f')" not in index
 
 
 def test_sidebar_import_targets_keep_existing_active_state_and_barcode_behavior():
