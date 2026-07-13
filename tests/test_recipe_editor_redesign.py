@@ -713,7 +713,7 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     assert "overflow-x: hidden;" in panel_rule
     assert "overflow-x: auto;" in table_rule
     assert "overscroll-behavior-inline: contain;" in table_rule
-    assert "min-width: 680px;" in v4_css
+    assert "min-width: 640px;" in v4_css
 
     tools_start = script.index("function organizeRecipeEditIngredientTools()")
     tools_end = script.index("function organizeRecipeEditEquipmentTools()", tools_start)
@@ -721,6 +721,27 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     assert 'tableScroll.className = "recipe-edit-ingredient-table-scroll";' in tools_block
     assert "tableScroll.appendChild(tableHead);" in tools_block
     assert "tableScroll.appendChild(ingredientList);" in tools_block
+
+
+def test_recipe_editor_ingredient_options_use_compact_anchored_menu():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
+    organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
+    organize = script[organize_start:organize_end]
+    assert 'substitutions.classList.add("recipe-edit-ingredient-options-panel")' in organize
+    assert "rowMenu.insertBefore(substitutions, rowMenu.firstChild);" in organize
+    assert 'optionsButton.classList.add("recipe-edit-ingredient-options-button")' in organize
+    assert "More ingredient actions" in organize
+    assert "organizeRecipeEditSubstitutionOptionRow" in script
+    assert 'label.textContent = optionRows.length ? optionLabel : "Options";' in script
+
+    v4_css = css[css.index("/* Recipe workspace v4: homepage alignment and compact tab editors. */"):]
+    assert "grid-template-columns: 16px 34px minmax(140px, 1fr) 46px 54px 94px 66px 72px 30px 30px !important;" in v4_css
+    assert ".recipe-edit-ingredient-options-button" in v4_css
+    assert ".recipe-edit-ingredient-options-panel" in v4_css
+    assert "width: min(430px, calc(100vw - 24px));" in v4_css
 
 
 def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization():
