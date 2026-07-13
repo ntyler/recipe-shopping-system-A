@@ -490,6 +490,12 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
             "recipe_url": "recipe://filler-0",
             "recipe_name": "Future Filler",
         })
+        meal_plan_service.add_meal({
+            "date": "2026-07-13",
+            "meal_type": "snack",
+            "recipe_url": "recipe://unlinked",
+            "recipe_name": "Unlinked Meal",
+        })
 
         planned = meal_plan_service.meal_plan_for_week("2026-07-10")["meals_by_day"]["2026-07-10"]["dinner"]
         assert [meal["id"] for meal in planned] == [soup_id, salad_id]
@@ -514,6 +520,20 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
         assert "View full meal plan" in preview_html
         assert "/static/test/weeknight-soup.jpg" in preview_html
         assert "/static/test/side-salad.jpg" in preview_html
+        assert 'class="app-home-meal-name-link"' in preview_html
+        assert 'href="#recipeView"' in preview_html
+        assert 'onclick="return jumpToRecipeViewRecipe(this, event)"' in preview_html
+        assert 'class="app-home-meal-thumb-link"' in preview_html
+        assert 'href="/recipe/edit?url=recipe://soup"' in preview_html
+        assert 'aria-label="Edit recipe: Weeknight Soup"' in preview_html
+        assert 'onkeydown="return handleHomeMealThumbnailKeydown(this, event)"' in preview_html
+        unlinked_start = preview_html.index('data-recipe-url="recipe://unlinked"')
+        unlinked_row_start = preview_html.rfind('<div class="app-home-meal-recipe">', 0, unlinked_start)
+        unlinked_row_end = preview_html.index("</div>", unlinked_start)
+        unlinked_row = preview_html[unlinked_row_start:unlinked_row_end]
+        assert "Unlinked Meal" in unlinked_row
+        assert "app-home-meal-thumb-link" not in unlinked_row
+        assert "/recipe/edit" not in unlinked_row
         assert 'class="app-meal-planner-day is-past"' in html
         assert 'class="app-meal-planner-day is-today" aria-current="date"' in html
         assert 'class="app-meal-planner-cell is-past"' in html
@@ -584,6 +604,8 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     assert 'class="app-home-meal-date-exact"' in index
     assert "slot.date_label" in index
     assert 'class="app-home-meal-recipe"' in index
+    assert 'class="app-home-meal-thumb-link"' in index
+    assert "handleHomeMealThumbnailKeydown" in index
     assert 'onclick="return openHomeMealPlanSlot(this, event)"' in index
     assert '{% extends "layouts/app_layout.html" %}' in index
     assert "data-app-sidebar-collapse" in sidebar

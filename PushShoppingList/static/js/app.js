@@ -1286,6 +1286,16 @@ function handleHomeMealPlanSlotKeydown(slot, event) {
     return openHomeMealPlanSlot(slot);
 }
 
+function handleHomeMealThumbnailKeydown(link, event) {
+    if (!link || !event || event.key !== " ") {
+        return true;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    link.click();
+    return false;
+}
+
 function setMealPlannerStatus(message, isError = false, selector = "[data-meal-plan-status]") {
     const status = document.querySelector(selector);
     if (!status) {

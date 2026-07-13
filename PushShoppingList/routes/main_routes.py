@@ -611,6 +611,12 @@ def shell_context(active_public_user=None):
     for meal in [*meal_plan["meals"], *home_preview_meals]:
         preview = recipe_preview_by_key.get(normalize_recipe_url_key(meal["recipe_url"]), {})
         meal["cover_image"] = preview.get("cover_image") or {}
+        linked_recipe_url = str(preview.get("url") or "").strip()
+        meal["edit_url"] = (
+            url_for("recipe_bp.edit_recipe_page_route", url=linked_recipe_url)
+            if linked_recipe_url
+            else ""
+        )
 
     pantry_running_low = [
         item

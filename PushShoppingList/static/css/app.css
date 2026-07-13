@@ -27870,7 +27870,8 @@ img[data-deferred-src] {
 }
 
 .app-home-meal-slot:focus-visible,
-.app-home-meal-recipe:focus-visible {
+.app-home-meal-name-link:focus-visible,
+.app-home-meal-thumb-link:focus-visible {
     border-radius: 6px;
     outline: 2px solid var(--app-primary);
     outline-offset: -2px;
@@ -27941,12 +27942,18 @@ img[data-deferred-src] {
     text-decoration: none;
 }
 
+.app-home-meal-name-link {
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+}
+
 .app-home-meal-recipe + .app-home-meal-recipe {
     border-top: 1px solid var(--app-border);
 }
 
-.app-home-meal-recipe:hover .app-home-meal-name,
-.app-home-meal-recipe:focus-visible .app-home-meal-name {
+.app-home-meal-name-link:hover .app-home-meal-name,
+.app-home-meal-name-link:focus-visible .app-home-meal-name {
     color: var(--app-primary);
     text-decoration: underline;
 }
@@ -27976,6 +27983,28 @@ img[data-deferred-src] {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+.app-home-meal-thumb-link {
+    display: block;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: box-shadow 150ms ease, filter 150ms ease;
+}
+
+.app-home-meal-thumb-link:hover {
+    box-shadow: 0 0 0 2px rgba(46, 182, 111, 0.42);
+    filter: brightness(1.06);
+}
+
+.app-home-meal-thumb-link:focus-visible {
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-home-meal-thumb-link {
+        transition: none;
+    }
 }
 
 .app-home-meal-more,

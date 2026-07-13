@@ -302,11 +302,19 @@ data-user-id="{{ current_user.user_id if current_user else '' }}"
                                     </div>
                                     <div class="app-home-meal-recipes">
                                         {% for meal in slot.meals %}
-                                            <a class="app-home-meal-recipe"
-                                               href="#recipeView"
-                                               data-recipe-url="{{ meal.recipe_url }}"
-                                               onclick="return jumpToRecipeViewRecipe(this, event)">
-                                                <strong class="app-home-meal-name">{{ meal.recipe_name }}</strong>
+                                            <div class="app-home-meal-recipe">
+                                                <a class="app-home-meal-name-link"
+                                                   href="#recipeView"
+                                                   data-recipe-url="{{ meal.recipe_url }}"
+                                                   onclick="return jumpToRecipeViewRecipe(this, event)">
+                                                    <strong class="app-home-meal-name">{{ meal.recipe_name }}</strong>
+                                                </a>
+                                                {% if meal.edit_url %}
+                                                <a class="app-home-meal-thumb-link"
+                                                   href="{{ meal.edit_url }}"
+                                                   aria-label="Edit recipe: {{ meal.recipe_name }}"
+                                                   onkeydown="return handleHomeMealThumbnailKeydown(this, event)">
+                                                {% endif %}
                                                 <span class="app-home-meal-thumb" aria-hidden="true">
                                                     {% if meal.cover_image and meal.cover_image.src %}
                                                         <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}"
@@ -315,7 +323,8 @@ data-user-id="{{ current_user.user_id if current_user else '' }}"
                                                              decoding="async">
                                                     {% endif %}
                                                 </span>
-                                            </a>
+                                                {% if meal.edit_url %}</a>{% endif %}
+                                            </div>
                                         {% endfor %}
                                         {% if slot.remaining_count %}
                                             <a class="app-home-meal-more"

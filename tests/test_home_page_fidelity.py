@@ -432,6 +432,8 @@ def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
     assert 'class="app-home-meal-day"' in template
     assert 'class="app-home-meal-type"' in template
     assert 'class="app-home-meal-thumb"' in template
+    assert 'class="app-home-meal-thumb-link"' in template
+    assert 'aria-label="Edit recipe: {{ meal.recipe_name }}"' in template
     assert "View full meal plan" in template
     assert ".app-home-meal-list {\n        width: 100%;\n        overflow: hidden;\n        border: 1px solid var(--app-border);" in css
     assert "grid-template-columns: 44px 62px minmax(0, 1fr) 60px;" in css
