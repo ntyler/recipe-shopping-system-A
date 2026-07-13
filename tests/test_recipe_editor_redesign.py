@@ -720,7 +720,7 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     assert "overflow-x: hidden;" in panel_rule
     assert "overflow-x: auto;" in table_rule
     assert "overscroll-behavior-inline: contain;" in table_rule
-    assert "min-width: 670px;" in v4_css
+    assert "min-width: 920px;" in v4_css
 
     tools_start = script.index("function organizeRecipeEditIngredientTools()")
     tools_end = script.index("function organizeRecipeEditEquipmentTools()", tools_start)
@@ -742,10 +742,10 @@ def test_recipe_editor_ingredient_options_use_compact_anchored_menu():
     assert 'optionsButton.classList.add("recipe-edit-ingredient-options-button")' in organize
     assert "More ingredient actions" in organize
     assert "organizeRecipeEditSubstitutionOptionRow" in script
-    assert 'label.textContent = optionRows.length ? optionLabel : (optionalField && optionalField.checked ? "Optional" : "Options");' in script
+    assert 'label.textContent = optionRows.length ? optionLabel : "No options";' in script
 
     v4_css = css[css.index("/* Recipe workspace v4: homepage alignment and compact tab editors. */"):]
-    assert "grid-template-columns: 16px 38px minmax(150px, 1fr) 46px 58px 100px 70px 78px 30px 30px !important;" in v4_css
+    assert "grid-template-columns: 18px 40px minmax(210px, 1fr) 68px 104px 148px 88px 96px 30px 30px !important;" in v4_css
     assert ".recipe-edit-ingredient-options-button" in v4_css
     assert ".recipe-edit-ingredient-options-panel" in v4_css
     assert "width: min(380px, calc(100vw - 24px));" in v4_css
@@ -760,9 +760,11 @@ def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls()
     assert '{{ shell.svg_icon("sort") }}' in template
     assert '{{ shell.svg_icon("folder") }}' in template
     assert '{{ shell.svg_icon("chevron-down") }}' in template
-    for icon_name in ("drag", "leaf", "dairy", "can", "jar", "edit", "trash", "chevron-down"):
+    for icon_name in ("drag", "leaf", "dairy", "can", "jar", "oil", "edit", "trash", "chevron-down"):
         assert f"{icon_name}:" in script or f'"{icon_name}":' in script
     assert "function recipeIngredientStoreSectionIconName" in script
+    assert "function recipeStoreSectionDisplayLabel" in script
+    assert '"CANNED": "Canned Goods"' in script
     assert "function syncRecipeIngredientStoreSectionControl" in script
     assert "function recipeIngredientTypeOptions" in script
     assert '<select data-field="section">${recipeIngredientTypeOptions' in script
@@ -771,6 +773,10 @@ def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls()
     assert ".recipe-edit-store-section-icon.is-dairy" in css
     assert ".recipe-edit-store-section-icon.is-can" in css
     assert ".recipe-edit-store-section-icon.is-jar" in css
+    assert ".recipe-edit-store-section-icon.is-oil" in css
+    assert 'value.includes("OIL") || value.includes("VINEGAR")' in script
+    assert "Edit ${accessibleName}" in script
+    assert "Delete ${accessibleName}" in script
 
 
 def test_recipe_editor_substitution_popover_uses_mockup_summary_hierarchy():

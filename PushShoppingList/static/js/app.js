@@ -25229,6 +25229,26 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
         </button>
     `;
     row.appendChild(actions);
+
+    const focusField = row.querySelector(focusSelector || "input, textarea, select");
+    const updateActionLabels = () => {
+        const fieldValue = String(focusField && "value" in focusField ? focusField.value : "").trim();
+        const accessibleName = label === "ingredient" && fieldValue ? fieldValue : label;
+        const editButton = actions.querySelector(".recipe-edit-compact-row-edit");
+        const deleteButton = actions.querySelector(".recipe-edit-compact-row-delete");
+        if (editButton) {
+            editButton.setAttribute("aria-label", `Edit ${accessibleName}`);
+            editButton.title = `Edit ${accessibleName}`;
+        }
+        if (deleteButton) {
+            deleteButton.setAttribute("aria-label", `Delete ${accessibleName}`);
+            deleteButton.title = `Delete ${accessibleName}`;
+        }
+    };
+    updateActionLabels();
+    if (focusField && label === "ingredient") {
+        focusField.addEventListener("input", updateActionLabels);
+    }
 }
 
 function focusRecipeEditCompactRow(button) {
@@ -30875,6 +30895,7 @@ function recipeEditSvgIcon(name) {
         dairy: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 3h7l1 4 2 2v12H6V9l2-2Z"></path><path d="M8 7h8"></path><path d="M9 11h6v6H9Z"></path></svg>',
         can: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><ellipse cx="12" cy="5" rx="6" ry="2"></ellipse><path d="M6 5v14c0 1.1 2.7 2 6 2s6-.9 6-2V5"></path><path d="M6 19c0-1.1 2.7-2 6-2s6 .9 6 2"></path></svg>',
         jar: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 4h8l-1 3H9L8 4Z"></path><path d="M7 9h10l1 10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L7 9Z"></path><path d="M9 13h6"></path></svg>',
+        oil: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M10 3h4v4l2 2v11H8V9l2-2V3Z"></path><path d="M10 6h4"></path><path d="M9 12h6"></path><path d="M11 15h2"></path></svg>',
         basket: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M7 9 10 4"></path><path d="m17 9-3-5"></path><path d="M4 9h16l-2 10H6L4 9Z"></path><path d="M9 13v3"></path><path d="M15 13v3"></path></svg>',
         search: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>',
         nutrition: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 21c4-4 8-8 8-12a8 8 0 0 0-16 0c0 4 4 8 8 12Z"></path><path d="M12 8v5"></path><path d="M9.5 10.5h5"></path></svg>',
@@ -30939,17 +30960,20 @@ function recipeIngredientBadgesHtml(item = {}) {
 
 function recipeIngredientStoreSectionIconName(section) {
     const value = String(section || "").trim().toUpperCase();
-    if (value === "PRODUCE") {
+    if (value.includes("PRODUCE")) {
         return "leaf";
     }
-    if (value === "DAIRY & EGGS") {
+    if (value.includes("DAIRY")) {
         return "dairy";
     }
-    if (value === "CANNED") {
+    if (value.includes("CANNED")) {
         return "can";
     }
-    if (value === "SPICES & SEASONINGS") {
+    if (value.includes("SPICE") || value.includes("SEASON")) {
         return "jar";
+    }
+    if (value.includes("OIL") || value.includes("VINEGAR")) {
+        return "oil";
     }
     return "basket";
 }
@@ -31217,8 +31241,19 @@ function resizeRecipeIngredientNameField(field) {
         return;
     }
 
+    if (!recipeEditorStandalonePageIsActive()) {
+        field.style.height = "auto";
+        field.style.height = `${field.scrollHeight + 4}px`;
+        return;
+    }
+
+    const isSubstitution = Boolean(field.closest("[data-substitution-option-row]"));
+    const minimumHeight = isSubstitution ? 22 : 32;
+    const maximumHeight = isSubstitution ? 36 : 52;
     field.style.height = "auto";
-    field.style.height = `${field.scrollHeight + 4}px`;
+    const nextHeight = Math.min(maximumHeight, Math.max(minimumHeight, field.scrollHeight + 2));
+    field.style.height = `${nextHeight}px`;
+    field.style.overflowY = field.scrollHeight > maximumHeight ? "auto" : "hidden";
 }
 
 function bindRecipeIngredientNameField(row) {
@@ -31635,10 +31670,9 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     const optionsButton = row ? row.querySelector(".recipe-edit-ingredient-options-button") : null;
     if (optionsButton) {
         const label = optionsButton.querySelector("[data-ingredient-options-label]");
-        const optionalField = row ? row.querySelector('[data-field="optional"]') : null;
         const optionLabel = `${optionRows.length} option${optionRows.length === 1 ? "" : "s"}`;
         if (label) {
-            label.textContent = optionRows.length ? optionLabel : (optionalField && optionalField.checked ? "Optional" : "Options");
+            label.textContent = optionRows.length ? optionLabel : "No options";
         }
         optionsButton.setAttribute("aria-label", optionRows.length
             ? `View ${optionLabel} for this ingredient`
@@ -33760,6 +33794,18 @@ function setRecipeImageElementSource(image, originalUrl, displayVariant = "card"
     }
 }
 
+function recipeStoreSectionDisplayLabel(section) {
+    const value = String(section || "").trim();
+    const normalized = value.toUpperCase();
+    const mockupLabels = {
+        "DAIRY & EGGS": "Dairy",
+        "CANNED": "Canned Goods",
+        "SPICES & SEASONINGS": "Spices",
+    };
+    return mockupLabels[normalized]
+        || value.toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
 function recipeStoreSectionOptions(selected) {
     const selectedValue = String(selected || "").toUpperCase();
     const sections = recipeEditStoreSections.length ? recipeEditStoreSections : ["MISC"];
@@ -33767,7 +33813,7 @@ function recipeStoreSectionOptions(selected) {
     return sections.map(section => {
         const value = String(section || "");
         const isSelected = value.toUpperCase() === selectedValue ? " selected" : "";
-        const label = value.toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+        const label = recipeStoreSectionDisplayLabel(value);
         return `<option value="${escapeAttribute(value)}"${isSelected}>${escapeHtml(label)}</option>`;
     }).join("");
 }
