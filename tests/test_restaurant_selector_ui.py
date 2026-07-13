@@ -283,7 +283,7 @@ def test_restaurant_scan_fields_have_editable_form_destinations():
     script = read_text("PushShoppingList/static/js/app.js")
 
     for field in (
-        "restaurant_note_text", "restaurant_social_links", "restaurant_rating_count",
+        "restaurant_note_text", "restaurant_social_links",
         "restaurant_pickup_available", "restaurant_rewards_program", "restaurant_active_promotions",
         "restaurant_latitude", "restaurant_longitude", "restaurant_logo_url",
         "restaurant_reservation_available", "restaurant_allergy_information_note",
@@ -300,7 +300,8 @@ def test_restaurant_scan_fields_have_editable_form_destinations():
     assert "function removeRecipeRestaurantSocialLink(button)" in script
     assert 'social_urls: { label: "Social links", field: "restaurant_social_links" }' in script
     assert 'restaurant_note: { label: "Restaurant note", field: "restaurant_note_text" }' in script
-    assert 'rating_count: { label: "Rating count", field: "restaurant_rating_count" }' in script
+    assert 'rating_count: { label: "Rating count" }' in script
+    assert 'data-restaurant-edit-field="restaurant_rating_count"' not in template
     assert 'pickup: { label: "Pickup", field: "restaurant_pickup_available" }' in script
     assert 'promotions: { label: "Promotions", field: "restaurant_active_promotions" }' in script
     assert 'latitude: { label: "Latitude", field: "restaurant_latitude" }' in script

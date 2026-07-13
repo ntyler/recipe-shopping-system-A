@@ -27087,7 +27087,7 @@ const recipeRestaurantFetchFieldDefinitions = {
     image_url: { label: "Restaurant logo / image", field: "restaurant_logo_url" },
     current_status: { label: "Business status", field: "restaurant_current_status" },
     rating: { label: "Rating", field: "restaurant_rating" },
-    rating_count: { label: "Rating count", field: "restaurant_rating_count" },
+    rating_count: { label: "Rating count" },
     online_payment: { label: "Online payment", field: "restaurant_online_payment_available" },
     online_ordering: { label: "Online ordering", field: "restaurant_online_ordering_available" },
     pickup: { label: "Pickup", field: "restaurant_pickup_available" },
@@ -27296,7 +27296,10 @@ function recipeRestaurantScanReviewStatus(row, recommended) {
 }
 
 function recipeRestaurantScanRowCanApply(row, status, recommended) {
-    return Boolean(recommended && row?.selectable && !row?.locked
+    const field = String(row?.field || "");
+    const hasFormDestination = Boolean(recipeRestaurantFetchFieldDefinitions[field]?.field)
+        || ["weekly_hours", "raw_hours_text", "hours_notes"].includes(field);
+    return Boolean(hasFormDestination && recommended && row?.selectable && !row?.locked
         && !["Already saved", "Unresolved", "Invalid", "Applied"].includes(status));
 }
 

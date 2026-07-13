@@ -327,7 +327,7 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
         "restaurant_city", "restaurant_state", "restaurant_postal_code", "restaurant_country",
         "restaurant_raw_hours_data", "restaurant_current_status", "restaurant_rewards_program",
         "restaurant_active_promotions", "restaurant_note_text", "restaurant_social_links",
-        "restaurant_rating_count", "restaurant_latitude", "restaurant_longitude",
+        "restaurant_latitude", "restaurant_longitude",
         "restaurant_online_payment_available", "restaurant_online_ordering_available",
         "restaurant_pickup_available", "restaurant_delivery_available",
         "restaurant_reservation_available", "restaurant_allergy_information_note",

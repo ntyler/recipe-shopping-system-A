@@ -2344,13 +2344,8 @@
                             <label class="recipe-edit-restaurant-form-wide"><span>Restaurant Name</span><input type="text" data-restaurant-edit-field="restaurant_name" required></label>
                             <fieldset class="recipe-edit-restaurant-rating-editor recipe-edit-rating-field">
                                 <legend>Rating</legend>
-                                <div class="recipe-edit-restaurant-rating-line">
-                                    <span>
-                                        <input type="hidden" data-rating-input data-restaurant-edit-field="restaurant_rating">
-                                        {{ shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant") }}
-                                    </span>
-                                    <label class="recipe-edit-restaurant-rating-count"><span>Rating Count</span><input type="number" min="0" step="1" inputmode="numeric" data-restaurant-edit-field="restaurant_rating_count"></label>
-                                </div>
+                                <input type="hidden" data-rating-input data-restaurant-edit-field="restaurant_rating">
+                                {{ shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant") }}
                             </fieldset>
                             <label><span>Phone</span><input type="tel" data-restaurant-edit-field="restaurant_phone"></label>
                             <label class="recipe-edit-restaurant-form-wide"><span>Website URL</span><input type="url" data-restaurant-edit-field="restaurant_website_url"><small>Restaurant's main website.</small></label>

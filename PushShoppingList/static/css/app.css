@@ -34558,31 +34558,6 @@ img[data-deferred-src] {
     font-weight: 700;
 }
 
-.recipe-edit-restaurant-rating-line {
-    display: flex;
-    min-width: 0;
-    align-items: end;
-    gap: 14px;
-}
-
-.recipe-edit-restaurant-rating-line > span {
-    display: inline-flex;
-    min-height: 40px;
-    align-items: center;
-}
-
-.recipe-edit-standalone-page .recipe-edit-restaurant-rating-count {
-    width: 96px;
-    flex: 0 0 96px;
-    gap: 4px;
-    font-size: 12px;
-}
-
-.recipe-edit-standalone-page .recipe-edit-restaurant-rating-count input {
-    min-height: 36px;
-    height: 36px;
-}
-
 .recipe-edit-restaurant-social-editor {
     display: grid;
     gap: 9px;
@@ -35394,15 +35369,9 @@ img[data-deferred-src] {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .recipe-edit-restaurant-rating-line,
     .recipe-edit-restaurant-social-header {
         align-items: stretch;
         flex-direction: column;
-    }
-
-    .recipe-edit-standalone-page .recipe-edit-restaurant-rating-count {
-        width: 100%;
-        flex-basis: auto;
     }
 
     .recipe-edit-restaurant-social-row,
