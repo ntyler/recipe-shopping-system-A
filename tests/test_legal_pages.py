@@ -183,9 +183,11 @@ def test_legal_pages_reuse_light_and_dark_public_theme_and_responsive_contract(m
     legal_template = (ROOT / "PushShoppingList/templates/legal_page.html").read_text(encoding="utf-8")
 
     for html in (terms, privacy):
-        assert 'data-public-theme-toggle' in html
-        assert '<option value="light">Light</option>' in html
-        assert '<option value="dark">Dark</option>' in html
+        assert 'data-public-theme-menu' in html
+        assert 'data-public-theme-trigger' in html
+        assert 'role="menu"' in html
+        assert 'data-public-theme-option="light"' in html
+        assert 'data-public-theme-option="dark"' in html
         assert 'localStorage.getItem("ai-pantry-public-theme")' in html
 
     assert 'html[data-public-auth-theme="light"]' in css

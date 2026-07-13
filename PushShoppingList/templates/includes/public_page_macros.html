@@ -22,15 +22,41 @@
             <span>Help &amp; Support</span>
         </a>
         <span class="public-auth-header-divider" aria-hidden="true"></span>
-        <label class="public-auth-theme-control">
-            <span class="sr-only">Color theme</span>
+        <div class="public-auth-theme-control" data-public-theme-menu>
             {{ shell.svg_icon("sparkles") }}
-            <select data-public-theme-toggle aria-label="Color theme">
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-            </select>
-        </label>
+            <button type="button"
+                    class="public-auth-theme-trigger"
+                    data-public-theme-trigger
+                    aria-label="Color theme: System"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    aria-controls="publicThemeMenu">
+                <span data-public-theme-label>System</span>
+                <span class="public-auth-theme-chevron" aria-hidden="true">
+                    {{ shell.svg_icon("chevron-down") }}
+                </span>
+            </button>
+            <div id="publicThemeMenu"
+                 class="public-auth-theme-menu"
+                 data-public-theme-menu-panel
+                 role="menu"
+                 aria-label="Color theme"
+                 hidden>
+                {% for value, label in (("system", "System"), ("light", "Light"), ("dark", "Dark")) %}
+                    <button type="button"
+                            class="public-auth-theme-option"
+                            data-public-theme-option="{{ value }}"
+                            role="menuitemradio"
+                            aria-checked="{{ 'true' if value == 'system' else 'false' }}"
+                            tabindex="-1">
+                        <span>{{ label }}</span>
+                        <span class="public-auth-theme-check" aria-hidden="true">
+                            {{ shell.svg_icon("check") }}
+                        </span>
+                    </button>
+                {% endfor %}
+            </div>
+        </div>
     </div>
 </header>
 {%- endmacro %}

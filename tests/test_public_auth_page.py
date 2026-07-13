@@ -173,7 +173,11 @@ def test_auth_card_defaults_to_single_sign_in_mode_and_keeps_auth_contracts(monk
 
 def test_public_auth_interactions_and_persistence_controls_are_wired():
     template = (ROOT / "PushShoppingList/templates/sections/public_auth_card.html").read_text(encoding="utf-8")
+    public_header = (ROOT / "PushShoppingList/templates/includes/public_page_macros.html").read_text(
+        encoding="utf-8"
+    )
     public_script = (ROOT / "PushShoppingList/static/js/public-auth.js").read_text(encoding="utf-8")
+    app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
 
     assert 'data-auth-mode-target="create"' in template
@@ -185,6 +189,25 @@ def test_public_auth_interactions_and_persistence_controls_are_wired():
     assert "function bindPasswordVisibilityControls()" in public_script
     assert "function bindPublicThemeControl()" in public_script
     assert 'localStorage.setItem(THEME_STORAGE_KEY, selectedTheme)' in public_script
+    assert '<select data-public-theme-toggle' not in public_header
+    assert 'aria-haspopup="menu"' in public_header
+    assert 'aria-controls="publicThemeMenu"' in public_header
+    assert 'role="menu"' in public_header
+    assert public_header.count('role="menuitemradio"') == 1
+    assert 'data-public-theme-option="{{ value }}"' in public_header
+    assert 'aria-checked="{{ \'true\' if value == \'system\' else \'false\' }}"' in public_header
+    assert "function bindPublicThemeMenu(menu)" in public_script
+    assert "function closePublicThemeMenu(menu, options = {})" in public_script
+    assert "function focusAdjacentPublicThemeOption(menu, direction)" in public_script
+    for key in ('"ArrowDown"', '"ArrowUp"', '"Home"', '"End"', '"Enter"', '"Escape"'):
+        assert key in public_script
+    assert 'event.target?.closest("[data-public-theme-menu]")' in public_script
+    assert '.public-auth-theme-option[aria-checked="true"]' in app_css
+    assert "top: calc(100% + 8px);" in app_css
+    assert "right: 0;" in app_css
+    assert "max-width: calc(100vw - 24px);" in app_css
+    assert "max-height: calc(100dvh - 90px);" in app_css
+    assert "z-index: 200;" in app_css
 
     assert "browserLocalPersistence" in firebase_script
     assert "browserSessionPersistence" in firebase_script
@@ -193,6 +216,25 @@ def test_public_auth_interactions_and_persistence_controls_are_wired():
     assert firebase_script.count("await setFirebasePersistenceForForm(form);") == 2
     assert 'while (headingBlock && headingBlock.parentElement !== form)' in firebase_script
     assert 'headingBlock.insertAdjacentElement("afterend", status);' in firebase_script
+
+
+def test_public_theme_menu_renders_three_accessible_high_contrast_options(monkeypatch, tmp_path):
+    app = seeded_app(monkeypatch, tmp_path)
+
+    with app.test_client() as client:
+        html = client.get("/").get_data(as_text=True)
+
+    assert 'data-public-theme-trigger' in html
+    assert 'aria-label="Color theme: System"' in html
+    assert 'aria-haspopup="menu"' in html
+    assert 'aria-expanded="false"' in html
+    assert 'id="publicThemeMenu"' in html
+    assert 'role="menu"' in html
+    assert html.count('role="menuitemradio"') == 3
+    for value, label in (("system", "System"), ("light", "Light"), ("dark", "Dark")):
+        assert f'data-public-theme-option="{value}"' in html
+        assert f"<span>{label}</span>" in html
+    assert '<select data-public-theme-toggle' not in html
 
 
 def test_signed_in_and_guest_sessions_keep_the_normal_application_shell(monkeypatch, tmp_path):

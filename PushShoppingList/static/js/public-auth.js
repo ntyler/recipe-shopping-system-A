@@ -2,6 +2,12 @@
     "use strict";
 
     const THEME_STORAGE_KEY = "ai-pantry-public-theme";
+    const THEME_VALUES = new Set(["system", "light", "dark"]);
+    const THEME_LABELS = {
+        system: "System",
+        light: "Light",
+        dark: "Dark",
+    };
     const AUTH_MODES = new Set(["sign-in", "create", "forgot"]);
 
     function normalizedAuthMode(mode) {
@@ -94,14 +100,37 @@
     function storedTheme() {
         try {
             const value = localStorage.getItem(THEME_STORAGE_KEY) || "system";
-            return ["system", "light", "dark"].includes(value) ? value : "system";
+            return THEME_VALUES.has(value) ? value : "system";
         } catch (error) {
             return "system";
         }
     }
 
+    function syncPublicThemeMenus(theme) {
+        const selectedTheme = THEME_VALUES.has(theme) ? theme : "system";
+
+        document.querySelectorAll("[data-public-theme-menu]").forEach(menu => {
+            const trigger = menu.querySelector("[data-public-theme-trigger]");
+            const label = menu.querySelector("[data-public-theme-label]");
+
+            if (trigger) {
+                trigger.setAttribute("aria-label", `Color theme: ${THEME_LABELS[selectedTheme]}`);
+            }
+            if (label) {
+                label.textContent = THEME_LABELS[selectedTheme];
+            }
+
+            menu.querySelectorAll("[data-public-theme-option]").forEach(option => {
+                option.setAttribute(
+                    "aria-checked",
+                    option.dataset.publicThemeOption === selectedTheme ? "true" : "false"
+                );
+            });
+        });
+    }
+
     function applyPublicTheme(theme, options = {}) {
-        const selectedTheme = ["light", "dark"].includes(theme) ? theme : "system";
+        const selectedTheme = THEME_VALUES.has(theme) ? theme : "system";
 
         if (selectedTheme === "system") {
             delete document.documentElement.dataset.publicAuthTheme;
@@ -117,15 +146,215 @@
             }
         }
 
-        document.querySelectorAll("[data-public-theme-toggle]").forEach(select => {
-            select.value = selectedTheme;
+        syncPublicThemeMenus(selectedTheme);
+    }
+
+    function publicThemeMenuIsOpen(menu) {
+        const panel = menu ? menu.querySelector("[data-public-theme-menu-panel]") : null;
+        return Boolean(panel && !panel.hidden);
+    }
+
+    function closePublicThemeMenu(menu, options = {}) {
+        const trigger = menu ? menu.querySelector("[data-public-theme-trigger]") : null;
+        const panel = menu ? menu.querySelector("[data-public-theme-menu-panel]") : null;
+
+        if (!menu || !trigger || !panel) {
+            return;
+        }
+
+        const wasOpen = !panel.hidden;
+        panel.hidden = true;
+        menu.classList.remove("is-open");
+        trigger.setAttribute("aria-expanded", "false");
+
+        if (wasOpen && options.restoreFocus) {
+            trigger.focus({ preventScroll: true });
+        }
+    }
+
+    function publicThemeMenuOptions(menu) {
+        return menu ? [...menu.querySelectorAll("[data-public-theme-option]")] : [];
+    }
+
+    function focusPublicThemeMenuOption(menu, target = "selected") {
+        const options = publicThemeMenuOptions(menu);
+        let option = options.find(item => item.getAttribute("aria-checked") === "true");
+
+        if (target === "first") {
+            option = options[0];
+        } else if (target === "last") {
+            option = options[options.length - 1];
+        }
+
+        option?.focus({ preventScroll: true });
+    }
+
+    function openPublicThemeMenu(menu, options = {}) {
+        const trigger = menu ? menu.querySelector("[data-public-theme-trigger]") : null;
+        const panel = menu ? menu.querySelector("[data-public-theme-menu-panel]") : null;
+
+        if (!menu || !trigger || !panel) {
+            return;
+        }
+
+        document.querySelectorAll("[data-public-theme-menu]").forEach(otherMenu => {
+            if (otherMenu !== menu) {
+                closePublicThemeMenu(otherMenu);
+            }
+        });
+
+        panel.hidden = false;
+        menu.classList.add("is-open");
+        trigger.setAttribute("aria-expanded", "true");
+        focusPublicThemeMenuOption(menu, options.focus || "selected");
+    }
+
+    function selectPublicThemeOption(menu, option) {
+        const theme = option?.dataset.publicThemeOption || "";
+
+        if (!THEME_VALUES.has(theme)) {
+            return;
+        }
+
+        applyPublicTheme(theme);
+        closePublicThemeMenu(menu, { restoreFocus: true });
+    }
+
+    function focusAdjacentPublicThemeOption(menu, direction) {
+        const options = publicThemeMenuOptions(menu);
+        const activeIndex = options.indexOf(document.activeElement);
+        const nextIndex = activeIndex < 0
+            ? (direction > 0 ? 0 : options.length - 1)
+            : (activeIndex + direction + options.length) % options.length;
+
+        options[nextIndex]?.focus({ preventScroll: true });
+    }
+
+    function bindPublicThemeMenu(menu) {
+        if (!menu || menu.dataset.publicThemeMenuBound === "1") {
+            return;
+        }
+
+        const trigger = menu.querySelector("[data-public-theme-trigger]");
+        const panel = menu.querySelector("[data-public-theme-menu-panel]");
+        if (!trigger || !panel) {
+            return;
+        }
+
+        menu.dataset.publicThemeMenuBound = "1";
+        closePublicThemeMenu(menu);
+
+        trigger.addEventListener("click", () => {
+            if (publicThemeMenuIsOpen(menu)) {
+                closePublicThemeMenu(menu);
+            } else {
+                openPublicThemeMenu(menu);
+            }
+        });
+
+        trigger.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+                event.preventDefault();
+                if (publicThemeMenuIsOpen(menu)) {
+                    closePublicThemeMenu(menu);
+                } else {
+                    openPublicThemeMenu(menu);
+                }
+                return;
+            }
+
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                openPublicThemeMenu(menu, {
+                    focus: event.key === "ArrowDown" ? "first" : "last",
+                });
+                return;
+            }
+
+            if (event.key === "Escape" && publicThemeMenuIsOpen(menu)) {
+                event.preventDefault();
+                closePublicThemeMenu(menu, { restoreFocus: true });
+            }
+        });
+
+        panel.addEventListener("click", event => {
+            const option = event.target?.closest("[data-public-theme-option]");
+            if (option && panel.contains(option)) {
+                selectPublicThemeOption(menu, option);
+            }
+        });
+
+        panel.addEventListener("keydown", event => {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                focusAdjacentPublicThemeOption(menu, event.key === "ArrowDown" ? 1 : -1);
+                return;
+            }
+
+            if (event.key === "Home" || event.key === "End") {
+                event.preventDefault();
+                focusPublicThemeMenuOption(menu, event.key === "Home" ? "first" : "last");
+                return;
+            }
+
+            if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+                const option = event.target?.closest("[data-public-theme-option]");
+                if (option && panel.contains(option)) {
+                    event.preventDefault();
+                    selectPublicThemeOption(menu, option);
+                }
+                return;
+            }
+
+            if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                closePublicThemeMenu(menu, { restoreFocus: true });
+            }
+        });
+
+        menu.addEventListener("focusout", () => {
+            window.requestAnimationFrame(() => {
+                if (publicThemeMenuIsOpen(menu) && !menu.contains(document.activeElement)) {
+                    closePublicThemeMenu(menu);
+                }
+            });
         });
     }
 
     function bindPublicThemeControl() {
         applyPublicTheme(storedTheme(), { persist: false });
-        document.querySelectorAll("[data-public-theme-toggle]").forEach(select => {
-            select.addEventListener("change", () => applyPublicTheme(select.value));
+        document.querySelectorAll("[data-public-theme-menu]").forEach(menu => {
+            bindPublicThemeMenu(menu);
+        });
+
+        if (document.documentElement.dataset.publicThemeMenuGlobalBound === "1") {
+            return;
+        }
+
+        document.documentElement.dataset.publicThemeMenuGlobalBound = "1";
+        document.addEventListener("click", event => {
+            if (event.target?.closest("[data-public-theme-menu]")) {
+                return;
+            }
+
+            document.querySelectorAll("[data-public-theme-menu]").forEach(menu => {
+                if (publicThemeMenuIsOpen(menu)) {
+                    closePublicThemeMenu(menu);
+                }
+            });
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key !== "Escape") {
+                return;
+            }
+
+            const openMenu = [...document.querySelectorAll("[data-public-theme-menu]")]
+                .find(menu => publicThemeMenuIsOpen(menu));
+            if (openMenu) {
+                event.preventDefault();
+                closePublicThemeMenu(openMenu, { restoreFocus: true });
+            }
         });
     }
 

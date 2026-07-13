@@ -32340,6 +32340,8 @@ body.public-auth-page {
 }
 
 .public-auth-header {
+    position: relative;
+    z-index: 20;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -32349,6 +32351,7 @@ body.public-auth-page {
     border-bottom: 1px solid var(--app-border);
     background: color-mix(in srgb, var(--app-bg) 94%, transparent);
     backdrop-filter: blur(14px);
+    overflow: visible;
 }
 
 .public-auth-brand {
@@ -32435,18 +32438,149 @@ body.public-auth-page {
 }
 
 .public-auth-theme-control {
+    position: relative;
     gap: 7px;
+    overflow: visible;
     color: var(--app-text-strong);
 }
 
-.public-auth-theme-control select {
+.public-auth-theme-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 86px;
     min-height: 40px;
-    padding: 0 25px 0 3px;
+    margin: 0;
+    padding: 0 5px 0 3px;
     border: 0;
+    border-radius: 7px;
     background: transparent;
     color: inherit;
+    font-family: inherit;
     font-size: 13px;
     font-weight: 680;
+    line-height: 1.2;
+    text-align: left;
+}
+
+.public-auth-theme-trigger:hover,
+.public-auth-theme-control.is-open .public-auth-theme-trigger {
+    background: var(--app-surface-soft);
+    color: var(--app-primary-hover);
+}
+
+.public-auth-theme-trigger [data-public-theme-label] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.public-auth-theme-chevron {
+    display: inline-flex;
+    flex: 0 0 14px;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    color: var(--app-muted);
+    transition: transform 150ms ease, color 150ms ease;
+}
+
+.public-auth-theme-chevron .app-icon-svg {
+    width: 14px;
+    height: 14px;
+}
+
+.public-auth-theme-control.is-open .public-auth-theme-chevron {
+    color: var(--app-primary);
+    transform: rotate(180deg);
+}
+
+.public-auth-theme-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 200;
+    width: 112px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 90px);
+    padding: 5px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 9px;
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: var(--app-shadow-md);
+}
+
+.public-auth-theme-menu[hidden] {
+    display: none !important;
+}
+
+.public-auth-theme-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-height: 36px;
+    margin: 0;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-text);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 680;
+    line-height: 1.2;
+    text-align: left;
+    box-shadow: none;
+}
+
+.public-auth-theme-option:hover,
+.public-auth-theme-option:focus-visible {
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
+    outline: none;
+}
+
+.public-auth-theme-option:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--app-focus);
+}
+
+.public-auth-theme-option[aria-checked="true"] {
+    background: var(--app-primary-soft);
+    color: var(--app-text-strong);
+}
+
+.public-auth-theme-option[aria-checked="true"]:hover,
+.public-auth-theme-option[aria-checked="true"]:focus-visible {
+    background: color-mix(in srgb, var(--app-primary-soft) 78%, var(--app-surface));
+}
+
+.public-auth-theme-check {
+    display: inline-flex;
+    flex: 0 0 16px;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    color: var(--app-primary);
+    opacity: 0;
+}
+
+.public-auth-theme-check .app-icon-svg {
+    width: 15px;
+    height: 15px;
+}
+
+.public-auth-theme-option[aria-checked="true"] .public-auth-theme-check {
+    opacity: 1;
 }
 
 .public-auth-main {
@@ -32718,7 +32852,7 @@ body.public-auth-page {
 }
 
 .public-auth-page .user-account-form input:focus,
-.public-auth-theme-control select:focus-visible {
+.public-auth-theme-trigger:focus-visible {
     border-color: var(--app-focus);
     outline: 2px solid color-mix(in srgb, var(--app-focus) 22%, transparent);
     outline-offset: 1px;
@@ -33445,7 +33579,7 @@ body.public-auth-page {
         display: none;
     }
 
-    .public-auth-theme-control select {
+    .public-auth-theme-trigger {
         width: 86px;
         padding-left: 4px;
         font-size: 12px;
