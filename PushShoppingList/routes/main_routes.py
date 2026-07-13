@@ -144,6 +144,7 @@ from PushShoppingList.services.global_search_service import recent_global_search
 from PushShoppingList.services.global_search_service import record_recent_global_search_result
 from PushShoppingList.services.job_service import job_for_client
 from PushShoppingList.services.job_service import recent_jobs
+from PushShoppingList.services.legal_content import legal_document as get_legal_document
 from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.user_account_service import SUPPORT_ADMIN_EMAILS
@@ -291,6 +292,22 @@ def public_auth_page_context():
             "supportEmail": SUPPORT_EMAIL,
             "supportAdminEmails": [],
         },
+    }
+
+
+def legal_page_context(slug):
+    """Return shared context for a public legal document."""
+    document = get_legal_document(slug)
+    endpoint = "main_bp.terms_route" if slug == "terms" else "main_bp.privacy_route"
+
+    return {
+        "app_public_auth": True,
+        "app_css_version": static_asset_version("css/app.css"),
+        "public_auth_js_version": static_asset_version("js/public-auth.js"),
+        "legal_document": document,
+        "support_email": SUPPORT_EMAIL,
+        "canonical_url": url_for(endpoint, _external=True),
+        "account_deletion_url": url_for("main_bp.index", _anchor="settingsDangerZonePanel"),
     }
 
 
@@ -3437,6 +3454,16 @@ def index():
         return render_template("public_auth.html", **public_auth_page_context())
 
     return render_template("index.html", **shell_context(active_public_user))
+
+
+@main_bp.route("/terms")
+def terms_route():
+    return render_template("legal_page.html", **legal_page_context("terms"))
+
+
+@main_bp.route("/privacy")
+def privacy_route():
+    return render_template("legal_page.html", **legal_page_context("privacy"))
 
 
 @main_bp.route("/api/global-search", methods=["GET"])

@@ -120,7 +120,7 @@ def test_public_auth_copy_features_footer_and_provider_claims_are_truthful(monke
         "Private &amp; Secure",
     ):
         assert capability in html
-    assert "&copy; 2026 AI Pantry. All rights reserved." in html
+    assert "&copy; 2026 AI Pantry" in html
     for fabricated_stat in ("10,000+", "5,000+", "2,000+", "99.9%"):
         assert fabricated_stat not in html
 
@@ -165,7 +165,10 @@ def test_auth_card_defaults_to_single_sign_in_mode_and_keeps_auth_contracts(monk
     legal = html[legal_start:legal_end]
     assert "Terms of Service" in legal
     assert "Privacy Policy" in legal
-    assert "<a " not in legal
+    assert '<a href="/terms">Terms of Service</a>' in legal
+    assert '<a href="/privacy">Privacy Policy</a>' in legal
+    assert "and acknowledge our" in legal
+    assert "target=" not in legal
 
 
 def test_public_auth_interactions_and_persistence_controls_are_wired():

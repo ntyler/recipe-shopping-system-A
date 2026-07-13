@@ -1,0 +1,90 @@
+{% extends "layouts/app_layout.html" %}
+{% import "includes/public_page_macros.html" as public %}
+{% set app_page_title = legal_document.title ~ " | AI Pantry" %}
+{% set app_body_class = "public-auth-page public-legal-page" %}
+
+{% block app_head %}
+    <meta name="description" content="{{ legal_document.description }}">
+    <link rel="canonical" href="{{ canonical_url }}">
+    {% include "includes/public_theme_head.html" %}
+{% endblock %}
+
+{% block app_body_attributes %}data-public-auth-page data-public-legal-page="{{ legal_document.slug }}"{% endblock %}
+
+{% block public_auth_content %}
+<div class="public-auth-page-frame public-legal-page-frame" data-public-legal-layout>
+    {{ public.public_header(support_email, url_for('main_bp.index'), 'Back to AI Pantry') }}
+
+    <main class="public-legal-main" aria-labelledby="legalPageTitle">
+        <article class="public-legal-article">
+            <header class="public-legal-title-block">
+                <h1 id="legalPageTitle">{{ legal_document.title }}</h1>
+                <dl class="public-legal-dates" aria-label="Document dates">
+                    <div>
+                        <dt>Effective Date</dt>
+                        <dd>{{ legal_document.effective_date }}</dd>
+                    </div>
+                    <div>
+                        <dt>Last Updated</dt>
+                        <dd>{{ legal_document.last_updated }}</dd>
+                    </div>
+                </dl>
+                <div class="public-legal-introduction">
+                    {% for paragraph in legal_document.introduction %}
+                        <p>{{ paragraph }}</p>
+                    {% endfor %}
+                </div>
+            </header>
+
+            <nav class="public-legal-toc" aria-labelledby="legalTableContents">
+                <h2 id="legalTableContents">Table of Contents</h2>
+                <ol>
+                    {% for section in legal_document.sections %}
+                        <li><a href="#{{ section.id }}">{{ section.number }}. {{ section.title }}</a></li>
+                    {% endfor %}
+                </ol>
+            </nav>
+
+            <div class="public-legal-sections">
+                {% for section in legal_document.sections %}
+                    <section class="public-legal-section" aria-labelledby="{{ section.id }}">
+                        <h2 id="{{ section.id }}">{{ section.number }}. {{ section.title }}</h2>
+                        {% if section.review_required|default(false) %}
+                            <p class="public-legal-review-note">
+                                <strong>Pending final legal review:</strong>
+                                The governing jurisdiction must be finalized before public launch.
+                            </p>
+                        {% endif %}
+                        {% for block in section.blocks %}
+                            {% if block.type == "paragraph" %}
+                                <p>{{ block.text }}</p>
+                            {% elif block.type == "list" %}
+                                <ul>
+                                    {% for item in block["items"] %}<li>{{ item }}</li>{% endfor %}
+                                </ul>
+                            {% elif block.type == "heading" %}
+                                <h3 id="{{ block.id }}">{{ block.title }}</h3>
+                            {% elif block.type == "contact" %}
+                                <p>{{ block.intro }}</p>
+                                <address><a href="mailto:{{ block.email }}">{{ block.email }}</a></address>
+                            {% elif block.type == "account_deletion" %}
+                                <a class="public-legal-action" href="{{ account_deletion_url }}">
+                                    Request Account Deletion
+                                </a>
+                            {% endif %}
+                        {% endfor %}
+                    </section>
+                {% endfor %}
+            </div>
+        </article>
+    </main>
+
+    <footer class="public-auth-footer public-legal-footer" data-public-auth-footer>
+        {{ public.public_legal_footer_links(legal_document.slug, support_email) }}
+    </footer>
+</div>
+{% endblock %}
+
+{% block app_scripts %}
+<script src="{{ url_for('static', filename='js/public-auth.js', v=public_auth_js_version) }}"></script>
+{% endblock %}

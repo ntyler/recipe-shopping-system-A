@@ -212,6 +212,9 @@
     </form>
 
     <p class="public-auth-legal">
-        By signing in, you agree to our <span>Terms of Service</span> and <span>Privacy Policy</span>.
+        By signing in, you agree to our
+        <a href="{{ url_for('main_bp.terms_route') }}">Terms of Service</a>
+        and acknowledge our
+        <a href="{{ url_for('main_bp.privacy_route') }}">Privacy Policy</a>.
     </p>
 </section>

@@ -47,6 +47,8 @@ mimetypes.add_type("image/webp", ".webp")
 
 PUBLIC_ENDPOINTS = {
     "main_bp.index",
+    "main_bp.terms_route",
+    "main_bp.privacy_route",
     "main_bp.api_device_stale_route",
     "main_bp.api_device_status_route",
     "main_bp.current_recipes_section",

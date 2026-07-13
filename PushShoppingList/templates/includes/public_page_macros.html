@@ -1,0 +1,49 @@
+{% import "includes/app_shell_macros.html" as shell %}
+
+{% macro public_header(support_email, back_href="", back_label="") -%}
+<header class="public-auth-header" data-public-auth-header>
+    <a class="public-auth-brand" href="{{ url_for('main_bp.index') }}" aria-label="AI Pantry home">
+        {{ shell.brand_mark() }}
+        <span class="public-auth-brand-copy">
+            <strong><span>AI</span> Pantry</strong>
+            <small>Recipe Shopping List</small>
+        </span>
+    </a>
+
+    <div class="public-auth-header-actions">
+        {% if back_href and back_label %}
+            <a class="public-page-back" href="{{ back_href }}">{{ back_label }}</a>
+            <span class="public-auth-header-divider public-page-back-divider" aria-hidden="true"></span>
+        {% endif %}
+        <a class="public-auth-help"
+           href="mailto:{{ support_email }}"
+           aria-label="Help &amp; Support">
+            {{ shell.svg_icon("help") }}
+            <span>Help &amp; Support</span>
+        </a>
+        <span class="public-auth-header-divider" aria-hidden="true"></span>
+        <label class="public-auth-theme-control">
+            <span class="sr-only">Color theme</span>
+            {{ shell.svg_icon("sparkles") }}
+            <select data-public-theme-toggle aria-label="Color theme">
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+            </select>
+        </label>
+    </div>
+</header>
+{%- endmacro %}
+
+{% macro public_legal_footer_links(active_page="", support_email="") -%}
+<div class="public-site-footer-row">
+    <p>&copy; 2026 AI Pantry</p>
+    <nav class="public-site-footer-nav" aria-label="Legal and support">
+        <a href="{{ url_for('main_bp.terms_route') }}"
+           {% if active_page == 'terms' %}class="is-current" aria-current="page"{% endif %}>Terms of Service</a>
+        <a href="{{ url_for('main_bp.privacy_route') }}"
+           {% if active_page == 'privacy' %}class="is-current" aria-current="page"{% endif %}>Privacy Policy</a>
+        <a href="mailto:{{ support_email }}">Help &amp; Support</a>
+    </nav>
+</div>
+{%- endmacro %}

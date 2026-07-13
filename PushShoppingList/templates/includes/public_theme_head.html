@@ -1,0 +1,12 @@
+<script>
+    (function applySavedPublicTheme() {
+        try {
+            var theme = localStorage.getItem("ai-pantry-public-theme") || "system";
+            if (theme === "light" || theme === "dark") {
+                document.documentElement.dataset.publicAuthTheme = theme;
+            }
+        } catch (error) {
+            // The system theme remains available when storage is restricted.
+        }
+    }());
+</script>
