@@ -22021,6 +22021,9 @@ let recipeEditPdfRefreshToken = 0;
 let recipeEditReturnState = null;
 let recipeEditorPrefetchBound = false;
 let recipeCoverImageGenerationPending = false;
+let recipeEditDescriptionRequestPending = false;
+let recipeEditDescriptionProposal = "";
+let recipeEditDescriptionReviewTrigger = null;
 const RECIPE_EDITOR_CACHE_TTL_MS = 60 * 1000;
 const recipeEditorDataCache = new Map();
 const RECIPE_EDIT_MENU_SECTION_FIELD_NAME = "menu_section";
@@ -23227,6 +23230,7 @@ function openIngredientFoodReviewFromRecipeView(button, event = null) {
 function closeRecipeEditor() {
     closeRecipeImageChangeActions();
     closeRecipeEditAiAnalysis({ restoreFocus: false });
+    closeRecipeDescriptionReview({ restoreFocus: false });
     const modal = document.getElementById("recipeEditModal");
 
     if (modal) {
@@ -23299,6 +23303,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditTitleInput", recipe.recipe_title || "");
     setValue("recipeEditDescription", recipe.description || "");
     updateRecipeEditDescriptionCount();
+    updateRecipeDescriptionAiActionLabel();
     setRecipeEditorSourceUrlField(recipe, originalUrl);
     setValue("recipeEditMenuItemUrl", recipe.menu_item_url || recipe.source_url || originalUrl);
     setValue("recipeEditDocumentSourceUrl", recipe.document_source_url || recipe.source_url || originalUrl);
@@ -25013,6 +25018,12 @@ function organizeRecipeEditAiAssistant() {
         return;
     }
     card.querySelectorAll(".recipe-edit-ai-overwrite-toggle").forEach(toggle => advancedContent.appendChild(toggle));
+    const description = document.getElementById("recipeEditDescription");
+    if (description && description.dataset.recipeDescriptionAiLabelBound !== "true") {
+        description.addEventListener("input", updateRecipeDescriptionAiActionLabel);
+        description.dataset.recipeDescriptionAiLabelBound = "true";
+    }
+    updateRecipeDescriptionAiActionLabel();
 }
 
 function organizeRecipeEditIngredientTools() {
@@ -35073,6 +35084,182 @@ function recipeNotesRegenerationSummary(data = {}) {
     const action = data.preview_only ? "Previewed" : "Regenerated";
 
     return `${action} ${sectionCount} note section${sectionCount === 1 ? "" : "s"} with ${itemCount} note${itemCount === 1 ? "" : "s"}.`;
+}
+
+function updateRecipeDescriptionAiActionLabel() {
+    const description = document.getElementById("recipeEditDescription");
+    const hasDescription = Boolean(String(description ? description.value : "").trim());
+    document.querySelectorAll("[data-recipe-description-ai-label]").forEach(label => {
+        label.textContent = recipeEditDescriptionRequestPending
+            ? "Generating..."
+            : (hasDescription ? "Regenerate Description" : "Generate Description");
+    });
+}
+
+function recipeDescriptionReviewModal() {
+    return document.querySelector("[data-recipe-description-review]");
+}
+
+function setRecipeDescriptionReviewError(message = "") {
+    const error = recipeDescriptionReviewModal()?.querySelector("[data-recipe-description-review-error]");
+    if (!error) return;
+    error.textContent = String(message || "").trim();
+    error.hidden = !error.textContent;
+}
+
+function setRecipeDescriptionActionsBusy(isBusy) {
+    recipeEditDescriptionRequestPending = Boolean(isBusy);
+    document.querySelectorAll("[data-recipe-description-ai-action]").forEach(action => {
+        action.disabled = recipeEditDescriptionRequestPending;
+        if (!action.querySelector("[data-recipe-description-ai-label]")) {
+            action.textContent = recipeEditDescriptionRequestPending ? "Generating..." : "Regenerate";
+        }
+    });
+    const apply = recipeDescriptionReviewModal()?.querySelector("[data-recipe-description-review-apply]");
+    if (apply) apply.disabled = recipeEditDescriptionRequestPending || !recipeEditDescriptionProposal;
+    updateRecipeDescriptionAiActionLabel();
+}
+
+function recipeDescriptionReviewFocusableElements(modal) {
+    return Array.from(modal?.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') || [])
+        .filter(element => !element.hidden && element.getAttribute("aria-hidden") !== "true");
+}
+
+function handleRecipeDescriptionReviewKeydown(event) {
+    const modal = recipeDescriptionReviewModal();
+    if (!modal || modal.hidden) return;
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeRecipeDescriptionReview();
+        return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = recipeDescriptionReviewFocusableElements(modal);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
+function openRecipeDescriptionReview(currentDescription, proposedDescription, trigger = null) {
+    const modal = recipeDescriptionReviewModal();
+    if (!modal) return false;
+    recipeEditDescriptionProposal = String(proposedDescription || "").trim();
+    if (trigger && !modal.contains(trigger)) recipeEditDescriptionReviewTrigger = trigger;
+    const current = modal.querySelector("[data-recipe-description-current]");
+    const proposed = modal.querySelector("[data-recipe-description-proposed]");
+    if (current) current.textContent = String(currentDescription || "").trim() || "No description yet.";
+    if (proposed) proposed.textContent = recipeEditDescriptionProposal;
+    setRecipeDescriptionReviewError();
+    modal.hidden = false;
+    document.addEventListener("keydown", handleRecipeDescriptionReviewKeydown);
+    const apply = modal.querySelector("[data-recipe-description-review-apply]");
+    if (apply) {
+        apply.disabled = !recipeEditDescriptionProposal;
+        window.requestAnimationFrame(() => apply.focus());
+    }
+    return false;
+}
+
+function closeRecipeDescriptionReview(options = {}) {
+    const modal = recipeDescriptionReviewModal();
+    const restoreFocus = options.restoreFocus !== false;
+    if (!modal || modal.hidden) return false;
+    modal.hidden = true;
+    setRecipeDescriptionReviewError();
+    document.removeEventListener("keydown", handleRecipeDescriptionReviewKeydown);
+    recipeEditDescriptionProposal = "";
+    if (restoreFocus && recipeEditDescriptionReviewTrigger && recipeEditDescriptionReviewTrigger.isConnected) {
+        recipeEditDescriptionReviewTrigger.focus();
+    }
+    recipeEditDescriptionReviewTrigger = null;
+    return false;
+}
+
+function closeRecipeDescriptionReviewFromBackdrop(event) {
+    if (event && event.target === event.currentTarget) return closeRecipeDescriptionReview();
+    return false;
+}
+
+async function regenerateRecipeDescription(button) {
+    if (recipeEditDescriptionRequestPending) return false;
+    const recipeUrl = recipeEditorCurrentUrl();
+    const description = document.getElementById("recipeEditDescription");
+    const currentDescription = String(description ? description.value : "").trim();
+    const modal = recipeDescriptionReviewModal();
+
+    closeRecipeEditRowMenus();
+    if (!recipeUrl) {
+        setRecipeEditStatus("Recipe URL is required before generating a description.", true);
+        return false;
+    }
+
+    if (!modal || modal.hidden) recipeEditDescriptionReviewTrigger = button;
+    setRecipeDescriptionReviewError();
+    setRecipeDescriptionActionsBusy(true);
+    setRecipeEditStatus(currentDescription ? "Regenerating recipe description..." : "Generating recipe description...");
+
+    try {
+        const payload = collectRecipeEditorPayload();
+        const response = await fetch("/api/recipe/regenerate_description", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                url: recipeUrl,
+                original_url: payload.original_url,
+                recipe: {
+                    ...payload.recipe,
+                    ...collectRecipeEditorCategoryValues(),
+                },
+                cookbook_id: recipeEditInferenceContext.cookbook_id || "",
+                cookbook_name: recipeEditInferenceContext.cookbook_name || "",
+            }),
+        });
+        const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to generate a recipe description.");
+        }
+        const proposed = String(data.description || "").trim();
+        if (!proposed || proposed.length > 1200) {
+            throw new Error("Description generation returned an invalid proposal.");
+        }
+        openRecipeDescriptionReview(currentDescription, proposed, recipeEditDescriptionReviewTrigger || button);
+        setRecipeEditStatus("Description proposal ready for review.");
+    } catch (err) {
+        console.warn("Unable to generate recipe description.", err);
+        const message = err.message || "Unable to generate a recipe description.";
+        if (modal && !modal.hidden) setRecipeDescriptionReviewError(message);
+        setRecipeEditStatus(message, true);
+    } finally {
+        setRecipeDescriptionActionsBusy(false);
+    }
+    return false;
+}
+
+function replaceRecipeDescriptionProposal(button) {
+    const description = document.getElementById("recipeEditDescription");
+    if (!description || !recipeEditDescriptionProposal || recipeEditDescriptionRequestPending) return false;
+    description.value = recipeEditDescriptionProposal;
+    description.dispatchEvent(new Event("input", { bubbles: true }));
+    description.dispatchEvent(new Event("change", { bubbles: true }));
+    const form = document.getElementById("recipeEditForm");
+    if (form) form.dataset.recipeEditDirty = "true";
+    updateRecipeEditDescriptionCount();
+    updateRecipeDescriptionAiActionLabel();
+    closeRecipeDescriptionReview({ restoreFocus: false });
+    setRecipeEditStatus("Description replaced in the editor. Save Recipe to keep this change.");
+    description.focus();
+    return false;
 }
 
 async function regenerateRecipeIngredientsSection(button) {

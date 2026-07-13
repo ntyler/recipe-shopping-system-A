@@ -995,3 +995,44 @@ def test_recipe_editor_description_loads_and_saves_existing_field(monkeypatch, t
 
     assert result["recipe"]["description"] == "A saved soup description."
     assert recipe_edit_service.load_recipe_output(url)["description"] == "A saved soup description."
+
+
+def test_recipe_description_ai_action_is_reviewed_before_it_changes_the_form():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    routes = read_text("PushShoppingList/routes/recipe_routes.py")
+
+    advanced_start = template.index('<details class="recipe-edit-ai-advanced">')
+    advanced_end = template.index("</details>", advanced_start)
+    advanced_markup = template[advanced_start:advanced_end]
+    assert "More AI Actions" in advanced_markup
+    assert "data-recipe-description-ai-action" in advanced_markup
+    assert "data-recipe-description-ai-label" in advanced_markup
+    assert "Regenerate Description" in advanced_markup
+    assert "Review Description" in template
+    assert "Current description" in template
+    assert "Proposed description" in template
+    assert "Replace Description" in template
+
+    generate_start = script.index("async function regenerateRecipeDescription(button)")
+    generate_end = script.index("function replaceRecipeDescriptionProposal", generate_start)
+    generate_function = script[generate_start:generate_end]
+    assert 'fetch("/api/recipe/regenerate_description"' in generate_function
+    assert "collectRecipeEditorPayload()" in generate_function
+    assert "openRecipeDescriptionReview" in generate_function
+    assert ".value =" not in generate_function
+    assert "recipeEditDescriptionRequestPending" in generate_function
+
+    replace_start = script.index("function replaceRecipeDescriptionProposal")
+    replace_end = script.index("async function regenerateRecipeIngredientsSection", replace_start)
+    replace_function = script[replace_start:replace_end]
+    assert "description.value = recipeEditDescriptionProposal" in replace_function
+    assert 'new Event("input", { bubbles: true })' in replace_function
+    assert "Save Recipe to keep this change" in replace_function
+    assert 'hasDescription ? "Regenerate Description" : "Generate Description"' in script
+
+    assert '@recipe_bp.route("/api/recipe/regenerate_description", methods=["POST"])' in routes
+    assert "regenerate_recipe_description_for_recipe" in routes
+    assert ".recipe-edit-description-comparison" in css
+    assert ".recipe-edit-description-review-dialog" in css

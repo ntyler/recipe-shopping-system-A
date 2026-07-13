@@ -223,6 +223,27 @@ def patch_note_regeneration_response(monkeypatch, calls=None, payload=None):
     return calls
 
 
+def patch_description_regeneration_response(monkeypatch, calls=None, payload=None):
+    calls = calls if isinstance(calls, list) else []
+
+    def fake_request(prompt, model, model_source, user_id=None):
+        calls.append({
+            "prompt": prompt,
+            "model": model,
+            "model_source": model_source,
+            "user_id": user_id,
+        })
+        return payload or json.dumps({
+            "description": (
+                "Crisp spring rolls pair a golden wrapper with a savory vegetable and noodle filling. "
+                "They are light, crunchy, and gently seasoned."
+            ),
+        })
+
+    monkeypatch.setattr(inference, "request_recipe_description_regeneration_from_openai", fake_request)
+    return calls
+
+
 def test_regenerate_ingredients_preview_uses_current_editor_context_without_saving(monkeypatch, tmp_path):
     configure_inference_storage(monkeypatch, tmp_path)
     original = seed_cookbook_and_recipe(recipe_overrides={
@@ -393,6 +414,64 @@ def test_regenerate_recipe_notes_preview_uses_current_editor_context_without_sav
     assert "Regenerate only the Recipe Notes section" in calls[0]["prompt"]
     assert "replace_entire_recipe_notes_section" in calls[0]["prompt"]
     assert "Current editor note." in calls[0]["prompt"]
+
+
+def test_regenerate_description_returns_review_proposal_without_saving(monkeypatch, tmp_path):
+    configure_inference_storage(monkeypatch, tmp_path)
+    original = seed_cookbook_and_recipe(recipe_overrides={
+        "description": "Old saved description.",
+        "cuisine_tags": ["Peruvian", "Asian fusion"],
+        "meal_type": "Appetizer",
+        "restaurant_name": "Vel Asian Cuisine",
+        "ingredients": [{"ingredient": "cabbage", "quantity": "1", "unit": "cup"}],
+        "instructions": [{"instruction": "Fry the rolls until crisp."}],
+    })
+    calls = patch_description_regeneration_response(monkeypatch)
+
+    result = inference.regenerate_recipe_description_for_recipe(
+        SPRING_ROLL_URL,
+        current_recipe={
+            **original,
+            "description": "Current unsaved description.",
+            "menu_description": "Vegetable rolls with mushrooms and noodles.",
+        },
+        cookbook_id="vel-asian-cuisine",
+        user_id="editor",
+    )
+    saved = recipe_edit_service.load_recipe_output(SPRING_ROLL_URL)
+
+    assert result["ok"] is True
+    assert result["preview_only"] is True
+    assert result["applied"] is False
+    assert result["updated_fields"] == []
+    assert result["would_update_fields"] == ["description"]
+    assert result["current_description"] == "Current unsaved description."
+    assert result["description"].startswith("Crisp spring rolls")
+    assert saved == original
+    assert len(calls) == 1
+    assert calls[0]["user_id"] == "editor"
+    assert "Generate only a proposed description" in calls[0]["prompt"]
+    assert "Current unsaved description." in calls[0]["prompt"]
+    assert "cabbage" in calls[0]["prompt"]
+    assert "Fry the rolls until crisp." in calls[0]["prompt"]
+    assert "Peruvian, Asian fusion" in calls[0]["prompt"]
+    assert '"meal_type": "Appetizer"' in calls[0]["prompt"]
+    assert '"restaurant_name": "Vel Asian Cuisine"' in calls[0]["prompt"]
+    assert "Vegetable rolls with mushrooms and noodles." in calls[0]["prompt"]
+
+
+def test_regenerate_description_rejects_more_than_three_sentences(monkeypatch, tmp_path):
+    configure_inference_storage(monkeypatch, tmp_path)
+    seed_cookbook_and_recipe()
+    patch_description_regeneration_response(
+        monkeypatch,
+        payload=json.dumps({"description": "One. Two. Three. Four."}),
+    )
+
+    result = inference.regenerate_recipe_description_for_recipe(SPRING_ROLL_URL)
+
+    assert result["ok"] is False
+    assert "1–3 sentence" in result["error"]
 
 
 def test_infer_missing_details_fills_placeholder_menu_item_rows(monkeypatch, tmp_path):

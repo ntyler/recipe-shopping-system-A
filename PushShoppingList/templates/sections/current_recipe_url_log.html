@@ -2670,7 +2670,15 @@
                 </button>
                 <details class="recipe-edit-ai-advanced">
                     <summary>More AI Actions</summary>
-                    <div data-recipe-edit-ai-advanced-content></div>
+                    <div data-recipe-edit-ai-advanced-content>
+                        <button type="button"
+                                class="recipe-edit-ai-targeted-action"
+                                data-recipe-description-ai-action
+                                onclick="return regenerateRecipeDescription(this)">
+                            <span class="recipe-edit-button-icon recipe-edit-infer-sparkles" aria-hidden="true">{{ shell.svg_icon("infer-sparkles") }}</span>
+                            <span data-recipe-description-ai-label>Regenerate Description</span>
+                        </button>
+                    </div>
                 </details>
                 <button type="submit" class="recipe-edit-save">
                     <span class="recipe-edit-button-icon" aria-hidden="true">▣</span>
@@ -2685,5 +2693,51 @@
                 </div>
             </section>
         </form>
+        <div class="recipe-edit-description-review-backdrop"
+             data-recipe-description-review
+             hidden
+             onclick="return closeRecipeDescriptionReviewFromBackdrop(event)">
+            <section class="recipe-edit-description-review-dialog"
+                     role="dialog"
+                     aria-modal="true"
+                     aria-labelledby="recipeEditDescriptionReviewTitle">
+                <header>
+                    <div>
+                        <h3 id="recipeEditDescriptionReviewTitle">Review Description</h3>
+                        <p>Compare the AI proposal before changing the recipe form.</p>
+                    </div>
+                    <button type="button"
+                            class="recipe-edit-description-review-close"
+                            aria-label="Close description review"
+                            onclick="return closeRecipeDescriptionReview()">
+                        {{ shell.svg_icon("x") }}
+                    </button>
+                </header>
+                <div class="recipe-edit-description-review-body">
+                    <p class="recipe-edit-description-review-error" data-recipe-description-review-error role="alert" hidden></p>
+                    <div class="recipe-edit-description-comparison">
+                        <section aria-labelledby="recipeEditCurrentDescriptionTitle">
+                            <h4 id="recipeEditCurrentDescriptionTitle">Current description</h4>
+                            <p data-recipe-description-current></p>
+                        </section>
+                        <section aria-labelledby="recipeEditProposedDescriptionTitle">
+                            <h4 id="recipeEditProposedDescriptionTitle">Proposed description</h4>
+                            <p data-recipe-description-proposed></p>
+                        </section>
+                    </div>
+                </div>
+                <footer>
+                    <button type="button" class="recipe-edit-description-review-cancel" onclick="return closeRecipeDescriptionReview()">Cancel</button>
+                    <button type="button"
+                            class="recipe-edit-description-review-regenerate"
+                            data-recipe-description-ai-action
+                            onclick="return regenerateRecipeDescription(this)">Regenerate</button>
+                    <button type="button"
+                            class="recipe-edit-description-review-apply"
+                            data-recipe-description-review-apply
+                            onclick="return replaceRecipeDescriptionProposal(this)">Replace Description</button>
+                </footer>
+            </section>
+        </div>
     </div>
 </div>

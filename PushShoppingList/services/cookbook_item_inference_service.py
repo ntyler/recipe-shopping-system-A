@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -915,6 +916,68 @@ Required response shape:
 """
 
 
+def prompt_text_value(value):
+    if isinstance(value, (list, tuple, set)):
+        return ", ".join(clean_text(item) for item in value if clean_text(item))
+    if isinstance(value, dict):
+        return ", ".join(
+            clean_text(item)
+            for item in value.values()
+            if clean_text(item)
+        )
+    return clean_text(value)
+
+
+def build_recipe_description_regeneration_prompt(recipe_url, recipe_data, cookbook_id="", cookbook_name=""):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    context = build_prompt_context(recipe_url, recipe_data, cookbook_id, cookbook_name)
+    context["current"]["description"] = clean_text(recipe_data.get("description"))
+    context["cuisine"] = first_clean_text(
+        prompt_text_value(recipe_data.get("cuisine")),
+        prompt_text_value(recipe_data.get("cuisine_tags")),
+        prompt_text_value(recipe_data.get("restaurant_cuisine_tags")),
+    )
+    context["meal_type"] = first_clean_text(
+        prompt_text_value(recipe_data.get("meal_type")),
+        prompt_text_value(recipe_data.get("meal_types")),
+        recipe_data.get("menu_section"),
+    )
+    context["restaurant_name"] = first_clean_text(
+        recipe_data.get("restaurant_name"),
+        recipe_data.get("source_restaurant_name"),
+        recipe_data.get("restaurant_source_name"),
+        recipe_data.get("source_name"),
+    )
+    context["regeneration_mode"] = {
+        "target": "description",
+        "action": "propose_description_only",
+        "apply_behavior": "review_before_apply",
+    }
+    return f"""
+Generate only a proposed description for this existing recipe.
+
+Use the title, current description, ingredients, instructions, cuisine, meal type, restaurant/source name, and menu item description in the context below.
+Return strict JSON only. Do not include markdown.
+
+Description rules:
+- Return 1 to 3 concise sentences in the same language currently used by the recipe.
+- Describe the finished dish clearly, including important flavors, textures, and major ingredients when supported by the context.
+- Do not invent unsupported details, restaurant history, awards, authenticity claims, health benefits, or dietary claims.
+- Do not repeat the full ingredient list.
+- Do not include preparation steps or instructions.
+- Avoid exaggerated marketing language.
+- Do not change or return the title, ingredients, instructions, equipment, nutrition, servings, times, categories, source information, images, or notes.
+
+Context JSON:
+{json.dumps(context, ensure_ascii=False, indent=2)}
+
+Required response shape:
+{{
+  "description": ""
+}}
+"""
+
+
 def openai_chat_content(response):
     return response.choices[0].message.content
 
@@ -1042,6 +1105,47 @@ def request_recipe_notes_regeneration_from_openai(prompt_text, model, model_sour
     return openai_chat_content(response)
 
 
+def request_recipe_description_regeneration_from_openai(prompt_text, model, model_source, user_id=None):
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
+        model,
+        "recipe-description-regeneration",
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You propose only the description field of an existing recipe. "
+                    "Return only strict JSON matching the requested shape."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    print(
+        "[OpenAI] action=recipe-description-regeneration "
+        f"model={resolved_model} model_source={model_source} "
+        f"temperature_included={temperature_included}"
+    )
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name="recipe-description-regeneration",
+        model=resolved_model,
+        kind="menu",
+    )
+    record_openai_usage(
+        response,
+        "recipe-description-regeneration",
+        model=resolved_model,
+        user_id=user_id,
+    )
+    return openai_chat_content(response)
+
+
 def parse_ai_json_response(raw_json):
     parsed = json.loads(clean_json_response(raw_json))
     if isinstance(parsed, dict) and isinstance(parsed.get("recipe"), dict):
@@ -1049,6 +1153,22 @@ def parse_ai_json_response(raw_json):
     if not isinstance(parsed, dict):
         raise ValueError("Cookbook item inference did not return a JSON object.")
     return parsed
+
+
+def normalize_generated_recipe_description(value):
+    if not isinstance(value, str):
+        return ""
+    description = clean_text(value).strip('"').strip()
+    if not description or len(description) > 1200:
+        return ""
+    sentences = [
+        clean_text(sentence)
+        for sentence in re.findall(r'[^.!?]+[.!?]+(?:["\')\]]+)?|[^.!?]+$', description)
+        if clean_text(sentence)
+    ]
+    if not 1 <= len(sentences) <= 3:
+        return ""
+    return description
 
 
 def build_original_ingredient_text(row):
@@ -1476,6 +1596,117 @@ def regenerate_ingredients_for_recipe(
         "saved_counts": {
             "ingredients": len(generated_ingredients),
         },
+    }
+
+
+def regenerate_recipe_description_for_recipe(
+    recipe_url,
+    current_recipe=None,
+    cookbook_id="",
+    cookbook_name="",
+    user_id=None,
+):
+    recipe_url = clean_text(recipe_url)
+    if not recipe_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    recipe_data = recipe_data_for_detail_inference(recipe_url, current_recipe)
+    cookbook_context = cookbook_context_for_recipe(recipe_url, cookbook_id, cookbook_name)
+    item_name = first_clean_text(
+        recipe_data.get("menu_item_name"),
+        recipe_data.get("recipe_title"),
+        recipe_data.get("display_name"),
+        recipe_url,
+    )
+    current_description = clean_text(recipe_data.get("description"))
+    model, model_source = resolve_cookbook_item_model()
+    prompt = build_recipe_description_regeneration_prompt(
+        recipe_url,
+        recipe_data,
+        cookbook_context.get("cookbook_id", ""),
+        cookbook_context.get("cookbook_name", ""),
+    )
+
+    raw_json = ""
+    parsed = {}
+    last_error = None
+    for attempt in range(COOKBOOK_ITEM_INFERENCE_MAX_RETRIES + 1):
+        try:
+            raw_json = request_recipe_description_regeneration_from_openai(
+                prompt,
+                model,
+                model_source,
+                user_id=user_id,
+            )
+            parsed = parse_ai_json_response(raw_json)
+            last_error = None
+            break
+        except Exception as exc:
+            last_error = exc
+            openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+            log_inference_event(
+                "recipe_description_regeneration_openai_failed",
+                recipe_id=recipe_url,
+                recipe_name=item_name,
+                model=model,
+                attempt=attempt + 1,
+                exception_type=type(exc).__name__,
+                error=str(exc),
+                openai_error_code=openai_error_code or "",
+                openai_error_param=openai_error_param or "",
+            )
+            if attempt >= COOKBOOK_ITEM_INFERENCE_MAX_RETRIES:
+                break
+            time.sleep(0.5 * (attempt + 1))
+
+    if last_error is not None and not parsed:
+        return {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "recipe_name": item_name,
+            "error": str(last_error) or "Unable to generate a recipe description.",
+            "model": model,
+            "model_source": model_source,
+        }
+
+    description = normalize_generated_recipe_description(parsed.get("description"))
+    if not description:
+        return {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "recipe_name": item_name,
+            "error": "Description generation did not return a usable 1–3 sentence description.",
+            "model": model,
+            "model_source": model_source,
+            "raw_ai_json": raw_json,
+            "parsed_ai_json": parsed,
+        }
+
+    log_inference_event(
+        "recipe_description_regenerated_preview",
+        recipe_id=recipe_url,
+        recipe_name=item_name,
+        model=model,
+        preview_only=True,
+        raw_ai_json=raw_json,
+        parsed_ai_json=parsed,
+    )
+
+    return {
+        "ok": True,
+        "skipped": False,
+        "recipe_url": recipe_url,
+        "recipe_name": item_name,
+        "preview_only": True,
+        "applied": False,
+        "updated_fields": [],
+        "would_update_fields": ["description"],
+        "model": model,
+        "model_source": model_source,
+        "current_description": current_description,
+        "description": description,
+        "raw_ai_json": raw_json,
+        "parsed_ai_json": parsed,
     }
 
 
