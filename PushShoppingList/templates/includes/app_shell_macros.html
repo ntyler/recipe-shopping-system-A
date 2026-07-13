@@ -213,10 +213,12 @@
                 onpointerenter="previewSharedRating(this, {{ rating_value }})"
                 onpointerleave="clearSharedRatingPreview(this)">&#9734;</button>
     {% endfor %}
-    <button type="button"
-            class="recipe-edit-rating-clear"
-            onclick="return clearSharedRating(this)"
-            hidden>Clear</button>
+    {% if mode != "restaurant" %}
+        <button type="button"
+                class="recipe-edit-rating-clear"
+                onclick="return clearSharedRating(this)"
+                hidden>Clear</button>
+    {% endif %}
 </div>
 {%- endmacro %}
 

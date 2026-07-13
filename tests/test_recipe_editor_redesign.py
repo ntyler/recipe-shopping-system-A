@@ -1,5 +1,8 @@
 from pathlib import Path
 
+from jinja2 import Environment
+from jinja2 import FileSystemLoader
+
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
 
@@ -30,6 +33,31 @@ def configure_recipe_editor_storage(monkeypatch, tmp_path):
     monkeypatch.setattr(recipe_edit_service, "sync_saved_recipe_with_shopping_list", lambda *args, **kwargs: None)
 
     return output_dir
+
+
+def test_restaurant_rating_macro_renders_exactly_five_toggleable_stars_without_clear_button():
+    environment = Environment(loader=FileSystemLoader(ROOT / "PushShoppingList" / "templates"))
+    template = environment.from_string(
+        '{% import "includes/app_shell_macros.html" as shell %}'
+        '{{ shell.rating_control("restaurantRating", "Restaurant rating", mode="restaurant") }}'
+    )
+    rendered = template.render()
+
+    assert rendered.count('class="recipe-edit-rating-star"') == 5
+    assert rendered.count('data-rating-value=') == 5
+    assert rendered.count("&#9734;") == 5
+    assert 'data-rating-toggle-selected="true"' in rendered
+    assert 'role="radiogroup"' in rendered
+    assert rendered.count('role="radio"') == 5
+    assert rendered.count("click again to clear") == 5
+    assert rendered.count("previewSharedRating") == 5
+    assert "recipe-edit-rating-clear" not in rendered
+
+    recipe_rendered = environment.from_string(
+        '{% import "includes/app_shell_macros.html" as shell %}'
+        '{{ shell.rating_control("recipeRating", "Recipe rating", mode="recipe") }}'
+    ).render()
+    assert 'class="recipe-edit-rating-clear"' in recipe_rendered
 
 
 def test_standalone_recipe_editor_uses_app_shell_navigation():
@@ -264,6 +292,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'class="recipe-edit-rating-label">Rating</span>' in template
     assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")' in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
+    assert '{% if mode != "restaurant" %}' in macros
     assert 'class="recipe-edit-rating-clear"' in macros
     assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
     assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, tagRow, metadataRow, descriptionRow, technicalDetails])" in organizer
@@ -314,6 +343,7 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Use Image URL" in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
     assert "Click the selected star again to clear the rating." in macros
+    assert '{% if mode != "restaurant" %}' in macros
     assert 'class="recipe-edit-rating-clear"' in macros
     assert macros.count('data-rating-value="{{ rating_value }}"') == 1
     assert "Restaurant's main website." in template
@@ -346,6 +376,9 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "{ allowToggle: false }" in script
     assert "color: #fbbf24;" in css
     assert "color: #9ca3af;" in css
+    assert ".recipe-edit-restaurant-rating-editor .recipe-edit-rating-star.active" in css
+    assert '.recipe-edit-restaurant-rating-editor .recipe-edit-rating-star[aria-checked="true"]' in css
+    assert "border-radius: 7px;" in css
     assert ':is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star' in css
     assert '.recipe-edit-rating-star[aria-checked="true"]' in css
     assert "function handleSharedRatingKeydown(button, event)" in script

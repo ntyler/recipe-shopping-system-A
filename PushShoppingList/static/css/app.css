@@ -32363,6 +32363,30 @@ img[data-deferred-src] {
     transform: scale(.94);
 }
 
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-stars {
+    gap: 2px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star {
+    border-radius: 7px;
+    background: transparent;
+    color: #9ca3af;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star.active {
+    background: transparent;
+    color: #fbbf24;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star.is-preview {
+    color: #fcd34d;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star[aria-checked="true"] {
+    border-color: rgba(251, 191, 36, .42);
+    background: rgba(17, 24, 39, .72);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star {
         transition: none;
