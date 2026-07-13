@@ -115,6 +115,58 @@ def test_sidebar_import_actions_are_grouped_by_task_without_duplicate_hub_link()
     assert 'href="{{ url_for(\'pantry_bp.pantry_coming_soon_route\') }}"' in sidebar
 
 
+def test_sidebar_navigation_uses_exact_lucide_outline_icon_mappings_only():
+    sidebar = read_text("PushShoppingList/templates/includes/app_sidebar.html")
+    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
+
+    expected_usage = {
+        "home": 1,
+        "recipes": 1,
+        "menus": 2,
+        "cookbooks": 1,
+        "shopping": 1,
+        "pantry": 1,
+        "meal": 1,
+        "stores": 1,
+        "price": 1,
+        "link": 1,
+        "document": 2,
+        "image": 1,
+        "barcode": 1,
+    }
+    for name, count in expected_usage.items():
+        assert sidebar.count(f'shell.sidebar_icon("{name}")') == count
+        assert f'shell.app_icon("{name}")' not in sidebar
+
+    # Account icons remain on the existing shared family; this change is scoped
+    # to the mockup-mapped navigation rows only.
+    for name in ("settings", "billing", "help"):
+        assert f'shell.app_icon("{name}")' in sidebar
+
+    exact_lucide_paths = (
+        'd="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"',
+        'd="M12 7v14"',
+        'd="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"',
+        'd="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"',
+        'width="20" height="5" x="2" y="3" rx="1"',
+        'width="18" height="18" x="3" y="4" rx="2"',
+        'd="M17.774 10.31a1.12 1.12 0 0 0-1.549 0',
+        'd="M2.586 17.414A2 2 0 0 0 2 18.828V21',
+        'd="M9 17H7A5 5 0 0 1 7 7h2"',
+        'd="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8',
+        'd="M13.997 4a2 2 0 0 1 1.76 1.05',
+        'd="M8 5h13"',
+        'd="M21 5v14"',
+    )
+    for path in exact_lucide_paths:
+        assert path in macros
+
+    assert 'class="app-icon-svg app-sidebar-icon-svg"' in macros
+    assert 'data-sidebar-icon="{{ name }}"' in macros
+    assert "Lucide v1.24.0 outline icon geometry" in macros
+    assert "shell.brand_mark()" in sidebar
+
+
 def test_recipe_editor_sidebar_uses_the_same_import_task_groups():
     template = read_text("PushShoppingList/templates/recipe_edit_page.html")
     sidebar_template = read_text("PushShoppingList/templates/includes/app_sidebar.html")

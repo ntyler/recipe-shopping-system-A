@@ -26767,6 +26767,11 @@ img[data-deferred-src] {
     stroke-linejoin: round;
 }
 
+.app-sidebar-icon-svg .app-sidebar-icon-fill {
+    fill: currentColor;
+    stroke: none;
+}
+
 .app-nav-text {
     min-width: 0;
     overflow: hidden;
