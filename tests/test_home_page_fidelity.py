@@ -181,16 +181,16 @@ def test_home_recent_import_rows_use_real_counts_timestamps_and_statuses():
     ]
 
 
-def test_home_template_has_supported_overflow_and_favorite_action():
+def test_home_template_has_right_aligned_favorite_without_overflow_action():
     template = read_text("PushShoppingList/templates/index.html")
     home_start = template.index('<section class="app-home-dashboard"')
     home_end = template.index("{% include \"sections/app_workspaces.html\" %}")
     home = template[home_start:home_end]
 
-    assert "toggleHomeRecipeMenu(this, event)" in home
-    assert "More actions for {{ recipe.name }}" in home
-    assert "Open Recipe" in home
-    assert "Edit Recipe" in home
+    assert "toggleHomeRecipeMenu(this, event)" not in home
+    assert "More actions for {{ recipe.name }}" not in home
+    assert "app-home-recipe-menu-toggle" not in home
+    assert "app-home-recipe-menu" not in home
     assert "openHomeRecentImport" in home
     assert "home_recent_imports" in home
     assert "app-home-panel-title" in home
@@ -221,6 +221,12 @@ def test_home_template_has_supported_overflow_and_favorite_action():
     assert 'aria-pressed="{% if recipe.favorite %}true{% else %}false{% endif %}"' in home
     assert 'onclick="return toggleRecipeFavorite(this, event)"' in home
     assert 'shell.svg_icon("heart")' in home
+    actions = home[
+        home.index('<div class="app-home-recipe-actions">'):
+        home.index('</div>', home.index('<div class="app-home-recipe-actions">'))
+    ]
+    assert actions.count("<button") == 1
+    assert "app-home-recipe-favorite" in actions
 
 
 def test_home_summary_cards_use_the_mockup_specific_svg_icons_only():

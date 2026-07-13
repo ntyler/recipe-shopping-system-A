@@ -196,24 +196,6 @@ data-user-id="{{ current_user.user_id if current_user else '' }}"
                                             onclick="return toggleRecipeFavorite(this, event)">
                                         {{ shell.svg_icon("heart") }}
                                     </button>
-                                    <button type="button"
-                                            class="app-home-recipe-menu-toggle"
-                                            aria-label="More actions for {{ recipe.name }}"
-                                            aria-haspopup="menu"
-                                            aria-expanded="false"
-                                            onclick="return toggleHomeRecipeMenu(this, event)">
-                                        {{ shell.svg_icon("more") }}
-                                    </button>
-                                    <div class="app-home-recipe-menu" role="menu" hidden>
-                                        <button type="button"
-                                                role="menuitem"
-                                                data-recipe-url="{{ recipe.url }}"
-                                                onclick="return openHomeRecipeAction(this, 'open', event)">Open Recipe</button>
-                                        <button type="button"
-                                                role="menuitem"
-                                                data-recipe-url="{{ recipe.url }}"
-                                                onclick="return openHomeRecipeAction(this, 'edit', event)">Edit Recipe</button>
-                                    </div>
                                 </div>
                                 <a class="app-home-recipe-media"
                                    href="{{ url_for('recipe_bp.edit_recipe_page_route', url=recipe.url) }}"
