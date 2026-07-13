@@ -27500,6 +27500,9 @@ function recipeRestaurantFetchDisplayValue(key, value) {
     if (key === "ordering_providers" && Array.isArray(value)) {
         return value.map(provider => [provider?.provider_name, provider?.website_url].filter(Boolean).join(" — ")).filter(Boolean).join("\n");
     }
+    if (key === "ordering_link" && value && typeof value === "object") {
+        return [value.provider_name || "Ordering provider", value.url].filter(Boolean).join("\n");
+    }
     if (Array.isArray(value)) return value.join("\n");
     if (value && typeof value === "object") return JSON.stringify(value, null, 2);
     return String(value);
@@ -27520,6 +27523,13 @@ function recipeRestaurantFetchCandidateHtml(key, candidate) {
         return `<div class="recipe-edit-restaurant-scan-providers">${value.map(provider => `
             <span><strong>${escapeHtml(provider?.provider_name || "Ordering provider")}</strong>${provider?.website_url ? `<a href="${escapeAttribute(provider.website_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(provider.website_url)}</a>` : ""}</span>
         `).join("")}</div>`;
+    }
+    if (key === "ordering_link" && value && typeof value === "object") {
+        return `<span class="recipe-edit-restaurant-scan-ordering-link">
+            <strong>${escapeHtml(value.provider_name || "Ordering provider")}</strong>
+            <a href="${escapeAttribute(value.url || "#")}" target="_blank" rel="noopener noreferrer" title="${escapeAttribute(value.url || "")}">${escapeHtml(value.url || "URL unavailable")}</a>
+            <small>${value.is_active ? "Active" : "Verification needed"}</small>
+        </span>`;
     }
     return `<span data-restaurant-scan-value>${escapeHtml(recipeRestaurantFetchDisplayValue(key, value))}</span>`;
 }
@@ -27559,9 +27569,51 @@ function recipeRestaurantScanReviewStatus(row, recommended) {
 function recipeRestaurantScanRowCanApply(row, status, recommended) {
     const field = String(row?.field || "");
     const hasFormDestination = Boolean(recipeRestaurantFetchFieldDefinitions[field]?.field)
-        || ["weekly_hours", "raw_hours_text", "hours_notes"].includes(field);
+        || ["weekly_hours", "raw_hours_text", "hours_notes", "ordering_link"].includes(field);
     return Boolean(hasFormDestination && recommended && row?.selectable && !row?.locked
         && !["Already saved", "Unresolved", "Invalid", "Applied"].includes(status));
+}
+
+function updateRecipeRestaurantOrderingScanResolution(select) {
+    const row = select?.closest("[data-restaurant-fetch-field]");
+    const accept = row?.querySelector(".recipe-edit-restaurant-fetch-accept input");
+    if (accept && !accept.disabled) accept.checked = select.value === "replace";
+    updateRecipeRestaurantScanApplyActions();
+}
+
+function recipeRestaurantOrderingScanRowHtml(row) {
+    const key = String(row?.row_key || "");
+    const recommended = recipeRestaurantScanCandidate(row);
+    const reviewStatus = recipeRestaurantScanReviewStatus(row, recommended);
+    const canApply = recipeRestaurantScanRowCanApply(row, reviewStatus, recommended);
+    const highConfidenceEligible = canApply && ["New", "Changed"].includes(reviewStatus)
+        && row.confidence_label === "High" && !row.conflict && !row.requires_explicit_review;
+    const current = recipeRestaurantFetchDisplayValue("ordering_link", row.current_value);
+    const sourceUrl = String(recommended?.source_url || "");
+    const resolution = row.conflict ? `
+        <label class="recipe-edit-restaurant-scan-ordering-resolution">
+            <span>Conflict action</span>
+            <select data-ordering-link-resolution aria-label="Choose how to handle this ordering link conflict" onchange="updateRecipeRestaurantOrderingScanResolution(this)">
+                <option value="keep">Keep existing</option>
+                <option value="replace">Replace existing</option>
+            </select>
+        </label>` : "";
+    const acceptControl = canApply
+        ? `<label class="recipe-edit-restaurant-fetch-accept"><input type="checkbox" ${highConfidenceEligible ? "checked" : ""} aria-label="Accept ${escapeAttribute(recommended?.normalized_value?.provider_name || "ordering and delivery link")}" onchange="updateRecipeRestaurantScanApplyActions()"></label>`
+        : '<span class="recipe-edit-restaurant-fetch-accept" aria-hidden="true"></span>';
+    return `<article class="recipe-edit-restaurant-fetch-row recipe-edit-restaurant-fetch-ordering-row${row.conflict ? " has-conflict" : ""}${row.locked ? " is-locked" : ""}${reviewStatus === "Already saved" ? " is-no-change" : ""}" data-restaurant-fetch-field="${escapeAttribute(key)}" data-restaurant-lock-field="ordering_providers" data-recommended-candidate="${escapeAttribute(recommended?.candidate_id || "")}" data-scan-status="${escapeAttribute(reviewStatus)}" data-high-confidence-eligible="${highConfidenceEligible ? "true" : "false"}">
+        ${acceptControl}
+        <strong>Ordering &amp; Delivery Link</strong>
+        <span class="recipe-edit-restaurant-fetch-current">${escapeHtml(current)}</span>
+        <span class="recipe-edit-restaurant-fetch-proposed">${recipeRestaurantFetchCandidateHtml("ordering_link", recommended)}${resolution}</span>
+        <span class="recipe-edit-restaurant-scan-confidence is-${String(row.confidence_label || "low").toLowerCase()}"><b data-restaurant-scan-status>${escapeHtml(reviewStatus)}</b><small>${escapeHtml(row.confidence_label || "Low")} · ${Math.round(Number(recommended?.confidence || 0) * 100)}%</small></span>
+        <span class="recipe-edit-restaurant-fetch-evidence">
+            ${sourceUrl ? `<a href="${escapeAttribute(sourceUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeAttribute(sourceUrl)}">View exact source</a>` : "Source unavailable"}
+            <small data-restaurant-scan-method title="${escapeAttribute(recommended?.evidence || "")}">${escapeHtml(String(recommended?.extraction_method || "").replaceAll("_", " "))}</small>
+            <label class="recipe-edit-restaurant-scan-lock"><input type="checkbox" data-restaurant-scan-lock ${row.locked ? "checked" : ""}> Lock existing</label>
+            ${row.requires_explicit_review && reviewStatus !== "Already saved" ? "<em>Explicit review required</em>" : ""}
+        </span>
+    </article>`;
 }
 
 function updateRecipeRestaurantScanApplyActions() {
@@ -27596,6 +27648,10 @@ function renderRecipeRestaurantFetchReview(data) {
     recipeRestaurantInformationScan = data || {};
     recipeRestaurantFetchedProposals = data?.proposals || {};
     const fieldRows = Object.entries(data?.fields || {});
+    const orderingRows = Array.isArray(data?.ordering_link_recommendations)
+        ? data.ordering_link_recommendations : [];
+    const unresolvedOrdering = Array.isArray(data?.unresolved_ordering_providers)
+        ? data.unresolved_ordering_providers : [];
     const scanSummary = data?.summary || {};
     panel.dataset.highConfidenceChangeCount = String(Number(scanSummary.high_confidence_changes) || 0);
     if (metrics) {
@@ -27613,7 +27669,20 @@ function renderRecipeRestaurantFetchReview(data) {
             return `<span class="${status.className}" title="${escapeAttribute(source.classification_warning || source.reason || status.label)}"><b aria-hidden="true">${status.icon}</b><span>${escapeHtml(label)}: ${escapeHtml(status.label)}</span></span>`;
         }).join("");
     }
-    list.innerHTML = fieldRows.length ? fieldRows.map(([key, row]) => {
+    const orderingHtml = orderingRows.length || unresolvedOrdering.length ? `
+        <section class="recipe-edit-restaurant-scan-group" aria-labelledby="restaurant-scan-ordering-heading">
+            <h3 id="restaurant-scan-ordering-heading">Ordering &amp; Delivery Links</h3>
+            ${orderingRows.map(recipeRestaurantOrderingScanRowHtml).join("")}
+            ${unresolvedOrdering.map(item => `<article class="recipe-edit-restaurant-fetch-row recipe-edit-restaurant-fetch-ordering-row is-not-found">
+                <span class="recipe-edit-restaurant-fetch-accept" aria-hidden="true"></span>
+                <strong>Ordering &amp; Delivery Link</strong>
+                <span class="recipe-edit-restaurant-fetch-current">Not set</span>
+                <span class="recipe-edit-restaurant-fetch-proposed"><strong>${escapeHtml(item.label || "Ordering provider")}</strong><small>${escapeHtml(item.reason || "No reliable source value found.")}</small></span>
+                <span class="recipe-edit-restaurant-scan-confidence is-low"><b>Unresolved</b></span>
+                <span class="recipe-edit-restaurant-fetch-evidence">No verified source</span>
+            </article>`).join("")}
+        </section>` : "";
+    const fieldHtml = fieldRows.length ? fieldRows.map(([key, row]) => {
         const definition = recipeRestaurantFetchFieldDefinitions[key] || { label: key.replaceAll("_", " ") };
         const recommended = recipeRestaurantScanCandidate(row);
         const reviewStatus = recipeRestaurantScanReviewStatus(row, recommended);
@@ -27648,7 +27717,8 @@ function renderRecipeRestaurantFetchReview(data) {
                         ${row.requires_explicit_review && !noChange ? "<em>Explicit review required</em>" : ""}
                     </span>
                 </article>`;
-    }).join("") : '<p class="recipe-edit-restaurant-scan-empty">No matching restaurant fields were discovered. Review the source statuses above and try Rescan after correcting the source URLs.</p>';
+    }).join("") : (orderingRows.length || unresolvedOrdering.length ? "" : '<p class="recipe-edit-restaurant-scan-empty">No matching restaurant fields were discovered. Review the source statuses above and try Rescan after correcting the source URLs.</p>');
+    list.innerHTML = orderingHtml + fieldHtml;
     const unresolvedFields = Array.isArray(data?.unresolved_fields) ? data.unresolved_fields : [];
     if (unresolved && unresolvedList) {
         unresolved.hidden = !unresolvedFields.length;
@@ -27823,7 +27893,15 @@ function applyRecipeRestaurantScanValuesToForm(form, appliedValues = {}) {
                     is_active: true,
                 };
             });
-            hydrateRecipeRestaurantOrderingLinks(form, [...current, ...proposed]);
+            const replaceProviders = new Set(proposed.filter(item => item?.replace_existing)
+                .map(item => String(item.provider || "").trim()).filter(Boolean));
+            const retained = current.filter(item => !replaceProviders.has(String(item?.provider || "").trim()));
+            const cleaned = proposed.map(item => {
+                if (!item || typeof item !== "object") return item;
+                const { replace_existing: ignored, ...value } = item;
+                return value;
+            });
+            hydrateRecipeRestaurantOrderingLinks(form, [...retained, ...cleaned]);
             updatedFields.push(key);
             return;
         }
@@ -27897,6 +27975,7 @@ async function applyRecipeRestaurantInformationScan(button, mode = "selected") {
     if (!form || !panel || !restaurantId || !recipeRestaurantInformationScan?.scan_id || button?.disabled) return false;
     const selections = {};
     const lockUpdates = {};
+    const orderingLinkResolutions = {};
     panel.querySelectorAll("[data-restaurant-fetch-field]").forEach(row => {
         const field = row.dataset.restaurantFetchField;
         const accept = row.querySelector(".recipe-edit-restaurant-fetch-accept input");
@@ -27905,7 +27984,14 @@ async function applyRecipeRestaurantInformationScan(button, mode = "selected") {
         const eligible = !["Already saved", "Unresolved", "Invalid", "Applied"].includes(status);
         if (eligible && accept?.checked && !accept.disabled && candidate) selections[field] = candidate;
         const lock = row.querySelector("[data-restaurant-scan-lock]");
-        if (lock) lockUpdates[field] = lock.checked;
+        if (lock) {
+            const lockField = row.dataset.restaurantLockField || field;
+            lockUpdates[lockField] = Object.prototype.hasOwnProperty.call(lockUpdates, lockField)
+                ? lockUpdates[lockField] || lock.checked
+                : lock.checked;
+        }
+        const orderingResolution = row.querySelector("[data-ordering-link-resolution]");
+        if (orderingResolution) orderingLinkResolutions[field] = orderingResolution.value;
     });
     const message = panel.querySelector("[data-restaurant-scan-apply-message]");
     if (mode === "selected" && !Object.keys(selections).length) {
@@ -27934,7 +28020,13 @@ async function applyRecipeRestaurantInformationScan(button, mode = "selected") {
         const response = await fetch(`/api/recipe/restaurants/${encodeURIComponent(restaurantId)}/apply-information-scan`, {
             method: "POST",
             headers: { "Accept": "application/json", "Content-Type": "application/json" },
-            body: JSON.stringify({ scan_id: recipeRestaurantInformationScan.scan_id, mode, selections, lock_updates: lockUpdates }),
+            body: JSON.stringify({
+                scan_id: recipeRestaurantInformationScan.scan_id,
+                mode,
+                selections,
+                lock_updates: lockUpdates,
+                ordering_link_resolutions: orderingLinkResolutions,
+            }),
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.ok) throw new Error(data.error || "Restaurant information could not be applied.");

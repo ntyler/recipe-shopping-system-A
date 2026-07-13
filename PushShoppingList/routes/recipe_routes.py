@@ -3616,6 +3616,7 @@ def recipe_restaurant_apply_information_scan_route(restaurant_id):
         selections=data.get("selections") or {},
         mode=str(data.get("mode") or "selected").strip(),
         lock_updates=data.get("lock_updates") or {},
+        ordering_link_resolutions=data.get("ordering_link_resolutions") or {},
     )
     return jsonify(result), 200 if result.get("ok") else 400
 

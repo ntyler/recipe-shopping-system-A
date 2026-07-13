@@ -201,6 +201,26 @@ def test_restaurant_scan_review_formats_provider_results_and_equivalent_values()
     assert ".recipe-edit-restaurant-fetch-row.is-no-change" in css
 
 
+def test_restaurant_scan_renders_and_applies_individual_ordering_delivery_links():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    routes = read_text("PushShoppingList/routes/recipe_routes.py")
+
+    assert "function recipeRestaurantOrderingScanRowHtml(row)" in script
+    assert "Ordering &amp; Delivery Links" in script
+    assert "Ordering &amp; Delivery Link" in script
+    assert "data-ordering-link-resolution" in script
+    assert "Keep existing" in script
+    assert "Replace existing" in script
+    assert "unresolved_ordering_providers" in script
+    assert "View exact source" in script
+    assert "ordering_link_resolutions: orderingLinkResolutions" in script
+    assert "replace_existing: ignored" in script
+    assert ".recipe-edit-restaurant-scan-group > h3" in css
+    assert ".recipe-edit-restaurant-scan-ordering-link" in css
+    assert 'ordering_link_resolutions=data.get("ordering_link_resolutions") or {}' in routes
+
+
 def test_restaurant_weekly_hours_use_canonical_hydration_and_separate_raw_data():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")

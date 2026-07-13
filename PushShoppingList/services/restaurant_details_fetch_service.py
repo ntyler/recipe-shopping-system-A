@@ -40,6 +40,20 @@ MAX_SCAN_WORKERS = 3
 MAX_DISCOVERED_LINKS = 6
 CACHE_TTL_SECONDS = 15 * 60
 FROM_THE_RESTAURANT_HOSTS = {"fromtherestaurant.com", "www.fromtherestaurant.com"}
+ORDERING_PROVIDER_DOMAINS = (
+    (("doordash.com",), "doordash", "DoorDash"),
+    (("grubhub.com",), "grubhub", "Grubhub"),
+    (("ubereats.com", "uber.com"), "uber_eats", "Uber Eats"),
+    (("postmates.com",), "postmates", "Postmates"),
+    (("slicelife.com",), "slice", "Slice"),
+    (("chownow.com",), "chownow", "ChowNow"),
+    (("toasttab.com",), "toast", "Toast"),
+    (("square.site", "squareup.com"), "square_online", "Square Online"),
+    (("clover.com",), "clover", "Clover"),
+)
+DELIVERY_PROVIDER_KEYS = {"doordash", "grubhub", "uber_eats", "postmates"}
+ORDERING_PATH_PATTERN = re.compile(r"(?:^|/)(?:order|order-online|online-ordering|pickup|delivery|menu/order)(?:/|$)", re.I)
+TRACKING_QUERY_KEYS = {"fbclid", "gclid", "msclkid", "ref", "referrer", "source"}
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 DAY_ALIASES = {
     "mo": "monday", "mon": "monday", "monday": "monday",
@@ -528,6 +542,102 @@ def _normalize_url(value):
         return ""
 
 
+def _canonical_ordering_url(value):
+    """Normalize public ordering URLs without retaining tracking-only query parameters."""
+    normalized = _normalize_url(value)
+    if not normalized:
+        return ""
+    parsed = urlparse(normalized)
+    query = []
+    for key, values in parse_qs(parsed.query, keep_blank_values=False).items():
+        if key.casefold().startswith("utm_") or key.casefold() in TRACKING_QUERY_KEYS:
+            continue
+        query.extend((key, value) for value in values if _clean(value))
+    return urlunparse((
+        parsed.scheme, parsed.netloc, parsed.path or "", "", urlencode(sorted(query)), "",
+    ))
+
+
+def _ordering_provider_for_url(value, source_url="", source_type="", link_text=""):
+    canonical = _canonical_ordering_url(value)
+    if not canonical:
+        return None
+    parsed = urlparse(canonical)
+    hostname = (parsed.hostname or "").casefold().removeprefix("www.")
+    if re.search(r"(?:^|/)(?:login|sign-?in|search)(?:/|$)", parsed.path or "", re.I):
+        return None
+    for domains, provider, label in ORDERING_PROVIDER_DOMAINS:
+        if any(hostname == domain or hostname.endswith(f".{domain}") for domain in domains):
+            # A provider homepage alone does not identify a restaurant or branch.
+            if parsed.path in {"", "/"} and not parsed.query:
+                return None
+            if provider == "uber_eats" and hostname.endswith("uber.com") and not re.search(
+                r"(?:^|/)(?:eats|ubereats|store|order)(?:/|$)", parsed.path or "", re.I,
+            ):
+                return None
+            return {"provider": provider, "provider_name": label, "url": canonical}
+    source_host = (urlparse(source_url).hostname or "").casefold().removeprefix("www.")
+    key = f"{link_text} {parsed.path} {parsed.query}".casefold()
+    same_official_domain = hostname == source_host or hostname.endswith(f".{source_host}")
+    official = source_type in {
+        "official_website", "official_menu", "official_menu_page",
+        "official_menu_item", "official_discovered",
+    } and same_official_domain and (
+        ORDERING_PATH_PATTERN.search(parsed.path or "") or re.search(r"\b(?:order|ordering|pickup|delivery)\b", key)
+    )
+    if official:
+        return {
+            "provider": "official_online_ordering",
+            "provider_name": "Official Online Ordering",
+            "url": canonical,
+        }
+    if re.search(r"\b(?:order|ordering|pickup|delivery)\b", key):
+        return {"provider": "other", "provider_name": _clean(link_text) or "Other", "url": canonical}
+    return None
+
+
+def _ordering_link_value(value, source_url, source_type, link_text="", verified=False):
+    provider = _ordering_provider_for_url(value, source_url, source_type, link_text)
+    if not provider:
+        return None
+    url_key = f"{provider['url']} {link_text}".casefold()
+    supports_pickup = bool(re.search(r"\bpickup\b", url_key))
+    supports_delivery = provider["provider"] in DELIVERY_PROVIDER_KEYS or bool(re.search(r"\bdelivery\b", url_key))
+    return {
+        **provider,
+        "is_active": bool(verified),
+        "supports_online_ordering": True,
+        "supports_pickup": supports_pickup,
+        "supports_delivery": supports_delivery,
+        "source_url": _normalize_url(source_url),
+    }
+
+
+def _normalize_ordering_link_value(value):
+    value = value if isinstance(value, dict) else {"url": value}
+    url = _canonical_ordering_url(value.get("url") or value.get("website_url"))
+    if not url:
+        return None
+    classified = _ordering_provider_for_url(
+        url,
+        value.get("source_url") or "",
+        value.get("source_type") or "",
+        value.get("provider_name") or "",
+    ) or {}
+    provider = _clean(value.get("provider") or classified.get("provider") or "other").casefold().replace(" ", "_")
+    provider_name = _clean(value.get("provider_name") or classified.get("provider_name") or "Other")
+    return {
+        "provider": provider,
+        "provider_name": provider_name,
+        "url": url,
+        "is_active": value.get("is_active") is True,
+        "supports_online_ordering": value.get("supports_online_ordering") is not False,
+        "supports_pickup": value.get("supports_pickup") is True,
+        "supports_delivery": value.get("supports_delivery") is True,
+        "source_url": _normalize_url(value.get("source_url")),
+    }
+
+
 def _normalize_status(value):
     token = re.sub(r"[^a-z]+", "_", _clean(value).split("/")[-1].casefold()).strip("_")
     if "temporarily" in token and "closed" in token:
@@ -582,6 +692,8 @@ def _normalize_value(field, value):
                 "source_url": source,
             })
         return sorted(normalized, key=lambda item: (item["provider_name"].casefold(), item["website_url"])) or None
+    if field == "ordering_link":
+        return _normalize_ordering_link_value(value)
     if field in BOOLEAN_FIELDS:
         if value is True or _clean(value).casefold() == "true":
             return True
@@ -707,9 +819,13 @@ def _link_candidates(soup, source_url):
             continue
         host = (urlparse(normalized).hostname or "").casefold().removeprefix("www.")
         key = f"{text} {normalized}".casefold()
+        provider_link = any(
+            host == domain or host.endswith(f".{domain}")
+            for domains, _, _ in ORDERING_PROVIDER_DOMAINS for domain in domains
+        )
         if re.search(r"\b(menu|food menu)\b", key):
             results["menu"].append((normalized, text))
-        if re.search(r"\b(order|ordering|order online|pickup|delivery)\b", key):
+        if provider_link or re.search(r"\b(order|ordering|order online|pickup|delivery)\b", key):
             results["order"].append((normalized, text))
         if re.search(r"\b(reserve|reservation|book a table)\b", key):
             results["reservation"].append((normalized, text))
@@ -944,6 +1060,23 @@ def extract_restaurant_candidates(html, source_url, source_type="official_websit
         if candidate:
             candidates.append(candidate)
 
+    def add_ordering_link(value, method, confidence, evidence, link_text=""):
+        ordering_link = _ordering_link_value(
+            value, source_url, source_type, link_text,
+            verified=source_type in {"official_website", "official_menu", "official_menu_page", "official_menu_item", "official_discovered"},
+        )
+        if not ordering_link:
+            return
+        add(
+            "ordering_link", ordering_link, method, confidence, evidence,
+            metadata={"provider": ordering_link["provider_name"], "ordering_group": "Ordering & Delivery Links"},
+        )
+        add("online_ordering", True, method, max(0.76, confidence - 0.03), evidence)
+        if ordering_link["supports_pickup"]:
+            add("pickup", True, method, max(0.72, confidence - 0.06), evidence)
+        if ordering_link["supports_delivery"]:
+            add("delivery", True, method, max(0.74, confidence - 0.05), evidence)
+
     if node:
         add("restaurant_name", node.get("name"), "json_ld", 0.99, f"Structured name: {node.get('name', '')}")
         add("phone", node.get("telephone"), "json_ld", 0.98, f"Structured telephone: {node.get('telephone', '')}")
@@ -996,6 +1129,7 @@ def extract_restaurant_candidates(html, source_url, source_type="official_websit
             if action_types & {"orderaction", "buyaction"}:
                 if target:
                     order_urls.append(target)
+                    add_ordering_link(target, "json_ld", 0.94, "Structured OrderAction target", "Order online")
                 add("online_ordering", True, "json_ld", 0.94, "Structured OrderAction")
             if action_types & {"reserveaction", "scheduleaction"}:
                 if target:
@@ -1010,6 +1144,11 @@ def extract_restaurant_candidates(html, source_url, source_type="official_websit
         add("menu_url", links["menu"][0][0], "navigation_link", 0.88, links["menu"][0][1] or "Menu navigation link")
     if links["order"]:
         add("ordering_provider_urls", [item[0] for item in links["order"][:5]], "navigation_link", 0.83, "Order or delivery navigation links")
+        for order_url, order_text in links["order"][:12]:
+            add_ordering_link(
+                order_url, "navigation_link", 0.9,
+                f"Official website link: {order_text or order_url}", order_text,
+            )
         add("online_ordering", True, "navigation_link", 0.82, links["order"][0][1] or "Order online link")
         if any(re.search(r"pickup", item[1], re.I) for item in links["order"]):
             add("pickup", True, "navigation_link", 0.8, "Pickup navigation link")
@@ -1262,17 +1401,151 @@ def _reconcile_field(field, candidates, record, locked_fields):
     }
 
 
+def _current_ordering_links(record):
+    record = record if isinstance(record, dict) else {}
+    values = []
+    for key in ("ordering_delivery_links", "ordering_links", "restaurant_ordering_links", "ordering_providers", "ordering_provider_urls"):
+        raw = record.get(key)
+        values.extend(raw if isinstance(raw, list) else ([raw] if raw not in (None, "", [], {}) else []))
+    normalized = []
+    seen = set()
+    for value in values:
+        item = _normalize_ordering_link_value(value)
+        if not item:
+            continue
+        key = (item["provider"], item["url"])
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(item)
+    return normalized
+
+
+def _reconcile_ordering_links(candidates, record, locked_fields):
+    current = _current_ordering_links(record)
+    by_destination = {}
+    for candidate in candidates:
+        normalized = candidate.get("normalized_value") or {}
+        key = (normalized.get("provider"), normalized.get("url"))
+        if not all(key):
+            continue
+        by_destination.setdefault(key, []).append(candidate)
+    rows = []
+    for key, agreeing in by_destination.items():
+        best = max(agreeing, key=lambda item: item.get("confidence", 0))
+        source_count = len({item.get("source_url") for item in agreeing if item.get("source_url")})
+        recommended = {
+            **best,
+            "confidence": round(min(0.99, best.get("confidence", 0) + min(0.09, 0.03 * max(0, source_count - 1))), 2),
+            "agreeing_source_count": source_count,
+        }
+        provider, url = key
+        exact = next((item for item in current if item.get("provider") == provider and item.get("url") == url), None)
+        provider_conflict = next((item for item in current if item.get("provider") == provider and item.get("url") != url), None)
+        conflict = provider_conflict is not None
+        locked = "ordering_providers" in locked_fields or "ordering_provider_urls" in locked_fields
+        status = "already_saved" if exact else "conflict" if conflict else "new"
+        current_value = exact or provider_conflict
+        # Conflict is a review status; preserve the evidence confidence separately.
+        confidence_label = _confidence_label(recommended.get("confidence", 0))
+        row_key = f"ordering_link:{recommended['candidate_id']}"
+        rows.append({
+            "field": "ordering_link",
+            "row_key": row_key,
+            "current_value": current_value,
+            "current_normalized_value": current_value,
+            "candidates": [recommended],
+            "recommended": recommended,
+            "conflict": conflict,
+            "changed": exact is None,
+            "locked": locked,
+            "requires_explicit_review": conflict,
+            "selectable": exact is None and not locked,
+            "status": status,
+            "confidence_label": confidence_label,
+        })
+    return sorted(rows, key=lambda row: (
+        (row.get("recommended") or {}).get("normalized_value", {}).get("provider_name", ""),
+        (row.get("recommended") or {}).get("normalized_value", {}).get("url", ""),
+    ))
+
+
+def _ordering_link_candidates(candidates_by_field):
+    """Return first-class ordering-link candidates, including legacy aggregate discoveries."""
+    candidates = list(candidates_by_field.get("ordering_link") or [])
+    for field in ("ordering_provider_urls", "ordering_providers"):
+        for aggregate in candidates_by_field.get(field) or []:
+            values = aggregate.get("value")
+            values = values if isinstance(values, list) else [values]
+            for value in values:
+                item = value if isinstance(value, dict) else {"website_url": value}
+                url = item.get("url") or item.get("website_url")
+                label = item.get("provider_name") or aggregate.get("provider") or "Order online"
+                structured = _ordering_link_value(
+                    url,
+                    aggregate.get("source_url") or "",
+                    aggregate.get("source_type") or "",
+                    label,
+                    verified=aggregate.get("source_type") in {
+                        "official_website", "official_menu", "official_menu_page",
+                        "official_menu_item", "official_discovered",
+                    },
+                )
+                if not structured:
+                    continue
+                candidate = _candidate(
+                    "ordering_link",
+                    structured,
+                    aggregate.get("source_url") or "",
+                    aggregate.get("source_type") or "",
+                    aggregate.get("extraction_method") or "navigation_link",
+                    min(0.99, float(aggregate.get("confidence") or 0.75) + 0.08),
+                    aggregate.get("evidence") or f"{structured['provider_name']} ordering link",
+                    aggregate.get("retrieved_at") or _now_iso(),
+                    metadata={
+                        "provider": structured["provider_name"],
+                        "ordering_group": "Ordering & Delivery Links",
+                    },
+                )
+                if candidate:
+                    candidates.append(candidate)
+    return candidates
+
+
+def _unresolved_ordering_providers(rows):
+    discovered = {
+        (row.get("recommended") or {}).get("normalized_value", {}).get("provider")
+        for row in rows
+    }
+    required = (
+        ("official_online_ordering", "Official Online Ordering"),
+        ("doordash", "DoorDash"),
+        ("grubhub", "Grubhub"),
+        ("uber_eats", "Uber Eats"),
+    )
+    return [
+        {"provider": provider, "label": label, "reason": "No reliable source value found."}
+        for provider, label in required if provider not in discovered
+    ]
+
+
 def scan_restaurant_information(record, force=False):
     record = deepcopy(record) if isinstance(record, dict) else {}
     restaurant_id = _clean(record.get("restaurant_id") or record.get("id"))
     sources = _discovery_sources(record)
     if not sources:
+        unresolved = [
+            field for field in FIELD_ORDER
+            if field not in {"ordering_provider_urls", "ordering_providers"}
+        ]
         return {
             "ok": True, "restaurant_id": restaurant_id, "scan_id": "", "scanned_at": _now_iso(),
             "fields": {}, "proposals": {field: _proposal(None, 0, "") for field in PROPOSAL_FIELDS},
             "sources": [{"label": "Restaurant sources", "status": "not_configured", "status_label": "Source not configured", "url": ""}],
-            "unresolved_fields": list(FIELD_ORDER),
-            "summary": {"sources_scanned": 0, "sources_reached": 0, "fields_discovered": 0, "high_confidence_changes": 0, "conflicts": 0, "unresolved": len(FIELD_ORDER)},
+            "unresolved_fields": unresolved,
+            "ordering_link_recommendations": [],
+            "unresolved_ordering_providers": _unresolved_ordering_providers([]),
+            "summary": {"sources_scanned": 0, "sources_reached": 0, "fields_discovered": 0, "high_confidence_changes": 0, "conflicts": 0, "unresolved": len(unresolved) + 4},
             "message": "No restaurant website, menu URL, or menu-item URL is configured.",
         }
     for source in sources:
@@ -1302,19 +1575,28 @@ def scan_restaurant_information(record, force=False):
         with ThreadPoolExecutor(max_workers=min(MAX_SCAN_WORKERS, len(discovered))) as pool:
             results.extend(pool.map(lambda source: _fetch_source(source, force), discovered))
 
-    candidates_by_field = {field: [] for field in FIELD_ORDER}
+    candidates_by_field = {field: [] for field in (*FIELD_ORDER, "ordering_link")}
     for result in results:
         for candidate in result.get("candidates", []):
             if candidate["field"] in candidates_by_field:
                 candidates_by_field[candidate["field"]].append(candidate)
     locked_fields = set(record.get("restaurant_information_locked_fields") or record.get("locked_fields") or [])
+    ordering_link_rows = _reconcile_ordering_links(
+        _ordering_link_candidates(candidates_by_field), record, locked_fields,
+    )
     fields = {
         field: _reconcile_field(field, candidates, record, locked_fields)
-        for field, candidates in candidates_by_field.items() if candidates
+        for field, candidates in candidates_by_field.items()
+        if field in FIELD_ORDER and candidates
     }
+    if ordering_link_rows:
+        # The review uses one row per provider URL. Keep aggregate discoveries out
+        # of the visible fixed-field list so the same link is never reviewed twice.
+        fields.pop("ordering_provider_urls", None)
+        fields.pop("ordering_providers", None)
     unresolved = [field for field in FIELD_ORDER if field not in fields]
-    if "ordering_providers" in fields and "ordering_provider_urls" in unresolved:
-        unresolved.remove("ordering_provider_urls")
+    unresolved = [field for field in unresolved if field not in {"ordering_provider_urls", "ordering_providers"}]
+    unresolved_ordering = _unresolved_ordering_providers(ordering_link_rows)
     logo_candidates = fields.get("image_url", {}).get("candidates", [])
     if logo_candidates and all(candidate.get("fallback") for candidate in logo_candidates):
         unresolved.append("image_url")
@@ -1327,13 +1609,13 @@ def scan_restaurant_information(record, force=False):
     summary = {
         "sources_scanned": len(results),
         "sources_reached": sum(item.get("status") == "success" for item in results),
-        "fields_discovered": len(fields),
+        "fields_discovered": len(fields) + len(ordering_link_rows),
         "high_confidence_changes": sum(
             row["changed"] and row["confidence_label"] == "High" and not row["conflict"] and not row["requires_explicit_review"] and not row["locked"]
-            for row in fields.values()
+            for row in [*fields.values(), *ordering_link_rows]
         ),
-        "conflicts": sum(row["conflict"] for row in fields.values()),
-        "unresolved": len(unresolved),
+        "conflicts": sum(row["conflict"] for row in [*fields.values(), *ordering_link_rows]),
+        "unresolved": len(unresolved) + len(unresolved_ordering),
     }
     public_sources = [{key: value for key, value in item.items() if key not in {"record", "candidates", "follow_links"}} for item in results]
     errors = [
@@ -1344,9 +1626,12 @@ def scan_restaurant_information(record, force=False):
         "ok": True, "restaurant_id": restaurant_id,
         "scan_id": f"scan_{hashlib.sha256(scan_signature.encode('utf-8')).hexdigest()[:20]}",
         "scanned_at": scanned_at, "fields": fields, "proposals": proposals,
-        "sources": public_sources, "errors": errors, "unresolved_fields": unresolved, "summary": summary,
+        "sources": public_sources, "errors": errors, "unresolved_fields": unresolved,
+        "ordering_link_recommendations": ordering_link_rows,
+        "unresolved_ordering_providers": unresolved_ordering,
+        "summary": summary,
         "partial": any(item.get("status") != "success" for item in results),
-        "message": "Restaurant information is ready to review." if fields else "Sources were scanned, but no matching restaurant fields were discovered.",
+        "message": "Restaurant information is ready to review." if fields or ordering_link_rows else "Sources were scanned, but no matching restaurant fields were discovered.",
     }
 
 
@@ -1440,12 +1725,68 @@ def select_restaurant_scan_values(scan, selections=None, mode="selected", locked
     return {"ok": True, "values": values, "accepted": accepted, "rejected": rejected}
 
 
+def select_restaurant_scan_ordering_links(
+    scan,
+    selections=None,
+    mode="selected",
+    locked_fields=None,
+    resolutions=None,
+):
+    """Select individually reviewed ordering links without overwriting conflicts silently."""
+    selections = selections if isinstance(selections, dict) else {}
+    resolutions = resolutions if isinstance(resolutions, dict) else {}
+    locked = set(locked_fields or [])
+    accepted, rejected = [], []
+    accepted_providers = set()
+    for row in scan.get("ordering_link_recommendations") or []:
+        row_key = _clean(row.get("row_key"))
+        if not row_key:
+            continue
+        if row.get("locked") or {"ordering_providers", "ordering_provider_urls"} & locked:
+            rejected.append({"field": row_key, "reason": "locked"})
+            continue
+        candidate = None
+        if mode == "high_confidence":
+            if (
+                row.get("selectable") and not row.get("conflict")
+                and not row.get("requires_explicit_review")
+                and row.get("confidence_label") == "High"
+            ):
+                candidate = row.get("recommended")
+        else:
+            candidate_id = _clean(selections.get(row_key))
+            candidate = next(
+                (item for item in row.get("candidates") or [] if item.get("candidate_id") == candidate_id),
+                None,
+            )
+        if not candidate:
+            continue
+        resolution = _clean(resolutions.get(row_key)).casefold() or "keep"
+        if row.get("conflict") and resolution != "replace":
+            rejected.append({"field": row_key, "reason": "conflict_kept"})
+            continue
+        value = _normalize_ordering_link_value(candidate.get("value"))
+        if not value:
+            rejected.append({"field": row_key, "reason": "invalid_url"})
+            continue
+        if row.get("conflict"):
+            value["replace_existing"] = True
+        if value["provider"] != "other" and value["provider"] in accepted_providers:
+            rejected.append({"field": row_key, "reason": "duplicate_provider"})
+            continue
+        accepted.append({"field": row_key, "candidate": candidate, "value": value})
+        if value["provider"] != "other":
+            accepted_providers.add(value["provider"])
+    return {"ok": True, "accepted": accepted, "rejected": rejected}
+
+
 def prepare_restaurant_information_scan_apply(
     restaurant_id,
     scan,
     selections=None,
     mode="selected",
     lock_updates=None,
+    ordering_link_resolutions=None,
 ):
     """Stage reviewed scan values for the editor without mutating normalized storage."""
     restaurant_id = _clean(restaurant_id)
@@ -1462,6 +1803,8 @@ def prepare_restaurant_information_scan_apply(
         return {"ok": False, "error": "Restaurant source was not found."}
     locked = set(restaurant.get("restaurant_information_locked_fields") or [])
     for field, value in (lock_updates if isinstance(lock_updates, dict) else {}).items():
+        if field.startswith("ordering_link:"):
+            field = "ordering_providers"
         if field not in FIELD_ORDER:
             continue
         if value is True:
@@ -1475,6 +1818,13 @@ def prepare_restaurant_information_scan_apply(
         mode=mode,
         locked_fields=locked,
     )
+    selected_ordering = select_restaurant_scan_ordering_links(
+        scan,
+        selections=selections,
+        mode=mode,
+        locked_fields=locked,
+        resolutions=ordering_link_resolutions,
+    )
     applied_values = {}
     for field, value in selected["values"].items():
         if field == "raw_hours_text":
@@ -1487,11 +1837,16 @@ def prepare_restaurant_information_scan_apply(
         for field, value in applied_values.items()
         if value not in (None, "", [], {})
     }
+    if selected_ordering["accepted"]:
+        applied_values["ordering_providers"] = [
+            deepcopy(item["value"]) for item in selected_ordering["accepted"]
+        ]
     applied_fields = [
         item["field"]
         for item in selected["accepted"]
         if item["field"] in applied_values
     ]
+    applied_fields.extend(item["field"] for item in selected_ordering["accepted"])
     field_statuses = {
         field: ("applied" if field in applied_values else row.get("status") or "unresolved")
         for field, row in (scan.get("fields") or {}).items()
@@ -1507,7 +1862,7 @@ def prepare_restaurant_information_scan_apply(
         "restaurant_id": restaurant_id,
         "applied_values": applied_values,
         "applied_fields": applied_fields,
-        "rejected": selected["rejected"],
+        "rejected": [*selected["rejected"], *selected_ordering["rejected"]],
         "locked_fields": sorted(locked),
         "field_statuses": field_statuses,
         "persisted": False,

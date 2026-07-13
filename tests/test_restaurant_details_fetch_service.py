@@ -46,6 +46,32 @@ def restaurant_html():
     """
 
 
+def restaurant_ordering_html():
+    payload = {
+        "@context": "https://schema.org",
+        "@type": "Restaurant",
+        "name": "Pisco Mar",
+        "telephone": "(317) 537-2025",
+        "potentialAction": {
+            "@type": "OrderAction",
+            "target": "https://pisco.example/order?utm_source=menu",
+        },
+    }
+    return f"""
+        <html><head><script type="application/ld+json">{json.dumps(payload)}</script></head><body>
+          <nav>
+            <a href="/pickup?utm_campaign=spring">Pickup online</a>
+            <a href="https://www.doordash.com/store/pisco-mar-indianapolis/?utm_source=site">DoorDash delivery</a>
+            <a href="https://www.grubhub.com/restaurant/pisco-mar-9546-allisonville-rd">Grubhub</a>
+            <a href="https://www.ubereats.com/store/pisco-mar/branch-123">Uber Eats</a>
+            <a href="https://order.toasttab.com/online/pisco-mar-indianapolis">Order with Toast</a>
+            <a href="https://www.doordash.com/">Generic DoorDash home</a>
+            <a href="https://www.grubhub.com/search?query=pisco">Provider search</a>
+          </nav>
+        </body></html>
+    """
+
+
 def test_extract_restaurant_proposals_from_public_structured_data():
     proposals = service.extract_restaurant_proposals(
         restaurant_html(),
@@ -67,6 +93,76 @@ def test_extract_restaurant_proposals_from_public_structured_data():
     assert proposals["delivery"]["value"] == "true"
     assert proposals["phone"]["value"] == "(317) 537-2025"
     assert proposals["city"]["value"] == "Indianapolis"
+
+
+def test_extracts_classified_ordering_links_and_separate_service_status_evidence():
+    result = service.extract_restaurant_candidates(
+        restaurant_ordering_html(),
+        "https://pisco.example/restaurant",
+        source_type="official_website",
+        record={"restaurant_name": "Pisco Mar", "phone": "(317) 537-2025"},
+        retrieved_at="2026-07-13T12:00:00Z",
+    )
+    ordering = [item for item in result["candidates"] if item["field"] == "ordering_link"]
+    links = {item["normalized_value"]["provider"]: item["normalized_value"] for item in ordering}
+
+    assert {"official_online_ordering", "doordash", "grubhub", "uber_eats", "toast"} <= set(links)
+    assert {
+        item["normalized_value"]["url"] for item in ordering
+        if item["normalized_value"]["provider"] == "official_online_ordering"
+    } == {"https://pisco.example/order", "https://pisco.example/pickup"}
+    assert links["doordash"]["url"] == "https://www.doordash.com/store/pisco-mar-indianapolis"
+    assert all(item["is_active"] is True for item in links.values())
+    assert not any(item["normalized_value"]["url"] == "https://www.doordash.com/" for item in ordering)
+    assert not any("/search" in item["normalized_value"]["url"] for item in ordering)
+    assert any(item["field"] == "online_ordering" and item["normalized_value"] is True for item in result["candidates"])
+    assert any(item["field"] == "pickup" and item["normalized_value"] is True for item in result["candidates"])
+    assert any(item["field"] == "delivery" and item["normalized_value"] is True for item in result["candidates"])
+    assert not any(item["field"] == "online_payment" for item in result["candidates"])
+
+
+def test_scan_returns_individual_ordering_rows_and_unresolved_provider_entries(monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "fetch_public_restaurant_page",
+        lambda url: (restaurant_ordering_html(), {
+            "url": url, "fetched_at": "2026-07-13T12:00:00Z", "http_status": 200,
+        }),
+    )
+    result = service.scan_restaurant_information({
+        "restaurant_id": "restaurant-1",
+        "restaurant_name": "Pisco Mar",
+        "phone": "(317) 537-2025",
+        "restaurant_website_url": "https://pisco.example/restaurant",
+    })
+
+    rows = result["ordering_link_recommendations"]
+    providers = {row["recommended"]["normalized_value"]["provider"] for row in rows}
+    assert {"official_online_ordering", "doordash", "grubhub", "uber_eats", "toast"} <= providers
+    assert all(row["row_key"].startswith("ordering_link:candidate_") for row in rows)
+    assert "ordering_provider_urls" not in result["fields"]
+    assert "ordering_providers" not in result["fields"]
+    assert result["summary"]["fields_discovered"] >= len(rows)
+    assert {item["provider"] for item in result["unresolved_ordering_providers"]} == set()
+
+
+def test_scan_lists_core_ordering_providers_as_unresolved_without_guessing(monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "fetch_public_restaurant_page",
+        lambda url: ('<script type="application/ld+json">{"@type":"Restaurant","name":"Pisco Mar"}</script>', {
+            "url": url, "fetched_at": "2026-07-13T12:00:00Z", "http_status": 200,
+        }),
+    )
+    result = service.scan_restaurant_information({
+        "restaurant_id": "restaurant-1",
+        "restaurant_name": "Pisco Mar",
+        "restaurant_website_url": "https://pisco.example",
+    })
+
+    unresolved = {item["label"]: item["reason"] for item in result["unresolved_ordering_providers"]}
+    assert set(unresolved) == {"Official Online Ordering", "DoorDash", "Grubhub", "Uber Eats"}
+    assert set(unresolved.values()) == {"No reliable source value found."}
 
 
 def test_fetch_restaurant_details_uses_website_then_menu_and_does_not_mutate(monkeypatch):
@@ -669,6 +765,76 @@ def test_apply_selected_persists_structured_ordering_provider_and_restaurant_not
     assert saved["ordering_providers"] == provider_value
     assert saved["allergy_information_note"] == "Please call for allergy information."
     assert saved["online_ordering_available"] is False
+
+
+def test_staged_apply_adds_selected_ordering_link_and_requires_replace_for_conflict(monkeypatch, tmp_path):
+    store_path = tmp_path / "restaurant_menus.json"
+    existing = {
+        "provider": "doordash",
+        "url": "https://www.doordash.com/store/pisco-mar-old",
+        "is_active": True,
+    }
+    store_path.write_text(json.dumps({
+        "restaurants": [{
+            "id": "restaurant-1",
+            "restaurant_id": "restaurant-1",
+            "restaurant_name": "Pisco Mar",
+            "ordering_delivery_links": [existing],
+        }],
+        "menus": [], "sections": [], "items": [], "pdf_logs": [],
+    }), encoding="utf-8")
+    monkeypatch.setattr(service.menu_store_service, "MENU_STORE_FILE", store_path)
+    discovered = service._candidate(
+        "ordering_link",
+        {
+            "provider": "doordash",
+            "provider_name": "DoorDash",
+            "url": "https://www.doordash.com/store/pisco-mar-new",
+            "is_active": True,
+            "supports_online_ordering": True,
+            "supports_pickup": False,
+            "supports_delivery": True,
+            "source_url": "https://pisco.example",
+        },
+        "https://pisco.example",
+        "official_website",
+        "navigation_link",
+        0.98,
+        "Official website DoorDash link",
+        "2026-07-13T12:00:00Z",
+    )
+    row = service._reconcile_ordering_links(
+        [discovered], {"ordering_delivery_links": [existing]}, set()
+    )[0]
+    scan = {
+        "ok": True,
+        "restaurant_id": "restaurant-1",
+        "scan_id": "scan-ordering",
+        "ordering_link_recommendations": [row],
+        "fields": {},
+    }
+
+    kept = service.prepare_restaurant_information_scan_apply(
+        "restaurant-1",
+        scan,
+        selections={row["row_key"]: discovered["candidate_id"]},
+        ordering_link_resolutions={row["row_key"]: "keep"},
+    )
+    replaced = service.prepare_restaurant_information_scan_apply(
+        "restaurant-1",
+        scan,
+        selections={row["row_key"]: discovered["candidate_id"]},
+        ordering_link_resolutions={row["row_key"]: "replace"},
+    )
+
+    assert kept["applied_values"] == {}
+    assert kept["rejected"] == [{"field": row["row_key"], "reason": "conflict_kept"}]
+    assert replaced["applied_fields"] == [row["row_key"]]
+    assert replaced["applied_values"]["ordering_providers"] == [{
+        **discovered["normalized_value"],
+        "replace_existing": True,
+    }]
+    assert json.loads(store_path.read_text(encoding="utf-8"))["restaurants"][0]["ordering_delivery_links"] == [existing]
 
 
 def test_shared_hours_codec_canonicalizes_split_closed_and_open_24_hours():

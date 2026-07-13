@@ -34862,6 +34862,19 @@ img[data-deferred-src] {
     overflow-y: auto;
 }
 
+.recipe-edit-restaurant-scan-group > h3 {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-bg-soft);
+    color: var(--app-text-strong);
+    font-size: 13px;
+    font-weight: 800;
+}
+
 .recipe-edit-restaurant-fetch-row {
     min-width: 0;
     padding: 11px 14px;
@@ -34981,6 +34994,41 @@ img[data-deferred-src] {
     font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.recipe-edit-restaurant-scan-ordering-link {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+}
+
+.recipe-edit-restaurant-scan-ordering-link a {
+    overflow: hidden;
+    color: var(--app-primary-hover);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recipe-edit-restaurant-scan-ordering-link small,
+.recipe-edit-restaurant-fetch-ordering-row .recipe-edit-restaurant-fetch-proposed > small {
+    color: #aeb8b2;
+    font-size: 11px;
+}
+
+.recipe-edit-restaurant-scan-ordering-resolution {
+    display: grid;
+    gap: 3px;
+}
+
+.recipe-edit-restaurant-scan-ordering-resolution > span {
+    color: #f0b84f;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.recipe-edit-restaurant-scan-ordering-resolution select {
+    min-height: 34px;
 }
 
 .recipe-edit-restaurant-logo-scan-actions {
