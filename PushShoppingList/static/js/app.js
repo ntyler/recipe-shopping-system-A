@@ -5091,19 +5091,6 @@ function consumeAuthCollapseAllRequest() {
     return true;
 }
 
-function publicWorkspaceStartsCollapsed() {
-    return document.body && document.body.dataset.publicWorkspace === "1";
-}
-
-function initPublicWorkspaceCollapsedState() {
-    if (!publicWorkspaceStartsCollapsed()) {
-        return;
-    }
-
-    persistShoppingListCollapsedState();
-    applyShoppingListCollapsedDomState({ showStatus: true });
-}
-
 function loadDeferredImage(image) {
     if (!image || image.dataset.deferredLoaded === "1") {
         return;
@@ -17223,7 +17210,7 @@ function storeOptionsPublicView() {
         return true;
     }
 
-    return document.body && document.body.dataset.publicWorkspace === "1";
+    return false;
 }
 
 function storeOptionsDefaultShouldShow(kind) {
@@ -42061,7 +42048,6 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initPerformanceStartupMode", initPerformanceStartupMode],
         ["initDeviceStaleReporting", initDeviceStaleReporting],
         ["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest],
-        ["initPublicWorkspaceCollapsedState", initPublicWorkspaceCollapsedState],
         ["restoreScroll", restoreScroll],
         ["restoreScreenSettings", restoreScreenSettings],
         ["restoreCardCollapseState", restoreCardCollapseState],

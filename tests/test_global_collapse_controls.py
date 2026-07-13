@@ -107,18 +107,15 @@ def test_auth_transition_can_request_collapse_before_lazy_sections_load():
     assert "safeStorageRemove(localStorage, USER_ACCOUNT_OPEN_PANEL_KEY);" in script
 
 
-def test_public_workspace_starts_collapsed_before_lazy_sections_load():
+def test_standalone_public_auth_does_not_initialize_workspace_lazy_loading():
     script = read_text("PushShoppingList/static/js/app.js")
     index_template = read_text("PushShoppingList/templates/index.html")
+    public_template = read_text("PushShoppingList/templates/public_auth.html")
 
-    assert 'data-public-workspace="{{ \'1\' if not current_user and not is_guest_demo else \'0\' }}"' in index_template
-    assert "function initPublicWorkspaceCollapsedState()" in script
-    assert 'document.body.dataset.publicWorkspace === "1"' in script
-    assert "persistShoppingListCollapsedState();" in script
-    assert "applyShoppingListCollapsedDomState({ showStatus: true });" in script
-    assert script.index('["initPublicWorkspaceCollapsedState", initPublicWorkspaceCollapsedState]') < script.index(
-        '["initLazySections", initLazySections]'
-    )
+    assert "data-public-workspace" not in index_template
+    assert "initPublicWorkspaceCollapsedState" not in script
+    assert "data-public-auth-page" in public_template
+    assert 'sections/app_workspaces.html' not in public_template
 
 
 def test_auth_collapse_still_allows_manual_lazy_section_open():
@@ -206,12 +203,14 @@ def test_firebase_auth_requests_collapse_before_sign_in_and_sign_out_work():
         "requestCollapseAllBeforeAuthReload();\n"
         "\n"
         "        try {\n"
+        "            await setFirebasePersistenceForForm(form);\n"
         "            const credential = await signInWithEmailAndPassword"
     ) in script
     assert (
         "requestCollapseAllBeforeAuthReload();\n"
         "\n"
         "            try {\n"
+        "                await setFirebasePersistenceForForm(form);\n"
         "                const credential = await signInWithPopup"
     ) in script
     assert "cancelCollapseAllBeforeAuthReload();\n            setStatus(form, firebaseErrorMessage(error), \"error\");" in script

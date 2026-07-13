@@ -4,6 +4,7 @@ import {
     getAuth,
     onAuthStateChanged,
     browserLocalPersistence,
+    browserSessionPersistence,
     setPersistence,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
@@ -94,6 +95,15 @@ function formValue(form, name) {
     return String((form.elements[name] || {}).value || "").trim();
 }
 
+async function setFirebasePersistenceForForm(form) {
+    const rememberChoice = form ? form.elements.remember_me : null;
+    const persistence = rememberChoice && !rememberChoice.checked
+        ? browserSessionPersistence
+        : browserLocalPersistence;
+
+    await setPersistence(auth, persistence);
+}
+
 function firebaseErrorMessage(error) {
     const code = String(error && error.code || "");
 
@@ -141,8 +151,14 @@ function statusForForm(form) {
     status.hidden = true;
 
     const heading = form.querySelector("h3");
-    if (heading && heading.nextSibling) {
-        form.insertBefore(status, heading.nextSibling);
+    let headingBlock = heading;
+
+    while (headingBlock && headingBlock.parentElement !== form) {
+        headingBlock = headingBlock.parentElement;
+    }
+
+    if (headingBlock) {
+        headingBlock.insertAdjacentElement("afterend", status);
     } else {
         form.prepend(status);
     }
@@ -1070,6 +1086,7 @@ function bindSignInForm() {
         requestCollapseAllBeforeAuthReload();
 
         try {
+            await setFirebasePersistenceForForm(form);
             const credential = await signInWithEmailAndPassword(
                 auth,
                 formValue(form, "identity"),
@@ -1094,6 +1111,7 @@ function bindSignInForm() {
             requestCollapseAllBeforeAuthReload();
 
             try {
+                await setFirebasePersistenceForForm(form);
                 const credential = await signInWithPopup(auth, googleProvider);
                 const result = await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user));
                 handleFirebaseBackendLogin(result, form, "Signed in with Google. Loading your workspace...");

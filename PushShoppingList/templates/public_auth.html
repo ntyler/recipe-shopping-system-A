@@ -1,0 +1,132 @@
+{% extends "layouts/app_layout.html" %}
+{% import "includes/app_shell_macros.html" as shell %}
+{% set app_page_title = "Sign in | AI Pantry" %}
+{% set app_body_class = "public-auth-page account-action-token" if password_reset_token|default("") or two_factor_recovery_token|default("") or account_delete_token|default("") else "public-auth-page" %}
+
+{% block app_head %}
+    <script>
+        (function applySavedPublicTheme() {
+            try {
+                var theme = localStorage.getItem("ai-pantry-public-theme") || "system";
+                if (theme === "light" || theme === "dark") {
+                    document.documentElement.dataset.publicAuthTheme = theme;
+                }
+            } catch (error) {
+                // The system theme remains available when storage is restricted.
+            }
+        }());
+    </script>
+{% endblock %}
+
+{% block app_body_attributes %}data-public-auth-page{% endblock %}
+
+{% block public_auth_content %}
+<div class="public-auth-page-frame" data-public-auth-layout>
+    <header class="public-auth-header" data-public-auth-header>
+        <a class="public-auth-brand" href="{{ url_for('main_bp.index') }}" aria-label="AI Pantry home">
+            {{ shell.brand_mark() }}
+            <span class="public-auth-brand-copy">
+                <strong><span>AI</span> Pantry</strong>
+                <small>Recipe Shopping List</small>
+            </span>
+        </a>
+
+        <div class="public-auth-header-actions">
+            <a class="public-auth-help"
+               href="mailto:{{ support_email }}"
+               aria-label="Help &amp; Support">
+                {{ shell.svg_icon("help") }}
+                <span>Help &amp; Support</span>
+            </a>
+            <span class="public-auth-header-divider" aria-hidden="true"></span>
+            <label class="public-auth-theme-control">
+                <span class="sr-only">Color theme</span>
+                {{ shell.svg_icon("sparkles") }}
+                <select data-public-theme-toggle aria-label="Color theme">
+                    <option value="system">System</option>
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </label>
+        </div>
+    </header>
+
+    <main class="public-auth-main" data-public-auth-main>
+        <section class="public-auth-intro" data-public-auth-intro aria-labelledby="publicAuthTitle">
+            <div class="public-auth-intro-copy">
+                <h1 id="publicAuthTitle">Your recipes.<br><span>Smarter with AI.</span></h1>
+                <p>
+                    Import from any website, menu, or photo. <br>
+                    AI extracts, organizes, and helps you cook <br>
+                    and shop with confidence.
+                </p>
+            </div>
+
+            <div class="public-auth-feature-grid" aria-label="AI Pantry capabilities">
+                <article class="public-auth-feature" data-public-auth-feature>
+                    <span class="public-auth-feature-icon">{{ shell.svg_icon("document") }}</span>
+                    <span><strong>Import Anything</strong><small>From recipe URLs, menus, <br>documents, or photos.</small></span>
+                </article>
+                <article class="public-auth-feature" data-public-auth-feature>
+                    <span class="public-auth-feature-icon">{{ shell.svg_icon("sparkles") }}</span>
+                    <span><strong>AI-Powered</strong><small>AI extracts ingredients, instructions, <br>nutrition, and more.</small></span>
+                </article>
+                <article class="public-auth-feature" data-public-auth-feature>
+                    <span class="public-auth-feature-icon">{{ shell.svg_icon("shopping") }}</span>
+                    <span><strong>Smart Shopping</strong><small>Organized shopping lists <br>with store links and prices.</small></span>
+                </article>
+                <article class="public-auth-feature" data-public-auth-feature>
+                    <span class="public-auth-feature-icon">{{ shell.svg_icon("meal") }}</span>
+                    <span><strong>Meal Planning</strong><small>Plan meals, manage cookbooks, <br>and track your pantry.</small></span>
+                </article>
+                <article class="public-auth-feature" data-public-auth-feature>
+                    <span class="public-auth-feature-icon">{{ shell.svg_icon("infer-sparkles") }}</span>
+                    <span><strong>Learn &amp; Improve</strong><small>AI helps improve recipes, <br>find substitutions, and more.</small></span>
+                </article>
+                <article class="public-auth-feature" data-public-auth-feature>
+                    <span class="public-auth-feature-icon">{{ shell.svg_icon("shield-check") }}</span>
+                    <span><strong>Private &amp; Secure</strong><small>Your data is private and only <br>accessible to you.</small></span>
+                </article>
+            </div>
+
+            <article class="public-auth-privacy-card" data-public-auth-privacy>
+                <span class="public-auth-privacy-icon">{{ shell.svg_icon("shield-check") }}</span>
+                <div>
+                    <h2>Your privacy matters</h2>
+                    <p>Your sign-in is handled by Firebase Authentication. <br>AI Pantry does not store or have access to your password.</p>
+                    <details>
+                        <summary>Learn more about privacy <span aria-hidden="true">&rarr;</span></summary>
+                        <p>Firebase or your chosen login provider verifies your credentials. AI Pantry receives the secure account confirmation needed to load your private workspace.</p>
+                    </details>
+                </div>
+            </article>
+        </section>
+
+        <div class="public-auth-card-column" data-public-auth-card>
+            {% set account_action_token = password_reset_token|default("") or two_factor_recovery_token|default("") or account_delete_token|default("") %}
+            {% if account_action_token or pending_two_factor_sign_in %}
+                {% include "sections/user_account.html" %}
+            {% else %}
+                {% include "sections/public_auth_card.html" %}
+            {% endif %}
+        </div>
+    </main>
+
+    <footer class="public-auth-footer" data-public-auth-footer>
+        <div class="public-auth-footer-capabilities" aria-label="Product capabilities">
+            <div><span>{{ shell.svg_icon("document") }}</span><strong>Recipe Imports</strong><small>Websites, menus, and photos</small></div>
+            <div><span>{{ shell.svg_icon("shopping") }}</span><strong>Smart Shopping Lists</strong><small>Organized for every store</small></div>
+            <div><span>{{ shell.svg_icon("meal") }}</span><strong>Meal Planning</strong><small>Plan meals with confidence</small></div>
+            <div><span>{{ shell.svg_icon("shield-check") }}</span><strong>Private &amp; Secure</strong><small>Protected personal workspace</small></div>
+        </div>
+        <p>&copy; 2026 AI Pantry. All rights reserved.</p>
+    </footer>
+</div>
+{% endblock %}
+
+{% block app_scripts %}
+<script id="supportPublicConfig" type="application/json">{{ support_public_config|tojson }}</script>
+<script id="firebaseWebConfig" type="application/json">{{ firebase_web_config|tojson }}</script>
+<script src="{{ url_for('static', filename='js/public-auth.js', v=public_auth_js_version) }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/firebase-auth.js', v=firebase_auth_js_version) }}"></script>
+{% endblock %}

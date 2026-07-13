@@ -271,6 +271,29 @@ def shared_page_context(active_public_user=None):
     }
 
 
+def public_auth_page_context():
+    """Return only the data needed by the signed-out authentication page."""
+    two_factor_recovery_token = request.args.get("two_factor_recovery_token", "")
+
+    return {
+        "app_public_auth": True,
+        "password_reset_token": request.args.get("reset_token", ""),
+        "two_factor_recovery_token": two_factor_recovery_token,
+        "two_factor_recovery_user": public_two_factor_recovery_user(two_factor_recovery_token),
+        "account_delete_token": request.args.get("account_delete_token", ""),
+        "app_css_version": static_asset_version("css/app.css"),
+        "app_js_version": static_asset_version("js/app.js"),
+        "public_auth_js_version": static_asset_version("js/public-auth.js"),
+        "firebase_auth_js_version": static_asset_version("js/firebase-auth.js"),
+        "firebase_web_config": firebase_web_config(),
+        "support_email": SUPPORT_EMAIL,
+        "support_public_config": {
+            "supportEmail": SUPPORT_EMAIL,
+            "supportAdminEmails": [],
+        },
+    }
+
+
 def recipe_rows_context(recipe_urls=None, food_rules=None, image_variants=None, include_detail_images=True):
     recipe_urls = recipe_urls if recipe_urls is not None else recipe_url_rows()
     food_rules = food_rules if food_rules is not None else load_food_rules()
@@ -3409,6 +3432,10 @@ def build_store_view(items, item_state, available_stores, enabled_stores):
 @main_bp.route("/")
 def index():
     active_public_user = current_public_user()
+
+    if not active_public_user and not is_guest_session():
+        return render_template("public_auth.html", **public_auth_page_context())
+
     return render_template("index.html", **shell_context(active_public_user))
 
 

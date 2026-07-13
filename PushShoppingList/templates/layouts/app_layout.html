@@ -15,6 +15,13 @@
       {% block app_body_attributes %}{% endblock %}>
 <a class="skip-link" href="#appContent">Skip to content</a>
 
+{% if app_public_auth|default(false) %}
+<div id="appContent"
+     class="public-auth-content"
+     data-public-auth-content>
+    {% block public_auth_content %}{% endblock %}
+</div>
+{% else %}
 <div class="app-shell" data-app-layout>
     {% include "includes/app_sidebar.html" %}
     <div class="app-main-shell" data-app-main-shell>
@@ -30,8 +37,11 @@
 
 {% block app_overlays %}{% endblock %}
 {% include "includes/app_mobile_navigation.html" %}
+{% endif %}
 
+{% if not (app_public_auth|default(false)) %}
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
+{% endif %}
 {% block app_scripts %}{% endblock %}
 </body>
 </html>

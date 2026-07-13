@@ -62,7 +62,7 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert 'data-app-nav-action="app-page"' in sidebar
     assert 'onclick="return collapseAllShoppingListPage()"' in template
     assert 'onclick="return expandAllShoppingListPage()"' in template
-    assert 'data-public-workspace="{{ \'1\' if not current_user and not is_guest_demo else \'0\' }}"' in template
+    assert "data-public-workspace" not in template
 
 
 def test_sidebar_import_actions_are_grouped_by_task_without_duplicate_hub_link():
