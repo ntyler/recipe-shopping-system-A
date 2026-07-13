@@ -465,6 +465,30 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert template.index("data-restaurant-edit-modal") > card_end
 
 
+def test_restaurant_selected_rating_star_has_no_persistent_gold_frame():
+    css = read_text("PushShoppingList/static/css/app.css")
+    selector = (
+        '.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor '
+        '.recipe-edit-rating-star[aria-checked="true"] {'
+    )
+    rule_start = css.index(selector)
+    selected_rule = css[rule_start:css.index("}", rule_start)]
+
+    assert "border-color: transparent;" in selected_rule
+    assert "background: transparent;" in selected_rule
+    assert "box-shadow: none;" in selected_rule
+    assert "251, 191, 36" not in selected_rule
+
+    focus_selector = (
+        ".recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor "
+        ".recipe-edit-rating-star:focus-visible {"
+    )
+    focus_start = css.index(focus_selector)
+    focus_rule = css[focus_start:css.index("}", focus_start)]
+    assert "156, 163, 175" in focus_rule
+    assert "251, 191, 36" not in focus_rule
+
+
 def test_restaurant_usage_duplicate_review_is_explicit_accessible_and_transactional():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")

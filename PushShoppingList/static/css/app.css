@@ -32345,8 +32345,20 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star[aria-checked="true"] {
-    border-color: rgba(251, 191, 36, .42);
-    background: rgba(17, 24, 39, .72);
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star:hover {
+    border-color: transparent;
+    box-shadow: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star:focus-visible {
+    border-color: rgba(156, 163, 175, .62);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(156, 163, 175, .18);
 }
 
 @media (prefers-reduced-motion: reduce) {
