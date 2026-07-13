@@ -213,6 +213,35 @@ def scan_field(field, current, candidates, **overrides):
     }
 
 
+def test_scan_reconciliation_recognizes_edit_form_aliases_as_current_values():
+    record = {
+        "restaurant_latitude": "39.7684",
+        "restaurant_longitude": "-86.1581",
+        "restaurant_rating_count": "224",
+        "restaurant_rewards_program": "Member rewards",
+        "restaurant_active_promotions": ["Lunch special"],
+        "restaurant_social_urls": ["https://instagram.com/piscomar"],
+    }
+    values = {
+        "latitude": 39.7684,
+        "longitude": -86.1581,
+        "rating_count": 224,
+        "rewards_promotions": "Member rewards",
+        "promotions": ["Lunch special"],
+        "social_urls": ["https://instagram.com/piscomar"],
+    }
+
+    for field, value in values.items():
+        reconciled = service._reconcile_field(
+            field,
+            [candidate(field, value, f"{field}-candidate")],
+            record,
+            set(),
+        )
+        assert reconciled["status"] == "already_saved"
+        assert reconciled["changed"] is False
+
+
 def test_open_24_hours_and_multi_period_hours_are_normalized():
     weekly = service._hours_from_specs([
         {"dayOfWeek": "Monday", "opens": "00:00", "closes": "24:00"},
