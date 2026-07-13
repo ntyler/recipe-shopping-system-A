@@ -134,7 +134,7 @@ def test_public_auth_feature_icons_match_reference_mapping():
     app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     expected_icons = (
         ("recipe-document-linked", "Import Anything"),
-        ("brain", "AI-Powered"),
+        ("brain-rounded", "AI-Powered"),
         ("shopping-cart", "Smart Shopping"),
         ("clipboard-checklist", "Meal Planning"),
         ("sparkles", "Learn &amp; Improve"),
@@ -152,9 +152,9 @@ def test_public_auth_feature_icons_match_reference_mapping():
             re.DOTALL,
         )
 
-    for obsolete_icon in ("infer-sparkles", "shield-check", "meal"):
+    for obsolete_icon in ("brain", "infer-sparkles", "shield-check", "meal"):
         assert f'svg_icon("{obsolete_icon}")' not in feature_grid
-    for new_icon in ("recipe-document-linked", "brain", "shopping-cart", "clipboard-checklist"):
+    for new_icon in ("recipe-document-linked", "brain-rounded", "shopping-cart", "clipboard-checklist"):
         assert f'elif name == "{new_icon}"' in icon_macros
 
     feature_icon_css = app_css[
@@ -166,6 +166,68 @@ def test_public_auth_feature_icons_match_reference_mapping():
     assert "width: 28px;" in feature_icon_css
     assert "height: 28px;" in feature_icon_css
     assert "stroke-width: 1.8;" in feature_icon_css
+    assert ".public-auth-feature-icon-brain .app-icon-svg" in feature_icon_css
+    assert "width: 32px;" in feature_icon_css
+    assert "height: 32px;" in feature_icon_css
+
+
+def test_public_auth_circled_icons_match_reference_without_changing_behavior():
+    public_template = (ROOT / "PushShoppingList/templates/public_auth.html").read_text(encoding="utf-8")
+    card_template = (ROOT / "PushShoppingList/templates/sections/public_auth_card.html").read_text(
+        encoding="utf-8"
+    )
+    public_header = (ROOT / "PushShoppingList/templates/includes/public_page_macros.html").read_text(
+        encoding="utf-8"
+    )
+    icon_macros = (ROOT / "PushShoppingList/templates/includes/app_shell_macros.html").read_text(
+        encoding="utf-8"
+    )
+    app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    theme_control = public_header[
+        public_header.index('class="public-auth-theme-control"'):
+        public_header.index('data-public-theme-menu-panel')
+    ]
+    assert 'svg_icon("sun")' in theme_control
+    assert 'svg_icon("sparkles")' not in theme_control
+    assert 'data-public-theme-trigger' in theme_control
+    assert 'svg_icon("chevron-down")' in public_header
+
+    sign_in_form = card_template[
+        card_template.index('id="firebaseSignInForm"'):
+        card_template.index('id="firebaseCreateAccountForm"')
+    ]
+    assert 'class="public-auth-email-field"' in sign_in_form
+    assert 'class="public-auth-email-icon" aria-hidden="true"' in sign_in_form
+    assert 'svg_icon("mail")' in sign_in_form
+    assert 'svg_icon("user-plus")' in sign_in_form
+    assert 'data-auth-mode-target="create"' in sign_in_form
+
+    guest_form = card_template[
+        card_template.index('class="public-auth-guest-access"'):
+        card_template.index('class="public-auth-legal"')
+    ]
+    assert 'svg_icon("user")' in guest_form
+    assert 'action="{{ url_for(\'account_bp.guest_start_route\') }}"' in guest_form
+    assert "Continue as Guest" in guest_form
+
+    privacy_card = public_template[
+        public_template.index('class="public-auth-privacy-card"'):
+        public_template.index("</section>", public_template.index('class="public-auth-privacy-card"'))
+    ]
+    assert 'class="public-auth-privacy-icon">{{ shell.svg_icon("shield-check") }}' in privacy_card
+    assert 'class="public-auth-privacy-art" aria-hidden="true"' in privacy_card
+    assert "shell.privacy_shield_art()" in privacy_card
+
+    for icon_name in ("sun", "mail", "user-plus", "brain-rounded"):
+        assert f'elif name == "{icon_name}"' in icon_macros
+    assert "macro privacy_shield_art()" in icon_macros
+    assert "padding-right: 46px !important;" in app_css
+    assert ".public-auth-email-icon" in app_css
+    assert ".public-auth-privacy-art-shield" in app_css
+    assert ".public-auth-privacy-art-decoration" in app_css
+    assert ".public-auth-privacy-copy" in app_css
+    assert "pointer-events: none;" in app_css
 
 
 def test_auth_card_defaults_to_single_sign_in_mode_and_keeps_auth_contracts(monkeypatch, tmp_path):

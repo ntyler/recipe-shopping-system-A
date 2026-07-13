@@ -31,7 +31,7 @@
                     <span><strong>Import Anything</strong><small>From recipe URLs, menus, <br>documents, or photos.</small></span>
                 </article>
                 <article class="public-auth-feature" data-public-auth-feature>
-                    <span class="public-auth-feature-icon">{{ shell.svg_icon("brain") }}</span>
+                    <span class="public-auth-feature-icon public-auth-feature-icon-brain">{{ shell.svg_icon("brain-rounded") }}</span>
                     <span><strong>AI-Powered</strong><small>AI extracts ingredients, instructions, <br>nutrition, and more.</small></span>
                 </article>
                 <article class="public-auth-feature" data-public-auth-feature>
@@ -54,7 +54,7 @@
 
             <article class="public-auth-privacy-card" data-public-auth-privacy>
                 <span class="public-auth-privacy-icon">{{ shell.svg_icon("shield-check") }}</span>
-                <div>
+                <div class="public-auth-privacy-copy">
                     <h2>Your privacy matters</h2>
                     <p>Your sign-in is handled by Firebase Authentication. <br>AI Pantry does not store or have access to your password.</p>
                     <details>
@@ -62,6 +62,9 @@
                         <p>Firebase or your chosen login provider verifies your credentials. AI Pantry receives the secure account confirmation needed to load your private workspace.</p>
                     </details>
                 </div>
+                <span class="public-auth-privacy-art" aria-hidden="true">
+                    {{ shell.privacy_shield_art() }}
+                </span>
             </article>
         </section>
 

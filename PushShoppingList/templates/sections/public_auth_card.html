@@ -54,11 +54,16 @@
 
             <label>
                 <span>Email address</span>
-                <input type="email"
-                       name="identity"
-                       required
-                       autocomplete="email"
-                       placeholder="you@example.com">
+                <span class="public-auth-email-field">
+                    <input type="email"
+                           name="identity"
+                           required
+                           autocomplete="email"
+                           placeholder="you@example.com">
+                    <span class="public-auth-email-icon" aria-hidden="true">
+                        {{ shell.svg_icon("mail") }}
+                    </span>
+                </span>
             </label>
             <label>
                 <span>Password</span>
@@ -99,7 +104,7 @@
                 <button type="button"
                         data-auth-mode-target="create"
                         aria-controls="firebaseCreateAccountForm">
-                    {{ shell.svg_icon("user") }}
+                    {{ shell.svg_icon("user-plus") }}
                     Create an Account
                 </button>
             </div>
@@ -207,7 +212,10 @@
           data-guest-demo-access
           method="GET"
           action="{{ url_for('account_bp.guest_start_route') }}">
-        <button type="submit" aria-label="Start temporary guest demo session">Continue as Guest</button>
+        <button type="submit" aria-label="Start temporary guest demo session">
+            {{ shell.svg_icon("user") }}
+            Continue as Guest
+        </button>
         <p>Explore with temporary demo data.<br>Nothing is saved permanently.</p>
     </form>
 

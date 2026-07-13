@@ -32659,6 +32659,11 @@ body.public-auth-page {
     stroke-width: 1.8;
 }
 
+.public-auth-feature-icon-brain .app-icon-svg {
+    width: 32px;
+    height: 32px;
+}
+
 .public-auth-feature > span:last-child {
     display: grid;
     gap: 7px;
@@ -32681,6 +32686,7 @@ body.public-auth-page {
 }
 
 .public-auth-privacy-card {
+    position: relative;
     display: grid;
     grid-template-columns: 50px minmax(0, 1fr);
     gap: 18px;
@@ -32690,9 +32696,12 @@ body.public-auth-page {
     border: 1px solid color-mix(in srgb, var(--app-primary) 18%, var(--app-border));
     border-radius: 10px;
     background: linear-gradient(115deg, var(--app-primary-soft), color-mix(in srgb, var(--app-surface) 92%, var(--app-primary-soft)));
+    overflow: hidden;
 }
 
 .public-auth-privacy-icon {
+    position: relative;
+    z-index: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -32705,6 +32714,68 @@ body.public-auth-page {
     width: 36px;
     height: 36px;
     stroke-width: 1.8;
+}
+
+.public-auth-privacy-copy {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    padding-right: 155px;
+}
+
+.public-auth-privacy-art {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    z-index: 0;
+    display: block;
+    width: 180px;
+    height: 124px;
+    color: var(--app-primary);
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
+.public-auth-privacy-art-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.public-auth-privacy-art-decoration {
+    fill: none;
+    stroke: color-mix(in srgb, var(--app-primary) 26%, transparent);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 4 6;
+}
+
+.public-auth-privacy-art-decoration circle {
+    fill: color-mix(in srgb, var(--app-primary) 24%, var(--app-surface));
+    stroke: color-mix(in srgb, var(--app-primary) 38%, transparent);
+    stroke-dasharray: none;
+}
+
+.public-auth-privacy-art-shield {
+    fill: color-mix(in srgb, var(--app-primary) 38%, var(--app-primary-soft));
+    stroke: var(--app-primary);
+    stroke-width: 2;
+    stroke-linejoin: round;
+}
+
+.public-auth-privacy-art-highlight {
+    fill: color-mix(in srgb, var(--app-primary-hover) 32%, transparent);
+    stroke: none;
+}
+
+.public-auth-privacy-art-check {
+    fill: none;
+    stroke: color-mix(in srgb, var(--app-primary-hover) 82%, var(--app-text-strong));
+    stroke-width: 5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .public-auth-privacy-card h2 {
@@ -32929,6 +33000,35 @@ body.public-auth-page {
     min-width: 0;
 }
 
+.public-auth-email-field {
+    position: relative;
+    display: block;
+    min-width: 0;
+}
+
+.public-auth-email-field > input {
+    padding-right: 46px !important;
+}
+
+.public-auth-email-icon {
+    position: absolute;
+    top: 50%;
+    right: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: var(--app-muted);
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
+.public-auth-email-icon .app-icon-svg {
+    width: 19px;
+    height: 19px;
+}
+
 .public-auth-password-field > input {
     padding-right: 48px !important;
 }
@@ -33026,6 +33126,7 @@ body.public-auth-page {
 
 .public-auth-primary-button .app-icon-svg,
 .public-auth-mode-prompt button .app-icon-svg,
+.public-auth-guest-access button .app-icon-svg,
 .public-auth-security-note .app-icon-svg {
     width: 16px;
     height: 16px;
@@ -33502,6 +33603,14 @@ body.public-auth-page {
 
     .public-auth-feature-grid {
         gap: 23px 20px;
+    }
+
+    .public-auth-privacy-copy {
+        padding-right: 0;
+    }
+
+    .public-auth-privacy-art {
+        display: none;
     }
 
     .public-auth-feature {
