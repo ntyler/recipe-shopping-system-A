@@ -57,7 +57,9 @@ def test_restaurant_rating_macro_renders_exactly_five_toggleable_stars_without_c
         '{% import "includes/app_shell_macros.html" as shell %}'
         '{{ shell.rating_control("recipeRating", "Recipe rating", mode="recipe") }}'
     ).render()
-    assert 'class="recipe-edit-rating-clear"' in recipe_rendered
+    assert 'data-rating-toggle-selected="true"' in recipe_rendered
+    assert recipe_rendered.count("click again to clear") == 5
+    assert "recipe-edit-rating-clear" not in recipe_rendered
 
 
 def test_standalone_recipe_editor_uses_app_shell_navigation():
@@ -293,8 +295,8 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'class="recipe-edit-rating-label">Rating</span>' in template
     assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")' in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
-    assert '{% if mode != "restaurant" %}' in macros
-    assert 'class="recipe-edit-rating-clear"' in macros
+    assert 'data-rating-toggle-selected="true"' in macros
+    assert 'class="recipe-edit-rating-clear"' not in macros
     assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
     assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, tagRow, metadataRow, descriptionRow, technicalDetails])" in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer
@@ -348,8 +350,8 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Use Image URL" in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
     assert "Click the selected star again to clear the rating." in macros
-    assert '{% if mode != "restaurant" %}' in macros
-    assert 'class="recipe-edit-rating-clear"' in macros
+    assert 'data-rating-toggle-selected="true"' in macros
+    assert 'class="recipe-edit-rating-clear"' not in macros
     assert macros.count('data-rating-value="{{ rating_value }}"') == 1
     assert "Restaurant's main website." in template
     assert "Page containing the full restaurant menu." in template

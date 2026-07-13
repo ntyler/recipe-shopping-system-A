@@ -32292,7 +32292,7 @@ img[data-deferred-src] {
     display: flex;
     margin: 0 0 0 auto;
     padding: 0;
-    align-items: center;
+    align-items: flex-start;
     justify-content: flex-end;
     gap: 8px;
 }
@@ -32326,8 +32326,9 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star[aria-checked="true"] {
-    border-color: rgba(251, 191, 36, .42);
-    background: rgba(251, 191, 36, .08);
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
 }
 
 .recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star:hover {

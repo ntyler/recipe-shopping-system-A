@@ -309,26 +309,20 @@
      aria-label="{{ aria_label }}"
      data-shared-rating-control
      data-rating-mode="{{ mode }}"
-     data-rating-toggle-selected="{{ 'true' if mode == 'restaurant' else 'false' }}">
+     data-rating-toggle-selected="true">
     {% for rating_value in range(1, 6) %}
         <button type="button"
                 class="recipe-edit-rating-star"
                 data-rating-value="{{ rating_value }}"
                 role="radio"
                 aria-checked="false"
-                aria-label="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}{% if mode == 'restaurant' %}. Click the selected star again to clear the rating.{% endif %}"
-                {% if mode == 'restaurant' %}title="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}; click again to clear"{% endif %}
+                aria-label="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}. Click the selected star again to clear the rating."
+                title="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}; click again to clear"
                 onclick="return setSharedRatingFromButton(this, {{ rating_value }})"
                 onkeydown="return handleSharedRatingKeydown(this, event)"
                 onpointerenter="previewSharedRating(this, {{ rating_value }})"
                 onpointerleave="clearSharedRatingPreview(this)">&#9734;</button>
     {% endfor %}
-    {% if mode != "restaurant" %}
-        <button type="button"
-                class="recipe-edit-rating-clear"
-                onclick="return clearSharedRating(this)"
-                hidden>Clear</button>
-    {% endif %}
 </div>
 {%- endmacro %}
 
