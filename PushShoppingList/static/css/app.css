@@ -34546,6 +34546,7 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-restaurant-rating-editor {
+    display: block;
     min-width: 0;
     margin: 0;
     padding: 0;
@@ -34557,6 +34558,11 @@ img[data-deferred-src] {
     color: #c8d0cc;
     font-size: 13px;
     font-weight: 700;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-stars {
+    justify-content: flex-start;
+    margin-left: 0;
 }
 
 .recipe-edit-restaurant-social-editor {

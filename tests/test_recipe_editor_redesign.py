@@ -496,6 +496,23 @@ def test_restaurant_selected_rating_star_has_no_persistent_gold_frame():
     assert "251, 191, 36" not in focus_rule
 
 
+def test_restaurant_rating_stars_start_directly_below_rating_label():
+    css = read_text("PushShoppingList/static/css/app.css")
+    editor_selector = ".recipe-edit-restaurant-rating-editor {"
+    editor_start = css.index(editor_selector, css.index(".recipe-edit-restaurant-form-logo"))
+    editor_rule = css[editor_start:css.index("}", editor_start)]
+    assert "display: block;" in editor_rule
+
+    stars_selector = (
+        ".recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor "
+        ".recipe-edit-rating-stars {"
+    )
+    stars_start = css.rindex(stars_selector)
+    stars_rule = css[stars_start:css.index("}", stars_start)]
+    assert "justify-content: flex-start;" in stars_rule
+    assert "margin-left: 0;" in stars_rule
+
+
 def test_restaurant_usage_duplicate_review_is_explicit_accessible_and_transactional():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
