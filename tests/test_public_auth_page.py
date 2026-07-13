@@ -265,6 +265,34 @@ def test_privacy_art_uses_opaque_layered_shield_with_explicit_dark_theme_colors(
     assert "stroke-width: 6;" in artwork_css
 
 
+def test_privacy_art_limits_attack_paths_to_three_subtle_background_lines():
+    icon_macros = (ROOT / "PushShoppingList/templates/includes/app_shell_macros.html").read_text(
+        encoding="utf-8"
+    )
+    app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    artwork = icon_macros[
+        icon_macros.index("macro privacy_shield_art()"):icon_macros.index("macro app_icon(name)")
+    ]
+    decoration = artwork[
+        artwork.index('<g class="public-auth-privacy-art-decoration">'):
+        artwork.index('<g class="public-auth-privacy-art-shield-layers"')
+    ]
+    artwork_css = app_css[
+        app_css.index(".public-auth-privacy-art {"):app_css.index(".public-auth-privacy-card h2")
+    ]
+
+    assert decoration.count("<path ") == 3
+    assert decoration.count("<circle ") == 3
+    assert 'd="M10 72c29-17 57-16 90-2"' in decoration
+    assert 'd="M154 7c1 14-4 25-16 35"' in decoration
+    assert 'd="M134 107c-6 8-9 15-10 23"' in decoration
+    assert "marker" not in decoration
+    assert "polygon" not in decoration
+    assert "--public-privacy-art-decoration: rgba(74, 222, 141, 0.18);" in artwork_css
+    assert "stroke-width: 1.1;" in artwork_css
+    assert "stroke-dasharray: 3 7;" in artwork_css
+
+
 def test_auth_card_defaults_to_single_sign_in_mode_and_keeps_auth_contracts(monkeypatch, tmp_path):
     app = seeded_app(monkeypatch, tmp_path)
 

@@ -32724,9 +32724,9 @@ body.public-auth-page {
 }
 
 .public-auth-privacy-art {
-    --public-privacy-art-decoration: rgba(22, 163, 74, 0.24);
-    --public-privacy-art-dot-fill: rgba(34, 197, 94, 0.3);
-    --public-privacy-art-dot-stroke: rgba(22, 163, 74, 0.48);
+    --public-privacy-art-decoration: rgba(22, 163, 74, 0.16);
+    --public-privacy-art-dot-fill: rgba(34, 197, 94, 0.24);
+    --public-privacy-art-dot-stroke: rgba(22, 163, 74, 0.34);
     --public-privacy-art-outer: #158b3b;
     --public-privacy-art-outer-stroke: #08752f;
     --public-privacy-art-inner: #68d67d;
@@ -32746,9 +32746,9 @@ body.public-auth-page {
 }
 
 html[data-public-auth-theme="dark"] .public-auth-privacy-art {
-    --public-privacy-art-decoration: rgba(74, 222, 141, 0.34);
-    --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.72);
-    --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.78);
+    --public-privacy-art-decoration: rgba(74, 222, 141, 0.18);
+    --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.36);
+    --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.46);
     --public-privacy-art-outer: #08713a;
     --public-privacy-art-outer-stroke: #36d983;
     --public-privacy-art-inner: #42c979;
@@ -32759,9 +32759,9 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 
 @media (prefers-color-scheme: dark) {
     html:not([data-public-auth-theme="light"]) .public-auth-privacy-art {
-        --public-privacy-art-decoration: rgba(74, 222, 141, 0.34);
-        --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.72);
-        --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.78);
+        --public-privacy-art-decoration: rgba(74, 222, 141, 0.18);
+        --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.36);
+        --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.46);
         --public-privacy-art-outer: #08713a;
         --public-privacy-art-outer-stroke: #36d983;
         --public-privacy-art-inner: #42c979;
@@ -32781,10 +32781,10 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 .public-auth-privacy-art-decoration {
     fill: none;
     stroke: var(--public-privacy-art-decoration);
-    stroke-width: 1.4;
+    stroke-width: 1.1;
     stroke-linecap: round;
     stroke-linejoin: round;
-    stroke-dasharray: 4 6;
+    stroke-dasharray: 3 7;
 }
 
 .public-auth-privacy-art-decoration circle {
