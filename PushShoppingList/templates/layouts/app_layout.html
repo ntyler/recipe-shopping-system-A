@@ -15,19 +15,20 @@
       {% block app_body_attributes %}{% endblock %}>
 <a class="skip-link" href="#appContent">Skip to content</a>
 
-<div class="app-shell{% if app_shell_class|default("") %} {{ app_shell_class }}{% endif %}">
+<div class="app-shell" data-app-layout>
     {% include "includes/app_sidebar.html" %}
-    <div class="app-main-shell{% if app_main_shell_class|default("") %} {{ app_main_shell_class }}{% endif %}">
+    <div class="app-main-shell" data-app-main-shell>
         {% include "includes/app_header.html" %}
-        {% block before_app_content %}{% endblock %}
         <main id="appContent"
               class="app-content{% if app_content_class|default("") %} {{ app_content_class }}{% endif %}"
+              data-app-content
               {% block app_content_attributes %}{% endblock %}>
             {% block app_content %}{% endblock %}
         </main>
     </div>
 </div>
 
+{% block app_overlays %}{% endblock %}
 {% include "includes/app_mobile_navigation.html" %}
 
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>

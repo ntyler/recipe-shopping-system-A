@@ -260,10 +260,10 @@ def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     css = read_text("PushShoppingList/static/css/app.css")
     script = read_text("PushShoppingList/static/js/app.js")
 
-    assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-content" in css
-    assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-topbar" in css
-    assert "padding-inline: 24px;" in css
-    assert "width: calc(100% - 48px);" in css
+    assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-content" not in css
+    assert ".app-shell-body:has(.app-home-dashboard:not([hidden])) .app-topbar" not in css
+    assert "--app-page-padding-inline: 24px;" in css
+    assert "padding: 28px var(--app-page-padding-inline) 56px;" in css
     assert "max-width: none;" in css
     assert 'class="app-home-hero-copy"' in template
     assert "ai-pantry-home-banner-v4.png" in css

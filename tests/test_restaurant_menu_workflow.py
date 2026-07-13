@@ -244,7 +244,9 @@ def test_menu_workflow_static_hooks_are_present():
     assert '{% set app_html_class = "menu-builder-document" %}' in cookbook_builder_template
     assert '{% set app_active_nav_item = "cookbooks" %}' in cookbook_builder_template
     assert ".menu-builder-document" in menu_builder_css
-    assert "min-height: 100vh" in menu_builder_css
+    assert ".menu-builder-page {\n    min-height: 100vh" not in menu_builder_css
+    assert "width: 100%;" in menu_builder_css
+    assert '"menus/cookbook_menu_pdf_log_page.html"' in routes
     assert "Create Restaurant Menu Page" in cookbook_builder_template
     assert '{% extends "layouts/app_layout.html" %}' in preview_template
     assert '{% set app_active_nav_item = "menus" %}' in preview_template

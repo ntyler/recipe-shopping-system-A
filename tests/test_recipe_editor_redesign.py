@@ -68,9 +68,10 @@ def test_standalone_recipe_editor_uses_app_shell_navigation():
 
     assert '{% extends "layouts/app_layout.html" %}' in template
     assert '{% set app_body_class = "recipe-edit-standalone-page" %}' in template
-    assert '{% set app_sidebar_class = "recipe-edit-page-sidebar" %}' in template
-    assert '{% set app_main_shell_class = "recipe-edit-page-main-shell" %}' in template
     assert '{% set app_content_class = "recipe-edit-standalone-shell" %}' in template
+    assert "app_sidebar_class" not in template
+    assert "app_main_shell_class" not in template
+    assert "app_shell_class" not in template
     assert "{% include \"sections/current_recipe_url_log.html\" %}" in template
     assert '{% include "includes/app_sidebar.html" %}' in layout
     assert '{% include "includes/app_header.html" %}' in layout
@@ -84,40 +85,40 @@ def test_standalone_recipe_editor_uses_app_shell_navigation():
 
 def test_standalone_recipe_editor_matches_homepage_width_without_a_max_cap():
     css = read_text("PushShoppingList/static/css/app.css")
-    rule_start = css.index(".recipe-edit-standalone-page .recipe-edit-standalone-shell {")
+    rule_start = css.index(
+        ".recipe-edit-standalone-page .recipe-edit-standalone-shell {",
+        css.index(".recipe-edit-standalone-page .recipe-edit-standalone-shell {") + 1,
+    )
     rule_end = css.index("}", rule_start)
     shell_rule = css[rule_start:rule_end]
 
-    assert "width: calc(100% - 48px);" in shell_rule
+    assert "width: 100%;" in shell_rule
     assert "max-width: none;" in shell_rule
     assert "width: min(" not in shell_rule
+    assert "100vw" not in shell_rule
 
 
 def test_standalone_recipe_editor_has_an_independent_main_scroll_region():
     css = read_text("PushShoppingList/static/css/app.css")
+    body_start = css.index(".app-shell-body {")
+    body_rule = css[body_start:css.index("}", body_start)]
+    main_start = css.index(".app-main-shell {")
+    main_rule = css[main_start:css.index("}", main_start)]
+    content_start = css.index(".app-content {")
+    content_rule = css[content_start:css.index("}", content_start)]
 
-    main_rule_start = css.index(".recipe-edit-page-main-shell {")
-    main_rule = css[main_rule_start:css.index("}", main_rule_start)]
-    page_rule_start = css.index(".recipe-edit-standalone-page {", main_rule_start)
-    page_rule = css[page_rule_start:css.index("}", page_rule_start)]
-    shell_rule_start = css.index(".recipe-edit-standalone-page .recipe-edit-page-shell {", page_rule_start)
-    shell_rule = css[shell_rule_start:css.index("}", shell_rule_start)]
-    content_rule_start = css.index(".recipe-edit-standalone-page .recipe-edit-standalone-shell {", main_rule_start)
-    content_rule = css[content_rule_start:css.index("}", content_rule_start)]
-
-    assert "height: 100vh;" in page_rule
-    assert "overflow: hidden;" in page_rule
-    assert "height: 100vh;" in shell_rule
-    assert "min-height: 0;" in shell_rule
-    assert "display: flex;" in main_rule
-    assert "flex-direction: column;" in main_rule
+    assert "height: 100dvh;" in body_rule
+    assert "overflow: hidden;" in body_rule
+    assert "display: grid;" in main_rule
+    assert "grid-template-rows: var(--app-toolbar-height) minmax(0, 1fr);" in main_rule
     assert "min-height: 0;" in main_rule
     assert "overflow: hidden;" in main_rule
-    assert "flex: 1 1 auto;" in content_rule
     assert "min-width: 0;" in content_rule
     assert "min-height: 0;" in content_rule
     assert "overflow-x: hidden;" in content_rule
     assert "overflow-y: auto;" in content_rule
+    assert ".recipe-edit-page-main-shell" not in css
+    assert ".recipe-edit-page-shell" not in css
 
 
 def test_recipe_editor_redesign_preserves_core_fields_and_actions():
@@ -823,7 +824,7 @@ def test_ai_analysis_uses_saved_confidence_evidence_without_health_completeness(
 def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert "Recipe workspace v3: target mockup structure with the homepage dark system" in css
+    assert "Recipe workspace v3: editor content uses its dark tokens without restyling AppLayout chrome" in css
     assert ".recipe-edit-standalone-page .recipe-edit-layout {" in css
     assert "grid-template-columns: minmax(0, 1.95fr) minmax(250px, 1fr) minmax(240px, .9fr);" in css
     assert ".recipe-edit-context-sidebar {" in css

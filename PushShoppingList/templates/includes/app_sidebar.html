@@ -2,7 +2,7 @@
 {% set in_shell = app_shell_mode|default("route") == "spa" %}
 {% set home_href = url_for("main_bp.index") %}
 {% set active_item = app_active_nav_item|default("home") %}
-<aside class="app-sidebar{% if app_sidebar_class|default("") %} {{ app_sidebar_class }}{% endif %}" aria-label="Primary navigation">
+<aside class="app-sidebar" aria-label="Primary navigation" data-app-sidebar>
     <a class="app-brand" href="{{ home_href }}" aria-label="AI Pantry home">
         {{ shell.brand_mark() }}
         <span>

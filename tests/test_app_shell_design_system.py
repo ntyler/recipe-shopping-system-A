@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from PushShoppingList.app import create_app
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -299,6 +301,8 @@ def test_authenticated_full_page_templates_extend_the_single_app_layout():
         "PushShoppingList/templates/recipe_edit_page.html",
         "PushShoppingList/templates/master_data.html",
         "PushShoppingList/templates/pdfs.html",
+        "PushShoppingList/templates/search_results.html",
+        "PushShoppingList/templates/menus/cookbook_menu_pdf_log_page.html",
         "PushShoppingList/templates/menus/cookbook_menu_builder.html",
         "PushShoppingList/templates/menus/menu_builder.html",
         "PushShoppingList/templates/menus/menu_edit.html",
@@ -312,6 +316,10 @@ def test_authenticated_full_page_templates_extend_the_single_app_layout():
     assert len(header_components) == 1
     assert layout.count('{% include "includes/app_header.html" %}') == 1
     assert layout.count('{% include "includes/app_sidebar.html" %}') == 1
+    assert 'class="app-shell" data-app-layout' in layout
+    assert 'class="app-main-shell" data-app-main-shell' in layout
+    assert "data-app-content" in layout
+    assert "{% block app_overlays %}{% endblock %}" in layout
     for page_path in authenticated_pages:
         page = read_text(page_path)
         assert '{% extends "layouts/app_layout.html" %}' in page
@@ -337,7 +345,8 @@ def test_home_and_recipe_editor_reuse_the_single_app_header_and_account_control(
     assert layout.count('{% include "includes/app_header.html" %}') == 1
     assert layout.count('{% include "includes/app_sidebar.html" %}') == 1
     assert header.count('<header class="app-topbar"') == 1
-    assert sidebar.count('<aside class="app-sidebar{%') == 1
+    assert sidebar.count('<aside class="app-sidebar"') == 1
+    assert "data-app-sidebar" in sidebar
     assert "shell.account_control(current_user, is_guest_demo|default(false), account_href, in_shell)" in header
     assert '<header class="app-topbar"' not in home
     assert '<header class="app-topbar"' not in recipe_editor
@@ -350,6 +359,35 @@ def test_home_and_recipe_editor_reuse_the_single_app_header_and_account_control(
     assert "grid-template-columns: minmax(280px, 620px) minmax(0, 1fr) auto;" in css
     assert "from PushShoppingList.services.user_account_service import current_public_user" in routes
     assert "current_user=current_public_user()," in routes
+
+
+def test_recipe_edit_route_renders_exactly_one_shared_shell(monkeypatch, tmp_path):
+    from PushShoppingList.services import user_account_service as accounts
+
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
+    accounts.save_users({
+        "users": [{
+            "user_id": "shell-route-user",
+            "username": "shell-route-user",
+            "email": "shell-route@example.com",
+            "account_status": "active",
+        }]
+    })
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "shell-route-user"
+        response = client.get("/recipe/edit?url=https%3A%2F%2Fexample.test%2Frecipes%2Fsoup")
+
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert html.count("data-app-layout>") == 1
+    assert html.count("data-app-sidebar>") == 1
+    assert html.count("data-app-header>") == 1
+    assert html.count("data-app-main-shell>") == 1
+    assert html.count("data-app-content") == 1
 
 
 def test_app_workspaces_define_mockup_style_individual_pages():
@@ -436,7 +474,9 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert "--app-surface:" in css
     assert "--app-primary:" in css
     assert "--app-sidebar-width:" in css
-    assert "--app-content-max:" in css
+    assert "--app-sidebar-collapsed-width:" in css
+    assert "--app-page-padding-inline:" in css
+    assert "--app-shell-border-color:" in css
     assert "--app-control-height:" in css
     assert "--app-radius-lg:" in css
     assert "scrollbar-gutter: stable;" in css
@@ -490,9 +530,15 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert "@media (max-width: 767px)" in css
     assert "@media (max-width: 1100px)" in css
     assert "@media (max-width: 768px)" in css
-    assert "width: min(var(--app-content-max), calc(100% - 56px));" in css
-    assert "width: min(var(--app-content-max), calc(100% - 32px));" in css
-    assert "width: calc(100% - 24px);" in css
+    assert "height: 100dvh;" in css
+    assert "grid-template-rows: var(--app-toolbar-height) minmax(0, 1fr);" in css
+    assert "grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);" in css
+    assert "grid-template-columns: var(--app-sidebar-collapsed-width) minmax(0, 1fr);" in css
+    assert "padding: 28px var(--app-page-padding-inline) 72px;" in css
+    assert "overflow-y: auto;" in css
+    assert ".app-shell-body:has(#recipesPage:not([hidden]))" not in css
+    assert ".recipe-edit-page-main-shell" not in css
+    assert ".recipe-edit-page-shell" not in css
     assert "calc(100vw - var(--app-sidebar-width)" not in css
     assert ".app-shell-body .app-card" in css
     assert ".app-shell-body .settings-workspace-section.app-card" in css
@@ -509,6 +555,22 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
     assert ".app-toolbar-actions {\n        grid-column: 3;" in tablet_shell
 
 
+def test_full_page_tools_size_against_the_shared_main_content_not_the_viewport():
+    app_css = read_text("PushShoppingList/static/css/app.css")
+    menu_css = read_text("PushShoppingList/static/css/menu_builder.css")
+
+    menu_workspace_start = menu_css.index(".menu-workspace,")
+    menu_workspace_rule = menu_css[menu_workspace_start:menu_css.index("}", menu_workspace_start)]
+    assert "width: 100%;" in menu_workspace_rule
+    assert "max-width: none;" in menu_workspace_rule
+    assert "100vw" not in menu_workspace_rule
+    assert ".menu-builder-page {\n    min-height: 100vh;" not in menu_css
+
+    assert ".recipe-edit-page-main-shell" not in app_css
+    assert ".recipe-edit-page-shell" not in app_css
+    assert "width: min(1680px, calc(100% - 48px));" not in app_css
+
+
 def test_desktop_sidebar_logo_and_icons_use_readable_scale():
     css = read_text("PushShoppingList/static/css/app.css")
     desktop_shell = css[css.index("/* Desktop mockup fidelity pass"):]
@@ -522,6 +584,10 @@ def test_app_shell_navigation_reuses_existing_lazy_and_account_panel_functions()
     script = read_text("PushShoppingList/static/js/app.js")
 
     assert "function initAppShellNavigation()" in script
+    assert "function appMainScrollRegion()" in script
+    assert 'document.querySelector("[data-app-content]")' in script
+    assert "function scrollAppMainBy(optionsOrX, y = 0)" in script
+    assert "scrollAppMainBy(0, delta);" in script
     assert "function submitGlobalAppSearch(form)" in script
     assert "function initGlobalAppSearch()" in script
     assert "GLOBAL_APP_SEARCH_DEBOUNCE_MS = 250" in script

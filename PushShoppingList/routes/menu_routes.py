@@ -665,7 +665,7 @@ def cookbook_menu_pdf_log_route(cookbook_id):
     if account_response:
         return account_response
     return render_template(
-        "menus/cookbook_menu_pdf_log.html",
+        "menus/cookbook_menu_pdf_log_page.html",
         **menu_template_context(
             cookbook_id=cookbook_id,
             menu_pdf_logs=menu_pdf_logs_for_cookbook(cookbook_id),

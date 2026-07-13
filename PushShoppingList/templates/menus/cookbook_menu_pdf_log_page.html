@@ -1,0 +1,24 @@
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = "Cookbook Menu PDF Log" %}
+{% set app_html_class = "menu-builder-document" %}
+{% set app_body_class = "menu-builder-page" %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "cookbooks" %}
+{% set app_search_id = "cookbookMenuPdfLogGlobalSearch" %}
+{% set app_content_class = "menu-workspace app-layout-wide-workspace" %}
+
+{% block app_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
+{% endblock %}
+
+{% block app_content %}
+    <section class="menu-preview-header">
+        <div>
+            <a class="menu-back-link" href="{{ url_for('main_bp.index') }}#cookbooksCard">Back to Cookbooks</a>
+            <h1>Cookbook Menu PDF Log</h1>
+        </div>
+    </section>
+    <section class="menu-pdf-log-panel" aria-label="Cookbook menu PDF log">
+        {% include "menus/cookbook_menu_pdf_log.html" %}
+    </section>
+{% endblock %}

@@ -47,7 +47,7 @@ data-public-workspace="{{ '1' if not current_user and not is_guest_demo else '0'
 data-user-id="{{ current_user.user_id if current_user else '' }}"
 {% endblock %}
 
-{% block before_app_content %}
+{% block app_overlays %}
     {% if current_user and current_user.is_admin %}
         {% include "sections/screen_settings.html" %}
     {% endif %}

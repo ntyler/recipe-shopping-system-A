@@ -4,7 +4,6 @@
 }
 
 .menu-builder-page {
-    min-height: 100vh;
     margin: 0;
     background: #121212;
     color: #f4f4f5;
@@ -12,8 +11,9 @@
 
 .menu-workspace,
 .restaurant-menu-page {
-    width: min(1180px, calc(100vw - 28px));
-    margin: 0 auto 40px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
 }
 
 .menu-preview-header {

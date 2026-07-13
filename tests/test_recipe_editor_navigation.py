@@ -101,7 +101,7 @@ def test_recipe_editor_return_scroll_offsets_current_recipe_sticky_header():
     assert '#currentRecipeUrlLogCard:not(.card-collapsed)' in jump_block
     assert ":scope > .recipe-url-log-header" in jump_block
     assert '[data-current-recipe-row]' in jump_block
-    assert "window.scrollBy({" in jump_block
+    assert "scrollAppMainBy({" in jump_block
     assert "top: -offset" in jump_block
 
 

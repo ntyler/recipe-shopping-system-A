@@ -7490,11 +7490,22 @@ const recipeQuantitySaveTimers = new WeakMap();
 const recipeQuantityNoticeTimers = new Map();
 const recipeQuantitySaveDelayMs = 2000;
 
+function appMainScrollRegion() {
+    return document.querySelector("[data-app-content]");
+}
+
+function scrollAppMainBy(optionsOrX, y = 0) {
+    const scrollRegion = appMainScrollRegion();
+    const target = scrollRegion || window;
+    target.scrollBy(optionsOrX, y);
+}
+
 function restoreScroll() {
     const scrollY = localStorage.getItem("scrollY");
 
     if (scrollY !== null) {
-        window.scrollTo(0, parseInt(scrollY));
+        const scrollRegion = appMainScrollRegion();
+        (scrollRegion || window).scrollTo(0, parseInt(scrollY));
         localStorage.removeItem("scrollY");
     }
 }
@@ -16252,7 +16263,7 @@ function preserveStoreOptionsStickyPosition(previousTop) {
     const delta = nextTop - previousTop;
 
     if (Math.abs(delta) > 0.5) {
-        window.scrollBy(0, delta);
+        scrollAppMainBy(0, delta);
     }
 }
 
@@ -16674,7 +16685,7 @@ function scrollRecipeJumpTargetBelowStickyHeader(target) {
         return;
     }
 
-    window.scrollBy({
+    scrollAppMainBy({
         top: -offset,
         left: 0,
         behavior: "auto",

@@ -77,9 +77,9 @@ def test_recipe_preview_link_opens_its_visible_parent_workspace():
 def test_recipes_page_css_locks_reference_geometry_and_responsive_fallbacks():
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert ".app-shell-body:has(#recipesPage:not([hidden]))" in css
-    assert "--app-sidebar-width: 274px;" in css
-    assert "--app-toolbar-height: 72px;" in css
+    assert ".app-shell-body:has(#recipesPage:not([hidden]))" not in css
+    assert "--app-sidebar-width: 274px;" not in css
+    assert "--app-toolbar-height: 72px;" not in css
     assert ".app-page-workspace-recipes .app-page-layout" in css
     assert "grid-template-columns: minmax(0, 1fr) 246px;" in css
     assert ".app-page-workspace-recipes .app-recipes-grid" in css
