@@ -2338,19 +2338,19 @@
                                     <input type="file" accept="image/png,image/jpeg,image/webp" data-restaurant-logo-file hidden>
                                     <input type="hidden" data-restaurant-edit-field="restaurant_logo_data_url">
                                     <input type="hidden" data-restaurant-edit-field="restaurant_logo_action" value="keep">
-                                    <label class="recipe-edit-restaurant-logo-url" data-restaurant-logo-url-panel hidden>
-                                        <span>Logo Image URL</span>
-                                        <input type="url" data-restaurant-edit-field="restaurant_logo_url" placeholder="https://example.com/logo.png">
-                                        <small>Enter a direct PNG, JPG, JPEG, or WebP image URL.</small>
-                                    </label>
                                     <p class="recipe-edit-restaurant-logo-error" data-restaurant-logo-error hidden></p>
                                 </div>
                             </div>
                             <label class="recipe-edit-restaurant-form-wide"><span>Restaurant Name</span><input type="text" data-restaurant-edit-field="restaurant_name" required></label>
                             <fieldset class="recipe-edit-restaurant-rating-editor recipe-edit-rating-field">
                                 <legend>Rating</legend>
-                                <input type="hidden" data-rating-input data-restaurant-edit-field="restaurant_rating">
-                                {{ shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant") }}
+                                <div class="recipe-edit-restaurant-rating-line">
+                                    <span>
+                                        <input type="hidden" data-rating-input data-restaurant-edit-field="restaurant_rating">
+                                        {{ shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant") }}
+                                    </span>
+                                    <label class="recipe-edit-restaurant-rating-count"><span>Rating Count</span><input type="number" min="0" step="1" inputmode="numeric" data-restaurant-edit-field="restaurant_rating_count"></label>
+                                </div>
                             </fieldset>
                             <label><span>Phone</span><input type="tel" data-restaurant-edit-field="restaurant_phone"></label>
                             <label class="recipe-edit-restaurant-form-wide"><span>Website URL</span><input type="url" data-restaurant-edit-field="restaurant_website_url"><small>Restaurant's main website.</small></label>
@@ -2361,6 +2361,15 @@
                             <label><span>State or Region</span><input type="text" data-restaurant-edit-field="restaurant_state"></label>
                             <label><span>Postal Code</span><input type="text" data-restaurant-edit-field="restaurant_postal_code"></label>
                             <label><span>Country</span><input type="text" data-restaurant-edit-field="restaurant_country"></label>
+                            <label class="recipe-edit-restaurant-form-wide"><span>Restaurant Note</span><textarea rows="3" data-restaurant-edit-field="restaurant_note_text"></textarea></label>
+                            <section class="recipe-edit-restaurant-social-editor recipe-edit-restaurant-form-wide" data-restaurant-social-links-editor>
+                                <div class="recipe-edit-restaurant-social-header">
+                                    <div><strong>Social Links</strong><small>Add official restaurant social profiles.</small></div>
+                                    <button type="button" onclick="return addRecipeRestaurantSocialLink(this)">+ Add Social Link</button>
+                                </div>
+                                <div class="recipe-edit-restaurant-social-rows" data-restaurant-social-links-rows></div>
+                                <input type="hidden" data-restaurant-edit-field="restaurant_social_links" value="[]">
+                            </section>
                             </section>
                             <section class="recipe-edit-restaurant-advanced recipe-edit-restaurant-operational-column">
                                 <header class="recipe-edit-restaurant-advanced-header">
@@ -2398,13 +2407,41 @@
                                             <label><span>Original / Raw Hours</span><textarea rows="3" data-restaurant-edit-field="restaurant_raw_hours_data"></textarea></label>
                                         </details>
                                     </section>
-                                    <label class="recipe-edit-restaurant-form-wide"><span>Rewards / Promotions</span><textarea rows="4" data-restaurant-edit-field="restaurant_promotions"></textarea><small>Optional rewards programs, discounts, or active promotions.</small></label>
+                                    <label class="recipe-edit-restaurant-form-wide"><span>Rewards Program</span><textarea rows="3" data-restaurant-edit-field="restaurant_rewards_program"></textarea><small>Optional loyalty or rewards program details.</small></label>
+                                    <label class="recipe-edit-restaurant-form-wide"><span>Active Promotions</span><textarea rows="3" data-restaurant-edit-field="restaurant_active_promotions"></textarea><small>Current discounts or promotions, one per line.</small></label>
+                                    <details class="recipe-edit-restaurant-subsection recipe-edit-restaurant-form-wide" data-restaurant-advanced-location>
+                                        <summary>Advanced Location</summary>
+                                        <div class="recipe-edit-restaurant-subsection-grid">
+                                            <label><span>Latitude</span><input type="number" min="-90" max="90" step="any" data-restaurant-edit-field="restaurant_latitude"></label>
+                                            <label><span>Longitude</span><input type="number" min="-180" max="180" step="any" data-restaurant-edit-field="restaurant_longitude"></label>
+                                        </div>
+                                    </details>
+                                    <details class="recipe-edit-restaurant-subsection recipe-edit-restaurant-form-wide" data-restaurant-advanced-media>
+                                        <summary>Advanced Media</summary>
+                                        <div class="recipe-edit-restaurant-subsection-grid">
+                                            <label class="recipe-edit-restaurant-form-wide" data-restaurant-logo-url-panel>
+                                                <span>Restaurant Logo / Image URL</span>
+                                                <input type="url" data-restaurant-edit-field="restaurant_logo_url" placeholder="https://example.com/logo.png">
+                                                <small>Enter the approved official logo or restaurant image URL.</small>
+                                            </label>
+                                        </div>
+                                    </details>
                                     <div class="recipe-edit-restaurant-availability-row recipe-edit-restaurant-form-wide">
                                         <label><span>Current Status</span><select data-restaurant-edit-field="restaurant_current_status"><option value="unknown">Unknown</option><option value="operating">Operating</option><option value="temporarily_closed">Temporarily Closed</option><option value="permanently_closed">Permanently Closed</option></select><small>Permanent business status, not real-time open-now.</small></label>
                                         <label><span>Online Payment</span><select data-restaurant-edit-field="restaurant_online_payment_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
                                         <label><span>Online Ordering</span><select data-restaurant-edit-field="restaurant_online_ordering_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+                                        <label><span>Pickup</span><select data-restaurant-edit-field="restaurant_pickup_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
                                         <label><span>Delivery</span><select data-restaurant-edit-field="restaurant_delivery_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
                                     </div>
+                                    <details class="recipe-edit-restaurant-raw-hours recipe-edit-restaurant-form-wide" data-restaurant-additional-raw-data>
+                                        <summary>Advanced Raw Data</summary>
+                                        <div class="recipe-edit-restaurant-raw-data-grid">
+                                            <label><span>Reservations</span><select data-restaurant-edit-field="restaurant_reservation_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
+                                            <label class="recipe-edit-restaurant-form-wide"><span>Allergy Information Note</span><textarea rows="2" data-restaurant-edit-field="restaurant_allergy_information_note"></textarea></label>
+                                            <label class="recipe-edit-restaurant-form-wide"><span>Ordering Provider URLs</span><textarea rows="3" data-restaurant-edit-field="restaurant_ordering_provider_urls" placeholder="One URL per line"></textarea></label>
+                                            <label class="recipe-edit-restaurant-form-wide"><span>Ordering Provider Records</span><textarea rows="3" data-restaurant-edit-field="restaurant_ordering_providers" placeholder="Scan-provided provider data"></textarea></label>
+                                        </div>
+                                    </details>
                                 </div>
                             </section>
                             <aside class="recipe-edit-restaurant-fetch-review"

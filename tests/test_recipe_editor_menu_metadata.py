@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from flask import Flask
@@ -1215,6 +1216,64 @@ def test_normalized_restaurant_status_and_tri_state_services_round_trip_without_
     assert loaded["restaurant_online_ordering_available"] == "false"
     assert loaded["restaurant_online_payment_available"] == ""
     assert loaded["restaurant_delivery_available"] == ""
+
+
+def test_restaurant_scan_destination_fields_round_trip_through_normalized_record(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({
+        "restaurant_name": "Scan Field Cafe",
+        "restaurant_promotions": "Legacy rewards and promotions",
+    })
+    restaurant_id = created["restaurant"]["restaurant_id"]
+
+    updated = recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Scan Field Cafe",
+        "restaurant_rating": "4.5",
+        "restaurant_rating_count": "224",
+        "restaurant_note_text": "Please call for allergy information.",
+        "restaurant_rewards_program": "Earn one point per dollar.",
+        "restaurant_active_promotions": "Lunch special\nFree dessert on birthdays",
+        "restaurant_latitude": "39.7684",
+        "restaurant_longitude": "-86.1581",
+        "restaurant_pickup_available": "true",
+        "restaurant_reservation_available": "false",
+        "restaurant_social_links": json.dumps([
+            {"platform": "facebook", "url": "https://facebook.com/scanfieldcafe"},
+            {"platform": "instagram", "url": "https://instagram.com/scanfieldcafe"},
+        ]),
+        "restaurant_allergy_information_note": "Kitchen handles common allergens.",
+        "restaurant_ordering_provider_urls": "https://order.example/menu\nhttps://delivery.example/store",
+        "restaurant_ordering_providers": json.dumps([
+            {"provider_name": "Order Example", "website_url": "https://order.example/menu"},
+        ]),
+    })
+    stored = menu_store_service.restaurant_for(menu_store_service.load_menu_store(), restaurant_id)
+    loaded = recipe_edit_service.get_editable_restaurant(restaurant_id)["restaurant"]
+
+    assert updated["ok"] is True
+    assert stored["rating_count"] == 224
+    assert stored["restaurant_note"] == "Please call for allergy information."
+    assert stored["rewards_text"] == "Earn one point per dollar."
+    assert stored["promotions"] == ["Lunch special", "Free dessert on birthdays"]
+    assert stored["latitude"] == 39.7684
+    assert stored["longitude"] == -86.1581
+    assert stored["pickup_available"] is True
+    assert stored["reservation_available"] is False
+    assert stored["social_urls"] == [
+        "https://facebook.com/scanfieldcafe",
+        "https://instagram.com/scanfieldcafe",
+    ]
+    assert stored["social_links"][0]["platform"] == "facebook"
+    assert stored["allergy_information_note"] == "Kitchen handles common allergens."
+    assert stored["ordering_provider_urls"] == [
+        "https://order.example/menu",
+        "https://delivery.example/store",
+    ]
+    assert stored["ordering_providers"][0]["provider_name"] == "Order Example"
+    assert loaded["restaurant_rating_count"] == "224"
+    assert loaded["restaurant_pickup_available"] == "true"
+    assert loaded["restaurant_social_links"][1]["platform"] == "instagram"
+    assert "Lunch special" in loaded["restaurant_promotions"]
 
 
 def test_structured_restaurant_hours_and_online_ordering_save_without_overwriting_raw(monkeypatch, tmp_path):

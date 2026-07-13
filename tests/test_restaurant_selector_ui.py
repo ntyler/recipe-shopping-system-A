@@ -185,9 +185,9 @@ def test_restaurant_scan_review_formats_provider_results_and_equivalent_values()
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert 'ordering_providers: { label: "Ordering providers" }' in script
-    assert 'allergy_information_note: { label: "Allergy information" }' in script
-    assert 'restaurant_note: { label: "Restaurant note" }' in script
+    assert 'ordering_providers: { label: "Ordering provider records", field: "restaurant_ordering_providers" }' in script
+    assert 'allergy_information_note: { label: "Allergy information", field: "restaurant_allergy_information_note" }' in script
+    assert 'restaurant_note: { label: "Restaurant note", field: "restaurant_note_text" }' in script
     assert "function recipeRestaurantFetchCandidateHtml(key, candidate)" in script
     assert 'key === "weekly_hours"' in script
     assert 'class="recipe-edit-restaurant-scan-address"' in script
@@ -275,7 +275,37 @@ def test_restaurant_online_ordering_is_a_separate_three_state_form_value():
     assert 'restaurant_online_payment_available: recipe.restaurant_online_payment_available ?? ""' in script
     assert 'restaurant_delivery_available: recipe.restaurant_delivery_available ?? ""' in script
     assert 'restaurant_online_ordering_available: recipeEditInputValue("recipeEditRestaurantOnlineOrderingAvailable")' in script
-    assert '["online_payment", "online_ordering", "delivery"]' in script
+    assert '["online_payment", "online_ordering", "pickup", "delivery", "reservations"]' in script
+
+
+def test_restaurant_scan_fields_have_editable_form_destinations():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    for field in (
+        "restaurant_note_text", "restaurant_social_links", "restaurant_rating_count",
+        "restaurant_pickup_available", "restaurant_rewards_program", "restaurant_active_promotions",
+        "restaurant_latitude", "restaurant_longitude", "restaurant_logo_url",
+        "restaurant_reservation_available", "restaurant_allergy_information_note",
+        "restaurant_ordering_provider_urls", "restaurant_ordering_providers",
+    ):
+        assert f'data-restaurant-edit-field="{field}"' in template
+
+    assert "Advanced Location" in template
+    assert "Advanced Media" in template
+    assert "Advanced Raw Data" in template
+    assert "Facebook" in script and "Instagram" in script and "TikTok" in script
+    assert "X / Twitter" in script and "YouTube" in script and "Other" in script
+    assert "function addRecipeRestaurantSocialLink(button)" in script
+    assert "function removeRecipeRestaurantSocialLink(button)" in script
+    assert 'social_urls: { label: "Social links", field: "restaurant_social_links" }' in script
+    assert 'restaurant_note: { label: "Restaurant note", field: "restaurant_note_text" }' in script
+    assert 'rating_count: { label: "Rating count", field: "restaurant_rating_count" }' in script
+    assert 'pickup: { label: "Pickup", field: "restaurant_pickup_available" }' in script
+    assert 'promotions: { label: "Promotions", field: "restaurant_active_promotions" }' in script
+    assert 'latitude: { label: "Latitude", field: "restaurant_latitude" }' in script
+    assert 'longitude: { label: "Longitude", field: "restaurant_longitude" }' in script
+    assert 'details.open = true;' in script
 
 
 def test_restaurant_scan_debug_logging_is_structured_and_value_safe():

@@ -139,6 +139,9 @@ from PushShoppingList.services.meal_plan_service import meal_plan_for_week
 from PushShoppingList.services.meal_plan_service import normalize_planned_servings
 from PushShoppingList.services.meal_plan_service import planned_servings_from_yield
 from PushShoppingList.services.global_search_service import global_search
+from PushShoppingList.services.global_search_service import ACTUAL_RECORD_GROUPS
+from PushShoppingList.services.global_search_service import recent_global_search
+from PushShoppingList.services.global_search_service import record_recent_global_search_result
 from PushShoppingList.services.job_service import job_for_client
 from PushShoppingList.services.job_service import recent_jobs
 from PushShoppingList.services.storage_service import active_guest_session_id
@@ -3418,6 +3421,8 @@ def global_search_route():
     query = str(request.args.get("q") or "")
     limit = request.args.get("limit", 10)
     try:
+        if not query.strip():
+            return jsonify(recent_global_search(limit=limit))
         # Header page shortcuts are sourced from the rendered shared Sidebar so
         # their SPA handlers remain intact. The API supplies record results only.
         return jsonify(global_search(query, limit=limit, include_pages=False))
@@ -3428,6 +3433,30 @@ def global_search_route():
             "query": query,
             "error": "AI Pantry search is temporarily unavailable.",
         }), 500
+
+
+@main_bp.route("/api/global-search/recent", methods=["POST"])
+def record_global_search_recent_route():
+    """Record a clicked, server-resolved result in the active workspace."""
+    if not active_user_id() and not active_guest_session_id():
+        return jsonify({"ok": False, "error": "Sign in to update recent search records."}), 401
+
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    group = str(payload.get("group") or "").strip().lower()
+    stable_id = str(payload.get("id") or "").strip()
+    if group not in ACTUAL_RECORD_GROUPS or not stable_id or len(stable_id) > 240:
+        return jsonify({"ok": False, "error": "A record group and id are required."}), 400
+
+    try:
+        result = record_recent_global_search_result(group, stable_id)
+    except Exception:
+        current_app.logger.exception("Recording recent global search result failed")
+        return jsonify({"ok": False, "error": "The recent item could not be recorded."}), 500
+    if not result:
+        return jsonify({"ok": False, "error": "That search record was not found."}), 404
+    return jsonify({"ok": True, "result": result})
 
 
 @main_bp.route("/search", methods=["GET"])

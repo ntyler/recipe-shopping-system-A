@@ -8,12 +8,16 @@ with the active workspace's scoped user id.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
+from datetime import timezone
+import json
 from pathlib import Path
 import re
 import threading
 import unicodedata
 from urllib.parse import quote
 from urllib.parse import urlencode
+from urllib.parse import urlsplit
 
 from PushShoppingList.services import cookbook_service
 from PushShoppingList.services import home_store_location_service
@@ -32,35 +36,51 @@ MIN_QUERY_LENGTH = 2
 DEFAULT_RESULT_LIMIT = 10
 MAX_RESULT_LIMIT = 12
 FULL_RESULTS_PER_GROUP = 50
+MAX_RECENT_RESULTS = 20
 
 GROUPS = (
     ("recipes", "RECIPES"),
     ("ingredients", "INGREDIENTS"),
     ("menus", "MENUS"),
+    ("restaurants", "RESTAURANTS"),
     ("cookbooks", "COOKBOOKS"),
     ("shopping-lists", "SHOPPING LISTS"),
     ("pantry", "PANTRY"),
-    ("meal-planner", "MEAL PLANNER"),
+    ("meal-planner", "MEAL PLAN"),
     ("stores", "STORES"),
-    ("restaurants", "RESTAURANTS"),
     ("equipment", "EQUIPMENT"),
     ("pages", "PAGES"),
 )
 GROUP_LABELS = dict(GROUPS)
 GROUP_ORDER = {key: index for index, (key, _label) in enumerate(GROUPS)}
+HEADER_GROUP_LIMITS = {
+    "recipes": 4,
+    "ingredients": 3,
+    "menus": 3,
+    "restaurants": 3,
+    "cookbooks": 2,
+    "shopping-lists": 2,
+    "pantry": 2,
+    "meal-planner": 2,
+    "stores": 2,
+    "equipment": 2,
+    "pages": 2,
+}
+ACTUAL_RECORD_GROUPS = frozenset(GROUP_LABELS).difference({"pages"})
+_RECENT_SEARCH_LOCK = threading.RLock()
 
 PAGE_SHORTCUTS = (
     ("Home", "Home page", "/#appPageHeader"),
     ("Recipes", "Browse and edit recipes", "/#recipesPage"),
     ("Menus", "Restaurant and cookbook menus", "/#menusPage"),
     ("Cookbooks", "Recipe collections", "/#cookbooksPage"),
-    ("Shopping Lists", "Current shopping-list workspace", "/#shoppingListsPage"),
-    ("Pantry", "Pantry inventory", "/#pantryPage"),
+    ("Shopping Lists", "Current shopping-list workspace", "/#shoppingViewsSection"),
+    ("Pantry", "Pantry inventory", "/#aiPantrySection"),
     ("Meal Planner", "Weekly meal plan", "/#mealPlannerPage"),
     ("Stores and Store Links", "Store settings and links", "/#storesPage"),
     ("Price Comparison", "Compare store prices", "/#priceComparisonPage"),
-    ("Import Recipes", "Import a recipe", "/#importPage"),
-    ("Import Menus", "Import a restaurant menu", "/#menuImportPage"),
+    ("Import Recipes", "Import a recipe", "/#recipeUrlsPage"),
+    ("Import Menus", "Import a restaurant menu", "/#menuUrlPage"),
 )
 
 
@@ -590,6 +610,29 @@ def build_store_candidates():
     return output
 
 
+def master_data_candidate(group, row):
+    if group not in {"ingredients", "equipment"} or not isinstance(row, dict):
+        return None
+    result_type = "Ingredient" if group == "ingredients" else "Equipment"
+    route_kind = group
+    usage_count = int(row.get("usage_count") or 0)
+    section = row.get("store_section") if group == "ingredients" else row.get("equipment_section")
+    return candidate(
+        group,
+        row.get("id"),
+        row.get("name"),
+        result_type,
+        result_url(f"/admin/master-data/{route_kind}", search=row.get("name")),
+        secondary=result_context(
+            section,
+            f"Used by {usage_count} recipe{'s' if usage_count != 1 else ''}",
+        ),
+        thumbnail_url=image_value(row.get("image_url")),
+        icon=group,
+        searchable=(row.get("normalized_name"),),
+    )
+
+
 def master_data_candidates(query):
     scoped_user_id = recipe_master_data_service.scoped_recipe_user_id()
     rows_by_group = (
@@ -619,24 +662,9 @@ def master_data_candidates(query):
         ),
     )
     output = []
-    for group, result_type, route_kind, rows in rows_by_group:
+    for group, _result_type, _route_kind, rows in rows_by_group:
         for row in rows:
-            usage_count = int(row.get("usage_count") or 0)
-            section = row.get("store_section") if group == "ingredients" else row.get("equipment_section")
-            output.append(candidate(
-                group,
-                row.get("id"),
-                row.get("name"),
-                result_type,
-                result_url(f"/admin/master-data/{route_kind}", search=row.get("name")),
-                secondary=result_context(
-                    section,
-                    f"Used by {usage_count} recipe{'s' if usage_count != 1 else ''}",
-                ),
-                thumbnail_url=image_value(row.get("image_url")),
-                icon=group,
-                searchable=(row.get("normalized_name"),),
-            ))
+            output.append(master_data_candidate(group, row))
     return [item for item in output if item]
 
 
@@ -687,6 +715,195 @@ def public_result(item):
     }
 
 
+def sanitize_relative_result_url(value):
+    value = str(value or "").strip()
+    if not value or len(value) > 2048 or "\\" in value or any(ord(character) < 32 for character in value):
+        return ""
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return ""
+    if parsed.scheme or parsed.netloc or not parsed.path.startswith("/") or parsed.path.startswith("//"):
+        return ""
+    return value
+
+
+def sanitize_thumbnail_url(value):
+    value = str(value or "").strip()
+    if not value or len(value) > 2048 or any(ord(character) < 32 for character in value):
+        return ""
+    if value.startswith("/"):
+        return sanitize_relative_result_url(value)
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return ""
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return value
+
+
+def sanitize_public_result(value):
+    value = value if isinstance(value, dict) else {}
+    result_id = clean_text(value.get("id"))[:240]
+    title = clean_text(value.get("title"))[:240]
+    result_type = clean_text(value.get("type"))[:80]
+    url = sanitize_relative_result_url(value.get("url"))
+    if not result_id or not title or not result_type or not url:
+        return None
+    icon = clean_text(value.get("icon")).lower()[:40]
+    if not re.fullmatch(r"[a-z0-9-]+", icon):
+        icon = "pages"
+    return {
+        "id": result_id,
+        "title": title,
+        "type": result_type,
+        "secondary": clean_text(value.get("secondary"))[:360],
+        "url": url,
+        "thumbnail_url": sanitize_thumbnail_url(value.get("thumbnail_url")),
+        "icon": icon,
+    }
+
+
+def utc_now_iso():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def recent_search_file():
+    """Resolve the recent ledger inside the active request workspace."""
+    return storage_service.workspace_data_root() / "global_search_recent.json"
+
+
+def load_recent_search_records():
+    path = recent_search_file()
+    with _RECENT_SEARCH_LOCK:
+        if not path.exists():
+            return []
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            return []
+    records = payload.get("records", []) if isinstance(payload, dict) else []
+    output = []
+    for entry in records:
+        if not isinstance(entry, dict):
+            continue
+        group = clean_text(entry.get("group")).lower()
+        result = sanitize_public_result(entry.get("result"))
+        if group not in ACTUAL_RECORD_GROUPS or not result:
+            continue
+        output.append({
+            "group": group,
+            "viewed_at": clean_text(entry.get("viewed_at"))[:40],
+            "result": result,
+        })
+        if len(output) >= MAX_RECENT_RESULTS:
+            break
+    return output
+
+
+def save_recent_search_records(records):
+    payload = {"records": list(records or [])[:MAX_RECENT_RESULTS]}
+    path = recent_search_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _RECENT_SEARCH_LOCK:
+        path.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+
+def resolve_actual_search_result(group, stable_id):
+    group = clean_text(group).lower()
+    stable_id = clean_text(stable_id)
+    if group not in ACTUAL_RECORD_GROUPS or not stable_id:
+        return None
+
+    if group in {"ingredients", "equipment"}:
+        table_name = group
+        scoped_user_id = recipe_master_data_service.scoped_recipe_user_id()
+        row = recipe_master_data_service.master_record_for_id(
+            table_name,
+            stable_id,
+            user_id=scoped_user_id,
+            include_all_users=False,
+        )
+        if not row:
+            return None
+        row = dict(row)
+        row["usage_count"] = (
+            recipe_master_data_service.count_ingredient_usage(row["id"], user_id=scoped_user_id)
+            if group == "ingredients"
+            else recipe_master_data_service.count_equipment_usage(row["id"], user_id=scoped_user_id)
+        )
+        return master_data_candidate(group, row)
+
+    return next(
+        (
+            item
+            for item in cached_projection().candidates
+            if item.get("group") == group and clean_text(item.get("id")) == stable_id
+        ),
+        None,
+    )
+
+
+def record_recent_global_search_result(group, stable_id):
+    actual = resolve_actual_search_result(group, stable_id)
+    sanitized = sanitize_public_result(public_result(actual)) if actual else None
+    if not sanitized:
+        return None
+
+    with _RECENT_SEARCH_LOCK:
+        records = load_recent_search_records()
+        records = [
+            entry
+            for entry in records
+            if not (
+                entry.get("group") == clean_text(group).lower()
+                and entry.get("result", {}).get("id") == sanitized["id"]
+            )
+        ]
+        records.insert(0, {
+            "group": clean_text(group).lower(),
+            "viewed_at": utc_now_iso(),
+            "result": sanitized,
+        })
+        save_recent_search_records(records)
+    return sanitized
+
+
+def recent_global_search(limit=4):
+    try:
+        limit = max(1, min(4, int(limit)))
+    except (TypeError, ValueError):
+        limit = 4
+    results = [
+        {**entry["result"], "tracking_group": entry["group"]}
+        for entry in load_recent_search_records()[:limit]
+    ]
+    groups = []
+    if results:
+        groups.append({
+            "key": "recent",
+            "label": "RECENT",
+            "count": len(results),
+            "results": results,
+        })
+    return {
+        "ok": True,
+        "query": "",
+        "normalized_query": "",
+        "min_query_length": MIN_QUERY_LENGTH,
+        "query_too_short": False,
+        "total_count": len(results),
+        "all_total_count": len(results),
+        "groups": groups,
+        "available_groups": [],
+        "view_all_url": "/search",
+    }
+
+
 def normalize_group_filter(group_filter):
     if not group_filter:
         return set()
@@ -697,6 +914,21 @@ def normalize_group_filter(group_filter):
         for group in group_filter
         if clean_text(group).lower() in GROUP_LABELS
     }
+
+
+def limited_header_results(ranked, limit):
+    visible = []
+    group_counts = {}
+    for entry in ranked:
+        group = entry[1].get("group")
+        group_limit = HEADER_GROUP_LIMITS.get(group, 2)
+        if group_counts.get(group, 0) >= group_limit:
+            continue
+        visible.append(entry)
+        group_counts[group] = group_counts.get(group, 0) + 1
+        if len(visible) >= limit:
+            break
+    return visible
 
 
 def global_search(query, limit=DEFAULT_RESULT_LIMIT, group_filter=None, full=False, include_pages=True):
@@ -755,7 +987,7 @@ def global_search(query, limit=DEFAULT_RESULT_LIMIT, group_filter=None, full=Fal
             limit = max(1, min(MAX_RESULT_LIMIT, int(limit)))
         except (TypeError, ValueError):
             limit = DEFAULT_RESULT_LIMIT
-        visible = ranked[:limit]
+        visible = limited_header_results(ranked, limit)
 
     grouped_results = []
     for group, label in GROUPS:

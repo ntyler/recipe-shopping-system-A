@@ -26921,7 +26921,7 @@ img[data-deferred-src] {
     left: 0;
     z-index: 240;
     width: 100%;
-    max-height: min(70vh, 560px);
+    max-height: min(70vh, 440px);
     overflow-y: auto;
     overscroll-behavior: contain;
     border: 1px solid var(--app-border-strong);
@@ -26937,18 +26937,23 @@ img[data-deferred-src] {
 
 .app-global-search-dropdown-content {
     display: grid;
-    padding: 8px;
+    padding: 6px;
+}
+
+.app-global-search-dropdown-content[hidden],
+.app-global-search-state[hidden] {
+    display: none;
 }
 
 .app-global-search-group + .app-global-search-group {
-    margin-top: 5px;
-    padding-top: 5px;
+    margin-top: 4px;
+    padding-top: 4px;
     border-top: 1px solid var(--app-border);
 }
 
 .app-global-search-group h2 {
     margin: 0;
-    padding: 7px 10px 5px;
+    padding: 5px 8px 4px;
     color: var(--app-muted);
     font-size: 10px;
     font-weight: 900;
@@ -26964,10 +26969,10 @@ img[data-deferred-src] {
 .app-global-search-result {
     display: grid;
     grid-template-columns: 38px minmax(0, 1fr);
-    gap: 10px;
+    gap: 8px;
     align-items: center;
-    min-height: 56px;
-    padding: 7px 10px;
+    min-height: 48px;
+    padding: 5px 8px;
     border: 1px solid transparent;
     border-radius: 8px;
     color: var(--app-text);
@@ -27017,7 +27022,7 @@ img[data-deferred-src] {
 .app-global-search-result-copy {
     display: grid;
     min-width: 0;
-    gap: 3px;
+    gap: 2px;
 }
 
 .app-global-search-result-copy strong,
@@ -27068,13 +27073,21 @@ img[data-deferred-src] {
 }
 
 .app-global-search-state {
-    min-height: 68px;
-    padding: 22px 14px;
+    min-height: 60px;
+    padding: 18px 12px;
     color: var(--app-muted);
     font-size: 12px;
     font-weight: 750;
     line-height: 1.45;
     text-align: center;
+}
+
+.app-global-search-state > span {
+    display: block;
+}
+
+.app-global-search-state > span + span {
+    margin-top: 3px;
 }
 
 .app-global-search-state.is-loading::before {
@@ -30470,7 +30483,7 @@ img[data-deferred-src] {
 
     .app-global-search-dropdown {
         width: 100%;
-        max-height: min(60vh, 460px);
+        max-height: min(60vh, 440px);
     }
 
     .global-search-results-header {
@@ -34545,6 +34558,87 @@ img[data-deferred-src] {
     font-weight: 700;
 }
 
+.recipe-edit-restaurant-rating-line {
+    display: flex;
+    min-width: 0;
+    align-items: end;
+    gap: 14px;
+}
+
+.recipe-edit-restaurant-rating-line > span {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-count {
+    width: 96px;
+    flex: 0 0 96px;
+    gap: 4px;
+    font-size: 12px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-rating-count input {
+    min-height: 36px;
+    height: 36px;
+}
+
+.recipe-edit-restaurant-social-editor {
+    display: grid;
+    gap: 9px;
+    padding: 12px;
+    border: 1px solid #59635f;
+    border-radius: 8px;
+    background: var(--app-bg-soft);
+}
+
+.recipe-edit-restaurant-social-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.recipe-edit-restaurant-social-header > div {
+    display: grid;
+    gap: 2px;
+}
+
+.recipe-edit-restaurant-social-header strong {
+    color: var(--app-text-strong);
+    font-size: 13px;
+}
+
+.recipe-edit-restaurant-social-header small {
+    color: #aeb8b2;
+    font-size: 12px;
+}
+
+.recipe-edit-restaurant-social-header button,
+.recipe-edit-restaurant-social-row button {
+    width: auto;
+    min-height: 36px;
+    padding: 0 11px;
+    border: 1px solid #59635f;
+    border-radius: 6px;
+    background: var(--app-surface);
+    color: var(--app-text);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.recipe-edit-restaurant-social-rows {
+    display: grid;
+    gap: 7px;
+}
+
+.recipe-edit-restaurant-social-row {
+    display: grid;
+    grid-template-columns: minmax(120px, .35fr) minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
 .recipe-edit-standalone-page .recipe-edit-restaurant-form label small {
     color: #aeb8b2;
     font-size: 12px;
@@ -35036,7 +35130,8 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-restaurant-advanced > summary,
-.recipe-edit-restaurant-raw-hours > summary {
+.recipe-edit-restaurant-raw-hours > summary,
+.recipe-edit-restaurant-subsection > summary {
     min-height: 38px;
     padding: 10px 12px;
     color: var(--app-text-strong);
@@ -35131,8 +35226,26 @@ img[data-deferred-src] {
     border-top: 1px solid #59635f;
 }
 
+.recipe-edit-restaurant-subsection {
+    border-top: 1px solid #59635f;
+}
+
+.recipe-edit-restaurant-subsection-grid,
+.recipe-edit-restaurant-raw-data-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+    padding: 0 12px 12px;
+}
+
+.recipe-edit-restaurant-subsection-grid > .recipe-edit-restaurant-form-wide,
+.recipe-edit-restaurant-raw-data-grid > .recipe-edit-restaurant-form-wide {
+    grid-column: 1 / -1;
+}
+
 .recipe-edit-restaurant-raw-hours textarea,
-.recipe-edit-restaurant-advanced textarea {
+.recipe-edit-restaurant-advanced textarea,
+.recipe-edit-restaurant-primary-column textarea {
     width: 100%;
     min-height: 88px;
     resize: vertical;
@@ -35146,14 +35259,17 @@ img[data-deferred-src] {
     line-height: 1.4;
 }
 
-.recipe-edit-restaurant-advanced textarea[data-restaurant-edit-field="restaurant_promotions"] {
-    min-height: 108px;
-    height: 108px;
+.recipe-edit-restaurant-advanced textarea:is(
+    [data-restaurant-edit-field="restaurant_rewards_program"],
+    [data-restaurant-edit-field="restaurant_active_promotions"]
+) {
+    min-height: 92px;
+    height: 92px;
 }
 
 .recipe-edit-restaurant-availability-row {
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) repeat(3, minmax(0, .8fr));
+    grid-template-columns: minmax(0, 1.35fr) repeat(4, minmax(0, .8fr));
     gap: 12px;
     align-items: start;
 }
@@ -35276,6 +35392,28 @@ img[data-deferred-src] {
     .recipe-edit-restaurant-primary-column,
     .recipe-edit-restaurant-availability-row {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .recipe-edit-restaurant-rating-line,
+    .recipe-edit-restaurant-social-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .recipe-edit-standalone-page .recipe-edit-restaurant-rating-count {
+        width: 100%;
+        flex-basis: auto;
+    }
+
+    .recipe-edit-restaurant-social-row,
+    .recipe-edit-restaurant-subsection-grid,
+    .recipe-edit-restaurant-raw-data-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .recipe-edit-restaurant-subsection-grid > .recipe-edit-restaurant-form-wide,
+    .recipe-edit-restaurant-raw-data-grid > .recipe-edit-restaurant-form-wide {
+        grid-column: 1;
     }
 
     .recipe-edit-restaurant-primary-column > * {

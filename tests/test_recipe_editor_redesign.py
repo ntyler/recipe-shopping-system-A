@@ -325,9 +325,13 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
         "restaurant_name", "restaurant_logo_url", "restaurant_rating", "restaurant_phone",
         "restaurant_website_url", "source_menu_url", "menu_item_url", "restaurant_street_address",
         "restaurant_city", "restaurant_state", "restaurant_postal_code", "restaurant_country",
-        "restaurant_raw_hours_data", "restaurant_current_status", "restaurant_promotions",
+        "restaurant_raw_hours_data", "restaurant_current_status", "restaurant_rewards_program",
+        "restaurant_active_promotions", "restaurant_note_text", "restaurant_social_links",
+        "restaurant_rating_count", "restaurant_latitude", "restaurant_longitude",
         "restaurant_online_payment_available", "restaurant_online_ordering_available",
-        "restaurant_delivery_available",
+        "restaurant_pickup_available", "restaurant_delivery_available",
+        "restaurant_reservation_available", "restaurant_allergy_information_note",
+        "restaurant_ordering_provider_urls", "restaurant_ordering_providers",
     ):
         assert f'data-restaurant-edit-field="{field}"' in template
     assert "data-restaurant-edit-form" in template
@@ -354,7 +358,8 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Advanced Raw Data" in template
     assert 'data-restaurant-hours-day="{{ day }}"' in template
     assert '<option value="open_24_hours">Open 24 hours</option>' in template
-    assert "Optional rewards programs, discounts, or active promotions." in template
+    assert "Optional loyalty or rewards program details." in template
+    assert "Current discounts or promotions, one per line." in template
     assert "Temporarily Closed" in template
     assert "Permanently Closed" in template
     assert template.count('<option value="">Unknown</option>') >= 2

@@ -29,6 +29,8 @@
         <div class="app-nav-section-title">Discover &amp; Plan</div>
         <a class="app-nav-link{% if active_item == 'recipes' %} is-active{% endif %}"
            href="{{ '#recipesPage' if in_shell else home_href ~ '#recipesPage' }}"
+           data-global-search-page-shortcut
+           data-global-search-shortcut-order="1"
            {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage" data-app-nav-lazy-section="current-recipes"{% endif %}>
             {{ shell.sidebar_icon("recipes") }}
             <span class="app-nav-text">Recipes</span>
@@ -47,12 +49,16 @@
         </a>
         <a class="app-nav-link{% if active_item == 'shopping-lists' %} is-active{% endif %}"
            href="{{ '#shoppingViewsSection' if in_shell else home_href ~ '#shoppingViewsSection' }}"
+           data-global-search-page-shortcut
+           data-global-search-shortcut-order="2"
            {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="shoppingListsPage" data-app-nav-target="shoppingViewsSection" data-app-nav-lazy-section="recipe-view"{% endif %}>
             {{ shell.sidebar_icon("shopping") }}
             <span class="app-nav-text">Shopping Lists</span>
         </a>
         <a class="app-nav-link{% if active_item == 'pantry' %} is-active{% endif %}"
            href="{{ '#aiPantrySection' if in_shell else home_href ~ '#aiPantrySection' }}"
+           data-global-search-page-shortcut
+           data-global-search-shortcut-order="3"
            {% if in_shell %}data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry"{% endif %}>
             {{ shell.sidebar_icon("pantry") }}
             <span class="app-nav-text">Pantry</span>
@@ -79,6 +85,10 @@
         <div class="app-nav-section-title">CREATE RECIPES</div>
         <a class="app-nav-link{% if active_item == 'recipe-url' %} is-active{% endif %}"
            href="{{ '#recipeUrlsPage' if in_shell else home_href ~ '#recipeUrlsPage' }}"
+           data-global-search-quick-action
+           data-global-search-shortcut-order="1"
+           data-global-search-title="Import Recipe URL"
+           data-global-search-secondary="Import a recipe from a URL"
            {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipeUrlsPage" data-app-nav-target="recipeUrlsPage"{% endif %}>
             {{ shell.sidebar_icon("link") }}
             <span class="app-nav-text">Recipe URL</span>
@@ -98,6 +108,10 @@
         <div class="app-nav-section-title">IMPORT MENUS</div>
         <a class="app-nav-link{% if active_item == 'menu-url' %} is-active{% endif %}"
            href="{{ '#menuUrlPage' if in_shell else home_href ~ '#menuUrlPage' }}"
+           data-global-search-quick-action
+           data-global-search-shortcut-order="2"
+           data-global-search-title="Import Menu URL"
+           data-global-search-secondary="Import a restaurant menu from a URL"
            {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="menuUrlPage" data-app-nav-target="menuUrlPage"{% endif %}>
             {{ shell.sidebar_icon("menus") }}
             <span class="app-nav-text">Menu URL</span>
@@ -109,7 +123,12 @@
             <span class="app-nav-text">Menu Document</span>
         </a>
         <div class="app-nav-section-title">PANTRY</div>
-        <a class="app-nav-link" href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
+        <a class="app-nav-link"
+           href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}"
+           data-global-search-quick-action
+           data-global-search-shortcut-order="3"
+           data-global-search-title="Scan Barcode"
+           data-global-search-secondary="Scan a pantry barcode">
             {{ shell.sidebar_icon("barcode") }}
             <span class="app-nav-text">Scan Barcode</span>
         </a>

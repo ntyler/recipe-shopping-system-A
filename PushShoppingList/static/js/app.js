@@ -1517,6 +1517,10 @@ const GLOBAL_APP_SEARCH_DEBOUNCE_MS = 250;
 const GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH = 2;
 const GLOBAL_APP_SEARCH_RESULT_LIMIT = 8;
 const GLOBAL_APP_SEARCH_OPTION_LIMIT = 12;
+const GLOBAL_APP_SEARCH_RECENT_LIMIT = 4;
+const GLOBAL_APP_SEARCH_QUICK_ACTION_LIMIT = 3;
+const GLOBAL_APP_SEARCH_PAGE_LIMIT = 3;
+const GLOBAL_APP_SEARCH_TYPED_PAGE_LIMIT = 2;
 
 function globalAppSearchInput(form) {
     return form ? form.querySelector("[data-app-global-search]") : null;
@@ -1528,6 +1532,10 @@ function globalAppSearchDropdown(form) {
 
 function globalAppSearchContent(form) {
     return form ? form.querySelector("[data-global-search-content]") : null;
+}
+
+function globalAppSearchVisibleStatus(form) {
+    return form ? form.querySelector("[data-global-search-visible-status]") : null;
 }
 
 function globalAppSearchQuery(form) {
@@ -1601,6 +1609,7 @@ function globalAppSearchCreateOption(form, result, query, index) {
     option.href = globalAppSearchOptionUrl(form, result);
     option.setAttribute("role", "option");
     option.setAttribute("aria-selected", "false");
+    option.tabIndex = -1;
     option.dataset.globalSearchResult = String(index);
     if (result.target) {
         option.dataset.globalSearchPageTarget = result.target;
@@ -1635,7 +1644,8 @@ function globalAppSearchCreateOption(form, result, query, index) {
     resultType.textContent = result.type || "Result";
     context.append(resultType);
     if (result.secondary) {
-        context.append(document.createTextNode(` • ${result.secondary}`));
+        context.append(document.createTextNode(" • "));
+        context.append(globalAppSearchHighlightedTitle(result.secondary, query));
     }
     copy.append(title, context);
     option.append(copy);
@@ -1661,39 +1671,50 @@ function globalAppSearchSetActiveIndex(form, nextIndex) {
 
 function globalAppSearchMessage(form, message, state = "empty") {
     const content = globalAppSearchContent(form);
-    if (!content) {
+    const visibleStatus = globalAppSearchVisibleStatus(form);
+    const input = globalAppSearchInput(form);
+    if (!content || !visibleStatus) {
         return;
     }
     content.replaceChildren();
-    const row = document.createElement("div");
-    row.className = `app-global-search-state is-${state}`;
-    row.setAttribute("role", "status");
-    row.textContent = message;
-    content.append(row);
+    content.hidden = true;
+    visibleStatus.replaceChildren();
+    visibleStatus.className = `app-global-search-state is-${state}`;
+    const lines = Array.isArray(message) ? message : [message];
+    lines.filter(Boolean).forEach(line => {
+        const text = document.createElement("span");
+        text.textContent = line;
+        visibleStatus.append(text);
+    });
+    visibleStatus.hidden = false;
     form._globalSearchResults = [];
     form._globalSearchActiveIndex = -1;
+    input?.removeAttribute("aria-activedescendant");
     globalAppSearchOpenDropdown(form);
-    appShellSetSearchStatus(message);
+    appShellSetSearchStatus(lines.filter(Boolean).join(" "));
 }
 
-function globalAppSearchPageResults(form, query = "") {
+function globalAppSearchShortcutResults(selector, group, query = "", limit = 3) {
     const normalizedQuery = normalizeAppShellSearchText(query);
     const seen = new Set();
-    return [...document.querySelectorAll(".app-sidebar-nav .app-nav-link")].map(link => {
-        const title = String(link.textContent || "").trim().replace(/\s+/g, " ");
+    return [...document.querySelectorAll(selector)]
+        .sort((left, right) => Number(left.dataset.globalSearchShortcutOrder || 0)
+            - Number(right.dataset.globalSearchShortcutOrder || 0))
+        .map(link => {
+        const title = String(link.dataset.globalSearchTitle || link.textContent || "").trim().replace(/\s+/g, " ");
         const iconElement = link.querySelector(".app-nav-icon");
         const iconClass = iconElement
             ? [...iconElement.classList].find(className => className.startsWith("app-nav-icon-") && className !== "app-nav-icon")
             : "";
         return {
             title,
-            type: "Page",
-            secondary: `Open the ${title} workspace`,
+            type: group === "pages" ? "Page" : "Quick action",
+            secondary: String(link.dataset.globalSearchSecondary || `Open ${title}`),
             icon: iconClass ? iconClass.replace("app-nav-icon-", "") : "pages",
             target: appShellNavTargetId(link),
             url: link.getAttribute("href") || "/",
             sourceNavLink: link,
-            group: "pages",
+            group,
         };
     }).filter(shortcut => {
         if (!shortcut.title || seen.has(shortcut.title)) {
@@ -1705,7 +1726,25 @@ function globalAppSearchPageResults(form, query = "") {
         }
         const searchable = normalizeAppShellSearchText(`${shortcut.title} ${shortcut.secondary} ${shortcut.target}`);
         return searchable.includes(normalizedQuery) || normalizedQuery.includes(normalizeAppShellSearchText(shortcut.title));
-    });
+    }).slice(0, limit);
+}
+
+function globalAppSearchPageResults(form, query = "", limit = GLOBAL_APP_SEARCH_PAGE_LIMIT) {
+    return globalAppSearchShortcutResults(
+        ".app-sidebar-nav .app-nav-link[data-global-search-page-shortcut]",
+        "pages",
+        query,
+        limit,
+    );
+}
+
+function globalAppSearchQuickActionResults(form) {
+    return globalAppSearchShortcutResults(
+        ".app-sidebar-nav .app-nav-link[data-global-search-quick-action]",
+        "quick-actions",
+        "",
+        GLOBAL_APP_SEARCH_QUICK_ACTION_LIMIT,
+    );
 }
 
 function globalAppSearchNormalizedGroups(payload) {
@@ -1721,9 +1760,14 @@ function globalAppSearchNormalizedGroups(payload) {
 
 function globalAppSearchRenderGroups(form, groups, query, options = {}) {
     const content = globalAppSearchContent(form);
-    if (!content) {
+    const visibleStatus = globalAppSearchVisibleStatus(form);
+    const input = globalAppSearchInput(form);
+    if (!content || !visibleStatus) {
         return;
     }
+    visibleStatus.hidden = true;
+    visibleStatus.replaceChildren();
+    content.hidden = false;
     content.replaceChildren();
     const renderedResults = [];
     const maxOptions = options.includeViewAll === false
@@ -1736,11 +1780,16 @@ function globalAppSearchRenderGroups(form, groups, query, options = {}) {
         }
         const section = document.createElement("section");
         section.className = "app-global-search-group";
+        section.setAttribute("role", "group");
         const heading = document.createElement("h2");
+        const groupToken = String(group.key || "results").replace(/[^a-z0-9_-]+/gi, "-");
+        heading.id = `${globalAppSearchInput(form)?.id || "globalSearch"}-${groupToken}-${renderedResults.length}`;
         heading.textContent = group.label;
+        section.setAttribute("aria-labelledby", heading.id);
         section.append(heading);
         const list = document.createElement("div");
         list.className = "app-global-search-group-results";
+        list.setAttribute("role", "presentation");
         group.results.forEach(result => {
             if (renderedResults.length >= maxOptions) {
                 return;
@@ -1778,10 +1827,72 @@ function globalAppSearchRenderGroups(form, groups, query, options = {}) {
 
     form._globalSearchResults = renderedResults;
     form._globalSearchActiveIndex = -1;
+    input?.removeAttribute("aria-activedescendant");
     globalAppSearchOpenDropdown(form);
     appShellSetSearchStatus(renderedResults.length
         ? `${renderedResults.length} global search options available.`
         : (options.emptyMessage || "No global search results found."));
+}
+
+function globalAppSearchRecentResults(payload) {
+    return globalAppSearchNormalizedGroups(payload)
+        .filter(group => group.key === "recent")
+        .flatMap(group => group.results)
+        .slice(0, GLOBAL_APP_SEARCH_RECENT_LIMIT)
+        .map(result => ({
+            ...result,
+            group: "recent",
+            isRecent: true,
+            trackingGroup: result.tracking_group || "",
+        }));
+}
+
+function globalAppSearchRenderEmpty(form) {
+    const groups = [];
+    const recent = Array.isArray(form._globalSearchRecentResults)
+        ? form._globalSearchRecentResults.slice(0, GLOBAL_APP_SEARCH_RECENT_LIMIT)
+        : [];
+    if (recent.length) {
+        groups.push({ key: "recent", label: "RECENT", results: recent });
+    }
+    const quickActions = globalAppSearchQuickActionResults(form);
+    if (quickActions.length) {
+        groups.push({ key: "quick-actions", label: "QUICK ACTIONS", results: quickActions });
+    }
+    const pages = globalAppSearchPageResults(form);
+    if (pages.length) {
+        groups.push({ key: "pages", label: "PAGES", results: pages });
+    }
+    globalAppSearchRenderGroups(form, groups, "", { includeViewAll: false });
+}
+
+async function globalAppSearchFetchRecent(form) {
+    if (form._globalSearchRecentLoaded || form._globalSearchRecentRequest) {
+        return;
+    }
+    const endpoint = new URL(form.dataset.globalSearchEndpoint || "/api/global-search", window.location.origin);
+    endpoint.searchParams.set("q", "");
+    endpoint.searchParams.set("limit", String(GLOBAL_APP_SEARCH_RECENT_LIMIT));
+    form._globalSearchRecentRequest = fetch(endpoint, {
+        headers: { "X-Requested-With": "fetch" },
+        credentials: "same-origin",
+    });
+    try {
+        const response = await form._globalSearchRecentRequest;
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || "Recent AI Pantry items are unavailable.");
+        }
+        form._globalSearchRecentResults = globalAppSearchRecentResults(payload);
+    } catch (error) {
+        form._globalSearchRecentResults = [];
+    } finally {
+        form._globalSearchRecentLoaded = true;
+        form._globalSearchRecentRequest = null;
+        if (!globalAppSearchQuery(form)) {
+            globalAppSearchRenderEmpty(form);
+        }
+    }
 }
 
 async function globalAppSearchFetch(form, query) {
@@ -1790,7 +1901,8 @@ async function globalAppSearchFetch(form, query) {
     }
     const controller = new AbortController();
     form._globalSearchAbortController = controller;
-    globalAppSearchMessage(form, "Searching AI Pantry…", "loading");
+    globalAppSearchInput(form)?.setAttribute("aria-busy", "true");
+    globalAppSearchMessage(form, "Searching…", "loading");
     try {
         const endpoint = new URL(form.dataset.globalSearchEndpoint || "/api/global-search", window.location.origin);
         endpoint.searchParams.set("q", query);
@@ -1808,23 +1920,34 @@ async function globalAppSearchFetch(form, query) {
             return;
         }
         const groups = globalAppSearchNormalizedGroups(payload)
-            .filter(group => group.key !== "pages");
-        const pages = globalAppSearchPageResults(form, query).slice(0, 3);
+            .filter(group => group.key !== "pages" && group.key !== "recent")
+            .map(group => ({
+                ...group,
+                results: group.results.map(result => ({
+                    ...result,
+                    trackingGroup: group.key,
+                })),
+            }));
+        const pages = globalAppSearchPageResults(form, query, GLOBAL_APP_SEARCH_TYPED_PAGE_LIMIT);
         if (pages.length) {
             groups.push({ key: "pages", label: "PAGES", results: pages });
         }
+        if (!groups.length) {
+            globalAppSearchMessage(form, `No results for “${query}”`, "empty");
+            return;
+        }
         globalAppSearchRenderGroups(form, groups, query, {
             totalCount: Number(payload.total_count || 0),
-            emptyMessage: "No matching AI Pantry records or pages found.",
         });
     } catch (error) {
         if (error && error.name === "AbortError") {
             return;
         }
-        globalAppSearchMessage(form, "Search error. Please try again.", "error");
+        globalAppSearchMessage(form, ["Search could not be completed.", "Try again."], "error");
     } finally {
         if (form._globalSearchAbortController === controller) {
             form._globalSearchAbortController = null;
+            globalAppSearchInput(form)?.removeAttribute("aria-busy");
         }
     }
 }
@@ -1834,18 +1957,16 @@ function globalAppSearchSchedule(form) {
     if (form._globalSearchAbortController) {
         form._globalSearchAbortController.abort();
         form._globalSearchAbortController = null;
+        globalAppSearchInput(form)?.removeAttribute("aria-busy");
     }
     const query = globalAppSearchQuery(form);
     if (!query) {
-        globalAppSearchRenderGroups(form, [{
-            key: "pages",
-            label: "PAGES",
-            results: globalAppSearchPageResults(form).slice(0, 8),
-        }], "", { includeViewAll: false });
+        globalAppSearchRenderEmpty(form);
+        globalAppSearchFetchRecent(form);
         return;
     }
     if (query.length < GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH) {
-        const pages = globalAppSearchPageResults(form, query).slice(0, 6);
+        const pages = globalAppSearchPageResults(form, query);
         if (pages.length) {
             globalAppSearchRenderGroups(form, [{ key: "pages", label: "PAGES", results: pages }], query, {
                 includeViewAll: false,
@@ -1855,9 +1976,25 @@ function globalAppSearchSchedule(form) {
         }
         return;
     }
+    globalAppSearchMessage(form, "Searching…", "loading");
     form._globalSearchTimer = window.setTimeout(() => {
         globalAppSearchFetch(form, query);
     }, GLOBAL_APP_SEARCH_DEBOUNCE_MS);
+}
+
+function globalAppSearchRememberResult(form, result) {
+    if (!result || !result.trackingGroup || result.id === undefined || result.id === null) {
+        return;
+    }
+    fetch(form.dataset.globalSearchRecentUrl || "/api/global-search/recent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group: result.trackingGroup, id: result.id }),
+        credentials: "same-origin",
+        keepalive: true,
+    }).catch(() => {
+        // Search navigation should never be blocked by recent-history tracking.
+    });
 }
 
 function globalAppSearchOpenResult(form, index) {
@@ -1865,6 +2002,7 @@ function globalAppSearchOpenResult(form, index) {
     if (!result) {
         return false;
     }
+    globalAppSearchRememberResult(form, result);
     globalAppSearchCloseDropdown(form);
     if (result.sourceNavLink && form.dataset.globalSearchSpa === "true") {
         const navLink = result.sourceNavLink;
@@ -1926,7 +2064,10 @@ function initGlobalAppSearch() {
                     const current = Number.isInteger(form._globalSearchActiveIndex)
                         ? form._globalSearchActiveIndex
                         : -1;
-                    globalAppSearchSetActiveIndex(form, event.key === "ArrowDown" ? current + 1 : current - 1);
+                    const next = current < 0
+                        ? (event.key === "ArrowDown" ? 0 : options.length - 1)
+                        : current + (event.key === "ArrowDown" ? 1 : -1);
+                    globalAppSearchSetActiveIndex(form, next);
                 }
                 return;
             }
@@ -1940,6 +2081,9 @@ function initGlobalAppSearch() {
                 ? event.target.closest("[data-global-search-result]")
                 : null;
             if (!option || !form.contains(option)) {
+                return;
+            }
+            if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
                 return;
             }
             event.preventDefault();
@@ -25616,6 +25760,7 @@ function recipeRestaurantRecordValue(record, field) {
         restaurant_name: ["restaurant_name", "name"],
         restaurant_logo_url: ["restaurant_logo_url", "logo_url", "logo"],
         restaurant_rating: ["restaurant_rating", "rating"],
+        restaurant_rating_count: ["restaurant_rating_count", "rating_count"],
         restaurant_phone: ["restaurant_phone", "phone"],
         restaurant_website_url: ["restaurant_website_url", "website_url"],
         source_menu_url: ["source_menu_url", "menu_url"],
@@ -25628,16 +25773,183 @@ function recipeRestaurantRecordValue(record, field) {
         restaurant_raw_hours_data: ["restaurant_raw_hours_data", "raw_hours_data"],
         restaurant_hours_notes: ["restaurant_hours_notes", "hours_notes"],
         restaurant_promotions: ["restaurant_promotions", "rewards_promotions"],
+        restaurant_rewards_program: ["restaurant_rewards_program", "rewards_text", "rewards_promotions", "restaurant_promotions"],
+        restaurant_active_promotions: ["restaurant_active_promotions", "promotions"],
         restaurant_current_status: ["restaurant_current_status", "current_status"],
         restaurant_online_payment_available: ["restaurant_online_payment_available", "online_payment"],
         restaurant_online_ordering_available: ["restaurant_online_ordering_available", "online_ordering"],
+        restaurant_pickup_available: ["restaurant_pickup_available", "pickup_available", "pickup"],
         restaurant_delivery_available: ["restaurant_delivery_available", "delivery"],
+        restaurant_reservation_available: ["restaurant_reservation_available", "reservation_available", "reservations"],
+        restaurant_latitude: ["restaurant_latitude", "latitude"],
+        restaurant_longitude: ["restaurant_longitude", "longitude"],
+        restaurant_note_text: ["restaurant_note_text", "restaurant_note", "restaurant_notes"],
+        restaurant_allergy_information_note: ["restaurant_allergy_information_note", "allergy_information_note"],
+        restaurant_ordering_provider_urls: ["restaurant_ordering_provider_urls", "ordering_provider_urls"],
+        restaurant_ordering_providers: ["restaurant_ordering_providers", "ordering_providers"],
         menu_item_url: ["menu_item_url"],
     };
     const key = (aliases[field] || [field]).find(candidate => record?.[candidate] !== undefined && record?.[candidate] !== null);
     const value = key ? record[key] : "";
     if (typeof value === "boolean") return value ? "true" : "false";
     return recipeMenuMetadataText(value);
+}
+
+const recipeRestaurantSocialPlatforms = [
+    ["facebook", "Facebook"],
+    ["instagram", "Instagram"],
+    ["tiktok", "TikTok"],
+    ["x", "X / Twitter"],
+    ["youtube", "YouTube"],
+    ["other", "Other"],
+];
+
+function recipeRestaurantStructuredArray(value) {
+    if (Array.isArray(value)) return value;
+    const text = String(value || "").trim();
+    if (!text) return [];
+    try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) return parsed;
+    } catch (err) {
+        // Older values may be stored as comma- or newline-delimited text.
+    }
+    return text.split(/\r?\n|\s*,\s*/).map(item => item.trim()).filter(Boolean);
+}
+
+function recipeRestaurantSocialPlatformForUrl(value) {
+    const url = String(value || "").toLowerCase();
+    if (url.includes("facebook.com")) return "facebook";
+    if (url.includes("instagram.com")) return "instagram";
+    if (url.includes("tiktok.com")) return "tiktok";
+    if (url.includes("twitter.com") || url.includes("x.com")) return "x";
+    if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
+    return "other";
+}
+
+function normalizeRecipeRestaurantSocialLinks(value) {
+    const seen = new Set();
+    return recipeRestaurantStructuredArray(value).map(item => {
+        const object = item && typeof item === "object" ? item : {};
+        const url = String(object.url || object.href || (typeof item === "string" ? item : "")).trim();
+        const requestedPlatform = String(object.platform || object.type || "").trim().toLowerCase();
+        const platform = recipeRestaurantSocialPlatforms.some(([key]) => key === requestedPlatform)
+            ? requestedPlatform
+            : recipeRestaurantSocialPlatformForUrl(url);
+        return { platform, url };
+    }).filter(item => {
+        const key = item.url.toLowerCase();
+        if (!item.url || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function recipeRestaurantSocialLinksFromRecord(record) {
+    return normalizeRecipeRestaurantSocialLinks(
+        record?.restaurant_social_links
+        ?? record?.social_links
+        ?? record?.restaurant_social_urls
+        ?? record?.social_urls
+        ?? []
+    );
+}
+
+function recipeRestaurantActivePromotionsFromRecord(record) {
+    const active = recipeRestaurantStructuredArray(
+        record?.restaurant_active_promotions ?? record?.promotions ?? []
+    ).map(item => recipeMenuMetadataText(item)).filter(Boolean);
+    const rewards = recipeRestaurantRecordValue(record, "restaurant_rewards_program");
+    const legacyRewards = recipeRestaurantStructuredArray(rewards).map(item => recipeMenuMetadataText(item)).filter(Boolean);
+    const activeKey = active.map(item => item.toLowerCase()).join("|");
+    const legacyKey = legacyRewards.map(item => item.toLowerCase()).join("|");
+    return activeKey && activeKey === legacyKey ? "" : active.join("\n");
+}
+
+function recipeRestaurantSocialLinkRow(editor, link = {}) {
+    const row = document.createElement("div");
+    row.className = "recipe-edit-restaurant-social-row";
+    row.dataset.restaurantSocialLinkRow = "1";
+
+    const platform = document.createElement("select");
+    platform.setAttribute("aria-label", "Social platform");
+    platform.dataset.restaurantSocialPlatform = "1";
+    recipeRestaurantSocialPlatforms.forEach(([value, label]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        platform.append(option);
+    });
+    platform.value = link.platform || "other";
+
+    const url = document.createElement("input");
+    url.type = "url";
+    url.placeholder = "https://social.example.com/restaurant";
+    url.setAttribute("aria-label", `${recipeRestaurantSocialPlatforms.find(([key]) => key === platform.value)?.[1] || "Social"} URL`);
+    url.dataset.restaurantSocialUrl = "1";
+    url.value = link.url || "";
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", "Remove social link");
+    remove.addEventListener("click", () => removeRecipeRestaurantSocialLink(remove));
+
+    [platform, url].forEach(control => control.addEventListener("input", () => syncRecipeRestaurantSocialLinks(editor)));
+    platform.addEventListener("change", () => {
+        url.setAttribute("aria-label", `${recipeRestaurantSocialPlatforms.find(([key]) => key === platform.value)?.[1] || "Social"} URL`);
+        syncRecipeRestaurantSocialLinks(editor);
+    });
+    row.append(platform, url, remove);
+    return row;
+}
+
+function hydrateRecipeRestaurantSocialLinks(form, value) {
+    const editor = form?.querySelector("[data-restaurant-social-links-editor]");
+    const rows = editor?.querySelector("[data-restaurant-social-links-rows]");
+    if (!editor || !rows) return;
+    rows.replaceChildren();
+    const links = normalizeRecipeRestaurantSocialLinks(value);
+    (links.length ? links : [{ platform: "facebook", url: "" }]).forEach(link => {
+        rows.append(recipeRestaurantSocialLinkRow(editor, link));
+    });
+    syncRecipeRestaurantSocialLinks(editor, { updateState: false });
+}
+
+function syncRecipeRestaurantSocialLinks(editor, options = {}) {
+    const form = editor?.closest("[data-restaurant-edit-form]");
+    const hidden = editor?.querySelector('[data-restaurant-edit-field="restaurant_social_links"]');
+    if (!form || !hidden) return;
+    const links = Array.from(editor.querySelectorAll("[data-restaurant-social-link-row]")).map(row => ({
+        platform: row.querySelector("[data-restaurant-social-platform]")?.value || "other",
+        url: String(row.querySelector("[data-restaurant-social-url]")?.value || "").trim(),
+    })).filter(item => item.url);
+    hidden.value = JSON.stringify(links);
+    if (options.updateState !== false) updateRecipeRestaurantEditState(form);
+}
+
+function addRecipeRestaurantSocialLink(button) {
+    const editor = button?.closest("[data-restaurant-social-links-editor]");
+    const rows = editor?.querySelector("[data-restaurant-social-links-rows]");
+    if (!editor || !rows) return false;
+    const row = recipeRestaurantSocialLinkRow(editor, { platform: "other", url: "" });
+    rows.append(row);
+    row.querySelector("[data-restaurant-social-platform]")?.focus();
+    return false;
+}
+
+function removeRecipeRestaurantSocialLink(button) {
+    const editor = button?.closest("[data-restaurant-social-links-editor]");
+    const row = button?.closest("[data-restaurant-social-link-row]");
+    if (!editor || !row) return false;
+    row.remove();
+    if (!editor.querySelector("[data-restaurant-social-link-row]")) {
+        editor.querySelector("[data-restaurant-social-links-rows]")?.append(
+            recipeRestaurantSocialLinkRow(editor, { platform: "facebook", url: "" })
+        );
+    }
+    syncRecipeRestaurantSocialLinks(editor);
+    return false;
 }
 
 function recipeRestaurantRecordSecondary(record) {
@@ -25960,6 +26272,17 @@ function populateRecipeRestaurantEditForm(record, options = {}) {
         if (field === "menu_item_url") savedValue = keepMenuItemUrl;
         else if (field === "restaurant_logo_data_url") savedValue = "";
         else if (field === "restaurant_logo_action") savedValue = "keep";
+        else if (field === "restaurant_social_links") savedValue = JSON.stringify(recipeRestaurantSocialLinksFromRecord(record));
+        else if (field === "restaurant_active_promotions") savedValue = recipeRestaurantActivePromotionsFromRecord(record);
+        else if (field === "restaurant_ordering_provider_urls") savedValue = recipeRestaurantStructuredArray(
+            record?.restaurant_ordering_provider_urls ?? record?.ordering_provider_urls ?? []
+        ).map(item => recipeMenuMetadataText(item)).filter(Boolean).join("\n");
+        else if (field === "restaurant_ordering_providers") {
+            const providers = recipeRestaurantStructuredArray(
+                record?.restaurant_ordering_providers ?? record?.ordering_providers ?? []
+            );
+            savedValue = providers.length ? JSON.stringify(providers, null, 2) : "";
+        }
         else savedValue = recipeRestaurantRecordValue(record, field);
         if (options.clearShared && field === "restaurant_current_status") savedValue = "unknown";
         if (input.tagName === "SELECT" && savedValue && !Array.from(input.options).some(option => option.value === savedValue)) {
@@ -25973,6 +26296,7 @@ function populateRecipeRestaurantEditForm(record, options = {}) {
         input.value = savedValue;
     });
     bindRecipeRestaurantEditFields(form);
+    hydrateRecipeRestaurantSocialLinks(form, recipeRestaurantSocialLinksFromRecord(record));
     closeRecipeRestaurantLogoChooser(form.querySelector("[data-restaurant-logo-chooser]"));
     hydrateRecipeRestaurantStructuredHours(form, record || {});
     updateRecipeRestaurantEditState(form);
@@ -26754,27 +27078,27 @@ const recipeRestaurantFetchFieldDefinitions = {
     state_or_region: { label: "State or region", field: "restaurant_state" },
     postal_code: { label: "Postal code", field: "restaurant_postal_code" },
     country: { label: "Country", field: "restaurant_country" },
-    latitude: { label: "Latitude" },
-    longitude: { label: "Longitude" },
+    latitude: { label: "Latitude", field: "restaurant_latitude" },
+    longitude: { label: "Longitude", field: "restaurant_longitude" },
     weekly_hours: { label: "Weekly hours", field: "restaurant_weekly_hours" },
     raw_hours_text: { label: "Raw hours data", field: "restaurant_raw_hours_data" },
     hours_notes: { label: "Hours notes", field: "restaurant_hours_notes" },
-    rewards_promotions: { label: "Rewards / promotions", field: "restaurant_promotions" },
+    rewards_promotions: { label: "Rewards program", field: "restaurant_rewards_program" },
     image_url: { label: "Restaurant logo / image", field: "restaurant_logo_url" },
     current_status: { label: "Business status", field: "restaurant_current_status" },
     rating: { label: "Rating", field: "restaurant_rating" },
-    rating_count: { label: "Rating count" },
+    rating_count: { label: "Rating count", field: "restaurant_rating_count" },
     online_payment: { label: "Online payment", field: "restaurant_online_payment_available" },
     online_ordering: { label: "Online ordering", field: "restaurant_online_ordering_available" },
-    pickup: { label: "Pickup" },
+    pickup: { label: "Pickup", field: "restaurant_pickup_available" },
     delivery: { label: "Delivery", field: "restaurant_delivery_available" },
-    reservations: { label: "Reservations" },
-    promotions: { label: "Promotions" },
-    social_urls: { label: "Social links" },
-    ordering_provider_urls: { label: "Ordering providers" },
-    ordering_providers: { label: "Ordering providers" },
-    allergy_information_note: { label: "Allergy information" },
-    restaurant_note: { label: "Restaurant note" },
+    reservations: { label: "Reservations", field: "restaurant_reservation_available" },
+    promotions: { label: "Promotions", field: "restaurant_active_promotions" },
+    social_urls: { label: "Social links", field: "restaurant_social_links" },
+    ordering_provider_urls: { label: "Ordering provider URLs", field: "restaurant_ordering_provider_urls" },
+    ordering_providers: { label: "Ordering provider records", field: "restaurant_ordering_providers" },
+    allergy_information_note: { label: "Allergy information", field: "restaurant_allergy_information_note" },
+    restaurant_note: { label: "Restaurant note", field: "restaurant_note_text" },
 };
 
 function recipeRestaurantFetchReviewPanel() {
@@ -27207,11 +27531,20 @@ function applyRecipeRestaurantScanValuesToForm(form, appliedValues = {}) {
         if (!field) return;
         const input = form.querySelector(`[data-restaurant-edit-field="${field}"]`);
         if (!input) return;
+        if (key === "social_urls") {
+            hydrateRecipeRestaurantSocialLinks(form, proposedValue);
+            updatedFields.push(key);
+            return;
+        }
         let value = proposedValue;
-        if (["online_payment", "online_ordering", "delivery"].includes(key)) {
+        if (["online_payment", "online_ordering", "pickup", "delivery", "reservations"].includes(key)) {
             value = proposedValue === true || String(proposedValue) === "true"
                 ? "true"
                 : proposedValue === false || String(proposedValue) === "false" ? "false" : "";
+        } else if (["promotions", "ordering_provider_urls"].includes(key) && Array.isArray(value)) {
+            value = value.map(item => recipeMenuMetadataText(item)).filter(Boolean).join("\n");
+        } else if (key === "ordering_providers" && value && typeof value === "object") {
+            value = JSON.stringify(value, null, 2);
         } else if (value && typeof value === "object") {
             value = JSON.stringify(value);
         }
@@ -27224,6 +27557,20 @@ function applyRecipeRestaurantScanValuesToForm(form, appliedValues = {}) {
         }
         updatedFields.push(key);
     });
+    if (["latitude", "longitude"].some(key => Object.prototype.hasOwnProperty.call(appliedValues, key))) {
+        const details = form.querySelector("[data-restaurant-advanced-location]");
+        if (details) details.open = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(appliedValues, "image_url")) {
+        const details = form.querySelector("[data-restaurant-advanced-media]");
+        if (details) details.open = true;
+    }
+    if (["reservations", "ordering_provider_urls", "ordering_providers", "allergy_information_note"].some(
+        key => Object.prototype.hasOwnProperty.call(appliedValues, key)
+    )) {
+        const details = form.querySelector("[data-restaurant-additional-raw-data]");
+        if (details) details.open = true;
+    }
     updateRecipeRestaurantEditLogo(form);
     updateRecipeRestaurantEditState(form);
     console.debug("restaurant-scan-apply", {
@@ -27337,6 +27684,10 @@ function recipeRestaurantEditValues(form = recipeRestaurantEditForm()) {
     values.restaurant_weekly_hours = weeklyHours;
     values.restaurant_hours_notes = hoursNotes;
     values.restaurant_hours_text = recipeRestaurantWeeklyHoursText(weeklyHours, hoursNotes);
+    values.restaurant_promotions = [
+        values.restaurant_rewards_program,
+        values.restaurant_active_promotions,
+    ].filter(Boolean).join("\n");
     return values;
 }
 
@@ -27630,11 +27981,7 @@ function closeRecipeRestaurantLogoChooser(button) {
     const chooser = button?.matches?.("[data-restaurant-logo-chooser]")
         ? button
         : button?.closest("[data-restaurant-logo-chooser]");
-    if (chooser) {
-        chooser.hidden = true;
-        const urlPanel = chooser.querySelector("[data-restaurant-logo-url-panel]");
-        if (urlPanel) urlPanel.hidden = true;
-    }
+    if (chooser) chooser.hidden = true;
     return false;
 }
 
@@ -27678,9 +28025,12 @@ function chooseRecipeRestaurantLogoUpload(button) {
 }
 
 function chooseRecipeRestaurantLogoUrl(button) {
+    const form = button?.closest("[data-restaurant-edit-form]");
     const chooser = button?.closest("[data-restaurant-logo-chooser]");
-    const panel = chooser?.querySelector("[data-restaurant-logo-url-panel]");
-    if (panel) panel.hidden = false;
+    const details = form?.querySelector("[data-restaurant-advanced-media]");
+    const panel = form?.querySelector("[data-restaurant-logo-url-panel]");
+    if (details) details.open = true;
+    if (chooser) chooser.hidden = true;
     panel?.querySelector("input")?.focus();
     return false;
 }

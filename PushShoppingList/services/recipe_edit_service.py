@@ -2269,6 +2269,39 @@ def split_recipe_menu_text_list(value):
     return values
 
 
+def parse_recipe_menu_json_list(value):
+    if isinstance(value, list):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return []
+    try:
+        parsed = json.loads(text)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return split_recipe_menu_text_list(text)
+    return parsed if isinstance(parsed, list) else []
+
+
+def normalize_editable_restaurant_social_links(value):
+    supported = {"facebook", "instagram", "tiktok", "x", "youtube", "other"}
+    links = []
+    seen = set()
+    for item in parse_recipe_menu_json_list(value):
+        item = item if isinstance(item, dict) else {"url": item}
+        url = clean_recipe_menu_text(item.get("url") or item.get("href"))
+        if not url:
+            continue
+        platform = clean_recipe_menu_text(item.get("platform") or item.get("type")).lower()
+        if platform not in supported:
+            platform = "other"
+        key = url.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        links.append({"platform": platform, "url": url})
+    return links
+
+
 def editable_menu_source_option_value(restaurant_id="", menu_id=""):
     restaurant_id = clean_recipe_menu_text(restaurant_id)
     menu_id = clean_recipe_menu_text(menu_id)
@@ -2479,9 +2512,13 @@ def editable_menu_source_option_from_records(restaurant, menu):
         "restaurant_hours_notes": hours_notes,
         "restaurant_raw_hours_data": clean_recipe_menu_text(restaurant.get("raw_hours_data")),
         "restaurant_current_status": normalize_editable_restaurant_status(restaurant.get("current_status")),
-        "restaurant_promotions": first_recipe_menu_text(
-            restaurant.get("rewards_text"),
+        "restaurant_promotions": "\n".join(dict.fromkeys(filter(None, (
+            clean_recipe_menu_text(restaurant.get("rewards_text")),
             recipe_menu_text_list_for_editor(restaurant.get("promotions")),
+        )))),
+        "restaurant_rewards_program": clean_recipe_menu_text(restaurant.get("rewards_text")),
+        "restaurant_active_promotions": (
+            restaurant.get("promotions") if isinstance(restaurant.get("promotions"), list) else []
         ),
         "restaurant_online_payment_available": recipe_menu_bool_for_editor(
             first_recipe_menu_text(
@@ -2501,6 +2538,7 @@ def editable_menu_source_option_from_records(restaurant, menu):
         "restaurant_latitude": clean_recipe_menu_text(restaurant.get("latitude")),
         "restaurant_longitude": clean_recipe_menu_text(restaurant.get("longitude")),
         "restaurant_rating_count": clean_recipe_menu_text(restaurant.get("rating_count")),
+        "restaurant_social_links": restaurant.get("social_links") if isinstance(restaurant.get("social_links"), list) else [],
         "restaurant_social_urls": restaurant.get("social_urls") if isinstance(restaurant.get("social_urls"), list) else [],
         "restaurant_ordering_provider_urls": restaurant.get("ordering_provider_urls") if isinstance(restaurant.get("ordering_provider_urls"), list) else [],
         "restaurant_ordering_providers": restaurant.get("ordering_providers") if isinstance(restaurant.get("ordering_providers"), list) else [],
@@ -2638,6 +2676,29 @@ def validate_editable_restaurant_values(values):
         if numeric_rating < 1 or numeric_rating > 5:
             return "Rating must be between 1 and 5."
 
+    rating_count = clean_recipe_menu_text(values.get("restaurant_rating_count"))
+    if rating_count:
+        try:
+            numeric_rating_count = int(rating_count)
+        except ValueError:
+            return "Rating Count must be a whole number."
+        if numeric_rating_count < 0:
+            return "Rating Count cannot be negative."
+
+    for field, label, minimum, maximum in (
+        ("restaurant_latitude", "Latitude", -90, 90),
+        ("restaurant_longitude", "Longitude", -180, 180),
+    ):
+        value = clean_recipe_menu_text(values.get(field))
+        if not value:
+            continue
+        try:
+            coordinate = float(value)
+        except ValueError:
+            return f"{label} must be a number."
+        if coordinate < minimum or coordinate > maximum:
+            return f"{label} must be between {minimum} and {maximum}."
+
     for field, label in (
         ("restaurant_website_url", "Website URL"),
         ("source_menu_url", "Menu URL"),
@@ -2650,6 +2711,17 @@ def validate_editable_restaurant_values(values):
         parsed = urlparse(value)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             return f"{label} must be a valid http or https URL."
+
+    social_links = normalize_editable_restaurant_social_links(values.get("restaurant_social_links"))
+    for link in social_links:
+        parsed = urlparse(link.get("url") or "")
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return "Each Social Link must be a valid http or https URL."
+
+    for url in split_recipe_menu_text_list(values.get("restaurant_ordering_provider_urls")):
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return "Each Ordering Provider URL must be a valid http or https URL."
     return ""
 
 
@@ -2675,7 +2747,8 @@ def apply_editable_restaurant_values(restaurant, values):
         "restaurant_state": "state",
         "restaurant_postal_code": "postal_code",
         "restaurant_country": "country",
-        "restaurant_promotions": "rewards_text",
+        "restaurant_note_text": "restaurant_note",
+        "restaurant_allergy_information_note": "allergy_information_note",
     }
     for source_field, store_field in field_map.items():
         if source_field in values:
@@ -2693,18 +2766,57 @@ def apply_editable_restaurant_values(restaurant, values):
     )
     restaurant["source_menu_url"] = source_menu_url or None
     restaurant["menu_url"] = source_menu_url or None
-    restaurant["promotions"] = split_recipe_menu_text_list(restaurant.get("rewards_text"))
-    restaurant["rewards_promotions"] = restaurant.get("rewards_text")
+
+    legacy_promotions_supplied = "restaurant_promotions" in values
+    if "restaurant_rewards_program" in values:
+        restaurant["rewards_text"] = clean_recipe_menu_text(values.get("restaurant_rewards_program")) or None
+    elif legacy_promotions_supplied:
+        restaurant["rewards_text"] = clean_recipe_menu_text(values.get("restaurant_promotions")) or None
+    if "restaurant_active_promotions" in values:
+        restaurant["promotions"] = split_recipe_menu_text_list(values.get("restaurant_active_promotions"))
+    elif legacy_promotions_supplied and "restaurant_rewards_program" not in values:
+        restaurant["promotions"] = split_recipe_menu_text_list(values.get("restaurant_promotions"))
+    rewards_promotions = [
+        clean_recipe_menu_text(restaurant.get("rewards_text")),
+        recipe_menu_text_list_for_editor(restaurant.get("promotions")),
+    ]
+    restaurant["rewards_promotions"] = "\n".join(value for value in rewards_promotions if value) or None
+
+    if "restaurant_rating_count" in values:
+        rating_count = clean_recipe_menu_text(values.get("restaurant_rating_count"))
+        restaurant["rating_count"] = int(rating_count) if rating_count else None
+    for source_field, store_field in (
+        ("restaurant_latitude", "latitude"),
+        ("restaurant_longitude", "longitude"),
+    ):
+        if source_field in values:
+            coordinate = clean_recipe_menu_text(values.get(source_field))
+            restaurant[store_field] = float(coordinate) if coordinate else None
+
+    if "restaurant_social_links" in values:
+        social_links = normalize_editable_restaurant_social_links(values.get("restaurant_social_links"))
+        restaurant["social_links"] = social_links
+        restaurant["social_urls"] = [item["url"] for item in social_links]
+    if "restaurant_ordering_provider_urls" in values:
+        restaurant["ordering_provider_urls"] = split_recipe_menu_text_list(values.get("restaurant_ordering_provider_urls"))
+    if "restaurant_ordering_providers" in values:
+        restaurant["ordering_providers"] = parse_recipe_menu_json_list(values.get("restaurant_ordering_providers"))
 
     if "restaurant_online_payment_available" in values:
         restaurant["online_payment_available"] = parse_recipe_menu_bool(values.get("restaurant_online_payment_available"))
     if "restaurant_online_ordering_available" in values:
         restaurant["online_ordering_available"] = parse_recipe_menu_bool(values.get("restaurant_online_ordering_available"))
+    if "restaurant_pickup_available" in values:
+        restaurant["pickup_available"] = parse_recipe_menu_bool(values.get("restaurant_pickup_available"))
     if "restaurant_delivery_available" in values:
         restaurant["delivery_available"] = parse_recipe_menu_bool(values.get("restaurant_delivery_available"))
+    if "restaurant_reservation_available" in values:
+        restaurant["reservation_available"] = parse_recipe_menu_bool(values.get("restaurant_reservation_available"))
     restaurant["online_payment"] = restaurant.get("online_payment_available")
     restaurant["online_ordering"] = restaurant.get("online_ordering_available")
+    restaurant["pickup"] = restaurant.get("pickup_available")
     restaurant["delivery"] = restaurant.get("delivery_available")
+    restaurant["reservations"] = restaurant.get("reservation_available")
 
     structured_hours_supplied = "restaurant_weekly_hours" in values
     legacy_hours_supplied = "restaurant_hours_text" in values
@@ -2735,13 +2847,14 @@ def apply_editable_restaurant_values(restaurant, values):
         restaurant["raw_hours_data"] = clean_recipe_menu_text(values.get("restaurant_raw_hours_data")) or None
 
     LOGGER.debug(
-        "restaurant_save_payload restaurant_id=%s structured_hours=%s legacy_hours=%s status=%s online_ordering=%s online_payment=%s delivery=%s",
+        "restaurant_save_payload restaurant_id=%s structured_hours=%s legacy_hours=%s status=%s online_ordering=%s online_payment=%s pickup=%s delivery=%s",
         restaurant_id,
         structured_hours_supplied,
         legacy_hours_supplied,
         "restaurant_current_status" in values,
         "restaurant_online_ordering_available" in values,
         "restaurant_online_payment_available" in values,
+        "restaurant_pickup_available" in values,
         "restaurant_delivery_available" in values,
     )
 
@@ -2764,6 +2877,7 @@ def apply_editable_restaurant_values(restaurant, values):
     for key, default in {
         "restaurant_name": None,
         "rating": None,
+        "rating_count": None,
         "phone": None,
         "restaurant_website_url": None,
         "website_url": None,
@@ -2775,6 +2889,8 @@ def apply_editable_restaurant_values(restaurant, values):
         "state_or_region": None,
         "postal_code": None,
         "country": None,
+        "latitude": None,
+        "longitude": None,
         "weekly_hours": {},
         "hours_notes": None,
         "raw_hours_data": None,
@@ -2782,13 +2898,23 @@ def apply_editable_restaurant_values(restaurant, values):
         "rewards_text": None,
         "rewards_promotions": None,
         "promotions": [],
+        "social_links": [],
+        "social_urls": [],
+        "ordering_provider_urls": [],
+        "ordering_providers": [],
+        "allergy_information_note": None,
+        "restaurant_note": None,
         "current_status": None,
         "online_payment_available": None,
         "online_payment": None,
         "online_ordering_available": None,
         "online_ordering": None,
+        "pickup_available": None,
+        "pickup": None,
         "delivery_available": None,
         "delivery": None,
+        "reservation_available": None,
+        "reservations": None,
     }.items():
         restaurant.setdefault(key, default)
     restaurant["updated_at"] = now
