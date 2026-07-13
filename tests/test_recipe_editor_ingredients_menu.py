@@ -548,9 +548,9 @@ def test_standalone_recipe_edit_page_renders_editor(monkeypatch, tmp_path):
     home_html = home_response.get_data(as_text=True)
     html = response.get_data(as_text=True)
     home_account_start = home_html.index('<span class="app-account-avatar"')
-    home_account_end = home_html.index("</a>", home_account_start)
+    home_account_end = home_html.index("</button>", home_account_start)
     edit_account_start = html.index('<span class="app-account-avatar"')
-    edit_account_end = html.index("</a>", edit_account_start)
+    edit_account_end = html.index("</button>", edit_account_start)
     home_account = home_html[home_account_start:home_account_end]
     edit_account = html[edit_account_start:edit_account_end]
 

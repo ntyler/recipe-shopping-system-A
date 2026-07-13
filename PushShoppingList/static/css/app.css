@@ -26812,7 +26812,7 @@ img[data-deferred-src] {
 .app-topbar {
     position: relative;
     top: auto;
-    z-index: 200;
+    z-index: 18500;
     display: grid;
     grid-template-columns: minmax(280px, 620px) minmax(0, 1fr) auto;
     gap: 18px;
@@ -27387,6 +27387,7 @@ img[data-deferred-src] {
     justify-content: flex-end;
     gap: 10px;
     min-width: 0;
+    overflow: visible;
 }
 
 .app-toolbar-button {
@@ -27470,6 +27471,241 @@ img[data-deferred-src] {
     max-width: 260px;
     border-color: transparent;
     background: transparent;
+}
+
+.app-profile-menu {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-width: 0;
+    overflow: visible;
+}
+
+.app-profile-menu [data-profile-menu-trigger] {
+    position: relative;
+    text-align: left;
+}
+
+.app-profile-menu [data-profile-menu-trigger]:focus-visible {
+    outline: 2px solid var(--app-focus);
+    outline-offset: 2px;
+}
+
+.app-profile-menu.is-open [data-profile-menu-trigger] {
+    border-color: var(--app-border-strong);
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
+}
+
+.app-profile-menu-trigger-chevron {
+    display: inline-flex;
+    flex: 0 0 16px;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 2px;
+    color: var(--app-muted);
+    transition: transform 160ms ease, color 160ms ease;
+}
+
+.app-profile-menu-trigger-chevron .app-icon-svg {
+    width: 15px;
+    height: 15px;
+}
+
+.app-profile-menu.is-open .app-profile-menu-trigger-chevron {
+    color: var(--app-text-strong);
+    transform: rotate(180deg);
+}
+
+.app-profile-menu-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 100;
+    width: min(332px, calc(100vw - 24px));
+    max-height: calc(100dvh - var(--app-toolbar-height) - 24px);
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 12px;
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: 0 24px 56px rgba(4, 12, 22, 0.34), 0 6px 18px rgba(4, 12, 22, 0.2);
+    scrollbar-gutter: stable;
+}
+
+.app-profile-menu-panel[hidden] {
+    display: none !important;
+}
+
+.app-profile-menu-identity {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 16px;
+    background: var(--app-bg-soft);
+}
+
+.app-profile-menu-identity .app-account-avatar {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+}
+
+.app-profile-menu-identity-copy {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.app-profile-menu-identity-copy strong,
+.app-profile-menu-identity-copy span,
+.app-profile-menu-identity-copy small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-profile-menu-identity-copy strong {
+    color: var(--app-text-strong);
+    font-size: 15px;
+    font-weight: 850;
+    line-height: 1.2;
+}
+
+.app-profile-menu-identity-copy span {
+    color: var(--app-primary);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.app-profile-menu-identity-copy small {
+    margin-top: 2px;
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.app-profile-menu-section {
+    padding: 7px 8px;
+    border-top: 1px solid var(--app-border);
+}
+
+.app-profile-menu-section-label {
+    padding: 5px 10px 6px;
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+.app-profile-menu-panel .app-profile-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 40px;
+    gap: 10px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--app-text);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 720;
+    line-height: 1.25;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: none;
+}
+
+.app-profile-menu-item:hover,
+.app-profile-menu-item:focus-visible {
+    background: var(--app-surface-muted);
+    color: var(--app-text-strong);
+    outline: none;
+}
+
+.app-profile-menu-item:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--app-focus);
+}
+
+.app-profile-menu-item-icon,
+.app-profile-menu-item-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--app-muted);
+}
+
+.app-profile-menu-item-icon {
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+}
+
+.app-profile-menu-item-icon .app-icon-svg {
+    width: 18px;
+    height: 18px;
+}
+
+.app-profile-menu-item-label {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.app-profile-menu-item-chevron {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.app-profile-menu-item-chevron .app-icon-svg {
+    width: 14px;
+    height: 14px;
+}
+
+.app-profile-menu-item:hover :is(.app-profile-menu-item-icon, .app-profile-menu-item-chevron),
+.app-profile-menu-item:focus-visible :is(.app-profile-menu-item-icon, .app-profile-menu-item-chevron) {
+    color: currentColor;
+}
+
+.app-profile-menu-footer {
+    padding: 8px;
+    border-top: 1px solid var(--app-border);
+}
+
+.app-profile-menu-sign-out-form {
+    display: block;
+    width: 100%;
+    margin: 0;
+}
+
+.app-profile-menu-sign-out {
+    color: var(--app-danger);
+}
+
+.app-profile-menu-sign-out .app-profile-menu-item-icon {
+    color: currentColor;
+}
+
+.app-profile-menu-sign-out:hover,
+.app-profile-menu-sign-out:focus-visible {
+    background: var(--app-danger-soft);
+    color: var(--app-danger);
 }
 
 .app-account-avatar {
@@ -30544,6 +30780,10 @@ img[data-deferred-src] {
     }
 
     .app-account-label {
+        display: none;
+    }
+
+    .app-profile-menu-trigger-chevron {
         display: none;
     }
 

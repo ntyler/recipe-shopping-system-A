@@ -281,7 +281,7 @@ def test_index_topbar_uses_current_user_profile_image(monkeypatch, tmp_path):
 
     html = response.get_data(as_text=True)
     topbar_start = html.index('class="app-toolbar-button app-account-button"')
-    topbar_end = html.index("</a>", topbar_start)
+    topbar_end = html.index("</button>", topbar_start)
     topbar_markup = html[topbar_start:topbar_end]
 
     assert response.status_code == 200
@@ -292,6 +292,14 @@ def test_index_topbar_uses_current_user_profile_image(monkeypatch, tmp_path):
     assert 'referrerpolicy="no-referrer"' in topbar_markup
     assert "Nathaniel Tyler" in topbar_markup
     assert ">N<" not in topbar_markup
+    assert html.count('id="appProfileMenuTrigger"') == 1
+    assert html.count('id="appProfileMenu"') == 1
+    assert 'aria-haspopup="menu"' in html
+    assert 'aria-controls="appProfileMenu"' in html
+    assert 'role="menu"' in html
+    assert "nathaniel@example.com" in html
+    for label in ("My Profile", "Billing &amp; Subscription", "Keyboard Shortcuts", "Send Feedback", "Sign Out"):
+        assert label in html
 
 
 def test_authenticated_full_page_templates_extend_the_single_app_layout():
@@ -359,6 +367,70 @@ def test_home_and_recipe_editor_reuse_the_single_app_header_and_account_control(
     assert "grid-template-columns: minmax(280px, 620px) minmax(0, 1fr) auto;" in css
     assert "from PushShoppingList.services.user_account_service import current_public_user" in routes
     assert "current_user=current_public_user()," in routes
+
+
+def test_header_profile_control_renders_accessible_grouped_dropdown_and_interactions():
+    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    menu_start = macros.index('<div class="app-profile-menu" data-profile-menu>')
+    menu_end = macros.index("{% else %}", menu_start)
+    menu_markup = macros[menu_start:menu_end]
+
+    assert 'data-profile-menu-trigger' in menu_markup
+    assert 'aria-haspopup="menu"' in menu_markup
+    assert 'aria-expanded="false"' in menu_markup
+    assert 'aria-controls="{{ profile_menu_id }}"' in menu_markup
+    assert 'data-profile-menu-panel' in menu_markup
+    assert 'role="menu"' in menu_markup
+    assert menu_markup.count('role="menuitem"') == 12
+    assert "current_user.email" in menu_markup
+    assert "current_user.display_name" in menu_markup
+    assert "Pro Plan" in menu_markup
+    assert 'data-firebase-sign-out-form' in menu_markup
+    assert "url_for('account_bp.sign_out_route')" in menu_markup
+
+    expected_labels = (
+        "ACCOUNT",
+        "My Profile",
+        "Account Settings",
+        "Billing &amp; Subscription",
+        "Security",
+        "PREFERENCES",
+        "Appearance",
+        "Notifications",
+        "Keyboard Shortcuts",
+        "Language",
+        "SUPPORT",
+        "Help Center",
+        "Send Feedback",
+        "What&rsquo;s New",
+        "Sign Out",
+    )
+    for label in expected_labels:
+        assert label in menu_markup
+
+    for sidebar_label in ("Recipes", "Cookbooks", "Shopping Lists", "Pantry", "Meal Planner"):
+        assert f">{sidebar_label}<" not in menu_markup
+
+    assert ".app-profile-menu-panel {" in css
+    assert "top: calc(100% + 10px);" in css
+    assert "right: 0;" in css
+    assert "width: min(332px, calc(100vw - 24px));" in css
+    assert "z-index: 18500;" in css
+    assert ".app-profile-menu-item:focus-visible" in css
+    assert ".app-profile-menu-sign-out:hover" in css
+
+    assert "const HEADER_PROFILE_MENU_OPEN_DELAY_MS = 175;" in script
+    assert "const HEADER_PROFILE_MENU_CLOSE_DELAY_MS = 200;" in script
+    assert "function bindHeaderProfileMenus()" in script
+    assert 'menu.addEventListener("pointerenter"' in script
+    assert 'menu.addEventListener("pointerleave"' in script
+    assert 'event.target.closest("[data-profile-menu]")' in script
+    assert 'closeHeaderProfileMenu(openMenu, { focusTrigger: true });' in script
+    for key in ("ArrowDown", "ArrowUp", "Home", "End", "Enter", "Escape"):
+        assert f'event.key === "{key}"' in script or f'event.key !== "{key}"' in script
 
 
 def test_recipe_edit_route_renders_exactly_one_shared_shell(monkeypatch, tmp_path):

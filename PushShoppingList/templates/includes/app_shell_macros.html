@@ -84,6 +84,21 @@
         <path d="m5 15 7-7 7 7"></path>
     {% elif name == "chevron-down" %}
         <path d="m5 9 7 7 7-7"></path>
+    {% elif name == "chevron-right" %}
+        <path d="m9 18 6-6-6-6"></path>
+    {% elif name == "keyboard" %}
+        <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+        <path d="M7 9h.01"></path><path d="M11 9h.01"></path><path d="M15 9h.01"></path><path d="M19 9h.01"></path>
+        <path d="M8 13h.01"></path><path d="M12 13h.01"></path><path d="M16 13h.01"></path><path d="M8 17h8"></path>
+    {% elif name == "globe" %}
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18"></path><path d="M12 3a15 15 0 0 0 0 18"></path>
+    {% elif name == "message" %}
+        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"></path>
+        <path d="M8 9h8"></path><path d="M8 13h5"></path>
+    {% elif name == "log-out" %}
+        <path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path>
+        <path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"></path>
     {% elif name == "utensils" %}
         <path d="M7 3v8"></path><path d="M4 3v5a3 3 0 0 0 6 0V3"></path><path d="M7 11v10"></path>
         <path d="M16 3c3 2 3 7 0 9v9"></path><path d="M16 3v9h3"></path>
@@ -340,13 +355,7 @@
 </div>
 {%- endmacro %}
 
-{% macro account_control(current_user, is_guest_demo, href, in_shell=false) -%}
-<a class="app-toolbar-button app-account-button"
-   href="{{ href }}"
-   aria-label="{% if current_user %}Open account for {{ current_user.display_name }}{% elif is_guest_demo %}Open Guest Demo account{% else %}Open sign in{% endif %}"
-   {% if in_shell %}data-app-nav-link
-   data-app-nav-action="account-workspace"
-   data-app-nav-target="userAccountSection"{% endif %}>
+{% macro account_avatar(current_user, is_guest_demo=false) -%}
     <span class="app-account-avatar" aria-hidden="true">
         {% if current_user and current_user.avatar_path %}
             <img class="app-account-avatar-image"
@@ -363,9 +372,184 @@
             G
         {% endif %}
     </span>
+{%- endmacro %}
+
+{% macro account_control(current_user, is_guest_demo, href, in_shell=false) -%}
+{% if current_user %}
+{% set home_href = url_for("main_bp.index") %}
+{% set profile_menu_id = "appProfileMenu" %}
+{% set profile_trigger_id = "appProfileMenuTrigger" %}
+<div class="app-profile-menu" data-profile-menu>
+    <button type="button"
+            id="{{ profile_trigger_id }}"
+            class="app-toolbar-button app-account-button"
+            aria-label="Open account menu for {{ current_user.display_name }}"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="{{ profile_menu_id }}"
+            data-profile-menu-trigger>
+        {{ account_avatar(current_user, is_guest_demo) }}
+        <span class="app-account-label">
+            <strong>{{ current_user.display_name }}</strong>
+            <small>Pro Plan</small>
+        </span>
+        <span class="app-profile-menu-trigger-chevron" aria-hidden="true">{{ svg_icon("chevron-down") }}</span>
+    </button>
+
+    <div id="{{ profile_menu_id }}"
+         class="app-profile-menu-panel"
+         data-profile-menu-panel
+         role="menu"
+         aria-labelledby="{{ profile_trigger_id }}"
+         hidden>
+        <div class="app-profile-menu-identity" role="presentation">
+            {{ account_avatar(current_user, is_guest_demo) }}
+            <div class="app-profile-menu-identity-copy">
+                <strong>{{ current_user.display_name }}</strong>
+                <span>Pro Plan</span>
+                <small>{{ current_user.email }}</small>
+            </div>
+        </div>
+
+        <div class="app-profile-menu-section" role="group" aria-labelledby="appProfileMenuAccountLabel">
+            <div id="appProfileMenuAccountLabel" class="app-profile-menu-section-label">ACCOUNT</div>
+            <a class="app-profile-menu-item"
+               href="{{ href }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="account-workspace" data-app-nav-target="userAccountSection"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("user") }}</span>
+                <span class="app-profile-menu-item-label">My Profile</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+            <a class="app-profile-menu-item"
+               href="{{ '#userAccountSection' if in_shell else home_href ~ '#userAccountSection' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="account-settings" data-app-nav-target="userAccountSection"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("settings") }}</span>
+                <span class="app-profile-menu-item-label">Account Settings</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+            <a class="app-profile-menu-item"
+               href="{{ '#accountUsageDashboardPanel' if in_shell else home_href ~ '#accountUsageDashboardPanel' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="usage-dashboard" data-app-nav-target="accountUsageDashboardPanel"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("billing") }}</span>
+                <span class="app-profile-menu-item-label">Billing &amp; Subscription</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+            <a class="app-profile-menu-item"
+               href="{{ '#settingsSecurityPanel' if in_shell else home_href ~ '#settingsSecurityPanel' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="security" data-app-nav-target="settingsSecurityPanel"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("shield-check") }}</span>
+                <span class="app-profile-menu-item-label">Security</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+        </div>
+
+        <div class="app-profile-menu-section" role="group" aria-labelledby="appProfileMenuPreferencesLabel">
+            <div id="appProfileMenuPreferencesLabel" class="app-profile-menu-section-label">PREFERENCES</div>
+            <a class="app-profile-menu-item"
+               href="{{ '#settingsDisplayPanel' if in_shell else home_href ~ '#settingsDisplayPanel' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="display" data-app-nav-target="settingsDisplayPanel"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("eye") }}</span>
+                <span class="app-profile-menu-item-label">Appearance</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+            <a class="app-profile-menu-item"
+               href="{{ '#notificationsPage' if in_shell else home_href ~ '#notificationsPage' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="notificationsPage" data-app-nav-target="notificationsPage"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("bell") }}</span>
+                <span class="app-profile-menu-item-label">Notifications</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+            <a class="app-profile-menu-item"
+               href="{{ '#settingsDisplayPanel' if in_shell else home_href ~ '#settingsDisplayPanel' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="display" data-app-nav-target="settingsDisplayPanel"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("keyboard") }}</span>
+                <span class="app-profile-menu-item-label">Keyboard Shortcuts</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+            <a class="app-profile-menu-item"
+               href="{{ '#settingsDisplayPanel' if in_shell else home_href ~ '#settingsDisplayPanel' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="display" data-app-nav-target="settingsDisplayPanel"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("globe") }}</span>
+                <span class="app-profile-menu-item-label">Language</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+        </div>
+
+        <div class="app-profile-menu-section" role="group" aria-labelledby="appProfileMenuSupportLabel">
+            <div id="appProfileMenuSupportLabel" class="app-profile-menu-section-label">SUPPORT</div>
+            <a class="app-profile-menu-item"
+               href="{{ '#feedbackSupportSection' if in_shell else home_href ~ '#feedbackSupportSection' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="feedback-support" data-app-nav-target="feedbackSupportSection"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("help") }}</span>
+                <span class="app-profile-menu-item-label">Help Center</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+            <a class="app-profile-menu-item"
+               href="{{ '#feedbackSupportSection' if in_shell else home_href ~ '#feedbackSupportSection' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="feedback-support" data-app-nav-target="feedbackSupportSection"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("message") }}</span>
+                <span class="app-profile-menu-item-label">Send Feedback</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+            <a class="app-profile-menu-item"
+               href="{{ '#notificationsPage' if in_shell else home_href ~ '#notificationsPage' }}"
+               role="menuitem"
+               tabindex="-1"
+               {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="notificationsPage" data-app-nav-target="notificationsPage"{% endif %}>
+                <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("sparkles") }}</span>
+                <span class="app-profile-menu-item-label">What&rsquo;s New</span>
+                <span class="app-profile-menu-item-chevron" aria-hidden="true">{{ svg_icon("chevron-right") }}</span>
+            </a>
+        </div>
+
+        <div class="app-profile-menu-footer" role="presentation">
+            <form class="app-profile-menu-sign-out-form"
+                  data-firebase-sign-out-form
+                  method="POST"
+                  action="{{ url_for('account_bp.sign_out_route') }}">
+                <button type="submit"
+                        class="app-profile-menu-item app-profile-menu-sign-out"
+                        role="menuitem"
+                        tabindex="-1">
+                    <span class="app-profile-menu-item-icon" aria-hidden="true">{{ svg_icon("log-out") }}</span>
+                    <span class="app-profile-menu-item-label">Sign Out</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% else %}
+<a class="app-toolbar-button app-account-button"
+   href="{{ href }}"
+   aria-label="{% if is_guest_demo %}Open Guest Demo account{% else %}Open sign in{% endif %}"
+   {% if in_shell %}data-app-nav-link
+   data-app-nav-action="account-workspace"
+   data-app-nav-target="userAccountSection"{% endif %}>
+    {{ account_avatar(current_user, is_guest_demo) }}
     <span class="app-account-label">
-        <strong>{% if current_user %}{{ current_user.display_name }}{% elif is_guest_demo %}Guest Demo{% else %}Sign In{% endif %}</strong>
-        <small>{% if current_user %}Pro Plan{% elif is_guest_demo %}Temporary workspace{% else %}AI Pantry account{% endif %}</small>
+        <strong>{% if is_guest_demo %}Guest Demo{% else %}Sign In{% endif %}</strong>
+        <small>{% if is_guest_demo %}Temporary workspace{% else %}AI Pantry account{% endif %}</small>
     </span>
 </a>
+{% endif %}
 {%- endmacro %}
