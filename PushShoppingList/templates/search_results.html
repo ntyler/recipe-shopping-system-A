@@ -1,0 +1,95 @@
+{% extends "layouts/app_layout.html" %}
+{% import "includes/app_shell_macros.html" as shell %}
+{% set app_page_title = "Search AI Pantry" %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "" %}
+{% set app_search_id = "searchResultsGlobalSearch" %}
+{% set app_search_initial_query = search_payload.query|default("") %}
+
+{% block app_content %}
+<section class="global-search-results-page" aria-labelledby="globalSearchResultsTitle">
+    <header class="global-search-results-header">
+        <div>
+            <p class="app-page-eyebrow">AI Pantry</p>
+            <h1 id="globalSearchResultsTitle">Search results</h1>
+            {% if search_payload.query %}
+            <p>{{ search_payload.total_count }} result{% if search_payload.total_count != 1 %}s{% endif %} for “{{ search_payload.query }}”</p>
+            {% else %}
+            <p>Search your recipes, menus, pantry, meal plans, and other AI Pantry records.</p>
+            {% endif %}
+        </div>
+        <form class="global-search-results-form" action="{{ url_for('main_bp.global_search_results_route') }}" method="get" role="search">
+            <label for="globalSearchResultsQuery">Search AI Pantry</label>
+            <div>
+                <input id="globalSearchResultsQuery"
+                       name="q"
+                       type="search"
+                       value="{{ search_payload.query }}"
+                       minlength="2"
+                       autocomplete="off"
+                       placeholder="Search recipes, ingredients, or menus...">
+                <button type="submit">Search</button>
+            </div>
+        </form>
+    </header>
+
+    {% if search_payload.available_groups %}
+    <nav class="global-search-result-filters" aria-label="Filter search results by type">
+        <a href="{{ url_for('main_bp.global_search_results_route', q=search_payload.query) }}"
+           {% if not search_type_filter %}aria-current="page"{% endif %}>All <span>{{ search_payload.all_total_count|default(search_payload.total_count) }}</span></a>
+        {% for filter_group in search_payload.available_groups %}
+        <a href="{{ url_for('main_bp.global_search_results_route', q=search_payload.query, type=filter_group.key) }}"
+           {% if search_type_filter == filter_group.key %}aria-current="page"{% endif %}>
+            {{ filter_group.label|title }} <span>{{ filter_group.count }}</span>
+        </a>
+        {% endfor %}
+    </nav>
+    {% endif %}
+
+    {% if search_error %}
+    <div class="global-search-results-state global-search-results-error" role="alert">
+        <h2>Search unavailable</h2>
+        <p>{{ search_error }}</p>
+        <a href="{{ url_for('main_bp.global_search_results_route', q=search_payload.query) }}">Try again</a>
+    </div>
+    {% elif search_payload.query_too_short %}
+    <div class="global-search-results-state">
+        <h2>Keep typing</h2>
+        <p>Enter at least {{ search_payload.min_query_length }} characters to search your records.</p>
+    </div>
+    {% elif search_payload.query and not search_payload.groups %}
+    <div class="global-search-results-state">
+        <h2>No results</h2>
+        <p>No AI Pantry records match “{{ search_payload.query }}”.</p>
+    </div>
+    {% endif %}
+
+    <div class="global-search-result-groups">
+        {% for group in search_payload.groups %}
+        <section class="global-search-result-group" aria-labelledby="globalSearchGroup{{ loop.index }}">
+            <header>
+                <h2 id="globalSearchGroup{{ loop.index }}">{{ group.label }}</h2>
+                <span>{{ group.count }}</span>
+            </header>
+            <div class="global-search-result-list">
+                {% for result in group.results %}
+                <a class="global-search-result-row" href="{{ result.url }}">
+                    <span class="global-search-result-media" aria-hidden="true">
+                        {% if result.thumbnail_url %}
+                        <img src="{{ result.thumbnail_url }}" alt="" loading="lazy" decoding="async">
+                        {% else %}
+                        {{ shell.app_icon(result.icon or group.key) }}
+                        {% endif %}
+                    </span>
+                    <span class="global-search-result-copy">
+                        <strong>{{ result.title }}</strong>
+                        <span>{{ result.type }}{% if result.secondary %} <span aria-hidden="true">•</span> {{ result.secondary }}{% endif %}</span>
+                    </span>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

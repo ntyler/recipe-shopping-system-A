@@ -3,7 +3,6 @@
 {% set app_shell_mode = "route" %}
 {% set app_active_nav_item = "settings" %}
 {% set app_search_id = "masterDataGlobalSearch" %}
-{% set app_search_submit_handler = "submitRecipeEditGlobalSearch" %}
 {% set app_content_class = "master-data-app-content" %}
 {% macro master_data_reference_url(row, master_data) -%}{{ url_for('main_bp.master_data_record_references_route', record_type=master_data.record_type, record_id=row.id) }}{% if master_data.scope == 'all' %}?scope=all{% elif master_data.scope == 'user' and master_data.scope_user_id %}?scope=user&user_id={{ master_data.scope_user_id|urlencode }}{% endif %}{%- endmacro %}
 {% macro render_master_data_row(row, master_data) -%}

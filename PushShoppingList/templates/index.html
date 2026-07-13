@@ -4,7 +4,6 @@
 {% set app_shell_mode = "spa" %}
 {% set app_active_nav_item = "home" %}
 {% set app_search_id = "appGlobalSearch" %}
-{% set app_search_submit_handler = "submitAppGlobalSearch" %}
 {% set app_body_class = "account-action-token" if password_reset_token|default("") or two_factor_recovery_token|default("") or account_delete_token|default("") else "" %}
 
 {% block app_head %}

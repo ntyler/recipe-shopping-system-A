@@ -49,7 +49,8 @@ def test_standalone_recipe_editor_uses_app_shell_navigation():
     assert 'data-app-sidebar-collapse' in sidebar
     assert 'data-app-header' in header
     assert 'app_search_id = "recipeEditGlobalSearch"' in template
-    assert 'app_search_submit_handler = "submitRecipeEditGlobalSearch"' in template
+    assert 'onsubmit="return submitGlobalAppSearch(this)"' in header
+    assert "submitRecipeEditGlobalSearch" not in template
     assert "organizeRecipeEditStandaloneWorkspace()" in template
 
 

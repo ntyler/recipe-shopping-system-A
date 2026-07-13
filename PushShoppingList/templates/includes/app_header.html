@@ -2,7 +2,7 @@
 {% set in_shell = app_shell_mode|default("route") == "spa" %}
 {% set home_href = url_for("main_bp.index") %}
 {% set search_id = app_search_id|default("appGlobalSearch") %}
-{% set search_submit_handler = app_search_submit_handler|default("submitRecipeEditGlobalSearch") %}
+{% set search_results_id = search_id ~ "Results" %}
 {% set import_href = "#importPage" if in_shell else home_href ~ "#importPage" %}
 {% set notifications_href = "#notificationsPage" if in_shell else home_href ~ "#notificationsPage" %}
 {% set help_href = "#feedbackSupportSection" if in_shell else home_href ~ "#feedbackSupportSection" %}
@@ -14,29 +14,63 @@
     </a>
     <form class="app-global-search"
           role="search"
-          onsubmit="return {{ search_submit_handler }}(this)">
-        <label class="sr-only" for="{{ search_id }}">Search app sections</label>
+          data-global-search-form
+          data-global-search-endpoint="/api/global-search"
+          data-global-search-results-url="/search"
+          data-global-search-spa="{{ 'true' if in_shell else 'false' }}"
+          onsubmit="return submitGlobalAppSearch(this)">
+        <label class="sr-only" for="{{ search_id }}">Search AI Pantry</label>
         <span class="app-global-search-icon" aria-hidden="true">{{ shell.svg_icon("search") }}</span>
         <input id="{{ search_id }}"
                name="app_search"
                data-app-global-search
-               list="{{ search_id }}Suggestions"
                type="search"
                autocomplete="off"
+               role="combobox"
+               aria-autocomplete="list"
+               aria-haspopup="listbox"
+               aria-expanded="false"
+               aria-controls="{{ search_results_id }}"
+               value="{{ app_search_initial_query|default('') }}"
                placeholder="Search recipes, ingredients, or menus...">
-        <datalist id="{{ search_id }}Suggestions">
-            <option value="Recipes"></option>
-            <option value="Cookbooks"></option>
-            <option value="Shopping Lists"></option>
-            <option value="Pantry"></option>
-            <option value="Stores"></option>
-            <option value="Import"></option>
-            <option value="Usage Billing"></option>
-            <option value="Help Support"></option>
-        </datalist>
         <span class="app-global-search-shortcut" aria-hidden="true">Ctrl + K</span>
         <button type="submit" class="app-search-submit">Search</button>
         <span class="sr-only" data-app-global-search-status aria-live="polite"></span>
+        <div id="{{ search_results_id }}"
+             class="app-global-search-dropdown"
+             data-global-search-dropdown
+             role="listbox"
+             aria-label="Global search results"
+             hidden>
+            <div class="app-global-search-dropdown-content" data-global-search-content></div>
+        </div>
+        <div class="app-global-search-icon-templates" hidden aria-hidden="true">
+            <template data-global-search-icon-template="recipes">{{ shell.app_icon("recipes") }}</template>
+            <template data-global-search-icon-template="ingredients">{{ shell.svg_icon("pantry") }}</template>
+            <template data-global-search-icon-template="menus">{{ shell.app_icon("menus") }}</template>
+            <template data-global-search-icon-template="menu-items">{{ shell.svg_icon("document") }}</template>
+            <template data-global-search-icon-template="cookbooks">{{ shell.app_icon("cookbooks") }}</template>
+            <template data-global-search-icon-template="shopping-lists">{{ shell.app_icon("shopping") }}</template>
+            <template data-global-search-icon-template="shopping">{{ shell.app_icon("shopping") }}</template>
+            <template data-global-search-icon-template="shopping-items">{{ shell.svg_icon("shopping") }}</template>
+            <template data-global-search-icon-template="pantry">{{ shell.app_icon("pantry") }}</template>
+            <template data-global-search-icon-template="meal-planner">{{ shell.app_icon("meal") }}</template>
+            <template data-global-search-icon-template="meal">{{ shell.app_icon("meal") }}</template>
+            <template data-global-search-icon-template="stores">{{ shell.app_icon("stores") }}</template>
+            <template data-global-search-icon-template="price">{{ shell.app_icon("price") }}</template>
+            <template data-global-search-icon-template="restaurants">{{ shell.svg_icon("link") }}</template>
+            <template data-global-search-icon-template="restaurant">{{ shell.svg_icon("link") }}</template>
+            <template data-global-search-icon-template="equipment">{{ shell.svg_icon("cooking-pot") }}</template>
+            <template data-global-search-icon-template="home">{{ shell.app_icon("home") }}</template>
+            <template data-global-search-icon-template="link">{{ shell.app_icon("link") }}</template>
+            <template data-global-search-icon-template="document">{{ shell.app_icon("document") }}</template>
+            <template data-global-search-icon-template="image">{{ shell.app_icon("image") }}</template>
+            <template data-global-search-icon-template="settings">{{ shell.app_icon("settings") }}</template>
+            <template data-global-search-icon-template="billing">{{ shell.app_icon("billing") }}</template>
+            <template data-global-search-icon-template="help">{{ shell.app_icon("help") }}</template>
+            <template data-global-search-icon-template="barcode">{{ shell.app_icon("barcode") }}</template>
+            <template data-global-search-icon-template="pages">{{ shell.svg_icon("search") }}</template>
+        </div>
     </form>
     <div class="app-toolbar-actions" aria-label="Quick actions">
         <a class="app-toolbar-button app-toolbar-primary"

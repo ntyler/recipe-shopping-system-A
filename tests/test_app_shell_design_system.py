@@ -35,7 +35,11 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert "app-global-search-icon" in header
     assert "app-global-search-shortcut" in header
     assert "Ctrl + K" in header
-    assert 'app_search_submit_handler = "submitAppGlobalSearch"' in template
+    assert 'onsubmit="return submitGlobalAppSearch(this)"' in header
+    assert 'data-global-search-endpoint="/api/global-search"' in header
+    assert 'role="combobox"' in header
+    assert 'role="listbox"' in header
+    assert "<datalist" not in header
     assert "app-toolbar-primary" in header
     assert 'data-app-page-target="notificationsPage"' in header
     assert 'data-app-nav-action="account-workspace"' in shell_macros
@@ -466,7 +470,15 @@ def test_app_shell_navigation_reuses_existing_lazy_and_account_panel_functions()
     script = read_text("PushShoppingList/static/js/app.js")
 
     assert "function initAppShellNavigation()" in script
-    assert "function submitAppGlobalSearch(form)" in script
+    assert "function submitGlobalAppSearch(form)" in script
+    assert "function initGlobalAppSearch()" in script
+    assert "GLOBAL_APP_SEARCH_DEBOUNCE_MS = 250" in script
+    assert "GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH = 2" in script
+    assert "new AbortController()" in script
+    assert 'event.key === "ArrowDown" || event.key === "ArrowUp"' in script
+    assert 'event.key === "Escape"' in script
+    assert '["initGlobalAppSearch", initGlobalAppSearch]' in script
+    assert "function submitRecipeEditGlobalSearch" not in script
     assert "function appShellNavActiveKey(link)" in script
     assert "function appShellSetActivePageLink(pageId)" in script
     assert "async function activateAppShellNavLink(link" in script

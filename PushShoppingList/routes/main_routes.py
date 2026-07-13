@@ -138,9 +138,11 @@ from PushShoppingList.services.meal_plan_service import meal_plan_home_preview
 from PushShoppingList.services.meal_plan_service import meal_plan_for_week
 from PushShoppingList.services.meal_plan_service import normalize_planned_servings
 from PushShoppingList.services.meal_plan_service import planned_servings_from_yield
+from PushShoppingList.services.global_search_service import global_search
 from PushShoppingList.services.job_service import job_for_client
 from PushShoppingList.services.job_service import recent_jobs
 from PushShoppingList.services.storage_service import active_guest_session_id
+from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.user_account_service import SUPPORT_ADMIN_EMAILS
 from PushShoppingList.services.user_account_service import SUPPORT_EMAIL
 from PushShoppingList.services.user_account_service import current_public_user
@@ -3399,6 +3401,65 @@ def build_store_view(items, item_state, available_stores, enabled_stores):
 def index():
     active_public_user = current_public_user()
     return render_template("index.html", **shell_context(active_public_user))
+
+
+@main_bp.route("/api/global-search", methods=["GET"])
+def global_search_route():
+    """Return a compact, active-workspace-only result set for AppHeader."""
+    if not active_user_id() and not active_guest_session_id():
+        return jsonify({"ok": False, "error": "Sign in to search AI Pantry."}), 401
+
+    query = str(request.args.get("q") or "")
+    limit = request.args.get("limit", 10)
+    try:
+        # Header page shortcuts are sourced from the rendered shared Sidebar so
+        # their SPA handlers remain intact. The API supplies record results only.
+        return jsonify(global_search(query, limit=limit, include_pages=False))
+    except Exception:
+        current_app.logger.exception("Global application search failed")
+        return jsonify({
+            "ok": False,
+            "query": query,
+            "error": "AI Pantry search is temporarily unavailable.",
+        }), 500
+
+
+@main_bp.route("/search", methods=["GET"])
+def global_search_results_route():
+    """Render the grouped full-results view for the active workspace."""
+    if not active_user_id() and not active_guest_session_id():
+        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+    query = str(request.args.get("q") or "")
+    group_filter = str(request.args.get("type") or "").strip().lower()
+    try:
+        search_payload = global_search(
+            query,
+            group_filter=[group_filter] if group_filter else None,
+            full=True,
+        )
+        search_error = ""
+    except Exception:
+        current_app.logger.exception("Global full-results search failed")
+        search_payload = {
+            "ok": False,
+            "query": query,
+            "total_count": 0,
+            "groups": [],
+            "available_groups": [],
+        }
+        search_error = "AI Pantry search is temporarily unavailable. Please try again."
+
+    return render_template(
+        "search_results.html",
+        search_payload=search_payload,
+        search_error=search_error,
+        search_type_filter=group_filter,
+        current_user=current_public_user(),
+        is_guest_demo=is_guest_session(),
+        app_css_version=static_asset_version("css/app.css"),
+        app_js_version=static_asset_version("js/app.js"),
+    )
 
 
 @main_bp.route("/api/meal-plan", methods=["POST"])

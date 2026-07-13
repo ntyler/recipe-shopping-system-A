@@ -1503,36 +1503,465 @@ async function confirmMealPlannerDelete(event) {
     return false;
 }
 
-function submitAppGlobalSearch(form) {
-    const input = form ? form.querySelector("[data-app-global-search]") : null;
-    const query = normalizeAppShellSearchText(input ? input.value : "");
+const GLOBAL_APP_SEARCH_DEBOUNCE_MS = 250;
+const GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH = 2;
+const GLOBAL_APP_SEARCH_RESULT_LIMIT = 8;
+const GLOBAL_APP_SEARCH_OPTION_LIMIT = 12;
 
-    if (!query) {
-        appShellSetSearchStatus("Type a section name to search.");
-        if (input) {
-            input.focus();
-        }
-        return false;
+function globalAppSearchInput(form) {
+    return form ? form.querySelector("[data-app-global-search]") : null;
+}
+
+function globalAppSearchDropdown(form) {
+    return form ? form.querySelector("[data-global-search-dropdown]") : null;
+}
+
+function globalAppSearchContent(form) {
+    return form ? form.querySelector("[data-global-search-content]") : null;
+}
+
+function globalAppSearchQuery(form) {
+    const input = globalAppSearchInput(form);
+    return input ? String(input.value || "").trim() : "";
+}
+
+function globalAppSearchOpenDropdown(form) {
+    const input = globalAppSearchInput(form);
+    const dropdown = globalAppSearchDropdown(form);
+    if (!input || !dropdown) {
+        return;
+    }
+    dropdown.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+}
+
+function globalAppSearchCloseDropdown(form) {
+    const input = globalAppSearchInput(form);
+    const dropdown = globalAppSearchDropdown(form);
+    if (!input || !dropdown) {
+        return;
+    }
+    dropdown.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+    form._globalSearchActiveIndex = -1;
+}
+
+function globalAppSearchIcon(form, iconName) {
+    const icon = document.createElement("span");
+    icon.className = "app-global-search-result-icon";
+    icon.setAttribute("aria-hidden", "true");
+    const template = form.querySelector(`[data-global-search-icon-template="${String(iconName || "pages")}"]`)
+        || form.querySelector('[data-global-search-icon-template="pages"]');
+    if (template && template.content) {
+        icon.append(template.content.cloneNode(true));
+    }
+    return icon;
+}
+
+function globalAppSearchHighlightedTitle(title, query) {
+    const fragment = document.createDocumentFragment();
+    const value = String(title || "");
+    const normalizedQuery = String(query || "").trim().toLocaleLowerCase();
+    const matchIndex = normalizedQuery ? value.toLocaleLowerCase().indexOf(normalizedQuery) : -1;
+    if (matchIndex < 0) {
+        fragment.append(document.createTextNode(value));
+        return fragment;
+    }
+    fragment.append(document.createTextNode(value.slice(0, matchIndex)));
+    const mark = document.createElement("mark");
+    mark.textContent = value.slice(matchIndex, matchIndex + normalizedQuery.length);
+    fragment.append(mark, document.createTextNode(value.slice(matchIndex + normalizedQuery.length)));
+    return fragment;
+}
+
+function globalAppSearchOptionUrl(form, result) {
+    if (result.url) {
+        return result.url;
+    }
+    const target = String(result.target || "");
+    return `${window.location.origin}/${target ? `#${target}` : ""}`;
+}
+
+function globalAppSearchCreateOption(form, result, query, index) {
+    const option = document.createElement("a");
+    const input = globalAppSearchInput(form);
+    option.id = `${input ? input.id : "globalSearch"}Option${index}`;
+    option.className = "app-global-search-result";
+    option.href = globalAppSearchOptionUrl(form, result);
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", "false");
+    option.dataset.globalSearchResult = String(index);
+    if (result.target) {
+        option.dataset.globalSearchPageTarget = result.target;
+    }
+    if (result.isViewAll) {
+        option.classList.add("app-global-search-view-all");
     }
 
-    const links = Array.from(document.querySelectorAll("[data-app-nav-link], .app-sidebar .app-nav-link"));
-    const match = links.find(link => {
-        const label = normalizeAppShellSearchText(link.textContent);
-        const target = normalizeAppShellSearchText(appShellNavTargetId(link));
-        return label.includes(query) || target.includes(query) || query.includes(label);
+    if (result.thumbnail_url) {
+        const thumbnail = document.createElement("img");
+        thumbnail.className = "app-global-search-result-thumbnail";
+        thumbnail.src = result.thumbnail_url;
+        thumbnail.alt = "";
+        thumbnail.loading = "lazy";
+        thumbnail.decoding = "async";
+        thumbnail.addEventListener("error", () => {
+            thumbnail.replaceWith(globalAppSearchIcon(form, result.icon));
+        }, { once: true });
+        option.append(thumbnail);
+    } else {
+        option.append(globalAppSearchIcon(form, result.icon));
+    }
+
+    const copy = document.createElement("span");
+    copy.className = "app-global-search-result-copy";
+    const title = document.createElement("strong");
+    title.append(globalAppSearchHighlightedTitle(result.title, query));
+    const context = document.createElement("span");
+    context.className = "app-global-search-result-context";
+    const resultType = document.createElement("span");
+    resultType.className = "app-global-search-result-type";
+    resultType.textContent = result.type || "Result";
+    context.append(resultType);
+    if (result.secondary) {
+        context.append(document.createTextNode(` • ${result.secondary}`));
+    }
+    copy.append(title, context);
+    option.append(copy);
+    return option;
+}
+
+function globalAppSearchSetActiveIndex(form, nextIndex) {
+    const input = globalAppSearchInput(form);
+    const options = [...form.querySelectorAll("[data-global-search-result]")];
+    if (!input || !options.length) {
+        return;
+    }
+    const normalizedIndex = ((nextIndex % options.length) + options.length) % options.length;
+    options.forEach((option, index) => {
+        const active = index === normalizedIndex;
+        option.classList.toggle("is-active", active);
+        option.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    form._globalSearchActiveIndex = normalizedIndex;
+    input.setAttribute("aria-activedescendant", options[normalizedIndex].id);
+    options[normalizedIndex].scrollIntoView({ block: "nearest" });
+}
+
+function globalAppSearchMessage(form, message, state = "empty") {
+    const content = globalAppSearchContent(form);
+    if (!content) {
+        return;
+    }
+    content.replaceChildren();
+    const row = document.createElement("div");
+    row.className = `app-global-search-state is-${state}`;
+    row.setAttribute("role", "status");
+    row.textContent = message;
+    content.append(row);
+    form._globalSearchResults = [];
+    form._globalSearchActiveIndex = -1;
+    globalAppSearchOpenDropdown(form);
+    appShellSetSearchStatus(message);
+}
+
+function globalAppSearchPageResults(form, query = "") {
+    const normalizedQuery = normalizeAppShellSearchText(query);
+    const seen = new Set();
+    return [...document.querySelectorAll(".app-sidebar-nav .app-nav-link")].map(link => {
+        const title = String(link.textContent || "").trim().replace(/\s+/g, " ");
+        const iconElement = link.querySelector(".app-nav-icon");
+        const iconClass = iconElement
+            ? [...iconElement.classList].find(className => className.startsWith("app-nav-icon-") && className !== "app-nav-icon")
+            : "";
+        return {
+            title,
+            type: "Page",
+            secondary: `Open the ${title} workspace`,
+            icon: iconClass ? iconClass.replace("app-nav-icon-", "") : "pages",
+            target: appShellNavTargetId(link),
+            url: link.getAttribute("href") || "/",
+            sourceNavLink: link,
+            group: "pages",
+        };
+    }).filter(shortcut => {
+        if (!shortcut.title || seen.has(shortcut.title)) {
+            return false;
+        }
+        seen.add(shortcut.title);
+        if (!normalizedQuery) {
+            return true;
+        }
+        const searchable = normalizeAppShellSearchText(`${shortcut.title} ${shortcut.secondary} ${shortcut.target}`);
+        return searchable.includes(normalizedQuery) || normalizedQuery.includes(normalizeAppShellSearchText(shortcut.title));
+    });
+}
+
+function globalAppSearchNormalizedGroups(payload) {
+    if (!payload || !Array.isArray(payload.groups)) {
+        return [];
+    }
+    return payload.groups.map(group => ({
+        key: String(group.key || "results"),
+        label: String(group.label || group.key || "RESULTS").toUpperCase(),
+        results: Array.isArray(group.results) ? group.results : [],
+    })).filter(group => group.results.length);
+}
+
+function globalAppSearchRenderGroups(form, groups, query, options = {}) {
+    const content = globalAppSearchContent(form);
+    if (!content) {
+        return;
+    }
+    content.replaceChildren();
+    const renderedResults = [];
+    const maxOptions = options.includeViewAll === false
+        ? GLOBAL_APP_SEARCH_OPTION_LIMIT
+        : GLOBAL_APP_SEARCH_OPTION_LIMIT - 1;
+
+    groups.forEach(group => {
+        if (!group.results || !group.results.length || renderedResults.length >= maxOptions) {
+            return;
+        }
+        const section = document.createElement("section");
+        section.className = "app-global-search-group";
+        const heading = document.createElement("h2");
+        heading.textContent = group.label;
+        section.append(heading);
+        const list = document.createElement("div");
+        list.className = "app-global-search-group-results";
+        group.results.forEach(result => {
+            if (renderedResults.length >= maxOptions) {
+                return;
+            }
+            const normalizedResult = { ...result, group: result.group || group.key };
+            list.append(globalAppSearchCreateOption(form, normalizedResult, query, renderedResults.length));
+            renderedResults.push(normalizedResult);
+        });
+        section.append(list);
+        content.append(section);
     });
 
-    if (!match) {
-        appShellSetSearchStatus("No matching app section found.");
-        if (input) {
-            input.select();
-        }
-        return false;
+    if (!renderedResults.length) {
+        const empty = document.createElement("div");
+        empty.className = "app-global-search-state is-empty";
+        empty.setAttribute("role", "status");
+        empty.textContent = options.emptyMessage || "No results found.";
+        content.append(empty);
     }
 
-    appShellSetSearchStatus(`Opening ${match.textContent.trim()}.`);
-    activateAppShellNavLink(match);
+    if (options.includeViewAll !== false && String(query || "").trim().length >= GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH) {
+        const resultsUrl = new URL(form.dataset.globalSearchResultsUrl || "/search", window.location.origin);
+        resultsUrl.searchParams.set("q", String(query || "").trim());
+        const viewAll = {
+            title: `View all results for “${String(query || "").trim()}”`,
+            type: "Search",
+            secondary: options.totalCount ? `${options.totalCount} matching records` : "Open grouped search results",
+            icon: "pages",
+            url: `${resultsUrl.pathname}${resultsUrl.search}`,
+            isViewAll: true,
+        };
+        content.append(globalAppSearchCreateOption(form, viewAll, "", renderedResults.length));
+        renderedResults.push(viewAll);
+    }
+
+    form._globalSearchResults = renderedResults;
+    form._globalSearchActiveIndex = -1;
+    globalAppSearchOpenDropdown(form);
+    appShellSetSearchStatus(renderedResults.length
+        ? `${renderedResults.length} global search options available.`
+        : (options.emptyMessage || "No global search results found."));
+}
+
+async function globalAppSearchFetch(form, query) {
+    if (form._globalSearchAbortController) {
+        form._globalSearchAbortController.abort();
+    }
+    const controller = new AbortController();
+    form._globalSearchAbortController = controller;
+    globalAppSearchMessage(form, "Searching AI Pantry…", "loading");
+    try {
+        const endpoint = new URL(form.dataset.globalSearchEndpoint || "/api/global-search", window.location.origin);
+        endpoint.searchParams.set("q", query);
+        endpoint.searchParams.set("limit", String(GLOBAL_APP_SEARCH_RESULT_LIMIT));
+        const response = await fetch(endpoint, {
+            headers: { "X-Requested-With": "fetch" },
+            credentials: "same-origin",
+            signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || "Global search is unavailable.");
+        }
+        if (globalAppSearchQuery(form) !== query) {
+            return;
+        }
+        const groups = globalAppSearchNormalizedGroups(payload)
+            .filter(group => group.key !== "pages");
+        const pages = globalAppSearchPageResults(form, query).slice(0, 3);
+        if (pages.length) {
+            groups.push({ key: "pages", label: "PAGES", results: pages });
+        }
+        globalAppSearchRenderGroups(form, groups, query, {
+            totalCount: Number(payload.total_count || 0),
+            emptyMessage: "No matching AI Pantry records or pages found.",
+        });
+    } catch (error) {
+        if (error && error.name === "AbortError") {
+            return;
+        }
+        globalAppSearchMessage(form, "Search error. Please try again.", "error");
+    } finally {
+        if (form._globalSearchAbortController === controller) {
+            form._globalSearchAbortController = null;
+        }
+    }
+}
+
+function globalAppSearchSchedule(form) {
+    window.clearTimeout(form._globalSearchTimer);
+    if (form._globalSearchAbortController) {
+        form._globalSearchAbortController.abort();
+        form._globalSearchAbortController = null;
+    }
+    const query = globalAppSearchQuery(form);
+    if (!query) {
+        globalAppSearchRenderGroups(form, [{
+            key: "pages",
+            label: "PAGES",
+            results: globalAppSearchPageResults(form).slice(0, 8),
+        }], "", { includeViewAll: false });
+        return;
+    }
+    if (query.length < GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH) {
+        const pages = globalAppSearchPageResults(form, query).slice(0, 6);
+        if (pages.length) {
+            globalAppSearchRenderGroups(form, [{ key: "pages", label: "PAGES", results: pages }], query, {
+                includeViewAll: false,
+            });
+        } else {
+            globalAppSearchMessage(form, "Type at least 2 characters to search your AI Pantry records.", "hint");
+        }
+        return;
+    }
+    form._globalSearchTimer = window.setTimeout(() => {
+        globalAppSearchFetch(form, query);
+    }, GLOBAL_APP_SEARCH_DEBOUNCE_MS);
+}
+
+function globalAppSearchOpenResult(form, index) {
+    const result = Array.isArray(form._globalSearchResults) ? form._globalSearchResults[index] : null;
+    if (!result) {
+        return false;
+    }
+    globalAppSearchCloseDropdown(form);
+    if (result.sourceNavLink && form.dataset.globalSearchSpa === "true") {
+        const navLink = result.sourceNavLink;
+        if (navLink) {
+            appShellSetSearchStatus(`Opening ${result.title}.`);
+            activateAppShellNavLink(navLink);
+            return false;
+        }
+    }
+    window.location.assign(globalAppSearchOptionUrl(form, result));
     return false;
+}
+
+function submitGlobalAppSearch(form) {
+    const query = globalAppSearchQuery(form);
+    const activeIndex = Number.isInteger(form?._globalSearchActiveIndex)
+        ? form._globalSearchActiveIndex
+        : -1;
+    if (activeIndex >= 0) {
+        return globalAppSearchOpenResult(form, activeIndex);
+    }
+    if (query.length < GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH) {
+        globalAppSearchSchedule(form);
+        globalAppSearchInput(form)?.focus();
+        return false;
+    }
+    const resultsUrl = new URL(form.dataset.globalSearchResultsUrl || "/search", window.location.origin);
+    resultsUrl.searchParams.set("q", query);
+    window.location.assign(`${resultsUrl.pathname}${resultsUrl.search}`);
+    return false;
+}
+
+function initGlobalAppSearch() {
+    document.querySelectorAll("[data-global-search-form]").forEach(form => {
+        if (form.dataset.globalSearchBound === "1") {
+            return;
+        }
+        form.dataset.globalSearchBound = "1";
+        form._globalSearchActiveIndex = -1;
+        const input = globalAppSearchInput(form);
+        if (!input) {
+            return;
+        }
+        input.addEventListener("focus", () => globalAppSearchSchedule(form));
+        input.addEventListener("input", () => globalAppSearchSchedule(form));
+        input.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                globalAppSearchCloseDropdown(form);
+                return;
+            }
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                if (globalAppSearchDropdown(form)?.hidden) {
+                    globalAppSearchSchedule(form);
+                }
+                const options = [...form.querySelectorAll("[data-global-search-result]")];
+                if (options.length) {
+                    const current = Number.isInteger(form._globalSearchActiveIndex)
+                        ? form._globalSearchActiveIndex
+                        : -1;
+                    globalAppSearchSetActiveIndex(form, event.key === "ArrowDown" ? current + 1 : current - 1);
+                }
+                return;
+            }
+            if (event.key === "Enter" && form._globalSearchActiveIndex >= 0) {
+                event.preventDefault();
+                globalAppSearchOpenResult(form, form._globalSearchActiveIndex);
+            }
+        });
+        form.addEventListener("click", event => {
+            const option = event.target && event.target.closest
+                ? event.target.closest("[data-global-search-result]")
+                : null;
+            if (!option || !form.contains(option)) {
+                return;
+            }
+            event.preventDefault();
+            globalAppSearchOpenResult(form, Number(option.dataset.globalSearchResult));
+        });
+        form.addEventListener("focusin", event => {
+            const option = event.target && event.target.closest
+                ? event.target.closest("[data-global-search-result]")
+                : null;
+            if (option && form.contains(option)) {
+                globalAppSearchSetActiveIndex(form, Number(option.dataset.globalSearchResult));
+            }
+        });
+        form.addEventListener("focusout", () => {
+            window.setTimeout(() => {
+                if (!form.contains(document.activeElement)) {
+                    globalAppSearchCloseDropdown(form);
+                }
+            }, 0);
+        });
+    });
+
+    if (document.documentElement.dataset.globalSearchOutsideBound !== "1") {
+        document.documentElement.dataset.globalSearchOutsideBound = "1";
+        document.addEventListener("pointerdown", event => {
+            document.querySelectorAll("[data-global-search-form]").forEach(form => {
+                if (!form.contains(event.target)) {
+                    globalAppSearchCloseDropdown(form);
+                }
+            });
+        });
+    }
 }
 
 function recipeBrowseCards() {
@@ -24109,16 +24538,6 @@ function recipeEditInputValue(id) {
     return input ? String(input.value || "").trim() : "";
 }
 
-function submitRecipeEditGlobalSearch(form) {
-    const input = form ? form.querySelector('input[type="search"]') : null;
-    const query = input ? String(input.value || "").trim() : "";
-    const target = query
-        ? `/?app_search=${encodeURIComponent(query)}#recipesPage`
-        : "/#recipesPage";
-    window.location.assign(target);
-    return false;
-}
-
 function recipeEditFieldContainer(id) {
     const input = document.getElementById(id);
     return input ? input.closest("label, .recipe-edit-cookbook-field") : null;
@@ -40496,6 +40915,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
         ["initJobActivityPanel", initJobActivityPanel],
         ["initAppShellNavigation", initAppShellNavigation],
+        ["initGlobalAppSearch", initGlobalAppSearch],
         ["initSettingsWorkspace", () => initSettingsWorkspace({ scroll: false })],
         ["initAppShellInitialWorkspace", initAppShellInitialWorkspace],
         ["initLazySections", initLazySections],
