@@ -25491,7 +25491,7 @@ function copyRecipeSourceDocumentsField(button) {
 
 async function saveRecipeSourceDocuments(form) {
     if (!form || form.dataset.saving) return false;
-    const invalid = form.querySelector("input:invalid");
+    const invalid = form.querySelector(":is(input, select, textarea):invalid");
     const error = form.querySelector("[data-source-documents-edit-error]");
     const save = form.querySelector("[data-source-documents-edit-save]");
     if (invalid) {
@@ -25841,6 +25841,7 @@ function recipeRestaurantRecordValue(record, field) {
         restaurant_longitude: ["restaurant_longitude", "longitude"],
         restaurant_note_text: ["restaurant_note_text", "restaurant_note", "restaurant_notes"],
         restaurant_allergy_information_note: ["restaurant_allergy_information_note", "allergy_information_note"],
+        restaurant_ordering_links: ["restaurant_ordering_links", "ordering_delivery_links", "ordering_links"],
         restaurant_ordering_provider_urls: ["restaurant_ordering_provider_urls", "ordering_provider_urls"],
         restaurant_ordering_providers: ["restaurant_ordering_providers", "ordering_providers"],
         menu_item_url: ["menu_item_url"],
@@ -25857,8 +25858,42 @@ const recipeRestaurantSocialPlatforms = [
     ["tiktok", "TikTok"],
     ["x", "X / Twitter"],
     ["youtube", "YouTube"],
+    ["linkedin", "LinkedIn"],
+    ["other_social", "Other Social"],
+];
+
+const recipeRestaurantOrderingProviders = [
+    ["official_online_ordering", "Official Online Ordering"],
+    ["doordash", "DoorDash"],
+    ["grubhub", "Grubhub"],
+    ["uber_eats", "Uber Eats"],
+    ["postmates", "Postmates"],
+    ["slice", "Slice"],
+    ["chownow", "ChowNow"],
+    ["toast", "Toast"],
+    ["square_online", "Square Online"],
+    ["clover", "Clover"],
     ["other", "Other"],
 ];
+
+function recipeRestaurantOrderingProviderForUrl(value) {
+    let hostname = "";
+    try {
+        hostname = new URL(String(value || "").trim()).hostname.toLowerCase().replace(/^www\./, "");
+    } catch (err) {
+        return "";
+    }
+    if (hostname === "doordash.com" || hostname.endsWith(".doordash.com")) return "doordash";
+    if (hostname === "grubhub.com" || hostname.endsWith(".grubhub.com")) return "grubhub";
+    if (["ubereats.com", "uber.com"].some(domain => hostname === domain || hostname.endsWith(`.${domain}`))) return "uber_eats";
+    if (hostname === "postmates.com" || hostname.endsWith(".postmates.com")) return "postmates";
+    if (hostname === "slicelife.com" || hostname.endsWith(".slicelife.com")) return "slice";
+    if (hostname === "chownow.com" || hostname.endsWith(".chownow.com")) return "chownow";
+    if (hostname === "toasttab.com" || hostname.endsWith(".toasttab.com")) return "toast";
+    if (["square.site", "squareup.com"].some(domain => hostname === domain || hostname.endsWith(`.${domain}`))) return "square_online";
+    if (hostname === "clover.com" || hostname.endsWith(".clover.com")) return "clover";
+    return "";
+}
 
 function recipeRestaurantStructuredArray(value) {
     if (Array.isArray(value)) return value;
@@ -25880,7 +25915,8 @@ function recipeRestaurantSocialPlatformForUrl(value) {
     if (url.includes("tiktok.com")) return "tiktok";
     if (url.includes("twitter.com") || url.includes("x.com")) return "x";
     if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
-    return "other";
+    if (url.includes("linkedin.com")) return "linkedin";
+    return "other_social";
 }
 
 function normalizeRecipeRestaurantSocialLinks(value) {
@@ -25895,10 +25931,59 @@ function normalizeRecipeRestaurantSocialLinks(value) {
         return { platform, url };
     }).filter(item => {
         const key = item.url.toLowerCase();
-        if (!item.url || seen.has(key)) return false;
+        if (!item.url || recipeRestaurantOrderingProviderForUrl(item.url) || seen.has(key)) return false;
         seen.add(key);
         return true;
     });
+}
+
+function normalizeRecipeRestaurantOrderingLinks(value) {
+    const seenUrls = new Set();
+    const seenProviders = new Set();
+    return recipeRestaurantStructuredArray(value).map(item => {
+        const object = item && typeof item === "object" ? item : {};
+        const url = String(object.url || object.website_url || object.href || (typeof item === "string" ? item : "")).trim();
+        let provider = String(object.provider || object.provider_key || object.provider_name || object.platform || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+        if (!recipeRestaurantOrderingProviders.some(([key]) => key === provider)) {
+            provider = recipeRestaurantOrderingProviderForUrl(url) || "other";
+        }
+        const activeValue = object.is_active ?? object.active;
+        const isActive = activeValue === false || String(activeValue).toLowerCase() === "false" ? false : true;
+        const normalized = { provider, url, is_active: isActive };
+        if (provider === "other" && object.provider_name) normalized.provider_name = String(object.provider_name).trim();
+        if (object.source_url) normalized.source_url = String(object.source_url).trim();
+        return normalized;
+    }).filter(item => {
+        const urlKey = item.url.toLowerCase();
+        if (!item.url || seenUrls.has(urlKey)) return false;
+        if (item.provider !== "other" && seenProviders.has(item.provider)) return false;
+        seenUrls.add(urlKey);
+        if (item.provider !== "other") seenProviders.add(item.provider);
+        return true;
+    });
+}
+
+function recipeRestaurantOrderingLinksFromRecord(record) {
+    const structured = recipeRestaurantStructuredArray(
+        record?.restaurant_ordering_links
+        ?? record?.ordering_delivery_links
+        ?? record?.ordering_links
+        ?? []
+    );
+    const providers = recipeRestaurantStructuredArray(
+        record?.restaurant_ordering_providers ?? record?.ordering_providers ?? []
+    ).map(item => ({
+        provider: item?.provider || item?.provider_key || item?.provider_name,
+        url: item?.url || item?.website_url,
+        is_active: item?.is_active ?? true,
+    }));
+    const urls = recipeRestaurantStructuredArray(
+        record?.restaurant_ordering_provider_urls ?? record?.ordering_provider_urls ?? []
+    );
+    const legacySocial = recipeRestaurantStructuredArray(
+        record?.restaurant_social_links ?? record?.social_links ?? record?.social_urls ?? []
+    ).filter(item => recipeRestaurantOrderingProviderForUrl(item?.url || item?.href || item));
+    return normalizeRecipeRestaurantOrderingLinks([...structured, ...providers, ...urls, ...legacySocial]);
 }
 
 function recipeRestaurantSocialLinksFromRecord(record) {
@@ -25936,7 +26021,7 @@ function recipeRestaurantSocialLinkRow(editor, link = {}) {
         option.textContent = label;
         platform.append(option);
     });
-    platform.value = link.platform || "other";
+    platform.value = link.platform || "other_social";
 
     const url = document.createElement("input");
     url.type = "url";
@@ -25977,7 +26062,7 @@ function syncRecipeRestaurantSocialLinks(editor, options = {}) {
     const hidden = editor?.querySelector('[data-restaurant-edit-field="restaurant_social_links"]');
     if (!form || !hidden) return;
     const links = Array.from(editor.querySelectorAll("[data-restaurant-social-link-row]")).map(row => ({
-        platform: row.querySelector("[data-restaurant-social-platform]")?.value || "other",
+        platform: row.querySelector("[data-restaurant-social-platform]")?.value || "other_social",
         url: String(row.querySelector("[data-restaurant-social-url]")?.value || "").trim(),
     })).filter(item => item.url);
     hidden.value = JSON.stringify(links);
@@ -25988,7 +26073,7 @@ function addRecipeRestaurantSocialLink(button) {
     const editor = button?.closest("[data-restaurant-social-links-editor]");
     const rows = editor?.querySelector("[data-restaurant-social-links-rows]");
     if (!editor || !rows) return false;
-    const row = recipeRestaurantSocialLinkRow(editor, { platform: "other", url: "" });
+    const row = recipeRestaurantSocialLinkRow(editor, { platform: "other_social", url: "" });
     rows.append(row);
     row.querySelector("[data-restaurant-social-platform]")?.focus();
     return false;
@@ -26005,6 +26090,124 @@ function removeRecipeRestaurantSocialLink(button) {
         );
     }
     syncRecipeRestaurantSocialLinks(editor);
+    return false;
+}
+
+function recipeRestaurantOrderingLinkRow(editor, link = {}) {
+    const row = document.createElement("div");
+    row.className = "recipe-edit-restaurant-social-row recipe-edit-restaurant-ordering-row";
+    row.dataset.restaurantOrderingLinkRow = "1";
+    row.dataset.restaurantOrderingProviderName = link.provider_name || "";
+    row.dataset.restaurantOrderingSourceUrl = link.source_url || "";
+
+    const provider = document.createElement("select");
+    provider.setAttribute("aria-label", "Ordering or delivery provider");
+    provider.dataset.restaurantOrderingProvider = "1";
+    recipeRestaurantOrderingProviders.forEach(([value, label]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        provider.append(option);
+    });
+    provider.value = link.provider || "other";
+
+    const url = document.createElement("input");
+    url.type = "url";
+    url.placeholder = "https://order.example.com/restaurant";
+    url.setAttribute("aria-label", "Ordering or delivery URL");
+    url.dataset.restaurantOrderingUrl = "1";
+    url.value = link.url || "";
+
+    const activeLabel = document.createElement("label");
+    activeLabel.className = "recipe-edit-restaurant-ordering-active";
+    const active = document.createElement("input");
+    active.type = "checkbox";
+    active.checked = link.is_active !== false;
+    active.dataset.restaurantOrderingActive = "1";
+    active.setAttribute("aria-label", "Ordering link is active");
+    const activeText = document.createElement("span");
+    activeText.textContent = "Active";
+    activeLabel.append(active, activeText);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", "Remove ordering link");
+    remove.addEventListener("click", () => removeRecipeRestaurantOrderingLink(remove));
+
+    [provider, url, active].forEach(control => control.addEventListener("input", () => syncRecipeRestaurantOrderingLinks(editor)));
+    provider.addEventListener("change", () => syncRecipeRestaurantOrderingLinks(editor));
+    active.addEventListener("change", () => syncRecipeRestaurantOrderingLinks(editor));
+    row.append(provider, url, activeLabel, remove);
+    return row;
+}
+
+function hydrateRecipeRestaurantOrderingLinks(form, value) {
+    const editor = form?.querySelector("[data-restaurant-ordering-links-editor]");
+    const rows = editor?.querySelector("[data-restaurant-ordering-links-rows]");
+    if (!editor || !rows) return;
+    rows.replaceChildren();
+    const links = normalizeRecipeRestaurantOrderingLinks(value);
+    (links.length ? links : [{ provider: "official_online_ordering", url: "", is_active: true }]).forEach(link => {
+        rows.append(recipeRestaurantOrderingLinkRow(editor, link));
+    });
+    syncRecipeRestaurantOrderingLinks(editor, { updateState: false });
+}
+
+function syncRecipeRestaurantOrderingLinks(editor, options = {}) {
+    const form = editor?.closest("[data-restaurant-edit-form]");
+    const hidden = editor?.querySelector('[data-restaurant-edit-field="restaurant_ordering_links"]');
+    if (!form || !hidden) return;
+    const rows = Array.from(editor.querySelectorAll("[data-restaurant-ordering-link-row]"));
+    const providerCounts = rows.reduce((counts, row) => {
+        const provider = row.querySelector("[data-restaurant-ordering-provider]")?.value || "other";
+        if (provider !== "other") counts.set(provider, (counts.get(provider) || 0) + 1);
+        return counts;
+    }, new Map());
+    rows.forEach(row => {
+        const control = row.querySelector("[data-restaurant-ordering-provider]");
+        const duplicate = control?.value !== "other" && providerCounts.get(control?.value) > 1;
+        control?.setCustomValidity(duplicate ? "This ordering provider is already listed." : "");
+    });
+    const links = rows.map(row => {
+        const provider = row.querySelector("[data-restaurant-ordering-provider]")?.value || "other";
+        return {
+            provider,
+            url: String(row.querySelector("[data-restaurant-ordering-url]")?.value || "").trim(),
+            is_active: Boolean(row.querySelector("[data-restaurant-ordering-active]")?.checked),
+            ...(provider === "other" && row.dataset.restaurantOrderingProviderName
+                ? { provider_name: row.dataset.restaurantOrderingProviderName }
+                : {}),
+            ...(row.dataset.restaurantOrderingSourceUrl ? { source_url: row.dataset.restaurantOrderingSourceUrl } : {}),
+        };
+    }).filter(item => item.url);
+    hidden.value = JSON.stringify(links);
+    if (options.updateState !== false) updateRecipeRestaurantEditState(form);
+}
+
+function addRecipeRestaurantOrderingLink(button) {
+    const editor = button?.closest("[data-restaurant-ordering-links-editor]");
+    const rows = editor?.querySelector("[data-restaurant-ordering-links-rows]");
+    if (!editor || !rows) return false;
+    const usedProviders = new Set(Array.from(rows.querySelectorAll("[data-restaurant-ordering-provider]"), control => control.value));
+    const provider = recipeRestaurantOrderingProviders.find(([key]) => key === "other" || !usedProviders.has(key))?.[0] || "other";
+    const row = recipeRestaurantOrderingLinkRow(editor, { provider, url: "", is_active: true });
+    rows.append(row);
+    row.querySelector("[data-restaurant-ordering-provider]")?.focus();
+    return false;
+}
+
+function removeRecipeRestaurantOrderingLink(button) {
+    const editor = button?.closest("[data-restaurant-ordering-links-editor]");
+    const row = button?.closest("[data-restaurant-ordering-link-row]");
+    if (!editor || !row) return false;
+    row.remove();
+    if (!editor.querySelector("[data-restaurant-ordering-link-row]")) {
+        editor.querySelector("[data-restaurant-ordering-links-rows]")?.append(
+            recipeRestaurantOrderingLinkRow(editor, { provider: "official_online_ordering", url: "", is_active: true })
+        );
+    }
+    syncRecipeRestaurantOrderingLinks(editor);
     return false;
 }
 
@@ -26329,6 +26532,7 @@ function populateRecipeRestaurantEditForm(record, options = {}) {
         else if (field === "restaurant_logo_data_url") savedValue = "";
         else if (field === "restaurant_logo_action") savedValue = "keep";
         else if (field === "restaurant_social_links") savedValue = JSON.stringify(recipeRestaurantSocialLinksFromRecord(record));
+        else if (field === "restaurant_ordering_links") savedValue = JSON.stringify(recipeRestaurantOrderingLinksFromRecord(record));
         else if (field === "restaurant_active_promotions") savedValue = recipeRestaurantActivePromotionsFromRecord(record);
         else if (field === "restaurant_ordering_provider_urls") savedValue = recipeRestaurantStructuredArray(
             record?.restaurant_ordering_provider_urls ?? record?.ordering_provider_urls ?? []
@@ -26353,6 +26557,7 @@ function populateRecipeRestaurantEditForm(record, options = {}) {
     });
     bindRecipeRestaurantEditFields(form);
     hydrateRecipeRestaurantSocialLinks(form, recipeRestaurantSocialLinksFromRecord(record));
+    hydrateRecipeRestaurantOrderingLinks(form, recipeRestaurantOrderingLinksFromRecord(record));
     closeRecipeRestaurantLogoChooser(form.querySelector("[data-restaurant-logo-chooser]"));
     hydrateRecipeRestaurantStructuredHours(form, record || {});
     updateRecipeRestaurantEditState(form);
@@ -27151,8 +27356,8 @@ const recipeRestaurantFetchFieldDefinitions = {
     reservations: { label: "Reservations", field: "restaurant_reservation_available" },
     promotions: { label: "Promotions", field: "restaurant_active_promotions" },
     social_urls: { label: "Social links", field: "restaurant_social_links" },
-    ordering_provider_urls: { label: "Ordering provider URLs", field: "restaurant_ordering_provider_urls" },
-    ordering_providers: { label: "Ordering provider records", field: "restaurant_ordering_providers" },
+    ordering_provider_urls: { label: "Ordering & delivery links", field: "restaurant_ordering_links" },
+    ordering_providers: { label: "Ordering & delivery providers", field: "restaurant_ordering_links" },
     allergy_information_note: { label: "Allergy information", field: "restaurant_allergy_information_note" },
     restaurant_note: { label: "Restaurant note", field: "restaurant_note_text" },
 };
@@ -27592,6 +27797,33 @@ function applyRecipeRestaurantScanValuesToForm(form, appliedValues = {}) {
         if (!input) return;
         if (key === "social_urls") {
             hydrateRecipeRestaurantSocialLinks(form, proposedValue);
+            const orderingFromSocial = normalizeRecipeRestaurantOrderingLinks(
+                recipeRestaurantStructuredArray(proposedValue).filter(item => (
+                    recipeRestaurantOrderingProviderForUrl(item?.url || item?.href || item)
+                ))
+            );
+            if (orderingFromSocial.length) {
+                const current = recipeRestaurantStructuredArray(
+                    form.querySelector('[data-restaurant-edit-field="restaurant_ordering_links"]')?.value
+                );
+                hydrateRecipeRestaurantOrderingLinks(form, [...current, ...orderingFromSocial]);
+            }
+            updatedFields.push(key);
+            return;
+        }
+        if (["ordering_provider_urls", "ordering_providers"].includes(key)) {
+            const current = recipeRestaurantStructuredArray(
+                form.querySelector('[data-restaurant-edit-field="restaurant_ordering_links"]')?.value
+            );
+            const proposed = recipeRestaurantStructuredArray(proposedValue).map((item, index) => {
+                if (key !== "ordering_provider_urls" || (item && typeof item === "object")) return item;
+                return {
+                    provider: recipeRestaurantOrderingProviderForUrl(item) || (index === 0 ? "official_online_ordering" : "other"),
+                    url: item,
+                    is_active: true,
+                };
+            });
+            hydrateRecipeRestaurantOrderingLinks(form, [...current, ...proposed]);
             updatedFields.push(key);
             return;
         }
@@ -27600,10 +27832,8 @@ function applyRecipeRestaurantScanValuesToForm(form, appliedValues = {}) {
             value = proposedValue === true || String(proposedValue) === "true"
                 ? "true"
                 : proposedValue === false || String(proposedValue) === "false" ? "false" : "";
-        } else if (["promotions", "ordering_provider_urls"].includes(key) && Array.isArray(value)) {
+        } else if (key === "promotions" && Array.isArray(value)) {
             value = value.map(item => recipeMenuMetadataText(item)).filter(Boolean).join("\n");
-        } else if (key === "ordering_providers" && value && typeof value === "object") {
-            value = JSON.stringify(value, null, 2);
         } else if (value && typeof value === "object") {
             value = JSON.stringify(value);
         }
@@ -27624,7 +27854,7 @@ function applyRecipeRestaurantScanValuesToForm(form, appliedValues = {}) {
         const details = form.querySelector("[data-restaurant-advanced-media]");
         if (details) details.open = true;
     }
-    if (["reservations", "ordering_provider_urls", "ordering_providers", "allergy_information_note"].some(
+    if (["reservations", "allergy_information_note"].some(
         key => Object.prototype.hasOwnProperty.call(appliedValues, key)
     )) {
         const details = form.querySelector("[data-restaurant-additional-raw-data]");

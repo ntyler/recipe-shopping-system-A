@@ -34632,6 +34632,35 @@ img[data-deferred-src] {
     align-items: center;
 }
 
+.recipe-edit-restaurant-ordering-editor {
+    margin-top: 2px;
+}
+
+.recipe-edit-restaurant-ordering-row {
+    grid-template-columns: minmax(145px, .42fr) minmax(0, 1fr) auto auto;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-form .recipe-edit-restaurant-ordering-active {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    gap: 7px;
+    padding: 0 8px;
+    white-space: nowrap;
+}
+
+.recipe-edit-standalone-page .recipe-edit-restaurant-form .recipe-edit-restaurant-ordering-active input {
+    width: 18px;
+    min-height: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--app-accent);
+}
+
+.recipe-edit-restaurant-ordering-row select:invalid {
+    border-color: #f2b84b;
+}
+
 .recipe-edit-standalone-page .recipe-edit-restaurant-form label small {
     color: #aeb8b2;
     font-size: 12px;

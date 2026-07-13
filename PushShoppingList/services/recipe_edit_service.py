@@ -2283,7 +2283,7 @@ def parse_recipe_menu_json_list(value):
 
 
 def normalize_editable_restaurant_social_links(value):
-    supported = {"facebook", "instagram", "tiktok", "x", "youtube", "other"}
+    supported = {"facebook", "instagram", "tiktok", "x", "youtube", "linkedin", "other_social"}
     links = []
     seen = set()
     for item in parse_recipe_menu_json_list(value):
@@ -2292,14 +2292,104 @@ def normalize_editable_restaurant_social_links(value):
         if not url:
             continue
         platform = clean_recipe_menu_text(item.get("platform") or item.get("type")).lower()
+        if editable_restaurant_ordering_provider_for_url(url):
+            continue
+        if platform == "other":
+            platform = "other_social"
         if platform not in supported:
-            platform = "other"
+            platform = "other_social"
         key = url.casefold()
         if key in seen:
             continue
         seen.add(key)
         links.append({"platform": platform, "url": url})
     return links
+
+
+EDITABLE_RESTAURANT_ORDERING_PROVIDER_LABELS = {
+    "official_online_ordering": "Official Online Ordering",
+    "doordash": "DoorDash",
+    "grubhub": "Grubhub",
+    "uber_eats": "Uber Eats",
+    "postmates": "Postmates",
+    "slice": "Slice",
+    "chownow": "ChowNow",
+    "toast": "Toast",
+    "square_online": "Square Online",
+    "clover": "Clover",
+    "other": "Other",
+}
+
+
+def editable_restaurant_ordering_provider_for_url(value):
+    try:
+        hostname = (urlparse(clean_recipe_menu_text(value)).hostname or "").casefold().removeprefix("www.")
+    except ValueError:
+        return ""
+    domain_map = (
+        (("doordash.com",), "doordash"),
+        (("grubhub.com",), "grubhub"),
+        (("ubereats.com", "uber.com"), "uber_eats"),
+        (("postmates.com",), "postmates"),
+        (("slicelife.com",), "slice"),
+        (("chownow.com",), "chownow"),
+        (("toasttab.com",), "toast"),
+        (("square.site", "squareup.com"), "square_online"),
+        (("clover.com",), "clover"),
+    )
+    for domains, provider in domain_map:
+        if any(hostname == domain or hostname.endswith(f".{domain}") for domain in domains):
+            return provider
+    return ""
+
+
+def normalize_editable_restaurant_ordering_links(value):
+    links = []
+    seen_urls = set()
+    seen_providers = set()
+    for item in parse_recipe_menu_json_list(value):
+        item = item if isinstance(item, dict) else {"url": item}
+        url = clean_recipe_menu_text(item.get("url") or item.get("website_url") or item.get("href"))
+        if not url:
+            continue
+        provider = re.sub(
+            r"[\s-]+", "_", clean_recipe_menu_text(
+                item.get("provider") or item.get("provider_key") or item.get("provider_name") or item.get("platform")
+            ).casefold()
+        )
+        if provider not in EDITABLE_RESTAURANT_ORDERING_PROVIDER_LABELS:
+            provider = editable_restaurant_ordering_provider_for_url(url) or "other"
+        url_key = url.casefold()
+        if url_key in seen_urls or (provider != "other" and provider in seen_providers):
+            continue
+        active = item.get("is_active", item.get("active", True))
+        is_active = not (active is False or clean_recipe_menu_text(active).casefold() == "false")
+        provider_name = clean_recipe_menu_text(item.get("provider_name"))
+        source_url = clean_recipe_menu_text(item.get("source_url"))
+        normalized = {"provider": provider, "url": url, "is_active": is_active}
+        if provider == "other" and provider_name:
+            normalized["provider_name"] = provider_name
+        if source_url:
+            normalized["source_url"] = source_url
+        links.append(normalized)
+        seen_urls.add(url_key)
+        if provider != "other":
+            seen_providers.add(provider)
+    return links
+
+
+def editable_restaurant_ordering_links_from_record(restaurant):
+    restaurant = restaurant if isinstance(restaurant, dict) else {}
+    combined = []
+    combined.extend(parse_recipe_menu_json_list(restaurant.get("ordering_delivery_links")))
+    combined.extend(parse_recipe_menu_json_list(restaurant.get("ordering_links")))
+    combined.extend(parse_recipe_menu_json_list(restaurant.get("ordering_providers")))
+    combined.extend(parse_recipe_menu_json_list(restaurant.get("ordering_provider_urls")))
+    for item in parse_recipe_menu_json_list(restaurant.get("social_links") or restaurant.get("social_urls")):
+        url = item.get("url") if isinstance(item, dict) else item
+        if editable_restaurant_ordering_provider_for_url(url):
+            combined.append(item)
+    return normalize_editable_restaurant_ordering_links(combined)
 
 
 def editable_menu_source_option_value(restaurant_id="", menu_id=""):
@@ -2425,6 +2515,35 @@ def normalize_editable_restaurant_store_metadata(payload):
         if restaurant.get("current_status") != normalized_status:
             restaurant["current_status"] = normalized_status
             changed = True
+        ordering_links = editable_restaurant_ordering_links_from_record(restaurant)
+        social_links = normalize_editable_restaurant_social_links(
+            restaurant.get("social_links") or restaurant.get("social_urls") or []
+        )
+        compatibility_providers = [
+            {
+                "provider": item["provider"],
+                "provider_name": item.get("provider_name") or EDITABLE_RESTAURANT_ORDERING_PROVIDER_LABELS[item["provider"]],
+                "provider_type": "ordering_provider",
+                "website_url": item["url"],
+                "is_active": item["is_active"],
+                **({"source_url": item["source_url"]} if item.get("source_url") else {}),
+            }
+            for item in ordering_links
+        ]
+        for field, normalized_value in (
+            ("social_links", social_links),
+            ("social_urls", [item["url"] for item in social_links]),
+            ("ordering_delivery_links", ordering_links),
+        ):
+            if restaurant.get(field) != normalized_value:
+                restaurant[field] = normalized_value
+                changed = True
+        if "ordering_provider_urls" not in restaurant:
+            restaurant["ordering_provider_urls"] = [item["url"] for item in ordering_links]
+            changed = True
+        if "ordering_providers" not in restaurant:
+            restaurant["ordering_providers"] = compatibility_providers
+            changed = True
     return changed
 
 
@@ -2540,6 +2659,7 @@ def editable_menu_source_option_from_records(restaurant, menu):
         "restaurant_rating_count": clean_recipe_menu_text(restaurant.get("rating_count")),
         "restaurant_social_links": restaurant.get("social_links") if isinstance(restaurant.get("social_links"), list) else [],
         "restaurant_social_urls": restaurant.get("social_urls") if isinstance(restaurant.get("social_urls"), list) else [],
+        "restaurant_ordering_links": editable_restaurant_ordering_links_from_record(restaurant),
         "restaurant_ordering_provider_urls": restaurant.get("ordering_provider_urls") if isinstance(restaurant.get("ordering_provider_urls"), list) else [],
         "restaurant_ordering_providers": restaurant.get("ordering_providers") if isinstance(restaurant.get("ordering_providers"), list) else [],
         "restaurant_allergy_information_note": clean_recipe_menu_text(restaurant.get("allergy_information_note")),
@@ -2718,6 +2838,31 @@ def validate_editable_restaurant_values(values):
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             return "Each Social Link must be a valid http or https URL."
 
+    raw_ordering_links = parse_recipe_menu_json_list(values.get("restaurant_ordering_links"))
+    seen_ordering_urls = set()
+    seen_ordering_providers = set()
+    for item in raw_ordering_links:
+        item = item if isinstance(item, dict) else {"url": item}
+        url = clean_recipe_menu_text(item.get("url") or item.get("website_url") or item.get("href"))
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return "Each Ordering & Delivery Link must be a valid http or https URL."
+        provider = re.sub(
+            r"[\s-]+", "_", clean_recipe_menu_text(
+                item.get("provider") or item.get("provider_key") or item.get("provider_name")
+            ).casefold()
+        )
+        if provider not in EDITABLE_RESTAURANT_ORDERING_PROVIDER_LABELS:
+            provider = editable_restaurant_ordering_provider_for_url(url) or "other"
+        url_key = url.casefold()
+        if url_key in seen_ordering_urls:
+            return "Each Ordering & Delivery Link URL may only be listed once."
+        if provider != "other" and provider in seen_ordering_providers:
+            return f"{EDITABLE_RESTAURANT_ORDERING_PROVIDER_LABELS[provider]} may only be listed once."
+        seen_ordering_urls.add(url_key)
+        if provider != "other":
+            seen_ordering_providers.add(provider)
+
     for url in split_recipe_menu_text_list(values.get("restaurant_ordering_provider_urls")):
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -2793,14 +2938,39 @@ def apply_editable_restaurant_values(restaurant, values):
             coordinate = clean_recipe_menu_text(values.get(source_field))
             restaurant[store_field] = float(coordinate) if coordinate else None
 
+    legacy_ordering_from_social = []
     if "restaurant_social_links" in values:
-        social_links = normalize_editable_restaurant_social_links(values.get("restaurant_social_links"))
+        raw_social_links = parse_recipe_menu_json_list(values.get("restaurant_social_links"))
+        legacy_ordering_from_social = [
+            item for item in raw_social_links
+            if editable_restaurant_ordering_provider_for_url(item.get("url") if isinstance(item, dict) else item)
+        ]
+        social_links = normalize_editable_restaurant_social_links(raw_social_links)
         restaurant["social_links"] = social_links
         restaurant["social_urls"] = [item["url"] for item in social_links]
-    if "restaurant_ordering_provider_urls" in values:
-        restaurant["ordering_provider_urls"] = split_recipe_menu_text_list(values.get("restaurant_ordering_provider_urls"))
-    if "restaurant_ordering_providers" in values:
-        restaurant["ordering_providers"] = parse_recipe_menu_json_list(values.get("restaurant_ordering_providers"))
+    ordering_fields_supplied = any(field in values for field in (
+        "restaurant_ordering_links", "restaurant_ordering_provider_urls", "restaurant_ordering_providers"
+    )) or bool(legacy_ordering_from_social)
+    if ordering_fields_supplied:
+        ordering_values = []
+        ordering_values.extend(parse_recipe_menu_json_list(values.get("restaurant_ordering_links")))
+        ordering_values.extend(parse_recipe_menu_json_list(values.get("restaurant_ordering_providers")))
+        ordering_values.extend(parse_recipe_menu_json_list(values.get("restaurant_ordering_provider_urls")))
+        ordering_values.extend(legacy_ordering_from_social)
+        ordering_links = normalize_editable_restaurant_ordering_links(ordering_values)
+        restaurant["ordering_delivery_links"] = ordering_links
+        restaurant["ordering_provider_urls"] = [item["url"] for item in ordering_links]
+        restaurant["ordering_providers"] = [
+            {
+                "provider": item["provider"],
+                "provider_name": item.get("provider_name") or EDITABLE_RESTAURANT_ORDERING_PROVIDER_LABELS[item["provider"]],
+                "provider_type": "ordering_provider",
+                "website_url": item["url"],
+                "is_active": item["is_active"],
+                **({"source_url": item["source_url"]} if item.get("source_url") else {}),
+            }
+            for item in ordering_links
+        ]
 
     if "restaurant_online_payment_available" in values:
         restaurant["online_payment_available"] = parse_recipe_menu_bool(values.get("restaurant_online_payment_available"))
@@ -2900,6 +3070,7 @@ def apply_editable_restaurant_values(restaurant, values):
         "promotions": [],
         "social_links": [],
         "social_urls": [],
+        "ordering_delivery_links": [],
         "ordering_provider_urls": [],
         "ordering_providers": [],
         "allergy_information_note": None,

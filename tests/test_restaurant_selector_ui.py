@@ -185,7 +185,7 @@ def test_restaurant_scan_review_formats_provider_results_and_equivalent_values()
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert 'ordering_providers: { label: "Ordering provider records", field: "restaurant_ordering_providers" }' in script
+    assert 'ordering_providers: { label: "Ordering & delivery providers", field: "restaurant_ordering_links" }' in script
     assert 'allergy_information_note: { label: "Allergy information", field: "restaurant_allergy_information_note" }' in script
     assert 'restaurant_note: { label: "Restaurant note", field: "restaurant_note_text" }' in script
     assert "function recipeRestaurantFetchCandidateHtml(key, candidate)" in script
@@ -287,7 +287,7 @@ def test_restaurant_scan_fields_have_editable_form_destinations():
         "restaurant_pickup_available", "restaurant_rewards_program", "restaurant_active_promotions",
         "restaurant_latitude", "restaurant_longitude", "restaurant_logo_url",
         "restaurant_reservation_available", "restaurant_allergy_information_note",
-        "restaurant_ordering_provider_urls", "restaurant_ordering_providers",
+        "restaurant_ordering_links",
     ):
         assert f'data-restaurant-edit-field="{field}"' in template
 
@@ -298,6 +298,11 @@ def test_restaurant_scan_fields_have_editable_form_destinations():
     assert "X / Twitter" in script and "YouTube" in script and "Other" in script
     assert "function addRecipeRestaurantSocialLink(button)" in script
     assert "function removeRecipeRestaurantSocialLink(button)" in script
+    assert "Ordering &amp; Delivery Links" in template
+    assert "+ Add Ordering Link" in template
+    assert "function addRecipeRestaurantOrderingLink(button)" in script
+    assert "function removeRecipeRestaurantOrderingLink(button)" in script
+    assert 'ordering_provider_urls: { label: "Ordering & delivery links", field: "restaurant_ordering_links" }' in script
     assert 'social_urls: { label: "Social links", field: "restaurant_social_links" }' in script
     assert 'restaurant_note: { label: "Restaurant note", field: "restaurant_note_text" }' in script
     assert 'rating_count: { label: "Rating count" }' in script

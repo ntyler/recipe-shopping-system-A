@@ -333,7 +333,7 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
         "restaurant_online_payment_available", "restaurant_online_ordering_available",
         "restaurant_pickup_available", "restaurant_delivery_available",
         "restaurant_reservation_available", "restaurant_allergy_information_note",
-        "restaurant_ordering_provider_urls", "restaurant_ordering_providers",
+        "restaurant_ordering_links",
     ):
         assert f'data-restaurant-edit-field="{field}"' in template
     assert "data-restaurant-edit-form" in template

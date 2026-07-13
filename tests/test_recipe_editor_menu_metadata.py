@@ -1276,6 +1276,59 @@ def test_restaurant_scan_destination_fields_round_trip_through_normalized_record
     assert "Lunch special" in loaded["restaurant_promotions"]
 
 
+def test_ordering_delivery_links_round_trip_and_migrate_legacy_social_domains(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "Ordering Cafe"})
+    restaurant_id = created["restaurant"]["restaurant_id"]
+
+    updated = recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Ordering Cafe",
+        "restaurant_social_links": json.dumps([
+            {"platform": "instagram", "url": "https://instagram.com/orderingcafe"},
+            {"platform": "other_social", "url": "https://www.doordash.com/store/ordering-cafe"},
+        ]),
+        "restaurant_ordering_links": json.dumps([
+            {"provider": "official_online_ordering", "url": "https://ordering.example/order", "is_active": True},
+            {"provider": "grubhub", "url": "https://www.grubhub.com/restaurant/ordering-cafe", "is_active": False},
+        ]),
+    })
+
+    assert updated["ok"] is True
+    stored = menu_store_service.restaurant_for(menu_store_service.load_menu_store(), restaurant_id)
+    loaded = recipe_edit_service.get_editable_restaurant(restaurant_id)["restaurant"]
+    assert stored["social_urls"] == ["https://instagram.com/orderingcafe"]
+    assert [item["provider"] for item in stored["ordering_delivery_links"]] == [
+        "official_online_ordering", "grubhub", "doordash",
+    ]
+    assert stored["ordering_delivery_links"][1]["is_active"] is False
+    assert loaded["restaurant_ordering_links"] == stored["ordering_delivery_links"]
+    assert stored["ordering_provider_urls"] == [item["url"] for item in stored["ordering_delivery_links"]]
+
+
+def test_ordering_delivery_links_reject_duplicate_provider_and_invalid_url(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "Validation Cafe"})
+    restaurant_id = created["restaurant"]["restaurant_id"]
+    duplicate = recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Validation Cafe",
+        "restaurant_ordering_links": json.dumps([
+            {"provider": "doordash", "url": "https://doordash.com/store/one"},
+            {"provider": "doordash", "url": "https://doordash.com/store/two"},
+        ]),
+    })
+    invalid = recipe_edit_service.update_editable_restaurant(restaurant_id, {
+        "restaurant_name": "Validation Cafe",
+        "restaurant_ordering_links": json.dumps([
+            {"provider": "toast", "url": "not-a-url"},
+        ]),
+    })
+
+    assert duplicate["ok"] is False
+    assert "DoorDash may only be listed once" in duplicate["error"]
+    assert invalid["ok"] is False
+    assert "valid http or https URL" in invalid["error"]
+
+
 def test_structured_restaurant_hours_and_online_ordering_save_without_overwriting_raw(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     created = recipe_edit_service.create_editable_restaurant({"restaurant_name": "Structured Cafe"})

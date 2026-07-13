@@ -2430,13 +2430,22 @@
                                         <label><span>Pickup</span><select data-restaurant-edit-field="restaurant_pickup_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
                                         <label><span>Delivery</span><select data-restaurant-edit-field="restaurant_delivery_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
                                     </div>
+                                    <section class="recipe-edit-restaurant-social-editor recipe-edit-restaurant-ordering-editor recipe-edit-restaurant-form-wide" data-restaurant-ordering-links-editor>
+                                        <div class="recipe-edit-restaurant-social-header">
+                                            <div>
+                                                <strong>Ordering &amp; Delivery Links</strong>
+                                                <small>Add official ordering, pickup, and delivery services.</small>
+                                            </div>
+                                            <button type="button" onclick="return addRecipeRestaurantOrderingLink(this)">+ Add Ordering Link</button>
+                                        </div>
+                                        <div class="recipe-edit-restaurant-social-rows" data-restaurant-ordering-links-rows></div>
+                                        <input type="hidden" data-restaurant-edit-field="restaurant_ordering_links" value="[]">
+                                    </section>
                                     <details class="recipe-edit-restaurant-raw-hours recipe-edit-restaurant-form-wide" data-restaurant-additional-raw-data>
                                         <summary>Advanced Raw Data</summary>
                                         <div class="recipe-edit-restaurant-raw-data-grid">
                                             <label><span>Reservations</span><select data-restaurant-edit-field="restaurant_reservation_available"><option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
                                             <label class="recipe-edit-restaurant-form-wide"><span>Allergy Information Note</span><textarea rows="2" data-restaurant-edit-field="restaurant_allergy_information_note"></textarea></label>
-                                            <label class="recipe-edit-restaurant-form-wide"><span>Ordering Provider URLs</span><textarea rows="3" data-restaurant-edit-field="restaurant_ordering_provider_urls" placeholder="One URL per line"></textarea></label>
-                                            <label class="recipe-edit-restaurant-form-wide"><span>Ordering Provider Records</span><textarea rows="3" data-restaurant-edit-field="restaurant_ordering_providers" placeholder="Scan-provided provider data"></textarea></label>
                                         </div>
                                     </details>
                                 </div>
