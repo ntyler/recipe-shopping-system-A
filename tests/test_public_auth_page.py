@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from PushShoppingList.app import create_app
@@ -123,6 +124,48 @@ def test_public_auth_copy_features_footer_and_provider_claims_are_truthful(monke
     assert "&copy; 2026 AI Pantry" in html
     for fabricated_stat in ("10,000+", "5,000+", "2,000+", "99.9%"):
         assert fabricated_stat not in html
+
+
+def test_public_auth_feature_icons_match_reference_mapping():
+    template = (ROOT / "PushShoppingList/templates/public_auth.html").read_text(encoding="utf-8")
+    icon_macros = (ROOT / "PushShoppingList/templates/includes/app_shell_macros.html").read_text(
+        encoding="utf-8"
+    )
+    app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    expected_icons = (
+        ("recipe-document-linked", "Import Anything"),
+        ("brain", "AI-Powered"),
+        ("shopping-cart", "Smart Shopping"),
+        ("clipboard-checklist", "Meal Planning"),
+        ("sparkles", "Learn &amp; Improve"),
+        ("lock", "Private &amp; Secure"),
+    )
+
+    feature_grid = template[
+        template.index('class="public-auth-feature-grid"'):
+        template.index('data-public-auth-privacy')
+    ]
+    for icon_name, title in expected_icons:
+        assert re.search(
+            rf'svg_icon\("{re.escape(icon_name)}"\).*?<strong>{re.escape(title)}</strong>',
+            feature_grid,
+            re.DOTALL,
+        )
+
+    for obsolete_icon in ("infer-sparkles", "shield-check", "meal"):
+        assert f'svg_icon("{obsolete_icon}")' not in feature_grid
+    for new_icon in ("recipe-document-linked", "brain", "shopping-cart", "clipboard-checklist"):
+        assert f'elif name == "{new_icon}"' in icon_macros
+
+    feature_icon_css = app_css[
+        app_css.index(".public-auth-feature-icon {"):
+        app_css.index(".public-auth-feature > span:last-child")
+    ]
+    assert "width: 58px;" in feature_icon_css
+    assert "height: 58px;" in feature_icon_css
+    assert "width: 28px;" in feature_icon_css
+    assert "height: 28px;" in feature_icon_css
+    assert "stroke-width: 1.8;" in feature_icon_css
 
 
 def test_auth_card_defaults_to_single_sign_in_mode_and_keeps_auth_contracts(monkeypatch, tmp_path):
