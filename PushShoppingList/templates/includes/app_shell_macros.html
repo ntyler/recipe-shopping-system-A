@@ -254,11 +254,15 @@
         <circle cx="156" cy="67" r="3"></circle>
         <circle cx="30" cy="104" r="2.5"></circle>
     </g>
-    <path class="public-auth-privacy-art-shield"
-          d="M126 20 164 36v29c0 25-14.5 43-38 54-23.5-11-38-29-38-54V36Z"></path>
-    <path class="public-auth-privacy-art-highlight"
-          d="M126 28v80c18.4-9.8 29-24.6 29-43V42Z"></path>
-    <path class="public-auth-privacy-art-check" d="m106 67 13 13 27-29"></path>
+    <g class="public-auth-privacy-art-shield-layers" transform="rotate(-2 126 69)">
+        <path class="public-auth-privacy-art-shield"
+              d="M126 18 166 35v30c0 26-15.5 45-40 56-24.5-11-40-30-40-56V35Z"></path>
+        <path class="public-auth-privacy-art-shield-inner"
+              d="M126 29 156 42v23c0 19.5-11 34-30 44-19-10-30-24.5-30-44V42Z"></path>
+        <path class="public-auth-privacy-art-shield-facet"
+              d="M126 29 156 42v23c0 19.5-11 34-30 44Z"></path>
+        <path class="public-auth-privacy-art-check" d="m106 67 13 13 28-31"></path>
+    </g>
 </svg>
 {%- endmacro %}
 

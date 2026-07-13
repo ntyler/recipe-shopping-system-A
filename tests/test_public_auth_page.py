@@ -230,6 +230,41 @@ def test_public_auth_circled_icons_match_reference_without_changing_behavior():
     assert "pointer-events: none;" in app_css
 
 
+def test_privacy_art_uses_opaque_layered_shield_with_explicit_dark_theme_colors():
+    icon_macros = (ROOT / "PushShoppingList/templates/includes/app_shell_macros.html").read_text(
+        encoding="utf-8"
+    )
+    app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    artwork = icon_macros[
+        icon_macros.index("macro privacy_shield_art()"):
+        icon_macros.index("macro app_icon(name)")
+    ]
+    artwork_css = app_css[
+        app_css.index(".public-auth-privacy-art {"):
+        app_css.index(".public-auth-privacy-card h2")
+    ]
+
+    for layer in (
+        "public-auth-privacy-art-shield-layers",
+        "public-auth-privacy-art-shield",
+        "public-auth-privacy-art-shield-inner",
+        "public-auth-privacy-art-shield-facet",
+        "public-auth-privacy-art-check",
+    ):
+        assert layer in artwork
+        assert f".{layer}" in artwork_css
+    assert 'transform="rotate(-2 126 69)"' in artwork
+    assert "public-auth-privacy-art-highlight" not in artwork
+    assert '--public-privacy-art-outer: #158b3b;' in artwork_css
+    assert '--public-privacy-art-inner: #68d67d;' in artwork_css
+    assert '--public-privacy-art-check: #08712c;' in artwork_css
+    assert 'html[data-public-auth-theme="dark"] .public-auth-privacy-art' in artwork_css
+    assert '--public-privacy-art-outer: #08713a;' in artwork_css
+    assert '--public-privacy-art-inner: #42c979;' in artwork_css
+    assert '--public-privacy-art-check: #063f22;' in artwork_css
+    assert "stroke-width: 6;" in artwork_css
+
+
 def test_auth_card_defaults_to_single_sign_in_mode_and_keeps_auth_contracts(monkeypatch, tmp_path):
     app = seeded_app(monkeypatch, tmp_path)
 
