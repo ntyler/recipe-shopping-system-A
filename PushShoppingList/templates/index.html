@@ -125,7 +125,7 @@ data-user-id="{{ current_user.user_id if current_user else '' }}"
                data-app-page-target="shoppingListsPage"
                data-app-nav-target="shoppingViewsSection"
                data-app-nav-lazy-section="recipe-view">
-                <span class="app-home-summary-icon">{{ shell.app_icon("shopping") }}</span>
+                <span class="app-home-summary-icon">{{ shell.dashboard_summary_icon("shopping-list") }}</span>
                 <span>My Shopping List</span>
                 <strong>{{ items|length }}</strong>
                 <small>item{% if (items|length) != 1 %}s{% endif %} ready to review</small>
@@ -137,7 +137,7 @@ data-user-id="{{ current_user.user_id if current_user else '' }}"
                data-app-page-target="recipesPage"
                data-app-nav-target="recipesPage"
                data-app-nav-lazy-section="current-recipes">
-                <span class="app-home-summary-icon">{{ shell.app_icon("recipes") }}</span>
+                <span class="app-home-summary-icon">{{ shell.dashboard_summary_icon("recipes") }}</span>
                 <span>My Recipes</span>
                 <strong>{{ current_recipe_count | default(0) }}</strong>
                 <small>saved recipe{% if (current_recipe_count | default(0)) != 1 %}s{% endif %}</small>
@@ -149,7 +149,7 @@ data-user-id="{{ current_user.user_id if current_user else '' }}"
                data-app-page-target="cookbooksPage"
                data-app-nav-target="cookbooksCard"
                data-app-nav-lazy-section="cookbooks">
-                <span class="app-home-summary-icon">{{ shell.app_icon("cookbooks") }}</span>
+                <span class="app-home-summary-icon">{{ shell.dashboard_summary_icon("cookbooks") }}</span>
                 <span>Cookbooks</span>
                 <strong>{{ cookbook_count | default(0) }}</strong>
                 <small>{{ cookbook_recipe_count | default(0) }} assigned recipe{% if (cookbook_recipe_count | default(0)) != 1 %}s{% endif %}</small>
@@ -161,7 +161,7 @@ data-user-id="{{ current_user.user_id if current_user else '' }}"
                data-app-page-target="pantryPage"
                data-app-nav-target="aiPantrySection"
                data-app-nav-lazy-section="pantry">
-                <span class="app-home-summary-icon">{{ shell.app_icon("pantry") }}</span>
+                <span class="app-home-summary-icon">{{ shell.dashboard_summary_icon("pantry") }}</span>
                 <span>Pantry Items</span>
                 <strong>{{ pantry_summary.total | default(0) }}</strong>
                 <small>{% if pantry_summary.running_low | default(0) %}{{ pantry_summary.running_low }} running low{% else %}inventory ready{% endif %}</small>

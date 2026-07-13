@@ -223,6 +223,38 @@ def test_home_template_has_supported_overflow_and_favorite_action():
     assert 'shell.svg_icon("heart")' in home
 
 
+def test_home_summary_cards_use_the_mockup_specific_svg_icons_only():
+    home = read_text("PushShoppingList/templates/index.html")
+    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
+    summary = home[
+        home.index('<div class="app-home-summary-grid">'):
+        home.index('<div class="app-home-primary-grid">')
+    ]
+
+    expected_calls = (
+        'shell.dashboard_summary_icon("shopping-list")',
+        'shell.dashboard_summary_icon("recipes")',
+        'shell.dashboard_summary_icon("cookbooks")',
+        'shell.dashboard_summary_icon("pantry")',
+    )
+    assert summary.count("shell.dashboard_summary_icon(") == 4
+    for call in expected_calls:
+        assert summary.count(call) == 1
+
+    assert 'shell.app_icon("shopping")' not in summary
+    assert 'shell.app_icon("recipes")' not in summary
+    assert 'shell.app_icon("cookbooks")' not in summary
+    assert 'shell.app_icon("pantry")' not in summary
+    assert home.count('shell.app_icon("pantry")') == 1
+
+    assert 'class="app-icon-svg app-dashboard-summary-icon-svg"' in macros
+    assert 'data-dashboard-summary-icon="{{ name }}"' in macros
+    assert '<circle cx="8" cy="21" r="1"></circle>' in macros
+    assert '<path d="M15 3v18"></path>' in macros
+    assert '<path d="M12 7v14"></path>' in macros
+    assert '<rect x="9" y="12" width="6" height="4" rx="1"></rect>' in macros
+
+
 def test_home_css_and_javascript_cover_fidelity_and_menu_interactions():
     template = read_text("PushShoppingList/templates/index.html")
     css = read_text("PushShoppingList/static/css/app.css")
