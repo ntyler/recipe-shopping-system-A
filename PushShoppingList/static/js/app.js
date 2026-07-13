@@ -25105,6 +25105,8 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
 
     optionRow.dataset.recipeEditCompactOption = "1";
     const detailFields = [
+        optionRow.querySelector(".recipe-edit-qty-label"),
+        optionRow.querySelector(".recipe-edit-unit-label"),
         optionRow.querySelector(".recipe-edit-preparation-inline"),
         optionRow.querySelector(".recipe-edit-original-text-label"),
         optionRow.querySelector(".recipe-edit-buy-as-label"),
@@ -25150,7 +25152,7 @@ function organizeRecipeEditIngredientRow(row) {
             .forEach(organizeRecipeEditSubstitutionOptionRow);
 
         optionsButton.classList.add("recipe-edit-ingredient-options-button");
-        optionsButton.innerHTML = '<span data-ingredient-options-label>Options</span>';
+        optionsButton.innerHTML = `<span data-ingredient-options-label>Options</span>${recipeEditSvgIcon("chevron-down")}`;
 
         const actionGroups = Array.from(rowMenu.children)
             .filter(child => child.classList && child.classList.contains("recipe-edit-menu-group"));
@@ -25177,7 +25179,7 @@ function organizeRecipeEditIngredientRow(row) {
         const details = document.createElement("details");
         details.className = "recipe-edit-ingredient-advanced-details";
         details.innerHTML = `
-            <summary>More fields</summary>
+            <summary>${recipeEditSvgIcon("chevron-down")}<span>More fields</span></summary>
             <div class="recipe-edit-ingredient-advanced-fields"></div>
         `;
         const body = details.querySelector(".recipe-edit-ingredient-advanced-fields");
@@ -30525,7 +30527,11 @@ function setRowFieldValue(row, field, value) {
 
     if (input) {
         input.value = value;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
+        const eventName = input.tagName === "SELECT" || input.type === "checkbox" ? "change" : "input";
+        input.dispatchEvent(new Event(eventName, { bubbles: true }));
+        if (field === "store_section") {
+            syncRecipeIngredientStoreSectionControl(input);
+        }
     }
 }
 
@@ -30533,6 +30539,8 @@ function recipeEditSvgIcon(name) {
     const icons = {
         drag: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="9" cy="5" r="1.5"></circle><circle cx="15" cy="5" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="19" r="1.5"></circle><circle cx="15" cy="19" r="1.5"></circle></svg>',
         leaf: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 19c8 0 14-6 14-14C11 5 5 11 5 19Z"></path><path d="M5 19c3-4 7-7 12-10"></path></svg>',
+        dairy: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 3h7l1 4 2 2v12H6V9l2-2Z"></path><path d="M8 7h8"></path><path d="M9 11h6v6H9Z"></path></svg>',
+        can: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><ellipse cx="12" cy="5" rx="6" ry="2"></ellipse><path d="M6 5v14c0 1.1 2.7 2 6 2s6-.9 6-2V5"></path><path d="M6 19c0-1.1 2.7-2 6-2s6 .9 6 2"></path></svg>',
         jar: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 4h8l-1 3H9L8 4Z"></path><path d="M7 9h10l1 10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L7 9Z"></path><path d="M9 13h6"></path></svg>',
         basket: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M7 9 10 4"></path><path d="m17 9-3-5"></path><path d="M4 9h16l-2 10H6L4 9Z"></path><path d="M9 13v3"></path><path d="M15 13v3"></path></svg>',
         search: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>',
@@ -30542,6 +30550,7 @@ function recipeEditSvgIcon(name) {
         check: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>',
         warning: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>',
         x: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m6 6 12 12"></path><path d="m18 6-12 12"></path></svg>',
+        "chevron-down": '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>',
         lock: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>',
         bot: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3"></rect><path d="M12 3v4"></path><path d="M8 12h.01"></path><path d="M16 12h.01"></path><path d="M9 16h6"></path></svg>',
     };
@@ -30593,6 +30602,71 @@ function recipeIngredientBadgesHtml(item = {}) {
     return badges.map(([label, kind]) => (
         `<span class="recipe-edit-ingredient-badge ${escapeAttribute(kind)}">${escapeHtml(label)}</span>`
     )).join("");
+}
+
+function recipeIngredientStoreSectionIconName(section) {
+    const value = String(section || "").trim().toUpperCase();
+    if (value === "PRODUCE") {
+        return "leaf";
+    }
+    if (value === "DAIRY & EGGS") {
+        return "dairy";
+    }
+    if (value === "CANNED") {
+        return "can";
+    }
+    if (value === "SPICES & SEASONINGS") {
+        return "jar";
+    }
+    return "basket";
+}
+
+function recipeIngredientStoreSectionIconHtml(section) {
+    const iconName = recipeIngredientStoreSectionIconName(section);
+    return `<span class="recipe-edit-store-section-icon is-${escapeAttribute(iconName)}"
+                  data-store-section-icon
+                  aria-hidden="true">${recipeEditSvgIcon(iconName)}</span>`;
+}
+
+function syncRecipeIngredientStoreSectionControl(select) {
+    const label = select ? select.closest(".recipe-edit-store-section-label") : null;
+    const icon = label ? label.querySelector("[data-store-section-icon]") : null;
+    if (icon) {
+        const replacement = document.createElement("span");
+        replacement.innerHTML = recipeIngredientStoreSectionIconHtml(select.value);
+        icon.replaceWith(replacement.firstElementChild);
+    }
+}
+
+function recipeIngredientTypeOptions(selected, optional = false) {
+    const rawValue = String(selected || "").trim();
+    const normalized = rawValue.toLowerCase();
+    const selectedValue = normalized || (optional ? "optional" : "main");
+    const standardOptions = ["main", "optional", "garnish", "substitute"];
+    const values = standardOptions.includes(selectedValue)
+        ? standardOptions
+        : [selectedValue, ...standardOptions];
+
+    return [...new Set(values)].map(value => {
+        const label = value.replace(/\b\w/g, letter => letter.toUpperCase());
+        return `<option value="${escapeAttribute(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("");
+}
+
+function ensureRecipeIngredientUnitOption(value) {
+    let list = document.getElementById("recipeIngredientUnitOptions");
+    if (!list) {
+        list = document.createElement("datalist");
+        list.id = "recipeIngredientUnitOptions";
+        document.body.appendChild(list);
+    }
+
+    const unit = String(value || "").trim();
+    if (unit && !Array.from(list.options).some(option => option.value.toLowerCase() === unit.toLowerCase())) {
+        const option = document.createElement("option");
+        option.value = unit;
+        list.appendChild(option);
+    }
 }
 
 function recipeIngredientExtractionWarning(item = {}) {
@@ -30665,6 +30739,28 @@ function recipeIngredientSubstitutionsText(item = {}) {
     return recipeIngredientSubstitutions(item).join("\n");
 }
 
+function recipeIngredientSubstitutionMatchQuality(option = {}) {
+    const raw = String(
+        option.match_quality
+        || option.quality
+        || option.confidence_label
+        || option.confidence
+        || "medium"
+    ).trim().toLowerCase();
+
+    if (["best", "best match", "exact", "high", "strong"].includes(raw)) {
+        return { label: "Best match", className: "best" };
+    }
+    if (["low", "weak", "acceptable"].includes(raw)) {
+        return { label: "Acceptable", className: "acceptable" };
+    }
+    return { label: "Good", className: "good" };
+}
+
+function recipeIngredientSubstitutionRatio(option = {}) {
+    return String(option.ratio || option.substitution_ratio || option.conversion_ratio || "").trim();
+}
+
 function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
     const baseQuantity = option.base_quantity !== undefined && option.base_quantity !== null
         ? option.base_quantity
@@ -30673,11 +30769,27 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
         ? option.base_unit
         : option.unit || "";
     const optionNumber = String(index + 1);
+    const optionImageUrl = option.ingredient_image_url || option.image_url || "";
+    const optionImageDisplayUrl = recipeImageVariantUrl(optionImageUrl, "thumb");
+    const optionImageSrcSet = recipeImageVariantSrcSet(optionImageUrl);
+    const matchQuality = recipeIngredientSubstitutionMatchQuality(option);
+    const ratio = recipeIngredientSubstitutionRatio(option);
+    ensureRecipeIngredientUnitOption(option.unit || "");
 
     return `
         <div class="recipe-edit-substitution-option-row recipe-edit-ingredient-row" data-substitution-option-row>
             <span class="recipe-edit-row-handle recipe-edit-substitution-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
             <span class="recipe-edit-row-number recipe-edit-substitution-row-number" data-substitution-row-number>${escapeHtml(optionNumber)}</span>
+            <span class="recipe-edit-substitution-thumbnail" aria-hidden="true">
+                ${optionImageUrl ? `
+                    <img src="${DEFERRED_IMAGE_PLACEHOLDER}"
+                         data-deferred-src="${escapeAttribute(optionImageDisplayUrl)}"
+                         ${optionImageSrcSet ? `data-deferred-srcset="${escapeAttribute(optionImageSrcSet)}"` : ""}
+                         sizes="38px"
+                         alt=""
+                         loading="lazy"
+                         decoding="async">` : recipeEditSvgIcon(recipeIngredientStoreSectionIconName(option.store_section || ""))}
+            </span>
             <div class="recipe-edit-ingredient-name-label">
                 <span class="sr-only">Substitution ingredient</span>
                 <span class="recipe-edit-ingredient-title-line">
@@ -30685,6 +30797,10 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
                     <span class="recipe-edit-ingredient-markers">
                         <span class="recipe-edit-ingredient-badges" data-substitution-badges>${recipeIngredientBadgesHtml(option)}</span>
                     </span>
+                </span>
+                <span class="recipe-edit-substitution-summary-meta">
+                    <span class="recipe-edit-substitution-ratio" ${ratio ? "" : "hidden"}>${escapeHtml(ratio)}</span>
+                    <span class="recipe-edit-substitution-quality is-${escapeAttribute(matchQuality.className)}">${escapeHtml(matchQuality.label)}</span>
                 </span>
                 <label class="recipe-edit-preparation-inline">
                     <span class="sr-only">Preparation</span>
@@ -30701,7 +30817,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
             </label>
             <label class="recipe-edit-unit-label">
                 <span>Unit</span>
-                <input type="text" data-field="unit" value="${escapeAttribute(option.unit || "")}">
+                <input type="text" data-field="unit" list="recipeIngredientUnitOptions" value="${escapeAttribute(option.unit || "")}">
             </label>
             <label class="recipe-edit-buy-as-label">
                 <span>Buy As</span>
@@ -30807,8 +30923,9 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     const extractionWarning = recipeIngredientExtractionWarning(item);
     const substitutionOptions = recipeIngredientSubstitutionRows(item);
     const substitutionCountText = substitutionOptions.length ? `(${substitutionOptions.length})` : "";
-    const ingredientType = item.section || item.ingredient_type || item.type || "";
+    const ingredientType = item.section || item.ingredient_type || item.type || (item.optional ? "optional" : "main");
     const recipeUrl = recipeEditorCurrentUrl();
+    ensureRecipeIngredientUnitOption(item.unit || "");
     const ingredientImagePanelHtml = `
             <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-ingredient-image-panel${ingredientImageUrl ? "" : " recipe-image-empty"}"
                  data-ingredient-image-panel
@@ -30913,13 +31030,19 @@ function addRecipeIngredientRow(item = {}, options = {}) {
             </span>
             <div class="recipe-edit-ingredient-substitutions" data-ingredient-substitutions ${substitutionOptions.length ? "" : "hidden"}>
                 <div class="recipe-edit-substitution-heading">
-                    <span>Substitutions / Options</span>
+                    <span data-ingredient-substitution-title>Substitutions</span>
                     <span data-ingredient-substitution-count>${escapeHtml(substitutionCountText)}</span>
                     <button type="button" onclick="return addRecipeIngredientSubstitutionRow(this)">Add Option</button>
                 </div>
                 <div class="recipe-edit-substitution-list" data-ingredient-substitution-list>
                     ${recipeIngredientSubstitutionOptionsHtml(item)}
                 </div>
+                <button type="button"
+                        class="recipe-edit-substitution-view-all"
+                        data-ingredient-substitution-view-all
+                        onclick="return viewAllRecipeIngredientSubstitutions(this)">
+                    View all <span data-ingredient-substitution-view-all-count>${substitutionOptions.length}</span> substitutions
+                </button>
             </div>
             <span class="recipe-edit-extraction-warning" data-ingredient-warning-message ${extractionWarning ? "" : "hidden"}>
                 ${escapeHtml(extractionWarning)}
@@ -30932,7 +31055,11 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         </label>
         <label class="recipe-edit-unit-label">
             <span>Unit</span>
-            <input type="text" data-field="unit" value="${escapeAttribute(item.unit || "")}">
+            <input type="text"
+                   data-field="unit"
+                   list="recipeIngredientUnitOptions"
+                   value="${escapeAttribute(item.unit || "")}">
+            <span class="recipe-edit-unit-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
         </label>
         <label class="recipe-edit-buy-as-label">
             <span>Buy As</span>
@@ -30945,14 +31072,12 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         </label>
         <label class="recipe-edit-section-label">
             <span>Type</span>
-            <input type="text"
-                   data-field="section"
-                   placeholder="main, sauce, garnish"
-                   value="${escapeAttribute(ingredientType)}">
+            <select data-field="section">${recipeIngredientTypeOptions(ingredientType, Boolean(item.optional))}</select>
         </label>
         <label class="recipe-edit-store-section-label">
-            <span>Store Section</span>
-            <select data-field="store_section">${recipeStoreSectionOptions(item.store_section || "")}</select>
+            <span class="sr-only">Store Section</span>
+            ${recipeIngredientStoreSectionIconHtml(item.store_section || "")}
+            <select data-field="store_section" onchange="syncRecipeIngredientStoreSectionControl(this)">${recipeStoreSectionOptions(item.store_section || "")}</select>
         </label>
         <label class="recipe-edit-check-label recipe-edit-optional-label">
             <span>Optional</span>
@@ -31139,6 +31264,9 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     const container = scope ? scope.querySelector("[data-ingredient-substitutions]") : null;
     const list = scope ? scope.querySelector("[data-ingredient-substitution-list]") : null;
     const count = scope ? scope.querySelector("[data-ingredient-substitution-count]") : null;
+    const title = scope ? scope.querySelector("[data-ingredient-substitution-title]") : null;
+    const viewAll = scope ? scope.querySelector("[data-ingredient-substitution-view-all]") : null;
+    const viewAllCount = scope ? scope.querySelector("[data-ingredient-substitution-view-all-count]") : null;
     const optionRows = list ? [...list.querySelectorAll("[data-substitution-option-row]")] : [];
 
     optionRows.forEach((optionRow, index) => {
@@ -31158,12 +31286,26 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         count.textContent = optionRows.length ? `(${optionRows.length})` : "";
     }
 
+    if (title) {
+        const ingredientField = row ? row.querySelector('[data-field="ingredient"]') : null;
+        const ingredientName = String(ingredientField ? ingredientField.value : "").trim();
+        title.textContent = ingredientName ? `Substitutions for ${ingredientName}` : "Substitutions";
+    }
+
+    if (viewAll) {
+        viewAll.hidden = optionRows.length === 0 || Boolean(container && container.classList.contains("show-all"));
+    }
+    if (viewAllCount) {
+        viewAllCount.textContent = String(optionRows.length);
+    }
+
     const optionsButton = row ? row.querySelector(".recipe-edit-ingredient-options-button") : null;
     if (optionsButton) {
         const label = optionsButton.querySelector("[data-ingredient-options-label]");
+        const optionalField = row ? row.querySelector('[data-field="optional"]') : null;
         const optionLabel = `${optionRows.length} option${optionRows.length === 1 ? "" : "s"}`;
         if (label) {
-            label.textContent = optionRows.length ? optionLabel : "Options";
+            label.textContent = optionRows.length ? optionLabel : (optionalField && optionalField.checked ? "Optional" : "Options");
         }
         optionsButton.setAttribute("aria-label", optionRows.length
             ? `View ${optionLabel} for this ingredient`
@@ -31274,16 +31416,16 @@ function replaceRecipeIngredientWithSubstitution(button) {
 
 function viewAllRecipeIngredientSubstitutions(button) {
     const row = recipeIngredientParentRowFromControl(button);
-    const substitutions = row ? row.querySelector("[data-ingredient-substitutions]") : null;
-
-    closeRecipeEditRowMenus();
+    const optionsMenu = recipeIngredientOptionsMenuForRow(row, button);
+    const substitutions = optionsMenu
+        ? optionsMenu.querySelector("[data-ingredient-substitutions]")
+        : (row ? row.querySelector("[data-ingredient-substitutions]") : null);
 
     if (substitutions) {
-        substitutions.hidden = false;
-        substitutions.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        const firstControl = substitutions.querySelector("button, input, textarea, select");
-        if (firstControl) {
-            firstControl.focus({ preventScroll: true });
+        substitutions.classList.add("show-all");
+        updateRecipeIngredientSubstitutionState(row, button);
+        if (optionsMenu && optionsMenu.recipeEditAnchorButton) {
+            positionRecipeEditPopupMenu(optionsMenu, optionsMenu.recipeEditAnchorButton);
         }
     }
 
@@ -31369,6 +31511,11 @@ function toggleRecipeEditRowMenu(button, event = null) {
     closeRecipeEditRowMenus();
 
     if (menu && shouldOpen) {
+        const ingredientOptionsPanel = menu.querySelector(".recipe-edit-ingredient-options-panel");
+        if (ingredientOptionsPanel) {
+            ingredientOptionsPanel.classList.remove("show-all");
+            updateRecipeIngredientSubstitutionState(row, button);
+        }
         updateRecipeIngredientRowCollapseToggle(row);
         updateRecipeEditRowImageMenu(row);
         updateCurrentRecipeUrlSummaryCollapseMenuToggle(row);
@@ -32203,7 +32350,8 @@ function updateRecipeIngredientsCollapsedToggle() {
     }
 
     if (icon) {
-        icon.textContent = collapsed ? "v" : "^";
+        icon.innerHTML = recipeEditSvgIcon("chevron-down");
+        icon.classList.toggle("is-expanded", !collapsed);
     }
 }
 
@@ -33286,7 +33434,8 @@ function recipeStoreSectionOptions(selected) {
     return sections.map(section => {
         const value = String(section || "");
         const isSelected = value.toUpperCase() === selectedValue ? " selected" : "";
-        return `<option value="${escapeAttribute(value)}"${isSelected}>${escapeHtml(value)}</option>`;
+        const label = value.toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+        return `<option value="${escapeAttribute(value)}"${isSelected}>${escapeHtml(label)}</option>`;
     }).join("");
 }
 

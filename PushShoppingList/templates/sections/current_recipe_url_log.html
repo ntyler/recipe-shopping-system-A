@@ -1633,19 +1633,21 @@
                     </div>
                     <div class="recipe-edit-section-actions recipe-edit-ingredient-actions">
                         <button type="button" onclick="addRecipeIngredientRow({}, { expanded: true })">
-                            <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
                             <span>Add Ingredient</span>
                         </button>
                         <button type="button" class="recipe-edit-ingredient-utility-action" onclick="return beginRecipeIngredientReorder(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("sort") }}</span>
                             <span>Reorder</span>
                         </button>
                         <button type="button" class="recipe-edit-ingredient-utility-action" onclick="return focusRecipeIngredientGrouping(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("folder") }}</span>
                             <span>Group</span>
                         </button>
                         <button type="button"
                                 data-recipe-ingredients-collapse-toggle
                                 onclick="toggleRecipeIngredientsCollapsed(this)">
-                            <span class="recipe-edit-button-icon" aria-hidden="true">v</span>
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
                             <span>Expand All</span>
                         </button>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-ingredients-menu-wrap">

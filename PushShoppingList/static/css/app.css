@@ -38629,29 +38629,29 @@ img[data-deferred-src] {
 .recipe-edit-standalone-page .recipe-edit-ingredient-table-head,
 .recipe-edit-standalone-page #recipeEditIngredients,
 .recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
-    min-width: 640px;
+    min-width: 670px;
 }
 
 .recipe-edit-standalone-page .recipe-edit-ingredient-table-head,
 .recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
-    grid-template-columns: 16px 34px minmax(140px, 1fr) 46px 54px 94px 66px 72px 30px 30px !important;
+    grid-template-columns: 16px 38px minmax(150px, 1fr) 46px 58px 100px 70px 78px 30px 30px !important;
     gap: 5px;
 }
 
 .recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-row-menu-wrap {
     grid-column: 8 !important;
-    width: 72px;
+    width: 78px;
 }
 
 .recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button {
-    width: 72px;
-    min-width: 72px;
-    padding: 0 7px;
+    width: 78px;
+    min-width: 78px;
+    padding: 0 6px 0 8px;
     border: 1px solid var(--app-border);
     border-radius: 6px;
     background: var(--app-bg-soft);
     color: var(--app-text);
-    font-size: 8px;
+    font-size: 9px;
     font-weight: 750;
     white-space: nowrap;
 }
@@ -38661,9 +38661,23 @@ img[data-deferred-src] {
 }
 
 .recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button > span {
-    display: block;
+    display: block !important;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button .recipe-edit-inline-icon {
+    display: inline-flex;
+    width: 13px;
+    min-width: 13px;
+    height: 13px;
+    margin-left: auto;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button .recipe-edit-inline-icon svg {
+    width: 13px;
+    height: 13px;
 }
 
 .recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button:hover,
@@ -38907,6 +38921,441 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions-body {
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions .recipe-edit-menu-group {
     padding: 4px 0;
+}
+
+/* Ingredients mockup fidelity: compact rows, category controls, and option summaries. */
+.recipe-edit-standalone-page .recipe-edit-ingredient-table-head {
+    align-items: center;
+    min-height: 24px;
+    padding: 0 4px 5px;
+    font-size: 8px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+    align-items: center;
+    padding: 6px 4px !important;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > :is(
+    .recipe-edit-ingredient-name-label,
+    .recipe-edit-qty-label,
+    .recipe-edit-unit-label,
+    .recipe-edit-store-section-label,
+    .recipe-edit-section-label,
+    .recipe-edit-row-menu-wrap,
+    .recipe-edit-compact-row-actions > button
+) {
+    align-self: center;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-title-line textarea[data-field="ingredient"] {
+    min-height: 32px;
+    height: 32px !important;
+    padding: 6px 7px;
+    border-radius: 6px;
+    font-size: 10px;
+    line-height: 18px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-markers {
+    margin-top: 3px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-badge {
+    min-height: 16px;
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-size: 7px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > :is(
+    .recipe-edit-qty-label,
+    .recipe-edit-unit-label,
+    .recipe-edit-store-section-label,
+    .recipe-edit-section-label
+) :is(input, select) {
+    min-height: 32px;
+    height: 32px;
+    padding: 4px 6px;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background-color: var(--app-bg-soft);
+    color: var(--app-text);
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-unit-label input {
+    padding-right: 17px;
+    appearance: none;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-unit-label {
+    position: relative;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-unit-chevron {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    z-index: 1;
+    display: inline-flex;
+    width: 12px;
+    height: 12px;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    color: var(--app-muted);
+    white-space: normal;
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-unit-chevron .recipe-edit-inline-icon,
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-unit-chevron svg {
+    width: 12px;
+    height: 12px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-store-section-label {
+    position: relative;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-icon {
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    z-index: 1;
+    display: inline-flex;
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    color: #94a3b8;
+    white-space: normal;
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-icon svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-icon.is-leaf { color: #4ade80; }
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-icon.is-dairy { color: #60a5fa; }
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-icon.is-can { color: #fb923c; }
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-icon.is-jar { color: #f87171; }
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-store-section-label select {
+    padding-left: 25px;
+    padding-right: 18px;
+    text-overflow: ellipsis;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-section-label select {
+    padding-right: 18px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-ingredient-image-panel.recipe-edit-row-image-panel {
+    width: 34px;
+    max-width: 34px;
+    border-radius: 6px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-ingredient-image-panel:not(.recipe-image-tools-visible) .recipe-ingredient-image {
+    width: 34px;
+    height: 34px;
+    border-radius: 5px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-row-number {
+    width: 34px;
+    height: 34px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 32px;
+    height: 32px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-actions > button {
+    width: 30px;
+    min-width: 30px;
+    height: 32px;
+    min-height: 32px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-advanced-details {
+    margin-top: 1px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-advanced-details > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-height: 18px;
+    padding: 0;
+    list-style: none;
+    font-size: 8px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-advanced-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-advanced-details > summary .recipe-edit-inline-icon {
+    width: 10px;
+    height: 10px;
+    transition: transform 150ms ease;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-advanced-details > summary .recipe-edit-inline-icon svg {
+    width: 10px;
+    height: 10px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-advanced-details[open] > summary .recipe-edit-inline-icon {
+    transform: rotate(180deg);
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-advanced-fields {
+    margin-top: 4px;
+    padding: 8px;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-surface-soft);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-row-menu.recipe-edit-ingredient-row-menu {
+    width: min(380px, calc(100vw - 24px));
+    min-width: min(380px, calc(100vw - 24px));
+    padding: 0;
+    border-radius: 8px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-row-menu > .recipe-edit-ingredient-options-panel {
+    gap: 0;
+    padding: 0;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-heading {
+    display: flex;
+    min-height: 46px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--app-border);
+    font-size: 11px;
+    font-weight: 850;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-heading > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-heading > span:nth-child(2),
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-heading > button {
+    display: none;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-list {
+    border: 0;
+    border-radius: 0;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel:not(.show-all) .recipe-edit-substitution-option-row:nth-child(n + 4) {
+    display: none;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-option-row {
+    grid-template-columns: 38px minmax(0, 1fr) 30px !important;
+    min-height: 58px !important;
+    padding: 8px 10px !important;
+    gap: 9px;
+    align-items: center;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-handle,
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-row-number {
+    display: none;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-thumbnail {
+    grid-column: 1;
+    grid-row: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: var(--app-bg-soft);
+    color: var(--app-muted);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-thumbnail .recipe-edit-inline-icon,
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-thumbnail svg {
+    width: 18px;
+    height: 18px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-ingredient-name-label {
+    grid-column: 2;
+    grid-row: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 8px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-ingredient-title-line {
+    min-width: 0;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel textarea[data-field="ingredient"] {
+    min-height: 22px;
+    height: 22px !important;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-ingredient-markers {
+    display: none;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-summary-meta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-ratio,
+body.recipe-edit-standalone-page .recipe-edit-substitution-quality {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 8px;
+    font-weight: 800;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-ratio {
+    border: 1px solid var(--app-border);
+    color: var(--app-muted);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-quality {
+    background: rgba(34, 197, 94, .13);
+    color: #86efac;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-quality.is-acceptable {
+    background: rgba(245, 158, 11, .13);
+    color: #fcd34d;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-row-menu-wrap {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-details {
+    grid-column: 2 / 4;
+    grid-row: 2;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-view-all {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 0;
+    border-top: 1px solid var(--app-border);
+    border-radius: 0;
+    background: var(--app-bg-soft);
+    color: var(--app-text);
+    font-size: 9px;
+    font-weight: 800;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-view-all:hover,
+body.recipe-edit-standalone-page .recipe-edit-substitution-view-all:focus-visible {
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    outline: none;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions {
+    margin: 0 10px 8px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 34px;
+    padding: 7px 4px 0;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-footer-actions > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 5px;
+    border: 0;
+    background: transparent;
+    color: var(--app-text);
+    font-size: 9px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-footer-actions .recipe-edit-button-icon,
+.recipe-edit-standalone-page .recipe-edit-ingredient-footer-actions .app-icon-svg {
+    width: 15px;
+    height: 15px;
+}
+
+.recipe-edit-standalone-page [data-recipe-ingredients-collapse-toggle] .recipe-edit-button-icon {
+    transition: transform 150ms ease;
+}
+
+.recipe-edit-standalone-page [data-recipe-ingredients-collapse-toggle] .recipe-edit-button-icon.is-expanded {
+    transform: rotate(180deg);
+}
+
+@media (max-width: 760px) {
+    body.recipe-edit-standalone-page .recipe-edit-substitution-detail-fields {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-ingredient-image-panel.recipe-image-tools-visible {

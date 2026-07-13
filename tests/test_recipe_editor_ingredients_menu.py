@@ -87,7 +87,7 @@ def test_recipe_editor_ingredient_substitutions_are_wired():
     assert "recipe-edit-ingredient-substitutions" in row_block
     assert "recipe-edit-substitution-option-row recipe-edit-ingredient-row" in script
     assert "data-ingredient-substitution-list" in row_block
-    assert "Substitutions / Options" in row_block
+    assert "data-ingredient-substitution-title" in row_block
     assert "Add Option" in row_block
     assert "Add substitution option" in row_block
     assert 'data-field="substitutions_text"' not in row_block

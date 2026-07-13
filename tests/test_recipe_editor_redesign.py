@@ -720,7 +720,7 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     assert "overflow-x: hidden;" in panel_rule
     assert "overflow-x: auto;" in table_rule
     assert "overscroll-behavior-inline: contain;" in table_rule
-    assert "min-width: 640px;" in v4_css
+    assert "min-width: 670px;" in v4_css
 
     tools_start = script.index("function organizeRecipeEditIngredientTools()")
     tools_end = script.index("function organizeRecipeEditEquipmentTools()", tools_start)
@@ -742,13 +742,51 @@ def test_recipe_editor_ingredient_options_use_compact_anchored_menu():
     assert 'optionsButton.classList.add("recipe-edit-ingredient-options-button")' in organize
     assert "More ingredient actions" in organize
     assert "organizeRecipeEditSubstitutionOptionRow" in script
-    assert 'label.textContent = optionRows.length ? optionLabel : "Options";' in script
+    assert 'label.textContent = optionRows.length ? optionLabel : (optionalField && optionalField.checked ? "Optional" : "Options");' in script
 
     v4_css = css[css.index("/* Recipe workspace v4: homepage alignment and compact tab editors. */"):]
-    assert "grid-template-columns: 16px 34px minmax(140px, 1fr) 46px 54px 94px 66px 72px 30px 30px !important;" in v4_css
+    assert "grid-template-columns: 16px 38px minmax(150px, 1fr) 46px 58px 100px 70px 78px 30px 30px !important;" in v4_css
     assert ".recipe-edit-ingredient-options-button" in v4_css
     assert ".recipe-edit-ingredient-options-panel" in v4_css
-    assert "width: min(430px, calc(100vw - 24px));" in v4_css
+    assert "width: min(380px, calc(100vw - 24px));" in v4_css
+
+
+def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert '{{ shell.svg_icon("plus") }}' in template
+    assert '{{ shell.svg_icon("sort") }}' in template
+    assert '{{ shell.svg_icon("folder") }}' in template
+    assert '{{ shell.svg_icon("chevron-down") }}' in template
+    for icon_name in ("drag", "leaf", "dairy", "can", "jar", "edit", "trash", "chevron-down"):
+        assert f"{icon_name}:" in script or f'"{icon_name}":' in script
+    assert "function recipeIngredientStoreSectionIconName" in script
+    assert "function syncRecipeIngredientStoreSectionControl" in script
+    assert "function recipeIngredientTypeOptions" in script
+    assert '<select data-field="section">${recipeIngredientTypeOptions' in script
+    assert 'class="recipe-edit-store-section-icon' in script
+    assert ".recipe-edit-store-section-icon.is-leaf" in css
+    assert ".recipe-edit-store-section-icon.is-dairy" in css
+    assert ".recipe-edit-store-section-icon.is-can" in css
+    assert ".recipe-edit-store-section-icon.is-jar" in css
+
+
+def test_recipe_editor_substitution_popover_uses_mockup_summary_hierarchy():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert "Substitutions for ${ingredientName}" in script
+    assert 'class="recipe-edit-substitution-thumbnail"' in script
+    assert 'class="recipe-edit-substitution-ratio"' in script
+    assert 'class="recipe-edit-substitution-quality' in script
+    assert "Best match" in script
+    assert "Acceptable" in script
+    assert 'data-ingredient-substitution-view-all' in script
+    assert "optionRows.length === 0" in script
+    assert ".recipe-edit-substitution-option-row:nth-child(n + 4)" in css
+    assert ".recipe-edit-substitution-view-all" in css
 
 
 def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization():
