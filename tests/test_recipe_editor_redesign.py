@@ -755,7 +755,7 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     assert "tableScroll.appendChild(ingredientList);" in tools_block
 
 
-def test_recipe_editor_ingredient_options_use_compact_anchored_menu():
+def test_recipe_editor_ingredient_options_use_inline_accessible_disclosure():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
 
@@ -763,17 +763,23 @@ def test_recipe_editor_ingredient_options_use_compact_anchored_menu():
     organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
     organize = script[organize_start:organize_end]
     assert 'substitutions.classList.add("recipe-edit-ingredient-options-panel")' in organize
-    assert "rowMenu.insertBefore(substitutions, rowMenu.firstChild);" in organize
-    assert 'optionsButton.classList.add("recipe-edit-ingredient-options-button")' in organize
-    assert "More ingredient actions" in organize
+    assert "row.appendChild(substitutions);" in organize
+    assert "substitutions.hidden = true;" in organize
+    assert 'optionsCell.className = "recipe-edit-ingredient-substitution-cell";' in organize
+    assert 'optionsCell.setAttribute("role", "cell");' in organize
+    assert 'optionsButton.className = "recipe-edit-ingredient-options-button";' in organize
+    assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organize
+    assert "toggleRecipeIngredientSubstitutions(optionsButton, event)" in organize
     assert "organizeRecipeEditSubstitutionOptionRow" in script
     assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
 
-    v4_css = css[css.index("/* Recipe workspace v4: homepage alignment and compact tab editors. */"):]
-    assert "grid-template-columns: 18px 40px minmax(210px, 1fr) 68px 104px 148px 88px 96px 30px 30px !important;" in v4_css
-    assert ".recipe-edit-ingredient-options-button" in v4_css
-    assert ".recipe-edit-ingredient-options-panel" in v4_css
-    assert "width: min(520px, calc(100vw - 24px));" in v4_css
+    v9_css = css[css.index("/* Ingredient editor v9:"):]
+    assert ".recipe-edit-ingredient-substitution-cell" in v9_css
+    assert "grid-column: 10 !important;" in v9_css
+    assert "> .recipe-edit-ingredient-options-panel" in v9_css
+    assert "grid-column: 1 / -1 !important;" in v9_css
+    assert "grid-row: 2 !important;" in v9_css
+    assert ".recipe-edit-ingredient-options-panel[hidden]" in v9_css
 
 
 def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls():
@@ -808,7 +814,9 @@ def test_recipe_editor_substitution_popover_uses_mockup_summary_hierarchy():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert "Substitutions for ${ingredientName}" in script
+    assert 'document.createTextNode("Alternatives for ")' in script
+    assert 'title.appendChild(name);' in script
+    assert "Add Alternative" in script
     assert 'class="recipe-edit-substitution-thumbnail"' in script
     assert 'class="recipe-edit-substitution-ratio"' in script
     assert 'class="recipe-edit-substitution-quality' in script

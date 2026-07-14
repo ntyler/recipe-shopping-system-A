@@ -93,7 +93,7 @@ def test_recipe_editor_ingredient_substitutions_are_wired():
     assert 'data-field="substitutions_text"' not in row_block
     assert "bindRecipeIngredientSubstitutionRows(row);" in row_block
     assert "data-ingredient-substitution-count" in row_block
-    assert 'badges.push([`${substitutionCount} Option${substitutionCount === 1 ? "" : "s"}`, "substitution"]);' in script
+    assert 'badges.push([`${substitutionCount} ${substitutionCount === 1 ? "option" : "alternatives"}`, "substitution"]);' in script
     assert "function recipeEditIngredientRows()" in script
     assert "function collectRecipeIngredientSubstitutionRows(row)" in script
     assert "item.substitutions = collectRecipeIngredientSubstitutionRows(row);" in collect_block
@@ -141,7 +141,7 @@ def test_recipe_editor_match_column_only_surfaces_attention_states():
         "Optional",
     ):
         assert status in badges
-    assert 'badges.push([`${substitutionCount} Option${substitutionCount === 1 ? "" : "s"}`, "substitution"]);' in badges
+    assert 'badges.push([`${substitutionCount} ${substitutionCount === 1 ? "option" : "alternatives"}`, "substitution"]);' in badges
 
     details_start = script.index("function recipeIngredientMatchDetails(item = {})")
     details_end = script.index("function recipeIngredientBadgesHtml", details_start)
@@ -417,12 +417,13 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     tools = script[tools_start:tools_end]
     assert 'tableScroll.setAttribute("role", "table");' in tools
     assert 'ingredientList.setAttribute("role", "rowgroup");' in tools
-    assert tools.count('role="columnheader"') == 10
+    assert tools.count('role="columnheader"') == 11
     assert '<span role="columnheader">Ingredient</span>' in tools
-    assert '<span role="columnheader">Match</span>' in tools
+    assert '<span role="columnheader">Match / Status</span>' in tools
     assert '<span role="columnheader">Amount</span>' in tools
+    assert '<span role="columnheader">Buy As</span>' in tools
     assert '<span role="columnheader">Store Section</span>' in tools
-    assert '<span role="columnheader">Options</span>' in tools
+    assert '<span role="columnheader">Substitutions</span>' in tools
     assert '<span role="columnheader">Actions</span>' in tools
     assert '<span class="sr-only">Drag</span>' in tools
     assert '<span class="sr-only">Image</span>' in tools
@@ -438,7 +439,7 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     assert 'row.querySelector(".recipe-edit-size-inline")' in organize
     assert 'row.querySelector(".recipe-edit-notes-inline")' in organize
     assert 'row.querySelector(".recipe-edit-preparation-inline")' in organize
-    assert 'row.querySelector(".recipe-edit-buy-as-label")' in organize
+    assert 'row.querySelector(":scope > .recipe-edit-buy-as-label")' in organize
     assert 'row.querySelector(".recipe-edit-optional-label")' in organize
     assert 'row.querySelector(".recipe-edit-original-text-label")' in organize
     assert 'details.id = `recipeEditIngredientDetails${recipeEditIngredientDetailsId}`;' in organize
@@ -623,16 +624,16 @@ def test_recipe_editor_substitutions_use_accessible_mini_table_without_losing_fi
     assert 'optionRow.setAttribute("role", "row");' in substitution
     assert 'cell.setAttribute("role", "cell")' in substitution
     for first_class_field in (
-        "recipe-edit-preparation-inline",
+        "recipe-edit-qty-label",
+        "recipe-edit-unit-label",
         "recipe-edit-buy-as-label",
         "recipe-edit-store-section-label",
-        "recipe-edit-optional-label",
     ):
         assert first_class_field in substitution
         assert first_class_field not in detail_fields
+    assert "preparation," in detail_fields
+    assert "optional," in detail_fields
     for secondary_field in (
-        "recipe-edit-qty-label",
-        "recipe-edit-unit-label",
         "recipe-edit-size-inline",
         "recipe-edit-notes-inline",
         "recipe-edit-original-text-label",
@@ -644,9 +645,7 @@ def test_recipe_editor_substitutions_use_accessible_mini_table_without_losing_fi
     organizer = script[organizer_start:organizer_end]
     assert 'substitutionTable.setAttribute("role", "table");' in organizer
     assert 'substitutionList.setAttribute("role", "rowgroup");' in organizer
-    header_labels = [
-        "Image", "Ingredient", "Match", "Preparation", "Buy As", "Store Section", "Optional", "Actions"
-    ]
+    header_labels = ["Alternative", "Ingredient", "Amount", "Unit", "Buy As", "Store Section", "Actions"]
     header_indexes = [organizer.index(f'<span role="columnheader">{label}</span>') for label in header_labels]
     assert header_indexes == sorted(header_indexes)
 
@@ -656,8 +655,50 @@ def test_recipe_editor_substitutions_use_accessible_mini_table_without_losing_fi
     assert ".recipe-edit-substitution-view-all" in polish
     assert "border-top: 1px solid var(--app-border-strong);" in polish
     assert "min-width: 1000px;" in polish
+    v9 = css[css.index("/* Ingredient editor v9:"):]
+    assert "min-width: 1180px;" in v9
+    assert ".recipe-edit-ingredient-options-panel .recipe-edit-ingredient-name-label" in v9
+    assert ".recipe-edit-ingredient-options-panel .recipe-edit-qty-label { grid-column: 4 !important; grid-row: 1 !important; }" in v9
+    assert ".recipe-edit-ingredient-options-panel .recipe-edit-unit-label { grid-column: 5 !important; grid-row: 1 !important; }" in v9
+    assert ".recipe-edit-substitution-details[hidden]" in v9
     assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
     assert '`${optionRows.length} substitution${optionRows.length === 1 ? "" : "s"}`' in script
+
+
+def test_recipe_editor_v9_matches_accepted_inline_alternatives_table():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    polish = css[css.index("/* Ingredient editor v9:"):]
+
+    expected_grid = """--recipe-edit-ingredient-grid:
+        28px
+        52px
+        minmax(220px, 1.3fr)
+        155px
+        72px
+        96px
+        minmax(150px, 1fr)
+        170px
+        110px
+        150px
+        88px;"""
+    assert expected_grid in polish
+    assert "min-width: 1444px;" in polish
+    assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in polish
+    for column in range(5, 10):
+        assert f"grid-column: {column} !important;" in polish
+    assert "grid-column: 10 !important;" in polish
+    assert "grid-column: 11 !important;" in polish
+    assert "overflow-x: auto;" in polish
+
+    assert "function toggleRecipeIngredientSubstitutions(button, event = null)" in script
+    assert 'otherContainer.hidden = true;' in script
+    assert 'button.setAttribute("aria-expanded", String(shouldOpen));' in script
+    assert 'row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);' in script
+    assert 'const isIngredientRow = label === "ingredient";' in script
+    assert 'actions.appendChild(menuWrap);' in script
+    assert 'class="recipe-edit-compact-row-delete"' in script
+    assert '${isIngredientRow ? "" : `<button type="button"' in script
 
 
 def test_recipe_editor_substitution_thumbnails_reuse_image_resolution_and_fallbacks():
