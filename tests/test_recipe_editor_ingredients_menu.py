@@ -439,6 +439,57 @@ def test_recipe_editor_ingredient_polish_uses_professional_grid_and_command_bar(
     assert 'title="Delete ${escapeAttribute(label)}"' in action_block
 
 
+def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8"
+    )
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    polish = css[css.index("/* Ingredient editor v7:"):]
+
+    assert 'class="recipe-edit-section-header ingredients-toolbar"' in template
+    assert "recipe-edit-ingredient-actions ingredients-toolbar-actions" in template
+    assert ".recipe-edit-ingredients-section > .ingredients-toolbar" in polish
+    assert "position: relative;" in polish
+    assert "justify-content: space-between;" in polish
+    assert "min-height: 48px;" in polish
+    assert "padding: 8px 16px;" in polish
+    assert ".ingredients-toolbar > .ingredients-toolbar-actions" in polish
+    assert "gap: 12px;" in polish
+
+    for column in (
+        "28px", "48px", "minmax(190px, 1.5fr)", "110px", "72px",
+        "160px", "136px", "104px",
+    ):
+        assert column in polish
+    assert "min-width: 1208px;" in polish
+    assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in polish
+    assert "min-width: 112px;" in polish
+    assert "width: 104px;" in polish
+    assert "width: 32px;" in polish
+    assert "height: 36px;" in polish
+
+    assert "width: min(680px, calc(100vw - 32px));" in polish
+    assert "min-width: min(620px, calc(100vw - 32px));" in polish
+    assert "minmax(130px, 1.4fr)" in polish
+    assert ".recipe-edit-buy-as-label" in polish
+    assert "min-width: 120px;" in polish
+    assert "overflow-wrap: break-word;" in polish
+    assert "word-break: normal;" in polish
+
+    position_start = script.index("function positionRecipeEditPopupMenu")
+    position_end = script.index("function portalRecipeEditPopupMenu", position_start)
+    position = script[position_start:position_end]
+    assert 'menu.classList.contains("recipe-edit-ingredient-row-menu")' in position
+    assert "const margin = isIngredientOptionsMenu ? 16 : 8;" in position
+    assert "const gap = isIngredientOptionsMenu ? 10 : 6;" in position
+    assert "buttonRect.left + menuWidth <= rightLimit" in position
+
+    assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
+    assert '`${optionRows.length} substitution${optionRows.length === 1 ? "" : "s"}`' in script
+    assert "document.body.appendChild(menu);" in script
+
+
 def test_recipe_editor_substitutions_use_accessible_mini_table_without_losing_fields():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

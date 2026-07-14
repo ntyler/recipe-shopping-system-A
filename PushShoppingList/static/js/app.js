@@ -33411,8 +33411,9 @@ function positionRecipeEditPopupMenu(menu, button) {
         return;
     }
 
-    const margin = 8;
-    const gap = 6;
+    const isIngredientOptionsMenu = menu.classList.contains("recipe-edit-ingredient-row-menu");
+    const margin = isIngredientOptionsMenu ? 16 : 8;
+    const gap = isIngredientOptionsMenu ? 10 : 6;
     const dialog = button.closest(".recipe-edit-dialog");
     const dialogRect = dialog
         ? dialog.getBoundingClientRect()
@@ -33441,6 +33442,9 @@ function positionRecipeEditPopupMenu(menu, button) {
     const rightLimit = window.innerWidth - margin;
 
     let left = buttonRect.right - menuWidth;
+    if (isIngredientOptionsMenu && left < margin && buttonRect.left + menuWidth <= rightLimit) {
+        left = buttonRect.left;
+    }
     left = Math.max(margin, Math.min(left, rightLimit - menuWidth));
 
     let top = buttonRect.bottom + gap;
