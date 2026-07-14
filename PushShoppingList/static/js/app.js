@@ -25667,11 +25667,8 @@ function organizeRecipeEditIngredientRow(row) {
         advancedFields.forEach(field => body.appendChild(field));
         const matchDetails = document.createElement("div");
         matchDetails.className = "recipe-edit-ingredient-match-details";
-        matchDetails.innerHTML = `
-            <span>Matching details</span>
-            <span class="recipe-edit-ingredient-badges" data-ingredient-all-badges></span>
-        `;
-        matchDetails.querySelector("[data-ingredient-all-badges]").innerHTML = recipeIngredientBadgesHtml(fieldValuesFromRow(row));
+        matchDetails.dataset.ingredientMatchDetails = "";
+        matchDetails.innerHTML = recipeIngredientMatchDetailsHtml(recipeIngredientMatchItemFromRow(row));
         body.appendChild(matchDetails);
         row.appendChild(details);
         details.addEventListener("toggle", () => updateRecipeEditIngredientDetailsState(row));
@@ -31894,12 +31891,275 @@ function recipeIngredientIconName(item = {}) {
     return "basket";
 }
 
+function recipeIngredientMatchSnapshot(item = {}) {
+    const source = item && typeof item === "object" ? item : {};
+    const snapshot = {};
+    [
+        "match_status",
+        "matching_status",
+        "match_confidence",
+        "master_match_confidence",
+        "normalization_confidence",
+        "matched_master_ingredient",
+        "master_ingredient_name",
+        "matched_ingredient",
+        "best_match",
+        "is_best_match",
+        "best_available_match",
+        "match_reason",
+        "matching_reason",
+        "match_source",
+        "matching_source",
+        "alternative_matches",
+        "match_alternatives",
+        "match_candidates",
+        "candidates",
+        "match_attempted",
+        "needs_match_review",
+        "review_match",
+        "multiple_matches",
+        "pantry_staple",
+        "is_pantry_staple",
+    ].forEach(key => {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+            snapshot[key] = source[key];
+        }
+    });
+    if (source.food_review && typeof source.food_review === "object") {
+        snapshot.food_review = source.food_review;
+    }
+    return snapshot;
+}
+
+function recipeIngredientMatchItemFromRow(row, values = null) {
+    let snapshot = {};
+    if (row && row.dataset.ingredientMatchDetails) {
+        try {
+            snapshot = JSON.parse(row.dataset.ingredientMatchDetails) || {};
+        } catch (err) {
+            snapshot = {};
+        }
+    }
+    const currentValues = values || (row ? fieldValuesFromRow(row) : {});
+    const foodReview = row ? recipeIngredientFoodReviewPayload(row) : null;
+    return {
+        ...snapshot,
+        ...currentValues,
+        food_review: foodReview || snapshot.food_review || null,
+    };
+}
+
+function recipeIngredientMatchFlag(value) {
+    if (value === true || value === 1) {
+        return true;
+    }
+    return ["1", "true", "yes", "on", "best", "best match"].includes(String(value || "").trim().toLowerCase());
+}
+
+function recipeIngredientMatchCandidateNames(value) {
+    const candidates = Array.isArray(value)
+        ? value
+        : (value ? String(value).split(/\r?\n|;/) : []);
+    const seen = new Set();
+    return candidates.map(candidate => {
+        if (candidate && typeof candidate === "object") {
+            return String(
+                candidate.ingredient
+                || candidate.name
+                || candidate.matched_ingredient
+                || candidate.master_ingredient_name
+                || candidate.purchasable_item
+                || ""
+            ).trim();
+        }
+        return String(candidate || "").trim();
+    }).filter(name => {
+        const key = name.toLowerCase();
+        if (!name || seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
+
+function recipeIngredientMatchCandidates(item = {}, options = {}) {
+    const explicit = item.alternative_matches
+        || item.match_alternatives
+        || item.match_candidates
+        || item.candidates
+        || [];
+    const names = recipeIngredientMatchCandidateNames(explicit);
+    if (options.includeFoodReview === false) {
+        return names;
+    }
+    const review = item.food_review && typeof item.food_review === "object" ? item.food_review : {};
+    recipeIngredientMatchCandidateNames(review.options || []).forEach(name => {
+        if (!names.some(existing => existing.toLowerCase() === name.toLowerCase())) {
+            names.push(name);
+        }
+    });
+    return names;
+}
+
+function recipeIngredientMatchConfidence(item = {}) {
+    const values = [
+        item.match_confidence,
+        item.master_match_confidence,
+        item.normalization_confidence,
+        item.confidence,
+        item.food_review && item.food_review.confidence,
+    ];
+    const raw = values.find(value => value !== undefined && value !== null && String(value).trim() !== "");
+    const text = String(raw === undefined ? "" : raw).trim();
+    const numeric = Number.parseFloat(text.replace(/%$/, ""));
+    let percent = null;
+    if (text && Number.isFinite(numeric)) {
+        percent = Math.max(0, Math.min(100, numeric <= 1 ? numeric * 100 : numeric));
+    }
+    return { raw: text, percent };
+}
+
+function recipeIngredientMatchDetails(item = {}) {
+    const status = String(item.match_status || item.matching_status || "").trim();
+    const statusKey = status.toLowerCase().replace(/[_-]+/g, " ");
+    const ingredient = String(item.ingredient || "").trim();
+    const purchasable = String(item.purchasable_item || item.buy_as || "").trim();
+    const selected = String(
+        item.matched_master_ingredient
+        || item.master_ingredient_name
+        || item.matched_ingredient
+        || purchasable
+        || ingredient
+        || ""
+    ).trim();
+    const confidence = recipeIngredientMatchConfidence(item);
+    const explicitCandidates = recipeIngredientMatchCandidates(item, { includeFoodReview: false });
+    const alternatives = recipeIngredientMatchCandidates(item).filter(name => name.toLowerCase() !== selected.toLowerCase());
+    const hasMasterMatch = Boolean(
+        item.ingredient_id
+        || item.master_ingredient_id
+        || item.matched_master_ingredient
+        || item.master_ingredient_name
+        || ["matched", "best", "best match", "exact"].includes(statusKey)
+    );
+    const hasMatchSignal = Boolean(
+        status
+        || item.match_confidence !== undefined
+        || item.master_match_confidence !== undefined
+        || item.normalization_confidence !== undefined
+        || (item.confidence !== undefined && String(item.confidence).trim() !== "")
+        || item.match_attempted !== undefined
+        || hasMasterMatch
+        || explicitCandidates.length
+    );
+    const hasExplicitBestStatus = ["best_match", "is_best_match", "best_available_match"]
+        .some(key => Object.prototype.hasOwnProperty.call(item, key));
+    const isBestAvailable = Boolean(
+        recipeIngredientMatchFlag(item.best_match)
+        || recipeIngredientMatchFlag(item.is_best_match)
+        || recipeIngredientMatchFlag(item.best_available_match)
+        || ["best", "best match", "exact"].includes(statusKey)
+        || (
+            !hasExplicitBestStatus
+            && hasMasterMatch
+            && !recipeIngredientMatchFlag(item.multiple_matches)
+            && !["multiple matches", "multiple", "ambiguous", "conflict"].includes(statusKey)
+        )
+    );
+    const explicitlyUnmatched = ["unmatched", "not matched", "no match", "missing"].includes(statusKey);
+    const explicitlyMultiple = recipeIngredientMatchFlag(item.multiple_matches)
+        || ["multiple matches", "multiple", "ambiguous", "conflict"].includes(statusKey);
+    const explicitlyReview = recipeIngredientMatchFlag(item.needs_match_review)
+        || recipeIngredientMatchFlag(item.review_match)
+        || ["review", "review match", "needs review", "pending review"].includes(statusKey);
+    const confidenceKey = confidence.raw.toLowerCase().replace(/[_-]+/g, " ");
+    const lowConfidence = ["low", "low confidence", "weak"].includes(statusKey)
+        || ["low", "low confidence", "weak"].includes(confidenceKey)
+        || (hasMatchSignal && confidence.percent !== null && confidence.percent < 60);
+    const mediumConfidence = hasMatchSignal
+        && (
+            ["medium", "moderate", "review"].includes(confidenceKey)
+            || (
+                confidence.percent !== null
+                && confidence.percent >= 60
+                && confidence.percent < 80
+            )
+        );
+    const ambiguousCandidates = explicitCandidates.length > 1
+        && (confidence.percent === null || confidence.percent < 80 || !isBestAvailable);
+    let attentionStatus = "";
+    if (explicitlyUnmatched) {
+        attentionStatus = "Unmatched";
+    } else if (explicitlyMultiple || ambiguousCandidates) {
+        attentionStatus = "Multiple Matches";
+    } else if (lowConfidence) {
+        attentionStatus = "Low Confidence";
+    } else if (explicitlyReview || mediumConfidence) {
+        attentionStatus = "Review Match";
+    } else if (ingredient && !hasMasterMatch) {
+        attentionStatus = "Unmatched";
+    }
+    const review = item.food_review && typeof item.food_review === "object" ? item.food_review : {};
+    const source = String(item.match_source || item.matching_source || review.source || "").trim();
+    const reason = String(item.match_reason || item.matching_reason || review.reason || "").trim();
+    const displayStatus = attentionStatus
+        || (hasMasterMatch || isBestAvailable ? "Matched" : (hasMatchSignal ? "Not matched" : "Not evaluated"));
+    return {
+        selected: attentionStatus === "Unmatched" ? "" : selected,
+        confidence,
+        isBestAvailable,
+        alternatives,
+        source,
+        reason,
+        attentionStatus,
+        displayStatus,
+    };
+}
+
+function recipeIngredientMatchConfidenceLabel(confidence = {}) {
+    if (confidence.percent !== null && confidence.percent !== undefined) {
+        return `${Math.round(confidence.percent)}%`;
+    }
+    if (confidence.raw) {
+        return confidence.raw.charAt(0).toUpperCase() + confidence.raw.slice(1);
+    }
+    return "Not provided";
+}
+
+function recipeIngredientMatchDetailsHtml(item = {}) {
+    const match = recipeIngredientMatchDetails(item);
+    const sourceReason = [match.source, match.reason].filter(Boolean).join(" · ") || "Not provided";
+    return `
+        <span class="recipe-edit-ingredient-match-details-title">Matching details</span>
+        <dl class="recipe-edit-ingredient-match-details-grid">
+            <div><dt>Status</dt><dd>${escapeHtml(match.displayStatus)}</dd></div>
+            <div><dt>Selected matched ingredient</dt><dd>${escapeHtml(match.selected || "Not matched")}</dd></div>
+            <div><dt>Match confidence</dt><dd>${escapeHtml(recipeIngredientMatchConfidenceLabel(match.confidence))}</dd></div>
+            <div><dt>Best available match</dt><dd>${match.isBestAvailable ? "Yes" : "No"}</dd></div>
+            <div><dt>Alternative matches</dt><dd>${escapeHtml(match.alternatives.join(", ") || "None")}</dd></div>
+            <div><dt>Source / matching reason</dt><dd>${escapeHtml(sourceReason)}</dd></div>
+        </dl>
+    `;
+}
+
 function recipeIngredientBadgesHtml(item = {}, options = {}) {
     const badges = [];
     const ingredient = String(item.ingredient || "").trim();
     const purchasable = String(item.purchasable_item || item.buy_as || "").trim();
     const section = String(item.store_section || item.section || "").toUpperCase();
     const pantryText = `${ingredient} ${purchasable} ${section}`.toUpperCase();
+    const match = recipeIngredientMatchDetails(item);
+
+    const attentionKinds = {
+        "Review Match": "review",
+        "Low Confidence": "low-confidence",
+        "Multiple Matches": "multiple",
+        "Unmatched": "unmatched",
+    };
+    if (options.includeMatchStatus !== false && match.attentionStatus) {
+        badges.push([match.attentionStatus, attentionKinds[match.attentionStatus] || "review"]);
+    }
 
     if (item.optional) {
         badges.push(["Optional", "optional"]);
@@ -31910,10 +32170,14 @@ function recipeIngredientBadgesHtml(item = {}, options = {}) {
         badges.push([`${substitutionCount} Option${substitutionCount === 1 ? "" : "s"}`, "substitution"]);
     }
 
-    if (pantryText.includes("BEAN") || pantryText.includes("LEGUME") || pantryText.includes("SPICE")) {
+    if (
+        recipeIngredientMatchFlag(item.pantry_staple)
+        || recipeIngredientMatchFlag(item.is_pantry_staple)
+        || pantryText.includes("BEAN")
+        || pantryText.includes("LEGUME")
+        || pantryText.includes("SPICE")
+    ) {
         badges.push(["Pantry Staple", "pantry"]);
-    } else if (ingredient && purchasable && !/\s+\bor\b\s+/i.test(ingredient)) {
-        badges.push(["Best Match", "best"]);
     }
 
     const requestedLimit = Number(options.maxVisible || 0);
@@ -32612,7 +32876,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
                 <span class="recipe-edit-ingredient-title-line">
                     <textarea data-field="ingredient" rows="1">${escapeHtml(option.ingredient || "")}</textarea>
                     <span class="recipe-edit-ingredient-markers">
-                        <span class="recipe-edit-ingredient-badges" data-substitution-badges>${recipeIngredientBadgesHtml(option)}</span>
+                        <span class="recipe-edit-ingredient-badges" data-substitution-badges>${recipeIngredientBadgesHtml(option, { includeMatchStatus: false })}</span>
                     </span>
                 </span>
                 <span class="recipe-edit-substitution-summary-meta">
@@ -32841,6 +33105,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                 <input type="hidden" data-field="ingredient_image_prompt" value="${escapeAttribute(ingredientImagePrompt)}">
             </div>`;
     row.className = "recipe-edit-ingredient-row";
+    row.dataset.ingredientMatchDetails = JSON.stringify(recipeIngredientMatchSnapshot(item));
     row.innerHTML = `
         <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
         <span class="recipe-edit-row-number" data-ingredient-row-number></span>
@@ -32855,7 +33120,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                           tabindex="0"
                           onclick="openFoodReviewAlternatives(this)"
                           onkeydown="openFoodReviewAlternativesFromKey(event, this)"
-                          hidden>Food Review</span>
+                          hidden>Review Match</span>
                 </span>
             </span>
             <div class="recipe-edit-ingredient-metadata-inline">
@@ -33115,7 +33380,7 @@ function updateRecipeIngredientSubstitutionRowSummary(optionRow) {
         return;
     }
 
-    badges.innerHTML = recipeIngredientBadgesHtml(fieldValuesFromRow(optionRow));
+    badges.innerHTML = recipeIngredientBadgesHtml(fieldValuesFromRow(optionRow), { includeMatchStatus: false });
 }
 
 function updateRecipeIngredientSubstitutionState(row, control = null) {
@@ -33302,18 +33567,19 @@ function cancelRecipeIngredientSubstitutionMenu() {
 
 function updateRecipeIngredientSummary(row) {
     const badges = row ? row.querySelector("[data-ingredient-badges]") : null;
-    const allBadges = row ? row.querySelector("[data-ingredient-all-badges]") : null;
+    const matchDetails = row ? row.querySelector("[data-ingredient-match-details]") : null;
     const optionsMenu = recipeIngredientOptionsMenuForRow(row);
     const scope = optionsMenu || row;
     const substitutionCount = scope ? scope.querySelector("[data-ingredient-substitution-count]") : null;
     const values = row ? fieldValuesFromRow(row) : {};
     values.substitutions = collectRecipeIngredientSubstitutionRows(row);
+    const matchItem = recipeIngredientMatchItemFromRow(row, values);
 
     if (badges) {
-        badges.innerHTML = recipeIngredientBadgesHtml(values, { maxVisible: 2 });
+        badges.innerHTML = recipeIngredientBadgesHtml(matchItem, { maxVisible: 2 });
     }
-    if (allBadges) {
-        allBadges.innerHTML = recipeIngredientBadgesHtml(values);
+    if (matchDetails) {
+        matchDetails.innerHTML = recipeIngredientMatchDetailsHtml(matchItem);
     }
 
     if (substitutionCount) {
@@ -34533,7 +34799,9 @@ function updateRecipeIngredientFoodRuleWarning(row) {
 
     if (ingredientChoiceReview) {
         marker.hidden = false;
-        marker.textContent = "Food Review";
+        marker.textContent = ingredientChoiceReview.options && ingredientChoiceReview.options.length > 1
+            ? "Multiple Matches"
+            : "Review Match";
         marker.title = ingredientChoiceReview.reason || "Pick one ingredient option.";
         marker.dataset.reviewKind = ingredientChoiceReview.sourceField === "ingredient_text_review"
             ? "ingredient_text_choice"
@@ -34545,7 +34813,9 @@ function updateRecipeIngredientFoodRuleWarning(row) {
 
     if (ingredientTextReview) {
         marker.hidden = false;
-        marker.textContent = "Food Review";
+        marker.textContent = ingredientTextReview.options && ingredientTextReview.options.length > 1
+            ? "Multiple Matches"
+            : "Review Match";
         marker.title = ingredientTextReview.reason || "This ingredient may need review before shopping.";
         marker.dataset.reviewKind = ingredientTextReview.kind || "ingredient_text";
         marker.dataset.blockedBy = JSON.stringify(blockedBy);
@@ -34555,7 +34825,7 @@ function updateRecipeIngredientFoodRuleWarning(row) {
 
     if (blockedBy.length) {
         marker.hidden = false;
-        marker.textContent = "Food Review";
+        marker.textContent = "Review Match";
         marker.title = `Food rule review: ${blockedBy.join("; ")}`;
         marker.dataset.reviewKind = "food_rule";
         marker.dataset.blockedBy = JSON.stringify(blockedBy);
@@ -34564,19 +34834,17 @@ function updateRecipeIngredientFoodRuleWarning(row) {
     }
 
     if (isReviewed) {
-        marker.hidden = false;
-        marker.textContent = reviewState === "ignored" ? "Ignored" : "Reviewed";
-        marker.title = reviewState === "ignored"
-            ? "Ignored after ingredient review."
-            : "Reviewed with an accepted fix.";
+        marker.hidden = true;
+        marker.textContent = "Review Match";
+        marker.title = "";
         marker.dataset.reviewKind = "reviewed";
         marker.dataset.blockedBy = "[]";
-        marker.tabIndex = 0;
+        marker.tabIndex = -1;
         return;
     }
 
     marker.hidden = true;
-    marker.textContent = "Food Review";
+    marker.textContent = "Review Match";
     marker.title = "";
     delete marker.dataset.reviewKind;
     marker.dataset.blockedBy = JSON.stringify(blockedBy);

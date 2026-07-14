@@ -123,6 +123,79 @@ def test_recipe_editor_ingredient_substitutions_are_wired():
     assert ".recipe-edit-row-collapsed .recipe-edit-ingredient-substitutions" in css
 
 
+def test_recipe_editor_match_column_only_surfaces_attention_states():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    badges_start = script.index("function recipeIngredientBadgesHtml")
+    badges_end = script.index("function recipeIngredientStoreSectionIconName", badges_start)
+    badges = script[badges_start:badges_end]
+    assert 'badges.push(["Best Match", "best"]);' not in badges
+    assert "const match = recipeIngredientMatchDetails(item);" in badges
+    for status in (
+        "Review Match",
+        "Low Confidence",
+        "Multiple Matches",
+        "Unmatched",
+        "Pantry Staple",
+        "Optional",
+    ):
+        assert status in badges
+    assert 'badges.push([`${substitutionCount} Option${substitutionCount === 1 ? "" : "s"}`, "substitution"]);' in badges
+
+    details_start = script.index("function recipeIngredientMatchDetails(item = {})")
+    details_end = script.index("function recipeIngredientBadgesHtml", details_start)
+    details = script[details_start:details_end]
+    assert "confidence.percent < 60" in details
+    assert "confidence.percent < 80" in details
+    assert "ingredient && !hasMasterMatch" in details
+    assert "!hasExplicitBestStatus" in details
+    assert 'attentionStatus = "Multiple Matches";' in details
+    assert 'attentionStatus = "Unmatched";' in details
+    assert "isBestAvailable" in details
+    for label in (
+        "Selected matched ingredient",
+        "Match confidence",
+        "Best available match",
+        "Alternative matches",
+        "Source / matching reason",
+    ):
+        assert label in details
+
+    row_start = script.index("function addRecipeIngredientRow")
+    row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
+    row_block = script[row_start:row_end]
+    assert "row.dataset.ingredientMatchDetails = JSON.stringify(recipeIngredientMatchSnapshot(item));" in row_block
+    assert "hidden>Review Match</span>" in row_block
+
+    summary_start = script.index("function updateRecipeIngredientSummary")
+    summary_end = script.index("function recipeEditIngredientRows", summary_start)
+    summary = script[summary_start:summary_end]
+    assert "const matchItem = recipeIngredientMatchItemFromRow(row, values);" in summary
+    assert "recipeIngredientBadgesHtml(matchItem, { maxVisible: 2 })" in summary
+    assert "recipeIngredientMatchDetailsHtml(matchItem)" in summary
+
+    assert "recipeIngredientBadgesHtml(option, { includeMatchStatus: false })" in script
+    assert "recipeIngredientBadgesHtml(fieldValuesFromRow(optionRow), { includeMatchStatus: false })" in script
+
+    marker_start = script.index("function updateRecipeIngredientFoodRuleWarning")
+    marker_end = script.index("function ingredientChoiceReviewFromRow", marker_start)
+    marker = script[marker_start:marker_end]
+    assert 'marker.textContent = "Food Review";' not in marker
+    assert '? "Multiple Matches"' in marker
+    assert ': "Review Match";' in marker
+    assert 'marker.hidden = true;' in marker
+
+    for selector in (
+        ".recipe-edit-ingredient-badge.review",
+        ".recipe-edit-ingredient-badge.multiple",
+        ".recipe-edit-ingredient-badge.low-confidence",
+        ".recipe-edit-ingredient-badge.unmatched",
+        ".recipe-edit-ingredient-match-details-grid",
+    ):
+        assert selector in css
+
+
 def test_recipe_editor_hide_all_images_keeps_title_image_visible():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     function_start = script.index("function setRecipeEditorImagesVisibleFromMenu")
@@ -370,7 +443,8 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     assert 'row.querySelector(".recipe-edit-original-text-label")' in organize
     assert 'details.id = `recipeEditIngredientDetails${recipeEditIngredientDetailsId}`;' in organize
     assert 'details.addEventListener("toggle", () => updateRecipeEditIngredientDetailsState(row));' in organize
-    assert 'data-ingredient-all-badges' in organize
+    assert 'matchDetails.dataset.ingredientMatchDetails = "";' in organize
+    assert "recipeIngredientMatchDetailsHtml(recipeIngredientMatchItemFromRow(row))" in organize
 
     row_start = script.index("function addRecipeIngredientRow")
     row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)

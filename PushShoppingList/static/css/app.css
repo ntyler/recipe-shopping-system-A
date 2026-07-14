@@ -18379,6 +18379,25 @@ body {
     color: #d7e885;
 }
 
+.recipe-edit-ingredient-badge.review,
+.recipe-edit-ingredient-badge.multiple {
+    border-color: #7a5b22;
+    background: rgba(113, 76, 19, 0.68);
+    color: #facc6b;
+}
+
+.recipe-edit-ingredient-badge.low-confidence {
+    border-color: #8a4b1e;
+    background: rgba(124, 57, 18, 0.7);
+    color: #fdba74;
+}
+
+.recipe-edit-ingredient-badge.unmatched {
+    border-color: #7f2f36;
+    background: rgba(114, 31, 40, 0.7);
+    color: #fda4af;
+}
+
 .recipe-edit-extraction-warning {
     display: inline-flex;
     align-items: flex-start;
@@ -43701,18 +43720,55 @@ body.recipe-edit-ai-report-open .app-content {
 .recipe-edit-standalone-page .recipe-edit-ingredient-advanced-fields > .recipe-edit-ingredient-match-details {
     grid-column: 1 / -1;
     grid-row: 3;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    display: grid;
+    gap: 8px;
     min-width: 0;
-    min-height: 32px;
-    padding: 6px 8px;
+    min-height: 0;
+    padding: 10px;
     border: 1px solid var(--app-border);
     border-radius: 7px;
     background: var(--app-surface);
     color: var(--app-muted);
     font-size: 8px;
     font-weight: 750;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-match-details-title {
+    color: var(--app-text);
+    font-size: 9px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-match-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 7px;
+    min-width: 0;
+    margin: 0;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-match-details-grid > div {
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: var(--app-bg-soft);
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-match-details-grid :is(dt, dd) {
+    margin: 0;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-match-details-grid dt {
+    margin-bottom: 3px;
+    color: var(--app-muted);
+    font-size: 7px;
+    text-transform: uppercase;
+}
+
+.recipe-edit-standalone-page .recipe-edit-ingredient-match-details-grid dd {
+    overflow-wrap: anywhere;
+    color: var(--app-text);
+    font-size: 9px;
 }
 
 .recipe-edit-standalone-page .recipe-edit-ingredient-advanced-fields > .recipe-edit-choice-review,
