@@ -76,7 +76,7 @@ def test_save_validation_and_dirty_state_cover_nested_editors():
     assert "Enter a recipe title." in validation
     assert "Add at least one ingredient." in validation
     assert "Ingredient ${index + 1} has an invalid amount." in validation
-    assert "Substitution ${optionIndex + 1}" in validation
+    assert "Alternative ${optionIndex + 1}" in validation
     assert "Add at least one instruction step." in validation
     assert "Instruction ${index + 1} needs instruction text." in validation
     assert '"step_image_url"' in validation

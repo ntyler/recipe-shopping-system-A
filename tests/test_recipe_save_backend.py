@@ -440,6 +440,172 @@ def test_grouped_substitution_alternative_round_trips_as_flat_component_rows(mon
     assert all("ingredients" not in row for row in substitutions)
 
 
+def test_read_first_ingredient_and_multi_component_alternative_preserve_normalized_fields(
+    monkeypatch,
+    tmp_path,
+):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/read-first-normalized-fields"
+    seed_recipe(
+        url,
+        ingredients=[{"id": "ingredient-buttermilk", "ingredient": "Buttermilk"}],
+        instructions=[{"step_number": 1, "instruction": "Mix."}],
+    )
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            ingredients=[{
+                "id": "ingredient-buttermilk",
+                "ingredient": "Buttermilk",
+                "quantity": "",
+                "quantity_text": "as needed",
+                "unit": "",
+                "size": "large",
+                "preparation": "shaken",
+                "purchasable_item": "Cultured buttermilk",
+                "store_section": "Specialty Dairy",
+                "store_section_custom": True,
+                "section": "sauce",
+                "optional": False,
+                "notes": "Use full-fat when available.",
+                "match_status": "best_match",
+                "confidence": "high",
+                "ingredient_image_url": "/static/generated/ingredients/buttermilk.webp",
+                "substitutions": [{
+                    "alternative_id": "alternative-milk-lemon",
+                    "alternative_order": 1,
+                    "alternative_label": "Milk and lemon juice",
+                    "match_status": "good_match",
+                    "preferred": True,
+                    "ingredients": [
+                        {
+                            "id": "substitution-milk",
+                            "ingredient": "Milk",
+                            "quantity": "1",
+                            "quantity_text": "",
+                            "unit": "cup",
+                            "size": "",
+                            "preparation": "room temperature",
+                            "purchasable_item": "Whole milk",
+                            "store_section": "Alternative Dairy",
+                            "store_section_custom": True,
+                            "notes": "Do not use skim milk.",
+                            "ingredient_image_url": "/static/generated/ingredients/milk.webp",
+                            "ingredient_image_generated_at": "2026-07-14T12:00:00Z",
+                            "ingredient_image_prompt": "A glass jug of whole milk",
+                        },
+                        {
+                            "id": "substitution-lemon",
+                            "ingredient": "Lemon Juice",
+                            "quantity": "",
+                            "quantity_text": "to taste",
+                            "unit": "",
+                            "size": "small",
+                            "preparation": "freshly squeezed",
+                            "purchasable_item": "Fresh lemon juice",
+                            "store_section": "PRODUCE",
+                            "notes": "Add gradually.",
+                            "ingredient_image_url": "/static/generated/ingredients/lemon.webp",
+                        },
+                    ],
+                }],
+            }],
+        ),
+        require_existing=True,
+    )
+
+    assert result["ok"] is True
+    ingredient = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+    assert {
+        "ingredient": ingredient["ingredient"],
+        "quantity": ingredient["quantity"],
+        "quantity_text": ingredient["quantity_text"],
+        "unit": ingredient["unit"],
+        "size": ingredient["size"],
+        "preparation": ingredient["preparation"],
+        "purchasable_item": ingredient["purchasable_item"],
+        "store_section": ingredient["store_section"],
+        "section": ingredient["section"],
+        "optional": ingredient["optional"],
+        "notes": ingredient["notes"],
+        "match_status": ingredient["match_status"],
+        "confidence": ingredient["confidence"],
+        "ingredient_image_url": ingredient["ingredient_image_url"],
+    } == {
+        "ingredient": "Buttermilk",
+        "quantity": None,
+        "quantity_text": "as needed",
+        "unit": "",
+        "size": "large",
+        "preparation": "shaken",
+        "purchasable_item": "Cultured buttermilk",
+        "store_section": "Specialty Dairy",
+        "section": "sauce",
+        "optional": False,
+        "notes": "Use full-fat when available.",
+        "match_status": "best_match",
+        "confidence": "high",
+        "ingredient_image_url": "/static/generated/ingredients/buttermilk.webp",
+    }
+
+    substitutions = ingredient["substitutions"]
+    assert [row["ingredient"] for row in substitutions] == ["Milk", "Lemon Juice"]
+    assert {row["alternative_id"] for row in substitutions} == {"alternative-milk-lemon"}
+    assert {row["alternative_label"] for row in substitutions} == {"Milk and lemon juice"}
+    assert {row["match_status"] for row in substitutions} == {"good_match"}
+    assert all(row["preferred"] is True for row in substitutions)
+
+    milk, lemon = substitutions
+    assert {
+        "quantity": milk["quantity"],
+        "quantity_text": milk["quantity_text"],
+        "unit": milk["unit"],
+        "size": milk["size"],
+        "preparation": milk["preparation"],
+        "purchasable_item": milk["purchasable_item"],
+        "store_section": milk["store_section"],
+        "notes": milk["notes"],
+        "ingredient_image_url": milk["ingredient_image_url"],
+        "ingredient_image_generated_at": milk["ingredient_image_generated_at"],
+        "ingredient_image_prompt": milk["ingredient_image_prompt"],
+    } == {
+        "quantity": "1",
+        "quantity_text": "",
+        "unit": "cup",
+        "size": "",
+        "preparation": "room temperature",
+        "purchasable_item": "Whole milk",
+        "store_section": "Alternative Dairy",
+        "notes": "Do not use skim milk.",
+        "ingredient_image_url": "/static/generated/ingredients/milk.webp",
+        "ingredient_image_generated_at": "2026-07-14T12:00:00Z",
+        "ingredient_image_prompt": "A glass jug of whole milk",
+    }
+    assert {
+        "quantity": lemon["quantity"],
+        "quantity_text": lemon["quantity_text"],
+        "unit": lemon["unit"],
+        "size": lemon["size"],
+        "preparation": lemon["preparation"],
+        "purchasable_item": lemon["purchasable_item"],
+        "store_section": lemon["store_section"],
+        "notes": lemon["notes"],
+        "ingredient_image_url": lemon["ingredient_image_url"],
+    } == {
+        "quantity": "",
+        "quantity_text": "to taste",
+        "unit": "",
+        "size": "small",
+        "preparation": "freshly squeezed",
+        "purchasable_item": "Fresh lemon juice",
+        "store_section": "PRODUCE",
+        "notes": "Add gradually.",
+        "ingredient_image_url": "/static/generated/ingredients/lemon.webp",
+    }
+
+
 def test_substitution_metadata_merge_is_scoped_to_alternative_group():
     substitutions = recipe_edit_service.normalize_ingredient_substitutions(
         [

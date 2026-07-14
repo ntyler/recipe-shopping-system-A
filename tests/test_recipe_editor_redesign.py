@@ -771,15 +771,15 @@ def test_recipe_editor_ingredient_options_use_inline_accessible_disclosure():
     assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organize
     assert "toggleRecipeIngredientSubstitutions(optionsButton, event)" in organize
     assert "organizeRecipeEditSubstitutionOptionRow" in script
-    assert 'label.textContent = alternativeCount ? optionLabel : "No substitutions";' in script
+    assert 'label.textContent = alternativeCount ? optionLabel : "None";' in script
 
-    v9_css = css[css.index("/* Ingredient editor v9:"):]
-    assert ".recipe-edit-ingredient-substitution-cell" in v9_css
-    assert "grid-column: 10 !important;" in v9_css
-    assert "> .recipe-edit-ingredient-options-panel" in v9_css
-    assert "grid-column: 1 / -1 !important;" in v9_css
-    assert "grid-row: 2 !important;" in v9_css
-    assert ".recipe-edit-ingredient-options-panel[hidden]" in v9_css
+    v10_css = css[css.index("/* Ingredient editor v10:"):]
+    assert ".recipe-edit-ingredient-substitution-cell" in v10_css
+    assert "grid-column: 9 !important;" in v10_css
+    assert "> .recipe-edit-ingredient-options-panel" in v10_css
+    assert "grid-column: 1 / -1 !important;" in v10_css
+    assert "grid-row: 2 !important;" in v10_css
+    assert ".recipe-edit-ingredient-options-panel[hidden]" in v10_css
 
 
 def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls():
@@ -979,7 +979,7 @@ def test_recipe_editor_redesign_javascript_wiring():
     assert "[\"initRecipeEditTabs\", initRecipeEditTabs]" in script
     assert "[\"initRecipeEditContextPanels\", initRecipeEditContextPanels]" in script
     assert 'data-field="section"' in script
-    assert "Replace ingredient with this option" in script
+    assert "Replace ingredient with this alternative" in script
     assert script.count("setRecipeIngredientsCollapsed(!recipeEditorStandalonePageIsActive());") == 2
 
 

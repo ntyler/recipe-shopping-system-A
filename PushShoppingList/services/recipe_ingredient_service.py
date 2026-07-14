@@ -97,6 +97,7 @@ def ingredient_detail_records(ingredients=None, recipe_metadata=None):
             "parsed_name": str(item.get("parsed_name") or "").strip(),
             "normalized_name": str(item.get("normalized_name") or item.get("ingredient") or "").strip(),
             "quantity": str(item.get("quantity") or "").strip(),
+            "quantity_text": str(item.get("quantity_text") or "").strip(),
             "unit": str(item.get("unit") or "").strip(),
             "unit_id": str(item.get("unit_id") or "").strip(),
             "unit_raw": str(item.get("unit_raw") or "").strip(),
@@ -107,6 +108,7 @@ def ingredient_detail_records(ingredients=None, recipe_metadata=None):
             "preparation": str(item.get("preparation") or "").strip(),
             "notes": str(item.get("notes") or "").strip(),
             "confidence": str(item.get("confidence") or "").strip(),
+            "match_status": str(item.get("match_status") or "").strip(),
             "inferred": truthy(item.get("inferred")),
             "warning": str(item.get("warning") or "").strip(),
         }

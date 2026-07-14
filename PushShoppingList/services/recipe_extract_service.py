@@ -9653,6 +9653,7 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
             "section": clean_recipe_text(raw_option.get("section") or parent_item.get("section") or ""),
             "original_text": clean_recipe_text(raw_option.get("original_text") or source_note or item_name),
             "quantity": quantity,
+            "quantity_text": clean_recipe_text(raw_option.get("quantity_text") or ""),
             "recipe_qty": clean_recipe_text(raw_option.get("recipe_qty") or quantity),
             "unit": unit,
             "unit_id": clean_recipe_text(raw_option.get("unit_id") or ""),
@@ -9676,6 +9677,17 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
             "size": clean_recipe_text(raw_option.get("size") or ""),
             "notes": clean_recipe_text(raw_option.get("notes") or ""),
             "confidence": clean_recipe_text(raw_option.get("confidence") or "medium"),
+            "match_status": clean_recipe_text(
+                raw_option.get("match_status")
+                or raw_option.get("match_quality")
+                or raw_option.get("quality")
+                or ""
+            ),
+            "preferred": str(
+                raw_option.get("preferred")
+                or raw_option.get("is_preferred")
+                or ""
+            ).strip().lower() in {"1", "true", "yes", "y", "on"},
             "inferred": bool(raw_option.get("inferred", True)),
             "warning": clean_recipe_text(raw_option.get("warning") or ""),
             "food_review": raw_option.get("food_review") if isinstance(raw_option.get("food_review"), dict) else {},
@@ -9687,6 +9699,15 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
             "buy_as": clean_recipe_text(raw_option.get("buy_as") or raw_option.get("purchasable_item") or item_name),
             "purchase_group": clean_recipe_text(raw_option.get("purchase_group") or ""),
             "source_note": clean_recipe_text(raw_option.get("source_note") or source_note),
+            "ingredient_image_url": clean_recipe_text(
+                raw_option.get("ingredient_image_url") or raw_option.get("image_url") or ""
+            ),
+            "ingredient_image_generated_at": clean_recipe_text(
+                raw_option.get("ingredient_image_generated_at") or raw_option.get("image_generated_at") or ""
+            ),
+            "ingredient_image_prompt": clean_recipe_text(
+                raw_option.get("ingredient_image_prompt") or raw_option.get("image_prompt") or ""
+            ),
         }
         alternative_id = clean_recipe_text(raw_option.get("alternative_id") or "")
         if alternative_id:
