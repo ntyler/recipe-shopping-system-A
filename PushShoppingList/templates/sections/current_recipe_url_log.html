@@ -1867,21 +1867,25 @@
                      aria-labelledby="recipeEditTabInstructions"
                      data-recipe-edit-tab-panel="instructions"
                      hidden>
-                <div class="recipe-edit-section-header">
+                <div class="recipe-edit-section-header instructions-toolbar">
                     <div class="recipe-edit-section-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-instructions" aria-hidden="true"></span>
                         <div>
-                            <h3>Instructions</h3>
+                            <h3 id="recipeEditInstructionsTitle">Instructions <span id="recipeEditInstructionCount"></span></h3>
                             <p>Step-by-step cooking directions.</p>
                         </div>
                     </div>
-                    <div class="recipe-edit-section-actions recipe-edit-instructions-actions">
-                        <button type="button" onclick="addRecipeInstructionRow()">
+                    <div class="recipe-edit-section-actions recipe-edit-instructions-actions instructions-toolbar-actions">
+                        <button type="button"
+                                class="recipe-edit-add-instruction-button"
+                                onclick="addRecipeInstructionRow()">
                             <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
                             <span>Add Step</span>
                         </button>
                         <button type="button"
-                                class="recipe-edit-tab-utility-action"
+                                class="recipe-edit-tab-utility-action recipe-edit-instruction-reorder-toggle"
+                                data-recipe-instruction-reorder-toggle
+                                aria-pressed="false"
                                 onclick="return beginRecipeInstructionReorder(this)">
                             <span>Reorder</span>
                         </button>
@@ -1928,10 +1932,10 @@
                     <div class="recipe-edit-instructions-header" aria-hidden="true">
                         <span></span>
                         <span>Step</span>
+                        <span>Image</span>
                         <span>Instruction</span>
                         <span>Options</span>
-                        <span>Edit</span>
-                        <span>Delete</span>
+                        <span>Actions</span>
                     </div>
                 </div>
             </section>

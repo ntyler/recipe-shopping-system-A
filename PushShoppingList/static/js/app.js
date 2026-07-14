@@ -29393,11 +29393,30 @@ function focusRecipeIngredientGrouping(button) {
 }
 
 function beginRecipeInstructionReorder(button) {
-    const firstStep = document.querySelector("#recipeEditInstructions .recipe-edit-instruction-row");
-    if (firstStep) {
-        firstStep.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const list = document.getElementById("recipeEditInstructions");
+    const label = button ? button.querySelector("span:last-child") : null;
+    const active = Boolean(list && !list.classList.contains("recipe-edit-instruction-reorder-mode"));
+
+    if (!list) {
+        return false;
     }
-    setRecipeEditStatus("Drag the step handles to reorder instructions.");
+
+    list.classList.toggle("recipe-edit-instruction-reorder-mode", active);
+    if (button) {
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+    }
+    if (label) {
+        label.textContent = active ? "Done Reordering" : "Reorder";
+    }
+
+    const firstHandle = list.querySelector(".recipe-edit-instruction-row .recipe-edit-row-handle");
+    if (active && firstHandle) {
+        firstHandle.focus({ preventScroll: false });
+    }
+    setRecipeEditStatus(active
+        ? "Drag the step handles to reorder instructions."
+        : "Instruction order updated. Save Recipe to keep it.");
     return false;
 }
 
@@ -35685,6 +35704,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
     `;
     wrap.appendChild(row);
     organizeRecipeEditCompactRowActions(row, '[data-field="text"]', "step");
+    organizeRecipeEditInstructionRow(row);
     bindRecipeEditDragAndDrop(row);
     updateRecipeInstructionStepNumbers();
     initDeferredImages(row);
@@ -35697,12 +35717,110 @@ function recipeInstructionsHeaderHtml() {
         <div class="recipe-edit-instructions-header" aria-hidden="true">
             <span></span>
             <span>Step</span>
+            <span>Image</span>
             <span>Instruction</span>
             <span>Options</span>
-            <span>Edit</span>
-            <span>Delete</span>
+            <span>Actions</span>
         </div>
     `;
+}
+
+function resizeRecipeEditInstructionTextarea(textarea) {
+    if (!textarea) {
+        return;
+    }
+
+    textarea.style.height = "0px";
+    const nextHeight = Math.max(48, Math.min(72, textarea.scrollHeight));
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > 72 ? "auto" : "hidden";
+}
+
+function organizeRecipeEditInstructionRow(row) {
+    if (!recipeEditorStandalonePageIsActive() || !row || row.dataset.recipeEditCompactInstruction === "1") {
+        return;
+    }
+
+    row.dataset.recipeEditCompactInstruction = "1";
+    const textarea = row.querySelector('[data-field="text"]');
+    const panel = row.querySelector("[data-step-image-panel]");
+    const menuWrap = row.querySelector(":scope > .recipe-edit-row-menu-wrap");
+    const optionsButton = menuWrap ? menuWrap.querySelector(".recipe-edit-row-menu-btn") : null;
+    const actions = row.querySelector(":scope > .recipe-edit-compact-row-actions");
+    const stepNumber = row.querySelector("[data-instruction-row-number]");
+
+    if (optionsButton) {
+        optionsButton.classList.add("recipe-edit-instruction-options-button");
+        optionsButton.innerHTML = `<span>Options</span>${recipeEditSvgIcon("chevron-down")}`;
+        optionsButton.setAttribute("aria-label", "Step options");
+        optionsButton.title = "Step options";
+    }
+
+    if (panel) {
+        if (!panel.id) {
+            let panelId = 1;
+            while (document.getElementById(`recipeEditInstructionDetails${panelId}`)) {
+                panelId += 1;
+            }
+            panel.id = `recipeEditInstructionDetails${panelId}`;
+        }
+        panel.setAttribute("role", "region");
+        panel.setAttribute("aria-label", `Step ${String(stepNumber ? stepNumber.textContent : "").trim() || "instruction"} image details`);
+        panel.setAttribute("aria-expanded", "false");
+    }
+
+    if (actions && panel && !actions.querySelector("[data-recipe-edit-instruction-details-toggle]")) {
+        const detailsButton = document.createElement("button");
+        detailsButton.type = "button";
+        detailsButton.className = "recipe-edit-compact-row-details recipe-edit-instruction-details-toggle";
+        detailsButton.dataset.recipeEditInstructionDetailsToggle = "";
+        detailsButton.setAttribute("aria-label", "Expand step details");
+        detailsButton.setAttribute("title", "Expand step details");
+        detailsButton.setAttribute("aria-controls", panel.id);
+        detailsButton.setAttribute("aria-expanded", "false");
+        detailsButton.setAttribute("onclick", "return toggleRecipeEditInstructionDetails(this)");
+        detailsButton.innerHTML = `${recipeEditSvgIcon("chevron-down")}<span class="sr-only" data-recipe-edit-instruction-details-label>Expand step details</span>`;
+        actions.insertBefore(detailsButton, actions.firstChild);
+    }
+
+    if (textarea && textarea.dataset.recipeEditInstructionResizeBound !== "true") {
+        textarea.dataset.recipeEditInstructionResizeBound = "true";
+        textarea.addEventListener("input", () => resizeRecipeEditInstructionTextarea(textarea));
+    }
+    resizeRecipeEditInstructionTextarea(textarea);
+    updateRecipeEditInstructionDetailsState(row);
+}
+
+function updateRecipeEditInstructionDetailsState(row) {
+    const panel = row ? row.querySelector("[data-step-image-panel]") : null;
+    const button = row ? row.querySelector("[data-recipe-edit-instruction-details-toggle]") : null;
+    const label = button ? button.querySelector("[data-recipe-edit-instruction-details-label]") : null;
+    const expanded = Boolean(panel && panel.classList.contains("recipe-image-tools-visible"));
+
+    if (!row || !panel || !button) {
+        return;
+    }
+
+    row.classList.toggle("recipe-edit-instruction-expanded", expanded);
+    button.classList.toggle("is-expanded", expanded);
+    button.setAttribute("aria-expanded", expanded ? "true" : "false");
+    button.setAttribute("aria-label", expanded ? "Collapse step details" : "Expand step details");
+    button.title = expanded ? "Collapse step details" : "Expand step details";
+    panel.setAttribute("aria-expanded", expanded ? "true" : "false");
+    if (label) {
+        label.textContent = expanded ? "Collapse step details" : "Expand step details";
+    }
+}
+
+function toggleRecipeEditInstructionDetails(button) {
+    const row = button ? button.closest(".recipe-edit-instruction-row") : null;
+    const panel = row ? row.querySelector("[data-step-image-panel]") : null;
+    const expanded = Boolean(panel && panel.classList.contains("recipe-image-tools-visible"));
+
+    closeRecipeEditRowMenus();
+    setRecipeEditRowImageToolsVisible(row, !expanded);
+    updateRecipeEditInstructionDetailsState(row);
+    return false;
 }
 
 function nextRecipeInstructionNumber() {
@@ -35713,7 +35831,8 @@ function nextRecipeInstructionNumber() {
 }
 
 function updateRecipeInstructionStepNumbers() {
-    [...document.querySelectorAll("#recipeEditInstructions .recipe-edit-instruction-row")]
+    const rows = [...document.querySelectorAll("#recipeEditInstructions .recipe-edit-instruction-row")];
+    rows
         .forEach((row, index) => {
             const input = row.querySelector('[data-field="step_number"]');
             const number = row.querySelector("[data-instruction-row-number]");
@@ -35731,8 +35850,14 @@ function updateRecipeInstructionStepNumbers() {
             if (panel) {
                 panel.dataset.stepNumber = value;
                 panel.dataset.recipeUrl = recipeEditorCurrentUrl();
+                panel.setAttribute("aria-label", `Step ${value} image details`);
             }
         });
+
+    const count = document.getElementById("recipeEditInstructionCount");
+    if (count) {
+        count.textContent = `${rows.length} ${rows.length === 1 ? "step" : "steps"}`;
+    }
 }
 
 function addRecipeNutritionRow(item = {}) {
@@ -40382,7 +40507,7 @@ function setRecipeEditRowImageToolsVisibleFromMenu(button, visible) {
 
 function setRecipeEditRowImageToolsVisible(row, visible) {
     const panel = row
-        ? row.querySelector("[data-equipment-image-panel], [data-ingredient-image-panel]")
+        ? row.querySelector("[data-equipment-image-panel], [data-ingredient-image-panel], [data-step-image-panel]")
         : null;
 
     if (!panel) {
@@ -40399,6 +40524,9 @@ function setRecipeEditRowImageToolsVisible(row, visible) {
 
     panel.classList.toggle("recipe-image-tools-visible", Boolean(visible));
     panel.setAttribute("aria-expanded", visible ? "true" : "false");
+    if (row.classList.contains("recipe-edit-instruction-row")) {
+        updateRecipeEditInstructionDetailsState(row);
+    }
     updateRecipeEditRowImageMenu(row);
     return true;
 }

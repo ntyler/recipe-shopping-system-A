@@ -826,7 +826,7 @@ def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization()
 
     for class_name, labels in (
         ("recipe-edit-equipment-header", ("Image", "Equipment", "Options", "Edit", "Delete")),
-        ("recipe-edit-instructions-header", ("Step", "Instruction", "Options", "Edit", "Delete")),
+        ("recipe-edit-instructions-header", ("Step", "Image", "Instruction", "Options", "Actions")),
         ("recipe-edit-nutrition-header", ("Nutrient", "Value", "Options", "Edit", "Delete")),
     ):
         header_start = template.index(f'class="{class_name}"')
@@ -874,6 +874,70 @@ def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization()
     assert ".recipe-edit-standalone-page #recipeEditRecipeNotes > .recipe-edit-note-section-row," in v4_css
     assert "min-height: 0;" in v4_css
     assert "height: 30px;" in v4_css
+
+
+def test_recipe_editor_instructions_use_compact_step_grid_and_preserve_handlers():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    instructions_css = css[css.index("/* Instruction editor v1:"):]
+
+    assert 'class="recipe-edit-section-header instructions-toolbar"' in template
+    assert "recipe-edit-instructions-actions instructions-toolbar-actions" in template
+    assert 'id="recipeEditInstructionCount"' in template
+    assert 'class="recipe-edit-add-instruction-button"' in template
+    assert "data-recipe-instruction-reorder-toggle" in template
+    assert 'aria-pressed="false"' in template
+
+    for column in (
+        "28px", "52px", "72px", "minmax(320px, 1fr)", "96px", "116px",
+    ):
+        assert column in instructions_css
+    assert "grid-template-columns: var(--recipe-edit-instruction-grid) !important;" in instructions_css
+    assert "min-height: 84px;" in instructions_css
+    assert "position: sticky;" in instructions_css
+    assert "min-height: 48px;" in instructions_css
+    assert "max-height: 72px;" in instructions_css
+    assert "width: 60px;" in instructions_css
+    assert "min-width: 88px;" in instructions_css
+    assert "width: 36px;" in instructions_css
+    assert "recipe-edit-instruction-expanded" in instructions_css
+    assert "recipe-edit-instruction-reorder-mode" in instructions_css
+    assert "recipe-edit-row-dragging" in instructions_css
+    assert "@media (max-width: 760px)" in instructions_css
+    assert "grid-template-columns: 28px 52px 64px minmax(0, 1fr) !important;" in instructions_css
+
+    row_start = script.index("function addRecipeInstructionRow")
+    row_end = script.index("function addRecipeNutritionRow", row_start)
+    row_code = script[row_start:row_end]
+    for preserved_field in (
+        'data-field="text"',
+        'data-field="step_number"',
+        'data-field="step_image_url"',
+        'data-field="step_image_generated_at"',
+    ):
+        assert preserved_field in row_code
+    assert "organizeRecipeEditInstructionRow(row);" in row_code
+    assert "bindRecipeEditDragAndDrop(row);" in row_code
+    assert "function resizeRecipeEditInstructionTextarea" in row_code
+    assert "function toggleRecipeEditInstructionDetails" in row_code
+    assert 'optionsButton.innerHTML = `<span>Options</span>${recipeEditSvgIcon("chevron-down")}`;' in row_code
+    assert 'detailsButton.setAttribute("aria-expanded", "false");' in row_code
+    assert 'detailsButton.setAttribute("onclick", "return toggleRecipeEditInstructionDetails(this)");' in row_code
+    assert 'count.textContent = `${rows.length} ${rows.length === 1 ? "step" : "steps"}`;' in row_code
+
+    reorder_start = script.index("function beginRecipeInstructionReorder")
+    reorder_end = script.index("function recipeEditMetadataFields", reorder_start)
+    reorder_code = script[reorder_start:reorder_end]
+    assert 'list.classList.toggle("recipe-edit-instruction-reorder-mode", active);' in reorder_code
+    assert 'label.textContent = active ? "Done Reordering" : "Reorder";' in reorder_code
+    assert 'button.setAttribute("aria-pressed", active ? "true" : "false");' in reorder_code
+
+    image_tools_start = script.index("function setRecipeEditRowImageToolsVisible(row, visible)")
+    image_tools_end = script.index("function setRecipeEditRowImageVisible", image_tools_start)
+    image_tools = script[image_tools_start:image_tools_end]
+    assert "[data-step-image-panel]" in image_tools
+    assert "updateRecipeEditInstructionDetailsState(row);" in image_tools
 
 
 def test_recipe_editor_redesign_javascript_wiring():

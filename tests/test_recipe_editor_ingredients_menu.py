@@ -172,7 +172,7 @@ def test_recipe_editor_equipment_images_use_thumbnail_previews():
     assert "setRecipeEditRowImageToolsVisibleFromMenu(this, true)" in row_block
     assert "data-recipe-edit-row-image-tools-hide" in row_block
     assert "setRecipeEditRowImageToolsVisibleFromMenu(this, false)" in row_block
-    assert 'row.querySelector("[data-equipment-image-panel], [data-ingredient-image-panel]")' in tools_block
+    assert 'row.querySelector("[data-equipment-image-panel], [data-ingredient-image-panel], [data-step-image-panel]")' in tools_block
     assert ".recipe-edit-equipment-row .recipe-equipment-image-panel .recipe-equipment-image" in css
     assert ".recipe-edit-equipment-row .recipe-equipment-image-panel:not(.recipe-image-tools-visible)" in css
     assert ".recipe-edit-equipment-row .recipe-equipment-image-panel.recipe-image-empty:not(.recipe-image-tools-visible)" in css
