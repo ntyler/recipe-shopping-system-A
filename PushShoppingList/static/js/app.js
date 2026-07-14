@@ -32014,16 +32014,159 @@ function canonicalizeRecipeIngredientUnitControl(input, options = {}) {
     return false;
 }
 
-function openRecipeIngredientUnitPicker(input) {
-    if (!input || typeof input.showPicker !== "function") {
+function ensureRecipeIngredientUnitMenu() {
+    let menu = document.getElementById("recipeIngredientUnitMenu");
+    if (menu) {
+        return menu;
+    }
+
+    menu = document.createElement("div");
+    menu.id = "recipeIngredientUnitMenu";
+    menu.className = "recipe-edit-row-menu recipe-edit-unit-menu";
+    menu.setAttribute("role", "listbox");
+    menu.setAttribute("aria-label", "Ingredient units");
+    menu.hidden = true;
+    document.body.appendChild(menu);
+    return menu;
+}
+
+function recipeIngredientUnitMenuOptions(menu) {
+    return menu ? [...menu.querySelectorAll('[role="option"]:not([disabled])')] : [];
+}
+
+function setRecipeIngredientUnitMenuActiveOption(menu, index) {
+    const options = recipeIngredientUnitMenuOptions(menu);
+    if (!menu || !options.length) {
+        if (menu && menu.recipeEditAnchorButton) {
+            menu.recipeEditAnchorButton.removeAttribute("aria-activedescendant");
+        }
+        return;
+    }
+
+    const nextIndex = Math.max(0, Math.min(Number(index) || 0, options.length - 1));
+    options.forEach((option, optionIndex) => option.classList.toggle("is-active", optionIndex === nextIndex));
+    menu.dataset.activeIndex = String(nextIndex);
+    const activeOption = options[nextIndex];
+    const input = menu.recipeEditAnchorButton;
+    if (input) {
+        input.setAttribute("aria-activedescendant", activeOption.id);
+    }
+    if (menu.classList.contains("recipe-edit-floating-menu")) {
+        activeOption.scrollIntoView({ block: "nearest" });
+    }
+}
+
+function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
+    if (!menu || !input) {
+        return;
+    }
+
+    const registry = recipeIngredientUnitRegistry();
+    const rawQuery = options.showAll ? "" : String(input.value || "").trim();
+    const query = recipeIngredientUnitKey(rawQuery);
+    const selectedName = registry.aliases[recipeIngredientUnitKey(input.value)] || "";
+    const units = registry.units.filter(unit => {
+        const name = String(unit.name || "");
+        return !query || recipeIngredientUnitKey(name).includes(query);
+    });
+    const optionRows = [{ id: "", name: "No unit" }, ...units];
+
+    menu.innerHTML = optionRows.map((unit, index) => {
+        const value = String(unit.name || "");
+        const selected = value
+            ? value.toLowerCase() === String(selectedName).toLowerCase()
+            : !String(input.value || "").trim();
+        return `
+            <button type="button"
+                    id="recipeIngredientUnitOption${index}"
+                    role="option"
+                    aria-selected="${selected ? "true" : "false"}"
+                    class="recipe-edit-unit-option${selected ? " is-selected" : ""}"
+                    data-unit-value="${escapeAttribute(value)}"
+                    onclick="return chooseRecipeIngredientUnit(this)">
+                <span>${escapeHtml(value || "No unit")}</span>
+                <span class="recipe-edit-unit-option-check" aria-hidden="true">${recipeEditSvgIcon("check")}</span>
+            </button>
+        `;
+    }).join("");
+
+    if (!units.length && query) {
+        menu.insertAdjacentHTML("beforeend", '<div class="recipe-edit-unit-empty">No matching units</div>');
+    }
+
+    const menuOptions = recipeIngredientUnitMenuOptions(menu);
+    const selectedIndex = menuOptions.findIndex(option => option.getAttribute("aria-selected") === "true");
+    setRecipeIngredientUnitMenuActiveOption(menu, selectedIndex >= 0 ? selectedIndex : 0);
+}
+
+function openRecipeIngredientUnitPicker(input, options = {}) {
+    if (!input) {
         return false;
     }
-    try {
-        input.showPicker();
-        return true;
-    } catch (error) {
-        // Browsers without a datalist picker keep their normal text-input behavior.
+
+    const menu = ensureRecipeIngredientUnitMenu();
+    const alreadyOpen = !menu.hidden && menu.recipeEditAnchorButton === input;
+    if (!alreadyOpen) {
+        closeRecipeEditRowMenus();
+        menu.recipeEditAnchorButton = input;
+        menu.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+    }
+    renderRecipeIngredientUnitMenu(menu, input, options);
+    positionRecipeEditPopupMenu(menu, input);
+    return true;
+}
+
+function chooseRecipeIngredientUnit(button) {
+    const menu = button ? button.closest(".recipe-edit-unit-menu") : null;
+    const input = menu ? menu.recipeEditAnchorButton : null;
+    if (!input) {
         return false;
+    }
+
+    input.value = button.dataset.unitValue || "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    closeRecipeEditRowMenus();
+    input.focus({ preventScroll: true });
+    return false;
+}
+
+function handleRecipeIngredientUnitKeydown(event, input) {
+    if (!event || !input) {
+        return;
+    }
+
+    const menu = document.getElementById("recipeIngredientUnitMenu");
+    const isOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === input);
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+        event.preventDefault();
+        if (!isOpen) {
+            openRecipeIngredientUnitPicker(input, { showAll: true });
+            return;
+        }
+        const currentIndex = Number(menu.dataset.activeIndex || 0);
+        setRecipeIngredientUnitMenuActiveOption(menu, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+        return;
+    }
+    if (!isOpen) {
+        return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        const optionCount = recipeIngredientUnitMenuOptions(menu).length;
+        setRecipeIngredientUnitMenuActiveOption(menu, event.key === "Home" ? 0 : optionCount - 1);
+    } else if (event.key === "Enter") {
+        const activeOption = recipeIngredientUnitMenuOptions(menu)[Number(menu.dataset.activeIndex || 0)];
+        if (activeOption) {
+            event.preventDefault();
+            chooseRecipeIngredientUnit(activeOption);
+        }
+    } else if (event.key === "Escape") {
+        event.preventDefault();
+        closeRecipeEditRowMenus();
+    } else if (event.key === "Tab") {
+        closeRecipeEditRowMenus();
     }
 }
 
@@ -32037,18 +32180,22 @@ function bindRecipeIngredientUnitControls(scope) {
         input.setAttribute("role", "combobox");
         input.setAttribute("aria-autocomplete", "list");
         input.setAttribute("aria-haspopup", "listbox");
-        input.setAttribute("aria-controls", "recipeIngredientUnitOptions");
-        input.addEventListener("click", () => openRecipeIngredientUnitPicker(input));
-        input.addEventListener("keydown", event => {
-            if (event.key === "ArrowDown" && openRecipeIngredientUnitPicker(input)) {
-                event.preventDefault();
-            }
-        });
+        input.setAttribute("aria-controls", "recipeIngredientUnitMenu");
+        input.setAttribute("aria-expanded", "false");
+        input.removeAttribute("list");
+        input.dataset.recipeEditUnitTrigger = "true";
+        input.addEventListener("click", () => openRecipeIngredientUnitPicker(input, { showAll: true }));
+        input.addEventListener("keydown", event => handleRecipeIngredientUnitKeydown(event, input));
         input.addEventListener("change", () => canonicalizeRecipeIngredientUnitControl(input, { report: true }));
         input.addEventListener("blur", () => canonicalizeRecipeIngredientUnitControl(input));
         input.addEventListener("input", () => {
             input.setCustomValidity("");
             input.removeAttribute("aria-invalid");
+            const menu = document.getElementById("recipeIngredientUnitMenu");
+            if (menu && !menu.hidden && menu.recipeEditAnchorButton === input) {
+                renderRecipeIngredientUnitMenu(menu, input);
+                positionRecipeEditPopupMenu(menu, input);
+            }
         });
         canonicalizeRecipeIngredientUnitControl(input);
     });
@@ -33009,6 +33156,8 @@ function positionRecipeEditPopupMenu(menu, button) {
     const buttonRect = button.getBoundingClientRect();
     if (menu.classList.contains("recipe-edit-cookbook-menu")) {
         menu.style.minWidth = `${Math.ceil(buttonRect.width)}px`;
+    } else if (menu.classList.contains("recipe-edit-unit-menu")) {
+        menu.style.minWidth = `${Math.max(180, Math.ceil(buttonRect.width))}px`;
     }
     const menuRect = menu.getBoundingClientRect();
     const menuWidth = menuRect.width;
@@ -33452,11 +33601,18 @@ function recipeEditAdjacentMovableRow(row, direction) {
 
 function closeRecipeEditRowMenus() {
     document.querySelectorAll(".recipe-edit-row-menu").forEach(menu => {
+        const anchorButton = menu.recipeEditAnchorButton;
         menu.hidden = true;
         menu.classList.remove("recipe-edit-floating-menu");
         menu.style.left = "";
         menu.style.top = "";
         menu.style.right = "";
+        menu.style.minWidth = "";
+        menu.dataset.activeIndex = "";
+        if (anchorButton && menu.classList.contains("recipe-edit-unit-menu")) {
+            anchorButton.setAttribute("aria-expanded", "false");
+            anchorButton.removeAttribute("aria-activedescendant");
+        }
         restoreRecipeEditPopupMenu(menu);
     });
     document.querySelectorAll(".recipe-edit-menu-wrap-open").forEach(wrap => {
@@ -33468,7 +33624,8 @@ function closeRecipeEditRowMenus() {
     document.querySelectorAll(
         ".recipe-edit-row-menu-btn, "
         + ".recipe-edit-row-menu-wrap button[aria-expanded], "
-        + ".recipe-edit-section-menu-wrap button[aria-expanded]"
+        + ".recipe-edit-section-menu-wrap button[aria-expanded], "
+        + "[data-recipe-edit-unit-trigger][aria-expanded]"
     ).forEach(button => {
         button.setAttribute("aria-expanded", "false");
     });
@@ -33547,7 +33704,7 @@ function handleRecipeEditRowMenuOutsideClick(event) {
     if (
         target
         && typeof target.closest === "function"
-        && target.closest(".recipe-edit-row-menu, .recipe-edit-row-menu-btn")
+        && target.closest(".recipe-edit-row-menu, .recipe-edit-row-menu-btn, [data-recipe-edit-unit-trigger]")
     ) {
         return;
     }
@@ -33562,7 +33719,8 @@ function handleRecipeEditRowMenuEscape(event) {
 
     const button = document.querySelector(
         ".recipe-edit-row-menu-btn[aria-expanded=\"true\"], "
-        + ".recipe-edit-section-menu-wrap button[aria-expanded=\"true\"]"
+        + ".recipe-edit-section-menu-wrap button[aria-expanded=\"true\"], "
+        + "[data-recipe-edit-unit-trigger][aria-expanded=\"true\"]"
     );
     event.preventDefault();
     closeRecipeEditRowMenus();

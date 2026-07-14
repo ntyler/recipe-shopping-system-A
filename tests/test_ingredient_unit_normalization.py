@@ -235,6 +235,7 @@ def test_saved_json_backfill_preserves_quantities_and_records_review(tmp_path):
 
 def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     app_js = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    app_css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     template = Path("PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")
 
     assert 'id="ingredientUnitConfig"' in template
@@ -242,10 +243,22 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert 'aria-autocomplete", "list"' in app_js
     assert 'aria-haspopup", "listbox"' in app_js
     assert 'list="recipeIngredientUnitOptions"' in app_js
-    assert "function openRecipeIngredientUnitPicker(input)" in app_js
-    assert 'typeof input.showPicker !== "function"' in app_js
-    assert 'input.addEventListener("click", () => openRecipeIngredientUnitPicker(input))' in app_js
-    assert 'event.key === "ArrowDown" && openRecipeIngredientUnitPicker(input)' in app_js
+    assert "function ensureRecipeIngredientUnitMenu()" in app_js
+    assert "function openRecipeIngredientUnitPicker(input, options = {})" in app_js
+    assert 'menu.id = "recipeIngredientUnitMenu";' in app_js
+    assert 'menu.setAttribute("role", "listbox");' in app_js
+    assert 'role="option"' in app_js
+    assert "function chooseRecipeIngredientUnit(button)" in app_js
+    assert "function handleRecipeIngredientUnitKeydown(event, input)" in app_js
+    assert 'input.setAttribute("aria-controls", "recipeIngredientUnitMenu")' in app_js
+    assert 'input.setAttribute("aria-expanded", "false")' in app_js
+    assert 'input.removeAttribute("list")' in app_js
+    assert 'input.addEventListener("click", () => openRecipeIngredientUnitPicker(input, { showAll: true }))' in app_js
+    assert 'input.addEventListener("keydown", event => handleRecipeIngredientUnitKeydown(event, input))' in app_js
+    assert 'typeof input.showPicker !== "function"' not in app_js
+    assert ".recipe-edit-row-menu.recipe-edit-unit-menu" in app_css
+    assert ".recipe-edit-unit-option.is-selected" in app_css
+    assert ".recipe-edit-unit-option.is-active" in app_css
     assert 'data-field="unit_id"' in app_js
     assert 'data-field="unit_raw"' in app_js
     assert 'data-field="size"' in app_js
