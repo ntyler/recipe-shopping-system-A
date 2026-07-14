@@ -90,6 +90,17 @@ if (missingFirebaseConfig(firebaseConfig)) {
 let backendSession = null;
 let explicitAuthInProgress = false;
 const TWO_FACTOR_PANEL_RETURN_KEY = "shoppingTwoFactorPanelReturn";
+const POST_AUTH_HOME_LOCAL_STORAGE_KEYS = [
+    "scrollY",
+    "user-account-open-panel",
+    "user-account-settings-open",
+];
+const POST_AUTH_HOME_SESSION_STORAGE_KEYS = [
+    TWO_FACTOR_PANEL_RETURN_KEY,
+    "recipe-edit-page-return-state",
+    "recipe-edit-pending-action",
+];
+const POST_AUTH_HOME_RESET_KEY = "shopping-post-auth-home-reset";
 
 function formValue(form, name) {
     return String((form.elements[name] || {}).value || "").trim();
@@ -258,6 +269,76 @@ function cancelCollapseAllBeforeAuthReload() {
     }
 }
 
+function clearPostAuthenticationNavigationState() {
+    try {
+        POST_AUTH_HOME_LOCAL_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    } catch (error) {
+        // Storage can be unavailable in private or restricted browser contexts.
+    }
+
+    try {
+        POST_AUTH_HOME_SESSION_STORAGE_KEYS.forEach((key) => sessionStorage.removeItem(key));
+    } catch (error) {
+        // Storage can be unavailable in private or restricted browser contexts.
+    }
+}
+
+function closePostAuthenticationTransientUi() {
+    document.querySelectorAll("dialog[open]").forEach((dialog) => {
+        if (typeof dialog.close === "function") {
+            dialog.close();
+        } else {
+            dialog.removeAttribute("open");
+        }
+    });
+    document.querySelectorAll("[data-account-menu][open]").forEach((menu) => menu.removeAttribute("open"));
+    document.querySelectorAll("[data-profile-menu-panel], [data-app-mobile-nav-drawer], [data-app-mobile-nav-backdrop]")
+        .forEach((panel) => {
+            panel.hidden = true;
+            panel.setAttribute("aria-hidden", "true");
+        });
+    document.querySelectorAll("[data-profile-menu-trigger], [data-app-mobile-nav-toggle]")
+        .forEach((trigger) => trigger.setAttribute("aria-expanded", "false"));
+    document.body.classList.remove("app-mobile-navigation-open");
+}
+
+function navigateToCanonicalHomeAfterAuthentication(options = {}) {
+    if (options.collapseAllBeforeReload) {
+        requestCollapseAllBeforeAuthReload();
+    }
+
+    clearPostAuthenticationNavigationState();
+    closePostAuthenticationTransientUi();
+
+    try {
+        sessionStorage.setItem(POST_AUTH_HOME_RESET_KEY, "1");
+    } catch (error) {
+        // The canonical URL replacement still resets the page when storage is unavailable.
+    }
+
+    if (typeof window.openHomeWorkspace === "function") {
+        window.openHomeWorkspace({ updateHash: false, scroll: false });
+    }
+
+    const homeLink = document.querySelector('[data-app-nav-action="home"]');
+    if (homeLink && typeof window.appShellSetActiveLink === "function") {
+        window.appShellSetActiveLink(homeLink);
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    const mainContent = document.querySelector("[data-app-content]");
+    if (mainContent && typeof mainContent.scrollTo === "function") {
+        mainContent.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
+
+    const canonicalHomeUrl = new URL("/", window.location.origin);
+    if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+    }
+    window.history.replaceState({}, document.title, canonicalHomeUrl.pathname);
+    window.location.replace(canonicalHomeUrl.href);
+}
+
 async function accountExistsForPasswordReset(email) {
     const query = new URLSearchParams({ email });
     return backendJson(`/auth/account-exists?${query.toString()}`, { method: "GET" });
@@ -327,7 +408,7 @@ function handleFirebaseBackendLogin(result, form, successMessage) {
     }
 
     setStatus(form, successMessage, "success");
-    reloadAccountSection({ collapseAllBeforeReload: true });
+    navigateToCanonicalHomeAfterAuthentication({ collapseAllBeforeReload: true });
     return true;
 }
 
@@ -1346,7 +1427,7 @@ if (auth) {
                     reloadAccountSection();
                     return;
                 }
-                reloadAccountSection({ collapseAllBeforeReload: true });
+                navigateToCanonicalHomeAfterAuthentication({ collapseAllBeforeReload: true });
                 return;
             }
 

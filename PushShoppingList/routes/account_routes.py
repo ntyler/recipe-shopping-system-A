@@ -358,6 +358,7 @@ def verify_account_creation_route(token):
     if result.get("ok"):
         session.pop("account_verification_link", None)
         flash("Account verified. You are signed in.", "success")
+        return redirect(url_for("main_bp.index"))
     else:
         flash_account_result(result, "")
 
@@ -377,7 +378,11 @@ def sign_in_route():
         return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
     flash_account_result(result, "Signed in.")
-    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+    destination = url_for("main_bp.index") if result.get("ok") else url_for(
+        "main_bp.index",
+        _anchor="userAccountSection",
+    )
+    response = make_response(redirect(destination))
     if result.get("ok"):
         clear_guest_cookie(response)
     return response
@@ -394,9 +399,11 @@ def verify_two_factor_route():
     if result.get("ok"):
         if two_factor_context == "setup_confirmation":
             flash("Two-factor setup confirmed. You are signed in.", "success")
+            destination = url_for("main_bp.index", _anchor="userAccountSection")
         else:
             flash("Signed in.", "success")
-        response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+            destination = url_for("main_bp.index")
+        response = make_response(redirect(destination))
 
         set_two_factor_trust_cookie(response, result.get("trust_token", ""))
         clear_guest_cookie(response)

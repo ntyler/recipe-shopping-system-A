@@ -67,6 +67,7 @@ const USER_ACCOUNT_PANEL_HIDE_SELECTOR = [
 ].join(", ");
 const AUTH_COLLAPSE_PENDING_KEY = "shopping-auth-collapse-all-pending";
 const AUTH_COLLAPSE_ACTIVE_KEY = "shopping-auth-collapse-all-active";
+const POST_AUTH_HOME_RESET_KEY = "shopping-post-auth-home-reset";
 const GLOBAL_COLLAPSE_STATE_KEY = "shopping-global-collapse-state";
 const APP_SIDEBAR_COLLAPSED_KEY = "ai-pantry-sidebar-collapsed";
 const PERFORMANCE_STARTUP_LAST_OPENED_KEY = "shopping-list-lastPageOpenedAt";
@@ -885,6 +886,33 @@ function initAppShellInitialWorkspace() {
         updateHash: false,
         scroll: false,
     });
+}
+
+function consumePostAuthenticationHomeReset() {
+    if (safeStorageGet(sessionStorage, POST_AUTH_HOME_RESET_KEY) !== "1") {
+        return false;
+    }
+
+    safeStorageRemove(sessionStorage, POST_AUTH_HOME_RESET_KEY);
+    if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+    }
+    window.history.replaceState({}, document.title, window.location.pathname || "/");
+    openHomeWorkspace({ updateHash: false, scroll: false });
+
+    const homeLink = appShellPrimaryNavigationLinks()
+        .find(link => String(link.dataset.appNavAction || "") === "home");
+    appShellSetActiveLink(homeLink || null);
+
+    window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        const mainContent = appMainScrollRegion();
+        if (mainContent && typeof mainContent.scrollTo === "function") {
+            mainContent.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        }
+    });
+
+    return true;
 }
 
 async function activateAppShellNavLink(link, options = {}) {
@@ -42441,6 +42469,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
         ["initJobActivityPanel", initJobActivityPanel],
         ["initAppShellNavigation", initAppShellNavigation],
+        ["consumePostAuthenticationHomeReset", consumePostAuthenticationHomeReset],
         ["initGlobalAppSearch", initGlobalAppSearch],
         ["initSettingsWorkspace", () => initSettingsWorkspace({ scroll: false })],
         ["initAppShellInitialWorkspace", initAppShellInitialWorkspace],
