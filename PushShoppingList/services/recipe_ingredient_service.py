@@ -102,6 +102,7 @@ def ingredient_detail_records(ingredients=None, recipe_metadata=None):
             "unit_raw": str(item.get("unit_raw") or "").strip(),
             "unit_review_required": truthy(item.get("unit_review_required")),
             "unit_review_value": str(item.get("unit_review_value") or "").strip(),
+            "unit_custom": truthy(item.get("unit_custom")),
             "size": str(item.get("size") or "").strip(),
             "preparation": str(item.get("preparation") or "").strip(),
             "notes": str(item.get("notes") or "").strip(),

@@ -626,6 +626,7 @@ def ensure_recipe_master_schema(connection=None):
             notes TEXT NOT NULL DEFAULT '',
             unit_review_required INTEGER NOT NULL DEFAULT 0,
             unit_review_value TEXT NOT NULL DEFAULT '',
+            unit_custom INTEGER NOT NULL DEFAULT 0,
             buy_as TEXT NOT NULL DEFAULT '',
             store_section TEXT NOT NULL DEFAULT '',
             original_recipe_text TEXT NOT NULL DEFAULT '',
@@ -709,6 +710,7 @@ def ensure_recipe_master_schema(connection=None):
         "notes": "TEXT NOT NULL DEFAULT ''",
         "unit_review_required": "INTEGER NOT NULL DEFAULT 0",
         "unit_review_value": "TEXT NOT NULL DEFAULT ''",
+        "unit_custom": "INTEGER NOT NULL DEFAULT 0",
     }
     for column_name, column_definition in recipe_ingredient_column_definitions.items():
         if column_name not in recipe_ingredient_columns:
@@ -1376,6 +1378,7 @@ def list_master_record_recipe_references(
                 r.notes,
                 r.unit_review_required,
                 r.unit_review_value,
+                r.unit_custom,
                 r.buy_as,
                 r.store_section,
                 r.original_recipe_text,
@@ -1393,6 +1396,7 @@ def list_master_record_recipe_references(
                 '' AS notes,
                 0 AS unit_review_required,
                 '' AS unit_review_value,
+                0 AS unit_custom,
                 '' AS buy_as,
                 '' AS store_section,
                 r.original_recipe_text,
@@ -1458,6 +1462,7 @@ def list_master_record_recipe_references(
             "notes": clean_text(row_data.get("notes")),
             "unit_review_required": bool(row_data.get("unit_review_required")),
             "unit_review_value": clean_text(row_data.get("unit_review_value")),
+            "unit_custom": bool(row_data.get("unit_custom")),
             "buy_as": clean_text(row_data.get("buy_as")),
             "store_section": clean_ingredient_store_section(row_data.get("store_section"), default="")
             if table_name == "ingredients"
@@ -1738,6 +1743,7 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             notes = clean_text(item.get("notes"))
             unit_review_required = truthy(item.get("unit_review_required"))
             unit_review_value = clean_text(item.get("unit_review_value"))
+            unit_custom = truthy(item.get("unit_custom"))
             buy_as = clean_text(item.get("buy_as") or item.get("purchasable_item") or item.get("purchase_group"))
             normalized_name = normalized_master_name(
                 item.get("master_normalized_name") or item.get("normalized_name")
@@ -1761,6 +1767,7 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             notes = ""
             unit_review_required = False
             unit_review_value = ""
+            unit_custom = False
             buy_as = ""
             normalized_name = ""
             store_section = ""
@@ -1781,6 +1788,7 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             "notes": notes,
             "unit_review_required": unit_review_required,
             "unit_review_value": unit_review_value,
+            "unit_custom": unit_custom,
             "buy_as": buy_as,
             "store_section": store_section,
             "original_recipe_text": original_text,
@@ -2143,10 +2151,10 @@ def sync_recipe_master_records(
                 INSERT INTO recipe_ingredients (
                     user_id, recipe_id, ingredient_id, quantity, unit, unit_id,
                     unit_raw, size, preparation, notes, unit_review_required,
-                    unit_review_value, buy_as, store_section,
+                    unit_review_value, unit_custom, buy_as, store_section,
                     original_recipe_text, optional, sort_order
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -2161,6 +2169,7 @@ def sync_recipe_master_records(
                     row.get("notes", ""),
                     1 if row.get("unit_review_required") else 0,
                     row.get("unit_review_value", ""),
+                    1 if row.get("unit_custom") else 0,
                     row.get("buy_as", ""),
                     row.get("store_section", ""),
                     row.get("original_recipe_text", ""),

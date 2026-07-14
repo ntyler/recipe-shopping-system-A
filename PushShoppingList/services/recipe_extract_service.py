@@ -9573,6 +9573,13 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
             "quantity": quantity,
             "recipe_qty": clean_recipe_text(raw_option.get("recipe_qty") or quantity),
             "unit": unit,
+            "unit_id": clean_recipe_text(raw_option.get("unit_id") or ""),
+            "unit_raw": clean_recipe_text(raw_option.get("unit_raw") or unit),
+            "unit_review_required": str(raw_option.get("unit_review_required") or "").strip().lower()
+            in {"1", "true", "yes", "y", "on"},
+            "unit_review_value": clean_recipe_text(raw_option.get("unit_review_value") or ""),
+            "unit_custom": str(raw_option.get("unit_custom") or "").strip().lower()
+            in {"1", "true", "yes", "y", "on"},
             "base_quantity": clean_recipe_text(raw_option.get("base_quantity") or quantity),
             "base_unit": clean_recipe_text(raw_option.get("base_unit") or unit),
             "ingredient": item_name,
@@ -9584,6 +9591,8 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
                 or raw_option.get("reason")
                 or ""
             ),
+            "size": clean_recipe_text(raw_option.get("size") or ""),
+            "notes": clean_recipe_text(raw_option.get("notes") or ""),
             "confidence": clean_recipe_text(raw_option.get("confidence") or "medium"),
             "inferred": bool(raw_option.get("inferred", True)),
             "warning": clean_recipe_text(raw_option.get("warning") or ""),

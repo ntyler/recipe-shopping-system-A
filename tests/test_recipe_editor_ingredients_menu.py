@@ -704,6 +704,8 @@ def test_recipe_editor_substitution_primary_fields_stay_inline_with_wide_ingredi
     assert "minmax(320px, 1.9fr)" in polish
     assert "min-width: 1220px;" in polish
     assert "--recipe-edit-substitution-gap: 12px;" in polish
+    assert "grid-template-rows: 64px auto;" in polish
+    assert "align-items: start;" in polish
 
     name_start = polish.index(
         "body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-ingredient-name-label {"
@@ -746,16 +748,20 @@ def test_recipe_editor_substitution_primary_fields_stay_inline_with_wide_ingredi
     organizer_start = script.index("function organizeRecipeEditSubstitutionOptionRow")
     organizer_end = script.index("function organizeRecipeEditIngredientRow", organizer_start)
     organizer = script[organizer_start:organizer_end]
-    assert "name.appendChild(details);" in organizer
-    assert "optionRow.appendChild(details);" not in organizer
+    assert "optionRow.appendChild(details);" in organizer
+    assert "name.appendChild(details);" not in organizer
 
-    details_open_start = polish.index(
-        ".recipe-edit-ingredient-options-panel .recipe-edit-substitution-details[open] {"
+    details_start = polish.index(
+        ".recipe-edit-ingredient-options-panel .recipe-edit-substitution-details {"
     )
-    details_open_end = polish.index("}", details_open_start)
-    details_open = polish[details_open_start:details_open_end]
-    assert "grid-column: 1 / -1 !important;" in details_open
-    assert "grid-row: 2 !important;" in details_open
+    details_end = polish.index("}", details_start)
+    details_rule = polish[details_start:details_end]
+    assert "grid-column: 2 / 9 !important;" in details_rule
+    assert "grid-row: 2 !important;" in details_rule
+    assert "justify-self: stretch;" in details_rule
+
+    assert "minmax(280px, 1.4fr);" in polish
+    assert ".recipe-edit-substitution-detail-fields > *" in polish
 
 
 def test_recipe_editor_advanced_fields_pair_preparation_and_buy_as():

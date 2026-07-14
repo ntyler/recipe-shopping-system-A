@@ -101,6 +101,30 @@ def test_forbidden_and_unknown_unit_values_never_become_canonical_units(caplog):
     assert cleared["unit"] == ""
 
 
+def test_explicit_custom_unit_is_preserved_without_weakening_unknown_unit_review():
+    custom = normalize_ingredient_unit_fields({
+        "ingredient": "protein powder",
+        "quantity": "1",
+        "unit": "scoop",
+        "unit_custom": True,
+    })
+    assert custom["unit"] == "scoop"
+    assert custom["unit_id"] == ""
+    assert custom["unit_custom"] is True
+    assert custom["unit_review_required"] is False
+    assert custom["unit_review_value"] == ""
+
+    unknown = normalize_ingredient_unit_fields({
+        "ingredient": "protein powder",
+        "quantity": "1",
+        "unit": "scoop",
+    }, log_unrecognized=False)
+    assert unknown["unit"] == ""
+    assert unknown["unit_custom"] is False
+    assert unknown["unit_review_required"] is True
+    assert unknown["unit_review_value"] == "scoop"
+
+
 def test_shared_post_extraction_normalizer_covers_aliases_and_review_flags():
     recipe = {
         "ingredients": [
@@ -190,6 +214,10 @@ def test_master_schema_seeds_registry_and_migrates_legacy_rows_with_report():
     master_data.ensure_recipe_master_schema(connection)
 
     assert connection.execute("SELECT COUNT(*) FROM canonical_units").fetchone()[0] == len(CANONICAL_UNITS)
+    recipe_ingredient_columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(recipe_ingredients)").fetchall()
+    }
+    assert "unit_custom" in recipe_ingredient_columns
     assert connection.execute("SELECT COUNT(*) FROM unit_aliases WHERE alias = 'tbsp'").fetchone()[0] == 1
     row = connection.execute(
         "SELECT unit, unit_id, unit_raw, unit_review_required FROM recipe_ingredients"
@@ -250,6 +278,17 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert 'role="option"' in app_js
     assert "function chooseRecipeIngredientUnit(button)" in app_js
     assert "function handleRecipeIngredientUnitKeydown(event, input)" in app_js
+    assert 'RECIPE_INGREDIENT_CUSTOM_UNITS_KEY = "recipeIngredientCustomUnits"' in app_js
+    assert "function addRecipeIngredientCustomUnit(button)" in app_js
+    assert "function storeRecipeIngredientCustomUnitNames(values)" in app_js
+    assert "function replaceRecipeIngredientCustomUnitName(previousValue, nextValue)" in app_js
+    assert "function editRecipeIngredientCustomUnit(button)" in app_js
+    assert 'data-unit-action="add-custom"' in app_js
+    assert 'data-unit-action="edit-custom"' in app_js
+    assert 'aria-label="Edit custom unit ${escapeAttribute(value)}"' in app_js
+    assert "Open ingredient rows using it will be cleared." in app_js
+    assert 'document.querySelectorAll(\'.recipe-edit-ingredient-row [data-field="unit"]\')' in app_js
+    assert "Add custom unit…" in app_js
     assert 'input.setAttribute("aria-controls", "recipeIngredientUnitMenu")' in app_js
     assert 'input.setAttribute("aria-expanded", "false")' in app_js
     assert 'input.removeAttribute("list")' in app_js
@@ -259,8 +298,12 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert ".recipe-edit-row-menu.recipe-edit-unit-menu" in app_css
     assert ".recipe-edit-unit-option.is-selected" in app_css
     assert ".recipe-edit-unit-option.is-active" in app_css
+    assert ".recipe-edit-unit-add-option" in app_css
+    assert ".recipe-edit-unit-custom-row" in app_css
+    assert ".recipe-edit-unit-edit-button" in app_css
     assert 'data-field="unit_id"' in app_js
     assert 'data-field="unit_raw"' in app_js
+    assert 'data-field="unit_custom"' in app_js
     assert 'data-field="size"' in app_js
     assert 'data-field="preparation"' in app_js
     assert 'data-field="notes"' in app_js

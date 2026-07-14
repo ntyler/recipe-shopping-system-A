@@ -228,10 +228,17 @@ def normalize_ingredient_unit_fields(item, *, log_unrecognized=True):
         item["unit_raw"] = saved_raw
 
     key = _unit_key(candidate)
+    explicit_custom = str(item.get("unit_custom") or "").strip().lower() in {"1", "true", "yes", "on"}
+    normalized = canonical_unit(candidate) if candidate else None
+    preserved_custom = bool(candidate and explicit_custom and not normalized)
     item["unit_review_required"] = False
     item["unit_review_value"] = ""
+    item["unit_custom"] = preserved_custom
 
-    if key in SIZE_VALUES:
+    if preserved_custom:
+        item["unit"] = candidate
+        item["unit_id"] = ""
+    elif key in SIZE_VALUES:
         item["size"] = item.get("size") or key
         item["unit"] = ""
         item["unit_id"] = ""
@@ -257,10 +264,10 @@ def normalize_ingredient_unit_fields(item, *, log_unrecognized=True):
             item["unit_review_required"] = True
             item["unit_review_value"] = candidate
     elif candidate:
-        normalized = canonical_unit(candidate)
         if normalized:
             item["unit"] = normalized["name"]
             item["unit_id"] = normalized["id"]
+            item["unit_custom"] = False
         else:
             item["unit"] = ""
             item["unit_id"] = ""
@@ -278,26 +285,27 @@ def normalize_ingredient_unit_fields(item, *, log_unrecognized=True):
 
     ingredient = _clean_phrase(item.get("ingredient") or item.get("name") or item.get("parsed_name"))
     original = _clean_phrase(item.get("original_text") or item.get("original_recipe_text"))
-    optional_match = re.search(r"(?:,?\s+)(to taste|as needed)\s*$", ingredient, re.I)
-    if not optional_match:
-        optional_match = re.search(r"(?:,?\s+)(to taste|as needed)\s*$", original, re.I)
-    if optional_match:
-        optional = canonical_unit(optional_match.group(1))
-        item["unit"] = optional["name"]
-        item["unit_id"] = optional["id"]
-        item["quantity"] = ""
-        item["recipe_qty"] = ""
-        item["base_quantity"] = ""
-        item["unit_review_required"] = False
-        item["unit_review_value"] = ""
-        item["ingredient"] = re.sub(
-            r"(?:,?\s+)(?:to taste|as needed)\s*$", "", ingredient, flags=re.I
-        ).strip()
-        item["preparation"] = re.sub(
-            r"(?:^|,\s*)(?:to taste|as needed)(?:\s*,|$)", "", _clean_phrase(item.get("preparation")), flags=re.I
-        ).strip(" ,")
+    if not preserved_custom:
+        optional_match = re.search(r"(?:,?\s+)(to taste|as needed)\s*$", ingredient, re.I)
+        if not optional_match:
+            optional_match = re.search(r"(?:,?\s+)(to taste|as needed)\s*$", original, re.I)
+        if optional_match:
+            optional = canonical_unit(optional_match.group(1))
+            item["unit"] = optional["name"]
+            item["unit_id"] = optional["id"]
+            item["quantity"] = ""
+            item["recipe_qty"] = ""
+            item["base_quantity"] = ""
+            item["unit_review_required"] = False
+            item["unit_review_value"] = ""
+            item["ingredient"] = re.sub(
+                r"(?:,?\s+)(?:to taste|as needed)\s*$", "", ingredient, flags=re.I
+            ).strip()
+            item["preparation"] = re.sub(
+                r"(?:^|,\s*)(?:to taste|as needed)(?:\s*,|$)", "", _clean_phrase(item.get("preparation")), flags=re.I
+            ).strip(" ,")
 
-    _strip_leading_metadata(item)
+        _strip_leading_metadata(item)
 
     base_unit = _clean_phrase(item.get("base_unit"))
     if base_unit:
