@@ -400,6 +400,11 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "Discard unsaved restaurant changes?" in script
     assert 'document.body.classList.add("restaurant-source-modal-open")' in script
     assert "document.body.appendChild(modal);" in script
+    assert "function closeRecipeRestaurantModalBackgroundPopovers()" in script
+    assert 'document.querySelectorAll("[data-profile-menu]")' in script
+    assert 'document.querySelectorAll("[data-global-search-form]")' in script
+    assert "function captureRecipeRestaurantModalScrollState()" in script
+    assert "function restoreRecipeRestaurantModalScrollState()" in script
     assert ".map(element => ({ element, wasInert: Boolean(element.inert) }))" in script
     assert "item.element.inert = true" in script
     assert "item.element.inert = item.wasInert" in script
@@ -408,9 +413,17 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert ".recipe-edit-standalone-page .recipe-edit-restaurant-form {" in css
     assert ".recipe-edit-restaurant-modal-backdrop {" in css
     assert ".recipe-edit-restaurant-modal-body {" in css
-    assert "width: min(96vw, 1440px);" in css
-    assert "height: min(900px, 94vh);" in css
-    assert "max-height: 94vh;" in css
+    assert "--app-layer-sticky-shell: 18500;" in css
+    assert "--app-layer-floating: 19000;" in css
+    assert "--app-layer-modal-backdrop: 20000;" in css
+    assert "--app-layer-modal-panel: 20010;" in css
+    assert "z-index: var(--app-layer-modal-backdrop);" in css
+    assert "width: 100vw;" in css
+    assert "height: 100dvh;" in css
+    assert "width: min(1440px, 100%);" in css
+    assert "height: min(900px, 100%);" in css
+    assert "max-width: calc(100vw - 32px);" in css
+    assert "max-height: calc(100dvh - 32px);" in css
     assert "grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);" in css
     assert "recipe-edit-restaurant-primary-column" in template
     assert "recipe-edit-restaurant-operational-column" in template

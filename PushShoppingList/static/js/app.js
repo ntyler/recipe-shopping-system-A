@@ -26177,6 +26177,7 @@ let recipeRestaurantEditSnapshot = "";
 let recipeRestaurantEditTrigger = null;
 let recipeRestaurantDisplaySource = null;
 let recipeRestaurantModalInertElements = [];
+let recipeRestaurantModalScrollState = null;
 let recipeRestaurantUsageRecipes = [];
 let recipeRestaurantUsageRestaurantId = "";
 let recipeRestaurantUsagePage = 1;
@@ -26204,6 +26205,50 @@ let recipeRestaurantOriginalRestaurantId = "";
 let recipeRestaurantDuplicateCandidates = [];
 let recipeRestaurantFetchedProposals = {};
 let recipeRestaurantInformationScan = null;
+
+function closeRecipeRestaurantModalBackgroundPopovers() {
+    document.querySelectorAll("[data-profile-menu]").forEach(menu => {
+        closeHeaderProfileMenu(menu);
+    });
+    document.querySelectorAll("[data-account-menu][open]").forEach(menu => {
+        closeAccountMenuDropdown(menu);
+    });
+    document.querySelectorAll("[data-global-search-form]").forEach(form => {
+        globalAppSearchCloseDropdown(form);
+    });
+    closeRecipeEditRowMenus();
+    closeRecipeIngredientRowMenus();
+}
+
+function captureRecipeRestaurantModalScrollState() {
+    const containers = Array.from(document.querySelectorAll("[data-app-content], .app-sidebar"))
+        .map(element => ({
+            element,
+            scrollLeft: element.scrollLeft,
+            scrollTop: element.scrollTop,
+        }));
+    return {
+        containers,
+        windowX: window.scrollX,
+        windowY: window.scrollY,
+    };
+}
+
+function restoreRecipeRestaurantModalScrollState() {
+    const state = recipeRestaurantModalScrollState;
+    recipeRestaurantModalScrollState = null;
+    if (!state) return;
+    state.containers.forEach(({ element, scrollLeft, scrollTop }) => {
+        if (!element.isConnected) return;
+        element.scrollLeft = scrollLeft;
+        element.scrollTop = scrollTop;
+    });
+    window.scrollTo({
+        top: state.windowY,
+        left: state.windowX,
+        behavior: "auto",
+    });
+}
 
 function recipeRestaurantRecordId(record) {
     return String(record?.restaurant_id || record?.id || "").trim();
@@ -28639,9 +28684,11 @@ function editRecipeRestaurantSource(button, event = null) {
     else setRecipeRestaurantUsageEmpty();
     recipeRestaurantEditSnapshot = JSON.stringify(recipeRestaurantEditComparableState(form));
     recipeRestaurantEditTrigger = button;
+    closeRecipeRestaurantModalBackgroundPopovers();
     if (modal.parentElement !== document.body) {
         document.body.appendChild(modal);
     }
+    recipeRestaurantModalScrollState = captureRecipeRestaurantModalScrollState();
     recipeRestaurantModalInertElements = Array.from(document.body.children)
         .filter(element => element !== modal)
         .map(element => ({ element, wasInert: Boolean(element.inert) }));
@@ -28680,6 +28727,7 @@ function closeRecipeRestaurantSourceModal(options = {}) {
     document.body.classList.remove("restaurant-source-modal-open");
     recipeRestaurantModalInertElements.forEach(item => { item.element.inert = item.wasInert; });
     recipeRestaurantModalInertElements = [];
+    restoreRecipeRestaurantModalScrollState();
     recipeRestaurantEditSnapshot = "";
     recipeRestaurantEditSelection = null;
     recipeRestaurantEditCreateMode = false;
@@ -28738,10 +28786,14 @@ document.addEventListener("keydown", event => {
     if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
+    const activeElement = document.activeElement;
+    if (!modal.contains(activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+    } else if (event.shiftKey && activeElement === first) {
         event.preventDefault();
         last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
+    } else if (!event.shiftKey && activeElement === last) {
         event.preventDefault();
         first.focus();
     }
