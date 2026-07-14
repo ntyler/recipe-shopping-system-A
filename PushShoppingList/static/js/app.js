@@ -22391,6 +22391,7 @@ let recipeEditDraggedRow = null;
 let recipeEditPointerDrag = null;
 let recipeEditPdfRefreshTimer = null;
 let recipeEditPdfRefreshToken = 0;
+let recipeEditIngredientDetailsId = 0;
 let recipeEditReturnState = null;
 let recipeEditorPrefetchBound = false;
 let recipeCoverImageGenerationPending = false;
@@ -25426,15 +25427,14 @@ function organizeRecipeEditIngredientTools() {
         tableHead.setAttribute("aria-hidden", "true");
         tableHead.innerHTML = `
             <span></span>
-            <span>Image</span>
+            <span></span>
             <span>Ingredient</span>
             <span>Amount</span>
             <span>Unit</span>
             <span>Store Section</span>
             <span>Type</span>
             <span>Options</span>
-            <span>Edit</span>
-            <span>Delete</span>
+            <span>Actions</span>
         `;
     }
     tableScroll.appendChild(tableHead);
@@ -25525,6 +25525,19 @@ function organizeRecipeEditIngredientRow(row) {
         row.appendChild(imagePanel);
     }
 
+    const primaryFields = [
+        row.querySelector(":scope > .recipe-edit-qty-label"),
+        row.querySelector(":scope > .recipe-edit-unit-label"),
+        row.querySelector(":scope > .recipe-edit-store-section-label"),
+        row.querySelector(":scope > .recipe-edit-section-label"),
+    ].filter(Boolean);
+    if (primaryFields.length) {
+        const primary = document.createElement("div");
+        primary.className = "recipe-edit-ingredient-primary-fields";
+        primaryFields.forEach(field => primary.appendChild(field));
+        row.appendChild(primary);
+    }
+
     const substitutions = row.querySelector("[data-ingredient-substitutions]");
     const menuWrap = Array.from(row.children)
         .find(child => child.classList && child.classList.contains("recipe-edit-row-menu-wrap"));
@@ -25555,6 +25568,8 @@ function organizeRecipeEditIngredientRow(row) {
     }
 
     const advancedFields = [
+        row.querySelector(".recipe-edit-size-inline"),
+        row.querySelector(".recipe-edit-notes-inline"),
         row.querySelector(".recipe-edit-preparation-inline"),
         row.querySelector(".recipe-edit-original-text-label"),
         row.querySelector(".recipe-edit-buy-as-label"),
@@ -25563,16 +25578,25 @@ function organizeRecipeEditIngredientRow(row) {
     if (advancedFields.length) {
         const details = document.createElement("details");
         details.className = "recipe-edit-ingredient-advanced-details";
+        recipeEditIngredientDetailsId += 1;
+        details.id = `recipeEditIngredientDetails${recipeEditIngredientDetailsId}`;
         details.innerHTML = `
-            <summary>${recipeEditSvgIcon("chevron-down")}<span>More fields</span></summary>
+            <summary class="recipe-edit-ingredient-details-native-summary">More details</summary>
             <div class="recipe-edit-ingredient-advanced-fields"></div>
         `;
         const body = details.querySelector(".recipe-edit-ingredient-advanced-fields");
         advancedFields.forEach(field => body.appendChild(field));
         row.appendChild(details);
+        details.addEventListener("toggle", () => updateRecipeEditIngredientDetailsState(row));
+    }
+
+    const metadata = row.querySelector(".recipe-edit-ingredient-metadata-inline");
+    if (metadata && !metadata.children.length) {
+        metadata.remove();
     }
 
     organizeRecipeEditCompactRowActions(row, '[data-field="ingredient"]', "ingredient");
+    updateRecipeEditIngredientDetailsState(row);
     updateRecipeIngredientSubstitutionState(row);
 }
 
@@ -25582,10 +25606,25 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
     }
 
     const label = String(itemLabel || "row").trim() || "row";
+    const details = row.querySelector(":scope > .recipe-edit-ingredient-advanced-details");
+    const detailsButton = details ? `
+        <button type="button"
+                class="recipe-edit-compact-row-details"
+                data-recipe-edit-ingredient-details-toggle
+                aria-label="More details"
+                aria-controls="${escapeAttribute(details.id)}"
+                aria-expanded="false"
+                title="More details"
+                onclick="return toggleRecipeEditIngredientDetails(this)">
+            ${recipeEditSvgIcon("chevron-down")}
+            <span class="sr-only" data-recipe-edit-details-label>More details</span>
+        </button>
+    ` : "";
     const actions = document.createElement("div");
     actions.className = "recipe-edit-compact-row-actions";
     actions.dataset.recipeEditCompactRowActions = "";
     actions.innerHTML = `
+        ${detailsButton}
         <button type="button"
                 class="recipe-edit-compact-row-edit"
                 data-recipe-edit-focus-selector="${escapeAttribute(focusSelector || "input, textarea, select")}"
@@ -25623,6 +25662,36 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
     if (focusField && label === "ingredient") {
         focusField.addEventListener("input", updateActionLabels);
     }
+}
+
+function updateRecipeEditIngredientDetailsState(row) {
+    const details = row ? row.querySelector(":scope > .recipe-edit-ingredient-advanced-details") : null;
+    const button = row ? row.querySelector("[data-recipe-edit-ingredient-details-toggle]") : null;
+    if (!details || !button) {
+        return;
+    }
+    const expanded = Boolean(details.open);
+    const label = expanded ? "Hide details" : "More details";
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.classList.toggle("is-expanded", expanded);
+    const labelElement = button.querySelector("[data-recipe-edit-details-label]");
+    if (labelElement) {
+        labelElement.textContent = label;
+    }
+    row.classList.toggle("recipe-edit-ingredient-details-open", expanded);
+}
+
+function toggleRecipeEditIngredientDetails(button) {
+    const row = recipeEditActionRowFromButton(button);
+    const details = row ? row.querySelector(":scope > .recipe-edit-ingredient-advanced-details") : null;
+    if (!details) {
+        return false;
+    }
+    details.open = !details.open;
+    updateRecipeEditIngredientDetailsState(row);
+    return false;
 }
 
 function focusRecipeEditCompactRow(button) {
@@ -32322,7 +32391,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
             </div>
             <label class="recipe-edit-original-text-label">
                 <span>Original Recipe Text</span>
-                <input type="text" data-field="original_text" value="${escapeAttribute(item.original_text || "")}">
+                <textarea data-field="original_text" rows="2" readonly>${escapeHtml(item.original_text || "")}</textarea>
             </label>
             <span class="recipe-edit-choice-review" data-ingredient-choice-review hidden>
                 <span class="recipe-edit-choice-prompt">Pick one option</span>
@@ -32350,7 +32419,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
             ${ingredientImagePanelHtml}
         </div>
         <label class="recipe-edit-qty-label">
-            <span>Qty</span>
+            <span>Amount</span>
             <input type="text" data-field="quantity" value="${escapeAttribute(item.quantity || "")}">
         </label>
         <label class="recipe-edit-unit-label">
@@ -32375,7 +32444,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
             <select data-field="section">${recipeIngredientTypeOptions(ingredientType, Boolean(item.optional))}</select>
         </label>
         <label class="recipe-edit-store-section-label">
-            <span class="sr-only">Store Section</span>
+            <span>Store Section</span>
             ${recipeIngredientStoreSectionIconHtml(item.store_section || "")}
             <select data-field="store_section" onchange="syncRecipeIngredientStoreSectionControl(this)">${recipeStoreSectionOptions(item.store_section || "")}</select>
         </label>
@@ -32612,6 +32681,8 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         if (label) {
             label.textContent = optionRows.length ? optionLabel : "No options";
         }
+        optionsButton.classList.toggle("is-empty", optionRows.length === 0);
+        optionsButton.title = optionRows.length ? `View ${optionLabel}` : "No alternatives saved; open ingredient actions";
         optionsButton.setAttribute("aria-label", optionRows.length
             ? `View ${optionLabel} for this ingredient`
             : "Ingredient options and actions");

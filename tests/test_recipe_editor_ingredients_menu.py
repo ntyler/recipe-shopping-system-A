@@ -335,6 +335,61 @@ def test_recipe_editor_ingredient_row_menu_is_grouped():
     assert ".recipe-edit-row-menu .recipe-edit-menu-group-danger button.delete" in css
 
 
+def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    tools_start = script.index("function organizeRecipeEditIngredientTools()")
+    tools_end = script.index("function organizeRecipeEditEquipmentTools()", tools_start)
+    tools = script[tools_start:tools_end]
+    assert "<span>Ingredient</span>" in tools
+    assert "<span>Amount</span>" in tools
+    assert "<span>Store Section</span>" in tools
+    assert "<span>Options</span>" in tools
+    assert "<span>Actions</span>" in tools
+    assert "<span>Image</span>" not in tools
+    assert "<span>Edit</span>" not in tools
+    assert "<span>Delete</span>" not in tools
+
+    organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
+    organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
+    organize = script[organize_start:organize_end]
+    assert 'primary.className = "recipe-edit-ingredient-primary-fields";' in organize
+    assert 'row.querySelector(".recipe-edit-size-inline")' in organize
+    assert 'row.querySelector(".recipe-edit-notes-inline")' in organize
+    assert 'row.querySelector(".recipe-edit-preparation-inline")' in organize
+    assert 'row.querySelector(".recipe-edit-buy-as-label")' in organize
+    assert 'row.querySelector(".recipe-edit-optional-label")' in organize
+    assert 'row.querySelector(".recipe-edit-original-text-label")' in organize
+    assert 'details.id = `recipeEditIngredientDetails${recipeEditIngredientDetailsId}`;' in organize
+    assert 'details.addEventListener("toggle", () => updateRecipeEditIngredientDetailsState(row));' in organize
+
+    row_start = script.index("function addRecipeIngredientRow")
+    row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
+    row_markup = script[row_start:row_end]
+    assert '<span>Amount</span>' in row_markup
+    assert '<span>Store Section</span>' in row_markup
+    assert '<textarea data-field="original_text" rows="2" readonly>' in row_markup
+    assert 'data-recipe-edit-ingredient-details-toggle' in script
+    assert 'aria-expanded="false"' in script
+    assert 'const label = expanded ? "Hide details" : "More details";' in script
+    assert 'optionsButton.classList.toggle("is-empty", optionRows.length === 0);' in script
+
+    v5 = css[css.index("/* Ingredient editor v5:"):]
+    assert "min-width: 900px;" in v5
+    assert "minmax(180px, 1fr)" in v5
+    assert "minmax(132px, 160px)" in v5
+    assert "min-height: 76px !important;" in v5
+    assert ".recipe-edit-ingredient-primary-fields" in v5
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in v5
+    assert ".recipe-edit-ingredient-options-button.is-empty" in v5
+    assert ".recipe-edit-compact-row-details.is-expanded" in v5
+    assert "@media (min-width: 761px) and (max-width: 1199px)" in v5
+    assert "@media (max-width: 760px)" in v5
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in v5
+    assert "grid-column: 1 / -1;" in v5
+
+
 def test_bulk_image_generation_menus_include_title_image_scope():
     recipe_view = (ROOT / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
     current_log = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")
