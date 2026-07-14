@@ -987,6 +987,36 @@ def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     assert "@media (max-width: 767px)" in css
 
 
+def test_recipe_editor_ingredients_workspace_spans_both_desktop_editing_columns():
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    wide_workspace_start = css.index("/* Wide recipe workspace:")
+    wide_workspace_end = css.index("\n}\n", wide_workspace_start) + 3
+    wide_workspace = css[wide_workspace_start:wide_workspace_end]
+
+    assert "@media (min-width: 1500px)" in wide_workspace
+    assert ".recipe-edit-standalone-page .recipe-edit-main-workspace {\n        display: contents;" in wide_workspace
+    assert ".recipe-edit-standalone-page .recipe-edit-info-panel {\n        grid-column: 1;\n        grid-row: 1;" in wide_workspace
+    assert ".recipe-edit-standalone-page .recipe-edit-utility-column {\n        grid-column: 2;\n        grid-row: 1;" in wide_workspace
+    assert ".recipe-edit-standalone-page .recipe-edit-tabs-card {\n        grid-column: 1 / 3;\n        grid-row: 2;" in wide_workspace
+    assert ".recipe-edit-standalone-page .recipe-edit-context-sidebar {\n        grid-column: 3;\n        grid-row: 1 / 3;" in wide_workspace
+
+
+def test_recipe_editor_wide_ingredients_workspace_grows_and_scrolls_internally():
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    wide_workspace_start = css.index("/* Wide recipe workspace:")
+    wide_workspace = css[wide_workspace_start:]
+
+    assert ".recipe-edit-standalone-page .recipe-edit-backdrop.open {\n        display: flex;\n        min-height: 100%;" in wide_workspace
+    assert "grid-template-rows: auto minmax(360px, 1fr);" in wide_workspace
+    assert ".recipe-edit-standalone-page .recipe-edit-tab-list {\n        position: sticky;" in wide_workspace
+    assert ".recipe-edit-ingredients-section > .recipe-edit-section-header {\n        position: sticky;" in wide_workspace
+    assert ".recipe-edit-ingredients-section:not([hidden]) {\n        display: flex;" in wide_workspace
+    assert ".recipe-edit-ingredients-section .recipe-edit-ingredient-table-scroll {" in wide_workspace
+    assert "flex: 1 1 auto;\n        overflow: auto;" in wide_workspace
+
+
 def test_recipe_editor_description_loads_and_saves_existing_field(monkeypatch, tmp_path):
     configure_recipe_editor_storage(monkeypatch, tmp_path)
     url = "https://example.com/recipes/description-soup"
