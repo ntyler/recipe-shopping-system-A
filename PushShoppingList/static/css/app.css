@@ -32727,10 +32727,12 @@ body.public-auth-page {
     --public-privacy-art-decoration: rgba(22, 163, 74, 0.16);
     --public-privacy-art-dot-fill: rgba(34, 197, 94, 0.24);
     --public-privacy-art-dot-stroke: rgba(22, 163, 74, 0.34);
-    --public-privacy-art-outer: #158b3b;
-    --public-privacy-art-outer-stroke: #08752f;
-    --public-privacy-art-inner: #68d67d;
-    --public-privacy-art-facet: #46bd64;
+    --public-privacy-art-node-fill: #148d39;
+    --public-privacy-art-node-stroke: #20b84f;
+    --public-privacy-art-outer: #2dcc61;
+    --public-privacy-art-outer-stroke: #0f9f3d;
+    --public-privacy-art-inner: #64d67c;
+    --public-privacy-art-facet: #43bd62;
     --public-privacy-art-check: #08712c;
     --public-privacy-art-shadow: rgba(8, 70, 31, 0.26);
     position: absolute;
@@ -32749,11 +32751,13 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     --public-privacy-art-decoration: rgba(74, 222, 141, 0.18);
     --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.36);
     --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.46);
-    --public-privacy-art-outer: #08713a;
-    --public-privacy-art-outer-stroke: #36d983;
-    --public-privacy-art-inner: #42c979;
-    --public-privacy-art-facet: #28a960;
-    --public-privacy-art-check: #063f22;
+    --public-privacy-art-node-fill: #087f31;
+    --public-privacy-art-node-stroke: #22c55e;
+    --public-privacy-art-outer: #45e87e;
+    --public-privacy-art-outer-stroke: #18b84f;
+    --public-privacy-art-inner: #4ace70;
+    --public-privacy-art-facet: #33b95d;
+    --public-privacy-art-check: #ffebcc;
     --public-privacy-art-shadow: rgba(0, 0, 0, 0.42);
 }
 
@@ -32762,11 +32766,13 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
         --public-privacy-art-decoration: rgba(74, 222, 141, 0.18);
         --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.36);
         --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.46);
-        --public-privacy-art-outer: #08713a;
-        --public-privacy-art-outer-stroke: #36d983;
-        --public-privacy-art-inner: #42c979;
-        --public-privacy-art-facet: #28a960;
-        --public-privacy-art-check: #063f22;
+        --public-privacy-art-node-fill: #087f31;
+        --public-privacy-art-node-stroke: #22c55e;
+        --public-privacy-art-outer: #45e87e;
+        --public-privacy-art-outer-stroke: #18b84f;
+        --public-privacy-art-inner: #4ace70;
+        --public-privacy-art-facet: #33b95d;
+        --public-privacy-art-check: #ffebcc;
         --public-privacy-art-shadow: rgba(0, 0, 0, 0.42);
     }
 }
@@ -32793,6 +32799,12 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     stroke-dasharray: none;
 }
 
+.public-auth-privacy-art-shield-nodes {
+    fill: var(--public-privacy-art-node-fill);
+    stroke: var(--public-privacy-art-node-stroke);
+    stroke-width: 1.4;
+}
+
 .public-auth-privacy-art-shield-layers {
     filter: drop-shadow(0 7px 8px var(--public-privacy-art-shadow));
 }
@@ -32800,7 +32812,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 .public-auth-privacy-art-shield {
     fill: var(--public-privacy-art-outer);
     stroke: var(--public-privacy-art-outer-stroke);
-    stroke-width: 2.5;
+    stroke-width: 2;
     stroke-linejoin: round;
 }
 
@@ -32817,7 +32829,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 .public-auth-privacy-art-check {
     fill: none;
     stroke: var(--public-privacy-art-check);
-    stroke-width: 6;
+    stroke-width: 7;
     stroke-linecap: round;
     stroke-linejoin: round;
 }

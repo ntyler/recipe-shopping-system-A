@@ -230,7 +230,7 @@ def test_public_auth_circled_icons_match_reference_without_changing_behavior():
     assert "pointer-events: none;" in app_css
 
 
-def test_privacy_art_uses_opaque_layered_shield_with_explicit_dark_theme_colors():
+def test_privacy_art_uses_layered_reference_shield_with_explicit_dark_theme_colors():
     icon_macros = (ROOT / "PushShoppingList/templates/includes/app_shell_macros.html").read_text(
         encoding="utf-8"
     )
@@ -250,19 +250,23 @@ def test_privacy_art_uses_opaque_layered_shield_with_explicit_dark_theme_colors(
         "public-auth-privacy-art-shield-inner",
         "public-auth-privacy-art-shield-facet",
         "public-auth-privacy-art-check",
+        "public-auth-privacy-art-shield-nodes",
     ):
         assert layer in artwork
         assert f".{layer}" in artwork_css
-    assert 'transform="rotate(-2 126 69)"' in artwork
+    assert 'd="M126 15 167 32q3 1 3 5v28c0 27-17 47-42 59q-2 1-4 0C99 112 82 92 82 65V37q0-4 3-5l39-17q2-1 2 0Z"' in artwork
+    assert 'd="m105 68 14 14 29-33"' in artwork
+    assert '<circle cx="84" cy="78" r="3.4"></circle>' in artwork
+    assert '<circle cx="168" cy="78" r="3.4"></circle>' in artwork
     assert "public-auth-privacy-art-highlight" not in artwork
-    assert '--public-privacy-art-outer: #158b3b;' in artwork_css
-    assert '--public-privacy-art-inner: #68d67d;' in artwork_css
+    assert '--public-privacy-art-outer: #2dcc61;' in artwork_css
+    assert '--public-privacy-art-inner: #64d67c;' in artwork_css
     assert '--public-privacy-art-check: #08712c;' in artwork_css
     assert 'html[data-public-auth-theme="dark"] .public-auth-privacy-art' in artwork_css
-    assert '--public-privacy-art-outer: #08713a;' in artwork_css
-    assert '--public-privacy-art-inner: #42c979;' in artwork_css
-    assert '--public-privacy-art-check: #063f22;' in artwork_css
-    assert "stroke-width: 6;" in artwork_css
+    assert '--public-privacy-art-outer: #45e87e;' in artwork_css
+    assert '--public-privacy-art-inner: #4ace70;' in artwork_css
+    assert '--public-privacy-art-check: #ffebcc;' in artwork_css
+    assert "stroke-width: 7;" in artwork_css
 
 
 def test_privacy_art_limits_attack_paths_to_three_subtle_background_lines():
@@ -283,9 +287,9 @@ def test_privacy_art_limits_attack_paths_to_three_subtle_background_lines():
 
     assert decoration.count("<path ") == 3
     assert decoration.count("<circle ") == 3
-    assert 'd="M10 72c29-17 57-16 90-2"' in decoration
-    assert 'd="M154 7c1 14-4 25-16 35"' in decoration
-    assert 'd="M134 107c-6 8-9 15-10 23"' in decoration
+    assert 'd="M6 65c31-6 47 2 65 13 6 4 11 5 18 5m75-5c11 6 18 6 26 0"' in decoration
+    assert 'd="M154 3c2 13-2 23-11 31"' in decoration
+    assert 'd="M129 115c-5 7-7 11-7 15"' in decoration
     assert "marker" not in decoration
     assert "polygon" not in decoration
     assert "--public-privacy-art-decoration: rgba(74, 222, 141, 0.18);" in artwork_css
