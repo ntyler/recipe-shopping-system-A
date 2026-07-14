@@ -250,6 +250,7 @@ def test_privacy_art_uses_layered_reference_shield_with_explicit_dark_theme_colo
     ]
 
     for layer in (
+        "public-auth-privacy-art-backdrop",
         "public-auth-privacy-art-shield-layers",
         "public-auth-privacy-art-shield-depth",
         "public-auth-privacy-art-shield",
@@ -264,10 +265,11 @@ def test_privacy_art_uses_layered_reference_shield_with_explicit_dark_theme_colo
     assert 'id="publicAuthShieldOuterGradient"' in artwork
     assert 'id="publicAuthShieldInnerGradient"' in artwork
     assert 'id="publicAuthShieldFacetGradient"' in artwork
+    assert 'id="publicAuthShieldBackdropGradient"' in artwork
     assert 'd="M126 14c3 0 5 2 8 3l30 13c5 2 7 5 7 10v24c0 27-16 48-41 61-3 2-5 2-8 0-25-13-41-34-41-61V40c0-5 2-8 7-10l30-13c3-1 5-3 8-3Z"' in artwork
     assert 'd="m104 68 15 15 30-35"' in artwork
-    assert '<circle cx="84" cy="78" r="3.4"></circle>' in artwork
-    assert '<circle cx="168" cy="78" r="3.4"></circle>' in artwork
+    assert '<circle cx="84" cy="81" r="2.3"></circle>' in artwork
+    assert '<circle cx="168" cy="80" r="2.3"></circle>' in artwork
     assert '--public-privacy-art-outer-start: #33d56c;' in artwork_css
     assert '--public-privacy-art-inner-start: #8de4a3;' in artwork_css
     assert '--public-privacy-art-check: #08712c;' in artwork_css
@@ -275,7 +277,7 @@ def test_privacy_art_uses_layered_reference_shield_with_explicit_dark_theme_colo
     assert '--public-privacy-art-outer-start: #31d677;' in artwork_css
     assert '--public-privacy-art-outer-end: #0c8f47;' in artwork_css
     assert '--public-privacy-art-inner-start: #72dc99;' in artwork_css
-    assert '--public-privacy-art-check: #ffebcc;' in artwork_css
+    assert '--public-privacy-art-check: #d8ded7;' in artwork_css
     assert "stroke-width: 6.5;" in artwork_css
 
 
@@ -297,14 +299,40 @@ def test_privacy_art_limits_attack_paths_to_three_subtle_background_lines():
 
     assert decoration.count("<path ") == 3
     assert decoration.count("<circle ") == 3
-    assert 'd="M6 65c31-6 47 2 65 13 6 4 11 5 18 5m75-5c11 6 18 6 26 0"' in decoration
-    assert 'd="M154 3c2 13-2 23-11 31"' in decoration
-    assert 'd="M129 115c-5 7-7 11-7 15"' in decoration
+    assert 'd="M5 65c29-5 48 1 66 12 5 3 9 4 13 4"' in decoration
+    assert 'd="M155 3c2 10-1 18-8 27"' in decoration
+    assert 'd="M190 74c-8 6-14 8-22 6"' in decoration
     assert "marker" not in decoration
     assert "polygon" not in decoration
-    assert "--public-privacy-art-decoration: rgba(74, 222, 141, 0.18);" in artwork_css
+    assert "--public-privacy-art-decoration: rgba(74, 222, 141, 0.11);" in artwork_css
     assert "stroke-width: 1.1;" in artwork_css
     assert "stroke-dasharray: 3 7;" in artwork_css
+
+
+def test_privacy_art_is_larger_left_shifted_and_uses_a_soft_contained_backdrop():
+    icon_macros = (ROOT / "PushShoppingList/templates/includes/app_shell_macros.html").read_text(
+        encoding="utf-8"
+    )
+    app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    artwork = icon_macros[
+        icon_macros.index("macro privacy_shield_art()"):icon_macros.index("macro app_icon(name)")
+    ]
+    artwork_css = app_css[
+        app_css.index(".public-auth-privacy-art {"):app_css.index(".public-auth-privacy-card h2")
+    ]
+
+    assert "right: 20px;" in artwork_css
+    assert "width: 196px;" in artwork_css
+    assert "height: 135px;" in artwork_css
+    assert "transform: translateY(-50%);" in artwork_css
+    assert "rotate(" not in artwork_css
+    assert "--public-privacy-art-backdrop-opacity: 0.07;" in artwork_css
+    assert "--public-privacy-art-shadow: rgba(0, 0, 0, 0.24);" in artwork_css
+    assert "filter: drop-shadow(0 5px 4px var(--public-privacy-art-shadow));" in artwork_css
+    assert '<ellipse class="public-auth-privacy-art-backdrop"' in artwork
+    assert artwork.index('<g class="public-auth-privacy-art-decoration">') < artwork.index(
+        '<g class="public-auth-privacy-art-shield-layers"'
+    )
 
 
 def test_auth_card_defaults_to_single_sign_in_mode_and_keeps_auth_contracts(monkeypatch, tmp_path):

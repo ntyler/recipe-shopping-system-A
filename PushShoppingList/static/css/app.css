@@ -32740,11 +32740,13 @@ body.public-auth-page {
 }
 
 .public-auth-privacy-art {
-    --public-privacy-art-decoration: rgba(22, 163, 74, 0.16);
-    --public-privacy-art-dot-fill: rgba(34, 197, 94, 0.24);
-    --public-privacy-art-dot-stroke: rgba(22, 163, 74, 0.34);
-    --public-privacy-art-node-fill: #148d39;
-    --public-privacy-art-node-stroke: #20b84f;
+    --public-privacy-art-decoration: rgba(22, 163, 74, 0.12);
+    --public-privacy-art-dot-fill: rgba(34, 197, 94, 0.18);
+    --public-privacy-art-dot-stroke: rgba(22, 163, 74, 0.25);
+    --public-privacy-art-node-fill: #116f32;
+    --public-privacy-art-node-stroke: #1b9d48;
+    --public-privacy-art-backdrop: #166534;
+    --public-privacy-art-backdrop-opacity: 0.06;
     --public-privacy-art-depth: #087334;
     --public-privacy-art-outer-start: #33d56c;
     --public-privacy-art-outer-end: #149d48;
@@ -32753,58 +32755,62 @@ body.public-auth-page {
     --public-privacy-art-inner-end: #58ca77;
     --public-privacy-art-facet-start: #62d481;
     --public-privacy-art-facet-end: #38b861;
-    --public-privacy-art-highlight: rgba(236, 253, 245, 0.38);
+    --public-privacy-art-highlight: rgba(236, 253, 245, 0.26);
     --public-privacy-art-check: #08712c;
-    --public-privacy-art-shadow: rgba(8, 70, 31, 0.26);
+    --public-privacy-art-shadow: rgba(8, 70, 31, 0.14);
     position: absolute;
     top: 50%;
-    right: 4px;
+    right: 20px;
     z-index: 0;
     display: block;
-    width: 180px;
-    height: 124px;
+    width: 196px;
+    height: 135px;
     color: var(--app-primary);
     pointer-events: none;
     transform: translateY(-50%);
 }
 
 html[data-public-auth-theme="dark"] .public-auth-privacy-art {
-    --public-privacy-art-decoration: rgba(74, 222, 141, 0.18);
-    --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.36);
-    --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.46);
-    --public-privacy-art-node-fill: #087f31;
-    --public-privacy-art-node-stroke: #22c55e;
+    --public-privacy-art-decoration: rgba(74, 222, 141, 0.11);
+    --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.23);
+    --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.3);
+    --public-privacy-art-node-fill: #0b6d34;
+    --public-privacy-art-node-stroke: #199c50;
+    --public-privacy-art-backdrop: #0f6a3a;
+    --public-privacy-art-backdrop-opacity: 0.07;
     --public-privacy-art-depth: #064c2c;
     --public-privacy-art-outer-start: #31d677;
     --public-privacy-art-outer-end: #0c8f47;
-    --public-privacy-art-outer-stroke: #22bf63;
+    --public-privacy-art-outer-stroke: #178e4b;
     --public-privacy-art-inner-start: #72dc99;
     --public-privacy-art-inner-end: #3fbd73;
     --public-privacy-art-facet-start: #4ac980;
     --public-privacy-art-facet-end: #269e60;
-    --public-privacy-art-highlight: rgba(220, 252, 231, 0.34);
-    --public-privacy-art-check: #ffebcc;
-    --public-privacy-art-shadow: rgba(0, 0, 0, 0.42);
+    --public-privacy-art-highlight: rgba(220, 252, 231, 0.22);
+    --public-privacy-art-check: #d8ded7;
+    --public-privacy-art-shadow: rgba(0, 0, 0, 0.24);
 }
 
 @media (prefers-color-scheme: dark) {
     html:not([data-public-auth-theme="light"]) .public-auth-privacy-art {
-        --public-privacy-art-decoration: rgba(74, 222, 141, 0.18);
-        --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.36);
-        --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.46);
-        --public-privacy-art-node-fill: #087f31;
-        --public-privacy-art-node-stroke: #22c55e;
+        --public-privacy-art-decoration: rgba(74, 222, 141, 0.11);
+        --public-privacy-art-dot-fill: rgba(74, 222, 141, 0.23);
+        --public-privacy-art-dot-stroke: rgba(134, 239, 172, 0.3);
+        --public-privacy-art-node-fill: #0b6d34;
+        --public-privacy-art-node-stroke: #199c50;
+        --public-privacy-art-backdrop: #0f6a3a;
+        --public-privacy-art-backdrop-opacity: 0.07;
         --public-privacy-art-depth: #064c2c;
         --public-privacy-art-outer-start: #31d677;
         --public-privacy-art-outer-end: #0c8f47;
-        --public-privacy-art-outer-stroke: #22bf63;
+        --public-privacy-art-outer-stroke: #178e4b;
         --public-privacy-art-inner-start: #72dc99;
         --public-privacy-art-inner-end: #3fbd73;
         --public-privacy-art-facet-start: #4ac980;
         --public-privacy-art-facet-end: #269e60;
-        --public-privacy-art-highlight: rgba(220, 252, 231, 0.34);
-        --public-privacy-art-check: #ffebcc;
-        --public-privacy-art-shadow: rgba(0, 0, 0, 0.42);
+        --public-privacy-art-highlight: rgba(220, 252, 231, 0.22);
+        --public-privacy-art-check: #d8ded7;
+        --public-privacy-art-shadow: rgba(0, 0, 0, 0.24);
     }
 }
 
@@ -32812,7 +32818,21 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     display: block;
     width: 100%;
     height: 100%;
-    overflow: visible;
+    overflow: hidden;
+}
+
+.public-auth-privacy-art-backdrop {
+    fill: url("#publicAuthShieldBackdropGradient");
+}
+
+.public-auth-privacy-art-backdrop-start {
+    stop-color: var(--public-privacy-art-backdrop);
+    stop-opacity: var(--public-privacy-art-backdrop-opacity);
+}
+
+.public-auth-privacy-art-backdrop-end {
+    stop-color: var(--public-privacy-art-backdrop);
+    stop-opacity: 0;
 }
 
 .public-auth-privacy-art-decoration {
@@ -32837,7 +32857,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 }
 
 .public-auth-privacy-art-shield-layers {
-    filter: drop-shadow(0 7px 8px var(--public-privacy-art-shadow));
+    filter: drop-shadow(0 5px 4px var(--public-privacy-art-shadow));
 }
 
 .public-auth-privacy-art-outer-start {
