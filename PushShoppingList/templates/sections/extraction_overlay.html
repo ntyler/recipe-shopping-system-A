@@ -46,11 +46,27 @@
                 Preparing extraction...
             </div>
 
-            <div class="bulk-progress-bar-wrap extract-old-progress-wrap">
+            <div id="extractPercentText"
+                 class="extract-old-percent"
+                 aria-live="polite">
+                0% complete
+            </div>
+
+            <div id="extractProgressTrack"
+                 class="bulk-progress-bar-wrap extract-old-progress-wrap"
+                 role="progressbar"
+                 aria-labelledby="extractPercentText"
+                 aria-valuemin="0"
+                 aria-valuemax="100"
+                 aria-valuenow="0"
+                 aria-valuetext="0% complete">
                 <div id="extractProgressBar"
                      class="bulk-progress-bar extract-old-progress-bar"
-                     style="width:15%;">
+                     style="width:0%;">
                 </div>
+                <span id="extractProgressBarLabel"
+                      class="extract-old-progress-label"
+                      aria-hidden="true">0%</span>
             </div>
 
         </div>

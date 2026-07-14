@@ -296,6 +296,61 @@ def test_job_for_client_includes_duration_details():
     assert payload["queue_wait_seconds"] == 70
 
 
+def test_import_workflow_percent_is_weighted_and_monotonic():
+    assert [
+        job_tasks.import_workflow_percent(0, 1, stage)
+        for stage in (5, 12, 22, 58, 72, 82, 92, 95)
+    ] == [5, 12, 22, 58, 72, 82, 92, 95]
+
+    multi_recipe_updates = []
+    for index in range(3):
+        multi_recipe_updates.extend(
+            job_tasks.import_workflow_percent(index, 3, stage)
+            for stage in (5, 12, 22, 58, 72, 82, 92, 95)
+        )
+
+    assert multi_recipe_updates == sorted(multi_recipe_updates)
+    assert multi_recipe_updates[-1] == 95
+    assert all(0 <= percent < 100 for percent in multi_recipe_updates)
+
+
+def test_import_progress_payload_is_server_authored_and_never_moves_backward(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    job = job_service.create_job(
+        "recipe-import",
+        input_payload={"urls": ["https://example.com/recipe"]},
+        user_id="owner",
+        total_items=1,
+    )
+    job_service.update_job(job["id"], status="running", progress_percent=42)
+
+    job_tasks.update_import_job_progress(
+        job["id"],
+        processed_items=0,
+        total_source_items=1,
+        item_stage_percent=12,
+        current_stage="downloading",
+        stage_label="Downloading source",
+        current_step="Downloading webpage HTML",
+        completed_items=0,
+        total_items=1,
+    )
+    payload = job_service.job_for_client(job_service.get_job(job["id"]))
+
+    assert payload["percent_complete"] == 42
+    assert payload["progress_percent"] == 42
+    assert payload["current_stage"] == "downloading"
+    assert payload["stage_label"] == "Downloading source"
+    assert payload["completed_items"] == 0
+    assert payload["total_items"] == 1
+
+    job_service.cancel_job(job["id"])
+    job_service.cancel_job(job["id"])
+    cancelled = job_service.job_for_client(job_service.get_job(job["id"]))
+    assert cancelled["status"] == "cancelled"
+    assert cancelled["percent_complete"] == 42
+
+
 def test_menu_generate_job_sources_link_to_recipe_item_editor(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"

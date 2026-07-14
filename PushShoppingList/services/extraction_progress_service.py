@@ -33,6 +33,33 @@ MENU_RECIPE_CHECKLIST_KEYS = (
     "estimate_per_serving",
 )
 
+LEGACY_IMPORT_ITEM_WORK_PERCENT = 95
+
+
+def workflow_percent(processed_items, total_items, item_stage_percent):
+    total_items = max(1, int(total_items or 1))
+    processed_items = max(0, min(total_items, int(processed_items or 0)))
+    item_stage_percent = max(0, min(LEGACY_IMPORT_ITEM_WORK_PERCENT, int(item_stage_percent or 0)))
+    if processed_items >= total_items:
+        return LEGACY_IMPORT_ITEM_WORK_PERCENT
+    return max(0, min(
+        LEGACY_IMPORT_ITEM_WORK_PERCENT,
+        round(((processed_items * LEGACY_IMPORT_ITEM_WORK_PERCENT) + item_stage_percent) / total_items),
+    ))
+
+
+def stage_from_message(message):
+    text = str(message or "").strip().lower()
+    if any(token in text for token in ("saving recipe", "creating recipe", "committing")):
+        return "saving", "Saving recipes", 90
+    if any(token in text for token in ("html downloaded", "reading recipe card", "structured data", "parsing", "detecting")):
+        return "parsing", "Parsing and detecting recipes", 22
+    if any(token in text for token in ("download", "fetch", "browser fallback", "loading webpage")):
+        return "downloading", "Downloading source", 12
+    if any(token in text for token in ("openai", "extract", "recipe card", "ingredient", "menu item")):
+        return "extracting", "Extracting recipe details", 58
+    return "extracting", "Extracting recipe details", 35
+
 
 def new_job_id():
     return uuid.uuid4().hex
@@ -114,7 +141,12 @@ def default_progress():
         "summary": "No extraction running.",
         "current_index": 0,
         "total": 0,
+        "total_items": 0,
+        "completed_items": 0,
         "percent": 0,
+        "percent_complete": 0,
+        "current_stage": "idle",
+        "stage_label": "No extraction running",
         "urls": [],
         "updated_at": time.time(),
     }
@@ -133,6 +165,21 @@ def load_progress():
 
 def save_progress(progress):
     with PROGRESS_LOCK:
+        total = max(0, int(progress.get("total_items", progress.get("total", 0)) or 0))
+        completed_items = sum(
+            1 for item in progress.get("urls", [])
+            if isinstance(item, dict) and item.get("state") == "done"
+        )
+        percent = max(0, min(100, round(float(progress.get("percent", progress.get("percent_complete", 0)) or 0))))
+        if progress.get("status") != "complete" and percent >= 100:
+            percent = 99
+        progress["total"] = total
+        progress["total_items"] = total
+        progress["completed_items"] = completed_items
+        progress["percent"] = percent
+        progress["percent_complete"] = percent
+        progress["current_stage"] = str(progress.get("current_stage") or "running").strip()
+        progress["stage_label"] = str(progress.get("stage_label") or progress.get("summary") or "Importing recipes").strip()
         progress["updated_at"] = time.time()
         PROGRESS_FILE.write_text(
             json.dumps(progress, indent=2, ensure_ascii=False),
@@ -160,7 +207,12 @@ def start_progress(urls, job_id=None, extraction_mode="recipe"):
             ),
             "current_index": 0,
             "total": len(urls),
-            "percent": 10 if urls else 0,
+            "total_items": len(urls),
+            "completed_items": 0,
+            "percent": 0,
+            "percent_complete": 0,
+            "current_stage": "downloading",
+            "stage_label": "Downloading source",
             "urls": [
                 {
                     "url": url,
@@ -193,7 +245,12 @@ def mark_url_running(job_id, urls, index):
             if is_menu_extract
             else "Fetching recipe page and extracting ingredients."
         )
-        progress["percent"] = progress_percent(index, progress["total"])
+        progress["current_stage"] = "downloading"
+        progress["stage_label"] = "Downloading source"
+        progress["percent"] = max(
+            int(progress.get("percent") or 0),
+            workflow_percent(index, progress["total"], 5),
+        )
 
         if 0 <= index < len(progress["urls"]):
             progress["urls"][index]["state"] = "running"
@@ -219,6 +276,14 @@ def mark_url_message(job_id, urls, index, message, summary=None):
 
         if summary:
             progress["summary"] = summary
+
+        current_stage, stage_label, stage_percent = stage_from_message(message)
+        progress["current_stage"] = current_stage
+        progress["stage_label"] = stage_label
+        progress["percent"] = max(
+            int(progress.get("percent") or 0),
+            workflow_percent(index, progress["total"], stage_percent),
+        )
 
         if 0 <= index < len(progress["urls"]):
             progress["urls"][index]["state"] = "running"
@@ -346,7 +411,12 @@ def mark_url_done(job_id, urls, index, ingredients_count):
                 progress["urls"][index]["message"] = f"done - {ingredients_count} ingredients extracted"
             progress["urls"][index]["ingredients_count"] = ingredients_count
 
-        progress["percent"] = progress_percent(completed_count(progress), progress["total"])
+        progress["current_stage"] = "saving"
+        progress["stage_label"] = "Saving recipes"
+        progress["percent"] = max(
+            int(progress.get("percent") or 0),
+            workflow_percent(index, progress["total"], LEGACY_IMPORT_ITEM_WORK_PERCENT),
+        )
         return save_progress(progress)
 
 
@@ -361,7 +431,10 @@ def mark_url_failed(job_id, urls, index, error):
             progress["urls"][index]["state"] = "failed"
             progress["urls"][index]["message"] = f"failed - {friendly_error_message(error)}"
 
-        progress["percent"] = progress_percent(completed_count(progress), progress["total"])
+        progress["percent"] = max(
+            int(progress.get("percent") or 0),
+            workflow_percent(index, progress["total"], LEGACY_IMPORT_ITEM_WORK_PERCENT),
+        )
         return save_progress(progress)
 
 
@@ -396,13 +469,14 @@ def request_cancel(job_id=None):
     progress["status"] = "cancelled"
     progress["cancel_requested"] = True
     progress["summary"] = "Extraction cancelled. Use Redo Missing to run anything that did not finish."
+    progress["current_stage"] = "cancelled"
+    progress["stage_label"] = "Import cancelled"
 
     for item in progress.get("urls", []):
         if item.get("state") in {"waiting", "running"}:
             item["state"] = "cancelled"
             item["message"] = "cancelled"
 
-    progress["percent"] = progress_percent(completed_count(progress), progress.get("total", 0))
     save_progress(progress)
     send_ntfy("Recipe extraction cancelled", progress["summary"])
     return progress
@@ -426,7 +500,10 @@ def finish_progress(job_id, ok=True):
     progress["active"] = False
     progress["status"] = "complete" if ok else "failed"
     progress["summary"] = "Extraction complete. Refreshing shopping list..." if ok else "Extraction finished with errors."
-    progress["percent"] = 100
+    progress["current_stage"] = "complete" if ok else "failed"
+    progress["stage_label"] = "Import complete" if ok else "Import failed"
+    if ok:
+        progress["percent"] = 100
     save_progress(progress)
 
     title = "Recipe extraction complete" if ok else "Recipe extraction failed"
@@ -463,7 +540,7 @@ def progress_percent(done_count, total):
     if not total:
         return 0
 
-    return max(10, min(100, round((done_count / total) * 100)))
+    return max(0, min(LEGACY_IMPORT_ITEM_WORK_PERCENT, round((done_count / total) * LEGACY_IMPORT_ITEM_WORK_PERCENT)))
 
 
 def completed_count(progress):

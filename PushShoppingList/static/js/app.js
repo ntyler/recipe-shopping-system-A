@@ -4622,7 +4622,8 @@ async function reopenImportProgressFromJob(jobId) {
                     status: "failed",
                     extraction_mode: isMenuExtract ? "menu_extract" : "recipe",
                     total: urls.length,
-                    percent: 100,
+                    percent: 0,
+                    percent_complete: 0,
                     summary: err.message || "Unable to refresh import progress.",
                     urls: urls.map(url => ({ url, state: "failed", message: err.message || "Unable to refresh import progress." })),
                 };
@@ -7883,6 +7884,7 @@ let currentExtractAbortController = null;
 let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
 let lastRecipeUrlExtractionMode = "recipe";
+let extractProgressRecoveryStarted = false;
 let productProgressTimer = null;
 let activeProductJobId = null;
 let activeProductPromptChoice = null;
@@ -42441,6 +42443,47 @@ async function startRecipeExtraction(event) {
     await startRecipeExtractionUrls(urls, { extractionMode, button: event.submitter || null });
 }
 
+function wholeExtractionPercent(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+        return 0;
+    }
+    return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function backendExtractionPercent(progress) {
+    if (!progress || typeof progress !== "object") {
+        return 0;
+    }
+    const value = progress.percent_complete !== undefined
+        ? progress.percent_complete
+        : progress.percent;
+    return wholeExtractionPercent(value);
+}
+
+function updateExtractionPercentElements(percent) {
+    const value = wholeExtractionPercent(percent);
+    const percentText = document.getElementById("extractPercentText");
+    const barLabel = document.getElementById("extractProgressBarLabel");
+    const track = document.getElementById("extractProgressTrack");
+    const bar = document.getElementById("extractProgressBar");
+    const completeText = `${value}% complete`;
+
+    if (percentText) {
+        percentText.textContent = completeText;
+    }
+    if (barLabel) {
+        barLabel.textContent = `${value}%`;
+    }
+    if (bar) {
+        bar.style.width = `${value}%`;
+    }
+    if (track) {
+        track.setAttribute("aria-valuenow", String(value));
+        track.setAttribute("aria-valuetext", completeText);
+    }
+}
+
 function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
     const jobStatus = String((job && job.status) || "queued").toLowerCase();
     const cancelRequested = jobStatus === "cancel_requested";
@@ -42526,6 +42569,14 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
     const menuActivity = menuImportActivityFromJob(job, isMenuExtract);
     const followupLabel = menuActivity && menuActivity.followup_label ? menuActivity.followup_label : "";
     const resultSummary = String(result.summary_message || "").trim();
+    const percentComplete = wholeExtractionPercent(
+        job && job.percent_complete !== undefined
+            ? job.percent_complete
+            : job && job.progress_percent
+    );
+    const totalItems = Math.max(sourceRecords.length, Number((job && job.total_items) || 0));
+    const currentStage = String((job && job.current_stage) || result.current_stage || "").trim();
+    const stageLabel = String((job && job.stage_label) || result.stage_label || (job && job.current_step) || "").trim();
     const summary = completed
         ? (resultSummary || (
             followupLabel
@@ -42546,8 +42597,13 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
         defer_refresh: Boolean(options.deferRefresh),
         status: completed ? "complete" : failed ? "failed" : cancelled ? "cancelled" : cancelRequested ? "cancel_requested" : "running",
         extraction_mode: isMenuExtract ? "menu_extract" : "recipe",
-        total: sourceRecords.length,
-        percent: Math.max(0, Math.min(100, Number((job && job.progress_percent) || 0))),
+        current_stage: currentStage,
+        stage_label: stageLabel,
+        completed_items: completedItems,
+        total_items: totalItems,
+        total: totalItems,
+        percent_complete: percentComplete,
+        percent: percentComplete,
         summary,
         menu_activity: menuActivity,
         urls: sourceRows,
@@ -42615,8 +42671,9 @@ async function startRecipeExtractionUrls(urls, options = {}) {
         ? "Fetching menu, parsing structured items, and saving lightweight menu records."
         : "Fetching recipe pages and extracting ingredients.";
     if (bar) {
-        bar.style.width = "10%";
+        bar.style.width = "0%";
     }
+    updateExtractionPercentElements(0);
 
     try {
         const startData = await startBackgroundJob(endpoint, {
@@ -42664,8 +42721,11 @@ async function startRecipeExtractionUrls(urls, options = {}) {
         status.textContent = "Import could not start.";
         summary.textContent = message;
         if (bar) {
-            bar.style.width = "100%";
+            bar.style.width = `${lastRenderedExtractProgress ? backendExtractionPercent(lastRenderedExtractProgress) : 0}%`;
         }
+        updateExtractionPercentElements(
+            lastRenderedExtractProgress ? backendExtractionPercent(lastRenderedExtractProgress) : 0
+        );
         updateExtractionActionButtons({
             active: false,
             status: "failed",
@@ -42806,7 +42866,40 @@ function waitForNextPaint() {
 }
 
 function startExtractionProgressPolling() {
-    scheduleExtractionProgressPoll(300);
+    if (extractProgressRecoveryStarted) {
+        return;
+    }
+    extractProgressRecoveryStarted = true;
+    recoverActiveImportProgress().finally(() => {
+        scheduleExtractionProgressPoll(300);
+    });
+}
+
+async function recoverActiveImportProgress() {
+    try {
+        const response = await fetch("/api/jobs/recent?limit=25", {
+            cache: "no-store",
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+        if (!response.ok || !data || data.ok === false) {
+            return false;
+        }
+        const activeImportJob = (data.jobs || []).find(job => {
+            const type = String((job && job.job_type) || "").trim();
+            return ["recipe-import", "menu-import"].includes(type) && jobIsActive(job) && jobSourceUrls(job).length;
+        });
+        if (!activeImportJob) {
+            return false;
+        }
+        await reopenImportProgressFromJob(activeImportJob.id || activeImportJob.job_id);
+        return true;
+    } catch (err) {
+        return false;
+    }
 }
 
 function scheduleExtractionProgressPoll(delay = 2000) {
@@ -44009,6 +44102,16 @@ function renderExtractionProgress(progress, options = {}) {
         ...progress,
         progress_source: progressSource,
     };
+    const incomingPercent = backendExtractionPercent(progress);
+    const previousPercent = lastRenderedExtractProgress && lastRenderedExtractJobId === progress.job_id
+        ? backendExtractionPercent(lastRenderedExtractProgress)
+        : 0;
+    const displayedPercent = Math.max(previousPercent, incomingPercent);
+    progress = {
+        ...progress,
+        percent: displayedPercent,
+        percent_complete: displayedPercent,
+    };
     if (progressSource === "job") {
         activeExtractProgressDriver = "job";
     }
@@ -44042,7 +44145,7 @@ function renderExtractionProgress(progress, options = {}) {
             ? "Fetching menu, parsing structured items, and saving lightweight menu records."
             : "Fetching recipe pages and extracting ingredients."
     );
-    bar.style.width = `${Math.max(0, Math.min(100, progress.percent || 0))}%`;
+    updateExtractionPercentElements(displayedPercent);
     renderMenuImportActivityPanel(progress);
     updateExtractionActionButtons(progress);
 
@@ -44060,6 +44163,21 @@ function renderExtractionProgress(progress, options = {}) {
         scheduleExtractionAutoClose(progress.job_id);
         scheduleExtractionRefresh(progress.job_id);
     }
+}
+
+function extractionStageStatusLabel(progress, isMenuExtract) {
+    const stage = String(progress.current_stage || "").trim().toLowerCase();
+    const itemLabel = isMenuExtract ? "menus" : "recipes";
+    const labels = {
+        downloading: `Downloading ${itemLabel}`,
+        parsing: `Detecting ${itemLabel}`,
+        extracting: `Extracting ${itemLabel}`,
+        enriching: `Enriching ${itemLabel}`,
+        saving: `Saving ${itemLabel}`,
+        assets: `Saving ${itemLabel} and assets`,
+        finalizing: `Finalizing ${itemLabel}`,
+    };
+    return labels[stage] || (isMenuExtract ? "Extracting menus" : "Downloading recipes");
 }
 
 function progressStatusText(progress) {
@@ -44088,17 +44206,12 @@ function progressStatusText(progress) {
         return "Starting...";
     }
 
-    if (activity && (activity.stage || activity.job_label)) {
-        return [activity.job_label, activity.stage].filter(Boolean).join(": ");
-    }
-
-    const completed = (progress.urls || []).filter(item => {
-        return item.state === "done" || item.state === "failed" || item.state === "cancelled";
-    }).length;
-
-    return isMenuExtract
-        ? `Extracting menus ${completed} of ${total} complete...`
-        : `Downloading recipes ${completed} of ${total} complete...`;
+    const completed = progress.completed_items !== undefined
+        ? Math.max(0, Number(progress.completed_items || 0))
+        : (progress.urls || []).filter(item => item.state === "done").length;
+    const stageStatus = extractionStageStatusLabel(progress, isMenuExtract);
+    const activityPrefix = activity && activity.job_label ? `${activity.job_label}: ` : "";
+    return `${activityPrefix}${stageStatus} ${completed} of ${total} complete...`;
 }
 
 function updateExtractionActionButtons(progress) {

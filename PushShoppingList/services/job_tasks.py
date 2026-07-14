@@ -153,11 +153,10 @@ def update_import_job_progress(
     )
     percent_complete = max(current_percent, max(0, min(99, candidate)))
     stable_progress = {
+        **(result_payload if isinstance(result_payload, dict) else {}),
         "current_stage": str(current_stage or "").strip(),
         "stage_label": str(stage_label or current_step or "Importing recipes").strip(),
     }
-    if isinstance(result_payload, dict):
-        stable_progress.update(result_payload)
     return update_job_progress(
         job_id,
         current_step=current_step or stable_progress["stage_label"],
