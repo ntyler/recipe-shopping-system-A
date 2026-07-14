@@ -28,9 +28,37 @@
        {% if in_shell %}data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry"{% endif %}>
         {{ shell.app_icon("pantry") }}<span>Pantry</span>
     </a>
-    <a class="app-mobile-nav-link"
-       href="{{ '#userAccountSection' if in_shell else home_href ~ '#userAccountSection' }}"
-       {% if in_shell %}data-app-nav-link data-app-nav-action="account-workspace" data-app-nav-target="userAccountSection"{% endif %}>
+    <button class="app-mobile-nav-link"
+            type="button"
+            aria-label="Open all navigation"
+            aria-controls="appMobileNavigationDrawer"
+            aria-expanded="false"
+            data-app-mobile-nav-toggle>
         {{ shell.app_icon("more") }}<span>More</span>
-    </a>
+    </button>
 </nav>
+
+<button class="app-mobile-nav-backdrop"
+        type="button"
+        aria-label="Close navigation"
+        data-app-mobile-nav-backdrop
+        hidden></button>
+<aside id="appMobileNavigationDrawer"
+       class="app-mobile-nav-drawer"
+       aria-label="All navigation"
+       aria-hidden="true"
+       data-app-mobile-nav-drawer
+       hidden>
+    <header class="app-mobile-nav-drawer-header">
+        <strong>Navigation</strong>
+        <button type="button"
+                aria-label="Close navigation"
+                title="Close navigation"
+                data-app-mobile-nav-close>&times;</button>
+    </header>
+    <nav class="app-sidebar-nav app-mobile-nav-drawer-sections" aria-label="App sections">
+        {% set app_nav_surface = "mobile" %}
+        {% include "includes/app_navigation_sections.html" %}
+    </nav>
+    {% include "includes/app_plan_promo.html" %}
+</aside>

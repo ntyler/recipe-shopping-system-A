@@ -1,0 +1,153 @@
+{% import "includes/app_shell_macros.html" as shell %}
+{% set app_nav_surface = app_nav_surface|default("sidebar") %}
+<div class="app-nav-section-title">MAIN</div>
+<a class="app-nav-link{% if active_item == 'home' %} is-active{% endif %}"
+   href="{{ '#appPageHeader' if in_shell else home_href ~ '#appPageHeader' }}"
+   aria-label="Home"
+   title="Home"
+   data-tooltip="Home"
+   {% if active_item == 'home' %}aria-current="page"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="home" data-app-nav-target="appPageHeader"{% endif %}>
+    {{ shell.sidebar_icon("home") }}
+    <span class="app-nav-text">Home</span>
+</a>
+<a class="app-nav-link{% if active_item == 'recipes' %} is-active{% endif %}"
+   href="{{ '#recipesPage' if in_shell else home_href ~ '#recipesPage' }}"
+   aria-label="Recipes"
+   title="Recipes"
+   data-tooltip="Recipes"
+   {% if active_item == 'recipes' %}aria-current="page"{% endif %}
+   {% if app_nav_surface == 'sidebar' %}data-global-search-page-shortcut data-global-search-shortcut-order="1"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage" data-app-nav-lazy-section="current-recipes"{% endif %}>
+    {{ shell.sidebar_icon("recipes") }}
+    <span class="app-nav-text">Recipes</span>
+</a>
+<a class="app-nav-link{% if active_item == 'menus' %} is-active{% endif %}"
+   href="{{ '#menusPage' if in_shell else home_href ~ '#menusPage' }}"
+   aria-label="Menus"
+   title="Menus"
+   data-tooltip="Menus"
+   {% if active_item == 'menus' %}aria-current="page"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="menusPage" data-app-nav-target="menusPage"{% endif %}>
+    {{ shell.sidebar_icon("menus") }}
+    <span class="app-nav-text">Menus</span>
+</a>
+<a class="app-nav-link{% if active_item == 'cookbooks' %} is-active{% endif %}"
+   href="{{ '#cookbooksCard' if in_shell else home_href ~ '#cookbooksCard' }}"
+   aria-label="Cookbooks"
+   title="Cookbooks"
+   data-tooltip="Cookbooks"
+   {% if active_item == 'cookbooks' %}aria-current="page"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="cookbooksPage" data-app-nav-target="cookbooksCard" data-app-nav-lazy-section="cookbooks"{% endif %}>
+    {{ shell.sidebar_icon("cookbooks") }}
+    <span class="app-nav-text">Cookbooks</span>
+</a>
+<a class="app-nav-link{% if active_item == 'shopping-lists' %} is-active{% endif %}"
+   href="{{ '#shoppingViewsSection' if in_shell else home_href ~ '#shoppingViewsSection' }}"
+   aria-label="Shopping Lists"
+   title="Shopping Lists"
+   data-tooltip="Shopping Lists"
+   {% if active_item == 'shopping-lists' %}aria-current="page"{% endif %}
+   {% if app_nav_surface == 'sidebar' %}data-global-search-page-shortcut data-global-search-shortcut-order="2"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="shoppingListsPage" data-app-nav-target="shoppingViewsSection" data-app-nav-lazy-section="recipe-view"{% endif %}>
+    {{ shell.sidebar_icon("shopping") }}
+    <span class="app-nav-text">Shopping Lists</span>
+</a>
+<a class="app-nav-link{% if active_item == 'pantry' %} is-active{% endif %}"
+   href="{{ '#aiPantrySection' if in_shell else home_href ~ '#aiPantrySection' }}"
+   aria-label="Pantry"
+   title="Pantry"
+   data-tooltip="Pantry"
+   {% if active_item == 'pantry' %}aria-current="page"{% endif %}
+   {% if app_nav_surface == 'sidebar' %}data-global-search-page-shortcut data-global-search-shortcut-order="3"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="ai-pantry" data-app-page-target="pantryPage" data-app-nav-target="aiPantrySection" data-app-nav-lazy-section="pantry"{% endif %}>
+    {{ shell.sidebar_icon("pantry") }}
+    <span class="app-nav-text">Pantry</span>
+</a>
+<a class="app-nav-link{% if active_item == 'meal-planner' %} is-active{% endif %}"
+   href="{{ '#mealPlannerPage' if in_shell else home_href ~ '#mealPlannerPage' }}"
+   aria-label="Meal Planner"
+   title="Meal Planner"
+   data-tooltip="Meal Planner"
+   {% if active_item == 'meal-planner' %}aria-current="page"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="mealPlannerPage" data-app-nav-target="mealPlannerPage"{% endif %}>
+    {{ shell.sidebar_icon("meal") }}
+    <span class="app-nav-text">Meal Planner</span>
+</a>
+
+<div class="app-nav-section-title">SHOP</div>
+<a class="app-nav-link{% if active_item == 'stores' %} is-active{% endif %}"
+   href="{{ '#storesPage' if in_shell else home_href ~ '#storesPage' }}"
+   aria-label="Stores"
+   title="Stores"
+   data-tooltip="Stores"
+   {% if active_item == 'stores' %}aria-current="page"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="storesPage" data-app-nav-target="storesPage"{% endif %}>
+    {{ shell.sidebar_icon("stores") }}
+    <span class="app-nav-text">Stores</span>
+</a>
+<a class="app-nav-link{% if active_item == 'price-comparison' %} is-active{% endif %}"
+   href="{{ '#priceComparisonPage' if in_shell else home_href ~ '#priceComparisonPage' }}"
+   aria-label="Compare Prices"
+   title="Compare Prices"
+   data-tooltip="Compare Prices"
+   {% if active_item == 'price-comparison' %}aria-current="page"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="priceComparisonPage" data-app-nav-target="priceComparisonPage"{% endif %}>
+    {{ shell.sidebar_icon("price") }}
+    <span class="app-nav-text">Compare Prices</span>
+</a>
+
+<div class="app-nav-section-title">TOOLS</div>
+<a class="app-nav-link{% if active_item in ['import', 'recipe-url', 'recipe-document', 'recipe-image', 'menu-url', 'menu-document'] %} is-active{% endif %}"
+   href="{{ '#importPage' if in_shell else home_href ~ '#importPage' }}"
+   aria-label="Import"
+   title="Import"
+   data-tooltip="Import"
+   {% if active_item in ['import', 'recipe-url', 'recipe-document', 'recipe-image', 'menu-url', 'menu-document'] %}aria-current="page"{% endif %}
+   {% if app_nav_surface == 'sidebar' %}data-global-search-quick-action data-global-search-shortcut-order="1" data-global-search-title="Import" data-global-search-secondary="Import recipes or restaurant menus"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-page-aliases="recipeUrlsPage importDocumentPage generateImagePage menuUrlPage menuDocumentPage" data-app-nav-target="importPage"{% endif %}>
+    {{ shell.sidebar_icon("import") }}
+    <span class="app-nav-text">Import</span>
+</a>
+<a class="app-nav-link{% if active_item == 'scan-barcode' %} is-active{% endif %}"
+   href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}"
+   aria-label="Scan Barcode"
+   title="Scan Barcode"
+   data-tooltip="Scan Barcode"
+   {% if active_item == 'scan-barcode' %}aria-current="page"{% endif %}
+   {% if app_nav_surface == 'sidebar' %}data-global-search-quick-action data-global-search-shortcut-order="2" data-global-search-title="Scan Barcode" data-global-search-secondary="Scan a pantry barcode"{% endif %}>
+    {{ shell.sidebar_icon("barcode") }}
+    <span class="app-nav-text">Scan Barcode</span>
+</a>
+
+<div class="app-nav-section-title">ACCOUNT</div>
+<a class="app-nav-link{% if active_item == 'billing' %} is-active{% endif %}"
+   href="{{ '#accountUsageDashboardPanel' if in_shell else home_href ~ '#accountUsageDashboardPanel' }}"
+   aria-label="Usage and Billing"
+   title="Usage &amp; Billing"
+   data-tooltip="Usage &amp; Billing"
+   {% if active_item == 'billing' %}aria-current="page"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="usage-dashboard" data-app-nav-target="accountUsageDashboardPanel"{% endif %}>
+    {{ shell.sidebar_icon("billing") }}
+    <span class="app-nav-text">Usage &amp; Billing</span>
+</a>
+<a class="app-nav-link{% if active_item == 'help' %} is-active{% endif %}"
+   href="{{ '#feedbackSupportSection' if in_shell else home_href ~ '#feedbackSupportSection' }}"
+   aria-label="Help and Support"
+   title="Help &amp; Support"
+   data-tooltip="Help &amp; Support"
+   {% if active_item == 'help' %}aria-current="page"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="feedback-support" data-app-nav-target="feedbackSupportSection"{% endif %}>
+    {{ shell.sidebar_icon("help") }}
+    <span class="app-nav-text">Help &amp; Support</span>
+</a>
+<a class="app-nav-link{% if active_item == 'settings' %} is-active{% endif %}"
+   href="{{ '#settingsWorkspaceSection' if in_shell else home_href ~ '#settingsWorkspaceSection' }}"
+   aria-label="Settings"
+   title="Settings"
+   data-tooltip="Settings"
+   {% if active_item == 'settings' %}aria-current="page"{% endif %}
+   {% if in_shell %}data-app-nav-link data-app-nav-action="settings-section" data-settings-section-target="profile" data-app-nav-target="settingsWorkspaceSection"{% endif %}>
+    {{ shell.sidebar_icon("settings") }}
+    <span class="app-nav-text">Settings</span>
+</a>

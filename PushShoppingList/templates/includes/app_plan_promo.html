@@ -1,0 +1,22 @@
+{% import "includes/app_shell_macros.html" as shell %}
+<aside class="app-sidebar-promo" aria-label="AI Pantry Pro">
+    <div class="app-sidebar-promo-icon" aria-hidden="true">{{ shell.sidebar_svg_icon("billing") }}</div>
+    <div class="app-sidebar-promo-copy">
+        <strong>AI Pantry Pro</strong>
+        <span>Unlock more from your pantry.</span>
+        <ul aria-label="Plan benefits">
+            <li>More imports</li>
+            <li>Advanced AI tools</li>
+            <li>Faster processing</li>
+        </ul>
+    </div>
+    <a class="app-sidebar-promo-action"
+       href="{{ '#accountUsageDashboardPanel' if in_shell else home_href ~ '#accountUsageDashboardPanel' }}"
+       aria-label="View AI Pantry Pro plans"
+       title="View Plans"
+       data-app-mobile-drawer-close
+       {% if in_shell %}data-app-plan-link data-app-nav-action="usage-dashboard" data-app-nav-target="accountUsageDashboardPanel"{% endif %}>
+        <span class="app-sidebar-promo-action-label">View Plans</span>
+        <span class="app-sidebar-promo-action-icon" aria-hidden="true">{{ shell.sidebar_svg_icon("billing") }}</span>
+    </a>
+</aside>

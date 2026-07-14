@@ -463,14 +463,12 @@ def test_global_search_client_debounces_groups_and_supports_keyboard_navigation(
 
 
 def test_global_search_empty_shortcuts_are_explicit_compact_and_reuse_sidebar_links():
-    sidebar = (ROOT / "PushShoppingList/templates/includes/app_sidebar.html").read_text(encoding="utf-8")
+    sidebar = (ROOT / "PushShoppingList/templates/includes/app_navigation_sections.html").read_text(encoding="utf-8")
 
     assert sidebar.count("data-global-search-page-shortcut") == 3
-    assert sidebar.count("data-global-search-quick-action") == 3
-    assert 'data-global-search-title="Import Recipe URL"' in sidebar
-    assert 'data-global-search-secondary="Import a recipe from a URL"' in sidebar
-    assert 'data-global-search-title="Import Menu URL"' in sidebar
-    assert 'data-global-search-secondary="Import a restaurant menu from a URL"' in sidebar
+    assert sidebar.count("data-global-search-quick-action") == 2
+    assert 'data-global-search-title="Import"' in sidebar
+    assert 'data-global-search-secondary="Import recipes or restaurant menus"' in sidebar
     assert 'data-global-search-title="Scan Barcode"' in sidebar
     assert 'data-global-search-secondary="Scan a pantry barcode"' in sidebar
 

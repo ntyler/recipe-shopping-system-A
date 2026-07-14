@@ -15,6 +15,8 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     layout = read_text("PushShoppingList/templates/layouts/app_layout.html")
     header = read_text("PushShoppingList/templates/includes/app_header.html")
     sidebar = read_text("PushShoppingList/templates/includes/app_sidebar.html")
+    navigation = read_text("PushShoppingList/templates/includes/app_navigation_sections.html")
+    plan_promo = read_text("PushShoppingList/templates/includes/app_plan_promo.html")
     mobile_navigation = read_text("PushShoppingList/templates/includes/app_mobile_navigation.html")
     shell_macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
 
@@ -27,12 +29,17 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert '<header class="app-topbar" aria-label="App toolbar" data-app-header>' in header
     assert '<header id="appPageHeader" class="app-page-header" data-app-home-header>' in template
     assert '<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">' in mobile_navigation
-    assert 'class="app-nav-section-title">Discover &amp; Plan</div>' in sidebar
-    assert 'class="app-nav-section-title">CREATE RECIPES</div>' in sidebar
-    assert 'class="app-nav-section-title">IMPORT MENUS</div>' in sidebar
-    assert 'class="app-nav-section-title">PANTRY</div>' in sidebar
-    assert 'class="app-nav-section-title">Account</div>' in sidebar
-    assert "app-sidebar-promo" in sidebar
+    assert '{% include "includes/app_navigation_sections.html" %}' in sidebar
+    assert '{% include "includes/app_navigation_sections.html" %}' in mobile_navigation
+    assert navigation.count('class="app-nav-section-title"') == 4
+    for heading in ("MAIN", "SHOP", "TOOLS", "ACCOUNT"):
+        assert f'class="app-nav-section-title">{heading}</div>' in navigation
+    for old_heading in ("Discover &amp; Plan", "CREATE RECIPES", "IMPORT MENUS", "PANTRY"):
+        assert f'class="app-nav-section-title">{old_heading}</div>' not in navigation
+    assert "app-sidebar-promo" in plan_promo
+    assert "AI Pantry Pro" in plan_promo
+    assert "Unlock more from your pantry." in plan_promo
+    assert 'data-app-plan-link data-app-nav-action="usage-dashboard"' in plan_promo
     assert 'data-app-global-search' in header
     assert "app-global-search-icon" in header
     assert "app-global-search-shortcut" in header
@@ -45,105 +52,102 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert "app-toolbar-primary" in header
     assert 'data-app-page-target="notificationsPage"' in header
     assert 'data-app-nav-action="account-workspace"' in shell_macros
-    assert 'data-app-page-target="recipesPage"' in sidebar
+    assert 'data-app-page-target="recipesPage"' in navigation
     assert 'class="app-account-avatar-image"' in shell_macros
     assert "current_user.avatar_path" in shell_macros
     assert "current_user.picture" in shell_macros
     assert 'referrerpolicy="no-referrer"' in shell_macros
-    assert 'data-app-nav-action="ai-pantry"' in sidebar
-    assert 'data-app-nav-lazy-section="pantry"' in sidebar
-    assert 'data-app-nav-lazy-section="current-recipes"' in sidebar
-    assert 'data-app-nav-lazy-section="recipe-view"' in sidebar
+    assert 'data-app-nav-action="ai-pantry"' in navigation
+    assert 'data-app-nav-lazy-section="pantry"' in navigation
+    assert 'data-app-nav-lazy-section="current-recipes"' in navigation
+    assert 'data-app-nav-lazy-section="recipe-view"' in navigation
     assert '{% include "sections/settings_workspace.html" %}' in template
     assert '{% include "sections/app_workspaces.html" %}' in template
     assert 'class="app-home-dashboard"' in template
     assert 'data-app-home-dashboard' in template
-    assert 'data-app-nav-action="settings-section"' in sidebar
-    assert 'data-app-nav-action="app-page"' in sidebar
+    assert 'data-app-nav-action="settings-section"' in navigation
+    assert 'data-app-nav-action="app-page"' in navigation
     assert 'onclick="return collapseAllShoppingListPage()"' in template
     assert 'onclick="return expandAllShoppingListPage()"' in template
     assert "data-public-workspace" not in template
 
 
-def test_sidebar_import_actions_are_grouped_by_task_without_duplicate_hub_link():
-    template = read_text("PushShoppingList/templates/includes/app_sidebar.html")
-    nav_start = template.index('<nav class="app-sidebar-nav" aria-label="App sections">')
-    nav_end = template.index("</nav>", nav_start)
-    sidebar = template[nav_start:nav_end]
+def test_sidebar_has_exact_group_order_and_one_import_destination():
+    navigation = read_text("PushShoppingList/templates/includes/app_navigation_sections.html")
+    import_workspace = read_text("PushShoppingList/templates/sections/app_workspaces.html")
 
     ordered_labels = (
-        'class="app-nav-section-title">CREATE RECIPES</div>',
-        '<span class="app-nav-text">Recipe URL</span>',
-        '<span class="app-nav-text">Recipe Document</span>',
-        '<span class="app-nav-text">Recipe Image</span>',
-        'class="app-nav-section-title">IMPORT MENUS</div>',
-        '<span class="app-nav-text">Menu URL</span>',
-        '<span class="app-nav-text">Menu Document</span>',
-        'class="app-nav-section-title">PANTRY</div>',
+        'class="app-nav-section-title">MAIN</div>',
+        '<span class="app-nav-text">Home</span>',
+        '<span class="app-nav-text">Recipes</span>',
+        '<span class="app-nav-text">Menus</span>',
+        '<span class="app-nav-text">Cookbooks</span>',
+        '<span class="app-nav-text">Shopping Lists</span>',
+        '<span class="app-nav-text">Pantry</span>',
+        '<span class="app-nav-text">Meal Planner</span>',
+        'class="app-nav-section-title">SHOP</div>',
+        '<span class="app-nav-text">Stores</span>',
+        '<span class="app-nav-text">Compare Prices</span>',
+        'class="app-nav-section-title">TOOLS</div>',
+        '<span class="app-nav-text">Import</span>',
         '<span class="app-nav-text">Scan Barcode</span>',
+        'class="app-nav-section-title">ACCOUNT</div>',
+        '<span class="app-nav-text">Usage &amp; Billing</span>',
+        '<span class="app-nav-text">Help &amp; Support</span>',
+        '<span class="app-nav-text">Settings</span>',
     )
-    positions = [sidebar.index(label) for label in ordered_labels]
+    positions = [navigation.index(label) for label in ordered_labels]
 
     assert positions == sorted(positions)
-    for old_label in ("Recipe URLs", "Import From Document", "Generate From Image", "Import Menu From Document"):
-        assert f'<span class="app-nav-text">{old_label}</span>' not in sidebar
-    assert '<span class="app-nav-text">Import</span>' not in sidebar
-    assert 'data-app-page-target="importPage"' not in sidebar
-    assert sidebar.count('class="app-nav-section-title">CREATE RECIPES</div>') == 1
-    assert sidebar.count('class="app-nav-section-title">IMPORT MENUS</div>') == 1
-    assert sidebar.count('class="app-nav-section-title">PANTRY</div>') == 1
-    assert sidebar.index('<span class="app-nav-text">Pantry</span>') < positions[0]
+    assert navigation.count('<span class="app-nav-text">Import</span>') == 1
+    assert 'data-app-page-target="importPage"' in navigation
+    assert 'data-app-page-aliases="recipeUrlsPage importDocumentPage generateImagePage menuUrlPage menuDocumentPage"' in navigation
+    for removed_label in ("Recipe URL", "Recipe Document", "Recipe Image", "Menu URL", "Menu Document"):
+        assert f'<span class="app-nav-text">{removed_label}</span>' not in navigation
+    assert "Stores / Store Links" not in navigation
+    assert "Price Comparison" not in navigation
+    assert 'href="{{ url_for(\'pantry_bp.pantry_coming_soon_route\') }}"' in navigation
 
-    for page_target, label in (
-        ("recipeUrlsPage", "Recipe URL"),
-        ("importDocumentPage", "Recipe Document"),
-        ("generateImagePage", "Recipe Image"),
-        ("menuUrlPage", "Menu URL"),
-        ("menuDocumentPage", "Menu Document"),
+    create_heading = import_workspace.index('id="createRecipesImportHeading"')
+    menu_heading = import_workspace.index('id="importMenusHeading"')
+    assert create_heading < menu_heading
+    for page_target in (
+        "recipeUrlsPage",
+        "importDocumentPage",
+        "generateImagePage",
+        "menuUrlPage",
+        "menuDocumentPage",
     ):
-        label_markup = f'<span class="app-nav-text">{label}</span>'
-        label_position = sidebar.index(label_markup)
-        link_start = sidebar.rfind("<a ", 0, label_position)
-        link_end = sidebar.index("</a>", label_position)
-        link = sidebar[link_start:link_end]
-
-        assert f"'#{page_target}'" in link
-        assert 'data-app-nav-link' in link
-        assert 'data-app-nav-action="app-page"' in link
-        assert f'data-app-page-target="{page_target}"' in link
-        assert f'data-app-nav-target="{page_target}"' in link
-
-    assert 'class="app-nav-link app-nav-link-multiline' in sidebar
-    assert 'href="{{ url_for(\'pantry_bp.pantry_coming_soon_route\') }}"' in sidebar
+        assert f'data-app-page-target="{page_target}"' in import_workspace
+    assert "Scan Barcode" not in import_workspace[create_heading:menu_heading + 1000]
 
 
 def test_sidebar_navigation_uses_exact_lucide_outline_icon_mappings_only():
     sidebar = read_text("PushShoppingList/templates/includes/app_sidebar.html")
+    navigation = read_text("PushShoppingList/templates/includes/app_navigation_sections.html")
+    plan_promo = read_text("PushShoppingList/templates/includes/app_plan_promo.html")
     macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
 
     expected_usage = {
         "home": 1,
         "recipes": 1,
-        "menus": 2,
+        "menus": 1,
         "cookbooks": 1,
         "shopping": 1,
         "pantry": 1,
         "meal": 1,
         "stores": 1,
         "price": 1,
-        "link": 1,
-        "document": 2,
-        "image": 1,
+        "import": 1,
         "barcode": 1,
+        "billing": 1,
+        "help": 1,
+        "settings": 1,
     }
     for name, count in expected_usage.items():
-        assert sidebar.count(f'shell.sidebar_icon("{name}")') == count
-        assert f'shell.app_icon("{name}")' not in sidebar
-
-    # Account icons remain on the existing shared family; this change is scoped
-    # to the mockup-mapped navigation rows only.
-    for name in ("settings", "billing", "help"):
-        assert f'shell.app_icon("{name}")' in sidebar
+        assert navigation.count(f'shell.sidebar_icon("{name}")') == count
+        assert f'shell.app_icon("{name}")' not in navigation
+    assert plan_promo.count('shell.sidebar_svg_icon("billing")') == 2
 
     exact_lucide_paths = (
         'd="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"',
@@ -153,12 +157,13 @@ def test_sidebar_navigation_uses_exact_lucide_outline_icon_mappings_only():
         'width="20" height="5" x="2" y="3" rx="1"',
         'width="18" height="18" x="3" y="4" rx="2"',
         'd="M17.774 10.31a1.12 1.12 0 0 0-1.549 0',
-        'd="M2.586 17.414A2 2 0 0 0 2 18.828V21',
-        'd="M9 17H7A5 5 0 0 1 7 7h2"',
-        'd="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8',
-        'd="M13.997 4a2 2 0 0 1 1.76 1.05',
+        'd="M12.586 2.586A2 2 0 0 0 11.172 2H4',
         'd="M8 5h13"',
         'd="M21 5v14"',
+        'points="17 8 12 3 7 8"',
+        'width="20" height="14" x="2" y="5" rx="2"',
+        'd="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 2-3 4"',
+        'd="M12.22 2h-.44a2 2 0 0 0-2 2v.18',
     )
     for path in exact_lucide_paths:
         assert path in macros
@@ -172,27 +177,16 @@ def test_sidebar_navigation_uses_exact_lucide_outline_icon_mappings_only():
 def test_recipe_editor_sidebar_uses_the_same_import_task_groups():
     template = read_text("PushShoppingList/templates/recipe_edit_page.html")
     sidebar_template = read_text("PushShoppingList/templates/includes/app_sidebar.html")
-    nav_start = sidebar_template.index('<nav class="app-sidebar-nav" aria-label="App sections">')
-    nav_end = sidebar_template.index("</nav>", nav_start)
-    sidebar = sidebar_template[nav_start:nav_end]
+    navigation = read_text("PushShoppingList/templates/includes/app_navigation_sections.html")
 
     assert '{% extends "layouts/app_layout.html" %}' in template
     assert '{% set app_active_nav_item = "recipes" %}' in template
     assert '<nav class="app-sidebar-nav"' not in template
-    assert '<span class="app-nav-text">Import</span>' not in sidebar
-    assert sidebar.count('class="app-nav-section-title">CREATE RECIPES</div>') == 1
-    assert sidebar.count('class="app-nav-section-title">IMPORT MENUS</div>') == 1
-    assert sidebar.count('class="app-nav-section-title">PANTRY</div>') == 1
-    for label in ("Recipe URL", "Recipe Document", "Recipe Image", "Menu URL", "Menu Document"):
-        assert f'<span class="app-nav-text">{label}</span>' in sidebar
-    for old_label in ("Recipe URLs", "Import From Document", "Generate From Image", "Import Menu From Document"):
-        assert f'<span class="app-nav-text">{old_label}</span>' not in sidebar
-    assert "home_href ~ '#recipeUrlsPage'" in sidebar
-    assert "home_href ~ '#importDocumentPage'" in sidebar
-    assert "home_href ~ '#generateImagePage'" in sidebar
-    assert "home_href ~ '#menuUrlPage'" in sidebar
-    assert "home_href ~ '#menuDocumentPage'" in sidebar
-    assert "url_for('pantry_bp.pantry_coming_soon_route')" in sidebar
+    assert '{% include "includes/app_navigation_sections.html" %}' in sidebar_template
+    assert '<span class="app-nav-text">Import</span>' in navigation
+    assert "home_href ~ '#importPage'" in navigation
+    assert 'data-app-page-aliases="recipeUrlsPage importDocumentPage generateImagePage menuUrlPage menuDocumentPage"' in navigation
+    assert "url_for('pantry_bp.pantry_coming_soon_route')" in navigation
 
 
 def test_brand_mark_uses_chef_hat_check_cart_logo():
@@ -228,6 +222,8 @@ def test_home_and_recipe_editor_reuse_the_shared_logo_asset_from_app_layout():
 def test_sidebar_import_targets_keep_existing_active_state_and_barcode_behavior():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
+    navigation = read_text("PushShoppingList/templates/includes/app_navigation_sections.html")
+    mobile_navigation = read_text("PushShoppingList/templates/includes/app_mobile_navigation.html")
     pantry_routes = read_text("PushShoppingList/routes/pantry_routes.py")
 
     for page_target in (
@@ -240,11 +236,23 @@ def test_sidebar_import_targets_keep_existing_active_state_and_barcode_behavior(
         assert f'{page_target}: "{page_target}"' in script
 
     assert "function appShellSetActivePageLink(pageId)" in script
+    assert "function appShellNavPageTargets(link)" in script
+    assert ".find(link => appShellNavPageTargets(link).includes(pageKey));" in script
     assert 'link.classList.toggle("is-active", Boolean(sameLinkKey));' in script
+    assert 'link.setAttribute("aria-current", "page");' in script
     assert ".app-nav-link:hover," in css
     assert ".app-nav-link:focus-visible," in css
     assert ".app-sidebar-collapsed .app-nav-text," in css
+    assert ".app-sidebar-collapsed .app-sidebar-promo-action-icon" in css
     assert "overflow-y: auto;" in css
+    assert navigation.count('data-tooltip=') == 14
+    assert navigation.count('aria-label=') == 14
+    assert 'data-app-page-aliases="recipeUrlsPage importDocumentPage generateImagePage menuUrlPage menuDocumentPage"' in navigation
+    assert 'data-app-mobile-nav-toggle' in mobile_navigation
+    assert 'data-app-mobile-nav-drawer' in mobile_navigation
+    assert 'data-app-mobile-nav-backdrop' in mobile_navigation
+    assert "function setAppMobileNavigationOpen(open, options = {})" in script
+    assert 'setAppMobileNavigationOpen(false, { restoreFocus: true });' in script
     assert '@pantry_bp.route("/pantry/coming-soon")' in pantry_routes
     assert 'redirect(url_for("main_bp.index", _anchor="aiPantrySection"))' in pantry_routes
 

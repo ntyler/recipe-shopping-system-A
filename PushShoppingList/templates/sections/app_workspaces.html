@@ -987,70 +987,72 @@
         </div>
     </div>
 
-    <h3 class="app-page-section-title">Choose an Import Method</h3>
-    <div class="app-import-method-grid app-import-method-grid-six" aria-label="Import methods">
-        <a class="app-import-method-card"
-           href="#recipeUrlsPage"
-           data-app-nav-link
-           data-app-nav-action="app-page"
-           data-app-page-target="recipeUrlsPage"
-           data-app-nav-target="recipeUrlsPage">
-            {{ shell.app_icon("link") }}
-            <strong>Import Recipe URLs</strong>
-            <span>Import recipes from websites by pasting one or more URLs.</span>
-            <small>Supports multiple URLs</small>
-        </a>
-        <a class="app-import-method-card"
-           href="#importDocumentPage"
-           data-app-nav-link
-           data-app-nav-action="app-page"
-           data-app-page-target="importDocumentPage"
-           data-app-nav-target="importDocumentPage">
-            {{ shell.app_icon("document") }}
-            <strong>Import from Document</strong>
-            <span>Upload a PDF, Word document, text file, or recipe image.</span>
-            <small>PDF, DOCX, TXT, PNG, JPG</small>
-        </a>
-        <a class="app-import-method-card"
-           href="#generateImagePage"
-           data-app-nav-link
-           data-app-nav-action="app-page"
-           data-app-page-target="generateImagePage"
-           data-app-nav-target="generateImagePage">
-            {{ shell.app_icon("image") }}
-            <strong>Generate from Image</strong>
-            <span>Upload a recipe photo or dish image and let AI build the recipe.</span>
-            <small>Great for handwritten recipes</small>
-        </a>
-        <a class="app-import-method-card"
-           href="{{ url_for('pantry_bp.pantry_coming_soon_route') }}">
-            {{ shell.app_icon("barcode") }}
-            <strong>Scan Barcode</strong>
-            <span>Look up products and add grocery items to pantry or lists.</span>
-            <small>Product lookup</small>
-        </a>
-        <a class="app-import-method-card"
-           href="#menuUrlPage"
-           data-app-nav-link
-           data-app-nav-action="app-page"
-           data-app-page-target="menuUrlPage"
-           data-app-nav-target="menuUrlPage">
-            {{ shell.app_icon("menus") }}
-            <strong>Menu URL</strong>
-            <span>Extract restaurant menus and create inferred recipes from menu items.</span>
-            <small>Restaurant menu pages</small>
-        </a>
-        <a class="app-import-method-card"
-           href="#menuDocumentPage"
-           data-app-nav-link
-           data-app-nav-action="app-page"
-           data-app-page-target="menuDocumentPage"
-           data-app-nav-target="menuDocumentPage">
-            {{ shell.app_icon("document") }}
-            <strong>Import Menu From Document</strong>
-            <span>Upload a menu PDF, photo, or document for restaurant-menu extraction.</span>
-            <small>Menu PDF or photo</small>
-        </a>
+    <div class="app-import-method-groups" aria-label="Import methods">
+        <section class="app-import-method-group" aria-labelledby="createRecipesImportHeading">
+            <h3 id="createRecipesImportHeading" class="app-page-section-title">CREATE RECIPES</h3>
+            <div class="app-import-method-grid app-import-method-grid-three">
+                <a class="app-import-method-card"
+                   href="#recipeUrlsPage"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="recipeUrlsPage"
+                   data-app-nav-target="recipeUrlsPage">
+                    {{ shell.app_icon("link") }}
+                    <strong>Import Recipe URLs</strong>
+                    <span>Import recipes from websites by pasting one or more URLs.</span>
+                    <small>Supports multiple URLs</small>
+                </a>
+                <a class="app-import-method-card"
+                   href="#importDocumentPage"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="importDocumentPage"
+                   data-app-nav-target="importDocumentPage">
+                    {{ shell.app_icon("document") }}
+                    <strong>Import from Document</strong>
+                    <span>Upload a PDF, Word document, text file, or recipe image.</span>
+                    <small>PDF, DOCX, TXT, PNG, JPG</small>
+                </a>
+                <a class="app-import-method-card"
+                   href="#generateImagePage"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="generateImagePage"
+                   data-app-nav-target="generateImagePage">
+                    {{ shell.app_icon("image") }}
+                    <strong>Generate from Image</strong>
+                    <span>Upload a recipe photo or dish image and let AI build the recipe.</span>
+                    <small>Great for handwritten recipes</small>
+                </a>
+            </div>
+        </section>
+        <section class="app-import-method-group" aria-labelledby="importMenusHeading">
+            <h3 id="importMenusHeading" class="app-page-section-title">IMPORT MENUS</h3>
+            <div class="app-import-method-grid app-import-method-grid-two">
+                <a class="app-import-method-card"
+                   href="#menuUrlPage"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="menuUrlPage"
+                   data-app-nav-target="menuUrlPage">
+                    {{ shell.app_icon("menus") }}
+                    <strong>Menu URL</strong>
+                    <span>Extract restaurant menus and create inferred recipes from menu items.</span>
+                    <small>Restaurant menu pages</small>
+                </a>
+                <a class="app-import-method-card"
+                   href="#menuDocumentPage"
+                   data-app-nav-link
+                   data-app-nav-action="app-page"
+                   data-app-page-target="menuDocumentPage"
+                   data-app-nav-target="menuDocumentPage">
+                    {{ shell.app_icon("document") }}
+                    <strong>Import Menu From Document</strong>
+                    <span>Upload a menu PDF, photo, or document for restaurant-menu extraction.</span>
+                    <small>Menu PDF or photo</small>
+                </a>
+            </div>
+        </section>
     </div>
 
     <div class="app-page-layout">

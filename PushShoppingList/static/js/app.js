@@ -408,6 +408,28 @@ function appShellNavTargetId(link) {
     return href.startsWith("#") ? href.slice(1) : "";
 }
 
+function appShellNavPageTargets(link) {
+    if (!link) {
+        return [];
+    }
+
+    const primaryTarget = String(link.dataset.appPageTarget || "").trim();
+    const aliasTargets = String(link.dataset.appPageAliases || "")
+        .split(/\s+/)
+        .map(target => target.trim())
+        .filter(Boolean);
+
+    return [...new Set([primaryTarget, ...aliasTargets].filter(Boolean))];
+}
+
+function appShellPrimaryNavigationLinks() {
+    return [...document.querySelectorAll([
+        "[data-app-sidebar] [data-app-nav-link]",
+        "[data-app-mobile-nav-drawer] [data-app-nav-link]",
+        ".app-mobile-bottom-nav [data-app-nav-link]",
+    ].join(", "))];
+}
+
 function appShellNavActiveKey(link) {
     if (!link) {
         return "";
@@ -440,16 +462,21 @@ function appShellNavActiveKey(link) {
 function appShellSetActiveLink(activeLink) {
     const activeKey = appShellNavActiveKey(activeLink);
 
-    document.querySelectorAll("[data-app-nav-link]").forEach(link => {
+    appShellPrimaryNavigationLinks().forEach(link => {
         const sameLinkKey = activeKey && appShellNavActiveKey(link) === activeKey;
         link.classList.toggle("is-active", Boolean(sameLinkKey));
+        if (sameLinkKey) {
+            link.setAttribute("aria-current", "page");
+        } else {
+            link.removeAttribute("aria-current");
+        }
     });
 }
 
 function appShellSetActivePageLink(pageId) {
     const pageKey = String(pageId || "");
-    const pageLink = [...document.querySelectorAll("[data-app-nav-link]")]
-        .find(link => String(link.dataset.appPageTarget || "") === pageKey);
+    const pageLink = appShellPrimaryNavigationLinks()
+        .find(link => appShellNavPageTargets(link).includes(pageKey));
 
     appShellSetActiveLink(pageLink || null);
 }
@@ -1027,8 +1054,31 @@ function initAppShellNavigation() {
             closeHomeRecipeMenus();
         }
 
+        const mobileNavigationToggle = event.target && event.target.closest
+            ? event.target.closest("[data-app-mobile-nav-toggle]")
+            : null;
+        if (mobileNavigationToggle) {
+            setAppMobileNavigationOpen(true);
+            return;
+        }
+
+        const mobileNavigationClose = event.target && event.target.closest
+            ? event.target.closest("[data-app-mobile-nav-close], [data-app-mobile-nav-backdrop]")
+            : null;
+        if (mobileNavigationClose) {
+            setAppMobileNavigationOpen(false, { restoreFocus: true });
+            return;
+        }
+
+        const mobileDrawerSelection = event.target && event.target.closest
+            ? event.target.closest("[data-app-mobile-nav-drawer] a, [data-app-mobile-drawer-close]")
+            : null;
+        if (mobileDrawerSelection) {
+            setAppMobileNavigationOpen(false);
+        }
+
         const link = event.target && event.target.closest
-            ? event.target.closest("[data-app-nav-link]")
+            ? event.target.closest("[data-app-nav-link], [data-app-plan-link]")
             : null;
 
         if (!link) {
@@ -1049,6 +1099,11 @@ function initAppShellNavigation() {
 
     document.addEventListener("keydown", event => {
         if (event && event.key === "Escape") {
+            const mobileDrawer = document.querySelector("[data-app-mobile-nav-drawer]");
+            if (mobileDrawer && !mobileDrawer.hidden) {
+                setAppMobileNavigationOpen(false, { restoreFocus: true });
+                return;
+            }
             closeHomeRecipeMenus({ restoreFocus: true });
             return;
         }
@@ -1254,6 +1309,34 @@ function setAppSidebarCollapsed(collapsed, options = {}) {
     if (options.persist !== false) {
         localStorage.setItem(APP_SIDEBAR_COLLAPSED_KEY, isCollapsed ? "1" : "0");
     }
+    return false;
+}
+
+function setAppMobileNavigationOpen(open, options = {}) {
+    const shouldOpen = Boolean(open);
+    const drawer = document.querySelector("[data-app-mobile-nav-drawer]");
+    const backdrop = document.querySelector("[data-app-mobile-nav-backdrop]");
+    const toggle = document.querySelector("[data-app-mobile-nav-toggle]");
+
+    if (!drawer || !backdrop || !toggle) {
+        return false;
+    }
+
+    drawer.hidden = !shouldOpen;
+    backdrop.hidden = !shouldOpen;
+    drawer.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
+    toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    document.body.classList.toggle("app-mobile-navigation-open", shouldOpen);
+
+    if (shouldOpen) {
+        const firstLink = drawer.querySelector(".app-nav-link");
+        if (firstLink && typeof firstLink.focus === "function") {
+            firstLink.focus();
+        }
+    } else if (options.restoreFocus === true && typeof toggle.focus === "function") {
+        toggle.focus();
+    }
+
     return false;
 }
 
