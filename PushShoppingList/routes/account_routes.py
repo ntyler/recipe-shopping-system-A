@@ -263,6 +263,7 @@ def firebase_login_route():
 @account_bp.route("/auth/logout", methods=["POST"])
 def firebase_logout_route():
     clear_admin_support_session()
+    delete_current_guest_session()
     sign_out_user()
     response = jsonify({"success": True, "authenticated": False, "user": None})
     clear_guest_cookie(response)
@@ -301,9 +302,10 @@ def guest_delete_route():
 @account_bp.route("/logout", methods=["GET", "POST"])
 def logout_route():
     clear_admin_support_session()
+    delete_current_guest_session()
     sign_out_user()
-    flash("Signed out. You are using the guest workspace.", "success")
-    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+    flash("Signed out.", "success")
+    response = make_response(redirect(url_for("main_bp.index")))
     clear_guest_cookie(response)
     return response
 
@@ -592,9 +594,10 @@ def complete_password_reset_route():
 @account_bp.route("/account/sign-out", methods=["POST"])
 def sign_out_route():
     clear_admin_support_session()
+    delete_current_guest_session()
     sign_out_user()
-    flash("Signed out. You are using the guest workspace.", "success")
-    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+    flash("Signed out.", "success")
+    response = make_response(redirect(url_for("main_bp.index")))
     clear_guest_cookie(response)
     return response
 

@@ -219,11 +219,15 @@ def test_firebase_auth_requests_collapse_before_sign_in_and_sign_out_work():
         "                requestCollapseAllBeforeAuthReload();\n"
         "                const result = await syncFirebaseUser"
     ) in script
-    assert (
-        "if (!firebaseUser && session.user && session.user.auth_provider === \"firebase\") {\n"
-        "                requestCollapseAllBeforeAuthReload();\n"
-        "                await logoutBackend();"
-    ) in script
+    external_sign_out = script[
+        script.index('if (!firebaseUser && session.user && session.user.auth_provider === "firebase")'):
+        script.index("        } catch (error) {", script.index('if (!firebaseUser && session.user && session.user.auth_provider === "firebase")'))
+    ]
+    assert "requestCollapseAllBeforeAuthReload();" in external_sign_out
+    assert "beginSignOutProtection();" in external_sign_out
+    assert "const result = await logoutBackend();" in external_sign_out
+    assert "clearPostSignOutClientState(result);" in external_sign_out
+    assert "navigateToCanonicalSignInAfterSignOut();" in external_sign_out
 
 
 def test_global_collapse_keeps_recipe_title_images_visible():

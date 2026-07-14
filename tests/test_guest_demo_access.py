@@ -362,10 +362,17 @@ def test_logout_clears_guest_session_and_cookie(monkeypatch, tmp_path):
 
     with app.test_client() as client:
         client.get("/guest/start")
+        with client.session_transaction() as session:
+            guest_session_id = session["guest_session_id"]
+        guest_file = tmp_path / "guests" / guest_session_id / "shopping_list.txt"
+        guest_file.write_text("temporary item", encoding="utf-8")
+
         response = client.get("/logout")
 
         assert response.status_code == 302
+        assert response.headers["Location"] == "/"
         assert "guest_demo_session=;" in response.headers.get("Set-Cookie", "")
+        assert not guest_file.exists()
         with client.session_transaction() as session:
             assert "is_guest" not in session
             assert "guest_session_id" not in session

@@ -90,6 +90,7 @@ if (missingFirebaseConfig(firebaseConfig)) {
 let backendSession = null;
 let explicitAuthInProgress = false;
 const TWO_FACTOR_PANEL_RETURN_KEY = "shoppingTwoFactorPanelReturn";
+const POST_SIGN_OUT_RESET_KEY = "shopping-post-sign-out-reset";
 const POST_AUTH_HOME_LOCAL_STORAGE_KEYS = [
     "scrollY",
     "user-account-open-panel",
@@ -99,8 +100,23 @@ const POST_AUTH_HOME_SESSION_STORAGE_KEYS = [
     TWO_FACTOR_PANEL_RETURN_KEY,
     "recipe-edit-page-return-state",
     "recipe-edit-pending-action",
+    POST_SIGN_OUT_RESET_KEY,
 ];
 const POST_AUTH_HOME_RESET_KEY = "shopping-post-auth-home-reset";
+const POST_SIGN_OUT_LOCAL_STORAGE_KEYS = [
+    ...POST_AUTH_HOME_LOCAL_STORAGE_KEYS,
+    "shopping-auth-collapse-all-pending",
+    "store-open-panels",
+    "shopping-view",
+    "import-recipe-cookbook-destination",
+    "recipe-image-progress-event",
+];
+const POST_SIGN_OUT_LOCAL_STORAGE_PREFIXES = [
+    "extract_closed_",
+    "extract_refreshed_",
+    "item-checked:",
+    "recipe-task-checked:",
+];
 
 function formValue(form, name) {
     return String((form.elements[name] || {}).value || "").trim();
@@ -302,6 +318,142 @@ function closePostAuthenticationTransientUi() {
     document.body.classList.remove("app-mobile-navigation-open");
 }
 
+function removeSignOutFailureNotice() {
+    const notice = document.querySelector("[data-sign-out-error]");
+    if (notice) {
+        notice.remove();
+    }
+}
+
+function beginSignOutProtection() {
+    removeSignOutFailureNotice();
+    closePostAuthenticationTransientUi();
+
+    const appLayout = document.querySelector("[data-app-layout]");
+    if (appLayout) {
+        appLayout.inert = true;
+        appLayout.setAttribute("aria-hidden", "true");
+    }
+
+    let screen = document.querySelector("[data-sign-out-protection]");
+    if (!screen) {
+        screen = document.createElement("div");
+        screen.className = "auth-sign-out-screen";
+        screen.setAttribute("data-sign-out-protection", "");
+        screen.setAttribute("role", "status");
+        screen.setAttribute("aria-live", "polite");
+
+        const spinner = document.createElement("span");
+        spinner.className = "auth-sign-out-spinner";
+        spinner.setAttribute("aria-hidden", "true");
+
+        const label = document.createElement("span");
+        label.textContent = "Signing out...";
+
+        screen.append(spinner, label);
+        document.body.append(screen);
+    }
+
+    document.body.classList.add("auth-sign-out-pending");
+}
+
+function endSignOutProtection() {
+    document.body.classList.remove("auth-sign-out-pending");
+    const screen = document.querySelector("[data-sign-out-protection]");
+    if (screen) {
+        screen.remove();
+    }
+
+    const appLayout = document.querySelector("[data-app-layout]");
+    if (appLayout) {
+        appLayout.inert = false;
+        appLayout.removeAttribute("aria-hidden");
+    }
+}
+
+function showSignOutFailure(form, error) {
+    const message = firebaseErrorMessage(error);
+    setStatus(form, message, "error");
+
+    const notice = document.createElement("div");
+    notice.className = "auth-sign-out-error";
+    notice.setAttribute("data-sign-out-error", "");
+    notice.setAttribute("role", "alert");
+    notice.textContent = message;
+    document.body.append(notice);
+}
+
+function clearPostSignOutClientState(logoutResult = {}) {
+    backendSession = {
+        ...logoutResult,
+        success: true,
+        authenticated: false,
+        pending_2fa: false,
+        user: null,
+    };
+    applyBackendSessionState(backendSession);
+
+    try {
+        const keysToRemove = [];
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = localStorage.key(index);
+            if (key && POST_SIGN_OUT_LOCAL_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+                keysToRemove.push(key);
+            }
+        }
+        [...POST_SIGN_OUT_LOCAL_STORAGE_KEYS, ...keysToRemove]
+            .forEach((key) => localStorage.removeItem(key));
+    } catch (error) {
+        // Authentication is already cleared even if browser storage is restricted.
+    }
+
+    try {
+        sessionStorage.clear();
+        sessionStorage.setItem(POST_SIGN_OUT_RESET_KEY, "1");
+    } catch (error) {
+        // The canonical navigation still prevents in-page state restoration.
+    }
+
+    window.shoppingFirebaseAuthStatus.backendVerified = false;
+}
+
+function navigateToCanonicalSignInAfterSignOut() {
+    const canonicalSignInUrl = new URL("/", window.location.origin);
+    if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+    }
+
+    window.history.replaceState({}, document.title, canonicalSignInUrl.pathname);
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    window.location.replace(canonicalSignInUrl.href);
+}
+
+function enforcePostSignOutDestination() {
+    let shouldEnforce = false;
+    try {
+        shouldEnforce = sessionStorage.getItem(POST_SIGN_OUT_RESET_KEY) === "1";
+    } catch (error) {
+        return false;
+    }
+
+    if (!shouldEnforce) {
+        return false;
+    }
+
+    const canonicalSignInUrl = new URL("/", window.location.origin);
+    const publicSignInPage = document.querySelector("[data-public-auth-content]");
+    if (publicSignInPage) {
+        window.history.replaceState({}, document.title, canonicalSignInUrl.pathname);
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        return true;
+    }
+
+    beginSignOutProtection();
+    window.history.replaceState({}, document.title, canonicalSignInUrl.pathname);
+    window.location.replace(canonicalSignInUrl.href);
+    return true;
+}
+
 function navigateToCanonicalHomeAfterAuthentication(options = {}) {
     if (options.collapseAllBeforeReload) {
         requestCollapseAllBeforeAuthReload();
@@ -382,21 +534,31 @@ async function finishPostTwoFactorDisableSignOut() {
 
     explicitAuthInProgress = true;
     requestCollapseAllBeforeAuthReload();
+    beginSignOutProtection();
 
     try {
         await signOut(auth);
     } catch (error) {
-        console.warn("Firebase sign-out after two-factor disable failed.", error);
+        cancelCollapseAllBeforeAuthReload();
+        explicitAuthInProgress = false;
+        endSignOutProtection();
+        showSignOutFailure(null, error);
+        return false;
     }
 
     try {
-        await logoutBackend();
+        const result = await logoutBackend();
+        clearPostSignOutClientState(result);
     } catch (error) {
-        console.warn("Backend sign-out after two-factor disable failed.", error);
+        cancelCollapseAllBeforeAuthReload();
+        explicitAuthInProgress = false;
+        endSignOutProtection();
+        showSignOutFailure(null, error);
+        return false;
     }
 
     removeQueryParams(["two_factor_disabled"]);
-    explicitAuthInProgress = false;
+    navigateToCanonicalSignInAfterSignOut();
     return true;
 }
 
@@ -1104,7 +1266,7 @@ function firebaseUserProfile(firebaseUser, extra = {}) {
 
 function disableFirebaseAuthForms(message) {
     document.querySelectorAll(
-        "[data-firebase-create-form], [data-firebase-sign-in-form], [data-firebase-forgot-form], [data-firebase-sign-out-form]"
+        "[data-firebase-create-form], [data-firebase-sign-in-form], [data-firebase-forgot-form]"
     ).forEach((form) => {
         setBusy(form, true);
         setStatus(form, message || "Firebase Authentication is not ready.", "error");
@@ -1239,25 +1401,34 @@ function bindForgotPasswordForm() {
 }
 
 function bindSignOutForm() {
-    const form = document.querySelector("[data-firebase-sign-out-form]");
+    document.addEventListener("submit", async (event) => {
+        const form = event.target.closest("[data-firebase-sign-out-form]");
+        if (!form || form.dataset.firebaseSignOutPending === "1") {
+            return;
+        }
 
-    if (!form) {
-        return;
-    }
-
-    form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        form.dataset.firebaseSignOutPending = "1";
+        setStatus(form, "", "");
         setBusy(form, true);
+        explicitAuthInProgress = true;
         requestCollapseAllBeforeAuthReload();
+        beginSignOutProtection();
 
         try {
-            await signOut(auth);
-        } finally {
-            try {
-                await logoutBackend();
-            } finally {
-                reloadAccountSection({ collapseAllBeforeReload: true });
+            if (auth) {
+                await signOut(auth);
             }
+            const result = await logoutBackend();
+            clearPostSignOutClientState(result);
+            navigateToCanonicalSignInAfterSignOut();
+        } catch (error) {
+            cancelCollapseAllBeforeAuthReload();
+            explicitAuthInProgress = false;
+            endSignOutProtection();
+            setBusy(form, false);
+            delete form.dataset.firebaseSignOutPending;
+            showSignOutFailure(form, error);
         }
     });
 }
@@ -1378,13 +1549,14 @@ function bindFirebaseForms() {
     bindCreateAccountForm();
     bindSignInForm();
     bindForgotPasswordForm();
-    bindSignOutForm();
     bindTwoFactorCancelButton();
     bindAccountMenuActions();
     bindAccountDeleteConfirmForm();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+    enforcePostSignOutDestination();
+    bindSignOutForm();
     bindPushNotificationsPanel();
     bindTwoFactorPanel();
     bindDeleteAccountPanel();
@@ -1433,14 +1605,29 @@ if (auth) {
 
             if (!firebaseUser && session.user && session.user.auth_provider === "firebase") {
                 requestCollapseAllBeforeAuthReload();
-                await logoutBackend();
-                reloadAccountSection({ collapseAllBeforeReload: true });
+                beginSignOutProtection();
+                try {
+                    const result = await logoutBackend();
+                    clearPostSignOutClientState(result);
+                    navigateToCanonicalSignInAfterSignOut();
+                } catch (error) {
+                    cancelCollapseAllBeforeAuthReload();
+                    endSignOutProtection();
+                    showSignOutFailure(null, error);
+                    throw error;
+                }
             }
         } catch (error) {
             console.warn("Firebase auth state sync failed.", error);
         }
     });
 }
+
+window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+        enforcePostSignOutDestination();
+    }
+});
 
 window.shoppingFirebaseAuth = {
     app,

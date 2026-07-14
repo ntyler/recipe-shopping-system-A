@@ -17,6 +17,7 @@ from flask import g
 from flask import jsonify
 from flask import has_request_context
 from flask import redirect
+from flask import make_response
 from flask import request
 from flask import render_template
 from flask import session
@@ -3451,9 +3452,13 @@ def index():
     active_public_user = current_public_user()
 
     if not active_public_user and not is_guest_session():
-        return render_template("public_auth.html", **public_auth_page_context())
+        response = make_response(render_template("public_auth.html", **public_auth_page_context()))
+    else:
+        response = make_response(render_template("index.html", **shell_context(active_public_user)))
 
-    return render_template("index.html", **shell_context(active_public_user))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @main_bp.route("/terms")
