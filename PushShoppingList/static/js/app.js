@@ -22381,6 +22381,8 @@ let recipeEditStoreSections = [];
 let recipeEditFoodRules = { require: [], avoid: [] };
 let recipeEditOriginalSnapshot = null;
 let recipeEditAiInsightSource = {};
+let recipeEditAiQualityReport = null;
+let recipeEditAiQualityReportRequest = null;
 let recipeEditScalingOptions = [];
 let recipeEditInferenceContext = {};
 let activeFoodReviewRow = null;
@@ -23631,6 +23633,7 @@ function closeRecipeEditor() {
 }
 
 function populateRecipeEditor(recipe, originalUrl) {
+    recipeEditAiQualityReport = null;
     const coverImage = normalizeRecipeEditorCoverImage(recipe.cover_image || {});
     const coverImagePrompt = String(recipe.cover_image_prompt || "").trim();
     if (coverImagePrompt) {
@@ -29405,12 +29408,7 @@ function recipeEditNumericConfidence(recipe) {
 }
 
 function recipeEditConfidenceValue(value) {
-    const numeric = recipeEditNumericConfidence({ confidence_score: value });
-    if (numeric != null) {
-        return numeric;
-    }
-    const label = String(value == null ? "" : value).trim().toLowerCase();
-    return label === "high" ? 90 : label === "medium" ? 70 : label === "low" ? 45 : null;
+    return recipeEditNumericConfidence({ confidence_score: value });
 }
 
 function recipeEditAverageConfidence(items = []) {
@@ -29425,12 +29423,8 @@ function recipeEditAiConfidenceModel(source = {}) {
     const inferredFields = recipeEditMetadataFields(source, ["ai_generated_fields", "ai_inferred_fields", "inferred_fields", "cookbook_item_inferred_fields"]);
     const verifiedFields = recipeEditMetadataFields(source, ["user_verified_fields", "verified_fields", "confirmed_fields"]);
     const estimatedFields = recipeEditMetadataFields(source, ["estimated_fields", "ai_estimated_fields"]);
-    const sourceUrl = String(source.source_url || source.url || source.source_menu_url || "").trim();
-    const sourceType = String(source.source_type || "").trim().toLowerCase();
     const explicitSourceQuality = recipeEditConfidenceValue(source.source_quality_score ?? source.source_quality_confidence);
-    const sourceQuality = explicitSourceQuality != null
-        ? explicitSourceQuality
-        : isLegitimateWebUrl(sourceUrl) ? 88 : sourceType.includes("manual") ? 70 : sourceType ? 62 : null;
+    const sourceQuality = explicitSourceQuality;
     const ingredientConfidence = recipeEditAverageConfidence(ingredients);
     const instructionConfidence = recipeEditAverageConfidence(instructions);
     const nutritionConfidence = recipeEditConfidenceValue(
@@ -29446,19 +29440,9 @@ function recipeEditAiConfidenceModel(source = {}) {
         ?? recipeEditConfidenceValue(source.ai_certainty ?? source.category_confidence ?? source.ingredients_inference_confidence);
     const verificationConfidence = recipeEditConfidenceValue(source.user_verification_confidence)
         ?? (verifiedFields.length ? 95 : null);
-    const weightedSignals = [
-        [sourceQuality, 0.25],
-        [extractionConfidence, 0.25],
-        [aiCertainty, 0.30],
-        [verificationConfidence, 0.20],
-    ].filter(([value]) => value != null);
     const savedConfidence = recipeEditNumericConfidence(source);
-    const signalWeight = weightedSignals.reduce((total, [, weight]) => total + weight, 0);
     const hasAiConfidenceEvidence = aiCertainty != null || extractionConfidence != null;
-    const calculatedConfidence = signalWeight && hasAiConfidenceEvidence
-        ? Math.round(weightedSignals.reduce((total, [value, weight]) => total + (value * weight), 0) / signalWeight)
-        : null;
-    const confidence = savedConfidence ?? calculatedConfidence;
+    const confidence = savedConfidence;
     const fieldList = value => value.length ? value.join(", ") : "Not recorded";
     const scoreLabel = value => value == null ? "Not scored" : `${value}%`;
     const sectionScores = [
@@ -29507,7 +29491,7 @@ function updateRecipeEditAiConfidenceCard(recipe = null) {
     }
     const source = recipeEditAiInsightSource || recipeEditOriginalSnapshot || {};
     const model = recipeEditAiConfidenceModel(source);
-    const confidence = model.confidence;
+    const confidence = recipeEditAiQualityReport?.overall_confidence ?? model.confidence;
     const percent = document.getElementById("recipeEditAiConfidencePercent");
     const bar = document.getElementById("recipeEditAiConfidenceBar");
     const track = document.getElementById("recipeEditAiConfidenceTrack");
@@ -29521,42 +29505,393 @@ function updateRecipeEditAiConfidenceCard(recipe = null) {
         track.setAttribute("aria-valuenow", String(confidence ?? 0));
         track.setAttribute("aria-valuetext", confidence == null ? "AI confidence not available" : `${confidence} percent`);
     }
+}
+
+function recipeEditAiReportActionHtml(action, options = {}) {
+    if (!action || !action.key || !action.label) return "";
+    const classes = ["recipe-edit-ai-report-action", options.className || ""].filter(Boolean).join(" ");
+    if (action.key === "open_original_image" && action.url) {
+        return `<a class="${classes}" href="${escapeAttribute(action.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(action.label)}</a>`;
+    }
+    return `<button type="button"
+                    class="${classes}"
+                    data-ai-report-action="${escapeAttribute(action.key)}"
+                    data-ai-report-target="${escapeAttribute(action.target || "")}"
+                    data-ai-report-index="${escapeAttribute(action.index == null ? "" : action.index)}"
+                    data-ai-report-document="${escapeAttribute(action.document || "")}"
+                    onclick="return runRecipeAiQualityReportAction(this)">${escapeHtml(action.label)}</button>`;
+}
+
+function recipeEditAiReportStatusIcon(status, score = null) {
+    const normalized = String(status || "").toLowerCase();
+    const icon = ["verified", "extracted", "manual", "high"].includes(normalized) || (score != null && score >= 75)
+        ? "check"
+        : ["missing", "low", "conflicting"].includes(normalized) || (score != null && score < 50)
+            ? "x"
+            : "warning";
+    return recipeEditSvgIcon(icon);
+}
+
+function recipeEditAiReportScore(value) {
+    return value == null ? "Not available" : `${value}%`;
+}
+
+function renderRecipeAiQualityReportCategories(categories = {}) {
+    const container = document.getElementById("recipeEditAiAnalysisCategories");
+    if (!container) return;
+    const rows = Object.values(categories || {}).filter(Boolean);
+    container.innerHTML = rows.length ? rows.map(item => {
+        const score = item.score == null ? null : Number(item.score);
+        return `<article class="recipe-edit-ai-report-category is-${escapeAttribute(item.status || "unavailable")}">
+            <div class="recipe-edit-ai-report-category-heading">
+                <span class="recipe-edit-ai-report-status-icon">${recipeEditAiReportStatusIcon(item.status, score)}</span>
+                <strong>${escapeHtml(item.label || "Confidence")}</strong>
+                <span>${escapeHtml(recipeEditAiReportScore(score))}</span>
+            </div>
+            <div class="recipe-edit-ai-report-progress"
+                 role="progressbar"
+                 aria-label="${escapeAttribute(item.label || "Confidence")}"
+                 aria-valuemin="0"
+                 aria-valuemax="100"
+                 aria-valuenow="${score == null ? 0 : score}"
+                 aria-valuetext="${escapeAttribute(recipeEditAiReportScore(score))}">
+                <span style="width:${score == null ? 0 : Math.max(0, Math.min(100, score))}%"></span>
+            </div>
+            <p>${escapeHtml(item.explanation || "Not available")}</p>
+        </article>`;
+    }).join("") : '<p class="recipe-edit-ai-report-empty">No saved confidence categories are available.</p>';
+}
+
+function renderRecipeAiQualityReportHealth(items = []) {
+    const container = document.getElementById("recipeEditAiAnalysisHealth");
+    if (!container) return;
+    container.innerHTML = items.length ? items.map((item, index) => `
+        <details class="recipe-edit-ai-report-detail is-${escapeAttribute(item.status || "unknown")}" ${index === 0 ? "open" : ""}>
+            <summary>
+                <span class="recipe-edit-ai-report-status-icon">${recipeEditAiReportStatusIcon(item.status, item.confidence)}</span>
+                <strong>${escapeHtml(item.label || "Field")}</strong>
+                <span>${escapeHtml(item.status_label || "Unknown")}</span>
+                <span>${escapeHtml(recipeEditAiReportScore(item.confidence))}</span>
+            </summary>
+            <div>
+                <dl>
+                    <div><dt>Current status</dt><dd>${escapeHtml(item.status_label || "Unknown")}</dd></div>
+                    <div><dt>Confidence</dt><dd>${escapeHtml(recipeEditAiReportScore(item.confidence))}</dd></div>
+                    <div><dt>Reason</dt><dd>${escapeHtml(item.reason || "Not available")}</dd></div>
+                    <div><dt>Recommendation</dt><dd>${escapeHtml(item.recommendation || "Not available")}</dd></div>
+                </dl>
+                ${item.action ? recipeEditAiReportActionHtml(item.action) : ""}
+            </div>
+        </details>`).join("") : '<p class="recipe-edit-ai-report-empty">No recipe-health details are available.</p>';
+}
+
+function renderRecipeAiQualityReportIngredients(items = []) {
+    const container = document.getElementById("recipeEditAiAnalysisIngredients");
+    if (!container) return;
+    container.innerHTML = items.length ? items.map(item => `
+        <article class="recipe-edit-ai-report-ingredient${item.flags?.length ? " has-warning" : ""}">
+            <div class="recipe-edit-ai-report-ingredient-heading">
+                <span class="recipe-edit-ai-report-ingredient-image">
+                    ${item.image_url ? `<img src="${escapeAttribute(item.image_url)}" alt="">` : recipeEditSvgIcon("cooking-pot")}
+                </span>
+                <div><strong>${escapeHtml(item.name || "Ingredient")}</strong><span>${escapeHtml(item.original_text || "Not available")}</span></div>
+                <span class="recipe-edit-ai-report-badge is-${escapeAttribute(item.match_status === "Matched" ? "verified" : "warning")}">${escapeHtml(item.match_status || "Unknown")}</span>
+            </div>
+            <dl class="recipe-edit-ai-report-grid-list">
+                <div><dt>Normalized</dt><dd>${escapeHtml(item.normalized_name || "Not available")}</dd></div>
+                <div><dt>Amount</dt><dd>${escapeHtml(item.amount || "Not available")}</dd></div>
+                <div><dt>Unit</dt><dd>${escapeHtml(item.unit || "Not available")}</dd></div>
+                <div><dt>Store section</dt><dd>${escapeHtml(item.store_section || "Not available")}</dd></div>
+                <div><dt>Type</dt><dd>${escapeHtml(item.ingredient_type || "Not available")}</dd></div>
+                <div><dt>Match confidence</dt><dd>${escapeHtml(recipeEditAiReportScore(item.match_confidence))}</dd></div>
+                <div><dt>Master ingredient</dt><dd>${escapeHtml(item.matched_master_ingredient || "Not available")}</dd></div>
+                <div><dt>Origin</dt><dd>${escapeHtml(item.origin || "Unknown")}</dd></div>
+            </dl>
+            ${item.alternatives?.length ? `<p><strong>Alternatives:</strong> ${item.alternatives.map(escapeHtml).join(", ")}</p>` : ""}
+            ${item.flags?.length ? `<div class="recipe-edit-ai-report-flags">${item.flags.map(flag => `<span>${escapeHtml(flag)}</span>`).join("")}</div>` : ""}
+            <div class="recipe-edit-ai-report-actions">${(item.actions || []).map(action => recipeEditAiReportActionHtml(action)).join("")}</div>
+        </article>`).join("") : '<p class="recipe-edit-ai-report-empty">No ingredients are saved for this recipe.</p>';
+}
+
+function renderRecipeAiQualityReportEvidence(items = []) {
+    const container = document.getElementById("recipeEditAiAnalysisEvidence");
+    if (!container) return;
+    container.innerHTML = items.length ? `
+        <div class="recipe-edit-ai-report-evidence-head" aria-hidden="true">
+            <span>Field</span><span>Source</span><span>Status</span><span>Confidence</span><span>Updated</span><span></span>
+        </div>
+        ${items.map(item => `<div class="recipe-edit-ai-report-evidence-row">
+            <span><strong>${escapeHtml(item.field || "Field")}</strong><small>${escapeHtml(item.value || "Not available")}</small></span>
+            <span><strong>${escapeHtml(item.source_type || "Not available")}</strong><small>${escapeHtml(item.source_name || "Not available")}</small></span>
+            <span class="recipe-edit-ai-report-badge is-${escapeAttribute(item.status || "unknown")}">${escapeHtml(item.status_label || "Unknown")}</span>
+            <span>${escapeHtml(recipeEditAiReportScore(item.confidence))}</span>
+            <span>${escapeHtml(item.updated_at || "Not available")}</span>
+            <span>${item.url ? `<a href="${escapeAttribute(item.url)}" target="_blank" rel="noopener noreferrer">Open</a>` : item.action ? recipeEditAiReportActionHtml(item.action) : ""}</span>
+        </div>`).join("")}` : '<p class="recipe-edit-ai-report-empty">No field-level source evidence is available.</p>';
+}
+
+function renderRecipeAiQualityReportRestaurant(model = {}) {
+    const container = document.getElementById("recipeEditAiAnalysisRestaurant");
+    if (!container) return;
+    container.innerHTML = `
+        ${model.available ? "" : '<p class="recipe-edit-ai-report-empty">No restaurant is linked to this recipe.</p>'}
+        <dl class="recipe-edit-ai-report-grid-list">
+            ${(model.fields || []).map(item => `<div><dt>${escapeHtml(item.label || "Field")}</dt><dd>${escapeHtml(item.value || "Not available")} <span class="recipe-edit-ai-report-badge is-${escapeAttribute(item.status || "unknown")}">${escapeHtml(item.status_label || "Unknown")}</span></dd></div>`).join("")}
+        </dl>
+        <p class="recipe-edit-ai-report-meta">Last scanned: ${escapeHtml(model.last_scanned_at || "Not available")}</p>
+        <div class="recipe-edit-ai-report-actions">${(model.actions || []).map(action => recipeEditAiReportActionHtml(action)).join("")}</div>`;
+}
+
+function renderRecipeAiQualityReportImage(model = {}) {
+    const container = document.getElementById("recipeEditAiAnalysisImage");
+    if (!container) return;
+    container.innerHTML = `
+        <div class="recipe-edit-ai-report-image-layout">
+            <div class="recipe-edit-ai-report-image-preview">${model.image_url ? `<img src="${escapeAttribute(model.image_url)}" alt="Current recipe">` : recipeEditSvgIcon("image")}</div>
+            <dl class="recipe-edit-ai-report-grid-list">
+                <div><dt>Image source</dt><dd>${escapeHtml(model.source || "Not available")}</dd></div>
+                <div><dt>Origin</dt><dd>${escapeHtml(model.status_label || "Unknown")}</dd></div>
+                <div><dt>Original image</dt><dd>${model.original_url ? `<a href="${escapeAttribute(model.original_url)}" target="_blank" rel="noopener noreferrer">Open source</a>` : "Not available"}</dd></div>
+                <div><dt>Confidence</dt><dd>${escapeHtml(recipeEditAiReportScore(model.confidence))}</dd></div>
+                <div><dt>Dimensions</dt><dd>${escapeHtml(model.dimensions || "Not available")}</dd></div>
+                <div><dt>Matches title</dt><dd>${escapeHtml(model.title_match || "Not available")}</dd></div>
+                <div><dt>Matches ingredients</dt><dd>${escapeHtml(model.ingredient_match || "Not available")}</dd></div>
+                <div><dt>Image prompt</dt><dd>${escapeHtml(model.prompt || "Not available")}</dd></div>
+            </dl>
+        </div>
+        ${(model.concerns || []).length ? `<div class="recipe-edit-ai-report-flags">${model.concerns.map(flag => `<span>${escapeHtml(flag)}</span>`).join("")}</div>` : ""}
+        <div class="recipe-edit-ai-report-actions">${(model.actions || []).map(action => recipeEditAiReportActionHtml(action)).join("")}</div>`;
+}
+
+function renderRecipeAiQualityReportRecommendations(items = []) {
+    const container = document.getElementById("recipeEditAiAnalysisRecommendations");
+    if (!container) return;
+    container.innerHTML = items.length ? items.map(item => `<article class="recipe-edit-ai-report-recommendation is-${escapeAttribute(String(item.priority || "low").toLowerCase())}">
+        <span>${escapeHtml(item.priority || "Low")}</span>
+        <div><strong>${escapeHtml(item.title || "Recommended improvement")}</strong><p>${escapeHtml(item.reason || "Not available")}</p><small>Expected benefit: ${escapeHtml(item.benefit || "Not available")}</small></div>
+        ${item.action ? recipeEditAiReportActionHtml(item.action) : ""}
+    </article>`).join("") : '<p class="recipe-edit-ai-report-empty">No saved-data improvements are currently recommended.</p>';
+}
+
+function renderRecipeAiQualityReport(report = {}) {
+    recipeEditAiQualityReport = report && typeof report === "object" ? report : {};
+    const overall = document.getElementById("recipeEditAiAnalysisOverall");
+    const label = document.getElementById("recipeEditAiAnalysisLabel");
+    const name = document.getElementById("recipeEditAiAnalysisRecipeName");
+    const timestamp = document.getElementById("recipeEditAiAnalysisTimestamp");
     const summary = document.getElementById("recipeEditAiAnalysisSummary");
-    const list = document.getElementById("recipeEditAiAnalysisList");
-    if (summary) {
-        summary.textContent = model.summary || "Saved confidence evidence for this recipe.";
+    if (overall) overall.textContent = report.overall_confidence == null ? "Unknown" : `${report.overall_confidence}%`;
+    if (label) label.textContent = `${report.confidence_label || "Unknown"} confidence`;
+    if (name) name.textContent = report.recipe_name || "Untitled Recipe";
+    if (timestamp) {
+        timestamp.hidden = !report.last_analyzed;
+        timestamp.textContent = report.last_analyzed ? `Last analyzed ${report.last_analyzed}` : "";
     }
-    if (list) {
-        list.innerHTML = model.items.map(([label, value]) => `
-            <section class="recipe-edit-ai-analysis-item">
-                <strong>${escapeHtml(label)}</strong>
-                <p>${escapeHtml(value)}</p>
-            </section>
-        `).join("");
+    if (summary) summary.textContent = report.summary || "No stored analysis summary is available.";
+    renderRecipeAiQualityReportCategories(report.categories);
+    renderRecipeAiQualityReportHealth(report.field_analysis || []);
+    renderRecipeAiQualityReportIngredients(report.ingredient_analysis || []);
+    renderRecipeAiQualityReportEvidence(report.source_evidence || []);
+    renderRecipeAiQualityReportRestaurant(report.restaurant_analysis || {});
+    renderRecipeAiQualityReportImage(report.image_analysis || {});
+    renderRecipeAiQualityReportRecommendations(report.recommendations || []);
+    document.getElementById("recipeEditAiAnalysisLoading")?.setAttribute("hidden", "");
+    document.getElementById("recipeEditAiAnalysisError")?.setAttribute("hidden", "");
+    document.getElementById("recipeEditAiAnalysisContent")?.removeAttribute("hidden");
+    updateRecipeEditAiConfidenceCard();
+}
+
+async function loadRecipeAiQualityReport(options = {}) {
+    const url = recipeEditorCurrentUrl();
+    const loading = document.getElementById("recipeEditAiAnalysisLoading");
+    const error = document.getElementById("recipeEditAiAnalysisError");
+    const content = document.getElementById("recipeEditAiAnalysisContent");
+    if (!url) {
+        if (loading) loading.hidden = true;
+        if (error) { error.hidden = false; error.textContent = "The current recipe URL is unavailable."; }
+        return null;
     }
+    if (recipeEditAiQualityReport && !options.force) {
+        renderRecipeAiQualityReport(recipeEditAiQualityReport);
+        return recipeEditAiQualityReport;
+    }
+    if (recipeEditAiQualityReportRequest && !options.force) return recipeEditAiQualityReportRequest;
+    if (loading) { loading.hidden = false; loading.textContent = options.force ? "Reanalyzing the saved recipe…" : "Loading saved AI analysis…"; }
+    if (error) error.hidden = true;
+    if (content) content.hidden = true;
+    const request = fetch(`/api/recipe/ai-quality-report?url=${encodeURIComponent(url)}`, { cache: "no-store" })
+        .then(async response => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.ok) throw new Error(data.error || "Unable to load the AI Quality Report.");
+            renderRecipeAiQualityReport(data.report || {});
+            return data.report || {};
+        })
+        .catch(err => {
+            if (loading) loading.hidden = true;
+            if (content) content.hidden = true;
+            if (error) { error.hidden = false; error.textContent = err.message || "Unable to load the AI Quality Report."; }
+            return null;
+        })
+        .finally(() => { if (recipeEditAiQualityReportRequest === request) recipeEditAiQualityReportRequest = null; });
+    recipeEditAiQualityReportRequest = request;
+    return request;
+}
+
+function recipeEditAiReportFocusables() {
+    const panel = document.getElementById("recipeEditAiAnalysisPanel");
+    return panel ? Array.from(panel.querySelectorAll('button:not([disabled]), a[href], summary, [tabindex]:not([tabindex="-1"])')).filter(element => !element.hidden && element.getClientRects().length) : [];
 }
 
 function openRecipeEditAiAnalysis(button) {
+    const backdrop = document.getElementById("recipeEditAiAnalysisBackdrop");
     const panel = document.getElementById("recipeEditAiAnalysisPanel");
-    if (!panel) {
-        return false;
-    }
-    if (!panel.hidden) {
-        return closeRecipeEditAiAnalysis();
-    }
-    panel.hidden = false;
+    if (!backdrop || !panel) return false;
+    if (!backdrop.hidden) return closeRecipeEditAiAnalysis();
+    if (backdrop.parentElement !== document.body) document.body.appendChild(backdrop);
+    backdrop.hidden = false;
+    document.body.classList.add("recipe-edit-ai-report-open");
     if (button) button.setAttribute("aria-expanded", "true");
-    panel.querySelector("button")?.focus({ preventScroll: true });
+    panel.querySelector(".recipe-edit-ai-analysis-close")?.focus({ preventScroll: true });
+    loadRecipeAiQualityReport();
     return false;
 }
 
 function closeRecipeEditAiAnalysis(options = {}) {
-    const panel = document.getElementById("recipeEditAiAnalysisPanel");
+    const backdrop = document.getElementById("recipeEditAiAnalysisBackdrop");
     const button = document.getElementById("recipeEditAiAnalysisButton");
-    if (panel) panel.hidden = true;
+    if (backdrop) backdrop.hidden = true;
+    document.body.classList.remove("recipe-edit-ai-report-open");
     if (button) {
         button.setAttribute("aria-expanded", "false");
         if (options.restoreFocus !== false) button.focus({ preventScroll: true });
+    }
+    return false;
+}
+
+function focusRecipeAiQualityIngredient(index, field = "ingredient") {
+    setRecipeEditActiveTab("ingredients", { focus: false });
+    const rows = Array.from(document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row"));
+    const row = rows[Number(index)] || rows[0];
+    if (!row) return;
+    row.classList.add("recipe-edit-row-expanded");
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    (row.querySelector(`[data-field="${field}"]`) || row.querySelector("input, textarea, select, button"))?.focus({ preventScroll: true });
+}
+
+function runRecipeAiQualityReportAction(button) {
+    const action = button?.dataset.aiReportAction || "";
+    const target = button?.dataset.aiReportTarget || "";
+    const index = button?.dataset.aiReportIndex || "0";
+    closeRecipeEditAiAnalysis({ restoreFocus: false });
+    window.setTimeout(() => {
+        if (action === "switch_tab") {
+            setRecipeEditActiveTab(target, { focus: true });
+        } else if (action === "focus_field") {
+            document.getElementById(target)?.focus({ preventScroll: false });
+        } else if (["review_ingredient", "change_match"].includes(action)) {
+            focusRecipeAiQualityIngredient(index, "ingredient");
+        } else if (action === "normalize_unit") {
+            focusRecipeAiQualityIngredient(index, "unit");
+        } else if (action === "add_missing_amount") {
+            focusRecipeAiQualityIngredient(index, "quantity");
+        } else if (action === "open_source_documents") {
+            const card = document.querySelector("[data-source-documents-card]");
+            if (card) { card.open = true; card.scrollIntoView({ block: "center" }); card.querySelector("summary")?.focus(); }
+        } else if (["edit_restaurant", "refresh_restaurant"].includes(action)) {
+            document.querySelector(".recipe-edit-restaurant-edit")?.click();
+            if (action === "refresh_restaurant") window.setTimeout(() => document.querySelector("[data-restaurant-fetch-button]")?.focus(), 0);
+        } else if (action === "open_restaurant_website") {
+            document.querySelector('[data-restaurant-action="website"]')?.click();
+        } else if (action === "open_restaurant_menu") {
+            document.querySelector('[data-restaurant-action="menu"]')?.click();
+        } else if (action === "open_restaurant_map") {
+            document.querySelector('[data-restaurant-action="map"]')?.click();
+        } else if (action === "change_image") {
+            openRecipeCoverUpload();
+        } else if (action === "regenerate_image") {
+            document.getElementById("recipeEditCoverGenerate")?.click();
+        } else if (action === "review_image_prompt") {
+            const prompt = document.getElementById("recipeEditCoverPrompt");
+            if (prompt) { prompt.hidden = false; prompt.scrollIntoView({ block: "center" }); document.getElementById("recipeEditCoverPromptToggle")?.focus(); }
+        } else if (action === "open_document") {
+            const row = document.querySelector(`[data-document-input-id="${CSS.escape(button.dataset.aiReportDocument || "")}"]`);
+            row?.querySelector("[data-document-open]")?.click();
+        }
+    }, 0);
+    return false;
+}
+
+async function reanalyzeRecipeAiQualityReport(button) {
+    if (button?.disabled) return false;
+    if (button) button.disabled = true;
+    const status = document.getElementById("recipeEditAiAnalysisActionStatus");
+    if (status) status.textContent = "Reanalyzing saved recipe…";
+    recipeEditAiQualityReport = null;
+    const report = await loadRecipeAiQualityReport({ force: true });
+    if (status) status.textContent = report ? "Report recalculated from the saved recipe." : "Reanalysis failed.";
+    if (button) button.disabled = false;
+    return false;
+}
+
+function applyRecipeAiQualitySafeUpdatesToEditor(updates = []) {
+    const ingredientRows = Array.from(document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row"));
+    const recipeFields = {
+        source_url: "recipeEditSourceUrl",
+        source_pdf_path: "recipeEditSourcePdfPath",
+        generated_pdf_path: "recipeEditGeneratedPdfPath",
+        source_menu_url: "recipeEditSourceMenuUrl",
+    };
+    let applied = 0;
+    let skipped = 0;
+    (Array.isArray(updates) ? updates : []).forEach(update => {
+        const field = String(update?.field || "");
+        const before = String(update?.before ?? "");
+        const after = String(update?.after ?? "");
+        let control = null;
+        if (update?.scope === "ingredient") {
+            control = ingredientRows[Number(update.index)]?.querySelector(`[data-field="${CSS.escape(field)}"]`) || null;
+        } else if (update?.scope === "recipe" && recipeFields[field]) {
+            control = document.getElementById(recipeFields[field]);
+        }
+        if (!control || String(control.value ?? "") !== before) {
+            skipped += 1;
+            return;
+        }
+        control.value = after;
+        control.dispatchEvent(new Event("input", { bubbles: true }));
+        control.dispatchEvent(new Event("change", { bubbles: true }));
+        applied += 1;
+    });
+    return { applied, skipped };
+}
+
+async function applyRecipeAiQualitySafeFixes(button) {
+    if (button?.disabled) return false;
+    const url = recipeEditorCurrentUrl();
+    const status = document.getElementById("recipeEditAiAnalysisActionStatus");
+    if (!url) return false;
+    if (button) button.disabled = true;
+    if (status) status.textContent = "Applying deterministic safe fixes…";
+    try {
+        const response = await fetch("/api/recipe/ai-quality-report/safe-fixes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || "Unable to apply safe fixes.");
+        invalidateRecipeEditorCache(url);
+        const synchronized = applyRecipeAiQualitySafeUpdatesToEditor(data.safe_updates || []);
+        renderRecipeAiQualityReport(data.report || {});
+        if (status) {
+            status.textContent = data.changed_count
+                ? `${data.changed_count} safe fix${data.changed_count === 1 ? "" : "es"} saved.${synchronized.skipped ? " Unsaved form values were preserved." : ""}`
+                : "No deterministic safe fixes were needed.";
+        }
+    } catch (err) {
+        if (status) status.textContent = err.message || "Unable to apply safe fixes.";
+    } finally {
+        if (button) button.disabled = false;
     }
     return false;
 }
@@ -29589,17 +29924,30 @@ function initRecipeEditContextPanels() {
             updateRecipeEditContextPanels();
         }
     });
-    document.addEventListener("click", event => {
-        const panel = document.getElementById("recipeEditAiAnalysisPanel");
-        if (panel && !panel.hidden && !event.target?.closest?.("#recipeEditAiConfidenceCard")) {
-            closeRecipeEditAiAnalysis({ restoreFocus: false });
-        }
-    });
     document.addEventListener("keydown", event => {
-        const panel = document.getElementById("recipeEditAiAnalysisPanel");
-        if (event.key === "Escape" && panel && !panel.hidden) {
+        const backdrop = document.getElementById("recipeEditAiAnalysisBackdrop");
+        if (!backdrop || backdrop.hidden) return;
+        if (event.key === "Escape") {
             event.preventDefault();
             closeRecipeEditAiAnalysis();
+            return;
+        }
+        if (event.key === "Tab") {
+            const focusable = recipeEditAiReportFocusables();
+            if (!focusable.length) {
+                event.preventDefault();
+                document.getElementById("recipeEditAiAnalysisPanel")?.focus();
+                return;
+            }
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
         }
     });
 }

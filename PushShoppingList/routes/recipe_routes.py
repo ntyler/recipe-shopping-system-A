@@ -142,6 +142,8 @@ from PushShoppingList.services.recipe_edit_service import create_editable_restau
 from PushShoppingList.services.recipe_edit_service import get_editable_restaurant
 from PushShoppingList.services.recipe_edit_service import list_editable_restaurants
 from PushShoppingList.services.recipe_edit_service import update_editable_restaurant
+from PushShoppingList.services.recipe_ai_quality_service import apply_recipe_ai_quality_safe_fixes
+from PushShoppingList.services.recipe_ai_quality_service import build_recipe_ai_quality_report
 from PushShoppingList.services.restaurant_details_fetch_service import load_pending_restaurant_scan
 from PushShoppingList.services.restaurant_details_fetch_service import prepare_restaurant_information_scan_apply
 from PushShoppingList.services.restaurant_details_fetch_service import scan_restaurant_information
@@ -3926,6 +3928,24 @@ def api_recipe_route():
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe/ai-quality-report", methods=["GET"])
+def api_recipe_ai_quality_report_route():
+    url = str(request.args.get("url", "") or "").strip()
+    if not url:
+        return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+    return jsonify({"ok": True, "report": build_recipe_ai_quality_report(url)})
+
+
+@recipe_bp.route("/api/recipe/ai-quality-report/safe-fixes", methods=["POST"])
+def api_recipe_ai_quality_report_safe_fixes_route():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or data.get("recipe_url") or "").strip()
+    if not url:
+        return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+    result = apply_recipe_ai_quality_safe_fixes(url)
+    return jsonify(result), 200 if result.get("ok") else 400
 
 
 @recipe_bp.route("/api/recipe/infer_missing_details", methods=["POST"])

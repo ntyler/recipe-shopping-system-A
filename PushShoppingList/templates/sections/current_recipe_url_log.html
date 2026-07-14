@@ -2620,22 +2620,87 @@
                                     aria-haspopup="dialog"
                                     aria-expanded="false"
                                     aria-controls="recipeEditAiAnalysisPanel"
-                                    onclick="return openRecipeEditAiAnalysis(this)">View AI Analysis</button>
-                            <aside id="recipeEditAiAnalysisPanel"
-                                   class="recipe-edit-ai-analysis-panel"
-                                   role="dialog"
-                                   aria-modal="false"
-                                   aria-labelledby="recipeEditAiAnalysisTitle"
-                                   hidden>
-                                <header>
-                                    <div>
-                                        <h3 id="recipeEditAiAnalysisTitle">AI Analysis</h3>
-                                        <p id="recipeEditAiAnalysisSummary"></p>
+                                    onclick="return openRecipeEditAiAnalysis(this)">AI Quality Report</button>
+                            <div id="recipeEditAiAnalysisBackdrop"
+                                 class="recipe-edit-ai-analysis-backdrop"
+                                 onclick="if (event.target === this) return closeRecipeEditAiAnalysis()"
+                                 hidden>
+                                <aside id="recipeEditAiAnalysisPanel"
+                                       class="recipe-edit-ai-analysis-panel"
+                                       role="dialog"
+                                       aria-modal="true"
+                                       aria-labelledby="recipeEditAiAnalysisTitle"
+                                       aria-describedby="recipeEditAiAnalysisSummary"
+                                       tabindex="-1">
+                                    <header class="recipe-edit-ai-analysis-header">
+                                        <div class="recipe-edit-ai-analysis-heading">
+                                            <span>Recipe transparency</span>
+                                            <h2 id="recipeEditAiAnalysisTitle">AI Quality Report</h2>
+                                            <p id="recipeEditAiAnalysisRecipeName">Current recipe</p>
+                                        </div>
+                                        <div class="recipe-edit-ai-analysis-overall">
+                                            <strong id="recipeEditAiAnalysisOverall">Unknown</strong>
+                                            <span id="recipeEditAiAnalysisLabel">Unknown confidence</span>
+                                            <small id="recipeEditAiAnalysisTimestamp" hidden></small>
+                                        </div>
+                                        <button type="button"
+                                                class="recipe-edit-ai-analysis-close"
+                                                aria-label="Close AI Quality Report"
+                                                onclick="return closeRecipeEditAiAnalysis()">{{ shell.svg_icon("x") }}</button>
+                                    </header>
+                                    <div class="recipe-edit-ai-analysis-body">
+                                        <div id="recipeEditAiAnalysisLoading"
+                                             class="recipe-edit-ai-analysis-state"
+                                             role="status">Loading saved AI analysis…</div>
+                                        <div id="recipeEditAiAnalysisError"
+                                             class="recipe-edit-ai-analysis-state is-error"
+                                             role="alert"
+                                             hidden></div>
+                                        <div id="recipeEditAiAnalysisContent" hidden>
+                                            <section class="recipe-edit-ai-report-section recipe-edit-ai-report-summary" aria-labelledby="recipeEditAiAnalysisSummaryTitle">
+                                                <h3 id="recipeEditAiAnalysisSummaryTitle">Overall Summary</h3>
+                                                <p id="recipeEditAiAnalysisSummary"></p>
+                                            </section>
+                                            <section class="recipe-edit-ai-report-section" aria-labelledby="recipeEditAiAnalysisConfidenceTitle">
+                                                <h3 id="recipeEditAiAnalysisConfidenceTitle">Confidence Breakdown</h3>
+                                                <div id="recipeEditAiAnalysisCategories" class="recipe-edit-ai-report-categories"></div>
+                                            </section>
+                                            <section class="recipe-edit-ai-report-section" aria-labelledby="recipeEditAiAnalysisHealthTitle">
+                                                <h3 id="recipeEditAiAnalysisHealthTitle">Recipe Health Details</h3>
+                                                <div id="recipeEditAiAnalysisHealth" class="recipe-edit-ai-report-details"></div>
+                                            </section>
+                                            <section class="recipe-edit-ai-report-section" aria-labelledby="recipeEditAiAnalysisIngredientsTitle">
+                                                <h3 id="recipeEditAiAnalysisIngredientsTitle">Ingredient Analysis</h3>
+                                                <div id="recipeEditAiAnalysisIngredients" class="recipe-edit-ai-report-ingredients"></div>
+                                            </section>
+                                            <section class="recipe-edit-ai-report-section" aria-labelledby="recipeEditAiAnalysisEvidenceTitle">
+                                                <h3 id="recipeEditAiAnalysisEvidenceTitle">Source Evidence</h3>
+                                                <div id="recipeEditAiAnalysisEvidence" class="recipe-edit-ai-report-evidence"></div>
+                                            </section>
+                                            <section class="recipe-edit-ai-report-section" aria-labelledby="recipeEditAiAnalysisRestaurantTitle">
+                                                <h3 id="recipeEditAiAnalysisRestaurantTitle">Restaurant Analysis</h3>
+                                                <div id="recipeEditAiAnalysisRestaurant"></div>
+                                            </section>
+                                            <section class="recipe-edit-ai-report-section" aria-labelledby="recipeEditAiAnalysisImageTitle">
+                                                <h3 id="recipeEditAiAnalysisImageTitle">Image Analysis</h3>
+                                                <div id="recipeEditAiAnalysisImage"></div>
+                                            </section>
+                                            <section class="recipe-edit-ai-report-section" aria-labelledby="recipeEditAiAnalysisRecommendationsTitle">
+                                                <h3 id="recipeEditAiAnalysisRecommendationsTitle">Recommended Improvements</h3>
+                                                <div id="recipeEditAiAnalysisRecommendations" class="recipe-edit-ai-report-recommendations"></div>
+                                            </section>
+                                        </div>
                                     </div>
-                                    <button type="button" aria-label="Close AI Analysis" onclick="return closeRecipeEditAiAnalysis()">{{ shell.svg_icon("x") }}</button>
-                                </header>
-                                <div id="recipeEditAiAnalysisList" class="recipe-edit-ai-analysis-list"></div>
-                            </aside>
+                                    <footer class="recipe-edit-ai-analysis-footer">
+                                        <span id="recipeEditAiAnalysisActionStatus" role="status" aria-live="polite"></span>
+                                        <div>
+                                            <button type="button" onclick="return closeRecipeEditAiAnalysis()">Close</button>
+                                            <button type="button" data-ai-report-reanalyze onclick="return reanalyzeRecipeAiQualityReport(this)">Reanalyze Recipe</button>
+                                            <button type="button" class="primary" data-ai-report-safe-fixes onclick="return applyRecipeAiQualitySafeFixes(this)">Apply Safe Fixes</button>
+                                        </div>
+                                    </footer>
+                                </aside>
+                            </div>
                         </div>
                     </section>
                 </aside>
