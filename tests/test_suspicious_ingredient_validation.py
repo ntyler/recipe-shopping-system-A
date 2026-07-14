@@ -44,7 +44,7 @@ def test_huancaina_flags_generated_potato_milk_without_replacing_it():
     assert "Huancaina-style" in ingredient["food_review"]["reason"]
     assert ingredient["food_review"]["options"][0]["ingredient"] == "evaporated milk"
     assert ingredient["food_review"]["options"][0]["quantity"] == "2"
-    assert ingredient["food_review"]["options"][0]["unit"] == "cups"
+    assert ingredient["food_review"]["options"][0]["unit"] == "cup"
 
 
 def test_huancaina_proposes_evaporated_milk_when_no_source_milk_phrase_exists():
@@ -156,6 +156,13 @@ def test_ingredient_detail_records_preserve_extraction_audit_fields_and_food_rev
             "normalized_name": "potato milk",
             "quantity": "1",
             "unit": "cup",
+            "unit_id": "volume_cup",
+            "unit_raw": "cup",
+            "unit_review_required": False,
+            "unit_review_value": "",
+            "size": "",
+            "preparation": "",
+            "notes": "",
             "confidence": "low",
             "inferred": True,
             "warning": POTATO_MILK_WARNING,

@@ -41,6 +41,8 @@ from PushShoppingList.services.cookbook_service import recipe_category_metadata_
 from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
+from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
+from PushShoppingList.services.ingredient_unit_service import normalize_recipe_unit_fields
 from PushShoppingList.services.image_variant_service import IMAGE_VARIANTS
 from PushShoppingList.services.image_variant_service import cover_image_variant_payload
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
@@ -8564,6 +8566,8 @@ def nutrition_prompt_ingredients(ingredients):
         if not isinstance(item, dict):
             continue
 
+        item = normalize_ingredient_unit_fields(dict(item))
+
         rows.append({
             "ingredient": str(item.get("ingredient") or "").strip(),
             "quantity": str(item.get("quantity") or "").strip(),
@@ -8681,6 +8685,7 @@ def load_recipe_output(url):
 
 
 def save_recipe_output(url, recipe_data):
+    normalize_recipe_unit_fields(recipe_data)
     json_path = OUTPUT_FOLDER / f"{safe_filename(url)}.json"
     json_path.write_text(
         json.dumps(recipe_data, indent=2, ensure_ascii=False),
@@ -8984,6 +8989,10 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "quantity": item.get("quantity") or "",
             "recipe_qty": item.get("recipe_qty") or item.get("quantity") or "",
             "unit": item.get("unit") or "",
+            "unit_id": item.get("unit_id") or "",
+            "unit_raw": item.get("unit_raw") or "",
+            "unit_review_required": truthy(item.get("unit_review_required")),
+            "unit_review_value": item.get("unit_review_value") or "",
             "base_quantity": item.get("base_quantity") or item.get("quantity") or "",
             "base_unit": item.get("base_unit") or item.get("unit") or "",
             "ingredient": item.get("ingredient") or "",
@@ -8991,6 +9000,8 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "normalized_name": item.get("normalized_name") or "",
             "master_normalized_name": item.get("master_normalized_name") or item.get("normalized_name") or "",
             "preparation": item.get("preparation") or "",
+            "size": item.get("size") or "",
+            "notes": item.get("notes") or "",
             "confidence": item.get("confidence") or "",
             "inferred": truthy(item.get("inferred")),
             "warning": item.get("warning") or "",
@@ -9273,6 +9284,10 @@ def sanitize_ingredients(value, existing_value=None):
             "quantity": nullable_string(item.get("quantity")),
             "recipe_qty": nullable_string(item.get("recipe_qty") or item.get("quantity")),
             "unit": nullable_string(item.get("unit")),
+            "unit_id": nullable_string(item.get("unit_id")),
+            "unit_raw": nullable_string(item.get("unit_raw") or existing.get("unit_raw")),
+            "unit_review_required": truthy(item.get("unit_review_required")),
+            "unit_review_value": nullable_string(item.get("unit_review_value")),
             "base_quantity": base_quantity or nullable_string(item.get("quantity")),
             "base_unit": base_unit or nullable_string(item.get("unit")),
             "ingredient": name or original_text,
@@ -9285,6 +9300,8 @@ def sanitize_ingredients(value, existing_value=None):
                 or existing.get("normalized_name")
             ),
             "preparation": nullable_string(item.get("preparation")),
+            "size": nullable_string(item.get("size")),
+            "notes": nullable_string(item.get("notes")),
             "confidence": nullable_string(item.get("confidence")),
             "inferred": truthy(item.get("inferred")),
             "warning": nullable_string(item.get("warning")),
@@ -9299,6 +9316,7 @@ def sanitize_ingredients(value, existing_value=None):
             "ingredient_image_generated_at": ingredient_image_generated_at,
             "ingredient_image_prompt": ingredient_image_prompt,
         }
+        normalize_ingredient_unit_fields(row)
         ingredients.append(apply_purchase_mapping_to_ingredient(row))
 
     return ingredients

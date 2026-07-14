@@ -18236,6 +18236,11 @@ body {
     display: none;
 }
 
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-metadata-inline,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-metadata-inline {
+    display: none;
+}
+
 .recipe-edit-ingredient-row {
     position: relative;
     grid-template-columns: 28px 54px minmax(260px, 1.5fr) minmax(74px, 0.42fr) minmax(100px, 0.52fr) minmax(160px, 0.8fr) minmax(190px, 0.95fr) 94px 40px;
@@ -18392,7 +18397,30 @@ body {
     display: none;
 }
 
-.recipe-edit-preparation-inline input {
+.recipe-edit-ingredient-metadata-inline {
+    display: grid;
+    grid-template-columns: minmax(60px, 0.38fr) minmax(90px, 0.8fr) minmax(90px, 1fr);
+    gap: 8px;
+    min-width: 0;
+}
+
+.recipe-edit-ingredient-metadata-inline label {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.recipe-edit-ingredient-metadata-inline label > span {
+    color: #8793a2;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.recipe-edit-preparation-inline input,
+.recipe-edit-size-inline input,
+.recipe-edit-notes-inline input {
     min-height: 24px;
     border: 0;
     background: transparent;
@@ -18402,7 +18430,9 @@ body {
     font-weight: 500;
 }
 
-.recipe-edit-preparation-inline input:focus {
+.recipe-edit-preparation-inline input:focus,
+.recipe-edit-size-inline input:focus,
+.recipe-edit-notes-inline input:focus {
     border: 1px solid #5b8cff;
     border-radius: 6px;
     background: #0b121c;
@@ -18599,7 +18629,9 @@ body {
 .recipe-edit-ingredient-row label.recipe-edit-buy-as-label input,
 .recipe-edit-ingredient-row label.recipe-edit-store-section-label select,
 .recipe-edit-ingredient-row label.recipe-edit-original-text-label input,
-.recipe-edit-ingredient-row .recipe-edit-preparation-inline input {
+.recipe-edit-ingredient-row .recipe-edit-preparation-inline input,
+.recipe-edit-ingredient-row .recipe-edit-size-inline input,
+.recipe-edit-ingredient-row .recipe-edit-notes-inline input {
     height: auto;
     min-height: 26px;
     padding: 0;
@@ -26513,6 +26545,12 @@ img[data-deferred-src] {
     color-scheme: light dark;
     font-family: var(--app-font-family);
     scrollbar-gutter: auto;
+}
+
+.recipe-edit-unit-label input[aria-invalid="true"] {
+    border-color: #ef8b8b;
+    background: rgba(127, 29, 29, 0.18);
+    box-shadow: 0 0 0 2px rgba(239, 139, 139, 0.14);
 }
 
 .app-shell-body *,

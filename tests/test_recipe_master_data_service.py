@@ -465,7 +465,8 @@ def test_list_master_record_recipe_references_returns_usage_details(monkeypatch,
     soup_reference = result["references"][1]
     assert soup_reference["recipe_url"] == first_url
     assert soup_reference["quantity"] == "1"
-    assert soup_reference["unit"] == "large"
+    assert soup_reference["unit"] == "piece"
+    assert soup_reference["size"] == "large"
     assert soup_reference["buy_as"] == "yellow onion"
     assert soup_reference["store_section"] == "PRODUCE"
     assert soup_reference["original_recipe_text"] == "1 large yellow onion, diced"

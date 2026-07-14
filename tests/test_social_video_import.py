@@ -133,7 +133,7 @@ def test_social_video_import_uses_audio_and_images_when_text_only_extraction_fin
     monkeypatch.setattr(
         recipe_extract_service,
         "save_json_response",
-        lambda url, response_text, html_text=None: (True, recipe_extract_service.json.loads(response_text)),
+        lambda url, response_text, html_text=None, source_text=None: (True, recipe_extract_service.json.loads(response_text)),
     )
 
     result = recipe_extract_service.extract_recipe_from_social_video_url(recipe_url)
@@ -217,7 +217,7 @@ def test_social_video_audio_image_uses_video_frame_cover_when_metadata_thumbnail
     monkeypatch.setattr(
         recipe_extract_service,
         "save_json_response",
-        lambda url, response_text, html_text=None: (True, recipe_extract_service.json.loads(response_text)),
+        lambda url, response_text, html_text=None, source_text=None: (True, recipe_extract_service.json.loads(response_text)),
     )
 
     result = recipe_extract_service.extract_recipe_from_social_video_audio_images(recipe_url)
@@ -300,12 +300,12 @@ def test_social_video_audio_image_repairs_missing_ingredient_amounts(tmp_path, m
     monkeypatch.setattr(
         recipe_extract_service,
         "save_json_response",
-        lambda url, response_text, html_text=None: (True, recipe_extract_service.json.loads(response_text)),
+        lambda url, response_text, html_text=None, source_text=None: (True, recipe_extract_service.json.loads(response_text)),
     )
     monkeypatch.setattr(
         recipe_extract_service,
         "save_extracted_recipe_json",
-        lambda url, data: saved.update({"url": url, "data": data}),
+        lambda url, data, source_text="": saved.update({"url": url, "data": data}),
     )
 
     result = recipe_extract_service.extract_recipe_from_social_video_audio_images(recipe_url)
@@ -316,7 +316,7 @@ def test_social_video_audio_image_repairs_missing_ingredient_amounts(tmp_path, m
     assert result["raw"]["ingredients"][0]["quantity"] == "1"
     assert result["raw"]["ingredients"][0]["unit"] == "cup"
     assert result["raw"]["ingredients"][1]["quantity"] == "8"
-    assert result["raw"]["ingredients"][1]["unit"] == "ounces"
+    assert result["raw"]["ingredients"][1]["unit"] == "ounce"
     assert saved["data"]["ingredients"][0]["base_quantity"] == "1"
 
 
@@ -405,7 +405,7 @@ def test_social_video_text_parse_uses_openai_to_fill_missing_estimates(monkeypat
     monkeypatch.setattr(
         recipe_extract_service,
         "save_extracted_recipe_json",
-        lambda url, data: saved.update({"url": url, "data": data}),
+        lambda url, data, source_text="": saved.update({"url": url, "data": data}),
     )
 
     result = recipe_extract_service.extract_recipe_from_social_video_url(recipe_url)
@@ -469,7 +469,7 @@ def test_social_video_text_openai_result_uses_audio_images_when_editor_fields_ar
     monkeypatch.setattr(
         recipe_extract_service,
         "save_json_response",
-        lambda url, response_text, html_text=None: (True, recipe_extract_service.json.loads(response_text)),
+        lambda url, response_text, html_text=None, source_text=None: (True, recipe_extract_service.json.loads(response_text)),
     )
     monkeypatch.setattr(
         recipe_extract_service,
@@ -520,7 +520,8 @@ def test_social_video_prompt_places_estimation_override_after_conservative_rules
     assert override_index > conservative_index
     assert "estimate reasonable values instead of leaving them null" in prompt
     assert "Fill nutrition as an estimated per serving basis" in prompt
-    assert "estimate quantity and unit" in prompt
+    assert "estimate quantity when the exact amount is not provided" in prompt
+    assert "Never invent a unit" in prompt
     assert "Do not leave quantity blank" in prompt
     assert "Fill display_name with a short, card-friendly recipe name" in prompt
     assert "create the likely missing steps" in prompt

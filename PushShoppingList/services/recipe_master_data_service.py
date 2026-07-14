@@ -9,6 +9,10 @@ from datetime import datetime
 from pathlib import Path
 
 from PushShoppingList.services import storage_service
+from PushShoppingList.services.ingredient_unit_service import canonical_unit_aliases
+from PushShoppingList.services.ingredient_unit_service import canonical_unit_options
+from PushShoppingList.services.ingredient_unit_service import canonical_unit
+from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import recipe_url_name
 
@@ -22,6 +26,7 @@ RECIPE_MASTER_DB_PATH = Path(
 )
 RECIPE_MASTER_DB_LOCK = threading.RLock()
 BACKFILL_MIGRATION_NAME = "recipe_master_user_scoped_store_section_backfill_v2"
+UNIT_NORMALIZATION_MIGRATION_NAME = "ingredient_unit_normalization_v1"
 INGREDIENT_STORE_SECTION_ORDER = {
     "PRODUCE": 1,
     "MEAT & SEAFOOD": 2,
@@ -556,6 +561,25 @@ def ensure_recipe_master_schema(connection=None):
 
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS canonical_units (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            category TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS unit_aliases (
+            alias TEXT PRIMARY KEY,
+            canonical_unit_id TEXT NOT NULL,
+            FOREIGN KEY(canonical_unit_id) REFERENCES canonical_units(id) ON DELETE CASCADE
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS ingredients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -595,12 +619,20 @@ def ensure_recipe_master_schema(connection=None):
             ingredient_id INTEGER NOT NULL,
             quantity TEXT NOT NULL DEFAULT '',
             unit TEXT NOT NULL DEFAULT '',
+            unit_id TEXT DEFAULT NULL,
+            unit_raw TEXT NOT NULL DEFAULT '',
+            size TEXT NOT NULL DEFAULT '',
+            preparation TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            unit_review_required INTEGER NOT NULL DEFAULT 0,
+            unit_review_value TEXT NOT NULL DEFAULT '',
             buy_as TEXT NOT NULL DEFAULT '',
             store_section TEXT NOT NULL DEFAULT '',
             original_recipe_text TEXT NOT NULL DEFAULT '',
             optional INTEGER NOT NULL DEFAULT 0,
             sort_order INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY(ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE
+            FOREIGN KEY(ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE,
+            FOREIGN KEY(unit_id) REFERENCES canonical_units(id)
         )
         """
     )
@@ -626,6 +658,38 @@ def ensure_recipe_master_schema(connection=None):
         )
         """
     )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS unit_normalization_reports (
+            migration_name TEXT PRIMARY KEY,
+            report_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    for unit in canonical_unit_options():
+        connection.execute(
+            """
+            INSERT INTO canonical_units (id, name, category, sort_order)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                category = excluded.category,
+                sort_order = excluded.sort_order
+            """,
+            (unit["id"], unit["name"], unit["category"], int(unit["sort_order"])),
+        )
+    unit_id_by_name = {unit["name"]: unit["id"] for unit in canonical_unit_options()}
+    for alias, canonical_name in canonical_unit_aliases().items():
+        connection.execute(
+            """
+            INSERT INTO unit_aliases (alias, canonical_unit_id)
+            VALUES (?, ?)
+            ON CONFLICT(alias) DO UPDATE SET
+                canonical_unit_id = excluded.canonical_unit_id
+            """,
+            (alias, unit_id_by_name[canonical_name]),
+        )
     ingredient_columns = recipe_master_column_names(connection, "ingredients")
     if "store_section" not in ingredient_columns:
         connection.execute(
@@ -636,6 +700,22 @@ def ensure_recipe_master_schema(connection=None):
         connection.execute(
             "ALTER TABLE equipment ADD COLUMN equipment_section TEXT NOT NULL DEFAULT 'MISC'"
         )
+    recipe_ingredient_columns = recipe_master_column_names(connection, "recipe_ingredients")
+    recipe_ingredient_column_definitions = {
+        "unit_id": "TEXT DEFAULT NULL",
+        "unit_raw": "TEXT NOT NULL DEFAULT ''",
+        "size": "TEXT NOT NULL DEFAULT ''",
+        "preparation": "TEXT NOT NULL DEFAULT ''",
+        "notes": "TEXT NOT NULL DEFAULT ''",
+        "unit_review_required": "INTEGER NOT NULL DEFAULT 0",
+        "unit_review_value": "TEXT NOT NULL DEFAULT ''",
+    }
+    for column_name, column_definition in recipe_ingredient_column_definitions.items():
+        if column_name not in recipe_ingredient_columns:
+            connection.execute(
+                f"ALTER TABLE recipe_ingredients ADD COLUMN {column_name} {column_definition}"
+            )
+    migrate_existing_recipe_ingredient_units(connection)
     normalize_existing_ingredient_store_sections(connection)
     normalize_existing_equipment_sections(connection)
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_name ON ingredients(user_id, normalized_name)")
@@ -644,6 +724,7 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_section ON equipment(user_id, equipment_section)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_user_recipe ON recipe_ingredients(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient ON recipe_ingredients(ingredient_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_unit ON recipe_ingredients(unit_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_user_recipe ON recipe_equipment(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_equipment ON recipe_equipment(equipment_id)")
 
@@ -654,6 +735,92 @@ def recipe_master_column_names(connection, table_name):
         str(row["name"] if isinstance(row, sqlite3.Row) else row[1])
         for row in rows
     }
+
+
+def migrate_existing_recipe_ingredient_units(connection):
+    """Normalize legacy master rows once and retain an auditable summary."""
+    if migration_already_applied(connection, UNIT_NORMALIZATION_MIGRATION_NAME):
+        report_row = connection.execute(
+            "SELECT report_json FROM unit_normalization_reports WHERE migration_name = ?",
+            (UNIT_NORMALIZATION_MIGRATION_NAME,),
+        ).fetchone()
+        if report_row:
+            try:
+                return json.loads(report_row["report_json"])
+            except (TypeError, ValueError, json.JSONDecodeError):
+                pass
+        return {"ok": True, "skipped": True}
+
+    summary = {
+        "ok": True,
+        "migration": UNIT_NORMALIZATION_MIGRATION_NAME,
+        "rows_scanned": 0,
+        "aliases_replaced": 0,
+        "size_values_moved": 0,
+        "ingredient_names_moved": 0,
+        "invalid_units_cleared": 0,
+        "ambiguous_rows_flagged": 0,
+    }
+    rows = connection.execute(
+        """
+        SELECT r.id, r.quantity, r.unit, r.original_recipe_text,
+               i.name AS ingredient
+          FROM recipe_ingredients r
+          JOIN ingredients i ON i.id = r.ingredient_id
+        """
+    ).fetchall()
+    for stored_row in rows:
+        summary["rows_scanned"] += 1
+        before_unit = clean_text(stored_row["unit"])
+        before_ingredient = clean_text(stored_row["ingredient"])
+        normalized = normalize_ingredient_unit_fields({
+            "quantity": clean_text(stored_row["quantity"]),
+            "unit": before_unit,
+            "ingredient": before_ingredient,
+            "original_text": clean_text(stored_row["original_recipe_text"]),
+        }, log_unrecognized=False)
+        after_unit = clean_text(normalized.get("unit"))
+        if before_unit and canonical_unit(before_unit) and after_unit != before_unit:
+            summary["aliases_replaced"] += 1
+        if normalized.get("size"):
+            summary["size_values_moved"] += 1
+        if before_unit.lower() in {"pepper", "onion", "garlic"}:
+            summary["ingredient_names_moved"] += 1
+        if before_unit and not after_unit and normalized.get("unit_review_required"):
+            summary["invalid_units_cleared"] += 1
+        if normalized.get("unit_review_required"):
+            summary["ambiguous_rows_flagged"] += 1
+
+        connection.execute(
+            """
+            UPDATE recipe_ingredients
+               SET quantity = ?, unit = ?, unit_id = ?, unit_raw = ?, size = ?,
+                   preparation = ?, unit_review_required = ?, unit_review_value = ?
+             WHERE id = ?
+            """,
+            (
+                clean_text(normalized.get("quantity")),
+                after_unit,
+                clean_text(normalized.get("unit_id")) or None,
+                clean_text(normalized.get("unit_raw")),
+                clean_text(normalized.get("size")),
+                clean_text(normalized.get("preparation")),
+                1 if normalized.get("unit_review_required") else 0,
+                clean_text(normalized.get("unit_review_value")),
+                int(stored_row["id"]),
+            ),
+        )
+
+    mark_migration_applied(connection, UNIT_NORMALIZATION_MIGRATION_NAME)
+    connection.execute(
+        """
+        INSERT OR REPLACE INTO unit_normalization_reports (
+            migration_name, report_json, created_at
+        ) VALUES (?, ?, ?)
+        """,
+        (UNIT_NORMALIZATION_MIGRATION_NAME, json.dumps(summary, sort_keys=True), utc_now_iso()),
+    )
+    return summary
 
 
 def ingredient_store_section_options():
@@ -1202,6 +1369,13 @@ def list_master_record_recipe_references(
         detail_columns = """
                 r.quantity,
                 r.unit,
+                r.unit_id,
+                r.unit_raw,
+                r.size,
+                r.preparation,
+                r.notes,
+                r.unit_review_required,
+                r.unit_review_value,
                 r.buy_as,
                 r.store_section,
                 r.original_recipe_text,
@@ -1212,6 +1386,13 @@ def list_master_record_recipe_references(
         detail_columns = """
                 '' AS quantity,
                 '' AS unit,
+                '' AS unit_id,
+                '' AS unit_raw,
+                '' AS size,
+                '' AS preparation,
+                '' AS notes,
+                0 AS unit_review_required,
+                '' AS unit_review_value,
                 '' AS buy_as,
                 '' AS store_section,
                 r.original_recipe_text,
@@ -1270,6 +1451,13 @@ def list_master_record_recipe_references(
             "cover_image": dict(cover_image) if isinstance(cover_image, dict) else {},
             "quantity": clean_text(row_data.get("quantity")),
             "unit": clean_text(row_data.get("unit")),
+            "unit_id": clean_text(row_data.get("unit_id")),
+            "unit_raw": clean_text(row_data.get("unit_raw")),
+            "size": clean_text(row_data.get("size")),
+            "preparation": clean_text(row_data.get("preparation")),
+            "notes": clean_text(row_data.get("notes")),
+            "unit_review_required": bool(row_data.get("unit_review_required")),
+            "unit_review_value": clean_text(row_data.get("unit_review_value")),
             "buy_as": clean_text(row_data.get("buy_as")),
             "store_section": clean_ingredient_store_section(row_data.get("store_section"), default="")
             if table_name == "ingredients"
@@ -1528,6 +1716,9 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
         if ingredient_has_open_suspicious_review(item):
             continue
 
+        if isinstance(item, dict):
+            item = normalize_ingredient_unit_fields(dict(item))
+
         name = ingredient_name_from_item(item)
         if not name:
             continue
@@ -1540,6 +1731,13 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             original_text = clean_text(item.get("original_recipe_text") or item.get("original_text") or item.get("text") or name)
             quantity = clean_text(item.get("quantity") or item.get("recipe_qty"))
             unit = clean_text(item.get("unit"))
+            unit_id = clean_text(item.get("unit_id"))
+            unit_raw = clean_text(item.get("unit_raw"))
+            size = clean_text(item.get("size"))
+            preparation = clean_text(item.get("preparation"))
+            notes = clean_text(item.get("notes"))
+            unit_review_required = truthy(item.get("unit_review_required"))
+            unit_review_value = clean_text(item.get("unit_review_value"))
             buy_as = clean_text(item.get("buy_as") or item.get("purchasable_item") or item.get("purchase_group"))
             normalized_name = normalized_master_name(
                 item.get("master_normalized_name") or item.get("normalized_name")
@@ -1556,6 +1754,13 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             original_text = name
             quantity = ""
             unit = ""
+            unit_id = ""
+            unit_raw = ""
+            size = ""
+            preparation = ""
+            notes = ""
+            unit_review_required = False
+            unit_review_value = ""
             buy_as = ""
             normalized_name = ""
             store_section = ""
@@ -1569,6 +1774,13 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             "normalized_name": normalized_name,
             "quantity": quantity,
             "unit": unit,
+            "unit_id": unit_id,
+            "unit_raw": unit_raw,
+            "size": size,
+            "preparation": preparation,
+            "notes": notes,
+            "unit_review_required": unit_review_required,
+            "unit_review_value": unit_review_value,
             "buy_as": buy_as,
             "store_section": store_section,
             "original_recipe_text": original_text,
@@ -1929,10 +2141,12 @@ def sync_recipe_master_records(
             connection.execute(
                 """
                 INSERT INTO recipe_ingredients (
-                    user_id, recipe_id, ingredient_id, quantity, unit, buy_as,
-                    store_section, original_recipe_text, optional, sort_order
+                    user_id, recipe_id, ingredient_id, quantity, unit, unit_id,
+                    unit_raw, size, preparation, notes, unit_review_required,
+                    unit_review_value, buy_as, store_section,
+                    original_recipe_text, optional, sort_order
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -1940,6 +2154,13 @@ def sync_recipe_master_records(
                     ingredient_id,
                     row.get("quantity", ""),
                     row.get("unit", ""),
+                    row.get("unit_id") or None,
+                    row.get("unit_raw", ""),
+                    row.get("size", ""),
+                    row.get("preparation", ""),
+                    row.get("notes", ""),
+                    1 if row.get("unit_review_required") else 0,
+                    row.get("unit_review_value", ""),
                     row.get("buy_as", ""),
                     row.get("store_section", ""),
                     row.get("original_recipe_text", ""),
@@ -2013,6 +2234,66 @@ def load_json_file(path):
         return json.loads(Path(path).read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def _normalize_unit_rows_for_migration(rows, summary):
+    if not isinstance(rows, list):
+        return False
+    changed = False
+    for index, item in enumerate(rows):
+        if not isinstance(item, dict):
+            continue
+        before = json.dumps(item, sort_keys=True, default=str)
+        before_unit = clean_text(item.get("unit"))
+        normalize_ingredient_unit_fields(item, log_unrecognized=False)
+        after = json.dumps(item, sort_keys=True, default=str)
+        if before == after:
+            continue
+        changed = True
+        summary["rows_updated"] += 1
+        if before_unit and canonical_unit(before_unit) and clean_text(item.get("unit")) != before_unit:
+            summary["aliases_replaced"] += 1
+        if item.get("size"):
+            summary["size_values_moved"] += 1
+        if item.get("unit_review_required"):
+            summary["ambiguous_rows_flagged"] += 1
+    return changed
+
+
+def normalize_saved_recipe_units(extractor_data_root):
+    """Backfill canonical unit fields in saved user JSON without changing quantities."""
+    extractor_data_root = Path(extractor_data_root)
+    summary = {
+        "files_updated": 0,
+        "rows_updated": 0,
+        "aliases_replaced": 0,
+        "size_values_moved": 0,
+        "ambiguous_rows_flagged": 0,
+    }
+    paths = [extractor_data_root / "recipe_ingredients.json"]
+    output_folder = extractor_data_root / "output"
+    if output_folder.exists():
+        paths.extend(path for path in output_folder.glob("*.json") if path.name != "sorted_ingredients.json")
+
+    for path in paths:
+        if not path.is_file():
+            continue
+        payload = load_json_file(path)
+        if not isinstance(payload, dict):
+            continue
+        changed = False
+        records = payload.values() if path.name == "recipe_ingredients.json" else (payload,)
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            changed = _normalize_unit_rows_for_migration(record.get("ingredients"), summary) or changed
+            changed = _normalize_unit_rows_for_migration(record.get("ingredient_details"), summary) or changed
+            raw = record.get("raw") if isinstance(record.get("raw"), dict) else {}
+            changed = _normalize_unit_rows_for_migration(raw.get("ingredients"), summary) or changed
+        if changed:
+            path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+            summary["files_updated"] += 1
+    return summary
 
 
 def recipe_outputs_by_key(output_folder):
@@ -2144,6 +2425,7 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, p
     if extractor_data_root is None:
         extractor_data_root = storage_service.extractor_root(user_id) / "data"
     extractor_data_root = Path(extractor_data_root)
+    unit_normalization = normalize_saved_recipe_units(extractor_data_root)
     metadata = load_json_file(extractor_data_root / "recipe_ingredients.json")
     if not isinstance(metadata, dict) or not metadata:
         store_section_result = backfill_ingredient_store_sections_for_user(user_id)
@@ -2158,6 +2440,7 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, p
             "equipment_rows": 0,
             "store_section_updated": store_section_result["updated"],
             "store_section_defaulted": store_section_result["defaulted"],
+            "unit_normalization": unit_normalization,
         })
         return {
             "ok": True,
@@ -2167,6 +2450,7 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, p
             "equipment_rows": 0,
             "store_section_updated": store_section_result["updated"],
             "store_section_defaulted": store_section_result["defaulted"],
+            "unit_normalization": unit_normalization,
         }
 
     outputs = recipe_outputs_by_key(extractor_data_root / "output")
@@ -2234,6 +2518,7 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, p
         "equipment_rows": equipment_rows,
         "store_section_updated": store_section_result["updated"],
         "store_section_defaulted": store_section_result["defaulted"],
+        "unit_normalization": unit_normalization,
     }
     _emit_backfill_progress(progress_callback, "user_done", summary)
     return summary

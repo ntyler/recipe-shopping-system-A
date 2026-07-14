@@ -31381,7 +31381,42 @@ function recipeIngredientTypeOptions(selected, optional = false) {
     }).join("");
 }
 
-function ensureRecipeIngredientUnitOption(value) {
+let recipeIngredientUnitRegistryCache = null;
+
+function recipeIngredientUnitRegistry() {
+    const source = document.getElementById("ingredientUnitConfig");
+    const signature = source ? source.textContent : "";
+    if (recipeIngredientUnitRegistryCache && recipeIngredientUnitRegistryCache.signature === signature) {
+        return recipeIngredientUnitRegistryCache;
+    }
+
+    let payload = { units: [], aliases: {} };
+    try {
+        payload = JSON.parse(signature || "{}") || payload;
+    } catch (error) {
+        console.warn("Unable to load the ingredient unit registry.", error);
+    }
+    const units = Array.isArray(payload.units) ? payload.units : [];
+    const aliases = payload.aliases && typeof payload.aliases === "object" ? payload.aliases : {};
+    recipeIngredientUnitRegistryCache = {
+        signature,
+        units,
+        aliases,
+        byName: new Map(units.map(unit => [String(unit.name || "").toLowerCase(), unit])),
+    };
+    return recipeIngredientUnitRegistryCache;
+}
+
+function recipeIngredientUnitKey(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\./g, "")
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ");
+}
+
+function ensureRecipeIngredientUnitOption() {
     let list = document.getElementById("recipeIngredientUnitOptions");
     if (!list) {
         list = document.createElement("datalist");
@@ -31389,12 +31424,90 @@ function ensureRecipeIngredientUnitOption(value) {
         document.body.appendChild(list);
     }
 
-    const unit = String(value || "").trim();
-    if (unit && !Array.from(list.options).some(option => option.value.toLowerCase() === unit.toLowerCase())) {
-        const option = document.createElement("option");
-        option.value = unit;
-        list.appendChild(option);
+    const registry = recipeIngredientUnitRegistry();
+    const values = registry.units.map(unit => String(unit.name || "")).filter(Boolean);
+    if (list.dataset.registryValues !== values.join("|")) {
+        list.replaceChildren(...values.map(value => {
+            const option = document.createElement("option");
+            option.value = value;
+            return option;
+        }));
+        list.dataset.registryValues = values.join("|");
     }
+    return list;
+}
+
+function recipeIngredientDirectField(row, fieldName) {
+    return [...row.querySelectorAll(`[data-field="${fieldName}"]`)].find(input => {
+        const optionRow = input.closest("[data-substitution-option-row]");
+        return optionRow ? optionRow === row : !row.matches("[data-substitution-option-row]");
+    }) || null;
+}
+
+function canonicalizeRecipeIngredientUnitControl(input, options = {}) {
+    if (!input) {
+        return true;
+    }
+    const row = input.closest(".recipe-edit-ingredient-row");
+    const registry = recipeIngredientUnitRegistry();
+    const raw = String(input.value || "").trim();
+    const canonicalName = registry.aliases[recipeIngredientUnitKey(raw)] || "";
+    const unit = registry.byName.get(String(canonicalName).toLowerCase()) || null;
+    const unitId = row ? recipeIngredientDirectField(row, "unit_id") : null;
+    const unitRaw = row ? recipeIngredientDirectField(row, "unit_raw") : null;
+    const reviewRequired = row ? recipeIngredientDirectField(row, "unit_review_required") : null;
+    const reviewValue = row ? recipeIngredientDirectField(row, "unit_review_value") : null;
+
+    if (unitRaw && raw) {
+        unitRaw.value = raw;
+    }
+    if (!raw) {
+        input.setCustomValidity("");
+        input.removeAttribute("aria-invalid");
+        if (unitId) unitId.value = "";
+        if (reviewRequired) reviewRequired.value = "false";
+        if (reviewValue) reviewValue.value = "";
+        return true;
+    }
+    if (unit) {
+        input.value = unit.name;
+        input.setCustomValidity("");
+        input.removeAttribute("aria-invalid");
+        if (unitId) unitId.value = unit.id || "";
+        if (reviewRequired) reviewRequired.value = "false";
+        if (reviewValue) reviewValue.value = "";
+        return true;
+    }
+
+    input.setCustomValidity("Choose a unit from the canonical list or leave this field blank.");
+    input.setAttribute("aria-invalid", "true");
+    if (unitId) unitId.value = "";
+    if (reviewRequired) reviewRequired.value = "true";
+    if (reviewValue) reviewValue.value = raw;
+    if (options.report && typeof input.reportValidity === "function") {
+        input.reportValidity();
+    }
+    return false;
+}
+
+function bindRecipeIngredientUnitControls(scope) {
+    ensureRecipeIngredientUnitOption();
+    scope.querySelectorAll('[data-field="unit"]').forEach(input => {
+        if (input.dataset.unitControlBound === "true") {
+            return;
+        }
+        input.dataset.unitControlBound = "true";
+        input.setAttribute("role", "combobox");
+        input.setAttribute("aria-autocomplete", "list");
+        input.setAttribute("aria-controls", "recipeIngredientUnitOptions");
+        input.addEventListener("change", () => canonicalizeRecipeIngredientUnitControl(input, { report: true }));
+        input.addEventListener("blur", () => canonicalizeRecipeIngredientUnitControl(input));
+        input.addEventListener("input", () => {
+            input.setCustomValidity("");
+            input.removeAttribute("aria-invalid");
+        });
+        canonicalizeRecipeIngredientUnitControl(input);
+    });
 }
 
 function recipeIngredientExtractionWarning(item = {}) {
@@ -31502,7 +31615,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
     const optionImageSrcSet = recipeImageVariantSrcSet(optionImageUrl);
     const matchQuality = recipeIngredientSubstitutionMatchQuality(option);
     const ratio = recipeIngredientSubstitutionRatio(option);
-    ensureRecipeIngredientUnitOption(option.unit || "");
+    ensureRecipeIngredientUnitOption();
 
     return `
         <div class="recipe-edit-substitution-option-row recipe-edit-ingredient-row" data-substitution-option-row>
@@ -31530,10 +31643,20 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
                     <span class="recipe-edit-substitution-ratio" ${ratio ? "" : "hidden"}>${escapeHtml(ratio)}</span>
                     <span class="recipe-edit-substitution-quality is-${escapeAttribute(matchQuality.className)}">${escapeHtml(matchQuality.label)}</span>
                 </span>
-                <label class="recipe-edit-preparation-inline">
-                    <span class="sr-only">Preparation</span>
-                    <input type="text" data-field="preparation" value="${escapeAttribute(option.preparation || "")}" placeholder="-">
-                </label>
+                <div class="recipe-edit-ingredient-metadata-inline">
+                    <label class="recipe-edit-size-inline">
+                        <span>Size</span>
+                        <input type="text" data-field="size" value="${escapeAttribute(option.size || "")}" placeholder="e.g. medium">
+                    </label>
+                    <label class="recipe-edit-preparation-inline">
+                        <span>Preparation</span>
+                        <input type="text" data-field="preparation" value="${escapeAttribute(option.preparation || "")}" placeholder="e.g. chopped">
+                    </label>
+                    <label class="recipe-edit-notes-inline">
+                        <span>Notes</span>
+                        <input type="text" data-field="notes" value="${escapeAttribute(option.notes || "")}" placeholder="Optional notes">
+                    </label>
+                </div>
                 <label class="recipe-edit-original-text-label">
                     <span>Original Recipe Text</span>
                     <input type="text" data-field="original_text" value="${escapeAttribute(option.original_text || option.source_note || "")}">
@@ -31588,6 +31711,10 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
             <input type="hidden" data-field="section" value="${escapeAttribute(option.section || "")}">
             <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
             <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
+            <input type="hidden" data-field="unit_id" value="${escapeAttribute(option.unit_id || "")}">
+            <input type="hidden" data-field="unit_raw" value="${escapeAttribute(option.unit_raw || option.unit || "")}">
+            <input type="hidden" data-field="unit_review_required" value="${escapeAttribute(option.unit_review_required ? "true" : "false")}">
+            <input type="hidden" data-field="unit_review_value" value="${escapeAttribute(option.unit_review_value || "")}">
             <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(option.recipe_qty || option.quantity || "")}">
             <input type="hidden" data-field="purchase_group" value="${escapeAttribute(option.purchase_group || "")}">
             <input type="hidden" data-field="parsed_name" value="${escapeAttribute(option.parsed_name || option.ingredient || "")}">
@@ -31664,7 +31791,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     const substitutionCountText = substitutionOptions.length ? `(${substitutionOptions.length})` : "";
     const ingredientType = item.section || item.ingredient_type || item.type || (item.optional ? "optional" : "main");
     const recipeUrl = recipeEditorCurrentUrl();
-    ensureRecipeIngredientUnitOption(item.unit || "");
+    ensureRecipeIngredientUnitOption();
     const ingredientImagePanelHtml = `
             <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-ingredient-image-panel${ingredientImageUrl ? "" : " recipe-image-empty"}"
                  data-ingredient-image-panel
@@ -31755,10 +31882,20 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                           hidden>Food Review</span>
                 </span>
             </span>
-            <label class="recipe-edit-preparation-inline">
-                <span class="sr-only">Preparation</span>
-                <input type="text" data-field="preparation" value="${escapeAttribute(item.preparation || "")}" placeholder="-">
-            </label>
+            <div class="recipe-edit-ingredient-metadata-inline">
+                <label class="recipe-edit-size-inline">
+                    <span>Size</span>
+                    <input type="text" data-field="size" value="${escapeAttribute(item.size || "")}" placeholder="e.g. medium">
+                </label>
+                <label class="recipe-edit-preparation-inline">
+                    <span>Preparation</span>
+                    <input type="text" data-field="preparation" value="${escapeAttribute(item.preparation || "")}" placeholder="e.g. chopped">
+                </label>
+                <label class="recipe-edit-notes-inline">
+                    <span>Notes</span>
+                    <input type="text" data-field="notes" value="${escapeAttribute(item.notes || "")}" placeholder="Optional notes">
+                </label>
+            </div>
             <label class="recipe-edit-original-text-label">
                 <span>Original Recipe Text</span>
                 <input type="text" data-field="original_text" value="${escapeAttribute(item.original_text || "")}">
@@ -31886,6 +32023,10 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         <input type="hidden" data-field="ingredient_id" value="${escapeAttribute(item.ingredient_id || item.master_ingredient_id || "")}">
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
+        <input type="hidden" data-field="unit_id" value="${escapeAttribute(item.unit_id || "")}">
+        <input type="hidden" data-field="unit_raw" value="${escapeAttribute(item.unit_raw || item.unit || "")}">
+        <input type="hidden" data-field="unit_review_required" value="${escapeAttribute(item.unit_review_required ? "true" : "false")}">
+        <input type="hidden" data-field="unit_review_value" value="${escapeAttribute(item.unit_review_value || "")}">
         <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
         <input type="hidden" data-field="purchase_group" value="${escapeAttribute(item.purchase_group || "")}">
         <input type="hidden" data-field="parsed_name" value="${escapeAttribute(item.parsed_name || "")}">
@@ -31904,6 +32045,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     wrap.appendChild(row);
     organizeRecipeEditIngredientRow(row);
     bindRecipeIngredientNameField(row);
+    bindRecipeIngredientUnitControls(row);
     bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
     bindRecipeIngredientSummaryUpdates(row);
@@ -31960,6 +32102,7 @@ function bindRecipeIngredientSubstitutionRow(optionRow) {
 
     optionRow.dataset.substitutionBound = "true";
     bindRecipeIngredientNameField(optionRow);
+    bindRecipeIngredientUnitControls(optionRow);
     bindRecipeIngredientBaseTracking(optionRow);
     optionRow.querySelectorAll("[data-field]").forEach(input => {
         const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
@@ -37036,6 +37179,8 @@ function collectRecipeTextRows(selector) {
 
 function fieldValuesFromRow(row) {
     const item = {};
+    const unitInput = recipeIngredientDirectField(row, "unit");
+    const unitIsValid = canonicalizeRecipeIngredientUnitControl(unitInput);
 
     row.querySelectorAll("[data-field]").forEach(input => {
         const optionRow = input.closest("[data-substitution-option-row]");
@@ -37044,6 +37189,13 @@ function fieldValuesFromRow(row) {
         }
         item[input.dataset.field] = input.type === "checkbox" ? input.checked : input.value.trim();
     });
+
+    if (unitInput && !unitIsValid) {
+        item.unit = "";
+        item.unit_id = "";
+        item.unit_review_required = "true";
+        item.unit_review_value = String(unitInput.value || "").trim();
+    }
 
     return item;
 }

@@ -5,6 +5,7 @@ from fractions import Fraction
 
 from openai import OpenAI
 
+from PushShoppingList.services.ingredient_unit_service import display_unit
 from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.recipe_extract_service import (
@@ -407,7 +408,7 @@ def format_number(value):
 
 def format_quantity_display(quantity, unit):
     quantity = str(quantity or "").strip()
-    unit = str(unit or "").strip()
+    unit = display_unit(unit, quantity)
 
     if not quantity:
         return ""

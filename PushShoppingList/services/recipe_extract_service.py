@@ -58,6 +58,8 @@ except Exception:  # pragma: no cover
         pass
 
 from PushShoppingList.services import cloudflare_r2_storage
+from PushShoppingList.services.ingredient_unit_service import canonical_unit_alias_pattern
+from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
 from PushShoppingList.services.job_runtime_context import current_job_context
 from PushShoppingList.services.job_runtime_context import current_job_id
@@ -2724,7 +2726,7 @@ def build_structured_ingredients(raw_ingredients):
             continue
 
         store_section = classify_store_section(ingredient)
-        ingredient_rows.append({
+        ingredient_row = {
             "section": None,
             "original_text": original_text,
             "quantity": parsed["quantity"],
@@ -2735,8 +2737,10 @@ def build_structured_ingredients(raw_ingredients):
             "optional": "optional" in original_text.lower(),
             "store_section": store_section,
             "store_section_order": STORE_SECTION_ORDER[store_section],
-        })
-        apply_purchase_mapping_to_ingredient(ingredient_rows[-1])
+        }
+        normalize_ingredient_unit_fields(ingredient_row)
+        ingredient_rows.append(ingredient_row)
+        apply_purchase_mapping_to_ingredient(ingredient_row)
         seen.add(key)
 
     return ingredient_rows
@@ -2764,11 +2768,7 @@ def split_quantity_unit(text):
     fraction_pattern = f"[{FRACTION_CHARS}]"
     quantity_value_pattern = rf"(?:\d+\s+\d+/\d+|\d+(?:[./]\d+)?|{fraction_pattern})"
     quantity_pattern = rf"{quantity_value_pattern}(?:\s*(?:-|to)\s*{quantity_value_pattern})?"
-    unit_pattern = (
-        r"cups?|c|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|pounds?|lbs?\.?|"
-        r"ounces?|oz\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|"
-        r"pinch|pinches|dash|dashes|cloves?|sticks?"
-    )
+    unit_pattern = canonical_unit_alias_pattern()
 
     match = re.match(
         rf"^(?P<quantity>{quantity_pattern})(?:\s*(?P<unit>{unit_pattern}))?\s+(?P<ingredient>.+)$",
@@ -4827,9 +4827,9 @@ These override rules apply only because this source is a social/video recipe.
 - Fill level with an estimated difficulty such as "Easy", "Intermediate", or "Advanced".
 - Fill total_time, prep_time, inactive_time, and cook_time with practical estimates using units, such as "45 min", "1 hr 15 min", or "0 min".
 - Use inactive_time for waiting, resting, chilling, cooling, or rising time when implied by the food or method. Use "0 min" when none is implied.
-- For visible or clearly mentioned ingredients, estimate quantity and unit when the exact amount is not provided. Keep estimates practical for a home cook, and set base_quantity/base_unit to the same estimated values.
+- For visible or clearly mentioned ingredients, estimate quantity when the exact amount is not provided. Never invent a unit that is not supported by the source; leave unit null when absent.
 - Do not leave quantity blank for visible or clearly mentioned ingredients. If the video only shows the ingredient visually, choose a practical home-cook amount that matches the recipe amount.
-- Use a concrete unit whenever possible, such as cups, tablespoons, teaspoons, ounces, pounds, cloves, slices, cans, packages, or each. Use null only when no practical unit applies.
+- Use a canonical unit only when the source supports one. Use null when the source has no unit.
 - Mark optional true only for garnishes, toppings, substitutions, "to taste", "as desired", or clearly optional ingredients.
 - If extracted instructions are missing, too terse, or only describe what is visible without enough cooking detail, create the likely missing steps needed to cook the recipe safely and clearly.
 - Improve vague steps into useful cooking directions with inferred order, temperatures, times, pan/cookware cues, and doneness cues when supported by the audio, images, dish type, or common preparation.
@@ -4855,12 +4855,6 @@ def social_video_result_needs_audio_image_enrichment(json_data):
 
             if not clean_recipe_text(item.get("quantity") or ""):
                 return True
-
-            if not clean_recipe_text(item.get("unit") or ""):
-                ingredient_name = clean_recipe_text(item.get("ingredient") or item.get("original_text") or "")
-                preparation = clean_recipe_text(item.get("preparation") or "")
-                if ingredient_name and "to taste" not in preparation.lower():
-                    return True
 
     instructions = json_data.get("instructions", [])
     instruction_texts = [
@@ -4967,7 +4961,7 @@ The current recipe JSON was extracted from the video's metadata, audio transcrip
 Repair the current recipe JSON using the social/video text, audio transcript, and attached images.
 - Return the full recipe JSON, not just the changed fields.
 - Preserve existing ingredients, equipment, instructions, nutrition, and recipe metadata unless a field is blank or clearly incomplete.
-- For every visible or clearly mentioned ingredient with a blank quantity, estimate a practical home-cook quantity and unit.
+- For every visible or clearly mentioned ingredient with a blank quantity, estimate a practical home-cook quantity. Do not invent a unit; leave it null unless supported by the source.
 - Set quantity, unit, base_quantity, base_unit, and recipe_qty consistently for each repaired ingredient.
 - If a whole-count ingredient needs no measurement unit, use quantity like "1", "2", or "8" and unit null.
 - If an ingredient is optional, keep optional true and still estimate an amount when the video supports it.
@@ -7066,17 +7060,22 @@ STRICT RULES:
 ========================
 INGREDIENT RULES
 ========================
-- ALWAYS split ingredients into: quantity, unit, ingredient, preparation.
+- ALWAYS split ingredients into: quantity, unit, ingredient, size, preparation, and notes.
 - quantity and unit should only be null when truly absent from the recipe text.
+- Unit must be one canonical singular value: teaspoon, tablespoon, fluid ounce, cup, pint, quart, gallon, milliliter, liter, ounce, pound, gram, kilogram, piece, clove, slice, sprig, stalk, bunch, head, leaf, package, packet, can, jar, bottle, box, bag, container, pinch, dash, drop, to taste, or as needed.
+- Normalize aliases before returning JSON (for example tsp -> teaspoon, tbsp -> tablespoon, oz -> ounce, lb -> pound, g -> gram, kg -> kilogram, ml -> milliliter, l -> liter, pkg -> package).
+- Never invent a unit when the source does not provide one.
+- Put small, medium, large, and extra large in size, never in unit.
+- Put preparation words such as whole, fresh, ripe, chopped, diced, minced, and sliced in preparation, never in unit.
 - Preserve original_text exactly.
-- Before returning JSON, re-read every original_text and verify quantity, unit, ingredient, and preparation are split correctly.
+- Before returning JSON, re-read every original_text and verify quantity, unit, ingredient, size, preparation, and notes are split correctly.
 - If original_text starts with a number, fraction, mixed fraction, or range, quantity must not be null.
 - If original_text has a measurement word immediately after the quantity, unit must not be null.
 - If original_text has text after a comma or a non-metric parenthetical such as "(melted)", "(chopped)", "(divided)", or "(room temperature)", preparation must not be null.
 - The ingredient field must be the unique grocery item name only.
 - Do NOT include quantity, unit, package size, metric conversion, or preparation in the ingredient field.
 - Do NOT include words like "divided", "chopped", "melted", "shredded", "to taste", "as desired", "for garnish", or "optional" in the ingredient field.
-- Put preparation words in preparation.
+- Put preparation words in preparation and other free-form qualifiers in notes.
 - If an ingredient is optional, set optional = true.
 - "pinch" and "pinches" are measurement units. Put them in unit, not ingredient.
 
@@ -7097,7 +7096,7 @@ INGREDIENT CONFIDENCE RULES:
 - Do NOT add water, oil, salt, or pepper unless explicitly mentioned.
 - If uncertain whether something is an ingredient or instruction text, exclude it.
 - Do not invent ingredient names. If an ingredient name is not present in the source text, set inferred = true and lower confidence instead of treating it as source-confirmed.
-- For each ingredient object include original_text, parsed_name, normalized_name, quantity, unit, confidence, inferred, warning, and food_review.
+- For each ingredient object include original_text, parsed_name, normalized_name, quantity, unit, size, preparation, notes, confidence, inferred, warning, and food_review.
 - original_text must preserve the source line. parsed_name is the grocery item parsed from original_text. normalized_name is the grocery-safe name used for shopping/master ingredient matching.
 - Flag unusual generated ingredient names such as potato milk, chicken milk, beef milk, pork milk, onion milk, garlic milk, and pepper milk unless that exact phrase appears in the source text.
 - Do not delete or silently replace suspicious ingredients. Keep the original ingredient text and add a food_review object with reason, confidence, and proposed correction options.
@@ -7134,12 +7133,12 @@ Examples:
 
 - "125 g all-purpose flour"
   -> quantity = "125"
-  -> unit = "g"
+  -> unit = "gram"
   -> ingredient = "all-purpose flour"
 
 - "4 Tablespoons unsalted butter, melted"
   -> quantity = "4"
-  -> unit = "Tablespoons"
+  -> unit = "tablespoon"
   -> ingredient = "unsalted butter"
   -> preparation = "melted"
 
@@ -7224,8 +7223,8 @@ FINAL INGREDIENT VALIDATION CHECK:
   - Check original_text again.
   - If original_text = "1 egg", output quantity "1", unit null, ingredient "egg".
   - If original_text = "¼ cup plain yogurt", output quantity "1/4", unit "cup", ingredient "plain yogurt".
-  - If original_text = "4 Tablespoons unsalted butter, melted", output quantity "4", unit "Tablespoons", ingredient "unsalted butter", preparation "melted".
-  - If original_text = "4 Tablespoons unsalted butter (melted)", output quantity "4", unit "Tablespoons", ingredient "unsalted butter", preparation "melted".
+  - If original_text = "4 Tablespoons unsalted butter, melted", output quantity "4", unit "tablespoon", ingredient "unsalted butter", preparation "melted".
+  - If original_text = "4 Tablespoons unsalted butter (melted)", output quantity "4", unit "tablespoon", ingredient "unsalted butter", preparation "melted".
   - If original_text = "2 ounces cocoa butter or 1/4 cup vegetable oil", output quantity "2 ounces OR 1/4 cup", unit null, ingredient "cocoa butter OR vegetable oil".
   - If any of these fields can be read from original_text, do not leave them null.
 
@@ -7440,7 +7439,9 @@ FINAL OUTPUT FORMAT
       "ingredient": null,
       "parsed_name": null,
       "normalized_name": null,
+      "size": null,
       "preparation": null,
+      "notes": null,
       "confidence": null,
       "inferred": false,
       "warning": null,
@@ -9595,6 +9596,7 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
             "purchase_group": clean_recipe_text(raw_option.get("purchase_group") or ""),
             "source_note": clean_recipe_text(raw_option.get("source_note") or source_note),
         }
+        normalize_ingredient_unit_fields(row)
         rows.append(row)
 
     return rows
@@ -9836,6 +9838,9 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
             if parsed["unit"] and not item.get("unit"):
                 item["unit"] = parsed["unit"]
 
+            if parsed["unit"] and not item.get("unit_raw"):
+                item["unit_raw"] = parsed["unit"]
+
             if parsed["preparation"] and not item.get("preparation"):
                 item["preparation"] = parsed["preparation"]
 
@@ -9847,7 +9852,17 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
                 if not current_ingredient or current_ingredient == normalize_ingredient_for_shopping_list(original_text):
                     item["ingredient"] = parsed["ingredient"]
 
-        parsed_name = clean_recipe_text(item.get("parsed_name") or parsed["ingredient"] or raw_ingredient or original_text)
+        # Deterministic normalization is the final authority after source/AI
+        # parsing. It never converts quantities or invents a missing unit.
+        normalize_ingredient_unit_fields(item)
+
+        parsed_name = clean_recipe_text(
+            item.get("parsed_name")
+            or item.get("ingredient")
+            or parsed["ingredient"]
+            or raw_ingredient
+            or original_text
+        )
         if parsed_name:
             item["parsed_name"] = parsed_name
 

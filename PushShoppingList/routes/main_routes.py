@@ -69,6 +69,9 @@ from PushShoppingList.services.home_store_location_service import load_nearest_s
 from PushShoppingList.services.home_store_location_service import resolve_nearest_stores_for_home_address
 from PushShoppingList.services.ingredient_text_review_service import fallback_ingredient_text_review
 from PushShoppingList.services.ingredient_text_review_service import normalize_ingredient_text_review
+from PushShoppingList.services.ingredient_unit_service import unit_registry_payload
+from PushShoppingList.services.ingredient_unit_service import canonical_unit
+from PushShoppingList.services.ingredient_unit_service import display_unit
 from PushShoppingList.services.image_variant_service import cover_image_variant_payload as build_cover_image_variant_payload
 from PushShoppingList.services.image_variant_service import local_static_image_variants
 from PushShoppingList.services.item_state_service import load_item_state
@@ -401,6 +404,7 @@ def current_recipes_context():
             len(cookbook.get("recipes", []))
             for cookbook in cookbook_view_data.get("cookbooks", [])
         ),
+        "ingredient_unit_config": unit_registry_payload(),
     }
 
 
@@ -2824,6 +2828,9 @@ def parse_quantity_display(value):
 
 def normalize_quantity_unit(unit):
     unit = str(unit or "").strip()
+    registered = canonical_unit(unit)
+    if registered:
+        return registered["name"]
     unit_key = unit.lower()
     singular_units = {
         "c": "cup",
@@ -3175,7 +3182,7 @@ def parse_quantity_alternative(name, quantity, unit, recipe_quantity, scaled_qua
 
 def format_quantity_unit(quantity, unit):
     quantity = str(quantity or "").strip()
-    unit = str(unit or "").strip()
+    unit = display_unit(unit, quantity)
 
     if not quantity:
         return ""

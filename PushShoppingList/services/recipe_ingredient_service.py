@@ -7,6 +7,7 @@ from PushShoppingList.services.recipe_extract_service import (
     normalize_ingredient_for_shopping_list,
 )
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
+from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
 from PushShoppingList.services.recipe_master_data_service import remove_recipe_master_records_for_recipe
 from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
@@ -90,12 +91,20 @@ def ingredient_detail_records(ingredients=None, recipe_metadata=None):
     for item in candidates:
         if not isinstance(item, dict):
             continue
+        item = normalize_ingredient_unit_fields(dict(item))
         row = {
             "original_text": str(item.get("original_text") or "").strip(),
             "parsed_name": str(item.get("parsed_name") or "").strip(),
             "normalized_name": str(item.get("normalized_name") or item.get("ingredient") or "").strip(),
             "quantity": str(item.get("quantity") or "").strip(),
             "unit": str(item.get("unit") or "").strip(),
+            "unit_id": str(item.get("unit_id") or "").strip(),
+            "unit_raw": str(item.get("unit_raw") or "").strip(),
+            "unit_review_required": truthy(item.get("unit_review_required")),
+            "unit_review_value": str(item.get("unit_review_value") or "").strip(),
+            "size": str(item.get("size") or "").strip(),
+            "preparation": str(item.get("preparation") or "").strip(),
+            "notes": str(item.get("notes") or "").strip(),
             "confidence": str(item.get("confidence") or "").strip(),
             "inferred": truthy(item.get("inferred")),
             "warning": str(item.get("warning") or "").strip(),

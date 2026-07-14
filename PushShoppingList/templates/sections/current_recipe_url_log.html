@@ -1,4 +1,5 @@
 {% import "includes/app_shell_macros.html" as shell %}
+<script id="ingredientUnitConfig" type="application/json">{{ ingredient_unit_config | default({"units": [], "aliases": {}}) | tojson }}</script>
 {% set unclassified_cookbook = namespace(id="", name="unclassified") %}
 {% if cookbook_view and cookbook_view.cookbooks %}
     {% for cookbook in cookbook_view.cookbooks %}
