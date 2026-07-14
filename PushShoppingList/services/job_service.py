@@ -591,6 +591,16 @@ def job_for_client(job, include_input=False):
     input_payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
     model_details = job_model_details(job)
     duration_details = job_duration_details(job)
+    result_payload = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    progress_percent = max(0, min(100, int(job.get("progress_percent") or 0)))
+    status = normalize_status(job.get("status"))
+    current_stage = str(result_payload.get("current_stage") or "").strip()
+    stage_label = str(result_payload.get("stage_label") or job.get("current_step") or "").strip()
+    if status == "completed":
+        current_stage = "complete"
+        stage_label = str(job.get("current_step") or "Import complete").strip()
+    elif not current_stage and status in {"failed", "cancelled", "cancel_requested"}:
+        current_stage = status
     payload = {
         "id": job.get("id", ""),
         "job_id": job.get("id", ""),
@@ -599,11 +609,14 @@ def job_for_client(job, include_input=False):
         "job_type": job.get("job_type", ""),
         "status": job.get("status", ""),
         "current_step": job.get("current_step", ""),
-        "progress_percent": int(job.get("progress_percent") or 0),
+        "current_stage": current_stage,
+        "stage_label": stage_label,
+        "progress_percent": progress_percent,
+        "percent_complete": progress_percent,
         "total_items": int(job.get("total_items") or 0),
         "completed_items": int(job.get("completed_items") or 0),
         "failed_items": int(job.get("failed_items") or 0),
-        "result_payload": job.get("result_payload") or {},
+        "result_payload": result_payload,
         "error_message": job.get("error_message") or "",
         "warning_messages": job.get("warning_messages") or [],
         "created_at": job.get("created_at") or "",

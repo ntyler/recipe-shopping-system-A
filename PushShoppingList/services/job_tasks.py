@@ -101,6 +101,72 @@ def bounded_percent(index, total, start=0, end=100):
     return int(start + ((end - start) * (index / total)))
 
 
+IMPORT_ITEM_WORK_PERCENT = 95
+
+
+def import_workflow_percent(processed_items, total_items, item_stage_percent):
+    """Return overall import progress from completed items plus the active item stage."""
+    total_items = max(1, int(total_items or 1))
+    processed_items = max(0, min(total_items, int(processed_items or 0)))
+    item_stage_percent = max(0, min(IMPORT_ITEM_WORK_PERCENT, int(item_stage_percent or 0)))
+    if processed_items >= total_items:
+        return IMPORT_ITEM_WORK_PERCENT
+    completed_work = processed_items * IMPORT_ITEM_WORK_PERCENT
+    return max(0, min(
+        IMPORT_ITEM_WORK_PERCENT,
+        round((completed_work + item_stage_percent) / total_items),
+    ))
+
+
+def import_stage_from_progress_message(message, summary=None):
+    text = " ".join(str(value or "").strip().lower() for value in (message, summary)).strip()
+    if any(token in text for token in ("saving menu", "saving recipe", "creating recipe record", "committing")):
+        return "saving", "Saving recipes", 90
+    if any(token in text for token in ("html downloaded", "reading recipe card", "structured data", "parsing", "detecting")):
+        return "parsing", "Parsing and detecting recipes", 22
+    if any(token in text for token in ("download", "fetch", "browser fallback", "loading webpage", "source document")):
+        return "downloading", "Downloading source", 12
+    if any(token in text for token in ("openai", "extract", "recipe card", "menu item", "ingredient")):
+        return "extracting", "Extracting recipe details", 58
+    return "extracting", "Extracting recipe details", 35
+
+
+def update_import_job_progress(
+    job_id,
+    *,
+    processed_items,
+    total_source_items,
+    item_stage_percent,
+    current_stage,
+    stage_label,
+    current_step=None,
+    direct_percent=None,
+    result_payload=None,
+    **kwargs,
+):
+    current_job = get_job(job_id) or {}
+    current_percent = max(0, min(99, int(current_job.get("progress_percent") or 0)))
+    candidate = (
+        int(direct_percent)
+        if direct_percent is not None
+        else import_workflow_percent(processed_items, total_source_items, item_stage_percent)
+    )
+    percent_complete = max(current_percent, max(0, min(99, candidate)))
+    stable_progress = {
+        "current_stage": str(current_stage or "").strip(),
+        "stage_label": str(stage_label or current_step or "Importing recipes").strip(),
+    }
+    if isinstance(result_payload, dict):
+        stable_progress.update(result_payload)
+    return update_job_progress(
+        job_id,
+        current_step=current_step or stable_progress["stage_label"],
+        progress_percent=percent_complete,
+        result_payload=stable_progress,
+        **kwargs,
+    )
+
+
 def menu_item_batch_inference_worker_count(batch_total=None):
     try:
         configured = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_WORKERS") or "8")
@@ -4096,11 +4162,17 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         "OPENAI_MENU_CLEANUP_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
     ))
 
-    update_job_progress(
+    update_import_job_progress(
         job_id,
+        processed_items=0,
+        total_source_items=total,
+        item_stage_percent=5,
+        current_stage="downloading",
+        stage_label="Downloading source",
         current_step="Fetching menu" if menu_extract else ("Reading source URL" if total == 1 else "Reading source URLs"),
         total_items=total,
-        progress_percent=5,
+        completed_items=0,
+        failed_items=0,
         result_payload={
             **job_model,
             **({
@@ -4128,10 +4200,14 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                 source_pdf=str(bool(menu_create_source_pdf)).lower(),
             )
         step = "Fetching menu" if menu_extract else "Reading source URL"
-        update_job_progress(
+        update_import_job_progress(
             job_id,
+            processed_items=index,
+            total_source_items=total,
+            item_stage_percent=5,
+            current_stage="downloading",
+            stage_label="Downloading source",
             current_step=step,
-            progress_percent=bounded_percent(index, total, 5, 35),
             completed_items=len(created_urls),
             failed_items=failed_items,
         )
@@ -4145,10 +4221,15 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                     "completed_items": item_completed,
                     "total_items": item_total,
                 }
-            update_job_progress(
+            current_stage, stage_label, stage_percent = import_stage_from_progress_message(message, summary)
+            update_import_job_progress(
                 job_id,
+                processed_items=index,
+                total_source_items=total,
+                item_stage_percent=stage_percent,
+                current_stage=current_stage,
+                stage_label=stage_label,
                 current_step=str(message or summary or "Running"),
-                progress_percent=bounded_percent(index, total, 15, 65),
                 result_payload=job_model,
                 **progress_kwargs,
             )
@@ -4171,6 +4252,17 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         except Exception as exc:
             failed_items += 1
             append_job_warning(job_id, f"{url}: {exc}")
+            update_import_job_progress(
+                job_id,
+                processed_items=index,
+                total_source_items=total,
+                item_stage_percent=IMPORT_ITEM_WORK_PERCENT,
+                current_stage="saving",
+                stage_label="Finishing recipe item",
+                current_step="Recipe item failed",
+                completed_items=len(created_urls),
+                failed_items=failed_items,
+            )
             continue
 
         ensure_not_cancelled(job_id)
@@ -4179,12 +4271,27 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
             if not result.get("ok"):
                 failed_items += 1
                 append_job_warning(job_id, f"{url}: {result.get('error') or 'Menu extraction failed.'}")
+                update_import_job_progress(
+                    job_id,
+                    processed_items=index,
+                    total_source_items=total,
+                    item_stage_percent=IMPORT_ITEM_WORK_PERCENT,
+                    current_stage="saving",
+                    stage_label="Finishing menu item",
+                    current_step="Menu item failed",
+                    completed_items=len(created_urls),
+                    failed_items=failed_items,
+                )
                 continue
 
-            update_job_progress(
+            update_import_job_progress(
                 job_id,
+                processed_items=index,
+                total_source_items=total,
+                item_stage_percent=90,
+                current_stage="saving",
+                stage_label="Saving recipes",
                 current_step="Saving menu items",
-                progress_percent=bounded_percent(index, total, 65, 90),
                 result_payload={
                     **job_model,
                     "stage": "Saving menu items",
@@ -4284,18 +4391,44 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                     updated=0,
                     elapsed=f"{import_menu_url_elapsed_seconds(menu_import_started_at):.2f}s",
                 )
+            update_import_job_progress(
+                job_id,
+                processed_items=index,
+                total_source_items=total,
+                item_stage_percent=IMPORT_ITEM_WORK_PERCENT,
+                current_stage="assets",
+                stage_label="Saving recipe assets",
+                current_step="Menu source complete" if committed.get("ok") else "Menu source failed",
+                completed_items=len(created_urls),
+                failed_items=failed_items,
+            )
             continue
 
         ingredients = result.get("ingredients", [])
         if not result.get("ok") or not ingredients:
             failed_items += 1
             append_job_warning(job_id, f"{url}: {result.get('error') or NO_INGREDIENTS_ERROR}")
+            update_import_job_progress(
+                job_id,
+                processed_items=index,
+                total_source_items=total,
+                item_stage_percent=IMPORT_ITEM_WORK_PERCENT,
+                current_stage="saving",
+                stage_label="Finishing recipe item",
+                current_step="Recipe item failed",
+                completed_items=len(created_urls),
+                failed_items=failed_items,
+            )
             continue
 
-        update_job_progress(
+        update_import_job_progress(
             job_id,
+            processed_items=index,
+            total_source_items=total,
+            item_stage_percent=72,
+            current_stage="enriching",
+            stage_label="Generating recipe details",
             current_step="Inferring ingredients",
-            progress_percent=bounded_percent(index, total, 50, 70),
         )
         with workspace_write_lock("recipe-imports"):
             add_items(ingredients)
@@ -4305,16 +4438,28 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
             add_recipe_urls([url])
             assignment = save_import_cookbook_assignment(url, result, cookbook)
 
-            update_job_progress(
+            update_import_job_progress(
                 job_id,
+                processed_items=index,
+                total_source_items=total,
+                item_stage_percent=82,
+                current_stage="enriching",
+                stage_label="Generating recipe details",
                 current_step=IMPORT_CATEGORY_STATUS_MESSAGE,
-                progress_percent=bounded_percent(index, total, 70, 82),
             )
             category_status = apply_imported_recipe_category_routine(url, result, assignment)
             if not category_status.get("ok"):
                 append_job_warning(job_id, f"{import_recipe_title(result, url)}: {category_status.get('error') or 'Category inference skipped.'}")
 
-            update_job_progress(job_id, current_step="Generating recipe PDF", progress_percent=bounded_percent(index, total, 82, 92))
+            update_import_job_progress(
+                job_id,
+                processed_items=index,
+                total_source_items=total,
+                item_stage_percent=92,
+                current_stage="assets",
+                stage_label="Saving recipe assets",
+                current_step="Generating recipe PDF",
+            )
             create_source_url_pdf(url)
             pdf_job = schedule_generated_recipe_pdf_creation(url, context=context)
         result = {
@@ -4324,10 +4469,32 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         }
         record_recipe_import_activity(url, result, context)
         created_urls.append(url)
+        update_import_job_progress(
+            job_id,
+            processed_items=index,
+            total_source_items=total,
+            item_stage_percent=IMPORT_ITEM_WORK_PERCENT,
+            current_stage="saving",
+            stage_label="Saving recipes",
+            current_step="Recipe saved",
+            completed_items=len(created_urls),
+            failed_items=failed_items,
+        )
 
     ensure_not_cancelled(job_id)
     if created_urls:
-        update_job_progress(job_id, current_step="Finalizing results", progress_percent=95)
+        update_import_job_progress(
+            job_id,
+            processed_items=total,
+            total_source_items=total,
+            item_stage_percent=IMPORT_ITEM_WORK_PERCENT,
+            current_stage="finalizing",
+            stage_label="Finalizing the import",
+            current_step="Finalizing results",
+            direct_percent=97,
+            completed_items=len(created_urls),
+            failed_items=failed_items,
+        )
         with workspace_write_lock("recipe-imports"):
             sort_ingredients()
 

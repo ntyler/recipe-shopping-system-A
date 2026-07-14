@@ -133,12 +133,12 @@ def test_public_auth_feature_icons_match_reference_mapping():
     )
     app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     expected_icons = (
-        ("recipe-document-linked", "Import Anything"),
-        ("brain-rounded", "AI-Powered"),
-        ("shopping-cart", "Smart Shopping"),
-        ("clipboard-checklist", "Meal Planning"),
-        ("sparkles", "Learn &amp; Improve"),
-        ("lock", "Private &amp; Secure"),
+        ("import", "Import Anything"),
+        ("brain", "AI-Powered"),
+        ("shopping", "Smart Shopping"),
+        ("planning", "Meal Planning"),
+        ("learn", "Learn &amp; Improve"),
+        ("secure", "Private &amp; Secure"),
     )
 
     feature_grid = template[
@@ -147,15 +147,18 @@ def test_public_auth_feature_icons_match_reference_mapping():
     ]
     for icon_name, title in expected_icons:
         assert re.search(
-            rf'svg_icon\("{re.escape(icon_name)}"\).*?<strong>{re.escape(title)}</strong>',
+            rf'public_auth_feature_icon\("{re.escape(icon_name)}"\).*?<strong>{re.escape(title)}</strong>',
             feature_grid,
             re.DOTALL,
         )
+        assert f'data-feature-icon="{icon_name}"' in feature_grid
+        assert f'{{% elif name == "{icon_name}" %}}' in icon_macros or (
+            icon_name == "import" and '{% if name == "import" %}' in icon_macros
+        )
 
-    for obsolete_icon in ("brain", "infer-sparkles", "shield-check", "meal"):
-        assert f'svg_icon("{obsolete_icon}")' not in feature_grid
-    for new_icon in ("recipe-document-linked", "brain-rounded", "shopping-cart", "clipboard-checklist"):
-        assert f'elif name == "{new_icon}"' in icon_macros
+    assert "macro public_auth_feature_icon(name)" in icon_macros
+    for shared_icon in ("sparkles", "lock", "shield-check", "meal"):
+        assert f'svg_icon("{shared_icon}")' not in feature_grid
 
     feature_icon_css = app_css[
         app_css.index(".public-auth-feature-icon {"):
@@ -163,10 +166,12 @@ def test_public_auth_feature_icons_match_reference_mapping():
     ]
     assert "width: 58px;" in feature_icon_css
     assert "height: 58px;" in feature_icon_css
-    assert "width: 28px;" in feature_icon_css
-    assert "height: 28px;" in feature_icon_css
+    assert ".public-auth-feature-icon-svg" in feature_icon_css
+    assert 'data-feature-icon="shopping"' in feature_icon_css
+    assert "width: 34px;" in feature_icon_css
+    assert "height: 34px;" in feature_icon_css
     assert "stroke-width: 1.8;" in feature_icon_css
-    assert ".public-auth-feature-icon-brain .app-icon-svg" in feature_icon_css
+    assert 'data-feature-icon="brain"' in feature_icon_css
     assert "width: 32px;" in feature_icon_css
     assert "height: 32px;" in feature_icon_css
 
@@ -246,27 +251,32 @@ def test_privacy_art_uses_layered_reference_shield_with_explicit_dark_theme_colo
 
     for layer in (
         "public-auth-privacy-art-shield-layers",
+        "public-auth-privacy-art-shield-depth",
         "public-auth-privacy-art-shield",
         "public-auth-privacy-art-shield-inner",
         "public-auth-privacy-art-shield-facet",
+        "public-auth-privacy-art-highlight",
         "public-auth-privacy-art-check",
         "public-auth-privacy-art-shield-nodes",
     ):
         assert layer in artwork
         assert f".{layer}" in artwork_css
-    assert 'd="M126 15 167 32q3 1 3 5v28c0 27-17 47-42 59q-2 1-4 0C99 112 82 92 82 65V37q0-4 3-5l39-17q2-1 2 0Z"' in artwork
-    assert 'd="m105 68 14 14 29-33"' in artwork
+    assert 'id="publicAuthShieldOuterGradient"' in artwork
+    assert 'id="publicAuthShieldInnerGradient"' in artwork
+    assert 'id="publicAuthShieldFacetGradient"' in artwork
+    assert 'd="M126 14c3 0 5 2 8 3l30 13c5 2 7 5 7 10v24c0 27-16 48-41 61-3 2-5 2-8 0-25-13-41-34-41-61V40c0-5 2-8 7-10l30-13c3-1 5-3 8-3Z"' in artwork
+    assert 'd="m104 68 15 15 30-35"' in artwork
     assert '<circle cx="84" cy="78" r="3.4"></circle>' in artwork
     assert '<circle cx="168" cy="78" r="3.4"></circle>' in artwork
-    assert "public-auth-privacy-art-highlight" not in artwork
-    assert '--public-privacy-art-outer: #2dcc61;' in artwork_css
-    assert '--public-privacy-art-inner: #64d67c;' in artwork_css
+    assert '--public-privacy-art-outer-start: #33d56c;' in artwork_css
+    assert '--public-privacy-art-inner-start: #8de4a3;' in artwork_css
     assert '--public-privacy-art-check: #08712c;' in artwork_css
     assert 'html[data-public-auth-theme="dark"] .public-auth-privacy-art' in artwork_css
-    assert '--public-privacy-art-outer: #45e87e;' in artwork_css
-    assert '--public-privacy-art-inner: #4ace70;' in artwork_css
+    assert '--public-privacy-art-outer-start: #31d677;' in artwork_css
+    assert '--public-privacy-art-outer-end: #0c8f47;' in artwork_css
+    assert '--public-privacy-art-inner-start: #72dc99;' in artwork_css
     assert '--public-privacy-art-check: #ffebcc;' in artwork_css
-    assert "stroke-width: 7;" in artwork_css
+    assert "stroke-width: 6.5;" in artwork_css
 
 
 def test_privacy_art_limits_attack_paths_to_three_subtle_background_lines():
