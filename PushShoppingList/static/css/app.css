@@ -10245,6 +10245,75 @@ body {
             color: #fecaca;
         }
 
+        .recipe-edit-validation-summary {
+            margin: 0 0 14px;
+            padding: 12px 14px;
+            border: 1px solid #b64343;
+            border-radius: 8px;
+            background: #2a1111;
+            color: #fecaca;
+        }
+
+        .recipe-edit-validation-summary[hidden] {
+            display: none;
+        }
+
+        .recipe-edit-validation-summary strong {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .recipe-edit-validation-summary ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .recipe-edit-validation-summary li + li {
+            margin-top: 3px;
+        }
+
+        #recipeEditForm [data-recipe-edit-validation-invalid="true"] {
+            border-color: #ef6b73 !important;
+            box-shadow: 0 0 0 2px rgba(239, 107, 115, 0.22);
+        }
+
+        #recipeEditForm .recipe-edit-has-validation-error {
+            border-color: rgba(239, 107, 115, 0.7);
+        }
+
+        .recipe-edit-save-spinner {
+            width: 14px;
+            height: 14px;
+            flex: 0 0 14px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: recipe-edit-save-spin 700ms linear infinite;
+        }
+
+        .recipe-edit-save-spinner[hidden] {
+            display: none;
+        }
+
+        .recipe-edit-save[aria-busy="true"] > .app-icon-svg {
+            display: none;
+        }
+
+        .recipe-edit-save:disabled {
+            cursor: not-allowed;
+            opacity: 0.62;
+        }
+
+        @keyframes recipe-edit-save-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .recipe-edit-save-spinner {
+                animation: none;
+            }
+        }
+
         .recipe-edit-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));

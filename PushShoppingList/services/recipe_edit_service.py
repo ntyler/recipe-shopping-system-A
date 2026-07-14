@@ -2,6 +2,7 @@ import base64
 from copy import deepcopy
 import json
 import logging
+import math
 import mimetypes
 import os
 import re
@@ -117,6 +118,7 @@ from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 
 LOGGER = logging.getLogger(__name__)
+_RECIPE_OUTPUT_WRITE_LOCK = threading.RLock()
 
 
 NUTRITION_FIELDS = [
@@ -1642,7 +1644,11 @@ def log_recipe_pdf_fields(action, recipe_data):
 
 def create_new_recipe():
     source_url = f"manual://recipe/{uuid.uuid4().hex}"
+    created_at = now_iso()
     recipe_data = {
+        "recipe_id": uuid.uuid4().hex,
+        "created_at": created_at,
+        "updated_at": created_at,
         "source_url": source_url,
         "recipe_title": "New Recipe",
         "servings": "",
@@ -4706,6 +4712,9 @@ def load_editable_recipe(url):
     return {
         "ok": True,
         "recipe": {
+            "recipe_id": recipe_data.get("recipe_id") or "",
+            "created_at": recipe_data.get("created_at") or "",
+            "updated_at": recipe_data.get("updated_at") or "",
             "source_url": recipe_data.get("source_url") or url,
             "document_source_url": recipe_data.get("document_source_url") or recipe_data.get("source_url") or url,
             "menu_item_url": recipe_data.get("menu_item_url") or recipe_data.get("source_url") or url,
@@ -6063,6 +6072,156 @@ def is_web_source_url(url):
     return parsed.scheme.lower() in {"http", "https"} and bool(parsed.netloc)
 
 
+def recipe_save_error(error, message, field_errors=None, status_code=400):
+    return {
+        "ok": False,
+        "success": False,
+        "error": str(error or "save_failed"),
+        "message": str(message or "The recipe could not be saved."),
+        "field_errors": field_errors if isinstance(field_errors, dict) else {},
+        "status_code": int(status_code or 400),
+    }
+
+
+def recipe_amount_is_valid(value):
+    if value in (None, ""):
+        return True
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return math.isfinite(float(value)) and float(value) >= 0
+
+    text = str(value or "").strip().lower()
+    if not text:
+        return True
+    if text in {"nan", "+nan", "-nan", "inf", "+inf", "-inf", "infinity", "+infinity", "-infinity"}:
+        return False
+    if re.search(r"\d\s*(?:\.\.|,,|//|--)\s*\d?", text):
+        return False
+    if re.search(r"\d+(?:\.\d+){2,}", text):
+        return False
+    if re.match(r"^-\s*(?:\d|\.\d)", text):
+        return False
+    if re.search(r"\b(?:to|or)\s+-\s*(?:\d|\.\d)", text):
+        return False
+
+    for fraction_match in re.finditer(r"(?<![\d/])(\d+)\s*/\s*(\d+)(?![\d/])", text):
+        if int(fraction_match.group(2)) == 0:
+            return False
+
+    compact_number = text.replace(",", "")
+    if re.fullmatch(r"[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?", compact_number):
+        try:
+            numeric_value = float(compact_number)
+        except ValueError:
+            return False
+        return math.isfinite(numeric_value) and numeric_value >= 0
+
+    return True
+
+
+def nutrition_numeric_value_is_valid(key, value):
+    text = str(value or "").strip()
+    if not text or key == "serving_basis" or not re.search(r"\d", text):
+        return True
+    return not bool(re.search(r"\d\s*(?:\.\.|,,|//|--+)\s*\d", text))
+
+
+def validate_recipe_save_payload(payload):
+    if not isinstance(payload, dict):
+        return {"recipe": "Recipe data must be a JSON object."}
+
+    errors = {}
+    title = str(payload.get("recipe_title") or "").strip()
+    if not title:
+        errors["recipe_title"] = "Recipe name is required."
+
+    source_url = str(payload.get("source_url") or "").strip()
+    if source_url.lower() in {"not available", "n/a", "none", "null"}:
+        errors["source_url"] = "Source URL must be a real URL or recipe identifier."
+
+    quantity = payload.get("quantity")
+    if quantity not in (None, ""):
+        try:
+            numeric_quantity = float(quantity)
+        except (TypeError, ValueError):
+            numeric_quantity = 0
+        if not math.isfinite(numeric_quantity) or numeric_quantity <= 0:
+            errors["quantity"] = "Recipe quantity must be greater than zero."
+
+    rating = payload.get("rating")
+    if rating not in (None, ""):
+        try:
+            numeric_rating = int(rating)
+        except (TypeError, ValueError):
+            numeric_rating = -1
+        if numeric_rating < 0 or numeric_rating > 5:
+            errors["rating"] = "Rating must be between 0 and 5."
+
+    collection_fields = ("ingredients", "equipment", "instructions", "nutrition")
+    for field in collection_fields:
+        if field in payload and not isinstance(payload.get(field), list):
+            errors[field] = f"{field.replace('_', ' ').title()} must be a list."
+
+    ingredients = payload.get("ingredients") if isinstance(payload.get("ingredients"), list) else []
+    if not ingredients and "ingredients" not in errors:
+        errors["ingredients"] = "Add at least one ingredient."
+    for index, item in enumerate(ingredients):
+        if not isinstance(item, dict):
+            errors[f"ingredients.{index}"] = "Ingredient row must be an object."
+            continue
+        if not str(item.get("ingredient") or item.get("original_text") or "").strip():
+            errors[f"ingredients.{index}.ingredient"] = "Ingredient name is required."
+        amount = item.get("quantity") if "quantity" in item else item.get("recipe_qty")
+        if not recipe_amount_is_valid(amount):
+            errors[f"ingredients.{index}.amount"] = "Ingredient amount is invalid."
+
+    equipment = payload.get("equipment") if isinstance(payload.get("equipment"), list) else []
+    for index, item in enumerate(equipment):
+        if isinstance(item, dict):
+            text = item.get("equipment") or item.get("text") or item.get("name")
+        else:
+            text = item
+        if not str(text or "").strip():
+            errors[f"equipment.{index}.equipment"] = "Equipment name is required."
+
+    instructions = payload.get("instructions") if isinstance(payload.get("instructions"), list) else []
+    if not instructions and "instructions" not in errors:
+        errors["instructions"] = "Add at least one instruction."
+    for index, item in enumerate(instructions):
+        if isinstance(item, dict):
+            text = item.get("instruction") or item.get("text")
+        else:
+            text = item
+        if not str(text or "").strip():
+            errors[f"instructions.{index}.instruction"] = "Instruction text is required."
+        if isinstance(item, dict) and item.get("step_number") not in (None, ""):
+            try:
+                step_number = float(item.get("step_number"))
+            except (TypeError, ValueError):
+                step_number = 0
+            if not math.isfinite(step_number) or step_number <= 0:
+                errors[f"instructions.{index}.step_number"] = "Step number must be greater than zero."
+
+    nutrition = payload.get("nutrition") if isinstance(payload.get("nutrition"), list) else []
+    for index, item in enumerate(nutrition):
+        if not isinstance(item, dict):
+            errors[f"nutrition.{index}"] = "Nutrition row must be an object."
+            continue
+        key = str(item.get("key") or item.get("label") or item.get("name") or "").strip()
+        value = str(item.get("value") or item.get("amount") or "").strip()
+        if not key and value:
+            errors[f"nutrition.{index}.key"] = "Nutrient name is required."
+        elif key and not value:
+            errors[f"nutrition.{index}.value"] = "Nutrient value is required."
+        elif key and value:
+            normalized_key = key.lower().replace(" ", "_").replace("-", "_")
+            if not nutrition_numeric_value_is_valid(normalized_key, value):
+                errors[f"nutrition.{index}.value"] = "Nutrient value is invalid."
+
+    return errors
+
+
 def delete_editable_recipe_pdf(url):
     url = str(url or "").strip()
 
@@ -6107,25 +6266,123 @@ def delete_editable_recipe_pdf(url):
     }
 
 
-def save_editable_recipe(original_url, payload):
+def save_editable_recipe(original_url, payload, require_existing=False):
     original_url = str(original_url or "").strip()
-    payload = payload if isinstance(payload, dict) else {}
-    source_url = str(payload.get("source_url") or original_url).strip()
 
     if not original_url:
-        return {"ok": False, "error": "Recipe URL is required."}
+        return recipe_save_error(
+            "validation_error",
+            "Some fields need attention.",
+            {"original_url": "Recipe URL is required."},
+            status_code=422,
+        )
+
+    if not isinstance(payload, dict):
+        return recipe_save_error(
+            "validation_error",
+            "Some fields need attention.",
+            {"recipe": "Recipe data must be a JSON object."},
+            status_code=422,
+        )
+
+    submitted_recipe_id = str(payload.get("recipe_id") or "").strip()
+    existing_data = load_recipe_output(original_url)
+    if (
+        (not isinstance(existing_data, dict) or not existing_data)
+        and require_existing
+        and submitted_recipe_id
+    ):
+        recipe_id_matches = [
+            recipe
+            for recipe in recipe_output_index().values()
+            if isinstance(recipe, dict)
+            and str(recipe.get("recipe_id") or "").strip() == submitted_recipe_id
+        ]
+        if len(recipe_id_matches) > 1:
+            return recipe_save_error(
+                "recipe_conflict",
+                "More than one saved recipe has that recipe identifier.",
+                {"recipe_id": "Reload the recipe before saving these changes."},
+                status_code=409,
+            )
+        if recipe_id_matches:
+            resolved_source_url = str(recipe_id_matches[0].get("source_url") or "").strip()
+            if resolved_source_url:
+                existing_data = recipe_id_matches[0]
+                original_url = resolved_source_url
+
+    if (not isinstance(existing_data, dict) or not existing_data) and require_existing:
+        return recipe_save_error(
+            "not_found",
+            "The recipe could not be found. Reload the recipe and try again.",
+            {"original_url": "Recipe was not found."},
+            status_code=404,
+        )
+    if not isinstance(existing_data, dict) or not existing_data:
+        existing_data = {"source_url": original_url}
+
+    existing_recipe_id = str(existing_data.get("recipe_id") or "").strip()
+    if (
+        require_existing
+        and existing_recipe_id
+        and submitted_recipe_id
+        and existing_recipe_id != submitted_recipe_id
+    ):
+        return recipe_save_error(
+            "recipe_conflict",
+            "Recipe identity does not match the open recipe.",
+            {"recipe_id": "Reload the recipe before saving these changes."},
+            status_code=409,
+        )
+
+    source_url = str(payload.get("source_url") or original_url).strip()
 
     if not source_url:
         source_url = original_url
+
+    identity_changed = normalize_recipe_url_key(source_url) != normalize_recipe_url_key(original_url)
+    target_data_before = load_recipe_output(source_url) if identity_changed else None
+    if require_existing and identity_changed:
+        if isinstance(target_data_before, dict) and target_data_before:
+            existing_recipe_id = str(existing_data.get("recipe_id") or "").strip()
+            target_recipe_id = str(target_data_before.get("recipe_id") or "").strip()
+            if not existing_recipe_id or not target_recipe_id or existing_recipe_id != target_recipe_id:
+                return recipe_save_error(
+                    "recipe_conflict",
+                    "Another recipe already uses that source URL.",
+                    {"source_url": "Choose a source URL that is not assigned to another recipe."},
+                    status_code=409,
+                )
 
     previous_recipe_data = load_recipe_ingredients()
     previous_ingredients = recipe_ingredients_for_key(
         normalize_recipe_url_key(original_url),
         previous_recipe_data,
     )
-    existing_data = load_recipe_output(original_url) or {"source_url": original_url}
     apply_recipe_pdf_asset_aliases(existing_data)
     log_recipe_pdf_fields("save_editable_recipe:existing", existing_data)
+    payload_cover_image = payload.get("cover_image") if isinstance(payload.get("cover_image"), dict) else {}
+    existing_cover_image = existing_data.get("cover_image") if isinstance(existing_data.get("cover_image"), dict) else {}
+    cover_image_prompt_supplied = (
+        "cover_image_prompt" in payload
+        or "prompt" in payload_cover_image
+        or "image_prompt" in payload_cover_image
+    )
+    if "cover_image_prompt" in payload:
+        cover_image_prompt = str(payload.get("cover_image_prompt") or "").strip()
+    elif "prompt" in payload_cover_image or "image_prompt" in payload_cover_image:
+        cover_image_prompt = str(
+            payload_cover_image.get("prompt")
+            or payload_cover_image.get("image_prompt")
+            or ""
+        ).strip()
+    else:
+        cover_image_prompt = str(
+            existing_data.get("cover_image_prompt")
+            or existing_cover_image.get("prompt")
+            or existing_cover_image.get("image_prompt")
+            or ""
+        ).strip()
     cover_image = sanitize_recipe_cover_image(
         payload.get("cover_image") or existing_data.get("cover_image"),
         source_url,
@@ -6139,42 +6396,55 @@ def save_editable_recipe(original_url, payload):
     )
     recipe_data = {
         **existing_data,
+        "recipe_id": str(existing_recipe_id or submitted_recipe_id or uuid.uuid4().hex).strip(),
+        "created_at": str(existing_data.get("created_at") or now_iso()).strip(),
+        "updated_at": now_iso(),
         "source_url": source_url,
-        "recipe_title": str(payload.get("recipe_title") or "").strip(),
+        "cover_image_prompt": cover_image_prompt,
+        "recipe_title": str(
+            payload.get("recipe_title")
+            if "recipe_title" in payload
+            else existing_data.get("recipe_title") or ""
+        ).strip(),
         "description": str(
             payload.get("description")
             if "description" in payload
             else existing_data.get("description") or ""
         ).strip(),
-        "servings": str(payload.get("servings") or "").strip(),
-        "level": str(payload.get("level") or "").strip(),
-        "total_time": str(payload.get("total_time") or "").strip(),
-        "prep_time": str(payload.get("prep_time") or "").strip(),
-        "inactive_time": str(payload.get("inactive_time") or "").strip(),
-        "cook_time": str(payload.get("cook_time") or "").strip(),
+        "servings": str(payload.get("servings") if "servings" in payload else existing_data.get("servings") or "").strip(),
+        "level": str(payload.get("level") if "level" in payload else existing_data.get("level") or "").strip(),
+        "total_time": str(payload.get("total_time") if "total_time" in payload else existing_data.get("total_time") or "").strip(),
+        "prep_time": str(payload.get("prep_time") if "prep_time" in payload else existing_data.get("prep_time") or "").strip(),
+        "inactive_time": str(payload.get("inactive_time") if "inactive_time" in payload else existing_data.get("inactive_time") or "").strip(),
+        "cook_time": str(payload.get("cook_time") if "cook_time" in payload else existing_data.get("cook_time") or "").strip(),
         "scaling": normalize_recipe_scaling_metadata(
             payload.get("scaling") or existing_data.get("scaling")
         ),
         "ingredients": sanitize_ingredients(
-            payload.get("ingredients", []),
+            payload.get("ingredients") if "ingredients" in payload else existing_data.get("ingredients", []),
             existing_data.get("ingredients", []),
         ),
         "equipment": sanitize_equipment_list(
-            payload.get("equipment", []),
+            payload.get("equipment") if "equipment" in payload else existing_data.get("equipment", []),
             existing_data.get("equipment", []),
         ),
         "instructions": sanitize_instruction_list(
-            payload.get("instructions", []),
+            payload.get("instructions") if "instructions" in payload else existing_data.get("instructions", []),
             existing_data.get("instructions", []),
         ),
-        "nutrition": sanitize_nutrition(payload.get("nutrition", [])),
-        "rating": normalize_recipe_rating(payload.get("rating")),
+        "nutrition": sanitize_nutrition(
+            payload.get("nutrition") if "nutrition" in payload else normalize_nutrition_rows(existing_data.get("nutrition", {})),
+            existing_data.get("nutrition", {}),
+        ),
+        "rating": normalize_recipe_rating(
+            payload.get("rating") if "rating" in payload else existing_data.get("rating")
+        ),
         "recipe_notes": sanitize_recipe_notes(
             payload.get("recipe_notes", existing_recipe_notes),
             existing_recipe_notes,
         ),
         "reflection_notes": sanitize_reflection_notes(
-            payload.get("reflection_notes", []),
+            payload.get("reflection_notes") if "reflection_notes" in payload else existing_data.get("reflection_notes", []),
             existing_data.get("reflection_notes", []),
         ),
         "chatgpt_feedback": str(
@@ -6192,31 +6462,88 @@ def save_editable_recipe(original_url, payload):
     hydrate_source_pdf_assets_from_url(recipe_data, source_url)
     apply_recipe_menu_metadata_payload(recipe_data, payload)
     if cover_image:
+        if cover_image_prompt:
+            cover_image["prompt"] = cover_image_prompt
+            cover_image["image_prompt"] = cover_image_prompt
+        elif cover_image_prompt_supplied:
+            cover_image.pop("prompt", None)
+            cover_image.pop("image_prompt", None)
         recipe_data["cover_image"] = cover_image
     else:
         recipe_data.pop("cover_image", None)
     if recipe_data["servings"] and not recipe_data["scaling"].get("base_servings"):
         recipe_data["scaling"]["base_servings"] = recipe_data["servings"]
 
+    substitution_metadata = [
+        deepcopy(item.get("substitutions") or []) if isinstance(item, dict) else []
+        for item in recipe_data.get("ingredients", [])
+    ]
     normalize_extracted_ingredient_fields(recipe_data)
+    for index, item in enumerate(recipe_data.get("ingredients", [])):
+        if not isinstance(item, dict):
+            continue
+        existing_substitutions = substitution_metadata[index] if index < len(substitution_metadata) else []
+        item["substitutions"] = normalize_ingredient_substitutions(
+            item.get("substitutions"),
+            existing_substitutions,
+            parent_item=item,
+        )
     normalize_extracted_equipment_fields(recipe_data)
     log_recipe_pdf_fields("save_editable_recipe:before_write", recipe_data)
     save_recipe_output(source_url, recipe_data)
 
-    if normalize_recipe_url_key(source_url) != normalize_recipe_url_key(original_url):
-        replace_recipe_url(original_url, source_url)
-        move_recipe_meta(original_url, source_url)
+    if identity_changed:
+        try:
+            replace_recipe_url(original_url, source_url)
+            move_recipe_meta(original_url, source_url)
+            remove_stale_recipe_output(original_url, source_url)
+        except Exception:
+            LOGGER.exception("Recipe identity migration failed; restoring the prior recipe output.")
+            try:
+                if isinstance(target_data_before, dict) and target_data_before:
+                    save_recipe_output(source_url, target_data_before)
+                else:
+                    remove_recipe_output_file(source_url)
+                save_recipe_output(original_url, existing_data)
+                replace_recipe_url(source_url, original_url)
+                move_recipe_meta(source_url, original_url)
+            except Exception:
+                LOGGER.exception("Recipe identity migration rollback was incomplete.")
+            raise
 
     quantity = normalize_recipe_quantity(payload.get("quantity", 1))
     display_name = str(payload.get("display_name") or "").strip()
 
-    save_recipe_url_quantity(source_url, quantity)
-    save_recipe_url_name(source_url, display_name)
-    update_recipe_ingredient_record(source_url, quantity, recipe_data)
-    update_recipe_quantity(source_url, quantity)
-    sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients)
+    warnings = []
+    derived_syncs = (
+        ("Recipe quantity metadata", lambda: save_recipe_url_quantity(source_url, quantity)),
+        ("Recipe display name", lambda: save_recipe_url_name(source_url, display_name)),
+        ("Ingredient and equipment master data", lambda: update_recipe_ingredient_record(source_url, quantity, recipe_data)),
+        ("Scaled recipe quantities", lambda: update_recipe_quantity(source_url, quantity)),
+        ("Shopping list", lambda: sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients)),
+    )
+    for label, sync_callback in derived_syncs:
+        try:
+            sync_callback()
+        except Exception:
+            LOGGER.exception("%s synchronization failed after the recipe was saved.", label)
+            warnings.append(f"{label} could not be synchronized.")
 
-    return load_editable_recipe(source_url)
+    try:
+        result = load_editable_recipe(source_url)
+    except Exception:
+        LOGGER.exception("The saved recipe could not be refreshed for the response.")
+        warnings.append("The saved recipe could not be refreshed in the response.")
+        result = {"recipe": recipe_data}
+    result.update({
+        "ok": True,
+        "success": True,
+        "recipe_id": recipe_data["recipe_id"],
+        "updated_at": recipe_data["updated_at"],
+        "message": "Recipe saved successfully",
+        "warnings": warnings,
+    })
+    return result
 
 
 def save_recipe_cover_image_upload(original_url, uploaded_file, source_url="", fallback_alt=""):
@@ -8684,13 +9011,46 @@ def load_recipe_output(url):
     return recipe_output_index().get(recipe_key)
 
 
+def remove_recipe_output_file(url):
+    recipe_key = normalize_recipe_url_key(url)
+    json_path = Path(os.fspath(OUTPUT_FOLDER / f"{safe_filename(url)}.json"))
+    with _RECIPE_OUTPUT_WRITE_LOCK:
+        json_path.unlink(missing_ok=True)
+    if has_request_context():
+        cached = getattr(g, "_recipe_edit_output_index", None)
+        if isinstance(cached, dict):
+            cached.pop(recipe_key, None)
+
+
+def remove_stale_recipe_output(original_url, source_url):
+    original_path = Path(os.fspath(OUTPUT_FOLDER / f"{safe_filename(original_url)}.json"))
+    source_path = Path(os.fspath(OUTPUT_FOLDER / f"{safe_filename(source_url)}.json"))
+    if original_path == source_path or not original_path.exists():
+        return False
+
+    original_data = _read_recipe_output_json(original_path)
+    original_key = normalize_recipe_url_key(original_url)
+    if not isinstance(original_data, dict):
+        return False
+    if normalize_recipe_url_key(original_data.get("source_url")) != original_key:
+        return False
+
+    remove_recipe_output_file(original_url)
+    return True
+
+
 def save_recipe_output(url, recipe_data):
     normalize_recipe_unit_fields(recipe_data)
-    json_path = OUTPUT_FOLDER / f"{safe_filename(url)}.json"
-    json_path.write_text(
-        json.dumps(recipe_data, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    json_path = Path(os.fspath(OUTPUT_FOLDER / f"{safe_filename(url)}.json"))
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = json_path.with_name(f".{json_path.name}.{uuid.uuid4().hex}.tmp")
+    serialized = json.dumps(recipe_data, indent=2, ensure_ascii=False)
+    with _RECIPE_OUTPUT_WRITE_LOCK:
+        try:
+            temporary_path.write_text(serialized, encoding="utf-8")
+            os.replace(temporary_path, json_path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
     if has_request_context():
         cached = getattr(g, "_recipe_edit_output_index", None)
         if isinstance(cached, dict):
@@ -9159,18 +9519,28 @@ def normalize_nutrition_rows(nutrition, include_defaults=False):
 
     rows = []
     included = set()
+    row_metadata = nutrition.get("_row_metadata")
+    row_metadata = row_metadata if isinstance(row_metadata, dict) else {}
 
     if include_defaults:
         for key in DEFAULT_MANUAL_NUTRITION_FIELDS:
             fallback = "per serving" if key == "serving_basis" else ""
-            rows.append({"key": key, "value": str(nutrition.get(key) or fallback)})
+            rows.append({
+                **(row_metadata.get(key) if isinstance(row_metadata.get(key), dict) else {}),
+                "key": key,
+                "value": str(nutrition.get(key) or fallback),
+            })
             included.add(key)
 
     for key in NUTRITION_FIELDS:
         if key in included or not nutrition.get(key):
             continue
 
-        rows.append({"key": key, "value": str(nutrition.get(key) or "")})
+        rows.append({
+            **(row_metadata.get(key) if isinstance(row_metadata.get(key), dict) else {}),
+            "key": key,
+            "value": str(nutrition.get(key) or ""),
+        })
         included.add(key)
 
     other = nutrition.get("other", [])
@@ -9180,17 +9550,49 @@ def normalize_nutrition_rows(nutrition, include_defaults=False):
                 key = str(item.get("label") or item.get("name") or "").strip()
                 value = str(item.get("value") or item.get("amount") or "").strip()
                 if key or value:
-                    rows.append({"key": key, "value": value})
+                    rows.append({
+                        **item,
+                        "key": key,
+                        "value": value,
+                    })
 
     return rows
 
 
 def normalize_ingredient_substitutions(value, existing_value=None, parent_item=None):
     candidates = value
-    if candidates in (None, "", []):
+    if candidates is None:
         candidates = existing_value
 
-    return normalize_ingredient_substitution_options(candidates, parent_item=parent_item)
+    normalized = normalize_ingredient_substitution_options(candidates, parent_item=parent_item)
+    metadata_by_name = {}
+    for option_rows in (existing_value, candidates):
+        if not isinstance(option_rows, list):
+            continue
+        for option in option_rows:
+            if not isinstance(option, dict):
+                continue
+            name = str(
+                option.get("ingredient")
+                or option.get("name")
+                or option.get("replacement")
+                or option.get("substitution")
+                or ""
+            ).strip()
+            key = instruction_match_text_key(name)
+            if key:
+                metadata_by_name[key] = {
+                    **metadata_by_name.get(key, {}),
+                    **option,
+                }
+
+    return [
+        {
+            **metadata_by_name.get(instruction_match_text_key(row.get("ingredient")), {}),
+            **row,
+        }
+        for row in normalized
+    ]
 
 
 def sanitize_ingredients(value, existing_value=None):
@@ -9203,7 +9605,16 @@ def sanitize_ingredients(value, existing_value=None):
         if isinstance(item, dict)
     ]
     existing_by_text = {}
+    existing_by_row_id = {}
     for existing in existing_rows:
+        row_identity = recipe_edit_row_identity(
+            existing,
+            "recipe_ingredient_id",
+            "row_id",
+            "id",
+        )
+        if row_identity:
+            existing_by_row_id.setdefault(row_identity, existing)
         for text in (
             existing.get("ingredient"),
             existing.get("name"),
@@ -9227,8 +9638,15 @@ def sanitize_ingredients(value, existing_value=None):
 
         base_quantity = nullable_string(item.get("base_quantity"))
         base_unit = nullable_string(item.get("base_unit"))
+        row_identity = recipe_edit_row_identity(
+            item,
+            "recipe_ingredient_id",
+            "row_id",
+            "id",
+        )
         existing = (
-            existing_by_text.get(instruction_match_text_key(name))
+            existing_by_row_id.get(row_identity)
+            or existing_by_text.get(instruction_match_text_key(name))
             or existing_by_text.get(instruction_match_text_key(item.get("purchasable_item") or item.get("buy_as")))
             or existing_by_text.get(instruction_match_text_key(original_text))
             or (existing_rows[index] if index < len(existing_rows) else {})
@@ -9261,11 +9679,17 @@ def sanitize_ingredients(value, existing_value=None):
             nullable_string(item.get("ingredient_image_prompt") or item.get("image_prompt"))
             or nullable_string(existing.get("ingredient_image_prompt") or existing.get("image_prompt"))
         )
+        substitution_value = next(
+            (item.get(field) for field in (
+                "substitutions",
+                "substitution_options",
+                "alternatives",
+                "substitutions_text",
+            ) if field in item),
+            None,
+        )
         substitutions = normalize_ingredient_substitutions(
-            item.get("substitutions")
-            or item.get("substitution_options")
-            or item.get("alternatives")
-            or item.get("substitutions_text"),
+            substitution_value,
             existing.get("substitutions")
             or existing.get("substitution_options")
             or existing.get("alternatives"),
@@ -9273,6 +9697,11 @@ def sanitize_ingredients(value, existing_value=None):
         )
 
         row = {
+            "id": nullable_string(item.get("id") or existing.get("id")),
+            "recipe_ingredient_id": nullable_string(
+                item.get("recipe_ingredient_id") or existing.get("recipe_ingredient_id")
+            ),
+            "row_id": nullable_string(item.get("row_id") or existing.get("row_id")),
             "ingredient_id": nullable_string(
                 item.get("ingredient_id")
                 or item.get("master_ingredient_id")
@@ -9421,6 +9850,16 @@ def sanitize_text_list(value):
     return rows
 
 
+def recipe_edit_row_identity(item, *field_names):
+    if not isinstance(item, dict):
+        return ""
+    for field in field_names:
+        value = str(item.get(field) or "").strip()
+        if value:
+            return value
+    return ""
+
+
 def sanitize_equipment_list(value, existing_value=None):
     if isinstance(value, str):
         value = value.splitlines()
@@ -9433,6 +9872,11 @@ def sanitize_equipment_list(value, existing_value=None):
         instruction_match_text_key(item.get("equipment") or item.get("text")): item
         for item in existing_rows
         if instruction_match_text_key(item.get("equipment") or item.get("text"))
+    }
+    existing_by_id = {
+        recipe_edit_row_identity(item, "equipment_row_id", "equipment_id", "row_id", "id"): item
+        for item in existing_rows
+        if recipe_edit_row_identity(item, "equipment_row_id", "equipment_id", "row_id", "id")
     }
     equipment = []
 
@@ -9457,7 +9901,15 @@ def sanitize_equipment_list(value, existing_value=None):
         if not text:
             continue
 
-        existing = existing_by_text.get(instruction_match_text_key(text))
+        item_identity = recipe_edit_row_identity(
+            item,
+            "equipment_row_id",
+            "equipment_id",
+            "row_id",
+            "id",
+        )
+        existing = existing_by_id.get(item_identity) if item_identity else None
+        existing = existing or existing_by_text.get(instruction_match_text_key(text))
         if existing is None and index < len(existing_rows):
             existing = existing_rows[index]
         existing = existing or {}
@@ -9474,13 +9926,18 @@ def sanitize_equipment_list(value, existing_value=None):
                 or ""
             )
 
-        equipment.append({
+        record = {
+            **existing,
+            **(item if isinstance(item, dict) else {}),
+        }
+        record.update({
             "equipment": text,
             "text": text,
             "equipment_image_url": equipment_image_url,
             "equipment_image_generated_at": equipment_image_generated_at,
             "equipment_image_prompt": equipment_image_prompt,
         })
+        equipment.append(record)
 
     return equipment
 
@@ -9502,6 +9959,11 @@ def sanitize_instruction_list(value, existing_value=None):
         for item in existing_rows
         if instruction_match_text_key(item.get("instruction"))
     }
+    existing_by_id = {
+        recipe_edit_row_identity(item, "instruction_id", "step_id", "row_id", "id"): item
+        for item in existing_rows
+        if recipe_edit_row_identity(item, "instruction_id", "step_id", "row_id", "id")
+    }
     instructions = []
     for index, item in enumerate(value, start=1):
         if isinstance(item, dict):
@@ -9520,9 +9982,18 @@ def sanitize_instruction_list(value, existing_value=None):
         if not text:
             continue
 
+        item_identity = recipe_edit_row_identity(
+            item,
+            "instruction_id",
+            "step_id",
+            "row_id",
+            "id",
+        )
+        existing = existing_by_id.get(item_identity) if item_identity else None
         existing = (
-            existing_by_step.get(instruction_match_step_key(step_number))
+            existing
             or existing_by_text.get(instruction_match_text_key(text))
+            or existing_by_step.get(instruction_match_step_key(step_number))
             or {}
         )
         step_image_url = step_image_url or nullable_string(existing.get("step_image_url")) or ""
@@ -9532,17 +10003,22 @@ def sanitize_instruction_list(value, existing_value=None):
             or ""
         )
 
-        instructions.append({
-            "section": None,
+        record = {
+            **existing,
+            **(item if isinstance(item, dict) else {}),
+        }
+        record.update({
             "step_number": step_number,
             "instruction": text,
             "text": text,
-            "temperature": None,
-            "time": None,
-            "equipment_used": [],
             "step_image_url": step_image_url,
             "step_image_generated_at": step_image_generated_at,
         })
+        record.setdefault("section", None)
+        record.setdefault("temperature", None)
+        record.setdefault("time", None)
+        record.setdefault("equipment_used", [])
+        instructions.append(record)
 
     return sorted(instructions, key=lambda item: item["step_number"])
 
@@ -9616,12 +10092,19 @@ def normalize_step_number(value, fallback):
     return step_number
 
 
-def sanitize_nutrition(value):
+def sanitize_nutrition(value, existing_value=None):
     if not isinstance(value, list):
         return {}
 
     nutrition = {}
     other = []
+    row_metadata = {}
+    existing_rows = normalize_nutrition_rows(existing_value or {})
+    existing_by_key = {
+        str(item.get("key") or "").strip().lower().replace(" ", "_").replace("-", "_"): item
+        for item in existing_rows
+        if str(item.get("key") or "").strip()
+    }
 
     for item in value:
         if not isinstance(item, dict):
@@ -9634,13 +10117,27 @@ def sanitize_nutrition(value):
             continue
 
         normalized_key = key.lower().replace(" ", "_").replace("-", "_")
+        existing = existing_by_key.get(normalized_key, {})
+        metadata = {
+            key_name: metadata_value
+            for key_name, metadata_value in {**existing, **item}.items()
+            if key_name not in {"key", "value", "label", "name", "amount"}
+        }
         if normalized_key in NUTRITION_FIELDS:
             nutrition[normalized_key] = value_text
+            if metadata:
+                row_metadata[normalized_key] = metadata
         else:
-            other.append({"label": key, "value": value_text})
+            other.append({
+                **metadata,
+                "label": key,
+                "value": value_text,
+            })
 
     if other:
         nutrition["other"] = other
+    if row_metadata:
+        nutrition["_row_metadata"] = row_metadata
 
     return nutrition
 

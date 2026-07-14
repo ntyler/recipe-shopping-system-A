@@ -142,6 +142,7 @@ from PushShoppingList.services.recipe_edit_service import create_editable_restau
 from PushShoppingList.services.recipe_edit_service import get_editable_restaurant
 from PushShoppingList.services.recipe_edit_service import list_editable_restaurants
 from PushShoppingList.services.recipe_edit_service import update_editable_restaurant
+from PushShoppingList.services.recipe_edit_service import validate_recipe_save_payload
 from PushShoppingList.services.recipe_ai_quality_service import apply_recipe_ai_quality_safe_fixes
 from PushShoppingList.services.recipe_ai_quality_service import build_recipe_ai_quality_report
 from PushShoppingList.services.restaurant_details_fetch_service import load_pending_restaurant_scan
@@ -3914,18 +3915,61 @@ def api_recipe_route():
 
         return jsonify(load_editable_recipe(url))
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "invalid_request",
+            "message": "Request body must be a JSON object.",
+            "field_errors": {"request": "Valid JSON is required."},
+        }), 400
+
     original_url = str(data.get("original_url", "") or "").strip()
-
+    recipe_payload = data.get("recipe")
+    field_errors = {}
     if not original_url:
-        return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+        field_errors["original_url"] = "Recipe URL is required."
+    field_errors.update(validate_recipe_save_payload(recipe_payload))
+    if field_errors:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "validation_error",
+            "message": "Some fields need attention.",
+            "field_errors": field_errors,
+        }), 422
 
-    recipe_payload = data.get("recipe", {})
+    top_level_recipe_id = str(data.get("recipe_id") or "").strip()
+    nested_recipe_id = str(recipe_payload.get("recipe_id") or "").strip()
+    if top_level_recipe_id and nested_recipe_id and top_level_recipe_id != nested_recipe_id:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "recipe_conflict",
+            "message": "Recipe identity does not match the open recipe.",
+            "field_errors": {"recipe_id": "Recipe identifiers do not match."},
+        }), 409
+    if top_level_recipe_id and not nested_recipe_id:
+        recipe_payload = {**recipe_payload, "recipe_id": top_level_recipe_id}
+
     if _is_uploaded_recipe_url(original_url) and isinstance(recipe_payload, dict):
         recipe_payload = _recipe_with_default_serving_basis(recipe_payload)
 
-    result = save_editable_recipe(original_url, recipe_payload)
-    status = 200 if result.get("ok") else 400
+    try:
+        result = save_editable_recipe(original_url, recipe_payload, require_existing=True)
+    except Exception:
+        current_app.logger.exception("Recipe save failed.")
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "save_failed",
+            "message": "The recipe could not be saved.",
+            "field_errors": {},
+        }), 500
+
+    status = 200 if result.get("ok") else int(result.get("status_code") or 400)
+    result.pop("status_code", None)
 
     return jsonify(result), status
 

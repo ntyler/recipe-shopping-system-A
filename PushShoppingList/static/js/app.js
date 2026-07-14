@@ -22398,6 +22398,7 @@ let recipeCoverImageGenerationPending = false;
 let recipeEditDescriptionRequestPending = false;
 let recipeEditDescriptionProposal = "";
 let recipeEditDescriptionReviewTrigger = null;
+const recipeEditSavedFormSnapshots = new WeakMap();
 const RECIPE_EDITOR_CACHE_TTL_MS = 60 * 1000;
 const recipeEditorDataCache = new Map();
 const RECIPE_EDIT_MENU_SECTION_FIELD_NAME = "menu_section";
@@ -23601,7 +23602,23 @@ function openIngredientFoodReviewFromRecipeView(button, event = null) {
     return false;
 }
 
-function closeRecipeEditor() {
+function closeRecipeEditor(options = {}) {
+    const form = document.getElementById("recipeEditForm");
+    if (options.force !== true && form && form.dataset.saving === "true") {
+        setRecipeEditStatus("Please wait for the recipe save to finish.", true);
+        return false;
+    }
+    const hasUnsavedChanges = options.force !== true && recipeEditorHasUnsavedChanges(form);
+    if (
+        options.force !== true
+        && hasUnsavedChanges
+        && !window.confirm("You have unsaved recipe changes. Discard them?")
+    ) {
+        return false;
+    }
+    if (hasUnsavedChanges) {
+        rememberRecipeEditorSavedState(form);
+    }
     closeRecipeImageChangeActions();
     closeRecipeEditAiAnalysis({ restoreFocus: false });
     closeRecipeDescriptionReview({ restoreFocus: false });
@@ -23619,7 +23636,7 @@ function closeRecipeEditor() {
 
         if (returnUrl) {
             window.location.assign(returnUrl);
-            return;
+            return true;
         }
 
         if (window.history.length > 1) {
@@ -23627,13 +23644,22 @@ function closeRecipeEditor() {
         } else {
             window.location.href = "/";
         }
-        return;
+        return true;
     }
 
     restoreRecipeEditorReturnState();
+    return true;
 }
 
-function populateRecipeEditor(recipe, originalUrl) {
+function populateRecipeEditor(recipe, originalUrl, options = {}) {
+    const form = document.getElementById("recipeEditForm");
+    const preserveSavedState = options.preserveSavedState === true;
+    const previousOriginalSnapshot = recipeEditOriginalSnapshot;
+    const previousRecipeId = document.getElementById("recipeEditId")?.value || "";
+    const previousOriginalUrl = document.getElementById("recipeEditOriginalUrl")?.value || "";
+    const previousCategoryValues = form ? form.dataset.originalCategoryValues : undefined;
+    const previousCategorySources = form ? form.dataset.originalCategorySources : undefined;
+    const previousCategoryUserSet = form ? form.dataset.categoryUserSet : undefined;
     recipeEditAiQualityReport = null;
     const coverImage = normalizeRecipeEditorCoverImage(recipe.cover_image || {});
     const coverImagePrompt = String(recipe.cover_image_prompt || "").trim();
@@ -23670,6 +23696,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     });
 
     setValue("recipeEditOriginalUrl", originalUrl);
+    setValue("recipeEditId", recipe.recipe_id || recipe.id || "");
     setValue("recipeEditDisplayName", recipe.display_name || "");
     const recipeBreadcrumbName = document.getElementById("recipeEditBreadcrumbName");
     if (recipeBreadcrumbName) {
@@ -23759,6 +23786,31 @@ function populateRecipeEditor(recipe, originalUrl) {
     updateRecipeEditAiConfidenceCard(recipe);
     updateRecipeEditContextPanels();
     updateRecipeEditStickyOffsets();
+    if (preserveSavedState) {
+        recipeEditOriginalSnapshot = previousOriginalSnapshot;
+        setValue("recipeEditId", previousRecipeId);
+        setValue("recipeEditOriginalUrl", previousOriginalUrl);
+        if (form) {
+            if (previousCategoryValues === undefined) {
+                delete form.dataset.originalCategoryValues;
+            } else {
+                form.dataset.originalCategoryValues = previousCategoryValues;
+            }
+            if (previousCategorySources === undefined) {
+                delete form.dataset.originalCategorySources;
+            } else {
+                form.dataset.originalCategorySources = previousCategorySources;
+            }
+            if (previousCategoryUserSet === undefined) {
+                delete form.dataset.categoryUserSet;
+            } else {
+                form.dataset.categoryUserSet = previousCategoryUserSet;
+            }
+        }
+        updateRecipeEditorDirtyState(form);
+    } else {
+        rememberRecipeEditorSavedState(form);
+    }
     window.setTimeout(() => {
         applyKnownRecipeImageProgressItems();
         scheduleRecipeImageProgressPoll(750);
@@ -23782,6 +23834,7 @@ function replaceRecipeEditorIngredients(ingredients = []) {
         setRecipeIngredientsCollapsed(!recipeEditorStandalonePageIsActive());
     }
     updateRecipeIngredientRowIndexes();
+    updateRecipeEditorDirtyState();
     return true;
 }
 
@@ -23796,6 +23849,7 @@ function replaceRecipeEditorRecipeNotes(recipeNotes = []) {
     const notes = Array.isArray(recipeNotes) ? recipeNotes : [];
     notes.forEach(item => addRecipeNoteSectionRow(item));
     updateRecipeNotesEmptyState();
+    updateRecipeEditorDirtyState();
     return true;
 }
 
@@ -24260,6 +24314,16 @@ function mergeRecipeEditorPdfFieldsIntoOpenEditor(recipe = {}, options = {}) {
         updateInputValues: false,
         useCurrentForMissing: false,
     });
+
+    if (changed) {
+        rememberRecipeEditorFieldsAsSaved(document.getElementById("recipeEditForm"), [
+            "source_pdf_path",
+            "source_cloudflare_pdf_url",
+            "generated_pdf_path",
+            "generated_cloudflare_pdf_url",
+        ]);
+        updateRecipeEditorDirtyState();
+    }
 
     return changed;
 }
@@ -28749,6 +28813,8 @@ function setSharedRatingValue(source, value, options = {}) {
     updateSharedRatingControl(control, nextRating);
     if (control.dataset.ratingMode === "restaurant") {
         updateRecipeRestaurantEditState(control.closest("[data-restaurant-edit-form]"));
+    } else if (control.dataset.ratingMode === "recipe") {
+        updateRecipeEditorDirtyState(control.closest("#recipeEditForm"));
     }
     return false;
 }
@@ -30144,12 +30210,21 @@ function initRecipeEditContextPanels() {
     document.addEventListener("input", event => {
         if (event.target && event.target.closest && event.target.closest("#recipeEditForm")) {
             updateRecipeEditContextPanels();
+            updateRecipeEditorDirtyState(event.target.closest("#recipeEditForm"));
         }
     });
     document.addEventListener("change", event => {
         if (event.target && event.target.closest && event.target.closest("#recipeEditForm")) {
             updateRecipeEditContextPanels();
+            updateRecipeEditorDirtyState(event.target.closest("#recipeEditForm"));
         }
+    });
+    window.addEventListener("beforeunload", event => {
+        if (!recipeEditorHasUnsavedChanges()) {
+            return;
+        }
+        event.preventDefault();
+        event.returnValue = "";
     });
     document.addEventListener("keydown", event => {
         const backdrop = document.getElementById("recipeEditAiAnalysisBackdrop");
@@ -30191,11 +30266,25 @@ function previewRecipeFromEditor() {
     }
 
     if (recipeEditorStandalonePageIsActive()) {
+        const form = document.getElementById("recipeEditForm");
+        if (form && form.dataset.saving === "true") {
+            setRecipeEditStatus("Please wait for the recipe save to finish.", true);
+            return false;
+        }
+        const hasUnsavedChanges = recipeEditorHasUnsavedChanges(form);
+        if (hasUnsavedChanges && !window.confirm("You have unsaved recipe changes. Discard them?")) {
+            return false;
+        }
+        if (hasUnsavedChanges) {
+            rememberRecipeEditorSavedState(form);
+        }
         window.location.assign(recipeEditPageReturnUrlFromState() || "/#shoppingViewsSection");
         return false;
     }
 
-    closeRecipeEditor();
+    if (!closeRecipeEditor()) {
+        return false;
+    }
 
     Promise.resolve(
         typeof loadLazySection === "function"
@@ -30337,6 +30426,553 @@ function setRecipeEditStatus(message, isError = false) {
     status.textContent = message || "";
     status.classList.toggle("visible", Boolean(message));
     status.classList.toggle("error", Boolean(isError));
+    status.setAttribute("role", isError ? "alert" : "status");
+    status.setAttribute("aria-live", isError ? "assertive" : "polite");
+}
+
+function recipeEditorCurrentSaveSnapshot(form = document.getElementById("recipeEditForm")) {
+    if (!form) {
+        return "";
+    }
+
+    try {
+        return JSON.stringify({
+            payload: collectRecipeEditorPayload(),
+            category_values: collectRecipeEditorCategoryValues(),
+            category_sources: collectRecipeEditorCategorySources(),
+        });
+    } catch (err) {
+        return "";
+    }
+}
+
+function rememberRecipeEditorSavedState(form = document.getElementById("recipeEditForm")) {
+    if (!form) {
+        return;
+    }
+
+    const snapshot = recipeEditorCurrentSaveSnapshot(form);
+    if (snapshot) {
+        recipeEditSavedFormSnapshots.set(form, snapshot);
+    }
+    form.dataset.recipeEditDirty = "false";
+    form.querySelectorAll("[data-recipe-edit-save]").forEach(button => {
+        button.dataset.dirty = "false";
+        if (form.dataset.saving !== "true") {
+            button.disabled = true;
+        }
+    });
+}
+
+function recipeEditorSubmittedSnapshotWithIdentity(submittedSnapshot, identity = {}, options = {}) {
+    if (!submittedSnapshot) {
+        return "";
+    }
+    try {
+        const snapshot = JSON.parse(submittedSnapshot);
+        const savedSourceUrl = String(identity.source_url || "").trim();
+        const savedRecipeId = String(identity.recipe_id || "").trim();
+        if (snapshot.payload && savedSourceUrl) {
+            snapshot.payload.original_url = savedSourceUrl;
+        }
+        if (snapshot.payload && savedRecipeId) {
+            snapshot.payload.recipe_id = savedRecipeId;
+            if (snapshot.payload.recipe && typeof snapshot.payload.recipe === "object") {
+                snapshot.payload.recipe.recipe_id = savedRecipeId;
+            }
+        }
+        if (options.preserveCategoriesFrom) {
+            const previousSnapshot = JSON.parse(options.preserveCategoriesFrom);
+            snapshot.category_values = previousSnapshot.category_values || {};
+            snapshot.category_sources = previousSnapshot.category_sources || {};
+        }
+        return JSON.stringify(snapshot);
+    } catch (err) {
+        return submittedSnapshot;
+    }
+}
+
+function rememberRecipeEditorSubmittedState(form, submittedSnapshot, identity = {}, options = {}) {
+    if (!form) {
+        return "";
+    }
+    const savedSnapshot = recipeEditorSubmittedSnapshotWithIdentity(submittedSnapshot, identity, options);
+    if (savedSnapshot) {
+        recipeEditSavedFormSnapshots.set(form, savedSnapshot);
+    }
+    return savedSnapshot;
+}
+
+function rememberRecipeEditorSubmittedCategories(form, submittedSnapshot) {
+    if (!form || !submittedSnapshot) {
+        return;
+    }
+    try {
+        const snapshot = JSON.parse(submittedSnapshot);
+        form.dataset.originalCategoryValues = JSON.stringify(snapshot.category_values || {});
+        form.dataset.originalCategorySources = JSON.stringify(snapshot.category_sources || {});
+    } catch (err) {
+        // The saved baseline still protects the recipe fields if category metadata is unavailable.
+    }
+}
+
+function rememberRecipeEditorFieldsAsSaved(form, fieldNames = []) {
+    if (!form || !recipeEditSavedFormSnapshots.has(form)) {
+        return;
+    }
+    try {
+        const current = JSON.parse(recipeEditorCurrentSaveSnapshot(form));
+        const saved = JSON.parse(recipeEditSavedFormSnapshots.get(form));
+        const currentRecipe = current.payload && current.payload.recipe;
+        const savedRecipe = saved.payload && saved.payload.recipe;
+        if (!currentRecipe || !savedRecipe) {
+            return;
+        }
+        fieldNames.forEach(field => {
+            savedRecipe[field] = currentRecipe[field];
+        });
+        recipeEditSavedFormSnapshots.set(form, JSON.stringify(saved));
+    } catch (err) {
+        // A later successful load can refresh the saved snapshot if the form changed shape.
+    }
+}
+
+function rememberRecipeEditorCoverImageAsSaved(form = document.getElementById("recipeEditForm")) {
+    rememberRecipeEditorFieldsAsSaved(form, [
+        "cover_image",
+        "cover_image_prompt",
+    ]);
+    updateRecipeEditorDirtyState(form);
+}
+
+function updateRecipeEditorDirtyState(form = document.getElementById("recipeEditForm")) {
+    if (!form || !recipeEditSavedFormSnapshots.has(form)) {
+        return false;
+    }
+
+    const snapshot = recipeEditorCurrentSaveSnapshot(form);
+    const dirty = Boolean(snapshot && snapshot !== recipeEditSavedFormSnapshots.get(form));
+    form.dataset.recipeEditDirty = dirty ? "true" : "false";
+    form.querySelectorAll("[data-recipe-edit-save]").forEach(button => {
+        button.dataset.dirty = dirty ? "true" : "false";
+        if (form.dataset.saving !== "true") {
+            button.disabled = !dirty;
+        }
+    });
+    return dirty;
+}
+
+function recipeEditorHasUnsavedChanges(form = document.getElementById("recipeEditForm")) {
+    if (!form) {
+        return false;
+    }
+    return updateRecipeEditorDirtyState(form);
+}
+
+function clearRecipeEditorValidation(form = document.getElementById("recipeEditForm")) {
+    if (!form) {
+        return;
+    }
+
+    form.querySelectorAll("[data-recipe-edit-validation-invalid]").forEach(control => {
+        control.removeAttribute("data-recipe-edit-validation-invalid");
+        if (!control.validationMessage) {
+            control.removeAttribute("aria-invalid");
+        }
+    });
+    form.querySelectorAll(".recipe-edit-has-validation-error").forEach(container => {
+        container.classList.remove("recipe-edit-has-validation-error");
+    });
+
+    const summary = document.getElementById("recipeEditValidationSummary");
+    const list = summary ? summary.querySelector("[data-recipe-edit-validation-errors]") : null;
+    if (list) {
+        list.replaceChildren();
+    }
+    if (summary) {
+        summary.hidden = true;
+    }
+}
+
+function recipeEditorValidationContainer(control) {
+    return control && control.closest
+        ? control.closest("label, .recipe-edit-ingredient-row, .recipe-edit-instruction-row, .recipe-edit-equipment-row, .recipe-edit-nutrition-row, .recipe-edit-note-section-row, .recipe-edit-reflection-note-row")
+        : null;
+}
+
+function addRecipeEditorValidationError(errors, message, control = null, field = "") {
+    if (control) {
+        control.setAttribute("aria-invalid", "true");
+        control.dataset.recipeEditValidationInvalid = "true";
+        const container = recipeEditorValidationContainer(control);
+        if (container) {
+            container.classList.add("recipe-edit-has-validation-error");
+        }
+    }
+    errors.push({ message, control, field });
+}
+
+function recipeEditorNumericExpressionIsMalformed(value, options = {}) {
+    let text = String(value || "").trim();
+    if (!text || !/\d/.test(text)) {
+        return false;
+    }
+    if (options.allowUnitSuffix) {
+        text = text.replace(/\s*(?:[A-Za-z%µμ].*)$/, "").trim();
+    } else if (/[A-Za-z]/.test(text)) {
+        return false;
+    }
+    if (!text) {
+        return false;
+    }
+    if (/(?:\.\.|,,|\/\/|--+)/.test(text)) {
+        return true;
+    }
+    if (!/^[\d\s./+\-–—]+$/.test(text)) {
+        return false;
+    }
+
+    const numberPart = "(?:\\d+(?:\\.\\d+)?|\\.\\d+|\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+)";
+    const expression = new RegExp(`^${numberPart}(?:\\s*(?:-|–|—)\\s*${numberPart})?$`);
+    if (!expression.test(text)) {
+        return true;
+    }
+
+    return text.split(/\s*(?:-|–|—)\s*/).some(part => {
+        const fraction = part.match(/(?:^|\s)(\d+)\/(\d+)$/);
+        return Boolean(fraction && Number(fraction[2]) === 0);
+    });
+}
+
+function recipeEditorControlForFieldPath(path, form = document.getElementById("recipeEditForm")) {
+    if (!form) {
+        return null;
+    }
+
+    const normalized = String(path || "").replace(/\[(\d+)\]/g, ".$1");
+    const parts = normalized.split(".").filter(Boolean);
+    const topLevelIds = {
+        display_name: "recipeEditDisplayName",
+        recipe_title: "recipeEditTitleInput",
+        description: "recipeEditDescription",
+        source_url: "recipeEditSourceUrl",
+        servings: "recipeEditServings",
+        total_time: "recipeEditTotalTime",
+        prep_time: "recipeEditPrepTime",
+        inactive_time: "recipeEditInactiveTime",
+        cook_time: "recipeEditCookTime",
+    };
+    if (parts.length === 1 && topLevelIds[parts[0]]) {
+        return document.getElementById(topLevelIds[parts[0]]);
+    }
+
+    const collectionSelectors = {
+        ingredients: ["#recipeEditIngredients .recipe-edit-ingredient-row", {
+            amount: "quantity",
+            name: "ingredient",
+        }],
+        instructions: ["#recipeEditInstructions .recipe-edit-instruction-row", {
+            instruction: "text",
+        }],
+        equipment: ["#recipeEditEquipment .recipe-edit-equipment-row", {
+            equipment: "text",
+        }],
+        nutrition: ["#recipeEditNutrition .recipe-edit-nutrition-row", {}],
+    };
+    const config = collectionSelectors[parts[0]];
+    const index = Number.parseInt(parts[1], 10);
+    if (!config || !Number.isInteger(index)) {
+        return null;
+    }
+    const row = document.querySelectorAll(config[0])[index];
+    const field = config[1][parts[2]] || parts[2] || "";
+    return row ? row.querySelector(`[data-field="${field}"]`) : null;
+}
+
+function showRecipeEditorValidationErrors(errors, options = {}) {
+    const summary = document.getElementById("recipeEditValidationSummary");
+    const list = summary ? summary.querySelector("[data-recipe-edit-validation-errors]") : null;
+    const safeErrors = Array.isArray(errors) ? errors.filter(error => error && error.message) : [];
+    if (!summary || !list || !safeErrors.length) {
+        return;
+    }
+
+    list.replaceChildren(...safeErrors.map(error => {
+        const item = document.createElement("li");
+        item.textContent = error.message;
+        return item;
+    }));
+    summary.hidden = false;
+
+    const firstControl = safeErrors.map(error => error.control).find(control => {
+        return control && !control.hidden && !control.disabled && typeof control.focus === "function";
+    });
+    if (options.focus !== false) {
+        if (firstControl) {
+            firstControl.scrollIntoView({ behavior: "smooth", block: "center" });
+            firstControl.focus({ preventScroll: true });
+        } else {
+            summary.scrollIntoView({ behavior: "smooth", block: "start" });
+            summary.focus({ preventScroll: true });
+        }
+    }
+}
+
+function validateRecipeEditor(form, payload) {
+    clearRecipeEditorValidation(form);
+    const errors = [];
+    const recipe = payload && payload.recipe && typeof payload.recipe === "object" ? payload.recipe : {};
+    const title = document.getElementById("recipeEditTitleInput");
+    if (!String(recipe.recipe_title || "").trim()) {
+        addRecipeEditorValidationError(errors, "Enter a recipe title.", title, "recipe_title");
+    }
+
+    if (!String(payload && payload.original_url || "").trim()) {
+        addRecipeEditorValidationError(
+            errors,
+            "The recipe identifier is missing. Reopen the recipe before saving.",
+            document.getElementById("recipeEditSourceUrl"),
+            "original_url",
+        );
+    }
+
+    const ingredientRows = recipeEditIngredientRows();
+    let ingredientCount = 0;
+    ingredientRows.forEach((row, index) => {
+        const name = recipeIngredientDirectField(row, "ingredient");
+        const originalText = recipeIngredientDirectField(row, "original_text");
+        const quantity = recipeIngredientDirectField(row, "quantity");
+        const unit = recipeIngredientDirectField(row, "unit");
+        const meaningful = [name, originalText, quantity, unit].some(control => String(control ? control.value : "").trim());
+        const hasName = Boolean(String(name ? name.value : "").trim() || String(originalText ? originalText.value : "").trim());
+        if (hasName) {
+            ingredientCount += 1;
+        } else if (meaningful) {
+            addRecipeEditorValidationError(errors, `Ingredient ${index + 1} needs a name.`, name, `ingredients.${index}.ingredient`);
+        }
+        if (recipeEditorNumericExpressionIsMalformed(quantity ? quantity.value : "")) {
+            addRecipeEditorValidationError(errors, `Ingredient ${index + 1} has an invalid amount.`, quantity, `ingredients.${index}.quantity`);
+        }
+        if (unit && unit.validationMessage) {
+            addRecipeEditorValidationError(errors, `Ingredient ${index + 1}: ${unit.validationMessage}`, unit, `ingredients.${index}.unit`);
+        }
+
+        const optionsMenu = recipeIngredientOptionsMenuForRow(row);
+        const scope = optionsMenu || row;
+        scope.querySelectorAll("[data-substitution-option-row]").forEach((optionRow, optionIndex) => {
+            const optionName = recipeIngredientDirectField(optionRow, "ingredient");
+            const optionQuantity = recipeIngredientDirectField(optionRow, "quantity");
+            const optionUnit = recipeIngredientDirectField(optionRow, "unit");
+            const hasOptionValues = [optionName, optionQuantity, optionUnit].some(control => String(control ? control.value : "").trim());
+            if (hasOptionValues && !String(optionName ? optionName.value : "").trim()) {
+                addRecipeEditorValidationError(errors, `Substitution ${optionIndex + 1} for ingredient ${index + 1} needs a name.`, optionName);
+            }
+            if (recipeEditorNumericExpressionIsMalformed(optionQuantity ? optionQuantity.value : "")) {
+                addRecipeEditorValidationError(errors, `Substitution ${optionIndex + 1} for ingredient ${index + 1} has an invalid amount.`, optionQuantity);
+            }
+            if (optionUnit && optionUnit.validationMessage) {
+                addRecipeEditorValidationError(errors, `Substitution ${optionIndex + 1} for ingredient ${index + 1}: ${optionUnit.validationMessage}`, optionUnit);
+            }
+        });
+    });
+    if (!ingredientCount) {
+        const firstIngredient = ingredientRows[0] && recipeIngredientDirectField(ingredientRows[0], "ingredient");
+        addRecipeEditorValidationError(errors, "Add at least one ingredient.", firstIngredient, "ingredients");
+    }
+
+    const instructionRows = [...document.querySelectorAll("#recipeEditInstructions .recipe-edit-instruction-row")];
+    let populatedInstructionCount = 0;
+    let partialInstructionCount = 0;
+    instructionRows.forEach((row, index) => {
+        const textControl = row.querySelector('[data-field="text"]');
+        const step = row.querySelector('[data-field="step_number"]');
+        const text = String(textControl ? textControl.value : "").trim();
+        const stepText = String(step ? step.value : "").trim();
+        const hasRowMetadata = [
+            "id",
+            "instruction_id",
+            "step_id",
+            "row_id",
+            "step_image_url",
+            "step_image_generated_at",
+            "step_image_prompt",
+        ].some(field => {
+            const control = row.querySelector(`[data-field="${field}"]`);
+            return Boolean(String(control ? control.value : "").trim());
+        });
+        const meaningful = Boolean(stepText || hasRowMetadata);
+
+        if (!text) {
+            if (meaningful) {
+                partialInstructionCount += 1;
+                addRecipeEditorValidationError(
+                    errors,
+                    `Instruction ${index + 1} needs instruction text.`,
+                    textControl,
+                    `instructions.${index}.instruction`,
+                );
+            }
+            return;
+        }
+
+        populatedInstructionCount += 1;
+        const stepNumber = Number(stepText);
+        if (!/^\d+$/.test(stepText) || !Number.isInteger(stepNumber) || stepNumber <= 0) {
+            addRecipeEditorValidationError(
+                errors,
+                `Instruction ${index + 1} has an invalid step number.`,
+                step,
+                `instructions.${index}.step_number`,
+            );
+        }
+    });
+    if (!populatedInstructionCount && !partialInstructionCount) {
+        addRecipeEditorValidationError(
+            errors,
+            "Add at least one instruction step.",
+            instructionRows[0] ? instructionRows[0].querySelector('[data-field="text"]') : null,
+            "instructions",
+        );
+    }
+
+    document.querySelectorAll("#recipeEditEquipment .recipe-edit-equipment-row").forEach((row, index) => {
+        const textControl = row.querySelector('[data-field="text"]');
+        const text = String(textControl ? textControl.value : "").trim();
+        const hasRowMetadata = [
+            "id",
+            "equipment_id",
+            "equipment_row_id",
+            "row_id",
+            "equipment_image_url",
+            "equipment_image_generated_at",
+            "equipment_image_prompt",
+        ].some(field => {
+            const control = row.querySelector(`[data-field="${field}"]`);
+            return Boolean(String(control ? control.value : "").trim());
+        });
+        if (!text && hasRowMetadata) {
+            addRecipeEditorValidationError(
+                errors,
+                `Equipment row ${index + 1} needs an equipment name.`,
+                textControl,
+                `equipment.${index}.equipment`,
+            );
+        }
+    });
+
+    document.querySelectorAll("#recipeEditNutrition .recipe-edit-nutrition-row").forEach((row, index) => {
+        const key = row.querySelector('[data-field="key"]');
+        const value = row.querySelector('[data-field="value"]');
+        const keyText = String(key ? key.value : "").trim();
+        const valueText = String(value ? value.value : "").trim();
+        if (keyText && !valueText) {
+            addRecipeEditorValidationError(errors, `Nutrition row ${index + 1} needs a value.`, value, `nutrition.${index}.value`);
+        } else if (!keyText && valueText) {
+            addRecipeEditorValidationError(errors, `Nutrition row ${index + 1} needs a label.`, key, `nutrition.${index}.key`);
+        } else if (valueText && recipeEditorNumericExpressionIsMalformed(valueText, { allowUnitSuffix: true })) {
+            addRecipeEditorValidationError(errors, `Nutrition row ${index + 1} has an invalid numeric value.`, value, `nutrition.${index}.value`);
+        }
+    });
+
+    if (errors.length) {
+        showRecipeEditorValidationErrors(errors);
+    }
+    return { valid: errors.length === 0, errors };
+}
+
+function applyRecipeEditorServerFieldErrors(fieldErrors = {}) {
+    const errors = [];
+    Object.entries(fieldErrors && typeof fieldErrors === "object" ? fieldErrors : {}).forEach(([field, message]) => {
+        const control = recipeEditorControlForFieldPath(field);
+        addRecipeEditorValidationError(errors, String(message || "This field needs attention."), control, field);
+    });
+    if (errors.length) {
+        showRecipeEditorValidationErrors(errors);
+    }
+    return errors;
+}
+
+function setRecipeEditorSavingState(form, saving) {
+    if (!form) {
+        return;
+    }
+    form.setAttribute("aria-busy", saving ? "true" : "false");
+    form.querySelectorAll("[data-recipe-edit-save]").forEach(button => {
+        button.disabled = saving ? true : form.dataset.recipeEditDirty !== "true";
+        button.setAttribute("aria-busy", saving ? "true" : "false");
+        const label = button.querySelector("[data-recipe-edit-save-label]");
+        const spinner = button.querySelector("[data-recipe-edit-save-spinner]");
+        if (label) {
+            label.textContent = saving ? "Saving…" : "Save Recipe";
+        }
+        if (spinner) {
+            spinner.hidden = !saving;
+        }
+    });
+}
+
+async function recipeEditorJsonResponse(response) {
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    const responseText = await response.text();
+    if (!responseText) {
+        return {};
+    }
+    if (!contentType.includes("json")) {
+        if (!response.ok) {
+            return { ok: false, error: `The server returned an unexpected ${response.status} response.` };
+        }
+        throw new Error("The server returned an invalid response.");
+    }
+    try {
+        return JSON.parse(responseText);
+    } catch (err) {
+        throw new Error("The server returned an invalid response.");
+    }
+}
+
+function recipeEditorSaveDebug(eventName, details = {}) {
+    const enabled = typeof window !== "undefined"
+        && (
+            window.RECIPE_EDITOR_SAVE_DEBUG === true
+            || document.documentElement.dataset.recipeSaveDebug === "true"
+        );
+    if (!enabled) {
+        return;
+    }
+    console.debug(`[Recipe save] ${eventName}`, details);
+}
+
+function updateRecipeEditorSavedIdentity(identity = {}, submittedPayload = {}, options = {}) {
+    const savedSourceUrl = String(identity.source_url || "").trim();
+    const savedRecipeId = String(identity.recipe_id || "").trim();
+    const updatedAt = String(identity.updated_at || "").trim();
+    const form = document.getElementById("recipeEditForm");
+
+    if (savedSourceUrl) {
+        setValue("recipeEditOriginalUrl", savedSourceUrl);
+        if (options.updateSourceField !== false) {
+            setRecipeEditorSourceUrlField({ source_url: savedSourceUrl }, savedSourceUrl, {
+                silent: true,
+                skipEmpty: true,
+            });
+        }
+        if (recipeEditorStandalonePageIsActive()) {
+            document.body.dataset.recipeEditUrl = savedSourceUrl;
+            window.history.replaceState(window.history.state, "", recipeEditPageUrl(savedSourceUrl));
+        }
+    }
+    if (savedRecipeId) {
+        setValue("recipeEditId", savedRecipeId);
+    }
+    if (form && updatedAt) {
+        form.dataset.recipeUpdatedAt = updatedAt;
+    }
+
+    return {
+        recipe_id: savedRecipeId || String(submittedPayload.recipe_id || "").trim(),
+        source_url: savedSourceUrl || String(submittedPayload.original_url || "").trim(),
+        updated_at: updatedAt,
+    };
 }
 
 function normalizeRecipeEditorCoverImage(value = {}) {
@@ -30527,11 +31163,13 @@ function collectRecipeEditorCoverImage() {
     const altInput = document.getElementById("recipeEditCoverAlt");
     const mimeTypeInput = document.getElementById("recipeEditCoverMimeType");
     const sourceInput = document.getElementById("recipeEditCoverSource");
+    const promptText = document.getElementById("recipeEditCoverPromptText");
     const path = String(pathInput ? pathInput.value : "").trim();
     const url = String(urlInput ? urlInput.value : "").trim();
     const alt = String(altInput ? altInput.value : "").trim();
     const mimeType = String(mimeTypeInput ? mimeTypeInput.value : "").trim();
     const source = String(sourceInput ? sourceInput.value : "").trim();
+    const prompt = recipeEditorPersistableText(promptText ? promptText.textContent : "");
     const coverImage = {};
 
     if (path) {
@@ -30554,7 +31192,12 @@ function collectRecipeEditorCoverImage() {
         coverImage.source = source;
     }
 
-    return coverImage.path || coverImage.url ? coverImage : {};
+    if (prompt) {
+        coverImage.prompt = prompt;
+        coverImage.image_prompt = prompt;
+    }
+
+    return coverImage.path || coverImage.url || coverImage.prompt ? coverImage : {};
 }
 
 function normalizeRecipeCoverImageSnapshot(value = {}) {
@@ -30883,6 +31526,7 @@ async function uploadRecipeCoverImage(input) {
         }
 
         setRecipeEditorCoverImage(coverImage, fallbackAlt);
+        rememberRecipeEditorCoverImageAsSaved();
         setRecipeEditStatus("Title image updated. Save Recipe to keep any other edits.");
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe title image updated.");
     } catch (err) {
@@ -30999,6 +31643,7 @@ async function generateRecipeCoverImage(button) {
         }
 
         setRecipeEditorCoverImage(coverImage, fallbackAlt);
+        rememberRecipeEditorCoverImageAsSaved();
         setRecipeEditStatus("Title image generated. Save Recipe to keep any other edits.");
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe title image generated.");
     } catch (err) {
@@ -31070,6 +31715,7 @@ async function removeRecipeCoverImage(button) {
         }
 
         setRecipeEditorCoverImage({});
+        rememberRecipeEditorCoverImageAsSaved();
         if (data.recipe && typeof data.recipe === "object") {
             recipeEditOriginalSnapshot = normalizeRecipeEditorSnapshot(data.recipe);
         } else if (recipeEditOriginalSnapshot) {
@@ -33005,6 +33651,9 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
                     </div>
                 </div>
             </div>
+            <input type="hidden" data-field="id" value="${escapeAttribute(option.id || "")}">
+            <input type="hidden" data-field="substitution_id" value="${escapeAttribute(option.substitution_id || "")}">
+            <input type="hidden" data-field="ingredient_id" value="${escapeAttribute(option.ingredient_id || option.master_ingredient_id || "")}">
             <input type="hidden" data-field="section" value="${escapeAttribute(option.section || "")}">
             <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
             <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
@@ -33318,6 +33967,8 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                 </div>
             </div>
         </div>
+        <input type="hidden" data-field="id" value="${escapeAttribute(item.id || "")}">
+        <input type="hidden" data-field="recipe_ingredient_id" value="${escapeAttribute(item.recipe_ingredient_id || "")}">
         <input type="hidden" data-field="ingredient_id" value="${escapeAttribute(item.ingredient_id || item.master_ingredient_id || "")}">
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
@@ -33364,6 +34015,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     } else {
         updateRecipeIngredientRowCollapseToggle(row);
     }
+    updateRecipeEditorDirtyState();
     return row;
 }
 
@@ -33407,8 +34059,10 @@ function bindRecipeIngredientSubstitutionRow(optionRow) {
     optionRow.querySelectorAll("[data-field]").forEach(input => {
         const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => {
+            const parentRow = recipeIngredientParentRowFromControl(optionRow);
             updateRecipeIngredientSubstitutionRowSummary(optionRow);
-            updateRecipeIngredientSummary(recipeIngredientParentRowFromControl(optionRow));
+            updateRecipeIngredientSummary(parentRow);
+            updateRecipeEditorDirtyState(parentRow ? parentRow.closest("#recipeEditForm") : null);
         });
     });
 }
@@ -33532,6 +34186,7 @@ function addRecipeIngredientSubstitutionRow(button) {
         field.focus({ preventScroll: true });
     }
 
+    updateRecipeEditorDirtyState();
     return false;
 }
 
@@ -33551,6 +34206,7 @@ function removeRecipeIngredientSubstitutionRow(button) {
     } else {
         positionRecipeEditPopupMenu(optionsMenu, optionsMenu.recipeEditAnchorButton);
     }
+    updateRecipeEditorDirtyState();
     return false;
 }
 
@@ -34205,6 +34861,9 @@ function updateRecipeEditRowOrder(row) {
             updateRecipeViewOrderNumbers(list);
             saveRecipeViewOrder(list);
         }
+    }
+    if (row.closest("#recipeEditForm")) {
+        updateRecipeEditorDirtyState(row.closest("#recipeEditForm"));
     }
 }
 
@@ -35769,6 +36428,10 @@ function addRecipeEquipmentRow(value = "", options = {}) {
             <input type="hidden" data-field="equipment_image_url" value="${escapeAttribute(equipmentImageUrl)}">
             <input type="hidden" data-field="equipment_image_generated_at" value="${escapeAttribute(equipmentImageGeneratedAt)}">
             <input type="hidden" data-field="equipment_image_prompt" value="${escapeAttribute(equipmentImagePrompt)}">
+            <input type="hidden" data-field="id" value="${escapeAttribute(typeof value === "object" && value !== null ? value.id || "" : "")}">
+            <input type="hidden" data-field="equipment_id" value="${escapeAttribute(typeof value === "object" && value !== null ? value.equipment_id || "" : "")}">
+            <input type="hidden" data-field="equipment_row_id" value="${escapeAttribute(typeof value === "object" && value !== null ? value.equipment_row_id || "" : "")}">
+            <input type="hidden" data-field="row_id" value="${escapeAttribute(typeof value === "object" && value !== null ? value.row_id || "" : "")}">
         </div>
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
@@ -35851,6 +36514,7 @@ function addRecipeEquipmentRow(value = "", options = {}) {
     } else {
         updateRecipeEquipmentRowCollapseToggle(row);
     }
+    updateRecipeEditorDirtyState();
     return row;
 }
 
@@ -35976,6 +36640,11 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
             </div>
             <input type="hidden" data-field="step_image_url" value="${escapeAttribute(stepImageUrl)}">
             <input type="hidden" data-field="step_image_generated_at" value="${escapeAttribute(stepImageGeneratedAt)}">
+            <input type="hidden" data-field="step_image_prompt" value="${escapeAttribute(typeof value === "object" && value !== null ? value.step_image_prompt || value.image_prompt || "" : "")}">
+            <input type="hidden" data-field="id" value="${escapeAttribute(typeof value === "object" && value !== null ? value.id || "" : "")}">
+            <input type="hidden" data-field="instruction_id" value="${escapeAttribute(typeof value === "object" && value !== null ? value.instruction_id || "" : "")}">
+            <input type="hidden" data-field="step_id" value="${escapeAttribute(typeof value === "object" && value !== null ? value.step_id || "" : "")}">
+            <input type="hidden" data-field="row_id" value="${escapeAttribute(typeof value === "object" && value !== null ? value.row_id || "" : "")}">
         </div>
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
@@ -36034,6 +36703,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
     updateRecipeInstructionStepNumbers();
     initDeferredImages(row);
     refreshRecipeImageProviderSelectors(row);
+    updateRecipeEditorDirtyState();
     return row;
 }
 
@@ -36218,10 +36888,13 @@ function addRecipeNutritionRow(item = {}) {
                 <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete nutrition row</button>
             </div>
         </div>
+        <input type="hidden" data-field="id" value="${escapeAttribute(item.id || "")}">
+        <input type="hidden" data-field="nutrition_id" value="${escapeAttribute(item.nutrition_id || "")}">
     `;
     wrap.appendChild(row);
     organizeRecipeEditCompactRowActions(row, '[data-field="key"]', "nutrition row");
     bindRecipeEditDragAndDrop(row);
+    updateRecipeEditorDirtyState();
     return row;
 }
 
@@ -36404,11 +37077,14 @@ function addRecipeNoteSectionRow(section = {}) {
                 <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete note section</button>
             </div>
         </div>
+        <input type="hidden" data-field="id" value="${escapeAttribute(section.id || "")}">
+        <input type="hidden" data-field="note_section_id" value="${escapeAttribute(section.note_section_id || "")}">
     `;
     wrap.appendChild(row);
     bindRecipeEditDragAndDrop(row);
     updateRecipeNoteSectionCount(row);
     updateRecipeNotesEmptyState();
+    updateRecipeEditorDirtyState();
     return row;
 }
 
@@ -36420,7 +37096,13 @@ function collectRecipeNoteSections() {
             const heading = String(headingField ? headingField.value : "").trim();
             const items = normalizeRecipeNoteItemsForEditor(itemsField ? itemsField.value : "");
 
-            return { heading, items };
+            const values = fieldValuesFromRow(row);
+            return {
+                id: values.id || "",
+                note_section_id: values.note_section_id || "",
+                heading,
+                items,
+            };
         })
         .filter(section => section.heading || section.items.length);
 }
@@ -36620,7 +37302,7 @@ function addRecipeReflectionNoteRow(note = {}) {
                     onclick="return askRecipeNoteFeedback(this)">
                 Ask ChatGPT
             </button>
-            <div class="recipe-edit-row-menu-wrap">
+        <div class="recipe-edit-row-menu-wrap">
                 <button type="button"
                         class="recipe-edit-row-menu-btn"
                         aria-label="Note actions"
@@ -36637,9 +37319,11 @@ function addRecipeReflectionNoteRow(note = {}) {
                 </div>
             </div>
         </div>
+        <input type="hidden" data-field="id" value="${escapeAttribute(note.id || "")}">
     `;
     wrap.appendChild(row);
     bindRecipeEditDragAndDrop(row);
+    updateRecipeEditorDirtyState();
     return row;
 }
 
@@ -36650,6 +37334,7 @@ function collectRecipeReflectionNotes() {
             const text = String(item.text || "").trim();
 
             return {
+                id: String(item.id || "").trim(),
                 note_id: recipeReflectionNoteId(item.note_id),
                 text,
                 created_at: String(item.created_at || "").trim() || recipeReflectionTimestamp(),
@@ -36763,6 +37448,7 @@ function removeRecipeEditRow(button) {
             updateRecipeNotesEmptyState();
         }
         updateRecipeEditContextPanels();
+        updateRecipeEditorDirtyState();
     }
 
     return false;
@@ -36845,33 +37531,56 @@ async function saveRecipeEditor(event) {
     }
 
     const form = document.getElementById("recipeEditForm");
-    const saveButton = form ? form.querySelector(".recipe-edit-save") : null;
-
     if (!form) {
         return false;
     }
 
-    const payload = collectRecipeEditorPayload();
-    const pdfSaveChoice = await recipePdfSaveChoiceForPayload(payload.recipe);
+    recipeEditorSaveDebug("submit", {
+        recipe_id: document.getElementById("recipeEditId")?.value || "",
+        route: "/api/recipe",
+    });
 
-    if (pdfSaveChoice === "cancel") {
-        setRecipeEditStatus("Save canceled.");
+    if (form.dataset.saving === "true") {
+        recipeEditorSaveDebug("duplicate prevented");
+        setRecipeEditStatus("A recipe save is already in progress.");
         return false;
     }
 
-    const shouldCreatePdf = pdfSaveChoice === "create";
-    const pdfCreationReason = shouldCreatePdf ? "missing_pdf" : "";
+    form.dataset.saving = "true";
+    setRecipeEditorSavingState(form, true);
+    setRecipeEditStatus("Validating recipe...");
 
-    if (saveButton) {
-        saveButton.disabled = true;
-        const saveLabel = saveButton.querySelector("span");
-        if (saveLabel) saveLabel.textContent = "Saving...";
-    }
-
-    setRecipeEditStatus("Saving recipe...");
+    let payload = null;
+    let submittedSnapshot = "";
+    let coreSaveSucceeded = false;
+    let followUpStage = "saving the recipe";
+    let savedIdentity = null;
+    let savedIdentityApplied = false;
+    let savedBaselineSnapshot = "";
+    const previousSavedSnapshot = recipeEditSavedFormSnapshots.get(form) || "";
 
     try {
+        payload = collectRecipeEditorPayload();
+        const validation = validateRecipeEditor(form, payload);
+        recipeEditorSaveDebug("validation", {
+            valid: validation.valid,
+            error_count: validation.errors.length,
+        });
+        if (!validation.valid) {
+            setRecipeEditStatus("Some fields need attention. Review the highlighted fields and try again.", true);
+            return false;
+        }
+
+        submittedSnapshot = recipeEditorCurrentSaveSnapshot(form);
         const shouldSaveCategories = recipeEditCategoryValuesChanged();
+        const pdfSaveChoice = await recipePdfSaveChoiceForPayload(payload.recipe);
+        if (pdfSaveChoice === "cancel") {
+            setRecipeEditStatus("Save canceled. Your changes are still on this page.");
+            return false;
+        }
+
+        const shouldCreatePdf = pdfSaveChoice === "create";
+        const pdfCreationReason = shouldCreatePdf ? "missing_pdf" : "";
         const progressItems = buildRecipeSaveProgressItems(payload.recipe);
         let refreshProgressIndex = progressItems.length - 1;
         let categoryProgressIndex = null;
@@ -36896,23 +37605,72 @@ async function saveRecipeEditor(event) {
         }
         showRecipeSaveProgressOverlay(progressItems);
         updateRecipeSaveProgressItem(0, "running", "Saving...");
+        setRecipeEditStatus("Saving recipe...");
 
+        followUpStage = "saving the recipe";
+        recipeEditorSaveDebug("request", {
+            route: "/api/recipe",
+            method: "POST",
+            recipe_id: payload.recipe_id || "",
+            ingredient_count: payload.recipe.ingredients.length,
+            instruction_count: payload.recipe.instructions.length,
+            equipment_count: payload.recipe.equipment.length,
+            nutrition_count: payload.recipe.nutrition.length,
+        });
         const response = await fetch("/api/recipe", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
+            credentials: "same-origin",
             body: JSON.stringify(payload),
         });
-        const data = await response.json();
+        const data = await recipeEditorJsonResponse(response);
+        recipeEditorSaveDebug("response", {
+            status: response.status,
+            ok: response.ok,
+            body: data,
+        });
 
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to save recipe.");
+        if (!response.ok || !(data.ok || data.success)) {
+            const fieldErrors = data && data.field_errors && typeof data.field_errors === "object"
+                ? data.field_errors
+                : {};
+            if (Object.keys(fieldErrors).length) {
+                applyRecipeEditorServerFieldErrors(fieldErrors);
+            }
+            const error = new Error(
+                (data && (data.message || data.error))
+                || `The recipe could not be saved (${response.status}).`
+            );
+            error.fieldErrors = fieldErrors;
+            throw error;
         }
+        coreSaveSucceeded = true;
+        const responseRecipe = data.recipe && typeof data.recipe === "object" ? data.recipe : {};
+        const savedRecipeId = String(data.recipe_id || responseRecipe.recipe_id || payload.recipe_id || "").trim();
+        const savedSourceUrl = String(
+            responseRecipe.source_url
+            || payload.recipe.source_url
+            || payload.original_url
+        ).trim();
+        savedIdentity = {
+            recipe_id: savedRecipeId,
+            source_url: savedSourceUrl,
+            updated_at: data.updated_at || responseRecipe.updated_at || "",
+        };
+        savedBaselineSnapshot = rememberRecipeEditorSubmittedState(form, submittedSnapshot, savedIdentity, {
+            preserveCategoriesFrom: previousSavedSnapshot,
+        });
+        updateRecipeEditorSavedIdentity(savedIdentity, payload, { updateSourceField: false });
+        savedIdentityApplied = true;
         invalidateRecipeEditorCache(payload.original_url);
+        if (savedSourceUrl && savedSourceUrl !== payload.original_url) {
+            invalidateRecipeEditorCache(savedSourceUrl);
+        }
         if (data.recipe) {
-            rememberRecipeEditorData(data.recipe.source_url || payload.recipe.source_url || payload.original_url, {
-                recipe: data.recipe,
+            rememberRecipeEditorData(savedSourceUrl, {
+                recipe: responseRecipe,
                 store_sections: recipeEditStoreSections,
                 food_rules: recipeEditFoodRules,
             });
@@ -36921,12 +37679,13 @@ async function saveRecipeEditor(event) {
         updateRecipeSaveProgressItem(0, "done", "Saved");
         updateRecipeSaveProgressItem(1, "done", "Updated");
 
-        let recipeForEditor = data.recipe || null;
-        const sourceUrl = (
-            recipeForEditor && recipeForEditor.source_url
-                ? recipeForEditor.source_url
-                : payload.recipe.source_url || payload.original_url
-        );
+        let recipeForEditor = data.recipe || {
+            ...payload.recipe,
+            recipe_id: savedRecipeId,
+            source_url: savedSourceUrl,
+            updated_at: data.updated_at || "",
+        };
+        const sourceUrl = savedSourceUrl;
         let createdPdfPublicUrl = "";
         let createdPdfUploadError = "";
 
@@ -36935,6 +37694,7 @@ async function saveRecipeEditor(event) {
         }
 
         if (shouldSaveCategories) {
+            followUpStage = "saving cookbook categories";
             updateRecipeSaveProgressItem(categoryProgressIndex, "running", "Saving...");
             setRecipeEditStatus("Saving recipe categories...");
             const categoryResult = await saveRecipeEditorCategories(sourceUrl, payload.original_url);
@@ -36944,10 +37704,13 @@ async function saveRecipeEditor(event) {
                 updateRecipeSaveProgressItem(categoryProgressIndex, "done", "No cookbook");
             } else {
                 updateRecipeSaveProgressItem(categoryProgressIndex, "done", "Saved");
+                savedBaselineSnapshot = rememberRecipeEditorSubmittedState(form, submittedSnapshot, savedIdentity);
+                rememberRecipeEditorSubmittedCategories(form, submittedSnapshot);
             }
         }
 
         if (shouldCreatePdf) {
+            followUpStage = "creating the recipe PDF";
             updateRecipeSaveProgressItem(pdfProgressIndex, "running", "Generating...");
             setRecipeEditStatus("Generating PDF...");
             const pdfData = await createRecipePdfAndUploadForSource(sourceUrl);
@@ -36967,48 +37730,74 @@ async function saveRecipeEditor(event) {
             updateRecipeSaveProgressItem(pdfProgressIndex, "done", createdPdfPublicUrl ? "Cloud ready" : "Created");
         }
 
-        updateRecipeSaveProgressItem(refreshProgressIndex, "running", "Refreshing...");
-        await refreshStoreMarkup();
-        if (shouldSaveCategories && sourceUrl) {
-            try {
-                recipeForEditor = await fetchRecipeEditorData(sourceUrl);
-            } catch (err) {
-                console.warn("Unable to refresh recipe categories after save.", err);
+        const changedDuringSave = recipeEditorCurrentSaveSnapshot(form) !== savedBaselineSnapshot;
+        if (changedDuringSave) {
+            updateRecipeSaveProgressItem(refreshProgressIndex, "done", "New edits kept");
+        } else {
+            followUpStage = "refreshing the saved page values";
+            updateRecipeSaveProgressItem(refreshProgressIndex, "running", "Refreshing...");
+            await refreshStoreMarkup();
+            if (shouldSaveCategories && sourceUrl) {
+                try {
+                    recipeForEditor = await fetchRecipeEditorData(sourceUrl);
+                } catch (err) {
+                    console.warn("Unable to refresh recipe categories after save.", err);
+                }
             }
+            if (recipeForEditor) {
+                populateRecipeEditor(recipeForEditor, recipeForEditor.source_url || sourceUrl);
+            }
+            updateRecipeSaveProgressItem(refreshProgressIndex, "done", "Refreshed");
         }
-        if (recipeForEditor) {
-            populateRecipeEditor(recipeForEditor, recipeForEditor.source_url || sourceUrl);
-        }
-        updateRecipeSaveProgressItem(refreshProgressIndex, "done", "Refreshed");
+
+        const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
+        const successMessage = changedDuringSave
+            ? "Recipe saved successfully. Newer edits remain unsaved."
+            : "Recipe saved successfully.";
         setRecipeSaveProgressSummary(
-            shouldCreatePdf
+            warnings.length
+                ? `${successMessage} ${warnings.join(" ")}`
+                : (shouldCreatePdf
                 ? (
                     createdPdfPublicUrl
-                        ? "Recipe saved and PDF created."
-                        : (createdPdfUploadError || "Recipe saved and PDF created, but Cloudflare upload is not ready.")
+                        ? `${successMessage} PDF created.`
+                        : (createdPdfUploadError || `${successMessage} PDF created, but Cloudflare upload is not ready.`)
                 )
-                : "Recipe saved and page values refreshed."
+                : successMessage)
         );
         setRecipeSaveProgressActionsState("done");
-        setRecipeEditStatus("");
+        setRecipeEditStatus(successMessage);
         showRecipeQuantityUpdatedMessage(
             "",
             "",
             "",
-            shouldCreatePdf && createdPdfPublicUrl ? "Recipe saved and PDF created." : "Recipe updated."
+            shouldCreatePdf && createdPdfPublicUrl
+                ? "Recipe saved successfully. PDF created."
+                : "Recipe saved successfully."
         );
     } catch (err) {
         console.warn("Unable to save recipe.", err);
-        setRecipeEditStatus((err && err.message) || "Unable to save recipe.", true);
-        setRecipeSaveProgressSummary("Unable to save recipe.");
+        recipeEditorSaveDebug("caught exception", { error: err });
+        const safeMessage = String(err && err.message || "").trim();
+        const message = coreSaveSucceeded
+            ? `Recipe saved, but ${followUpStage} could not finish. ${safeMessage || "Try that step again."}`
+            : `Recipe could not be saved. Your changes are still on this page. ${safeMessage || "Review the highlighted fields or try again."}`;
+        setRecipeEditStatus(message, true);
+        setRecipeSaveProgressSummary(message);
         updateRecipeSaveProgressFailed();
         setRecipeSaveProgressActionsState("failed");
     } finally {
-        if (saveButton) {
-            saveButton.disabled = false;
-            const saveLabel = saveButton.querySelector("span");
-            if (saveLabel) saveLabel.textContent = "Save Recipe";
+        if (coreSaveSucceeded && savedIdentity && !savedIdentityApplied) {
+            savedBaselineSnapshot = rememberRecipeEditorSubmittedState(form, submittedSnapshot, savedIdentity, {
+                preserveCategoriesFrom: previousSavedSnapshot,
+            });
+            updateRecipeEditorSavedIdentity(savedIdentity, payload || {}, { updateSourceField: false });
         }
+        const currentForm = document.getElementById("recipeEditForm") || form;
+        delete form.dataset.saving;
+        delete currentForm.dataset.saving;
+        updateRecipeEditorDirtyState(currentForm);
+        setRecipeEditorSavingState(currentForm, false);
     }
 
     return false;
@@ -37556,7 +38345,11 @@ async function inferMissingRecipeDetails(button, options = {}) {
 
         syncOpenAiUsageDashboardFromResponse(data);
         if (previewOnly && applyPreviewToEditor && data.recipe) {
-            populateRecipeEditor(data.recipe, data.recipe.source_url || data.recipe_url || recipeUrl);
+            populateRecipeEditor(
+                data.recipe,
+                data.recipe.source_url || data.recipe_url || recipeUrl,
+                { preserveSavedState: true },
+            );
         }
         if (!previewOnly) {
             await refreshStoreMarkup({ cacheBust: true });
@@ -37632,9 +38425,26 @@ function recipeEditorHasChanges(recipe) {
 }
 
 async function createRecipeEditorPdf(button) {
-    const originalText = button ? button.textContent : "";
+    const form = document.getElementById("recipeEditForm");
+    const originalHtml = button ? button.innerHTML : "";
     let statusMessage = "Cloud PDF ready.";
     let finalPdfData = null;
+    let coreSaveSucceeded = false;
+    let submittedSnapshot = "";
+    let savedBaselineSnapshot = "";
+    const previousSavedSnapshot = form ? recipeEditSavedFormSnapshots.get(form) || "" : "";
+
+    if (!form) {
+        setRecipeEditStatus("Unable to create the PDF because the recipe form is unavailable.", true);
+        return false;
+    }
+    if (form.dataset.saving === "true") {
+        setRecipeEditStatus("A recipe save is already in progress. Wait for it to finish before creating the PDF.", true);
+        return false;
+    }
+
+    form.dataset.saving = "true";
+    setRecipeEditorSavingState(form, true);
 
     if (button) {
         button.disabled = true;
@@ -37642,46 +38452,69 @@ async function createRecipeEditorPdf(button) {
     }
 
     try {
-        setRecipeEditStatus("Saving recipe before PDF...");
-
+        setRecipeEditStatus("Validating recipe before PDF creation...");
         const payload = collectRecipeEditorPayload();
+        const validation = validateRecipeEditor(form, payload);
+        if (!validation.valid) {
+            setRecipeEditStatus("Some fields need attention before the recipe PDF can be created.", true);
+            return false;
+        }
+
+        const candidateSourceUrl = payload.recipe.source_url || payload.original_url;
+        if (isUploadedRecipeSourceUrl(candidateSourceUrl) && !recipeHasPerServingEstimate(payload.recipe || {})) {
+            setRecipeEditStatus("Estimate per serving basis is required before creating the recipe PDF.", true);
+            return false;
+        }
+
+        submittedSnapshot = recipeEditorCurrentSaveSnapshot(form);
+        setRecipeEditStatus("Saving recipe before PDF...");
         const saveResponse = await fetch("/api/recipe", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
+            credentials: "same-origin",
             body: JSON.stringify(payload),
         });
-        const saveData = await saveResponse.json();
+        const saveData = await recipeEditorJsonResponse(saveResponse);
 
-        if (!saveResponse.ok || !saveData.ok) {
-            throw new Error((saveData && saveData.error) || "Unable to save recipe.");
+        if (!saveResponse.ok || !(saveData.ok || saveData.success)) {
+            const fieldErrors = saveData && saveData.field_errors && typeof saveData.field_errors === "object"
+                ? saveData.field_errors
+                : {};
+            if (Object.keys(fieldErrors).length) {
+                applyRecipeEditorServerFieldErrors(fieldErrors);
+            }
+            throw new Error(
+                (saveData && (saveData.message || saveData.error))
+                || `The recipe could not be saved (${saveResponse.status}).`
+            );
         }
+        coreSaveSucceeded = true;
+        const responseRecipe = saveData.recipe && typeof saveData.recipe === "object" ? saveData.recipe : {};
+        const savedIdentity = {
+            recipe_id: saveData.recipe_id || responseRecipe.recipe_id || payload.recipe_id || "",
+            source_url: responseRecipe.source_url || payload.recipe.source_url || payload.original_url,
+            updated_at: saveData.updated_at || responseRecipe.updated_at || "",
+        };
+        savedBaselineSnapshot = rememberRecipeEditorSubmittedState(form, submittedSnapshot, savedIdentity, {
+            preserveCategoriesFrom: previousSavedSnapshot,
+        });
+        updateRecipeEditorSavedIdentity(savedIdentity, payload, { updateSourceField: false });
         invalidateRecipeEditorCache(payload.original_url);
 
-        const sourceUrl = (
-            saveData.recipe && saveData.recipe.source_url
-                ? saveData.recipe.source_url
-                : payload.recipe.source_url || payload.original_url
-        );
+        const sourceUrl = String(savedIdentity.source_url || "").trim();
         if (saveData.recipe) {
             rememberRecipeEditorData(sourceUrl, {
-                recipe: saveData.recipe,
+                recipe: responseRecipe,
                 store_sections: recipeEditStoreSections,
                 food_rules: recipeEditFoodRules,
             });
         }
 
-        const recipeForPdfCheck = saveData.recipe && typeof saveData.recipe === "object"
-            ? saveData.recipe
-            : payload.recipe;
-
-        if (isUploadedRecipeSourceUrl(sourceUrl || "") && !recipeHasPerServingEstimate(recipeForPdfCheck || {})) {
-            throw new Error("Estimate per serving basis is required before creating the recipe PDF.");
-        }
-
-        if (saveData.recipe) {
-            populateRecipeEditor(saveData.recipe, sourceUrl);
+        const changedDuringSave = recipeEditorCurrentSaveSnapshot(form) !== savedBaselineSnapshot;
+        if (saveData.recipe && !changedDuringSave) {
+            populateRecipeEditor(responseRecipe, sourceUrl);
         }
 
         setRecipeEditStatus("Generating PDF...");
@@ -37720,21 +38553,43 @@ async function createRecipeEditorPdf(button) {
             pdf_object_key: finalPdfData.pdf_object_key || "",
             pdf_uploaded_at: finalPdfData.pdf_uploaded_at || "",
         });
+        rememberRecipeEditorFieldsAsSaved(document.getElementById("recipeEditForm") || form, [
+            "source_pdf_path",
+            "source_cloudflare_pdf_url",
+            "generated_pdf_path",
+            "generated_cloudflare_pdf_url",
+        ]);
         scheduleOpenRecipeEditorPdfRefresh({
             recipeUrl: sourceUrl,
             waitForGeneratedCloudflare: true,
             initialDelay: 600,
             timeoutMs: 15000,
         });
-        setRecipeEditStatus(statusMessage);
+        setRecipeEditStatus(
+            changedDuringSave
+                ? `${statusMessage} Newer recipe edits remain unsaved.`
+                : statusMessage
+        );
         showRecipeQuantityUpdatedMessage("", "", "", statusMessage);
     } catch (err) {
         console.warn("Unable to create recipe PDF.", err);
-        setRecipeEditStatus((err && err.message) || "Unable to create PDF.", true);
+        const message = coreSaveSucceeded
+            ? `Recipe saved, but the PDF could not be created. ${(err && err.message) || "Try again."}`
+            : `Recipe could not be saved before PDF creation. Your changes are still on this page. ${(err && err.message) || "Try again."}`;
+        setRecipeEditStatus(message, true);
     } finally {
-        if (button) {
+        const currentForm = document.getElementById("recipeEditForm") || form;
+        delete form.dataset.saving;
+        delete currentForm.dataset.saving;
+        updateRecipeEditorDirtyState(currentForm);
+        setRecipeEditorSavingState(currentForm, false);
+        if (button && button.isConnected) {
             button.disabled = false;
-            button.textContent = originalText || "Create recipe PDF";
+            if (originalHtml) {
+                button.innerHTML = originalHtml;
+            } else {
+                button.textContent = "Create recipe PDF";
+            }
         }
     }
 
@@ -38424,12 +39279,18 @@ function updateRecipeSaveProgressFailed() {
 
 function collectRecipeEditorPayload() {
     const originalUrl = document.getElementById("recipeEditOriginalUrl").value || "";
+    const recipeId = document.getElementById("recipeEditId")
+        ? document.getElementById("recipeEditId").value.trim()
+        : "";
     const quantity = parseRecipeScaleMultiplier(document.getElementById("recipeEditQuantity").value || "1") || 1;
-    const sourceUrl = recipeEditorSourceUrlForSave();
+    const sourceUrl = recipeEditorPersistableText(recipeEditorSourceUrlForSave());
+    const coverImage = collectRecipeEditorCoverImage();
 
     return {
         original_url: originalUrl,
+        recipe_id: recipeId,
         recipe: {
+            recipe_id: recipeId,
             display_name: document.getElementById("recipeEditDisplayName").value.trim(),
             recipe_title: document.getElementById("recipeEditTitleInput").value.trim(),
             description: document.getElementById("recipeEditDescription")
@@ -38450,7 +39311,8 @@ function collectRecipeEditorPayload() {
                 : "",
             quantity,
             servings: document.getElementById("recipeEditServings").value.trim(),
-            cover_image: collectRecipeEditorCoverImage(),
+            cover_image: coverImage,
+            cover_image_prompt: coverImage.prompt || coverImage.image_prompt || "",
             rating: currentRecipeRating(),
             chatgpt_feedback: recipeEditOriginalSnapshot ? recipeEditOriginalSnapshot.chatgpt_feedback || "" : "",
             chatgpt_feedback_created_at: recipeEditOriginalSnapshot ? recipeEditOriginalSnapshot.chatgpt_feedback_created_at || "" : "",
@@ -38469,6 +39331,11 @@ function collectRecipeEditorPayload() {
             ...collectRecipeMenuMetadataPayload(),
         },
     };
+}
+
+function recipeEditorPersistableText(value) {
+    const text = String(value || "").trim();
+    return /^(?:not available|n\/?a|none|null)$/i.test(text) ? "" : text;
 }
 
 function recipeEditorSourceUrlForSave() {
@@ -38576,20 +39443,30 @@ function collectRecipeInstructionRows() {
             const stepNumber = Math.max(1, parseFloat(stepInput ? stepInput.value : "") || index + 1);
 
             return {
+                id: values.id || "",
+                instruction_id: values.instruction_id || "",
+                step_id: values.step_id || "",
+                row_id: values.row_id || "",
                 text: textInput ? textInput.value.trim() : "",
                 stepNumber,
                 originalIndex: index,
                 step_image_url: values.step_image_url || "",
                 step_image_generated_at: values.step_image_generated_at || "",
+                step_image_prompt: values.step_image_prompt || "",
             };
         })
         .filter(item => item.text)
         .sort((a, b) => (a.stepNumber - b.stepNumber) || (a.originalIndex - b.originalIndex))
         .map(item => ({
+            id: item.id,
+            instruction_id: item.instruction_id,
+            step_id: item.step_id,
+            row_id: item.row_id,
             step_number: item.stepNumber,
             instruction: item.text,
             step_image_url: item.step_image_url,
             step_image_generated_at: item.step_image_generated_at,
+            step_image_prompt: item.step_image_prompt,
         }));
 }
 
@@ -38600,6 +39477,10 @@ function collectRecipeEquipmentRows() {
             const text = String(values.text || "").trim();
 
             return {
+                id: values.id || "",
+                equipment_id: values.equipment_id || "",
+                equipment_row_id: values.equipment_row_id || "",
+                row_id: values.row_id || "",
                 equipment: text,
                 text,
                 equipment_image_url: values.equipment_image_url || "",
@@ -41169,6 +42050,7 @@ async function generateRecipeTitleImageForCard(card, options = {}) {
 
         if (isEditor) {
             setRecipeEditorCoverImage(coverImage, fallbackAlt);
+            rememberRecipeEditorCoverImageAsSaved();
             setRecipeEditStatus("Title image generated. Save Recipe to keep any other edits.");
         }
 

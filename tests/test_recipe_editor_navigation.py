@@ -84,7 +84,7 @@ def test_recipe_editor_modal_close_does_not_reload_current_page():
     assert "triggerMenu.recipeEditAnchorButton" in script
     assert "restoreRecipeEditorReturnState();" in script
     assert "window.location.reload();" not in script[
-        script.index("function closeRecipeEditor()"):
+        script.index("function closeRecipeEditor(options = {})"):
         script.index("function populateRecipeEditor")
     ]
 
@@ -123,7 +123,7 @@ def test_recipe_editor_cancel_uses_stored_page_return_before_history():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     close_block = script[
-        script.index("function closeRecipeEditor()"):
+        script.index("function closeRecipeEditor(options = {})"):
         script.index("function populateRecipeEditor")
     ]
 

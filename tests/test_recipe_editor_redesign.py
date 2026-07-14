@@ -250,7 +250,8 @@ def test_recipe_editor_header_actions_match_the_mockup_order_and_icons():
 
     assert "inferMissingRecipeDetails(this)" in template
     assert "confirmDeleteRecipeFromEditor(this, event)" in template
-    assert 'type="submit" class="recipe-edit-save"' in template
+    assert 'id="recipeEditSaveButton"' in template
+    assert 'data-recipe-edit-save' in template
 
 
 def test_restaurant_source_card_uses_compact_identity_details_and_actions():

@@ -557,7 +557,7 @@
      class="recipe-edit-backdrop"
      aria-hidden="true">
     <div class="recipe-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="recipeEditTitle">
-        <form id="recipeEditForm" onsubmit="return saveRecipeEditor(event)">
+        <form id="recipeEditForm" novalidate onsubmit="return saveRecipeEditor(event)">
             <div class="recipe-edit-header">
                 <div class="recipe-edit-title-block">
                     <nav class="recipe-edit-breadcrumb" aria-label="Breadcrumb">
@@ -758,19 +758,38 @@
                         </div>
                     </div>
                     <button type="button" class="recipe-edit-cancel recipe-edit-header-cancel" onclick="closeRecipeEditor()">Cancel</button>
-                    <button type="submit" class="recipe-edit-save recipe-edit-header-save">
+                    <button type="submit"
+                            id="recipeEditSaveButton"
+                            class="recipe-edit-save recipe-edit-header-save"
+                            data-recipe-edit-save
+                            aria-busy="false">
                         {{ shell.svg_icon("check") }}
-                        <span>Save Recipe</span>
+                        <span class="recipe-edit-save-spinner" data-recipe-edit-save-spinner aria-hidden="true" hidden></span>
+                        <span data-recipe-edit-save-label>Save Recipe</span>
                     </button>
                 </div>
             </div>
 
             <input type="hidden" name="original_url" id="recipeEditOriginalUrl">
+            <input type="hidden" name="recipe_id" id="recipeEditId">
             <input type="hidden" id="recipeEditMenuItemUrl">
             <input type="hidden" id="recipeEditDocumentSourceUrl">
             <input type="hidden" name="quantity" id="recipeEditQuantity" value="1">
 
-            <div id="recipeEditStatus" class="recipe-edit-status"></div>
+            <div id="recipeEditStatus"
+                 class="recipe-edit-status"
+                 role="status"
+                 aria-live="polite"
+                 aria-atomic="true"></div>
+            <div id="recipeEditValidationSummary"
+                 class="recipe-edit-validation-summary"
+                 role="alert"
+                 aria-labelledby="recipeEditValidationTitle"
+                 tabindex="-1"
+                 hidden>
+                <strong id="recipeEditValidationTitle">Some fields need attention.</strong>
+                <ul data-recipe-edit-validation-errors></ul>
+            </div>
 
             <div class="recipe-edit-layout">
                 <div class="recipe-edit-main-workspace">
@@ -2776,10 +2795,6 @@
                         </button>
                     </div>
                 </details>
-                <button type="submit" class="recipe-edit-save">
-                    <span class="recipe-edit-button-icon" aria-hidden="true">▣</span>
-                    <span>Save Recipe</span>
-                </button>
                 <button type="button"
                         class="recipe-edit-delete"
                         onclick="return confirmDeleteRecipeFromEditor(this, event)">
