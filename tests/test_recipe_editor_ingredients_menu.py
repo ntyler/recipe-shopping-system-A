@@ -342,18 +342,25 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     tools_start = script.index("function organizeRecipeEditIngredientTools()")
     tools_end = script.index("function organizeRecipeEditEquipmentTools()", tools_start)
     tools = script[tools_start:tools_end]
-    assert "<span>Ingredient</span>" in tools
-    assert "<span>Amount</span>" in tools
-    assert "<span>Store Section</span>" in tools
-    assert "<span>Options</span>" in tools
-    assert "<span>Actions</span>" in tools
-    assert "<span>Image</span>" not in tools
+    assert 'tableScroll.setAttribute("role", "table");' in tools
+    assert 'ingredientList.setAttribute("role", "rowgroup");' in tools
+    assert tools.count('role="columnheader"') == 10
+    assert '<span role="columnheader">Ingredient</span>' in tools
+    assert '<span role="columnheader">Match</span>' in tools
+    assert '<span role="columnheader">Amount</span>' in tools
+    assert '<span role="columnheader">Store Section</span>' in tools
+    assert '<span role="columnheader">Options</span>' in tools
+    assert '<span role="columnheader">Actions</span>' in tools
+    assert '<span class="sr-only">Drag</span>' in tools
+    assert '<span class="sr-only">Image</span>' in tools
     assert "<span>Edit</span>" not in tools
     assert "<span>Delete</span>" not in tools
 
     organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
     organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
     organize = script[organize_start:organize_end]
+    assert 'matchStatus.classList.add("recipe-edit-ingredient-match-status");' in organize
+    assert 'matchStatus.setAttribute("role", "cell");' in organize
     assert 'primary.className = "recipe-edit-ingredient-primary-fields";' in organize
     assert 'row.querySelector(".recipe-edit-size-inline")' in organize
     assert 'row.querySelector(".recipe-edit-notes-inline")' in organize
@@ -363,6 +370,7 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     assert 'row.querySelector(".recipe-edit-original-text-label")' in organize
     assert 'details.id = `recipeEditIngredientDetails${recipeEditIngredientDetailsId}`;' in organize
     assert 'details.addEventListener("toggle", () => updateRecipeEditIngredientDetailsState(row));' in organize
+    assert 'data-ingredient-all-badges' in organize
 
     row_start = script.index("function addRecipeIngredientRow")
     row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
@@ -370,21 +378,27 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     assert '<span>Amount</span>' in row_markup
     assert '<span>Store Section</span>' in row_markup
     assert '<textarea data-field="original_text" rows="2" readonly>' in row_markup
+    assert 'recipeIngredientBadgesHtml(item, { maxVisible: 2 })' in row_markup
     assert 'data-recipe-edit-ingredient-details-toggle' in script
     assert 'aria-expanded="false"' in script
     assert 'const label = expanded ? "Hide details" : "More details";' in script
     assert 'optionsButton.classList.toggle("is-empty", optionRows.length === 0);' in script
 
     v5 = css[css.index("/* Ingredient editor v5:"):]
-    assert "min-width: 900px;" in v5
-    assert "minmax(180px, 1fr)" in v5
-    assert "minmax(132px, 160px)" in v5
-    assert "min-height: 76px !important;" in v5
+    assert "min-width: 1052px;" in v5
+    assert "--recipe-edit-ingredient-grid:" in v5
+    assert "minmax(180px, 1.8fr)" in v5
+    assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in v5
+    assert "min-height: 64px !important;" in v5
+    assert "position: sticky;" in v5
+    assert ".recipe-edit-ingredient-match-status" in v5
+    assert "grid-column: 10;" in v5
+    assert "grid-column: 3 / 11;" in v5
     assert ".recipe-edit-ingredient-primary-fields" in v5
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in v5
     assert ".recipe-edit-ingredient-options-button.is-empty" in v5
     assert ".recipe-edit-compact-row-details.is-expanded" in v5
-    assert "@media (min-width: 761px) and (max-width: 1199px)" in v5
+    assert "@media (min-width: 761px) and (max-width: 1399px)" in v5
     assert "@media (max-width: 760px)" in v5
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in v5
     assert "grid-column: 1 / -1;" in v5
