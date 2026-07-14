@@ -240,7 +240,12 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert 'id="ingredientUnitConfig"' in template
     assert 'role", "combobox"' in app_js
     assert 'aria-autocomplete", "list"' in app_js
+    assert 'aria-haspopup", "listbox"' in app_js
     assert 'list="recipeIngredientUnitOptions"' in app_js
+    assert "function openRecipeIngredientUnitPicker(input)" in app_js
+    assert 'typeof input.showPicker !== "function"' in app_js
+    assert 'input.addEventListener("click", () => openRecipeIngredientUnitPicker(input))' in app_js
+    assert 'event.key === "ArrowDown" && openRecipeIngredientUnitPicker(input)' in app_js
     assert 'data-field="unit_id"' in app_js
     assert 'data-field="unit_raw"' in app_js
     assert 'data-field="size"' in app_js

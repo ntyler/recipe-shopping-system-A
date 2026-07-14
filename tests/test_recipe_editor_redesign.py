@@ -125,6 +125,7 @@ def test_standalone_recipe_editor_has_an_independent_main_scroll_region():
 
 def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
 
     assert "recipe-edit-breadcrumb" in template
     assert "Preview Recipe" in template
@@ -143,6 +144,14 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "recipe-edit-source-documents-card" in template
     assert "data-document-download" in template
     assert "recipe-edit-restaurant-card" in template
+    organizer = script[
+        script.index("function organizeRecipeEditStandaloneWorkspace()"):
+        script.index("function syncRecipeEditDocumentRows()")
+    ]
+    assert 'const restaurantCard = document.querySelector(".recipe-edit-restaurant-card");' in organizer
+    assert 'restaurantCard.insertAdjacentElement("afterend", sourceCard);' in organizer
+    assert "appendRecipeEditWorkspaceChildren(utility, [aiCard]);" in organizer
+    assert "appendRecipeEditWorkspaceChildren(utility, [sourceCard, aiCard]);" not in organizer
     assert "recipeEditIngredientGallery" in template
     assert "recipeEditHealthList" in template
     assert "recipe-edit-ai-assistant-card" in template

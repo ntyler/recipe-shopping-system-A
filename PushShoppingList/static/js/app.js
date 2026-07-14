@@ -25675,9 +25675,13 @@ function organizeRecipeEditStandaloneWorkspace() {
 
     const utility = document.getElementById("recipeEditUtilityColumn");
     const sourceCard = document.querySelector(".recipe-edit-source-documents-card");
+    const restaurantCard = document.querySelector(".recipe-edit-restaurant-card");
     const aiCard = document.querySelector(".recipe-edit-ai-assistant-card");
+    if (restaurantCard && sourceCard) {
+        restaurantCard.insertAdjacentElement("afterend", sourceCard);
+    }
     if (utility) {
-        appendRecipeEditWorkspaceChildren(utility, [sourceCard, aiCard]);
+        appendRecipeEditWorkspaceChildren(utility, [aiCard]);
     }
 }
 
@@ -31542,6 +31546,19 @@ function canonicalizeRecipeIngredientUnitControl(input, options = {}) {
     return false;
 }
 
+function openRecipeIngredientUnitPicker(input) {
+    if (!input || typeof input.showPicker !== "function") {
+        return false;
+    }
+    try {
+        input.showPicker();
+        return true;
+    } catch (error) {
+        // Browsers without a datalist picker keep their normal text-input behavior.
+        return false;
+    }
+}
+
 function bindRecipeIngredientUnitControls(scope) {
     ensureRecipeIngredientUnitOption();
     scope.querySelectorAll('[data-field="unit"]').forEach(input => {
@@ -31551,7 +31568,14 @@ function bindRecipeIngredientUnitControls(scope) {
         input.dataset.unitControlBound = "true";
         input.setAttribute("role", "combobox");
         input.setAttribute("aria-autocomplete", "list");
+        input.setAttribute("aria-haspopup", "listbox");
         input.setAttribute("aria-controls", "recipeIngredientUnitOptions");
+        input.addEventListener("click", () => openRecipeIngredientUnitPicker(input));
+        input.addEventListener("keydown", event => {
+            if (event.key === "ArrowDown" && openRecipeIngredientUnitPicker(input)) {
+                event.preventDefault();
+            }
+        });
         input.addEventListener("change", () => canonicalizeRecipeIngredientUnitControl(input, { report: true }));
         input.addEventListener("blur", () => canonicalizeRecipeIngredientUnitControl(input));
         input.addEventListener("input", () => {
