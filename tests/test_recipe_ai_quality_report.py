@@ -100,6 +100,13 @@ def test_quality_report_projects_explicit_saved_scores_and_provenance(monkeypatc
     instruction = next(item for item in report["field_analysis"] if item["label"] == "Instructions")
     assert instruction["status"] == "generated"
     assert instruction["confidence"] == 73
+    title = next(item for item in report["field_analysis"] if item["label"] == "Title")
+    assert title["source"] == "Dinner Menu"
+    assert title["source_type"] == "Restaurant Menu URL"
+    assert title["source_name"] == "Dinner Menu"
+    assert title["last_updated"] == "2026-07-14T12:00:00Z"
+    assert instruction["source"] == "AI Generation"
+    assert instruction["last_updated"] == "Not available"
     ingredient = report["ingredient_analysis"][0]
     assert ingredient["match_status"] == "Matched"
     assert ingredient["match_confidence"] == 95
@@ -125,6 +132,16 @@ def test_quality_report_marks_missing_scores_unavailable_without_fabricating_val
     monkeypatch.setattr(recipe_ai_quality_service.recipe_edit_service, "load_recipe_ingredients", lambda: {})
     monkeypatch.setattr(recipe_ai_quality_service.recipe_edit_service, "editable_recipe_cover_image", lambda _url, _raw, _meta: {})
     monkeypatch.setattr(recipe_ai_quality_service.recipe_edit_service, "editable_recipe_pdf_info", lambda _url, _raw: {})
+    monkeypatch.setattr(
+        recipe_ai_quality_service.recipe_edit_service,
+        "review_recipe_store_sections",
+        lambda recipe: {"ok": True, "recipe": deepcopy(recipe)},
+    )
+    monkeypatch.setattr(
+        recipe_ai_quality_service.recipe_edit_service,
+        "save_recipe_output",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("report projection must be read-only")),
+    )
 
     report = recipe_ai_quality_service.build_recipe_ai_quality_report(url)
 
@@ -134,6 +151,8 @@ def test_quality_report_marks_missing_scores_unavailable_without_fabricating_val
     assert report["categories"]["source_reliability"]["status"] == "unavailable"
     assert report["categories"]["ingredients"]["score"] is None
     assert "No overall AI confidence score is stored." in report["summary"]
+    assert report["safe_fix_count"] == 0
+    assert report["safe_fixes_available"] is False
     assert all(
         item["confidence"] is None
         for item in report["field_analysis"]
@@ -183,9 +202,18 @@ def test_safe_fixes_normalize_units_and_only_fill_missing_store_sections(monkeyp
         lambda _url, recipe: persisted.update(recipe=deepcopy(recipe)),
     )
 
+    original = deepcopy(saved)
+    preview = recipe_ai_quality_service.build_recipe_ai_quality_report(url)
+
+    assert saved == original
+    assert persisted == {}
+    assert preview["safe_fix_count"] > 0
+    assert preview["safe_fixes_available"] is True
+
     result = recipe_ai_quality_service.apply_recipe_ai_quality_safe_fixes(url)
 
     assert result["ok"] is True
+    assert result["changed_count"] == preview["safe_fix_count"]
     assert result["changed_count"] > 0
     assert persisted["recipe"]["source_url"] == url
     assert persisted["recipe"]["recipe_title"] == "Keep this title"
@@ -195,6 +223,8 @@ def test_safe_fixes_normalize_units_and_only_fill_missing_store_sections(monkeyp
     assert persisted["recipe"]["ingredients"][1]["store_section"] == "MY CUSTOM SECTION"
     assert any(update["field"] == "unit" and update["after"] == "tablespoon" for update in result["safe_updates"])
     assert any(update["field"] == "store_section" and update["after"] == "BAKING" for update in result["safe_updates"])
+    assert result["report"]["safe_fix_count"] == 0
+    assert result["report"]["safe_fixes_available"] is False
 
 
 def test_quality_report_preserves_extracted_conflicting_and_stale_provenance(monkeypatch):
@@ -229,7 +259,7 @@ def test_quality_report_preserves_extracted_conflicting_and_stale_provenance(mon
     assert restaurant["restaurant_address"]["status"] == "stale"
 
 
-def test_quality_report_drawer_wiring_accessibility_and_backend_routes():
+def test_quality_report_modal_wiring_accessibility_layout_and_backend_routes():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
@@ -237,8 +267,17 @@ def test_quality_report_drawer_wiring_accessibility_and_backend_routes():
 
     assert ">AI Quality Report</button>" in template
     assert 'id="recipeEditAiAnalysisBackdrop"' in template
+    assert 'role="dialog"' in template
     assert 'aria-modal="true"' in template
-    assert 'aria-describedby="recipeEditAiAnalysisSummary"' in template
+    assert 'aria-labelledby="recipeEditAiAnalysisTitle"' in template
+    assert 'aria-describedby="recipeEditAiAnalysisDescription"' in template
+    assert 'id="recipeEditAiAnalysisTitle" tabindex="-1"' in template
+    assert 'onclick="if (event.target === this) return closeRecipeEditAiAnalysis()"' in template
+    panel = template.index('id="recipeEditAiAnalysisPanel"')
+    header = template.index('class="recipe-edit-ai-analysis-header"', panel)
+    body = template.index('class="recipe-edit-ai-analysis-body"', panel)
+    footer = template.index('class="recipe-edit-ai-analysis-footer"', panel)
+    assert panel < header < body < footer
     for heading in (
         "Confidence Breakdown", "Overall Summary", "Recipe Health Details", "Ingredient Analysis",
         "Source Evidence", "Restaurant Analysis", "Image Analysis", "Recommended Improvements",
@@ -251,21 +290,42 @@ def test_quality_report_drawer_wiring_accessibility_and_backend_routes():
     assert "function runRecipeAiQualityReportAction(button)" in script
     assert "function applyRecipeAiQualitySafeFixes(button)" in script
     assert "function applyRecipeAiQualitySafeUpdatesToEditor(updates = [])" in script
+    assert "function updateRecipeAiQualityReportSafeFixes(report = {})" in script
+    assert 'report.safe_fixes_available === true' in script
+    assert 'button.disabled = !available' in script
+    assert '"Not calculated"' in script
+    assert "Some confidence categories are unavailable because" in script
+    assert '<dt>Source</dt>' in script
+    assert '<dt>Last updated</dt>' in script
     assert 'String(control.value ?? "") !== before' in script
     assert 'Unsaved form values were preserved.' in script
     assert 'event.key === "Escape"' in script
     assert 'event.key === "Tab"' in script
+    assert '!focusable.includes(document.activeElement)' in script
+    assert 'document.getElementById("recipeEditAiAnalysisTitle")?.focus({ preventScroll: true })' in script
     assert 'button.focus({ preventScroll: true })' in script
     assert 'fetch(`/api/recipe/ai-quality-report?url=' in script
     assert 'fetch("/api/recipe/ai-quality-report/safe-fixes"' in script
     assert 'data-ai-report-action="${escapeAttribute(action.key)}"' in script
     assert 'data-document-input-id="${CSS.escape(button.dataset.aiReportDocument || "")}"' in script
-    assert '"document": "recipeEditSourcePdfPath"' in read_text("PushShoppingList/services/recipe_ai_quality_service.py")
-    assert "width: clamp(520px, 42vw, 680px);" in css
-    assert "height: 100dvh;" in css
+    service = read_text("PushShoppingList/services/recipe_ai_quality_service.py")
+    assert '"document": "recipeEditSourcePdfPath"' in service
+    assert '"safe_fixes_available": bool(safe_fix_changes)' in service
+    assert "width: clamp(520px, 42vw, 680px);" not in css
+    assert "width: min(360px, calc(100vw - 32px));" not in css
+    assert "width: clamp(900px, 82vw, 1120px);" in css
+    assert "height: min(88vh, 920px);" in css
+    assert "max-height: calc(100dvh - 48px);" in css
+    assert "grid-template-rows: auto minmax(0, 1fr) auto;" in css
     assert ".recipe-edit-ai-analysis-body {" in css
     assert "overflow-y: auto;" in css
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
+    assert "width: calc(100vw - 32px);" in css
+    assert "height: calc(100dvh - 32px);" in css
     assert "@media (max-width: 720px)" in css
+    assert "border-radius: 0;" in css
+    assert ".recipe-edit-ai-report-category.is-unavailable" in css
+    assert ".recipe-edit-ai-report-category:is(.is-medium, .is-unavailable)" not in css
     assert '@recipe_bp.route("/api/recipe/ai-quality-report", methods=["GET"])' in routes
     assert '@recipe_bp.route("/api/recipe/ai-quality-report/safe-fixes", methods=["POST"])' in routes
 

@@ -2631,22 +2631,23 @@
                                  class="recipe-edit-ai-analysis-backdrop"
                                  onclick="if (event.target === this) return closeRecipeEditAiAnalysis()"
                                  hidden>
-                                <aside id="recipeEditAiAnalysisPanel"
-                                       class="recipe-edit-ai-analysis-panel"
-                                       role="dialog"
-                                       aria-modal="true"
-                                       aria-labelledby="recipeEditAiAnalysisTitle"
-                                       aria-describedby="recipeEditAiAnalysisSummary"
-                                       tabindex="-1">
+                                <div id="recipeEditAiAnalysisPanel"
+                                     class="recipe-edit-ai-analysis-panel"
+                                     role="dialog"
+                                     aria-modal="true"
+                                     aria-labelledby="recipeEditAiAnalysisTitle"
+                                     aria-describedby="recipeEditAiAnalysisDescription"
+                                     tabindex="-1">
+                                    <p id="recipeEditAiAnalysisDescription" class="sr-only">Detailed confidence, provenance, health, and recommended improvements for the current recipe.</p>
                                     <header class="recipe-edit-ai-analysis-header">
                                         <div class="recipe-edit-ai-analysis-heading">
                                             <span>Recipe transparency</span>
-                                            <h2 id="recipeEditAiAnalysisTitle">AI Quality Report</h2>
+                                            <h2 id="recipeEditAiAnalysisTitle" tabindex="-1">AI Quality Report</h2>
                                             <p id="recipeEditAiAnalysisRecipeName">Current recipe</p>
                                         </div>
-                                        <div class="recipe-edit-ai-analysis-overall">
-                                            <strong id="recipeEditAiAnalysisOverall">Unknown</strong>
-                                            <span id="recipeEditAiAnalysisLabel">Unknown confidence</span>
+                                        <div id="recipeEditAiAnalysisOverallGroup" class="recipe-edit-ai-analysis-overall is-unavailable">
+                                            <strong id="recipeEditAiAnalysisOverall">Not calculated</strong>
+                                            <span id="recipeEditAiAnalysisLabel">Confidence unavailable</span>
                                             <small id="recipeEditAiAnalysisTimestamp" hidden></small>
                                         </div>
                                         <button type="button"
@@ -2654,7 +2655,7 @@
                                                 aria-label="Close AI Quality Report"
                                                 onclick="return closeRecipeEditAiAnalysis()">{{ shell.svg_icon("x") }}</button>
                                     </header>
-                                    <div class="recipe-edit-ai-analysis-body">
+                                    <div id="recipeEditAiAnalysisBody" class="recipe-edit-ai-analysis-body" aria-busy="true">
                                         <div id="recipeEditAiAnalysisLoading"
                                              class="recipe-edit-ai-analysis-state"
                                              role="status">Loading saved AI analysis…</div>
@@ -2663,6 +2664,16 @@
                                              role="alert"
                                              hidden></div>
                                         <div id="recipeEditAiAnalysisContent" hidden>
+                                            <aside id="recipeEditAiAnalysisUnavailableNotice"
+                                                   class="recipe-edit-ai-report-notice"
+                                                   aria-labelledby="recipeEditAiAnalysisUnavailableTitle"
+                                                   hidden>
+                                                <div>
+                                                    <strong id="recipeEditAiAnalysisUnavailableTitle">Analysis is incomplete</strong>
+                                                    <p id="recipeEditAiAnalysisUnavailableMessage"></p>
+                                                </div>
+                                                <button type="button" class="recipe-edit-ai-report-action" data-ai-report-reanalyze onclick="return reanalyzeRecipeAiQualityReport(this)">Reanalyze Recipe</button>
+                                            </aside>
                                             <section class="recipe-edit-ai-report-section recipe-edit-ai-report-summary" aria-labelledby="recipeEditAiAnalysisSummaryTitle">
                                                 <h3 id="recipeEditAiAnalysisSummaryTitle">Overall Summary</h3>
                                                 <p id="recipeEditAiAnalysisSummary"></p>
@@ -2700,12 +2711,22 @@
                                     <footer class="recipe-edit-ai-analysis-footer">
                                         <span id="recipeEditAiAnalysisActionStatus" role="status" aria-live="polite"></span>
                                         <div>
-                                            <button type="button" onclick="return closeRecipeEditAiAnalysis()">Close</button>
-                                            <button type="button" data-ai-report-reanalyze onclick="return reanalyzeRecipeAiQualityReport(this)">Reanalyze Recipe</button>
-                                            <button type="button" class="primary" data-ai-report-safe-fixes onclick="return applyRecipeAiQualitySafeFixes(this)">Apply Safe Fixes</button>
+                                            <button type="button" class="secondary" onclick="return closeRecipeEditAiAnalysis()">Close</button>
+                                            <button type="button" class="outlined" data-ai-report-reanalyze onclick="return reanalyzeRecipeAiQualityReport(this)">Reanalyze Recipe</button>
+                                            <span class="recipe-edit-ai-analysis-safe-fixes-wrap"
+                                                  data-ai-report-safe-fixes-tooltip
+                                                  title="No deterministic safe fixes are available.">
+                                                <button type="button"
+                                                        class="primary"
+                                                        data-ai-report-safe-fixes
+                                                        aria-describedby="recipeEditAiAnalysisSafeFixesHelp"
+                                                        onclick="return applyRecipeAiQualitySafeFixes(this)"
+                                                        disabled>Apply Safe Fixes</button>
+                                            </span>
+                                            <span id="recipeEditAiAnalysisSafeFixesHelp" class="sr-only">No deterministic safe fixes are available for this recipe.</span>
                                         </div>
                                     </footer>
-                                </aside>
+                                </div>
                             </div>
                         </div>
                     </section>

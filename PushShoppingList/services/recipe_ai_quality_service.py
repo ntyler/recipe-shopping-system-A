@@ -159,6 +159,39 @@ def _provenance_index(recipe):
     return index
 
 
+def _field_provenance(field, provenance):
+    """Return the saved provenance row that best represents a report field."""
+    key = _field_key(field)
+    aliases = {
+        "title": ("title", "recipe_title", "display_name", "menu_item_name"),
+        "recipe_image": ("recipe_image", "cover_image", "image"),
+        "cookbook_assignment": ("cookbook_assignment", "cookbook", "cookbook_id", "cookbook_name"),
+        "source_information": (
+            "source_information", "source", "source_url", "source_menu_url", "source_pdf", "generated_pdf",
+        ),
+        "restaurant_information": (
+            "restaurant_information", "restaurant", "restaurant_id", "restaurant_name",
+            "restaurant_address", "restaurant_phone",
+        ),
+    }.get(key, (key,))
+    provenance = provenance if isinstance(provenance, dict) else {}
+    return next((provenance.get(alias) for alias in aliases if isinstance(provenance.get(alias), dict)), {})
+
+
+def _health_provenance_details(field, provenance):
+    evidence = _field_provenance(field, provenance)
+    source_type = _text(_first(evidence.get("source_type"), evidence.get("type")))
+    source_name = _text(_first(
+        evidence.get("source_name"), evidence.get("document"), evidence.get("source"), evidence.get("name"),
+    ))
+    return {
+        "source": source_name or source_type or "Not available",
+        "source_type": source_type or "Not available",
+        "source_name": source_name or "Not available",
+        "last_updated": _text(_first(evidence.get("updated_at"), evidence.get("last_updated"))) or "Not available",
+    }
+
+
 def _field_state(field, value, recipe, provenance):
     key = _field_key(field)
     field_aliases = {
@@ -328,6 +361,7 @@ def _health_item(key, label, value, recipe, provenance, action):
         "reason": reason,
         "recommendation": recommendation,
         "action": action,
+        **_health_provenance_details(key, provenance),
     }
 
 
@@ -727,6 +761,7 @@ def build_recipe_ai_quality_report(url):
         raw.get("ai_analysis_updated_at"), raw.get("ai_analyzed_at"), raw.get("last_analyzed_at"),
         raw.get("inference_updated_at"),
     ))
+    _, safe_fix_changes, _ = _prepare_recipe_ai_quality_safe_fixes(raw)
     return {
         "overall_confidence": overall,
         "confidence_label": _confidence_label(overall),
@@ -740,6 +775,8 @@ def build_recipe_ai_quality_report(url):
         "restaurant_analysis": restaurant,
         "image_analysis": image,
         "recommendations": recommendations,
+        "safe_fix_count": len(safe_fix_changes),
+        "safe_fixes_available": bool(safe_fix_changes),
     }
 
 
@@ -771,11 +808,9 @@ def _strip_safe_whitespace(recipe):
     return changes, updates
 
 
-def apply_recipe_ai_quality_safe_fixes(url):
-    current = recipe_edit_service.load_recipe_output(url)
-    if not isinstance(current, dict) or not current:
-        return {"ok": False, "error": "Recipe not found."}
-    updated = deepcopy(current)
+def _prepare_recipe_ai_quality_safe_fixes(recipe):
+    """Project deterministic safe fixes onto a copy without persisting them."""
+    updated = deepcopy(recipe if isinstance(recipe, dict) else {})
     changes, safe_updates = _strip_safe_whitespace(updated)
 
     before_units = [
@@ -812,7 +847,14 @@ def apply_recipe_ai_quality_safe_fixes(url):
                 "before": current_section, "after": proposed_section,
             })
 
-    changes = list(dict.fromkeys(changes))
+    return updated, list(dict.fromkeys(changes)), safe_updates
+
+
+def apply_recipe_ai_quality_safe_fixes(url):
+    current = recipe_edit_service.load_recipe_output(url)
+    if not isinstance(current, dict) or not current:
+        return {"ok": False, "error": "Recipe not found."}
+    updated, changes, safe_updates = _prepare_recipe_ai_quality_safe_fixes(current)
     if changes:
         recipe_edit_service.save_recipe_output(url, updated)
     return {
