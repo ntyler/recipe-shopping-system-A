@@ -457,17 +457,57 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert ".ingredients-toolbar > .ingredients-toolbar-actions" in polish
     assert "gap: 12px;" in polish
 
-    for column in (
-        "28px", "48px", "minmax(190px, 1.5fr)", "110px", "72px",
-        "160px", "136px", "104px",
-    ):
-        assert column in polish
-    assert "min-width: 1208px;" in polish
+    desktop_grid = """--recipe-edit-ingredient-grid:
+        28px
+        48px
+        minmax(180px, 1.35fr)
+        110px
+        72px
+        110px
+        160px
+        110px
+        140px
+        88px;"""
+    assert desktop_grid in polish
+    assert "--recipe-edit-ingredient-column-gap: 12px;" in polish
+    assert "overflow-x: auto;" in polish
+    assert "min-width: 1186px;" in polish
     assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in polish
-    assert "min-width: 112px;" in polish
-    assert "width: 104px;" in polish
-    assert "width: 32px;" in polish
-    assert "height: 36px;" in polish
+
+    options_start = polish.index(
+        ".recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button {"
+    )
+    options_end = polish.index("}", options_start)
+    options = polish[options_start:options_end]
+    for rule in (
+        "display: flex;", "align-items: center;", "width: 100%;", "min-width: 130px;",
+        "max-width: 160px;", "height: 38px;", "padding: 0 12px;", "flex: 1 1 auto;",
+        "justify-content: space-between;", "gap: 8px;", "overflow: visible;",
+        "text-indent: 0;", "white-space: nowrap;", "aspect-ratio: auto;",
+    ):
+        assert rule in options
+    assert "width: 32px;" not in options
+    assert "max-width: 40px;" not in options
+    assert "overflow: hidden;" not in options
+
+    options_label_start = polish.index("[data-ingredient-options-label]")
+    options_label_end = polish.index("}", options_label_start)
+    options_label = polish[options_label_start:options_label_end]
+    assert "overflow: visible;" in options_label
+    assert "text-overflow: clip;" in options_label
+
+    actions_start = polish.index(
+        ".recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-compact-row-actions {"
+    )
+    actions_end = polish.index("}", actions_start)
+    actions = polish[actions_start:actions_end]
+    assert "width: 88px;" in actions
+    assert "min-width: 88px;" in actions
+
+    assert "minmax(160px, 1.35fr)" in polish
+    assert "min-width: 1166px;" in polish
+    assert "min-width: 1146px;" in polish
+    assert "min-width: 1132px;" in polish
 
     assert "width: min(680px, calc(100vw - 32px));" in polish
     assert "min-width: min(620px, calc(100vw - 32px));" in polish
