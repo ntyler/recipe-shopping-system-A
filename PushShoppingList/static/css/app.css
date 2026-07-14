@@ -38107,6 +38107,149 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     }
 }
 
+/* Icon-bearing Store Section picker. The native select remains as the saved value source. */
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-trigger {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) 14px;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    height: 36px;
+    margin: 0;
+    padding: 6px 7px;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-bg-soft);
+    color: var(--app-text);
+    font-size: 9px;
+    font-weight: 700;
+    text-align: left;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-trigger:hover,
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-trigger[aria-expanded="true"] {
+    border-color: color-mix(in srgb, var(--app-primary) 60%, var(--app-border));
+    background: var(--app-surface-soft);
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-trigger:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-primary) 58%, transparent);
+    outline-offset: 1px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-trigger > [data-store-section-trigger-label] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-trigger .recipe-edit-store-section-icon,
+.recipe-edit-store-section-menu .recipe-edit-store-section-icon {
+    position: static;
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    padding: 0;
+    transform: none;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-trigger .recipe-edit-store-section-icon :is(.recipe-edit-inline-icon, svg),
+.recipe-edit-store-section-menu .recipe-edit-store-section-icon :is(.recipe-edit-inline-icon, svg) {
+    width: 16px;
+    height: 16px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-chevron {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+    color: var(--app-muted);
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-chevron :is(.recipe-edit-inline-icon, svg) {
+    width: 14px;
+    height: 14px;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu {
+    min-width: 220px;
+    max-width: min(280px, calc(100vw - 16px));
+    max-height: min(360px, calc(100vh - 16px));
+    padding: 6px;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option {
+    display: grid;
+    grid-template-columns: 17px minmax(0, 1fr) 16px;
+    align-items: center;
+    gap: 9px;
+    min-height: 34px;
+    padding: 7px 9px;
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option.is-active,
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option:hover,
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option:focus-visible {
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+    outline: none;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option.is-selected {
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option-check {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    color: var(--app-primary-hover);
+    opacity: 0;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option.is-selected .recipe-edit-store-section-option-check {
+    opacity: 1;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option-check :is(.recipe-edit-inline-icon, svg) {
+    width: 16px;
+    height: 16px;
+}
+
+.recipe-edit-store-section-icon.is-leaf { color: #4ade80; }
+.recipe-edit-store-section-icon.is-fish,
+.recipe-edit-store-section-icon.is-dairy { color: #60a5fa; }
+.recipe-edit-store-section-icon.is-snowflake { color: #93c5fd; }
+.recipe-edit-store-section-icon.is-package { color: #c4b5fd; }
+.recipe-edit-store-section-icon.is-wheat,
+.recipe-edit-store-section-icon.is-bread,
+.recipe-edit-store-section-icon.is-sandwich { color: #fbbf24; }
+.recipe-edit-store-section-icon.is-can,
+.recipe-edit-store-section-icon.is-sauce { color: #fb923c; }
+.recipe-edit-store-section-icon.is-cookie { color: #d6a16a; }
+.recipe-edit-store-section-icon.is-cup { color: #38bdf8; }
+.recipe-edit-store-section-icon.is-jar { color: #f87171; }
+.recipe-edit-store-section-icon.is-oil { color: #fbbf24; }
+.recipe-edit-store-section-icon.is-home,
+.recipe-edit-store-section-icon.is-basket { color: #94a3b8; }
+.recipe-edit-store-section-icon.is-heart { color: #f472b6; }
+.recipe-edit-store-section-icon.is-paw { color: #c084fc; }
+
 @media (max-width: 1180px) {
     .recipe-edit-standalone-page .recipe-edit-restaurant-actions {
         display: flex;

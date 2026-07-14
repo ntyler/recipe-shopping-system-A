@@ -404,6 +404,39 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     assert "grid-column: 1 / -1;" in v5
 
 
+def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_value():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert "function ensureRecipeIngredientStoreSectionMenu()" in script
+    assert 'menu.id = "recipeIngredientStoreSectionMenu";' in script
+    assert 'menu.setAttribute("role", "listbox");' in script
+    assert 'class="recipe-edit-store-section-option${selected ? " is-selected" : ""}"' in script
+    assert "${recipeIngredientStoreSectionIconHtml(value)}" in script
+    assert 'role="option"' in script
+    assert "function chooseRecipeIngredientStoreSection(button)" in script
+    assert 'select.value = button.dataset.storeSectionValue || "";' in script
+    assert 'select.dispatchEvent(new Event("change", { bubbles: true }));' in script
+    assert "function bindRecipeIngredientStoreSectionControls(scope)" in script
+    assert 'trigger.setAttribute("role", "combobox");' in script
+    assert 'select.hidden = true;' in script
+    assert 'bindRecipeIngredientStoreSectionControls(row);' in script
+    assert 'bindRecipeIngredientStoreSectionControls(optionRow);' in script
+    assert "[data-recipe-edit-store-section-trigger]" in script
+    for icon_name in (
+        "fish", "snowflake", "package", "wheat", "sauce", "cookie",
+        "cup", "bread", "sandwich", "home", "heart", "paw",
+    ):
+        assert f'{icon_name}:' in script
+
+    assert ".recipe-edit-store-section-trigger" in css
+    assert ".recipe-edit-row-menu.recipe-edit-store-section-menu" in css
+    assert ".recipe-edit-store-section-option.is-selected" in css
+    assert ".recipe-edit-store-section-option.is-active" in css
+    assert ".recipe-edit-store-section-icon.is-fish" in css
+    assert ".recipe-edit-store-section-icon.is-paw" in css
+
+
 def test_bulk_image_generation_menus_include_title_image_scope():
     recipe_view = (ROOT / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
     current_log = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")

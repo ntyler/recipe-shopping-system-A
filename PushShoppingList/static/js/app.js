@@ -31779,6 +31779,18 @@ function recipeEditSvgIcon(name) {
         jar: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 4h8l-1 3H9L8 4Z"></path><path d="M7 9h10l1 10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L7 9Z"></path><path d="M9 13h6"></path></svg>',
         oil: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M10 3h4v4l2 2v11H8V9l2-2V3Z"></path><path d="M10 6h4"></path><path d="M9 12h6"></path><path d="M11 15h2"></path></svg>',
         basket: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M7 9 10 4"></path><path d="m17 9-3-5"></path><path d="M4 9h16l-2 10H6L4 9Z"></path><path d="M9 13v3"></path><path d="M15 13v3"></path></svg>',
+        fish: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 12c3-4 7-6 12-4l4-3v14l-4-3c-5 2-9 0-12-4Z"></path><path d="M8 12h.01"></path></svg>',
+        snowflake: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2v20"></path><path d="m4 6.5 16 11"></path><path d="m20 6.5-16 11"></path><path d="m9 4 3 3 3-3"></path><path d="m9 20 3-3 3 3"></path></svg>',
+        package: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m4 7 8-4 8 4v10l-8 4-8-4V7Z"></path><path d="m4 7 8 4 8-4"></path><path d="M12 11v10"></path></svg>',
+        wheat: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 21V6"></path><path d="M12 10C8 10 7 7 7 5c3 0 5 2 5 5Z"></path><path d="M12 14c4 0 5-3 5-5-3 0-5 2-5 5Z"></path><path d="M12 18c-4 0-5-3-5-5 3 0 5 2 5 5Z"></path></svg>',
+        sauce: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M9 3h6v4l2 3v10H7V10l2-3V3Z"></path><path d="M9 7h6"></path><path d="M9 13h6"></path></svg>',
+        cookie: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M20 12a8 8 0 1 1-8-8 4 4 0 0 0 4 4 4 4 0 0 0 4 4Z"></path><path d="M8 10h.01"></path><path d="M11 16h.01"></path><path d="M7 15h.01"></path></svg>',
+        cup: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 7h12v10a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V7Z"></path><path d="M17 10h2a3 3 0 0 1 0 6h-2"></path><path d="M8 3v2"></path><path d="M12 3v2"></path></svg>',
+        bread: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 20V9a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v11H5Z"></path><path d="M9 8h.01"></path><path d="M14 8h.01"></path></svg>',
+        sandwich: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m4 8 8-4 8 4-8 4-8-4Z"></path><path d="m4 12 8 4 8-4"></path><path d="m4 16 8 4 8-4"></path></svg>',
+        home: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m3 11 9-8 9 8"></path><path d="M5 10v11h14V10"></path><path d="M9 21v-6h6v6"></path></svg>',
+        heart: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 10.4-8.8 10.4S3.2 14 3.2 8.8A4.6 4.6 0 0 1 12 6.9a4.6 4.6 0 0 1 8.8 1.9Z"></path></svg>',
+        paw: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="7" cy="8" r="2"></circle><circle cx="17" cy="8" r="2"></circle><circle cx="12" cy="5" r="2"></circle><path d="M6.5 18c0-3 2.5-6 5.5-6s5.5 3 5.5 6c0 2-2 3-5.5 1.5C8.5 21 6.5 20 6.5 18Z"></path></svg>',
         search: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>',
         nutrition: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 21c4-4 8-8 8-12a8 8 0 0 0-16 0c0 4 4 8 8 12Z"></path><path d="M12 8v5"></path><path d="M9.5 10.5h5"></path></svg>',
         edit: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20Z"></path><path d="m13.5 6.5 3.5 3.5"></path></svg>',
@@ -31861,6 +31873,18 @@ function recipeIngredientStoreSectionIconName(section) {
     if (value.includes("DAIRY")) {
         return "dairy";
     }
+    if (value.includes("MEAT") || value.includes("SEAFOOD")) {
+        return "fish";
+    }
+    if (value.includes("FROZEN")) {
+        return "snowflake";
+    }
+    if (value.includes("DRY GOODS")) {
+        return "package";
+    }
+    if (value.includes("PASTA") || value.includes("RICE") || value.includes("GRAIN") || value.includes("BAKING")) {
+        return "wheat";
+    }
     if (value.includes("CANNED")) {
         return "can";
     }
@@ -31869,6 +31893,30 @@ function recipeIngredientStoreSectionIconName(section) {
     }
     if (value.includes("OIL") || value.includes("VINEGAR")) {
         return "oil";
+    }
+    if (value.includes("SAUCE") || value.includes("CONDIMENT")) {
+        return "sauce";
+    }
+    if (value.includes("SNACK")) {
+        return "cookie";
+    }
+    if (value.includes("BEVERAGE")) {
+        return "cup";
+    }
+    if (value.includes("BAKERY")) {
+        return "bread";
+    }
+    if (value.includes("DELI")) {
+        return "sandwich";
+    }
+    if (value.includes("HOUSEHOLD")) {
+        return "home";
+    }
+    if (value.includes("PERSONAL CARE")) {
+        return "heart";
+    }
+    if (value.includes("PET")) {
+        return "paw";
     }
     return "basket";
 }
@@ -31883,11 +31931,179 @@ function recipeIngredientStoreSectionIconHtml(section) {
 function syncRecipeIngredientStoreSectionControl(select) {
     const label = select ? select.closest(".recipe-edit-store-section-label") : null;
     const icon = label ? label.querySelector("[data-store-section-icon]") : null;
+    const triggerLabel = label ? label.querySelector("[data-store-section-trigger-label]") : null;
     if (icon) {
         const replacement = document.createElement("span");
         replacement.innerHTML = recipeIngredientStoreSectionIconHtml(select.value);
         icon.replaceWith(replacement.firstElementChild);
     }
+    if (triggerLabel) {
+        triggerLabel.textContent = recipeStoreSectionDisplayLabel(select.value);
+    }
+}
+
+function ensureRecipeIngredientStoreSectionMenu() {
+    let menu = document.getElementById("recipeIngredientStoreSectionMenu");
+    if (menu) {
+        return menu;
+    }
+
+    menu = document.createElement("div");
+    menu.id = "recipeIngredientStoreSectionMenu";
+    menu.className = "recipe-edit-row-menu recipe-edit-store-section-menu";
+    menu.setAttribute("role", "listbox");
+    menu.setAttribute("aria-label", "Store sections");
+    menu.hidden = true;
+    document.body.appendChild(menu);
+    return menu;
+}
+
+function renderRecipeIngredientStoreSectionMenu(menu, select) {
+    if (!menu || !select) {
+        return;
+    }
+
+    const selectedValue = String(select.value || "").toUpperCase();
+    menu.innerHTML = [...select.options].map((option, index) => {
+        const value = String(option.value || "");
+        const selected = value.toUpperCase() === selectedValue;
+        return `
+            <button type="button"
+                    id="recipeIngredientStoreSectionOption${index}"
+                    role="option"
+                    aria-selected="${selected ? "true" : "false"}"
+                    class="recipe-edit-store-section-option${selected ? " is-selected" : ""}"
+                    data-store-section-value="${escapeAttribute(value)}"
+                    onclick="return chooseRecipeIngredientStoreSection(this)">
+                ${recipeIngredientStoreSectionIconHtml(value)}
+                <span class="recipe-edit-store-section-option-label">${escapeHtml(option.textContent || recipeStoreSectionDisplayLabel(value))}</span>
+                <span class="recipe-edit-store-section-option-check" aria-hidden="true">${recipeEditSvgIcon("check")}</span>
+            </button>
+        `;
+    }).join("");
+
+    const options = recipeEditListboxOptions(menu);
+    const selectedIndex = options.findIndex(option => option.getAttribute("aria-selected") === "true");
+    setRecipeEditListboxActiveOption(menu, selectedIndex >= 0 ? selectedIndex : 0);
+}
+
+function openRecipeIngredientStoreSectionMenu(trigger) {
+    const label = trigger ? trigger.closest(".recipe-edit-store-section-label") : null;
+    const select = label ? label.querySelector('select[data-field="store_section"]') : null;
+    if (!trigger || !select) {
+        return false;
+    }
+
+    const menu = ensureRecipeIngredientStoreSectionMenu();
+    if (!menu.hidden && menu.recipeEditAnchorButton === trigger) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    closeRecipeEditRowMenus();
+    menu.recipeEditAnchorButton = trigger;
+    menu.recipeEditStoreSectionSelect = select;
+    menu.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    renderRecipeIngredientStoreSectionMenu(menu, select);
+    positionRecipeEditPopupMenu(menu, trigger);
+    return false;
+}
+
+function chooseRecipeIngredientStoreSection(button) {
+    const menu = button ? button.closest(".recipe-edit-store-section-menu") : null;
+    const select = menu ? menu.recipeEditStoreSectionSelect : null;
+    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    if (!select) {
+        return false;
+    }
+
+    select.value = button.dataset.storeSectionValue || "";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    closeRecipeEditRowMenus();
+    if (trigger) {
+        trigger.focus({ preventScroll: true });
+    }
+    return false;
+}
+
+function handleRecipeIngredientStoreSectionKeydown(event, trigger) {
+    if (!event || !trigger) {
+        return;
+    }
+
+    const menu = document.getElementById("recipeIngredientStoreSectionMenu");
+    const isOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === trigger);
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+        event.preventDefault();
+        if (!isOpen) {
+            openRecipeIngredientStoreSectionMenu(trigger);
+            return;
+        }
+        const currentIndex = Number(menu.dataset.activeIndex || 0);
+        setRecipeEditListboxActiveOption(menu, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+        return;
+    }
+    if (!isOpen) {
+        return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        const optionCount = recipeEditListboxOptions(menu).length;
+        setRecipeEditListboxActiveOption(menu, event.key === "Home" ? 0 : optionCount - 1);
+    } else if (event.key === "Enter" || event.key === " ") {
+        const activeOption = recipeEditListboxOptions(menu)[Number(menu.dataset.activeIndex || 0)];
+        if (activeOption) {
+            event.preventDefault();
+            chooseRecipeIngredientStoreSection(activeOption);
+        }
+    } else if (event.key === "Escape") {
+        event.preventDefault();
+        closeRecipeEditRowMenus();
+    } else if (event.key === "Tab") {
+        closeRecipeEditRowMenus();
+    }
+}
+
+function bindRecipeIngredientStoreSectionControls(scope) {
+    if (!recipeEditorStandalonePageIsActive()) {
+        return;
+    }
+    scope.querySelectorAll('select[data-field="store_section"]').forEach(select => {
+        if (select.dataset.storeSectionControlBound === "true") {
+            return;
+        }
+        select.dataset.storeSectionControlBound = "true";
+        const label = select.closest(".recipe-edit-store-section-label");
+        if (!label) {
+            return;
+        }
+
+        label.querySelector("[data-store-section-icon]")?.remove();
+        const trigger = document.createElement("button");
+        trigger.type = "button";
+        trigger.className = "recipe-edit-store-section-trigger";
+        trigger.dataset.recipeEditStoreSectionTrigger = "true";
+        trigger.setAttribute("role", "combobox");
+        trigger.setAttribute("aria-haspopup", "listbox");
+        trigger.setAttribute("aria-controls", "recipeIngredientStoreSectionMenu");
+        trigger.setAttribute("aria-expanded", "false");
+        trigger.innerHTML = `
+            ${recipeIngredientStoreSectionIconHtml(select.value)}
+            <span data-store-section-trigger-label>${escapeHtml(recipeStoreSectionDisplayLabel(select.value))}</span>
+            <span class="recipe-edit-store-section-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
+        `;
+        trigger.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            openRecipeIngredientStoreSectionMenu(trigger);
+        });
+        trigger.addEventListener("keydown", event => handleRecipeIngredientStoreSectionKeydown(event, trigger));
+        select.addEventListener("change", () => syncRecipeIngredientStoreSectionControl(select));
+        select.hidden = true;
+        select.insertAdjacentElement("beforebegin", trigger);
+        syncRecipeIngredientStoreSectionControl(select);
+    });
 }
 
 function recipeIngredientTypeOptions(selected, optional = false) {
@@ -32030,12 +32246,12 @@ function ensureRecipeIngredientUnitMenu() {
     return menu;
 }
 
-function recipeIngredientUnitMenuOptions(menu) {
+function recipeEditListboxOptions(menu) {
     return menu ? [...menu.querySelectorAll('[role="option"]:not([disabled])')] : [];
 }
 
-function setRecipeIngredientUnitMenuActiveOption(menu, index) {
-    const options = recipeIngredientUnitMenuOptions(menu);
+function setRecipeEditListboxActiveOption(menu, index) {
+    const options = recipeEditListboxOptions(menu);
     if (!menu || !options.length) {
         if (menu && menu.recipeEditAnchorButton) {
             menu.recipeEditAnchorButton.removeAttribute("aria-activedescendant");
@@ -32094,9 +32310,9 @@ function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
         menu.insertAdjacentHTML("beforeend", '<div class="recipe-edit-unit-empty">No matching units</div>');
     }
 
-    const menuOptions = recipeIngredientUnitMenuOptions(menu);
+    const menuOptions = recipeEditListboxOptions(menu);
     const selectedIndex = menuOptions.findIndex(option => option.getAttribute("aria-selected") === "true");
-    setRecipeIngredientUnitMenuActiveOption(menu, selectedIndex >= 0 ? selectedIndex : 0);
+    setRecipeEditListboxActiveOption(menu, selectedIndex >= 0 ? selectedIndex : 0);
 }
 
 function openRecipeIngredientUnitPicker(input, options = {}) {
@@ -32146,7 +32362,7 @@ function handleRecipeIngredientUnitKeydown(event, input) {
             return;
         }
         const currentIndex = Number(menu.dataset.activeIndex || 0);
-        setRecipeIngredientUnitMenuActiveOption(menu, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+        setRecipeEditListboxActiveOption(menu, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
         return;
     }
     if (!isOpen) {
@@ -32154,10 +32370,10 @@ function handleRecipeIngredientUnitKeydown(event, input) {
     }
     if (event.key === "Home" || event.key === "End") {
         event.preventDefault();
-        const optionCount = recipeIngredientUnitMenuOptions(menu).length;
-        setRecipeIngredientUnitMenuActiveOption(menu, event.key === "Home" ? 0 : optionCount - 1);
+        const optionCount = recipeEditListboxOptions(menu).length;
+        setRecipeEditListboxActiveOption(menu, event.key === "Home" ? 0 : optionCount - 1);
     } else if (event.key === "Enter") {
-        const activeOption = recipeIngredientUnitMenuOptions(menu)[Number(menu.dataset.activeIndex || 0)];
+        const activeOption = recipeEditListboxOptions(menu)[Number(menu.dataset.activeIndex || 0)];
         if (activeOption) {
             event.preventDefault();
             chooseRecipeIngredientUnit(activeOption);
@@ -32737,6 +32953,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     organizeRecipeEditIngredientRow(row);
     bindRecipeIngredientNameField(row);
     bindRecipeIngredientUnitControls(row);
+    bindRecipeIngredientStoreSectionControls(row);
     bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
     bindRecipeIngredientSummaryUpdates(row);
@@ -32794,6 +33011,7 @@ function bindRecipeIngredientSubstitutionRow(optionRow) {
     optionRow.dataset.substitutionBound = "true";
     bindRecipeIngredientNameField(optionRow);
     bindRecipeIngredientUnitControls(optionRow);
+    bindRecipeIngredientStoreSectionControls(optionRow);
     bindRecipeIngredientBaseTracking(optionRow);
     optionRow.querySelectorAll("[data-field]").forEach(input => {
         const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
@@ -33158,6 +33376,8 @@ function positionRecipeEditPopupMenu(menu, button) {
         menu.style.minWidth = `${Math.ceil(buttonRect.width)}px`;
     } else if (menu.classList.contains("recipe-edit-unit-menu")) {
         menu.style.minWidth = `${Math.max(180, Math.ceil(buttonRect.width))}px`;
+    } else if (menu.classList.contains("recipe-edit-store-section-menu")) {
+        menu.style.minWidth = `${Math.max(220, Math.ceil(buttonRect.width))}px`;
     }
     const menuRect = menu.getBoundingClientRect();
     const menuWidth = menuRect.width;
@@ -33609,10 +33829,11 @@ function closeRecipeEditRowMenus() {
         menu.style.right = "";
         menu.style.minWidth = "";
         menu.dataset.activeIndex = "";
-        if (anchorButton && menu.classList.contains("recipe-edit-unit-menu")) {
+        if (anchorButton && menu.matches(".recipe-edit-unit-menu, .recipe-edit-store-section-menu")) {
             anchorButton.setAttribute("aria-expanded", "false");
             anchorButton.removeAttribute("aria-activedescendant");
         }
+        delete menu.recipeEditStoreSectionSelect;
         restoreRecipeEditPopupMenu(menu);
     });
     document.querySelectorAll(".recipe-edit-menu-wrap-open").forEach(wrap => {
@@ -33625,7 +33846,8 @@ function closeRecipeEditRowMenus() {
         ".recipe-edit-row-menu-btn, "
         + ".recipe-edit-row-menu-wrap button[aria-expanded], "
         + ".recipe-edit-section-menu-wrap button[aria-expanded], "
-        + "[data-recipe-edit-unit-trigger][aria-expanded]"
+        + "[data-recipe-edit-unit-trigger][aria-expanded], "
+        + "[data-recipe-edit-store-section-trigger][aria-expanded]"
     ).forEach(button => {
         button.setAttribute("aria-expanded", "false");
     });
@@ -33704,7 +33926,10 @@ function handleRecipeEditRowMenuOutsideClick(event) {
     if (
         target
         && typeof target.closest === "function"
-        && target.closest(".recipe-edit-row-menu, .recipe-edit-row-menu-btn, [data-recipe-edit-unit-trigger]")
+        && target.closest(
+            ".recipe-edit-row-menu, .recipe-edit-row-menu-btn, "
+            + "[data-recipe-edit-unit-trigger], [data-recipe-edit-store-section-trigger]"
+        )
     ) {
         return;
     }
@@ -33720,7 +33945,8 @@ function handleRecipeEditRowMenuEscape(event) {
     const button = document.querySelector(
         ".recipe-edit-row-menu-btn[aria-expanded=\"true\"], "
         + ".recipe-edit-section-menu-wrap button[aria-expanded=\"true\"], "
-        + "[data-recipe-edit-unit-trigger][aria-expanded=\"true\"]"
+        + "[data-recipe-edit-unit-trigger][aria-expanded=\"true\"], "
+        + "[data-recipe-edit-store-section-trigger][aria-expanded=\"true\"]"
     );
     event.preventDefault();
     closeRecipeEditRowMenus();
