@@ -45858,3 +45858,142 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions-body {
         overflow-x: auto;
     }
 }
+
+/* Ingredient editor v8: keep each substitution's primary fields on one row. */
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel {
+    --recipe-edit-substitution-grid:
+        56px
+        minmax(320px, 1.9fr)
+        96px
+        minmax(140px, 1fr)
+        minmax(170px, 1fr)
+        minmax(170px, 1fr)
+        80px
+        56px;
+    --recipe-edit-substitution-gap: 12px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-table-head,
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-option-row {
+    min-width: 1220px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-option-row {
+    align-items: center;
+    min-height: 64px !important;
+    row-gap: 8px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-thumbnail {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-ingredient-name-label {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 320px;
+    justify-self: stretch;
+    align-self: center;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-ingredient-title-line {
+    display: block;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel textarea[data-field="ingredient"] {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none;
+    min-height: 40px;
+    height: 40px !important;
+    max-height: 40px;
+    padding: 8px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-substitution-match-cell {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-preparation-inline {
+    grid-column: 4 !important;
+    grid-row: 1 !important;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-buy-as-label {
+    grid-column: 5 !important;
+    grid-row: 1 !important;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-store-section-label {
+    grid-column: 6 !important;
+    grid-row: 1 !important;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-optional-label {
+    grid-column: 7 !important;
+    grid-row: 1 !important;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-list .recipe-edit-row-menu-wrap {
+    grid-column: 8 !important;
+    grid-row: 1 !important;
+    align-self: center;
+    justify-self: center;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-details {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: max-content;
+    min-width: 0;
+    margin: 0;
+    align-self: center;
+    justify-self: end;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-details > summary {
+    min-height: 0;
+    padding: 4px 0;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-details[open] {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    width: 100%;
+    justify-self: stretch;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-details[open] > summary {
+    margin-left: auto;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-detail-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (max-width: 560px) {
+    body.recipe-edit-standalone-page .recipe-edit-substitution-table-head,
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-substitution-option-row {
+        min-width: 1220px;
+    }
+}

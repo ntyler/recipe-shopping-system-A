@@ -25600,7 +25600,7 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     `;
     const body = details.querySelector(".recipe-edit-substitution-detail-fields");
     detailFields.forEach(field => body.appendChild(field));
-    optionRow.appendChild(details);
+    name.appendChild(details);
 }
 
 function organizeRecipeEditIngredientRow(row) {

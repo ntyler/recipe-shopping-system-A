@@ -695,6 +695,69 @@ def test_recipe_editor_substitution_thumbnails_reuse_image_resolution_and_fallba
     assert ".recipe-edit-substitution-image-fallback[hidden]" in polish
 
 
+def test_recipe_editor_substitution_primary_fields_stay_inline_with_wide_ingredient_column():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    assert css.index("/* Ingredient editor v8:") > css.index("/* Ingredient editor v7:")
+    polish = css[css.index("/* Ingredient editor v8:"):]
+
+    assert "minmax(320px, 1.9fr)" in polish
+    assert "min-width: 1220px;" in polish
+    assert "--recipe-edit-substitution-gap: 12px;" in polish
+
+    name_start = polish.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-edit-ingredient-name-label {"
+    )
+    name_end = polish.index("}", name_start)
+    name_rule = polish[name_start:name_end]
+    assert "grid-column: 2 !important;" in name_rule
+    assert "grid-row: 1 !important;" in name_rule
+    assert "min-width: 320px;" in name_rule
+    assert "justify-self: stretch;" in name_rule
+
+    textarea_start = polish.index(
+        'body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel textarea[data-field="ingredient"] {'
+    )
+    textarea_end = polish.index("}", textarea_start)
+    textarea_rule = polish[textarea_start:textarea_end]
+    for rule in (
+        "width: 100% !important;",
+        "min-width: 0 !important;",
+        "height: 40px !important;",
+        "overflow-x: auto;",
+        "overflow-y: hidden;",
+        "white-space: nowrap;",
+    ):
+        assert rule in textarea_rule
+
+    inline_cells = (
+        ".recipe-edit-substitution-match-cell",
+        ".recipe-edit-preparation-inline",
+        ".recipe-edit-buy-as-label",
+        ".recipe-edit-store-section-label",
+        ".recipe-edit-optional-label",
+        ".recipe-edit-substitution-list .recipe-edit-row-menu-wrap",
+    )
+    for selector in inline_cells:
+        rule_start = polish.index(selector)
+        rule_end = polish.index("}", rule_start)
+        assert "grid-row: 1 !important;" in polish[rule_start:rule_end]
+
+    organizer_start = script.index("function organizeRecipeEditSubstitutionOptionRow")
+    organizer_end = script.index("function organizeRecipeEditIngredientRow", organizer_start)
+    organizer = script[organizer_start:organizer_end]
+    assert "name.appendChild(details);" in organizer
+    assert "optionRow.appendChild(details);" not in organizer
+
+    details_open_start = polish.index(
+        ".recipe-edit-ingredient-options-panel .recipe-edit-substitution-details[open] {"
+    )
+    details_open_end = polish.index("}", details_open_start)
+    details_open = polish[details_open_start:details_open_end]
+    assert "grid-column: 1 / -1 !important;" in details_open
+    assert "grid-row: 2 !important;" in details_open
+
+
 def test_recipe_editor_advanced_fields_pair_preparation_and_buy_as():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     polish = css[css.index("/* Ingredient editor v6:"):]
