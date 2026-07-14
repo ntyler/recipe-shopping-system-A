@@ -185,6 +185,61 @@ def test_recipe_editor_save_matches_master_by_normalized_name_without_id(monkeyp
     assert master_data.master_record_for_name("ingredients", master_data.LOCAL_USER_ID, "broth") is None
 
 
+def test_recipe_editor_custom_store_section_round_trips_without_overwriting_master(monkeypatch, tmp_path):
+    configure_editor_master_sync(monkeypatch, tmp_path)
+    url = "https://example.com/international-broth-soup"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "International Broth Soup",
+        "ingredients": [{"ingredient": "Chicken broth", "store_section": "CANNED"}],
+        "instructions": [{"instruction": "Simmer."}],
+    })
+    master_data.sync_recipe_master_records(
+        url,
+        recipe_data={"ingredients": [{"ingredient": "Chicken broth", "store_section": "CANNED"}]},
+        user_id=master_data.LOCAL_USER_ID,
+    )
+    local_broth = master_data.master_record_for_name(
+        "ingredients",
+        master_data.LOCAL_USER_ID,
+        "chicken broth",
+    )
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        recipe_payload(url, [{
+            "ingredient_id": str(local_broth["id"]),
+            "ingredient": "Chicken broth",
+            "normalized_name": "chicken broth",
+            "store_section": "International Foods",
+            "store_section_custom": True,
+            "substitutions": [{
+                "ingredient": "Miso broth",
+                "store_section": "Asian Market",
+                "store_section_custom": True,
+            }],
+        }]),
+    )
+
+    assert result["ok"] is True
+    saved = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+    assert saved["store_section"] == "International Foods"
+    assert saved["store_section_custom"] is True
+    assert saved["substitutions"][0]["store_section"] == "Asian Market"
+    assert saved["substitutions"][0]["store_section_custom"] is True
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]["ingredients"][0]
+    assert loaded["store_section"] == "International Foods"
+    assert loaded["store_section_custom"] is True
+    assert loaded["substitutions"][0]["store_section"] == "Asian Market"
+    assert loaded["substitutions"][0]["store_section_custom"] is True
+    assert master_data.master_record_for_name(
+        "ingredients",
+        master_data.LOCAL_USER_ID,
+        "chicken broth",
+    )["store_section"] == "CANNED"
+
+
 def test_recipe_editor_missing_store_section_defaults_to_misc(monkeypatch, tmp_path, capsys):
     configure_editor_master_sync(monkeypatch, tmp_path)
     url = "https://example.com/mystery-soup"

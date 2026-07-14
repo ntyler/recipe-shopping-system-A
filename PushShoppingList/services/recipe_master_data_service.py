@@ -1748,11 +1748,19 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             normalized_name = normalized_master_name(
                 item.get("master_normalized_name") or item.get("normalized_name")
             )
-            store_section = resolve_ingredient_store_section(
-                " ".join(part for part in (name, buy_as, original_text, normalized_name) if part),
-                item.get("store_section") or item.get("section"),
-                default="",
-            )
+            store_section_custom = truthy(item.get("store_section_custom"))
+            if store_section_custom:
+                store_section = re.sub(
+                    r"\s+",
+                    " ",
+                    str(item.get("store_section") or "").strip(),
+                )[:60]
+            else:
+                store_section = resolve_ingredient_store_section(
+                    " ".join(part for part in (name, buy_as, original_text, normalized_name) if part),
+                    item.get("store_section") or item.get("section"),
+                    default="",
+                )
             optional = truthy(item.get("optional"))
             image_url, image_path = compact_image_fields(item, "ingredient_image_url", "image_url")
         else:
@@ -1771,6 +1779,7 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             buy_as = ""
             normalized_name = ""
             store_section = ""
+            store_section_custom = False
             optional = False
             image_url = ""
             image_path = ""
@@ -1791,6 +1800,7 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             "unit_custom": unit_custom,
             "buy_as": buy_as,
             "store_section": store_section,
+            "store_section_custom": store_section_custom,
             "original_recipe_text": original_text,
             "optional": optional,
             "sort_order": index,
@@ -2051,7 +2061,7 @@ def update_ingredient_master_record_from_recipe_row(
         row.get("store_section"),
     )
     next_section = previous_section
-    if force_store_section or previous_section == "MISC":
+    if not row.get("store_section_custom") and (force_store_section or previous_section == "MISC"):
         next_section = proposed_section
 
     image_url = clean_text(row.get("image_url"))

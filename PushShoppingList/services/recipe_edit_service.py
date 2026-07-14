@@ -9239,6 +9239,10 @@ def recipe_edit_add_master_record_to_lookup(lookup, row):
         lookup["by_normalized_name"][normalized] = record
 
 
+def clean_recipe_custom_store_section(value):
+    return re.sub(r"\s+", " ", str(value or "").strip())[:60]
+
+
 def recipe_edit_ingredient_master_lookup(ingredients, recipe_url=None):
     lookup = ingredient_master_records_for_items(ingredients)
     lookup = {
@@ -9274,6 +9278,13 @@ def recipe_edit_master_record_for_ingredient(item, master_lookup):
 def recipe_edit_store_section_for_ingredient(item, master_lookup, recipe_id=""):
     ingredient_name = recipe_edit_ingredient_name(item)
     master_record = recipe_edit_master_record_for_ingredient(item, master_lookup)
+    custom_section = (
+        clean_recipe_custom_store_section(item.get("store_section"))
+        if truthy(item.get("store_section_custom"))
+        else ""
+    )
+    if custom_section:
+        return custom_section, master_record
     if master_record:
         section = resolve_ingredient_store_section(
             recipe_edit_ingredient_classification_text(item, master_record),
@@ -9369,6 +9380,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "food_review": normalize_food_review_payload(item.get("food_review")),
             "optional": bool(item.get("optional")),
             "store_section": store_section,
+            "store_section_custom": truthy(item.get("store_section_custom")),
             "store_section_order": ingredient_store_section_sort_key(store_section),
             "purchasable_item": item.get("purchasable_item") or item.get("buy_as") or "",
             "purchase_group": item.get("purchase_group") or "",
@@ -9587,13 +9599,23 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
                     **option,
                 }
 
-    return [
-        {
-            **metadata_by_name.get(instruction_match_text_key(row.get("ingredient")), {}),
-            **row,
-        }
-        for row in normalized
-    ]
+    rows = []
+    for row in normalized:
+        metadata = metadata_by_name.get(instruction_match_text_key(row.get("ingredient")), {})
+        merged = {**metadata, **row}
+        custom_section = (
+            clean_recipe_custom_store_section(metadata.get("store_section"))
+            if truthy(metadata.get("store_section_custom"))
+            else ""
+        )
+        if custom_section:
+            merged["store_section"] = custom_section
+            merged["store_section_custom"] = True
+            merged["store_section_order"] = ingredient_store_section_sort_key(custom_section)
+        else:
+            merged["store_section_custom"] = False
+        rows.append(merged)
+    return rows
 
 
 def sanitize_ingredients(value, existing_value=None):
@@ -9653,21 +9675,35 @@ def sanitize_ingredients(value, existing_value=None):
             or (existing_rows[index] if index < len(existing_rows) else {})
             or {}
         )
-        store_section = resolve_ingredient_store_section(
-            " ".join(
-                part
-                for part in (
-                    name,
-                    item.get("purchasable_item") or item.get("buy_as"),
-                    original_text,
-                    item.get("normalized_name"),
-                    item.get("master_normalized_name"),
-                )
-                if part
-            ),
-            item.get("store_section") or existing.get("store_section"),
-            default="MISC",
+        store_section_custom = (
+            truthy(item.get("store_section_custom"))
+            if "store_section_custom" in item
+            else truthy(existing.get("store_section_custom"))
         )
+        custom_store_section = (
+            clean_recipe_custom_store_section(item.get("store_section") or existing.get("store_section"))
+            if store_section_custom
+            else ""
+        )
+        if custom_store_section:
+            store_section = custom_store_section
+        else:
+            store_section_custom = False
+            store_section = resolve_ingredient_store_section(
+                " ".join(
+                    part
+                    for part in (
+                        name,
+                        item.get("purchasable_item") or item.get("buy_as"),
+                        original_text,
+                        item.get("normalized_name"),
+                        item.get("master_normalized_name"),
+                    )
+                    if part
+                ),
+                item.get("store_section") or existing.get("store_section"),
+                default="MISC",
+            )
         ingredient_image_url = (
             nullable_string(item.get("ingredient_image_url") or item.get("image_url"))
             or nullable_string(existing.get("ingredient_image_url") or existing.get("image_url"))
@@ -9739,6 +9775,7 @@ def sanitize_ingredients(value, existing_value=None):
             "food_review": normalize_food_review_payload(item.get("food_review")),
             "optional": bool(item.get("optional")),
             "store_section": store_section,
+            "store_section_custom": store_section_custom,
             "store_section_order": ingredient_store_section_sort_key(store_section),
             "purchasable_item": nullable_string(item.get("purchasable_item") or item.get("buy_as")),
             "purchase_group": nullable_string(item.get("purchase_group")),

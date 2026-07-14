@@ -38269,9 +38269,12 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 
 .recipe-edit-row-menu.recipe-edit-store-section-menu {
     min-width: 220px;
-    max-width: min(280px, calc(100vw - 16px));
+    max-width: min(320px, calc(100vw - 16px));
     max-height: min(360px, calc(100vh - 16px));
     padding: 6px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option {
@@ -38320,6 +38323,80 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 .recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option-check :is(.recipe-edit-inline-icon, svg) {
     width: 16px;
     height: 16px;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-menu-list {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-menu-footer {
+    flex: 0 0 auto;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--submenu-divider);
+    background: var(--app-surface);
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-add-option {
+    width: 100%;
+    color: var(--app-primary-hover);
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-add-option > :is(.recipe-edit-inline-icon, svg) {
+    width: 15px;
+    height: 15px;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-custom-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 34px 34px;
+    align-items: center;
+    gap: 2px;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-custom-row .recipe-edit-store-section-option {
+    width: 100%;
+    min-width: 0;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-edit-button,
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-delete-button {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-muted);
+    cursor: pointer;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-edit-button:hover,
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-edit-button.is-active,
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-edit-button:focus-visible {
+    background: var(--app-surface-soft);
+    color: var(--app-primary-hover);
+    outline: none;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-delete-button:hover,
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-delete-button.is-active,
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-delete-button:focus-visible {
+    background: color-mix(in srgb, var(--app-danger, #ff6b6b) 12%, var(--app-surface-soft));
+    color: var(--app-danger, #ff6b6b);
+    outline: none;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu :is(.recipe-edit-store-section-edit-button, .recipe-edit-store-section-delete-button) :is(.recipe-edit-inline-icon, svg) {
+    width: 14px;
+    height: 14px;
 }
 
 .recipe-edit-store-section-icon.is-leaf { color: #4ade80; }

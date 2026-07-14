@@ -33037,17 +33037,140 @@ function recipeIngredientStoreSectionIconHtml(section) {
                   aria-hidden="true">${recipeEditSvgIcon(iconName)}</span>`;
 }
 
+const RECIPE_INGREDIENT_CUSTOM_STORE_SECTIONS_KEY = "recipeIngredientCustomStoreSections";
+
+function recipeIngredientStoreSectionKey(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ");
+}
+
+function recipeIngredientBuiltInStoreSectionValue(value) {
+    const key = recipeIngredientStoreSectionKey(value);
+    if (!key) {
+        return "";
+    }
+    return (recipeEditStoreSections || []).find(section => {
+        return recipeIngredientStoreSectionKey(section) === key
+            || recipeIngredientStoreSectionKey(recipeStoreSectionDisplayLabel(section)) === key;
+    }) || "";
+}
+
+function recipeIngredientCustomStoreSectionNames() {
+    try {
+        const values = JSON.parse(
+            safeStorageGet(localStorage, RECIPE_INGREDIENT_CUSTOM_STORE_SECTIONS_KEY) || "[]",
+        );
+        const names = [];
+        const seen = new Set();
+        (Array.isArray(values) ? values : []).forEach(value => {
+            const name = String(value || "").trim().replace(/\s+/g, " ").slice(0, 60);
+            const key = recipeIngredientStoreSectionKey(name);
+            if (name && !recipeIngredientBuiltInStoreSectionValue(name) && !seen.has(key)) {
+                names.push(name);
+                seen.add(key);
+            }
+        });
+        return names;
+    } catch (error) {
+        console.warn("Unable to load custom ingredient store sections.", error);
+        return [];
+    }
+}
+
+function refreshRecipeIngredientStoreSectionSelectOptions(scope = document) {
+    const selects = scope.matches && scope.matches('select[data-field="store_section"]')
+        ? [scope]
+        : [...scope.querySelectorAll('select[data-field="store_section"]')];
+    selects.forEach(select => {
+        const selectedValue = String(select.value || "").trim();
+        select.innerHTML = recipeStoreSectionOptions(selectedValue);
+        select.value = recipeIngredientBuiltInStoreSectionValue(selectedValue) || selectedValue;
+        syncRecipeIngredientStoreSectionControl(select);
+    });
+}
+
+function storeRecipeIngredientCustomStoreSectionNames(values) {
+    const names = [];
+    const seen = new Set();
+    (Array.isArray(values) ? values : []).forEach(value => {
+        const name = String(value || "").trim().replace(/\s+/g, " ").slice(0, 60);
+        const key = recipeIngredientStoreSectionKey(name);
+        if (name && !recipeIngredientBuiltInStoreSectionValue(name) && !seen.has(key)) {
+            names.push(name);
+            seen.add(key);
+        }
+    });
+    safeStorageSet(localStorage, RECIPE_INGREDIENT_CUSTOM_STORE_SECTIONS_KEY, JSON.stringify(names));
+    refreshRecipeIngredientStoreSectionSelectOptions();
+    return names;
+}
+
+function saveRecipeIngredientCustomStoreSectionName(value) {
+    const name = String(value || "").trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!name) {
+        return "";
+    }
+    const builtIn = recipeIngredientBuiltInStoreSectionValue(name);
+    if (builtIn) {
+        return builtIn;
+    }
+    const names = recipeIngredientCustomStoreSectionNames();
+    const existing = names.find(item => (
+        recipeIngredientStoreSectionKey(item) === recipeIngredientStoreSectionKey(name)
+    ));
+    if (existing) {
+        return existing;
+    }
+    storeRecipeIngredientCustomStoreSectionNames([...names, name]);
+    return name;
+}
+
+function replaceRecipeIngredientCustomStoreSectionName(previousValue, nextValue) {
+    const previousKey = recipeIngredientStoreSectionKey(previousValue);
+    const names = recipeIngredientCustomStoreSectionNames();
+    if (!previousKey || !names.some(name => recipeIngredientStoreSectionKey(name) === previousKey)) {
+        return false;
+    }
+
+    const nextName = String(nextValue || "").trim().replace(/\s+/g, " ").slice(0, 60);
+    const builtIn = recipeIngredientBuiltInStoreSectionValue(nextName);
+    const replacement = builtIn || nextName || "MISC";
+    const nextNames = names
+        .filter(name => recipeIngredientStoreSectionKey(name) !== previousKey)
+        .concat(nextName && !builtIn ? [nextName] : []);
+    storeRecipeIngredientCustomStoreSectionNames(nextNames);
+
+    document.querySelectorAll('select[data-field="store_section"]').forEach(select => {
+        if (recipeIngredientStoreSectionKey(select.value) !== previousKey) {
+            return;
+        }
+        select.value = replacement;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    return true;
+}
+
 function syncRecipeIngredientStoreSectionControl(select) {
     const label = select ? select.closest(".recipe-edit-store-section-label") : null;
     const icon = label ? label.querySelector("[data-store-section-icon]") : null;
     const triggerLabel = label ? label.querySelector("[data-store-section-trigger-label]") : null;
+    const row = select ? select.closest(".recipe-edit-ingredient-row") : null;
+    const customField = row ? recipeIngredientDirectField(row, "store_section_custom") : null;
+    const selectedValue = String(select && select.value || "").trim();
+    const isCustom = Boolean(selectedValue && !recipeIngredientBuiltInStoreSectionValue(selectedValue));
+    if (customField) {
+        customField.value = isCustom ? "true" : "false";
+    }
     if (icon) {
         const replacement = document.createElement("span");
-        replacement.innerHTML = recipeIngredientStoreSectionIconHtml(select.value);
+        replacement.innerHTML = recipeIngredientStoreSectionIconHtml(selectedValue);
         icon.replaceWith(replacement.firstElementChild);
     }
     if (triggerLabel) {
-        triggerLabel.textContent = recipeStoreSectionDisplayLabel(select.value);
+        triggerLabel.textContent = recipeStoreSectionDisplayLabel(selectedValue);
     }
 }
 
@@ -33072,11 +33195,13 @@ function renderRecipeIngredientStoreSectionMenu(menu, select) {
         return;
     }
 
-    const selectedValue = String(select.value || "").toUpperCase();
-    menu.innerHTML = [...select.options].map((option, index) => {
+    refreshRecipeIngredientStoreSectionSelectOptions(select);
+    const selectedValue = recipeIngredientStoreSectionKey(select.value);
+    const optionMarkup = [...select.options].map((option, index) => {
         const value = String(option.value || "");
-        const selected = value.toUpperCase() === selectedValue;
-        return `
+        const selected = recipeIngredientStoreSectionKey(value) === selectedValue;
+        const custom = option.dataset.custom === "true";
+        const optionButton = `
             <button type="button"
                     id="recipeIngredientStoreSectionOption${index}"
                     role="option"
@@ -33089,7 +33214,56 @@ function renderRecipeIngredientStoreSectionMenu(menu, select) {
                 <span class="recipe-edit-store-section-option-check" aria-hidden="true">${recipeEditSvgIcon("check")}</span>
             </button>
         `;
+        if (!custom) {
+            return optionButton;
+        }
+        return `
+            <div class="recipe-edit-store-section-custom-row">
+                ${optionButton}
+                <button type="button"
+                        id="recipeIngredientStoreSectionEdit${index}"
+                        role="option"
+                        aria-selected="false"
+                        class="recipe-edit-store-section-edit-button"
+                        data-store-section-action="edit-custom"
+                        data-store-section-value="${escapeAttribute(value)}"
+                        aria-label="Edit custom store section ${escapeAttribute(value)}"
+                        title="Rename ${escapeAttribute(value)}"
+                        onclick="return editRecipeIngredientCustomStoreSection(this)">
+                    ${recipeEditSvgIcon("edit")}
+                </button>
+                <button type="button"
+                        id="recipeIngredientStoreSectionDelete${index}"
+                        role="option"
+                        aria-selected="false"
+                        class="recipe-edit-store-section-delete-button"
+                        data-store-section-action="delete-custom"
+                        data-store-section-value="${escapeAttribute(value)}"
+                        aria-label="Delete custom store section ${escapeAttribute(value)}"
+                        title="Delete ${escapeAttribute(value)}"
+                        onclick="return deleteRecipeIngredientCustomStoreSection(this)">
+                    ${recipeEditSvgIcon("trash")}
+                </button>
+            </div>
+        `;
     }).join("");
+    menu.innerHTML = `
+        <div class="recipe-edit-store-section-menu-list" data-store-section-menu-list>
+            ${optionMarkup}
+        </div>
+        <div class="recipe-edit-store-section-menu-footer">
+            <button type="button"
+                    id="recipeIngredientStoreSectionAddCustom"
+                    role="option"
+                    aria-selected="false"
+                    class="recipe-edit-store-section-option recipe-edit-store-section-add-option"
+                    data-store-section-action="add-custom"
+                    onclick="return addRecipeIngredientCustomStoreSection(this)">
+                ${recipeEditSvgIcon("plus")}
+                <span class="recipe-edit-store-section-option-label">Add custom section…</span>
+            </button>
+        </div>
+    `;
 
     const options = recipeEditListboxOptions(menu);
     const selectedIndex = options.findIndex(option => option.getAttribute("aria-selected") === "true");
@@ -33120,6 +33294,15 @@ function openRecipeIngredientStoreSectionMenu(trigger) {
 }
 
 function chooseRecipeIngredientStoreSection(button) {
+    if (button && button.dataset.storeSectionAction === "add-custom") {
+        return addRecipeIngredientCustomStoreSection(button);
+    }
+    if (button && button.dataset.storeSectionAction === "edit-custom") {
+        return editRecipeIngredientCustomStoreSection(button);
+    }
+    if (button && button.dataset.storeSectionAction === "delete-custom") {
+        return deleteRecipeIngredientCustomStoreSection(button);
+    }
     const menu = button ? button.closest(".recipe-edit-store-section-menu") : null;
     const select = menu ? menu.recipeEditStoreSectionSelect : null;
     const trigger = menu ? menu.recipeEditAnchorButton : null;
@@ -33133,6 +33316,81 @@ function chooseRecipeIngredientStoreSection(button) {
     if (trigger) {
         trigger.focus({ preventScroll: true });
     }
+    return false;
+}
+
+function addRecipeIngredientCustomStoreSection(button) {
+    const menu = button ? button.closest(".recipe-edit-store-section-menu") : null;
+    const select = menu ? menu.recipeEditStoreSectionSelect : null;
+    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    if (!select) {
+        return false;
+    }
+
+    const requested = window.prompt("Add a custom store section", "");
+    if (requested === null) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+    const name = String(requested || "").trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!name) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+
+    select.value = saveRecipeIngredientCustomStoreSectionName(name);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    closeRecipeEditRowMenus();
+    if (trigger) trigger.focus({ preventScroll: true });
+    return false;
+}
+
+function editRecipeIngredientCustomStoreSection(button) {
+    const menu = button ? button.closest(".recipe-edit-store-section-menu") : null;
+    const select = menu ? menu.recipeEditStoreSectionSelect : null;
+    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    const currentName = String(button && button.dataset.storeSectionValue || "").trim();
+    if (!menu || !select || !currentName) {
+        return false;
+    }
+
+    const requested = window.prompt(`Rename custom store section "${currentName}".`, currentName);
+    if (requested === null) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+    const nextName = String(requested || "").trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!nextName) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+
+    replaceRecipeIngredientCustomStoreSectionName(currentName, nextName);
+    renderRecipeIngredientStoreSectionMenu(menu, select);
+    positionRecipeEditPopupMenu(menu, trigger);
+    if (trigger) trigger.focus({ preventScroll: true });
+    return false;
+}
+
+function deleteRecipeIngredientCustomStoreSection(button) {
+    const menu = button ? button.closest(".recipe-edit-store-section-menu") : null;
+    const select = menu ? menu.recipeEditStoreSectionSelect : null;
+    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    const currentName = String(button && button.dataset.storeSectionValue || "").trim();
+    if (!menu || !select || !currentName) {
+        return false;
+    }
+    if (!window.confirm(
+        `Delete custom store section "${currentName}"? Open ingredient rows using it will be moved to Misc.`,
+    )) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+
+    replaceRecipeIngredientCustomStoreSectionName(currentName, "");
+    renderRecipeIngredientStoreSectionMenu(menu, select);
+    positionRecipeEditPopupMenu(menu, trigger);
+    if (trigger) trigger.focus({ preventScroll: true });
     return false;
 }
 
@@ -33186,6 +33444,16 @@ function bindRecipeIngredientStoreSectionControls(scope) {
         const label = select.closest(".recipe-edit-store-section-label");
         if (!label) {
             return;
+        }
+
+        const row = select.closest(".recipe-edit-ingredient-row");
+        const customField = row ? recipeIngredientDirectField(row, "store_section_custom") : null;
+        const savedAsCustom = customField && String(customField.value || "").toLowerCase() === "true";
+        const selectedValue = String(select.value || "").trim();
+        if (savedAsCustom && selectedValue && !recipeIngredientBuiltInStoreSectionValue(selectedValue)) {
+            saveRecipeIngredientCustomStoreSectionName(selectedValue);
+        } else {
+            refreshRecipeIngredientStoreSectionSelectOptions(select);
         }
 
         label.querySelector("[data-store-section-icon]")?.remove();
@@ -34041,6 +34309,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
             <input type="hidden" data-field="unit_review_required" value="${escapeAttribute(option.unit_review_required ? "true" : "false")}">
             <input type="hidden" data-field="unit_review_value" value="${escapeAttribute(option.unit_review_value || "")}">
             <input type="hidden" data-field="unit_custom" value="${escapeAttribute(option.unit_custom ? "true" : "false")}">
+            <input type="hidden" data-field="store_section_custom" value="${escapeAttribute(option.store_section_custom ? "true" : "false")}">
             <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(option.recipe_qty || option.quantity || "")}">
             <input type="hidden" data-field="purchase_group" value="${escapeAttribute(option.purchase_group || "")}">
             <input type="hidden" data-field="parsed_name" value="${escapeAttribute(option.parsed_name || option.ingredient || "")}">
@@ -34357,6 +34626,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         <input type="hidden" data-field="unit_review_required" value="${escapeAttribute(item.unit_review_required ? "true" : "false")}">
         <input type="hidden" data-field="unit_review_value" value="${escapeAttribute(item.unit_review_value || "")}">
         <input type="hidden" data-field="unit_custom" value="${escapeAttribute(item.unit_custom ? "true" : "false")}">
+        <input type="hidden" data-field="store_section_custom" value="${escapeAttribute(item.store_section_custom ? "true" : "false")}">
         <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
         <input type="hidden" data-field="purchase_group" value="${escapeAttribute(item.purchase_group || "")}">
         <input type="hidden" data-field="parsed_name" value="${escapeAttribute(item.parsed_name || "")}">
@@ -36791,14 +37061,31 @@ function recipeStoreSectionDisplayLabel(section) {
 }
 
 function recipeStoreSectionOptions(selected) {
-    const selectedValue = String(selected || "").toUpperCase();
-    const sections = recipeEditStoreSections.length ? recipeEditStoreSections : ["MISC"];
+    const selectedValue = String(selected || "").trim();
+    const builtIns = recipeEditStoreSections.length ? recipeEditStoreSections : ["MISC"];
+    const customNames = recipeIngredientCustomStoreSectionNames();
+    const values = builtIns.map(value => ({ value: String(value || ""), custom: false }));
+    const seen = new Set(values.map(item => recipeIngredientStoreSectionKey(item.value)));
+    customNames.forEach(value => {
+        const key = recipeIngredientStoreSectionKey(value);
+        if (key && !seen.has(key)) {
+            values.push({ value, custom: true });
+            seen.add(key);
+        }
+    });
+    const selectedBuiltIn = recipeIngredientBuiltInStoreSectionValue(selectedValue);
+    const canonicalSelectedValue = selectedBuiltIn || selectedValue;
+    const selectedKey = recipeIngredientStoreSectionKey(canonicalSelectedValue);
+    if (selectedKey && !seen.has(selectedKey)) {
+        values.push({ value: canonicalSelectedValue, custom: true });
+    }
 
-    return sections.map(section => {
-        const value = String(section || "");
-        const isSelected = value.toUpperCase() === selectedValue ? " selected" : "";
+    return values.map(item => {
+        const value = item.value;
+        const isSelected = recipeIngredientStoreSectionKey(value) === selectedKey ? " selected" : "";
+        const custom = item.custom ? ' data-custom="true"' : "";
         const label = recipeStoreSectionDisplayLabel(value);
-        return `<option value="${escapeAttribute(value)}"${isSelected}>${escapeHtml(label)}</option>`;
+        return `<option value="${escapeAttribute(value)}"${custom}${isSelected}>${escapeHtml(label)}</option>`;
     }).join("");
 }
 

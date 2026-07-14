@@ -9555,15 +9555,27 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
             )
             if part
         )
-        store_section = resolve_ingredient_store_section(
-            review_text,
-            clean_recipe_text(raw_option.get("store_section") or ""),
-            default="",
+        store_section_custom = str(raw_option.get("store_section_custom") or "").strip().lower() in {
+            "1", "true", "yes", "y", "on",
+        }
+        custom_store_section = (
+            clean_recipe_text(raw_option.get("store_section") or "")[:60]
+            if store_section_custom
+            else ""
         )
-        if store_section not in STORE_SECTION_ORDER:
-            store_section = classify_store_section(review_text)
-        if store_section not in STORE_SECTION_ORDER:
-            store_section = parent_item.get("store_section") or "MISC"
+        if custom_store_section:
+            store_section = custom_store_section
+        else:
+            store_section_custom = False
+            store_section = resolve_ingredient_store_section(
+                review_text,
+                clean_recipe_text(raw_option.get("store_section") or ""),
+                default="",
+            )
+            if store_section not in STORE_SECTION_ORDER:
+                store_section = classify_store_section(review_text)
+            if store_section not in STORE_SECTION_ORDER:
+                store_section = parent_item.get("store_section") or "MISC"
 
         quantity = clean_recipe_text(raw_option.get("quantity") or "")
         unit = clean_recipe_text(raw_option.get("unit") or "")
@@ -9599,6 +9611,7 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
             "food_review": raw_option.get("food_review") if isinstance(raw_option.get("food_review"), dict) else {},
             "optional": bool(raw_option.get("optional", True)),
             "store_section": store_section,
+            "store_section_custom": store_section_custom,
             "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),
             "purchasable_item": clean_recipe_text(raw_option.get("purchasable_item") or raw_option.get("buy_as") or item_name),
             "buy_as": clean_recipe_text(raw_option.get("buy_as") or raw_option.get("purchasable_item") or item_name),
@@ -9965,11 +9978,24 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
             )
             if part
         )
-        store_section = resolve_ingredient_store_section(
-            store_section_text,
-            item.get("store_section") or item.get("section"),
+        store_section_custom = str(item.get("store_section_custom") or "").strip().lower() in {
+            "1", "true", "yes", "y", "on",
+        }
+        custom_store_section = (
+            clean_recipe_text(item.get("store_section") or "")[:60]
+            if store_section_custom
+            else ""
         )
+        if custom_store_section:
+            store_section = custom_store_section
+        else:
+            store_section_custom = False
+            store_section = resolve_ingredient_store_section(
+                store_section_text,
+                item.get("store_section") or item.get("section"),
+            )
         item["store_section"] = store_section
+        item["store_section_custom"] = store_section_custom
         item["store_section_order"] = STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"])
 
     apply_recipe_note_substitutions_to_ingredients(

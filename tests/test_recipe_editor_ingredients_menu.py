@@ -833,6 +833,16 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert "function chooseRecipeIngredientStoreSection(button)" in script
     assert 'select.value = button.dataset.storeSectionValue || "";' in script
     assert 'select.dispatchEvent(new Event("change", { bubbles: true }));' in script
+    assert 'const RECIPE_INGREDIENT_CUSTOM_STORE_SECTIONS_KEY = "recipeIngredientCustomStoreSections";' in script
+    assert "function saveRecipeIngredientCustomStoreSectionName(value)" in script
+    assert "function addRecipeIngredientCustomStoreSection(button)" in script
+    assert "function editRecipeIngredientCustomStoreSection(button)" in script
+    assert "function deleteRecipeIngredientCustomStoreSection(button)" in script
+    assert 'data-field="store_section_custom"' in script
+    assert "recipe-edit-store-section-menu-list" in script
+    assert "recipe-edit-store-section-menu-footer" in script
+    assert "Add custom section…" in script
+    assert "if (!custom)" in script
     assert "function bindRecipeIngredientStoreSectionControls(scope)" in script
     assert 'trigger.setAttribute("role", "combobox");' in script
     assert 'select.hidden = true;' in script
@@ -849,6 +859,10 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert ".recipe-edit-row-menu.recipe-edit-store-section-menu" in css
     assert ".recipe-edit-store-section-option.is-selected" in css
     assert ".recipe-edit-store-section-option.is-active" in css
+    assert ".recipe-edit-store-section-custom-row" in css
+    assert ".recipe-edit-store-section-edit-button" in css
+    assert ".recipe-edit-store-section-delete-button" in css
+    assert ".recipe-edit-store-section-menu-footer" in css
     assert ".recipe-edit-store-section-icon.is-fish" in css
     assert ".recipe-edit-store-section-icon.is-paw" in css
 
