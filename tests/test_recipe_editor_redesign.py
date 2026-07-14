@@ -1067,7 +1067,7 @@ def test_recipe_editor_ingredients_workspace_spans_both_desktop_editing_columns(
     assert ".recipe-edit-standalone-page .recipe-edit-context-sidebar {\n        grid-column: 3;\n        grid-row: 1 / 3;" in wide_workspace
 
 
-def test_recipe_editor_wide_ingredients_workspace_grows_and_scrolls_internally():
+def test_recipe_editor_wide_ingredients_workspace_grows_without_sticky_headers():
     css = read_text("PushShoppingList/static/css/app.css")
 
     wide_workspace_start = css.index("/* Wide recipe workspace:")
@@ -1075,11 +1075,16 @@ def test_recipe_editor_wide_ingredients_workspace_grows_and_scrolls_internally()
 
     assert ".recipe-edit-standalone-page .recipe-edit-backdrop.open {\n        display: flex;\n        min-height: 100%;" in wide_workspace
     assert "grid-template-rows: auto minmax(360px, 1fr);" in wide_workspace
-    assert ".recipe-edit-standalone-page .recipe-edit-tab-list {\n        position: sticky;" in wide_workspace
-    assert ".recipe-edit-ingredients-section > .recipe-edit-section-header {\n        position: sticky;" in wide_workspace
+    assert ".recipe-edit-standalone-page .recipe-edit-tab-list {\n        position: static;" in wide_workspace
+    assert ".recipe-edit-ingredients-section > .recipe-edit-section-header {\n        position: static;" in wide_workspace
     assert ".recipe-edit-ingredients-section:not([hidden]) {\n        display: flex;" in wide_workspace
     assert ".recipe-edit-ingredients-section .recipe-edit-ingredient-table-scroll {" in wide_workspace
     assert "flex: 1 1 auto;\n        overflow: auto;" in wide_workspace
+    ingredient_polish = wide_workspace[wide_workspace.index("/* Ingredient editor v7:"):]
+    assert ".recipe-edit-standalone-page .recipe-edit-tab-list," in ingredient_polish
+    assert ".recipe-edit-standalone-page .recipe-edit-ingredient-table-head {\n    position: static;" in ingredient_polish
+    assert "top: auto;" in ingredient_polish
+    assert "z-index: auto;" in ingredient_polish
 
 
 def test_recipe_editor_description_loads_and_saves_existing_field(monkeypatch, tmp_path):

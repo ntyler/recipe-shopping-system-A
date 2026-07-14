@@ -33545,6 +33545,71 @@ function recipeIngredientSubstitutionRatio(option = {}) {
     return String(option.ratio || option.substitution_ratio || option.conversion_ratio || "").trim();
 }
 
+function recipeIngredientImageCandidateUrl(value) {
+    if (typeof value === "string") {
+        return value.trim();
+    }
+    if (!value || typeof value !== "object") {
+        return "";
+    }
+
+    const directFields = [
+        "ingredient_image_url",
+        "image_url",
+        "thumbnail_url",
+        "thumb_url",
+        "src",
+        "url",
+        "path",
+    ];
+    for (const field of directFields) {
+        const candidate = value[field];
+        if (typeof candidate === "string") {
+            const directUrl = cookbookRecipeImageUrlFromRecord(value, [field]);
+            if (directUrl) {
+                return directUrl;
+            }
+        } else if (candidate && typeof candidate === "object") {
+            const nestedUrl = recipeIngredientImageCandidateUrl(candidate);
+            if (nestedUrl) {
+                return nestedUrl;
+            }
+        }
+    }
+
+    return recipeIngredientImageCandidateUrl(value.image)
+        || recipeIngredientImageCandidateUrl(value.ingredient_image)
+        || recipeIngredientImageCandidateUrl(value.thumbnail);
+}
+
+function recipeIngredientImageUrl(item = {}) {
+    const candidates = [
+        item.ingredient_image_url,
+        item.image_url,
+        item.thumbnail_url,
+        item.thumb_url,
+        item.image,
+        item.ingredient_image,
+        item.thumbnail,
+        item.matched_ingredient,
+        item.master_ingredient,
+        item.matched_master_ingredient,
+    ];
+    return candidates.map(recipeIngredientImageCandidateUrl).find(Boolean) || "";
+}
+
+function handleRecipeIngredientThumbnailError(image) {
+    if (!image) {
+        return;
+    }
+    image.hidden = true;
+    const thumbnail = image.closest(".recipe-edit-substitution-thumbnail");
+    const fallback = thumbnail ? thumbnail.querySelector("[data-substitution-image-fallback]") : null;
+    if (fallback) {
+        fallback.hidden = false;
+    }
+}
+
 function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
     const baseQuantity = option.base_quantity !== undefined && option.base_quantity !== null
         ? option.base_quantity
@@ -33553,7 +33618,8 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
         ? option.base_unit
         : option.unit || "";
     const optionNumber = String(index + 1);
-    const optionImageUrl = option.ingredient_image_url || option.image_url || "";
+    const optionIngredientName = String(option.ingredient || option.name || "Substitution").trim() || "Substitution";
+    const optionImageUrl = recipeIngredientImageUrl(option);
     const optionImageDisplayUrl = recipeImageVariantUrl(optionImageUrl, "thumb");
     const optionImageSrcSet = recipeImageVariantSrcSet(optionImageUrl);
     const matchQuality = recipeIngredientSubstitutionMatchQuality(option);
@@ -33564,15 +33630,23 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
         <div class="recipe-edit-substitution-option-row recipe-edit-ingredient-row" data-substitution-option-row>
             <span class="recipe-edit-row-handle recipe-edit-substitution-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
             <span class="recipe-edit-row-number recipe-edit-substitution-row-number" data-substitution-row-number>${escapeHtml(optionNumber)}</span>
-            <span class="recipe-edit-substitution-thumbnail" aria-hidden="true">
+            <span class="recipe-edit-substitution-thumbnail">
                 ${optionImageUrl ? `
                     <img src="${DEFERRED_IMAGE_PLACEHOLDER}"
                          data-deferred-src="${escapeAttribute(optionImageDisplayUrl)}"
                          ${optionImageSrcSet ? `data-deferred-srcset="${escapeAttribute(optionImageSrcSet)}"` : ""}
-                         sizes="38px"
-                         alt=""
+                         sizes="44px"
+                         alt="${escapeAttribute(optionIngredientName)} ingredient"
                          loading="lazy"
-                         decoding="async">` : recipeEditSvgIcon(recipeIngredientStoreSectionIconName(option.store_section || ""))}
+                         decoding="async"
+                         onerror="handleRecipeIngredientThumbnailError(this)">` : ""}
+                <span class="recipe-edit-substitution-image-fallback"
+                      data-substitution-image-fallback
+                      role="img"
+                      aria-label="No image available for ${escapeAttribute(optionIngredientName)}"
+                      ${optionImageUrl ? "hidden" : ""}>
+                    ${recipeEditSvgIcon("basket")}
+                </span>
             </span>
             <div class="recipe-edit-ingredient-name-label">
                 <span class="sr-only">Substitution ingredient</span>
@@ -33654,6 +33728,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0) {
             <input type="hidden" data-field="id" value="${escapeAttribute(option.id || "")}">
             <input type="hidden" data-field="substitution_id" value="${escapeAttribute(option.substitution_id || "")}">
             <input type="hidden" data-field="ingredient_id" value="${escapeAttribute(option.ingredient_id || option.master_ingredient_id || "")}">
+            <input type="hidden" data-field="ingredient_image_url" value="${escapeAttribute(optionImageUrl)}">
             <input type="hidden" data-field="section" value="${escapeAttribute(option.section || "")}">
             <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
             <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
@@ -33727,7 +33802,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     const baseUnit = item.base_unit !== undefined && item.base_unit !== null
         ? item.base_unit
         : item.unit || "";
-    const ingredientImageUrl = item.ingredient_image_url || item.image_url || "";
+    const ingredientImageUrl = recipeIngredientImageUrl(item);
     const ingredientImageDisplayUrl = recipeImageVariantUrl(ingredientImageUrl, "thumb");
     const ingredientImageSrcSet = recipeImageVariantSrcSet(ingredientImageUrl);
     const ingredientImageGeneratedAt = item.ingredient_image_generated_at || item.image_generated_at || "";
@@ -34416,16 +34491,34 @@ function positionRecipeEditPopupMenu(menu, button) {
     const dialogRect = dialog
         ? dialog.getBoundingClientRect()
         : { top: 0, bottom: window.innerHeight };
+    const ingredientCard = isIngredientOptionsMenu
+        ? button.closest(".recipe-edit-tabs-card")
+        : null;
+    const ingredientCardRect = ingredientCard ? ingredientCard.getBoundingClientRect() : null;
 
     menu.classList.add("recipe-edit-floating-menu");
     portalRecipeEditPopupMenu(menu, button);
     menu.style.left = "0px";
     menu.style.top = "0px";
     menu.style.right = "auto";
+    menu.style.width = "";
     menu.style.minWidth = "";
+    menu.style.maxWidth = "";
 
     const buttonRect = button.getBoundingClientRect();
-    if (menu.classList.contains("recipe-edit-cookbook-menu")) {
+    const horizontalLeftLimit = isIngredientOptionsMenu && ingredientCardRect
+        ? Math.max(margin, ingredientCardRect.left + 12)
+        : margin;
+    const horizontalRightLimit = isIngredientOptionsMenu && ingredientCardRect
+        ? Math.min(window.innerWidth - margin, ingredientCardRect.right - 12)
+        : window.innerWidth - margin;
+    if (isIngredientOptionsMenu) {
+        const availableWidth = Math.max(0, horizontalRightLimit - horizontalLeftLimit);
+        const popupWidth = Math.min(1080, availableWidth);
+        menu.style.width = `${Math.floor(popupWidth)}px`;
+        menu.style.minWidth = "0px";
+        menu.style.maxWidth = `${Math.floor(availableWidth)}px`;
+    } else if (menu.classList.contains("recipe-edit-cookbook-menu")) {
         menu.style.minWidth = `${Math.ceil(buttonRect.width)}px`;
     } else if (menu.classList.contains("recipe-edit-unit-menu")) {
         menu.style.minWidth = `${Math.max(180, Math.ceil(buttonRect.width))}px`;
@@ -34437,13 +34530,13 @@ function positionRecipeEditPopupMenu(menu, button) {
     const menuHeight = menuRect.height;
     const topLimit = Math.max(margin, dialogRect.top + margin);
     const bottomLimit = Math.min(window.innerHeight - margin, dialogRect.bottom - margin);
-    const rightLimit = window.innerWidth - margin;
+    const rightLimit = horizontalRightLimit;
 
     let left = buttonRect.right - menuWidth;
-    if (isIngredientOptionsMenu && left < margin && buttonRect.left + menuWidth <= rightLimit) {
+    if (isIngredientOptionsMenu && left < horizontalLeftLimit && buttonRect.left + menuWidth <= rightLimit) {
         left = buttonRect.left;
     }
-    left = Math.max(margin, Math.min(left, rightLimit - menuWidth));
+    left = Math.max(horizontalLeftLimit, Math.min(left, rightLimit - menuWidth));
 
     let top = buttonRect.bottom + gap;
     const hasRoomAbove = buttonRect.top - gap - menuHeight >= topLimit;

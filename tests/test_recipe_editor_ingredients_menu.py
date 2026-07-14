@@ -464,7 +464,7 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     assert "minmax(180px, 1.8fr)" in v5
     assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in v5
     assert "min-height: 64px !important;" in v5
-    assert "position: sticky;" in v5
+    assert "position: static;" in v5
     assert ".recipe-edit-ingredient-match-status" in v5
     assert "grid-column: 10;" in v5
     assert "grid-column: 3 / 11;" in v5
@@ -540,12 +540,12 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
         110px
         160px
         110px
-        140px
+        160px
         88px;"""
     assert desktop_grid in polish
     assert "--recipe-edit-ingredient-column-gap: 12px;" in polish
     assert "overflow-x: auto;" in polish
-    assert "min-width: 1186px;" in polish
+    assert "min-width: 1206px;" in polish
     assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in polish
 
     options_start = polish.index(
@@ -554,8 +554,8 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     options_end = polish.index("}", options_start)
     options = polish[options_start:options_end]
     for rule in (
-        "display: flex;", "align-items: center;", "width: 100%;", "min-width: 130px;",
-        "max-width: 160px;", "height: 38px;", "padding: 0 12px;", "flex: 1 1 auto;",
+        "display: flex;", "align-items: center;", "width: 100%;", "min-width: 150px;",
+        "max-width: 165px;", "height: 38px;", "padding: 0 12px 0 13px;", "flex: 1 1 auto;",
         "justify-content: space-between;", "gap: 8px;", "overflow: visible;",
         "text-indent: 0;", "white-space: nowrap;", "aspect-ratio: auto;",
     ):
@@ -579,17 +579,19 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert "min-width: 88px;" in actions
 
     assert "minmax(160px, 1.35fr)" in polish
+    assert "min-width: 1186px;" in polish
     assert "min-width: 1166px;" in polish
-    assert "min-width: 1146px;" in polish
-    assert "min-width: 1132px;" in polish
+    assert "min-width: 1152px;" in polish
 
-    assert "width: min(680px, calc(100vw - 32px));" in polish
-    assert "min-width: min(620px, calc(100vw - 32px));" in polish
-    assert "minmax(130px, 1.4fr)" in polish
+    assert "width: min(1080px, calc(100vw - 32px));" in polish
+    assert "min-width: min(760px, calc(100vw - 32px));" in polish
+    assert "minmax(170px, 1.5fr)" in polish
     assert ".recipe-edit-buy-as-label" in polish
-    assert "min-width: 120px;" in polish
+    assert "min-width: 160px;" in polish
     assert "overflow-wrap: break-word;" in polish
     assert "word-break: normal;" in polish
+    assert "white-space: normal;" in polish
+    assert "hyphens: none;" in polish
 
     position_start = script.index("function positionRecipeEditPopupMenu")
     position_end = script.index("function portalRecipeEditPopupMenu", position_start)
@@ -597,6 +599,9 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert 'menu.classList.contains("recipe-edit-ingredient-row-menu")' in position
     assert "const margin = isIngredientOptionsMenu ? 16 : 8;" in position
     assert "const gap = isIngredientOptionsMenu ? 10 : 6;" in position
+    assert 'button.closest(".recipe-edit-tabs-card")' in position
+    assert "const availableWidth = Math.max(0, horizontalRightLimit - horizontalLeftLimit);" in position
+    assert "const popupWidth = Math.min(1080, availableWidth);" in position
     assert "buttonRect.left + menuWidth <= rightLimit" in position
 
     assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
@@ -645,14 +650,49 @@ def test_recipe_editor_substitutions_use_accessible_mini_table_without_losing_fi
     header_indexes = [organizer.index(f'<span role="columnheader">{label}</span>') for label in header_labels]
     assert header_indexes == sorted(header_indexes)
 
-    assert "width: min(520px, calc(100vw - 24px));" in polish
+    assert "width: min(1080px, calc(100vw - 32px));" in polish
     assert "--recipe-edit-substitution-grid:" in polish
     assert "grid-template-columns: var(--recipe-edit-substitution-grid) !important;" in polish
     assert ".recipe-edit-substitution-view-all" in polish
     assert "border-top: 1px solid var(--app-border-strong);" in polish
-    assert "min-width: 500px;" in polish
+    assert "min-width: 1000px;" in polish
     assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
     assert '`${optionRows.length} substitution${optionRows.length === 1 ? "" : "s"}`' in script
+
+
+def test_recipe_editor_substitution_thumbnails_reuse_image_resolution_and_fallbacks():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    resolver_start = script.index("function recipeIngredientImageCandidateUrl")
+    resolver_end = script.index("function recipeIngredientSubstitutionOptionRowHtml", resolver_start)
+    resolver = script[resolver_start:resolver_end]
+    assert "function recipeIngredientImageUrl(item = {})" in resolver
+    for field in (
+        "ingredient_image_url", "image_url", "thumbnail_url", "thumb_url",
+        "matched_ingredient", "master_ingredient", "matched_master_ingredient",
+    ):
+        assert field in resolver
+    assert "cookbookRecipeImageUrlFromRecord" in resolver
+
+    row_start = script.index("function recipeIngredientSubstitutionOptionRowHtml")
+    row_end = script.index("function recipeIngredientSubstitutionOptionsHtml", row_start)
+    row = script[row_start:row_end]
+    assert "recipeIngredientImageUrl(option)" in row
+    assert 'recipeImageVariantUrl(optionImageUrl, "thumb")' in row
+    assert "data-deferred-src" in row
+    assert 'sizes="44px"' in row
+    assert 'alt="${escapeAttribute(optionIngredientName)} ingredient"' in row
+    assert 'onerror="handleRecipeIngredientThumbnailError(this)"' in row
+    assert "data-substitution-image-fallback" in row
+    assert 'recipeEditSvgIcon("basket")' in row
+    assert 'data-field="ingredient_image_url"' in row
+    assert "recipeIngredientStoreSectionIconName" not in row
+
+    polish = css[css.index("/* Ingredient editor v7:"):]
+    assert ".recipe-edit-substitution-thumbnail img" in polish
+    assert "object-fit: cover;" in polish
+    assert ".recipe-edit-substitution-image-fallback[hidden]" in polish
 
 
 def test_recipe_editor_advanced_fields_pair_preparation_and_buy_as():
