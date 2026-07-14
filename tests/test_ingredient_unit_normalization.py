@@ -284,6 +284,11 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert "function replaceRecipeIngredientCustomUnitName(previousValue, nextValue)" in app_js
     assert "function editRecipeIngredientCustomUnit(button)" in app_js
     assert "function deleteRecipeIngredientCustomUnit(button)" in app_js
+    assert 'const signature = `${sourceText}\\n${JSON.stringify(customNames)}`;' in app_js
+    assert 'payload = JSON.parse(sourceText || "{}") || payload;' in app_js
+    assert "const units = [...customUnits, ...canonicalUnits];" in app_js
+    assert "if (savedAsCustom && selectedValue)" in app_js
+    assert "saveRecipeIngredientCustomUnitName(selectedValue);" in app_js
     assert 'data-unit-action="add-custom"' in app_js
     assert 'data-unit-action="edit-custom"' in app_js
     assert 'data-unit-action="delete-custom"' in app_js
@@ -309,6 +314,7 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert ".recipe-edit-unit-custom-row" in app_css
     assert ".recipe-edit-unit-edit-button" in app_css
     assert ".recipe-edit-unit-delete-button" in app_css
+    assert ".recipe-edit-unit-menu-list {\n    flex: 1 1 auto;" in app_css
     assert 'data-field="unit_id"' in app_js
     assert 'data-field="unit_raw"' in app_js
     assert 'data-field="unit_custom"' in app_js

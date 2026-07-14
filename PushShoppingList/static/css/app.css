@@ -38326,6 +38326,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 }
 
 .recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-menu-list {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
@@ -46104,6 +46105,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-e
 }
 
 .recipe-edit-row-menu.recipe-edit-unit-menu .recipe-edit-unit-menu-list {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;

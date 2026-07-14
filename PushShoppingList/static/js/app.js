@@ -33583,15 +33583,16 @@ function replaceRecipeIngredientCustomUnitName(previousValue, nextValue) {
 
 function recipeIngredientUnitRegistry() {
     const source = document.getElementById("ingredientUnitConfig");
+    const sourceText = source ? source.textContent : "";
     const customNames = recipeIngredientCustomUnitNames();
-    const signature = `${source ? source.textContent : ""}\n${customNames.join("|")}`;
+    const signature = `${sourceText}\n${JSON.stringify(customNames)}`;
     if (recipeIngredientUnitRegistryCache && recipeIngredientUnitRegistryCache.signature === signature) {
         return recipeIngredientUnitRegistryCache;
     }
 
     let payload = { units: [], aliases: {} };
     try {
-        payload = JSON.parse(signature || "{}") || payload;
+        payload = JSON.parse(sourceText || "{}") || payload;
     } catch (error) {
         console.warn("Unable to load the ingredient unit registry.", error);
     }
@@ -33600,7 +33601,7 @@ function recipeIngredientUnitRegistry() {
     const customUnits = customNames
         .filter(name => !canonicalKeys.has(recipeIngredientUnitKey(name)))
         .map(name => ({ id: "", name, category: "custom", custom: true }));
-    const units = [...canonicalUnits, ...customUnits];
+    const units = [...customUnits, ...canonicalUnits];
     const aliases = {
         ...(payload.aliases && typeof payload.aliases === "object" ? payload.aliases : {}),
     };
@@ -34001,6 +34002,13 @@ function bindRecipeIngredientUnitControls(scope) {
             return;
         }
         input.dataset.unitControlBound = "true";
+        const row = input.closest(".recipe-edit-ingredient-row");
+        const customField = row ? recipeIngredientDirectField(row, "unit_custom") : null;
+        const savedAsCustom = customField && String(customField.value || "").toLowerCase() === "true";
+        const selectedValue = String(input.value || "").trim();
+        if (savedAsCustom && selectedValue) {
+            saveRecipeIngredientCustomUnitName(selectedValue);
+        }
         input.setAttribute("role", "combobox");
         input.setAttribute("aria-autocomplete", "list");
         input.setAttribute("aria-haspopup", "listbox");
@@ -37064,12 +37072,13 @@ function recipeStoreSectionOptions(selected) {
     const selectedValue = String(selected || "").trim();
     const builtIns = recipeEditStoreSections.length ? recipeEditStoreSections : ["MISC"];
     const customNames = recipeIngredientCustomStoreSectionNames();
-    const values = builtIns.map(value => ({ value: String(value || ""), custom: false }));
+    const values = customNames.map(value => ({ value, custom: true }));
     const seen = new Set(values.map(item => recipeIngredientStoreSectionKey(item.value)));
-    customNames.forEach(value => {
+    builtIns.forEach(value => {
+        value = String(value || "");
         const key = recipeIngredientStoreSectionKey(value);
         if (key && !seen.has(key)) {
-            values.push({ value, custom: true });
+            values.push({ value, custom: false });
             seen.add(key);
         }
     });

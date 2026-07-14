@@ -838,6 +838,7 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert "function addRecipeIngredientCustomStoreSection(button)" in script
     assert "function editRecipeIngredientCustomStoreSection(button)" in script
     assert "function deleteRecipeIngredientCustomStoreSection(button)" in script
+    assert "const values = customNames.map(value => ({ value, custom: true }));" in script
     assert 'data-field="store_section_custom"' in script
     assert "recipe-edit-store-section-menu-list" in script
     assert "recipe-edit-store-section-menu-footer" in script
@@ -863,6 +864,7 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert ".recipe-edit-store-section-edit-button" in css
     assert ".recipe-edit-store-section-delete-button" in css
     assert ".recipe-edit-store-section-menu-footer" in css
+    assert ".recipe-edit-store-section-menu-list {\n    flex: 1 1 auto;" in css
     assert ".recipe-edit-store-section-icon.is-fish" in css
     assert ".recipe-edit-store-section-icon.is-paw" in css
 
