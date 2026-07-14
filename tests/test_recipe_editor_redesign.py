@@ -766,13 +766,13 @@ def test_recipe_editor_ingredient_options_use_compact_anchored_menu():
     assert 'optionsButton.classList.add("recipe-edit-ingredient-options-button")' in organize
     assert "More ingredient actions" in organize
     assert "organizeRecipeEditSubstitutionOptionRow" in script
-    assert 'label.textContent = optionRows.length ? optionLabel : "No options";' in script
+    assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
 
     v4_css = css[css.index("/* Recipe workspace v4: homepage alignment and compact tab editors. */"):]
     assert "grid-template-columns: 18px 40px minmax(210px, 1fr) 68px 104px 148px 88px 96px 30px 30px !important;" in v4_css
     assert ".recipe-edit-ingredient-options-button" in v4_css
     assert ".recipe-edit-ingredient-options-panel" in v4_css
-    assert "width: min(380px, calc(100vw - 24px));" in v4_css
+    assert "width: min(520px, calc(100vw - 24px));" in v4_css
 
 
 def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls():

@@ -88,7 +88,7 @@ def test_recipe_editor_ingredient_substitutions_are_wired():
     assert "recipe-edit-substitution-option-row recipe-edit-ingredient-row" in script
     assert "data-ingredient-substitution-list" in row_block
     assert "data-ingredient-substitution-title" in row_block
-    assert "Add Option" in row_block
+    assert "Add substitution" in row_block
     assert "Add substitution option" in row_block
     assert 'data-field="substitutions_text"' not in row_block
     assert "bindRecipeIngredientSubstitutionRows(row);" in row_block
@@ -402,6 +402,107 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     assert "@media (max-width: 760px)" in v5
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in v5
     assert "grid-column: 1 / -1;" in v5
+
+
+def test_recipe_editor_ingredient_polish_uses_professional_grid_and_command_bar():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8"
+    )
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    polish = css[css.index("/* Ingredient editor v6:"):]
+
+    assert 'class="recipe-edit-add-ingredient-button"' in template
+    assert ".recipe-edit-add-ingredient-button" in polish
+    assert "min-height: 40px;" in polish
+    assert "minmax(144px, 1.25fr)" in polish
+    for width in ("80px", "120px", "170px", "128px"):
+        assert width in polish
+    assert "min-width: 1152px;" in polish
+    assert "min-height: 60px !important;" in polish
+    assert "line-height: 14px;" in polish
+    assert "white-space: pre-wrap;" in polish
+    assert "box-shadow: inset 3px 0 0 var(--app-primary);" in polish
+    assert ".recipe-edit-ingredient-row.recipe-edit-menu-open" in polish
+    assert "width: 40px;" in polish
+    assert "height: 40px;" in polish
+    assert "text-transform: uppercase;" in polish
+    assert "white-space: nowrap;" in polish
+
+    action_start = script.index("function organizeRecipeEditCompactRowActions")
+    action_end = script.index("function updateRecipeEditIngredientDetailsState", action_start)
+    action_block = script[action_start:action_end]
+    assert action_block.index("recipe-edit-compact-row-details") < action_block.index("recipe-edit-compact-row-edit")
+    assert action_block.index("recipe-edit-compact-row-edit") < action_block.index("recipe-edit-compact-row-delete")
+    assert 'title="More details"' in action_block
+    assert 'title="Edit ${escapeAttribute(label)}"' in action_block
+    assert 'title="Delete ${escapeAttribute(label)}"' in action_block
+
+
+def test_recipe_editor_substitutions_use_accessible_mini_table_without_losing_fields():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    polish = css[css.index("/* Ingredient editor v6:"):]
+
+    substitution_start = script.index("function organizeRecipeEditSubstitutionOptionRow")
+    substitution_end = script.index("function organizeRecipeEditIngredientRow", substitution_start)
+    substitution = script[substitution_start:substitution_end]
+    details_start = substitution.index("const detailFields = [")
+    details_end = substitution.index("].filter(Boolean);", details_start)
+    detail_fields = substitution[details_start:details_end]
+    assert 'optionRow.setAttribute("role", "row");' in substitution
+    assert 'cell.setAttribute("role", "cell")' in substitution
+    for first_class_field in (
+        "recipe-edit-preparation-inline",
+        "recipe-edit-buy-as-label",
+        "recipe-edit-store-section-label",
+        "recipe-edit-optional-label",
+    ):
+        assert first_class_field in substitution
+        assert first_class_field not in detail_fields
+    for secondary_field in (
+        "recipe-edit-qty-label",
+        "recipe-edit-unit-label",
+        "recipe-edit-size-inline",
+        "recipe-edit-notes-inline",
+        "recipe-edit-original-text-label",
+    ):
+        assert secondary_field in detail_fields
+
+    organizer_start = script.index("function organizeRecipeEditIngredientRow(row)")
+    organizer_end = script.index("function organizeRecipeEditCompactRowActions", organizer_start)
+    organizer = script[organizer_start:organizer_end]
+    assert 'substitutionTable.setAttribute("role", "table");' in organizer
+    assert 'substitutionList.setAttribute("role", "rowgroup");' in organizer
+    header_labels = [
+        "Image", "Ingredient", "Match", "Preparation", "Buy As", "Store Section", "Optional", "Actions"
+    ]
+    header_indexes = [organizer.index(f'<span role="columnheader">{label}</span>') for label in header_labels]
+    assert header_indexes == sorted(header_indexes)
+
+    assert "width: min(520px, calc(100vw - 24px));" in polish
+    assert "--recipe-edit-substitution-grid:" in polish
+    assert "grid-template-columns: var(--recipe-edit-substitution-grid) !important;" in polish
+    assert ".recipe-edit-substitution-view-all" in polish
+    assert "border-top: 1px solid var(--app-border-strong);" in polish
+    assert "min-width: 500px;" in polish
+    assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
+    assert '`${optionRows.length} substitution${optionRows.length === 1 ? "" : "s"}`' in script
+
+
+def test_recipe_editor_advanced_fields_pair_preparation_and_buy_as():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    polish = css[css.index("/* Ingredient editor v6:"):]
+
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in polish
+    assert ".recipe-edit-preparation-inline { grid-column: 3; grid-row: 1; }" in polish
+    assert ".recipe-edit-buy-as-label { grid-column: 4; grid-row: 1; }" in polish
+    assert ".recipe-edit-original-text-label { grid-column: 1 / 4; grid-row: 2; }" in polish
+    assert ".recipe-edit-optional-label { grid-column: 4; grid-row: 2; }" in polish
+    assert "transition: max-height 180ms ease" in polish
+    assert "max-height: 900px;" in polish
+    assert "animation: recipe-edit-details-reveal 140ms ease-out;" in polish
+    assert "@media (prefers-reduced-motion: reduce)" in polish
 
 
 def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_value():
