@@ -33494,7 +33494,7 @@ function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
     });
     const optionRows = [{ id: "", name: "No unit", custom: false }, ...units];
 
-    menu.innerHTML = optionRows.map((unit, index) => {
+    const optionMarkup = optionRows.map((unit, index) => {
         const value = String(unit.name || "");
         const selected = value
             ? value.toLowerCase() === String(selectedName).toLowerCase()
@@ -33525,29 +33525,43 @@ function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
                         data-unit-action="edit-custom"
                         data-unit-value="${escapeAttribute(value)}"
                         aria-label="Edit custom unit ${escapeAttribute(value)}"
-                        title="Rename or delete ${escapeAttribute(value)}"
+                        title="Rename ${escapeAttribute(value)}"
                         onclick="return editRecipeIngredientCustomUnit(this)">
                     ${recipeEditSvgIcon("edit")}
+                </button>
+                <button type="button"
+                        id="recipeIngredientUnitDelete${index}"
+                        role="option"
+                        aria-selected="false"
+                        class="recipe-edit-unit-delete-button"
+                        data-unit-action="delete-custom"
+                        data-unit-value="${escapeAttribute(value)}"
+                        aria-label="Delete custom unit ${escapeAttribute(value)}"
+                        title="Delete ${escapeAttribute(value)}"
+                        onclick="return deleteRecipeIngredientCustomUnit(this)">
+                    ${recipeEditSvgIcon("trash")}
                 </button>
             </div>
         `;
     }).join("");
 
-    menu.insertAdjacentHTML("beforeend", `
-        <button type="button"
-                id="recipeIngredientUnitAddCustom"
-                role="option"
-                aria-selected="false"
-                class="recipe-edit-unit-option recipe-edit-unit-add-option"
-                data-unit-action="add-custom"
-                onclick="return addRecipeIngredientCustomUnit(this)">
-            <span>${recipeEditSvgIcon("plus")} Add custom unit…</span>
-        </button>
-    `);
-
-    if (!units.length && query) {
-        menu.insertAdjacentHTML("beforeend", '<div class="recipe-edit-unit-empty">No matching units</div>');
-    }
+    menu.innerHTML = `
+        <div class="recipe-edit-unit-menu-list" data-unit-menu-list>
+            ${optionMarkup}
+            ${!units.length && query ? '<div class="recipe-edit-unit-empty">No matching units</div>' : ""}
+        </div>
+        <div class="recipe-edit-unit-menu-footer">
+            <button type="button"
+                    id="recipeIngredientUnitAddCustom"
+                    role="option"
+                    aria-selected="false"
+                    class="recipe-edit-unit-option recipe-edit-unit-add-option"
+                    data-unit-action="add-custom"
+                    onclick="return addRecipeIngredientCustomUnit(this)">
+                <span>${recipeEditSvgIcon("plus")} Add custom unit…</span>
+            </button>
+        </div>
+    `;
 
     const menuOptions = recipeEditListboxOptions(menu);
     const selectedIndex = menuOptions.findIndex(option => option.getAttribute("aria-selected") === "true");
@@ -33578,6 +33592,9 @@ function chooseRecipeIngredientUnit(button) {
     }
     if (button && button.dataset.unitAction === "edit-custom") {
         return editRecipeIngredientCustomUnit(button);
+    }
+    if (button && button.dataset.unitAction === "delete-custom") {
+        return deleteRecipeIngredientCustomUnit(button);
     }
     const menu = button ? button.closest(".recipe-edit-unit-menu") : null;
     const input = menu ? menu.recipeEditAnchorButton : null;
@@ -33629,7 +33646,7 @@ function editRecipeIngredientCustomUnit(button) {
     }
 
     const requested = window.prompt(
-        `Rename custom unit "${currentName}". Leave the name blank to delete it.`,
+        `Rename custom unit "${currentName}".`,
         currentName,
     );
     if (requested === null) {
@@ -33638,14 +33655,33 @@ function editRecipeIngredientCustomUnit(button) {
     }
 
     const nextName = String(requested || "").trim().replace(/\s+/g, " ").slice(0, 40);
-    if (!nextName && !window.confirm(
+    if (!nextName) {
+        input.focus({ preventScroll: true });
+        return false;
+    }
+
+    replaceRecipeIngredientCustomUnitName(currentName, nextName);
+    renderRecipeIngredientUnitMenu(menu, input, { showAll: true });
+    positionRecipeEditPopupMenu(menu, input);
+    input.focus({ preventScroll: true });
+    return false;
+}
+
+function deleteRecipeIngredientCustomUnit(button) {
+    const menu = button ? button.closest(".recipe-edit-unit-menu") : null;
+    const input = menu ? menu.recipeEditAnchorButton : null;
+    const currentName = String(button && button.dataset.unitValue || "").trim();
+    if (!menu || !input || !currentName) {
+        return false;
+    }
+    if (!window.confirm(
         `Delete custom unit "${currentName}"? Open ingredient rows using it will be cleared.`,
     )) {
         input.focus({ preventScroll: true });
         return false;
     }
 
-    replaceRecipeIngredientCustomUnitName(currentName, nextName);
+    replaceRecipeIngredientCustomUnitName(currentName, "");
     renderRecipeIngredientUnitMenu(menu, input, { showAll: true });
     positionRecipeEditPopupMenu(menu, input);
     input.focus({ preventScroll: true });
@@ -34858,7 +34894,7 @@ function positionRecipeEditPopupMenu(menu, button) {
     } else if (menu.classList.contains("recipe-edit-cookbook-menu")) {
         menu.style.minWidth = `${Math.ceil(buttonRect.width)}px`;
     } else if (menu.classList.contains("recipe-edit-unit-menu")) {
-        menu.style.minWidth = `${Math.max(180, Math.ceil(buttonRect.width))}px`;
+        menu.style.minWidth = `${Math.max(240, Math.ceil(buttonRect.width))}px`;
     } else if (menu.classList.contains("recipe-edit-store-section-menu")) {
         menu.style.minWidth = `${Math.max(220, Math.ceil(buttonRect.width))}px`;
     }

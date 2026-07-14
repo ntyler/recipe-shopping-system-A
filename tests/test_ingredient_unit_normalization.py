@@ -283,9 +283,14 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert "function storeRecipeIngredientCustomUnitNames(values)" in app_js
     assert "function replaceRecipeIngredientCustomUnitName(previousValue, nextValue)" in app_js
     assert "function editRecipeIngredientCustomUnit(button)" in app_js
+    assert "function deleteRecipeIngredientCustomUnit(button)" in app_js
     assert 'data-unit-action="add-custom"' in app_js
     assert 'data-unit-action="edit-custom"' in app_js
+    assert 'data-unit-action="delete-custom"' in app_js
+    assert 'class="recipe-edit-unit-menu-list" data-unit-menu-list' in app_js
+    assert 'class="recipe-edit-unit-menu-footer"' in app_js
     assert 'aria-label="Edit custom unit ${escapeAttribute(value)}"' in app_js
+    assert 'aria-label="Delete custom unit ${escapeAttribute(value)}"' in app_js
     assert "Open ingredient rows using it will be cleared." in app_js
     assert 'document.querySelectorAll(\'.recipe-edit-ingredient-row [data-field="unit"]\')' in app_js
     assert "Add custom unit…" in app_js
@@ -299,8 +304,11 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert ".recipe-edit-unit-option.is-selected" in app_css
     assert ".recipe-edit-unit-option.is-active" in app_css
     assert ".recipe-edit-unit-add-option" in app_css
+    assert ".recipe-edit-unit-menu-list" in app_css
+    assert ".recipe-edit-unit-menu-footer" in app_css
     assert ".recipe-edit-unit-custom-row" in app_css
     assert ".recipe-edit-unit-edit-button" in app_css
+    assert ".recipe-edit-unit-delete-button" in app_css
     assert 'data-field="unit_id"' in app_js
     assert 'data-field="unit_raw"' in app_js
     assert 'data-field="unit_custom"' in app_js
