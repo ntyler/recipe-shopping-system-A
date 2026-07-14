@@ -2082,8 +2082,11 @@
                         </div>
                         <div id="recipeEditImageCardContent" class="recipe-edit-image-card-content"></div>
                     </section>
-                    <section class="recipe-edit-context-card recipe-edit-source-documents-card" data-source-documents-card>
-                        <div class="recipe-edit-source-documents-header">
+                    <details class="recipe-edit-context-card recipe-edit-source-documents-card"
+                             data-source-documents-card
+                             ontoggle="if (!this.open) closeRecipeSourceDocumentsHelp()"
+                             open>
+                        <summary class="recipe-edit-source-documents-header">
                             <span class="recipe-edit-source-documents-title">Source &amp; Documents
                                 <button type="button"
                                         class="recipe-edit-source-documents-help"
@@ -2094,7 +2097,7 @@
                                         onfocus="openRecipeSourceDocumentsHelp(this)">{{ shell.svg_icon("help") }}</button>
                             </span>
                             <button type="button" class="recipe-edit-source-documents-edit" onclick="return editRecipeSourceDocuments(this, event)">Edit</button>
-                        </div>
+                        </summary>
                             <aside id="recipeEditSourceDocumentsHelp" class="recipe-edit-source-documents-popover" role="dialog" aria-label="About Source and Documents" hidden>
                                 <strong>Source &amp; Documents</strong>
                                 <p>These files are associated with this recipe.</p>
@@ -2189,7 +2192,7 @@
                                 <a class="recipe-edit-document-secondary" href="#" target="_blank" rel="noopener noreferrer" data-document-download title="Open Cloudflare generated PDF in a new tab" aria-label="Open Cloudflare generated PDF in a new tab" hidden>{{ shell.svg_icon("external-link") }}</a>
                             </div>
                         </div>
-                    </section>
+                    </details>
 
                     <div class="recipe-edit-source-documents-modal-backdrop" data-source-documents-edit-modal onclick="if (event.target === this) return closeRecipeSourceDocumentsModal({ force: false })" hidden>
                         <section class="recipe-edit-source-documents-modal" role="dialog" aria-modal="true" aria-labelledby="recipeEditSourceDocumentsModalTitle">

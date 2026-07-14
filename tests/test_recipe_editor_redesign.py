@@ -625,7 +625,7 @@ def test_source_documents_card_uses_compact_rows_and_edit_modal():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
-    card_start = template.index('<section class="recipe-edit-context-card recipe-edit-source-documents-card"')
+    card_start = template.index('<details class="recipe-edit-context-card recipe-edit-source-documents-card"')
     card_end = template.index('<div class="recipe-edit-source-documents-modal-backdrop"', card_start)
     card = template[card_start:card_end]
     expected_labels = (
@@ -643,7 +643,9 @@ def test_source_documents_card_uses_compact_rows_and_edit_modal():
     assert "Original webpage the recipe was imported from." in card
     assert "Use Open to view a document." in card
     assert "recipe-edit-context-chevron" not in card
-    assert "<summary>" not in card
+    assert '<summary class="recipe-edit-source-documents-header">' in card
+    assert 'ontoggle="if (!this.open) closeRecipeSourceDocumentsHelp()"' in card
+    assert "open>" in card
     assert "recipe-edit-source-documents-toggle" not in card
     assert 'class="recipe-edit-source-documents-edit"' in card
     assert "toggleRecipeSourceDocumentsCard" not in script
