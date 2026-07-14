@@ -25552,18 +25552,43 @@ function organizeRecipeEditEquipmentTools() {
     viewSection.appendChild(collapseToggle);
 }
 
+const RECIPE_INGREDIENT_BUILT_IN_TYPES = [
+    { value: "main", label: "Main" },
+    { value: "optional", label: "Optional" },
+    { value: "garnish", label: "Garnish" },
+    { value: "topping", label: "Topping" },
+    { value: "sauce", label: "Sauce" },
+    { value: "substitute", label: "Substitute" },
+];
+
+function recipeIngredientTypeKey(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ");
+}
+
+function recipeIngredientBuiltInType(value) {
+    const key = recipeIngredientTypeKey(value);
+    return RECIPE_INGREDIENT_BUILT_IN_TYPES.find(type => recipeIngredientTypeKey(type.value) === key) || null;
+}
+
 function recipeIngredientTypeValue(values = {}) {
-    const explicitType = String(values.section || values.ingredient_type || values.type || "").trim().toLowerCase();
+    const explicitType = String(values.section || values.ingredient_type || values.type || "").trim();
     const optional = values.optional === true
         || ["1", "true", "yes", "on"].includes(String(values.optional || "").trim().toLowerCase());
     if (optional) {
         return "optional";
     }
-    return explicitType || "main";
+    const builtIn = recipeIngredientBuiltInType(explicitType);
+    return builtIn ? builtIn.value : explicitType || "main";
 }
 
 function recipeIngredientTypeLabel(values = {}) {
-    return recipeIngredientTypeValue(values).replace(/[_-]+/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
+    const value = recipeIngredientTypeValue(values);
+    const builtIn = recipeIngredientBuiltInType(value);
+    return builtIn ? builtIn.label : value;
 }
 
 function recipeIngredientPluralUnit(unit, quantity) {
@@ -25664,6 +25689,9 @@ function restoreRecipeIngredientEditableFieldSnapshot(scope, values = {}) {
         }
         if (input.dataset.field === "store_section") {
             syncRecipeIngredientStoreSectionControl(input);
+        }
+        if (input.dataset.field === "section") {
+            syncRecipeIngredientTypeControl(input);
         }
         if (input.dataset.field === "unit") {
             canonicalizeRecipeIngredientUnitControl(input, { allowCustom: true });
@@ -29696,9 +29724,11 @@ function beginRecipeIngredientReorder(button) {
 
 function focusRecipeIngredientGrouping(button) {
     setRecipeIngredientsCollapsed(false);
-    const group = document.querySelector('#recipeEditIngredients [data-field="section"]');
-    if (group) {
-        group.focus({ preventScroll: false });
+    const row = document.querySelector("#recipeEditIngredients > .recipe-edit-ingredient-row");
+    if (row) {
+        setRecipeIngredientEditMode(row, true);
+        const group = row.querySelector("[data-recipe-edit-type-trigger]");
+        if (group) group.focus({ preventScroll: false });
     }
     setRecipeEditStatus("Use the Type fields to group related ingredients.");
     return false;
@@ -33676,19 +33706,440 @@ function bindRecipeIngredientStoreSectionControls(scope) {
     });
 }
 
+const RECIPE_INGREDIENT_CUSTOM_TYPES_KEY = "recipeIngredientCustomTypes";
+
+function recipeIngredientCustomTypeNames() {
+    try {
+        const values = JSON.parse(safeStorageGet(localStorage, RECIPE_INGREDIENT_CUSTOM_TYPES_KEY) || "[]");
+        const names = [];
+        const seen = new Set();
+        (Array.isArray(values) ? values : []).forEach(value => {
+            const name = String(value || "").trim().replace(/\s+/g, " ").slice(0, 40);
+            const key = recipeIngredientTypeKey(name);
+            if (name && !recipeIngredientBuiltInType(name) && !seen.has(key)) {
+                names.push(name);
+                seen.add(key);
+            }
+        });
+        return names;
+    } catch (error) {
+        console.warn("Unable to load custom ingredient types.", error);
+        return [];
+    }
+}
+
 function recipeIngredientTypeOptions(selected, optional = false) {
     const rawValue = String(selected || "").trim();
-    const normalized = rawValue.toLowerCase();
-    const selectedValue = normalized || (optional ? "optional" : "main");
-    const standardOptions = ["main", "optional", "garnish", "topping", "sauce", "substitute"];
-    const values = standardOptions.includes(selectedValue)
-        ? standardOptions
-        : [selectedValue, ...standardOptions];
+    const builtInSelected = recipeIngredientBuiltInType(optional ? "optional" : rawValue);
+    const customNames = recipeIngredientCustomTypeNames();
+    const savedCustom = customNames.find(name => recipeIngredientTypeKey(name) === recipeIngredientTypeKey(rawValue));
+    const selectedValue = builtInSelected
+        ? builtInSelected.value
+        : savedCustom || rawValue || "main";
+    const values = [
+        ...RECIPE_INGREDIENT_BUILT_IN_TYPES.map(type => ({ ...type, custom: false })),
+        ...customNames.map(name => ({ value: name, label: name, custom: true })),
+    ];
+    if (
+        selectedValue
+        && !values.some(type => recipeIngredientTypeKey(type.value) === recipeIngredientTypeKey(selectedValue))
+    ) {
+        values.push({ value: selectedValue, label: selectedValue, custom: false });
+    }
 
-    return [...new Set(values)].map(value => {
-        const label = value.replace(/\b\w/g, letter => letter.toUpperCase());
-        return `<option value="${escapeAttribute(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(label)}</option>`;
+    return values.map(type => {
+        const selectedOption = recipeIngredientTypeKey(type.value) === recipeIngredientTypeKey(selectedValue);
+        return `<option value="${escapeAttribute(type.value)}" data-custom="${type.custom ? "true" : "false"}"${selectedOption ? " selected" : ""}>${escapeHtml(type.label)}</option>`;
     }).join("");
+}
+
+function refreshRecipeIngredientTypeSelectOptions(scope = document) {
+    const selects = scope.matches && scope.matches('select[data-field="section"]')
+        ? [scope]
+        : [...scope.querySelectorAll('select[data-field="section"]')];
+    selects.forEach(select => {
+        const selectedValue = String(select.value || "").trim();
+        select.innerHTML = recipeIngredientTypeOptions(selectedValue);
+        const builtIn = recipeIngredientBuiltInType(selectedValue);
+        const customName = recipeIngredientCustomTypeNames().find(
+            name => recipeIngredientTypeKey(name) === recipeIngredientTypeKey(selectedValue),
+        );
+        select.value = builtIn ? builtIn.value : customName || selectedValue || "main";
+        syncRecipeIngredientTypeControl(select);
+    });
+}
+
+function storeRecipeIngredientCustomTypeNames(values) {
+    const names = [];
+    const seen = new Set();
+    (Array.isArray(values) ? values : []).forEach(value => {
+        const name = String(value || "").trim().replace(/\s+/g, " ").slice(0, 40);
+        const key = recipeIngredientTypeKey(name);
+        if (name && !recipeIngredientBuiltInType(name) && !seen.has(key)) {
+            names.push(name);
+            seen.add(key);
+        }
+    });
+    safeStorageSet(localStorage, RECIPE_INGREDIENT_CUSTOM_TYPES_KEY, JSON.stringify(names));
+    refreshRecipeIngredientTypeSelectOptions();
+    return names;
+}
+
+function saveRecipeIngredientCustomTypeName(value) {
+    const name = String(value || "").trim().replace(/\s+/g, " ").slice(0, 40);
+    if (!name) {
+        return "";
+    }
+    const builtIn = recipeIngredientBuiltInType(name);
+    if (builtIn) {
+        return builtIn.value;
+    }
+    const names = recipeIngredientCustomTypeNames();
+    const existing = names.find(item => recipeIngredientTypeKey(item) === recipeIngredientTypeKey(name));
+    if (existing) {
+        return existing;
+    }
+    storeRecipeIngredientCustomTypeNames([...names, name]);
+    return name;
+}
+
+function replaceRecipeIngredientCustomTypeName(previousValue, nextValue) {
+    const previousKey = recipeIngredientTypeKey(previousValue);
+    const names = recipeIngredientCustomTypeNames();
+    if (!previousKey || !names.some(name => recipeIngredientTypeKey(name) === previousKey)) {
+        return false;
+    }
+
+    const nextName = String(nextValue || "").trim().replace(/\s+/g, " ").slice(0, 40);
+    const builtIn = recipeIngredientBuiltInType(nextName);
+    const nextNames = names
+        .filter(name => recipeIngredientTypeKey(name) !== previousKey)
+        .concat(nextName && !builtIn ? [nextName] : []);
+    const storedNames = storeRecipeIngredientCustomTypeNames(nextNames);
+    const replacement = builtIn
+        ? builtIn.value
+        : storedNames.find(name => recipeIngredientTypeKey(name) === recipeIngredientTypeKey(nextName)) || "main";
+
+    document.querySelectorAll("[data-recipe-ingredient-edit-panel][data-edit-snapshot]").forEach(panel => {
+        try {
+            const snapshot = JSON.parse(panel.dataset.editSnapshot || "{}");
+            if (recipeIngredientTypeKey(snapshot.section) !== previousKey) {
+                return;
+            }
+            snapshot.section = replacement;
+            snapshot.optional = replacement === "optional";
+            panel.dataset.editSnapshot = JSON.stringify(snapshot);
+        } catch (error) {
+            console.warn("Unable to update an ingredient type edit snapshot.", error);
+        }
+    });
+
+    document.querySelectorAll('select[data-field="section"]').forEach(select => {
+        if (recipeIngredientTypeKey(select.value) !== previousKey) {
+            return;
+        }
+        select.value = replacement;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    return true;
+}
+
+function syncRecipeIngredientTypeControl(select) {
+    const label = select ? select.closest(".recipe-edit-section-label") : null;
+    const triggerLabel = label ? label.querySelector("[data-type-trigger-label]") : null;
+    const dot = label ? label.querySelector("[data-type-trigger-dot]") : null;
+    const selectedValue = String(select && select.value || "").trim() || "main";
+    const builtIn = recipeIngredientBuiltInType(selectedValue);
+    if (triggerLabel) {
+        triggerLabel.textContent = recipeIngredientTypeLabel({ section: selectedValue });
+    }
+    if (dot) {
+        dot.className = `recipe-edit-type-dot${builtIn && builtIn.value === "optional" ? " is-optional" : ""}${!builtIn ? " is-custom" : ""}`;
+    }
+}
+
+function ensureRecipeIngredientTypeMenu() {
+    let menu = document.getElementById("recipeIngredientTypeMenu");
+    if (menu) {
+        return menu;
+    }
+    menu = document.createElement("div");
+    menu.id = "recipeIngredientTypeMenu";
+    menu.className = "recipe-edit-row-menu recipe-edit-store-section-menu recipe-edit-type-menu";
+    menu.setAttribute("role", "listbox");
+    menu.setAttribute("aria-label", "Ingredient types");
+    menu.hidden = true;
+    document.body.appendChild(menu);
+    return menu;
+}
+
+function renderRecipeIngredientTypeMenu(menu, select) {
+    if (!menu || !select) {
+        return;
+    }
+    refreshRecipeIngredientTypeSelectOptions(select);
+    const selectedValue = recipeIngredientTypeKey(select.value);
+    const optionMarkup = [...select.options].map((option, index) => {
+        const value = String(option.value || "");
+        const selected = recipeIngredientTypeKey(value) === selectedValue;
+        const custom = option.dataset.custom === "true";
+        const optionButton = `
+            <button type="button"
+                    id="recipeIngredientTypeOption${index}"
+                    role="option"
+                    aria-selected="${selected ? "true" : "false"}"
+                    class="recipe-edit-store-section-option recipe-edit-type-option${selected ? " is-selected" : ""}"
+                    data-type-value="${escapeAttribute(value)}"
+                    onclick="return chooseRecipeIngredientType(this)">
+                <span class="recipe-edit-type-option-dot" aria-hidden="true"></span>
+                <span class="recipe-edit-store-section-option-label recipe-edit-type-option-label">${escapeHtml(option.textContent || value)}</span>
+                <span class="recipe-edit-store-section-option-check recipe-edit-type-option-check" aria-hidden="true">${recipeEditSvgIcon("check")}</span>
+            </button>
+        `;
+        if (!custom) {
+            return optionButton;
+        }
+        return `
+            <div class="recipe-edit-store-section-custom-row recipe-edit-type-custom-row">
+                ${optionButton}
+                <button type="button"
+                        id="recipeIngredientTypeEdit${index}"
+                        role="option"
+                        aria-selected="false"
+                        class="recipe-edit-store-section-edit-button recipe-edit-type-edit-button"
+                        data-type-action="edit-custom"
+                        data-type-value="${escapeAttribute(value)}"
+                        aria-label="Edit custom type ${escapeAttribute(value)}"
+                        title="Rename ${escapeAttribute(value)}"
+                        onclick="return editRecipeIngredientCustomType(this)">
+                    ${recipeEditSvgIcon("edit")}
+                </button>
+                <button type="button"
+                        id="recipeIngredientTypeDelete${index}"
+                        role="option"
+                        aria-selected="false"
+                        class="recipe-edit-store-section-delete-button recipe-edit-type-delete-button"
+                        data-type-action="delete-custom"
+                        data-type-value="${escapeAttribute(value)}"
+                        aria-label="Delete custom type ${escapeAttribute(value)}"
+                        title="Delete ${escapeAttribute(value)}"
+                        onclick="return deleteRecipeIngredientCustomType(this)">
+                    ${recipeEditSvgIcon("trash")}
+                </button>
+            </div>
+        `;
+    }).join("");
+    menu.innerHTML = `
+        <div class="recipe-edit-store-section-menu-list recipe-edit-type-menu-list" data-type-menu-list>
+            ${optionMarkup}
+        </div>
+        <div class="recipe-edit-store-section-menu-footer recipe-edit-type-menu-footer">
+            <button type="button"
+                    id="recipeIngredientTypeAddCustom"
+                    role="option"
+                    aria-selected="false"
+                    class="recipe-edit-store-section-option recipe-edit-store-section-add-option recipe-edit-type-option recipe-edit-type-add-option"
+                    data-type-action="add-custom"
+                    onclick="return addRecipeIngredientCustomType(this)">
+                ${recipeEditSvgIcon("plus")}
+                <span class="recipe-edit-store-section-option-label recipe-edit-type-option-label">Add custom type…</span>
+            </button>
+        </div>
+    `;
+    const options = recipeEditListboxOptions(menu);
+    const selectedIndex = options.findIndex(option => option.getAttribute("aria-selected") === "true");
+    setRecipeEditListboxActiveOption(menu, selectedIndex >= 0 ? selectedIndex : 0);
+}
+
+function openRecipeIngredientTypeMenu(trigger) {
+    const label = trigger ? trigger.closest(".recipe-edit-section-label") : null;
+    const select = label ? label.querySelector('select[data-field="section"]') : null;
+    if (!trigger || !select) {
+        return false;
+    }
+    const menu = ensureRecipeIngredientTypeMenu();
+    if (!menu.hidden && menu.recipeEditAnchorButton === trigger) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+    closeRecipeEditRowMenus();
+    menu.recipeEditAnchorButton = trigger;
+    menu.recipeEditTypeSelect = select;
+    menu.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    renderRecipeIngredientTypeMenu(menu, select);
+    positionRecipeEditPopupMenu(menu, trigger);
+    return false;
+}
+
+function chooseRecipeIngredientType(button) {
+    if (button && button.dataset.typeAction === "add-custom") {
+        return addRecipeIngredientCustomType(button);
+    }
+    if (button && button.dataset.typeAction === "edit-custom") {
+        return editRecipeIngredientCustomType(button);
+    }
+    if (button && button.dataset.typeAction === "delete-custom") {
+        return deleteRecipeIngredientCustomType(button);
+    }
+    const menu = button ? button.closest(".recipe-edit-type-menu") : null;
+    const select = menu ? menu.recipeEditTypeSelect : null;
+    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    if (!select) {
+        return false;
+    }
+    select.value = button.dataset.typeValue || "main";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    closeRecipeEditRowMenus();
+    if (trigger) trigger.focus({ preventScroll: true });
+    return false;
+}
+
+function addRecipeIngredientCustomType(button) {
+    const menu = button ? button.closest(".recipe-edit-type-menu") : null;
+    const select = menu ? menu.recipeEditTypeSelect : null;
+    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    if (!select) {
+        return false;
+    }
+    const requested = window.prompt("Add a custom ingredient type", "");
+    if (requested === null) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+    const name = String(requested || "").trim().replace(/\s+/g, " ").slice(0, 40);
+    if (!name) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+    select.value = saveRecipeIngredientCustomTypeName(name);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    closeRecipeEditRowMenus();
+    if (trigger) trigger.focus({ preventScroll: true });
+    return false;
+}
+
+function editRecipeIngredientCustomType(button) {
+    const menu = button ? button.closest(".recipe-edit-type-menu") : null;
+    const select = menu ? menu.recipeEditTypeSelect : null;
+    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    const currentName = String(button && button.dataset.typeValue || "").trim();
+    if (!menu || !select || !currentName || recipeIngredientBuiltInType(currentName)) {
+        return false;
+    }
+    const requested = window.prompt(`Rename custom type "${currentName}".`, currentName);
+    if (requested === null) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+    const nextName = String(requested || "").trim().replace(/\s+/g, " ").slice(0, 40);
+    if (!nextName) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+    replaceRecipeIngredientCustomTypeName(currentName, nextName);
+    renderRecipeIngredientTypeMenu(menu, select);
+    positionRecipeEditPopupMenu(menu, trigger);
+    if (trigger) trigger.focus({ preventScroll: true });
+    return false;
+}
+
+function deleteRecipeIngredientCustomType(button) {
+    const menu = button ? button.closest(".recipe-edit-type-menu") : null;
+    const select = menu ? menu.recipeEditTypeSelect : null;
+    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    const currentName = String(button && button.dataset.typeValue || "").trim();
+    if (!menu || !select || !currentName || recipeIngredientBuiltInType(currentName)) {
+        return false;
+    }
+    if (!window.confirm(
+        `Delete custom type "${currentName}"? Open ingredient rows using it will be changed to Main.`,
+    )) {
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    }
+    replaceRecipeIngredientCustomTypeName(currentName, "");
+    renderRecipeIngredientTypeMenu(menu, select);
+    positionRecipeEditPopupMenu(menu, trigger);
+    if (trigger) trigger.focus({ preventScroll: true });
+    return false;
+}
+
+function handleRecipeIngredientTypeKeydown(event, trigger) {
+    if (!event || !trigger) {
+        return;
+    }
+    const menu = document.getElementById("recipeIngredientTypeMenu");
+    const isOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === trigger);
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+        event.preventDefault();
+        if (!isOpen) {
+            openRecipeIngredientTypeMenu(trigger);
+            return;
+        }
+        const currentIndex = Number(menu.dataset.activeIndex || 0);
+        setRecipeEditListboxActiveOption(menu, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+        return;
+    }
+    if (!isOpen) {
+        return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        const optionCount = recipeEditListboxOptions(menu).length;
+        setRecipeEditListboxActiveOption(menu, event.key === "Home" ? 0 : optionCount - 1);
+    } else if (event.key === "Enter" || event.key === " ") {
+        const activeOption = recipeEditListboxOptions(menu)[Number(menu.dataset.activeIndex || 0)];
+        if (activeOption) {
+            event.preventDefault();
+            chooseRecipeIngredientType(activeOption);
+        }
+    } else if (event.key === "Escape") {
+        event.preventDefault();
+        closeRecipeEditRowMenus();
+    } else if (event.key === "Tab") {
+        closeRecipeEditRowMenus();
+    }
+}
+
+function bindRecipeIngredientTypeControls(scope) {
+    if (!recipeEditorStandalonePageIsActive()) {
+        return;
+    }
+    scope.querySelectorAll('select[data-field="section"]').forEach(select => {
+        if (select.dataset.typeControlBound === "true") {
+            return;
+        }
+        select.dataset.typeControlBound = "true";
+        const label = select.closest(".recipe-edit-section-label");
+        if (!label) {
+            return;
+        }
+        refreshRecipeIngredientTypeSelectOptions(select);
+        const trigger = document.createElement("button");
+        trigger.type = "button";
+        trigger.className = "recipe-edit-store-section-trigger recipe-edit-type-trigger";
+        trigger.dataset.recipeEditTypeTrigger = "true";
+        trigger.setAttribute("role", "combobox");
+        trigger.setAttribute("aria-haspopup", "listbox");
+        trigger.setAttribute("aria-controls", "recipeIngredientTypeMenu");
+        trigger.setAttribute("aria-expanded", "false");
+        trigger.innerHTML = `
+            <span class="recipe-edit-type-dot" data-type-trigger-dot aria-hidden="true"></span>
+            <span data-type-trigger-label>${escapeHtml(recipeIngredientTypeLabel({ section: select.value }))}</span>
+            <span class="recipe-edit-store-section-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
+        `;
+        trigger.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            openRecipeIngredientTypeMenu(trigger);
+        });
+        trigger.addEventListener("keydown", event => handleRecipeIngredientTypeKeydown(event, trigger));
+        select.addEventListener("change", () => syncRecipeIngredientTypeControl(select));
+        select.hidden = true;
+        select.insertAdjacentElement("beforebegin", trigger);
+        syncRecipeIngredientTypeControl(select);
+    });
 }
 
 let recipeIngredientUnitRegistryCache = null;
@@ -34963,6 +35414,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     bindRecipeIngredientNameField(row);
     bindRecipeIngredientUnitControls(row);
     bindRecipeIngredientStoreSectionControls(row);
+    bindRecipeIngredientTypeControls(row);
     bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
     bindRecipeIngredientSummaryUpdates(row);
@@ -35763,8 +36215,14 @@ function updateRecipeIngredientSummary(row) {
     }
     if (typeSummary) {
         const typeValue = recipeIngredientTypeValue(values);
-        typeSummary.className = `recipe-edit-ingredient-type-summary is-${escapeAttribute(typeValue)}`;
-        typeSummary.textContent = recipeIngredientTypeLabel(values);
+        const typeLabel = recipeIngredientTypeLabel(values);
+        const typeClass = recipeIngredientTypeKey(typeValue)
+            .replace(/[^a-z0-9 ]/g, "")
+            .replace(/\s+/g, "-") || "main";
+        typeSummary.className = `recipe-edit-ingredient-type-summary is-${typeClass}`;
+        typeSummary.textContent = typeLabel;
+        typeSummary.title = typeLabel;
+        typeSummary.setAttribute("aria-label", `Type: ${typeLabel}`);
     }
 
     if (substitutionCount) {
@@ -35919,6 +36377,8 @@ function positionRecipeEditPopupMenu(menu, button) {
         menu.style.minWidth = `${Math.ceil(buttonRect.width)}px`;
     } else if (menu.classList.contains("recipe-edit-unit-menu")) {
         menu.style.minWidth = `${Math.max(240, Math.ceil(buttonRect.width))}px`;
+    } else if (menu.classList.contains("recipe-edit-type-menu")) {
+        menu.style.minWidth = `${Math.max(220, Math.ceil(buttonRect.width))}px`;
     } else if (menu.classList.contains("recipe-edit-store-section-menu")) {
         menu.style.minWidth = `${Math.max(220, Math.ceil(buttonRect.width))}px`;
     }
@@ -36378,11 +36838,12 @@ function closeRecipeEditRowMenus() {
         menu.style.right = "";
         menu.style.minWidth = "";
         menu.dataset.activeIndex = "";
-        if (anchorButton && menu.matches(".recipe-edit-unit-menu, .recipe-edit-store-section-menu")) {
+        if (anchorButton && menu.matches(".recipe-edit-unit-menu, .recipe-edit-store-section-menu, .recipe-edit-type-menu")) {
             anchorButton.setAttribute("aria-expanded", "false");
             anchorButton.removeAttribute("aria-activedescendant");
         }
         delete menu.recipeEditStoreSectionSelect;
+        delete menu.recipeEditTypeSelect;
         restoreRecipeEditPopupMenu(menu);
     });
     document.querySelectorAll(".recipe-edit-menu-wrap-open").forEach(wrap => {
@@ -36396,7 +36857,8 @@ function closeRecipeEditRowMenus() {
         + ".recipe-edit-row-menu-wrap button[aria-expanded], "
         + ".recipe-edit-section-menu-wrap button[aria-expanded], "
         + "[data-recipe-edit-unit-trigger][aria-expanded], "
-        + "[data-recipe-edit-store-section-trigger][aria-expanded]"
+        + "[data-recipe-edit-store-section-trigger][aria-expanded], "
+        + "[data-recipe-edit-type-trigger][aria-expanded]"
     ).forEach(button => {
         button.setAttribute("aria-expanded", "false");
     });
@@ -36477,7 +36939,8 @@ function handleRecipeEditRowMenuOutsideClick(event) {
         && typeof target.closest === "function"
         && target.closest(
             ".recipe-edit-row-menu, .recipe-edit-row-menu-btn, "
-            + "[data-recipe-edit-unit-trigger], [data-recipe-edit-store-section-trigger]"
+            + "[data-recipe-edit-unit-trigger], [data-recipe-edit-store-section-trigger], "
+            + "[data-recipe-edit-type-trigger]"
         )
     ) {
         return;
@@ -36495,7 +36958,8 @@ function handleRecipeEditRowMenuEscape(event) {
         ".recipe-edit-row-menu-btn[aria-expanded=\"true\"], "
         + ".recipe-edit-section-menu-wrap button[aria-expanded=\"true\"], "
         + "[data-recipe-edit-unit-trigger][aria-expanded=\"true\"], "
-        + "[data-recipe-edit-store-section-trigger][aria-expanded=\"true\"]"
+        + "[data-recipe-edit-store-section-trigger][aria-expanded=\"true\"], "
+        + "[data-recipe-edit-type-trigger][aria-expanded=\"true\"]"
     );
     event.preventDefault();
     closeRecipeEditRowMenus();

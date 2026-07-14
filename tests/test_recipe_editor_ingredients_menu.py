@@ -922,7 +922,8 @@ def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value
         script.index("function recipeIngredientPluralUnit")
     ]
     assert 'return "optional";' in type_helpers
-    assert 'return explicitType || "main";' in type_helpers
+    assert 'return builtIn ? builtIn.value : explicitType || "main";' in type_helpers
+    assert 'return builtIn ? builtIn.label : value;' in type_helpers
 
     summary = script[
         script.index("function updateRecipeIngredientSummary"):
@@ -934,7 +935,8 @@ def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value
     assert 'preparationSummary.textContent = String(values.preparation || "").trim() || "\\u2014"' in summary
     assert "values.purchasable_item || values.buy_as || values.ingredient" in summary
     assert "recipeIngredientStoreSectionIconHtml(values.store_section || \"\")" in summary
-    assert "typeSummary.textContent = recipeIngredientTypeLabel(values)" in summary
+    assert "const typeLabel = recipeIngredientTypeLabel(values)" in summary
+    assert "typeSummary.textContent = typeLabel" in summary
 
     v10 = css[css.index("/* Ingredient editor v10:"):]
     hidden_status_start = v10.index(".recipe-edit-ingredient-role-summary")
@@ -992,6 +994,65 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert ".recipe-edit-store-section-menu-list {\n    flex: 1 1 auto;" in css
     assert ".recipe-edit-store-section-icon.is-fish" in css
     assert ".recipe-edit-store-section-icon.is-paw" in css
+
+
+def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert 'RECIPE_INGREDIENT_CUSTOM_TYPES_KEY = "recipeIngredientCustomTypes"' in script
+    assert "const RECIPE_INGREDIENT_BUILT_IN_TYPES = [" in script
+    for value in ("main", "optional", "garnish", "topping", "sauce", "substitute"):
+        assert f'{{ value: "{value}"' in script
+    assert "function recipeIngredientCustomTypeNames()" in script
+    assert "function storeRecipeIngredientCustomTypeNames(values)" in script
+    assert "function saveRecipeIngredientCustomTypeName(value)" in script
+    assert "function replaceRecipeIngredientCustomTypeName(previousValue, nextValue)" in script
+    assert "function refreshRecipeIngredientTypeSelectOptions(scope = document)" in script
+    assert 'data-custom="${type.custom ? "true" : "false"}"' in script
+
+    assert "function ensureRecipeIngredientTypeMenu()" in script
+    assert 'menu.id = "recipeIngredientTypeMenu";' in script
+    assert 'menu.setAttribute("role", "listbox");' in script
+    assert "function renderRecipeIngredientTypeMenu(menu, select)" in script
+    assert 'class="recipe-edit-store-section-option recipe-edit-type-option${selected ? " is-selected" : ""}"' in script
+    assert "if (!custom)" in script
+    assert 'data-type-action="add-custom"' in script
+    assert 'data-type-action="edit-custom"' in script
+    assert 'data-type-action="delete-custom"' in script
+    assert "Add custom type…" in script
+    assert 'aria-label="Edit custom type ${escapeAttribute(value)}"' in script
+    assert 'aria-label="Delete custom type ${escapeAttribute(value)}"' in script
+    assert "function addRecipeIngredientCustomType(button)" in script
+    assert "function editRecipeIngredientCustomType(button)" in script
+    assert "function deleteRecipeIngredientCustomType(button)" in script
+    assert "recipeIngredientBuiltInType(currentName)" in script
+
+    replace_start = script.index("function replaceRecipeIngredientCustomTypeName")
+    replace_end = script.index("function syncRecipeIngredientTypeControl", replace_start)
+    replace = script[replace_start:replace_end]
+    assert "document.querySelectorAll('select[data-field=\"section\"]')" in replace
+    assert 'select.dispatchEvent(new Event("change", { bubbles: true }));' in replace
+    assert 'snapshot.section = replacement;' in replace
+    assert 'snapshot.optional = replacement === "optional";' in replace
+    assert ': storedNames.find(name => recipeIngredientTypeKey(name) === recipeIngredientTypeKey(nextName)) || "main"' in replace
+    assert "Open ingredient rows using it will be changed to Main." in script
+
+    assert "function bindRecipeIngredientTypeControls(scope)" in script
+    assert 'trigger.dataset.recipeEditTypeTrigger = "true";' in script
+    assert 'trigger.setAttribute("role", "combobox");' in script
+    assert 'trigger.setAttribute("aria-controls", "recipeIngredientTypeMenu");' in script
+    assert "select.hidden = true;" in script
+    assert "bindRecipeIngredientStoreSectionControls(row);\n    bindRecipeIngredientTypeControls(row);" in script
+    assert 'optionalInput.checked = String(typeSelect.value || "").trim().toLowerCase() === "optional";' in script
+    assert 'syncRecipeIngredientTypeControl(input);' in script
+    assert 'row.querySelector("[data-recipe-edit-type-trigger]")' in script
+
+    assert "/* Ingredient editor v11: managed custom Type picker. */" in css
+    assert ".recipe-edit-type-trigger > [data-type-trigger-label]" in css
+    assert ".recipe-edit-type-menu .recipe-edit-type-option-dot" in css
+    assert ".recipe-edit-type-menu .recipe-edit-type-custom-row" in css
+    assert ".recipe-edit-ingredient-type-summary" in css
 
 
 def test_bulk_image_generation_menus_include_title_image_scope():
