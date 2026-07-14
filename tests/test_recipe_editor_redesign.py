@@ -771,7 +771,7 @@ def test_recipe_editor_ingredient_options_use_inline_accessible_disclosure():
     assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organize
     assert "toggleRecipeIngredientSubstitutions(optionsButton, event)" in organize
     assert "organizeRecipeEditSubstitutionOptionRow" in script
-    assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
+    assert 'label.textContent = alternativeCount ? optionLabel : "No substitutions";' in script
 
     v9_css = css[css.index("/* Ingredient editor v9:"):]
     assert ".recipe-edit-ingredient-substitution-cell" in v9_css

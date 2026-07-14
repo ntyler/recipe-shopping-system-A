@@ -9534,6 +9534,76 @@ def split_substitution_option_names(value):
     return parts or [text]
 
 
+SUBSTITUTION_ALTERNATIVE_COMPONENT_FIELDS = (
+    "ingredients",
+    "components",
+    "replacements",
+)
+
+
+def flatten_ingredient_substitution_alternatives(value):
+    """Flatten grouped substitution alternatives into the legacy row list."""
+    if value in (None, "", []):
+        return []
+
+    if isinstance(value, str):
+        options = re.split(r"[\r\n;]+", value)
+    elif isinstance(value, list):
+        options = value
+    else:
+        options = [value]
+
+    flattened = []
+    for alternative_index, option in enumerate(options):
+        if not isinstance(option, dict):
+            flattened.append(option)
+            continue
+
+        components = None
+        for field in SUBSTITUTION_ALTERNATIVE_COMPONENT_FIELDS:
+            if isinstance(option.get(field), list):
+                components = option.get(field)
+                break
+        if components is None:
+            flattened.append(option)
+            continue
+
+        alternative_order = option.get("alternative_order")
+        if alternative_order in (None, ""):
+            alternative_order = alternative_index
+        alternative_id = clean_recipe_text(
+            option.get("alternative_id")
+            or option.get("group_id")
+            or option.get("id")
+            or option.get("substitution_id")
+            or f"alternative-{alternative_index + 1}"
+        )
+        shared_metadata = {
+            key: item_value
+            for key, item_value in option.items()
+            if key not in SUBSTITUTION_ALTERNATIVE_COMPONENT_FIELDS
+        }
+
+        for component_index, component in enumerate(components):
+            component_data = component if isinstance(component, dict) else {"ingredient": component}
+            component_order = component_data.get("alternative_component_order")
+            if component_order in (None, ""):
+                component_order = component_index
+            flattened_row = {
+                **shared_metadata,
+                **component_data,
+                "alternative_id": alternative_id,
+                "alternative_order": alternative_order,
+                "alternative_component_order": component_order,
+            }
+            for identity_field in ("id", "substitution_id"):
+                if identity_field not in component_data:
+                    flattened_row.pop(identity_field, None)
+            flattened.append(flattened_row)
+
+    return flattened
+
+
 def normalize_substitution_option_row(option, parent_item=None, source_note=""):
     parent_item = parent_item if isinstance(parent_item, dict) else {}
     source_note = clean_recipe_text(source_note)
@@ -9618,6 +9688,15 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
             "purchase_group": clean_recipe_text(raw_option.get("purchase_group") or ""),
             "source_note": clean_recipe_text(raw_option.get("source_note") or source_note),
         }
+        alternative_id = clean_recipe_text(raw_option.get("alternative_id") or "")
+        if alternative_id:
+            row["alternative_id"] = alternative_id
+        for field in ("alternative_order", "alternative_component_order"):
+            if raw_option.get(field) not in (None, ""):
+                row[field] = raw_option.get(field)
+        alternative_label = clean_recipe_text(raw_option.get("alternative_label") or "")
+        if alternative_label:
+            row["alternative_label"] = alternative_label
         normalize_ingredient_unit_fields(row)
         rows.append(row)
 
@@ -9625,22 +9704,20 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
 
 
 def normalize_ingredient_substitutions(value, parent_item=None):
-    if value in (None, "", []):
-        return []
-
-    if isinstance(value, str):
-        rows = re.split(r"[\r\n;]+", value)
-    elif isinstance(value, list):
-        rows = value
-    else:
-        rows = [value]
+    rows = flatten_ingredient_substitution_alternatives(value)
 
     normalized = []
     seen = set()
     for option in rows:
         for row in normalize_substitution_option_row(option, parent_item=parent_item):
-            key = normalize_ingredient_key(row.get("ingredient"))
-            if not key or key in seen:
+            ingredient_key = normalize_ingredient_key(row.get("ingredient"))
+            alternative_id = clean_recipe_text(row.get("alternative_id") or "")
+            key = (
+                ("grouped", alternative_id, ingredient_key)
+                if alternative_id
+                else ("legacy", ingredient_key)
+            )
+            if not ingredient_key or key in seen:
                 continue
             normalized.append(row)
             seen.add(key)

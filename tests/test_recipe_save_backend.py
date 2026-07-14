@@ -389,6 +389,75 @@ def test_nested_reorder_delete_and_row_metadata_are_persisted(monkeypatch, tmp_p
     assert "other" not in saved["nutrition"]
 
 
+def test_grouped_substitution_alternative_round_trips_as_flat_component_rows(monkeypatch, tmp_path):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/grouped-substitution"
+    seed_recipe(
+        url,
+        ingredients=[{"id": "ingredient-buttermilk", "ingredient": "buttermilk", "quantity": "1", "unit": "cup"}],
+        instructions=[{"step_number": 1, "instruction": "Mix."}],
+    )
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            ingredients=[{
+                "id": "ingredient-buttermilk",
+                "ingredient": "buttermilk",
+                "quantity": "1",
+                "unit": "cup",
+                "substitutions": [{
+                    "alternative_id": "alternative-milk-lemon",
+                    "alternative_order": 1,
+                    "ingredients": [
+                        {
+                            "id": "substitution-milk",
+                            "ingredient": "Milk",
+                            "quantity": "1",
+                            "unit": "cup",
+                        },
+                        {
+                            "id": "substitution-lemon",
+                            "ingredient": "Lemon Juice",
+                            "quantity": "1",
+                            "unit": "tablespoon",
+                        },
+                    ],
+                }],
+            }],
+        ),
+        require_existing=True,
+    )
+
+    assert result["ok"] is True
+    substitutions = recipe_edit_service.load_recipe_output(url)["ingredients"][0]["substitutions"]
+    assert [row["ingredient"] for row in substitutions] == ["Milk", "Lemon Juice"]
+    assert [row["id"] for row in substitutions] == ["substitution-milk", "substitution-lemon"]
+    assert {row["alternative_id"] for row in substitutions} == {"alternative-milk-lemon"}
+    assert [row["alternative_order"] for row in substitutions] == [1, 1]
+    assert [row["alternative_component_order"] for row in substitutions] == [0, 1]
+    assert all("ingredients" not in row for row in substitutions)
+
+
+def test_substitution_metadata_merge_is_scoped_to_alternative_group():
+    substitutions = recipe_edit_service.normalize_ingredient_substitutions(
+        [
+            {"alternative_id": "alternative-a", "ingredient": "Milk", "quantity": "1"},
+            {"alternative_id": "alternative-b", "ingredient": "Milk", "quantity": "2"},
+        ],
+        [
+            {"id": "milk-a", "alternative_id": "alternative-a", "ingredient": "Milk"},
+            {"id": "milk-b", "alternative_id": "alternative-b", "ingredient": "Milk"},
+        ],
+    )
+
+    assert [(row["alternative_id"], row["id"]) for row in substitutions] == [
+        ("alternative-a", "milk-a"),
+        ("alternative-b", "milk-b"),
+    ]
+
+
 def test_cover_image_prompt_round_trips_and_is_preserved_when_omitted(monkeypatch, tmp_path):
     configure_recipe_save_storage(monkeypatch, tmp_path)
     url = "https://example.test/cover-prompt"

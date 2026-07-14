@@ -83,7 +83,7 @@ def test_recipe_editor_ingredient_substitutions_are_wired():
 
     assert "function recipeIngredientSubstitutionRows(item = {})" in script
     assert "function recipeIngredientSubstitutions(item = {})" in script
-    assert "function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0)" in script
+    assert "function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group = {})" in script
     assert "recipe-edit-ingredient-substitutions" in row_block
     assert "recipe-edit-substitution-option-row recipe-edit-ingredient-row" in script
     assert "data-ingredient-substitution-list" in row_block
@@ -457,7 +457,7 @@ def test_recipe_editor_ingredient_rows_use_compact_table_and_secondary_details()
     assert 'data-recipe-edit-ingredient-details-toggle' in script
     assert 'aria-expanded="false"' in script
     assert 'const label = expanded ? "Hide details" : "More details";' in script
-    assert 'optionsButton.classList.toggle("is-empty", optionRows.length === 0);' in script
+    assert 'optionsButton.classList.toggle("is-empty", alternativeCount === 0);' in script
 
     v5 = css[css.index("/* Ingredient editor v5:"):]
     assert "min-width: 1052px;" in v5
@@ -605,8 +605,8 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert "const popupWidth = Math.min(1080, availableWidth);" in position
     assert "buttonRect.left + menuWidth <= rightLimit" in position
 
-    assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
-    assert '`${optionRows.length} substitution${optionRows.length === 1 ? "" : "s"}`' in script
+    assert 'label.textContent = alternativeCount ? optionLabel : "No substitutions";' in script
+    assert '`${alternativeCount} substitution${alternativeCount === 1 ? "" : "s"}`' in script
     assert "document.body.appendChild(menu);" in script
 
 
@@ -645,8 +645,16 @@ def test_recipe_editor_substitutions_use_accessible_mini_table_without_losing_fi
     organizer = script[organizer_start:organizer_end]
     assert 'substitutionTable.setAttribute("role", "table");' in organizer
     assert 'substitutionList.setAttribute("role", "rowgroup");' in organizer
-    header_labels = ["Alternative", "Ingredient", "Amount", "Unit", "Buy As", "Store Section", "Actions"]
-    header_indexes = [organizer.index(f'<span role="columnheader">{label}</span>') for label in header_labels]
+    header_markup = [
+        '<span role="columnheader">Alternative</span>',
+        '<span role="columnheader" aria-colspan="2">Ingredient</span>',
+        '<span role="columnheader">Amount</span>',
+        '<span role="columnheader">Unit</span>',
+        '<span role="columnheader">Buy As</span>',
+        '<span role="columnheader">Store Section</span>',
+        '<span role="columnheader">Actions</span>',
+    ]
+    header_indexes = [organizer.index(markup) for markup in header_markup]
     assert header_indexes == sorted(header_indexes)
 
     assert "width: min(1080px, calc(100vw - 32px));" in polish
@@ -661,8 +669,8 @@ def test_recipe_editor_substitutions_use_accessible_mini_table_without_losing_fi
     assert ".recipe-edit-ingredient-options-panel .recipe-edit-qty-label { grid-column: 4 !important; grid-row: 1 !important; }" in v9
     assert ".recipe-edit-ingredient-options-panel .recipe-edit-unit-label { grid-column: 5 !important; grid-row: 1 !important; }" in v9
     assert ".recipe-edit-substitution-details[hidden]" in v9
-    assert 'label.textContent = optionRows.length ? optionLabel : "No substitutions";' in script
-    assert '`${optionRows.length} substitution${optionRows.length === 1 ? "" : "s"}`' in script
+    assert 'label.textContent = alternativeCount ? optionLabel : "No substitutions";' in script
+    assert '`${alternativeCount} substitution${alternativeCount === 1 ? "" : "s"}`' in script
 
 
 def test_recipe_editor_v9_matches_accepted_inline_alternatives_table():
@@ -692,13 +700,88 @@ def test_recipe_editor_v9_matches_accepted_inline_alternatives_table():
     assert "overflow-x: auto;" in polish
 
     assert "function toggleRecipeIngredientSubstitutions(button, event = null)" in script
+    assert "function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen)" in script
     assert 'otherContainer.hidden = true;' in script
-    assert 'button.setAttribute("aria-expanded", String(shouldOpen));' in script
+    assert 'optionsButton.setAttribute("aria-expanded", String(shouldOpen));' in script
     assert 'row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);' in script
     assert 'const isIngredientRow = label === "ingredient";' in script
     assert 'actions.appendChild(menuWrap);' in script
     assert 'class="recipe-edit-compact-row-delete"' in script
     assert '${isIngredientRow ? "" : `<button type="button"' in script
+
+
+def test_recipe_editor_substitution_disclosure_opens_populated_and_empty_rows_inline():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    organizer = script[
+        script.index("function organizeRecipeEditIngredientRow(row)"):
+        script.index("function organizeRecipeEditCompactRowActions", script.index("function organizeRecipeEditIngredientRow(row)"))
+    ]
+    toggle = script[
+        script.index("function setRecipeIngredientSubstitutionsExpanded"):
+        script.index("function updateRecipeIngredientSubstitutionState")
+    ]
+    state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
+
+    assert 'optionsButton.type = "button";' in organizer
+    assert 'optionsButton.setAttribute("aria-expanded", "false");' in organizer
+    assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organizer
+    assert 'optionsButton.addEventListener("click"' in organizer
+    assert 'substitutions.setAttribute("role", "cell");' in organizer
+    assert 'substitutions.setAttribute("aria-colspan", "11");' in organizer
+    assert organizer.index("organizeRecipeEditCompactRowActions") < organizer.index("row.appendChild(substitutions)")
+
+    assert "!optionCount" not in toggle
+    assert 'otherContainer.hidden = true;' in toggle
+    assert 'container.hidden = !shouldOpen;' in toggle
+    assert 'row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);' in toggle
+    assert "event.preventDefault();" in toggle
+    assert "event.stopPropagation();" in toggle
+
+    assert "optionsButton.disabled = false;" in state
+    assert '`${action} substitutions for ${ingredientName}`' in state
+    assert 'empty.hidden = optionRows.length !== 0;' in state
+    assert 'addLabel.textContent = optionRows.length ? "Add Alternative" : "Add First Alternative";' in state
+    assert "No alternatives have been added." in script
+    assert "Add a single replacement ingredient or a multi-ingredient replacement bundle." in script
+
+    assert ".recipe-edit-ingredient-options-panel:not([hidden])" in css
+    open_rule = css[css.index(".recipe-edit-ingredient-options-panel:not([hidden])"):]
+    open_rule = open_rule[:open_rule.index("}")]
+    assert "display: grid !important;" in open_rule
+    assert ".recipe-edit-substitution-empty[hidden]" in css
+    assert ".recipe-edit-ingredient-options-button:focus-visible" in css
+
+
+def test_recipe_editor_renders_and_serializes_multi_ingredient_alternative_groups():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    rows = script[
+        script.index("function recipeIngredientSubstitutionRows"):
+        script.index("function recipeIngredientSubstitutionsText")
+    ]
+    row_html = script[
+        script.index("function recipeIngredientSubstitutionOptionRowHtml"):
+        script.index("function resizeRecipeIngredientNameField")
+    ]
+    collect = script[
+        script.index("function collectRecipeIngredientSubstitutionRows"):
+        script.index("function collectRecipeIngredientRows")
+    ]
+
+    assert "option.ingredients, option.components, option.replacements" in rows
+    assert "alternative_id:" in rows
+    assert "alternative_component_order:" in rows
+    assert 'data-field="alternative_id"' in row_html
+    assert 'data-field="alternative_order"' in row_html
+    assert 'data-field="alternative_component_order"' in row_html
+    assert "recipeIngredientSubstitutionGroups" in row_html
+    assert "componentIndex" in row_html
+    assert "recipeIngredientSubstitutionDomGroups(optionRows)" in collect
+    assert "option.inferred = recipeIngredientInferredValue(option) === \"true\";" in collect
 
 
 def test_recipe_editor_substitution_thumbnails_reuse_image_resolution_and_fallbacks():

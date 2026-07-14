@@ -59,6 +59,7 @@ from PushShoppingList.services.recipe_extract_service import extract_recipe_cove
 from PushShoppingList.services.recipe_extract_service import extract_recipe_info_from_text
 from PushShoppingList.services.recipe_extract_service import extract_ingredients_from_result
 from PushShoppingList.services.recipe_extract_service import fetch_recipe_page
+from PushShoppingList.services.recipe_extract_service import flatten_ingredient_substitution_alternatives
 from PushShoppingList.services.recipe_extract_service import generated_recipe_pdf_path
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import get_openai_error_code_and_param
@@ -9578,11 +9579,10 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
         candidates = existing_value
 
     normalized = normalize_ingredient_substitution_options(candidates, parent_item=parent_item)
+    metadata_by_group_and_name = {}
     metadata_by_name = {}
     for option_rows in (existing_value, candidates):
-        if not isinstance(option_rows, list):
-            continue
-        for option in option_rows:
+        for option in flatten_ingredient_substitution_alternatives(option_rows):
             if not isinstance(option, dict):
                 continue
             name = str(
@@ -9594,14 +9594,28 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
             ).strip()
             key = instruction_match_text_key(name)
             if key:
-                metadata_by_name[key] = {
-                    **metadata_by_name.get(key, {}),
+                alternative_id = str(option.get("alternative_id") or "").strip()
+                metadata_key = (alternative_id, key)
+                metadata_lookup = (
+                    metadata_by_group_and_name
+                    if alternative_id
+                    else metadata_by_name
+                )
+                lookup_key = metadata_key if alternative_id else key
+                metadata_lookup[lookup_key] = {
+                    **metadata_lookup.get(lookup_key, {}),
                     **option,
                 }
 
     rows = []
     for row in normalized:
-        metadata = metadata_by_name.get(instruction_match_text_key(row.get("ingredient")), {})
+        name_key = instruction_match_text_key(row.get("ingredient"))
+        alternative_id = str(row.get("alternative_id") or "").strip()
+        metadata = (
+            metadata_by_group_and_name.get((alternative_id, name_key), {})
+            if alternative_id
+            else metadata_by_name.get(name_key, {})
+        )
         merged = {**metadata, **row}
         custom_section = (
             clean_recipe_custom_store_section(metadata.get("store_section"))
