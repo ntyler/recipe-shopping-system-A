@@ -748,7 +748,7 @@ def test_recipe_editor_v10_prioritizes_seven_readable_read_first_groups():
     assert 'const isIngredientRow = label === "ingredient";' in script
     assert 'actions.appendChild(menuWrap);' in script
     assert 'class="recipe-edit-compact-row-delete"' in script
-    assert '${isIngredientRow ? "" : `<button type="button"' in script
+    assert '${menuInActions ? "" : `<button type="button"' in script
 
 
 def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inline():

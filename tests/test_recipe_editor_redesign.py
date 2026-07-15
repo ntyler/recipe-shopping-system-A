@@ -835,7 +835,7 @@ def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization()
 
     for class_name, labels in (
         ("recipe-edit-equipment-header", ("Image", "Equipment", "Options", "Edit", "Delete")),
-        ("recipe-edit-instructions-header", ("Step", "Image", "Instruction", "Options", "Actions")),
+        ("recipe-edit-instructions-header", ("Step", "Image", "Instruction", "Actions")),
         ("recipe-edit-nutrition-header", ("Nutrient", "Value", "Options", "Edit", "Delete")),
     ):
         header_start = template.index(f'class="{class_name}"')
@@ -885,11 +885,11 @@ def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization()
     assert "height: 30px;" in v4_css
 
 
-def test_recipe_editor_instructions_use_compact_step_grid_and_preserve_handlers():
+def test_recipe_editor_instructions_use_read_first_step_grid_and_preserve_handlers():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
-    instructions_css = css[css.index("/* Instruction editor v1:"):]
+    instructions_css = css[css.index("/* Instruction editor v2:"):]
 
     assert 'class="recipe-edit-section-header instructions-toolbar"' in template
     assert "recipe-edit-instructions-actions instructions-toolbar-actions" in template
@@ -897,52 +897,166 @@ def test_recipe_editor_instructions_use_compact_step_grid_and_preserve_handlers(
     assert 'class="recipe-edit-add-instruction-button"' in template
     assert "data-recipe-instruction-reorder-toggle" in template
     assert 'aria-pressed="false"' in template
+    template_header_start = template.index('class="recipe-edit-instructions-header"')
+    template_header_end = template.index("</div>", template_header_start)
+    template_header = template[template_header_start:template_header_end]
+    assert template_header.count("<span") == 5
+    assert "<span>Options</span>" not in template_header
 
-    for column in (
-        "28px", "52px", "72px", "minmax(320px, 1fr)", "96px", "116px",
-    ):
-        assert column in instructions_css
+    assert """--recipe-edit-instruction-grid:
+        28px
+        48px
+        64px
+        minmax(320px, 1fr)
+        116px;""" in instructions_css
     assert "grid-template-columns: var(--recipe-edit-instruction-grid) !important;" in instructions_css
+    assert "body.recipe-edit-standalone-page .recipe-edit-instructions-header," in instructions_css
+    assert "body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row {" in instructions_css
+    assert "display: block;" in instructions_css
+    assert "flex: 0 0 auto;" in instructions_css
     assert "align-content: start;" in instructions_css
-    assert "grid-auto-rows: max-content;" in instructions_css
-    assert "min-height: 84px;" in instructions_css
-    assert "position: sticky;" in instructions_css
-    assert "min-height: 48px;" in instructions_css
-    assert "max-height: 72px;" in instructions_css
-    assert "width: 60px;" in instructions_css
-    assert "min-width: 88px;" in instructions_css
+    assert "overflow-x: auto;" in instructions_css
+    assert "overflow-y: visible;" in instructions_css
+    assert "position: static;" in instructions_css
+    assert "min-height: 72px;" in instructions_css
+    assert "width: 52px;" in instructions_css
     assert "width: 36px;" in instructions_css
-    assert """.recipe-edit-instruction-options-button > span {
-    display: block;""" in instructions_css
-    assert """.recipe-edit-instruction-options-button::before {
-    display: none;
-    content: none;""" in instructions_css
-    assert "recipe-edit-instruction-expanded" in instructions_css
-    assert "recipe-edit-instruction-reorder-mode" in instructions_css
-    assert "recipe-edit-row-dragging" in instructions_css
+    assert ".recipe-edit-instruction-read-text" in instructions_css
+    assert ".recipe-edit-instruction-row.is-editing > .recipe-edit-instruction-read-text" in instructions_css
+    assert ".recipe-edit-instruction-edit-panel[hidden]" in instructions_css
+    assert "display: none !important;" in instructions_css
+    assert "min-height: 88px;" in instructions_css
+    assert "max-height: 180px;" in instructions_css
     assert "@media (max-width: 760px)" in instructions_css
-    assert "grid-template-columns: 28px 52px 64px minmax(0, 1fr) !important;" in instructions_css
+    assert "grid-template-columns: 28px 42px 56px minmax(0, 1fr) !important;" in instructions_css
+    assert "grid-column: 2 / 5;" in instructions_css
+    assert "-webkit-line-clamp: 3;" in instructions_css
+
+    medium_start = instructions_css.index("@media (min-width: 761px) and (max-width: 1100px)")
+    medium_end = instructions_css.index("@media (max-width: 760px)", medium_start)
+    medium_css = instructions_css[medium_start:medium_end]
+    medium_step_start = medium_css.index(
+        "body.recipe-edit-standalone-page #recipeEditInstructions > "
+        ".recipe-edit-instruction-row > .recipe-edit-step-number {"
+    )
+    medium_step_end = medium_css.index("}", medium_step_start)
+    medium_step_rule = medium_css[medium_step_start:medium_step_end]
+    assert "width: 44px;" in medium_step_rule
+    assert "min-width: 44px;" in medium_step_rule
+
+    mobile_start = instructions_css.index("@media (max-width: 760px)")
+    mobile_end = instructions_css.index("@media (max-width: 360px)", mobile_start)
+    mobile_css = instructions_css[mobile_start:mobile_end]
+    mobile_header_start = mobile_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-instructions-header {"
+    )
+    mobile_header_end = mobile_css.index("}", mobile_header_start)
+    assert "display: none;" in mobile_css[mobile_header_start:mobile_header_end]
+
+    mobile_edit_start = mobile_css.index(
+        "body.recipe-edit-standalone-page #recipeEditInstructions > "
+        ".recipe-edit-instruction-row > .recipe-edit-instruction-edit-panel {"
+    )
+    mobile_edit_end = mobile_css.index("}", mobile_edit_start)
+    mobile_edit_rule = mobile_css[mobile_edit_start:mobile_edit_end]
+    assert "grid-row: 2;" in mobile_edit_rule
+
+    mobile_image_start = mobile_css.index(
+        "body.recipe-edit-standalone-page #recipeEditInstructions > "
+        ".recipe-edit-instruction-row > .recipe-step-image-panel.recipe-image-tools-visible {"
+    )
+    mobile_image_end = mobile_css.index("}", mobile_image_start)
+    mobile_image_rule = mobile_css[mobile_image_start:mobile_image_end]
+    assert "grid-row: 3;" in mobile_image_rule
+    assert "grid-row: 2;" not in mobile_image_rule
 
     row_start = script.index("function addRecipeInstructionRow")
     row_end = script.index("function addRecipeNutritionRow", row_start)
     row_code = script[row_start:row_end]
+    assert 'const isNewBlankRow = arguments.length === 0 && !String(instruction || "").trim();' in row_code
+    assert 'row.dataset.recipeInstructionNew = "true";' in row_code
     for preserved_field in (
         'data-field="text"',
         'data-field="step_number"',
         'data-field="step_image_url"',
         'data-field="step_image_generated_at"',
+        'data-field="step_image_prompt"',
+        'data-field="id"',
+        'data-field="instruction_id"',
+        'data-field="step_id"',
+        'data-field="row_id"',
     ):
         assert preserved_field in row_code
     assert "data-instruction-row-number" in row_code
     assert "number.textContent = value;" in row_code
+    assert "panel.dataset.stepNumber = value;" in row_code
     assert "organizeRecipeEditInstructionRow(row);" in row_code
     assert "bindRecipeEditDragAndDrop(row);" in row_code
     assert "function resizeRecipeEditInstructionTextarea" in row_code
     assert "function toggleRecipeEditInstructionDetails" in row_code
-    assert 'optionsButton.innerHTML = `<span>Options</span>${recipeEditSvgIcon("chevron-down")}`;' in row_code
+    assert 'row.classList.add("recipe-edit-read-first-instruction");' in row_code
+    assert 'optionsButton.setAttribute("aria-label", "Step actions");' in row_code
+    assert 'readText.className = "recipe-edit-instruction-read-text";' in row_code
+    assert 'readText.dataset.recipeEditInstructionReadText = "";' in row_code
+    assert 'summary.textContent = text || "Add instruction text";' in row_code
+    assert 'summary.classList.toggle("is-empty", !text);' in row_code
+    assert 'editPanel.className = "recipe-edit-instruction-edit-panel";' in row_code
+    assert "editPanel.hidden = true;" in row_code
+    assert "editBody.appendChild(textField);" in row_code
+    assert 'onclick="return cancelRecipeInstructionInlineEdit(this)"' in row_code
+    assert 'onclick="return saveRecipeInstructionInlineEdit(this)"' in row_code
+    assert "Save Step" in row_code
+    assert 'document.querySelectorAll("#recipeEditInstructions > .recipe-edit-instruction-row.is-editing")' in row_code
+    assert 'editPanel.dataset.editSnapshot = JSON.stringify({ text: textarea.value });' in row_code
+    assert 'setRecipeInstructionEditMode(otherRow, false, { restore: restoreOtherEdits });' in row_code
+    assert 'row.classList.toggle("is-editing", Boolean(shouldEdit));' in row_code
+    assert "editPanel.hidden = !shouldEdit;" in row_code
+    assert 'setRecipeInstructionEditMode(row, false, { restore: true })' in row_code
+    assert 'textarea.setCustomValidity("Enter instruction text.");' in row_code
+    assert "updateRecipeInstructionReadSummary(row);" in row_code
+    assert 'updateRecipeEditorDirtyState(row.closest("#recipeEditForm"));' in row_code
+    assert "setRecipeEditRowImageToolsVisible(row, false);" in row_code
     assert 'detailsButton.setAttribute("aria-expanded", "false");' in row_code
     assert 'detailsButton.setAttribute("onclick", "return toggleRecipeEditInstructionDetails(this)");' in row_code
     assert 'count.textContent = `${rows.length} ${rows.length === 1 ? "step" : "steps"}`;' in row_code
+
+    edit_mode_start = row_code.index("function setRecipeInstructionEditMode")
+    edit_mode_end = row_code.index("function saveRecipeInstructionInlineEdit", edit_mode_start)
+    edit_mode = row_code[edit_mode_start:edit_mode_end]
+    assert "const restoreOtherEdits = options.restoreOtherEdits === true;" in edit_mode
+    assert 'if (!shouldEdit && row.dataset.recipeInstructionNew === "true")' in edit_mode
+    assert 'if (!String(textarea.value || "").trim())' in edit_mode
+    assert "row.remove();" in edit_mode
+    assert "updateRecipeInstructionStepNumbers();" in edit_mode
+    assert "updateRecipeEditContextPanels();" in edit_mode
+    assert 'updateRecipeEditorDirtyState(document.getElementById("recipeEditForm"));' in edit_mode
+    assert "delete row.dataset.recipeInstructionNew;" in edit_mode
+
+    step_numbers_start = row_code.index("function updateRecipeInstructionStepNumbers")
+    step_numbers = row_code[step_numbers_start:]
+    assert 'const editStep = row.querySelector("[data-recipe-instruction-edit-step]");' in step_numbers
+    assert "editStep.textContent = value;" in step_numbers
+
+    header_start = row_code.index("function recipeInstructionsHeaderHtml")
+    header_end = row_code.index("function resizeRecipeEditInstructionTextarea", header_start)
+    runtime_header = row_code[header_start:header_end]
+    assert runtime_header.count("<span") == 5
+    assert "<span>Options</span>" not in runtime_header
+
+    compact_actions_start = script.index("function organizeRecipeEditCompactRowActions")
+    compact_actions_end = script.index("function updateRecipeEditIngredientDetailsState", compact_actions_start)
+    compact_actions = script[compact_actions_start:compact_actions_end]
+    assert 'const isInstructionRow = label === "step";' in compact_actions
+    assert "const menuInActions = isIngredientRow || isInstructionRow;" in compact_actions
+    assert '${menuInActions ? "" : `<button type="button"' in compact_actions
+    assert "if (menuInActions)" in compact_actions
+    assert "actions.appendChild(menuWrap);" in compact_actions
+
+    focus_start = script.index("function focusRecipeEditCompactRow")
+    focus_end = script.index("function setRecipeIngredientEditMode", focus_start)
+    focus_code = script[focus_start:focus_end]
+    assert 'row.classList.contains("recipe-edit-read-first-instruction")' in focus_code
+    assert "return setRecipeInstructionEditMode(row, true);" in focus_code
 
     reorder_start = script.index("function beginRecipeInstructionReorder")
     reorder_end = script.index("function recipeEditMetadataFields", reorder_start)
@@ -950,6 +1064,12 @@ def test_recipe_editor_instructions_use_compact_step_grid_and_preserve_handlers(
     assert 'list.classList.toggle("recipe-edit-instruction-reorder-mode", active);' in reorder_code
     assert 'label.textContent = active ? "Done Reordering" : "Reorder";' in reorder_code
     assert 'button.setAttribute("aria-pressed", active ? "true" : "false");' in reorder_code
+    assert 'setRecipeInstructionEditMode(row, false);' in reorder_code
+    assert 'setRecipeEditRowImageToolsVisible(row, false);' in reorder_code
+
+    assert "recipe-edit-instruction-expanded" in css
+    assert "recipe-edit-instruction-reorder-mode" in css
+    assert "recipe-edit-row-dragging" in css
 
     image_tools_start = script.index("function setRecipeEditRowImageToolsVisible(row, visible)")
     image_tools_end = script.index("function setRecipeEditRowImageVisible", image_tools_start)

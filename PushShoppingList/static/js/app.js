@@ -26015,6 +26015,8 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
 
     const label = String(itemLabel || "row").trim() || "row";
     const isIngredientRow = label === "ingredient";
+    const isInstructionRow = label === "step";
+    const menuInActions = isIngredientRow || isInstructionRow;
     const details = row.querySelector(":scope > .recipe-edit-ingredient-advanced-details");
     const detailsButton = details && !isIngredientRow ? `
         <button type="button"
@@ -26043,7 +26045,7 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
                 onclick="return focusRecipeEditCompactRow(this)">
             ${recipeEditSvgIcon("edit")}
         </button>
-        ${isIngredientRow ? "" : `<button type="button"
+        ${menuInActions ? "" : `<button type="button"
                 class="recipe-edit-compact-row-delete"
                 aria-label="Delete ${escapeAttribute(label)}"
                 title="Delete ${escapeAttribute(label)}"
@@ -26051,7 +26053,7 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
             ${recipeEditSvgIcon("trash")}
         </button>`}
     `;
-    if (isIngredientRow) {
+    if (menuInActions) {
         const menuWrap = row.querySelector(":scope > .recipe-edit-row-menu-wrap");
         if (menuWrap) {
             menuWrap.removeAttribute("role");
@@ -26115,6 +26117,9 @@ function focusRecipeEditCompactRow(button) {
     const row = recipeEditActionRowFromButton(button);
     if (row && row.classList.contains("recipe-edit-read-first-row")) {
         return setRecipeIngredientEditMode(row, true);
+    }
+    if (row && row.classList.contains("recipe-edit-read-first-instruction")) {
+        return setRecipeInstructionEditMode(row, true);
     }
     const selector = button && button.dataset ? button.dataset.recipeEditFocusSelector : "";
     const field = row ? row.querySelector(selector || "input, textarea, select") : null;
@@ -29818,6 +29823,15 @@ function beginRecipeInstructionReorder(button) {
         label.textContent = active ? "Done Reordering" : "Reorder";
     }
 
+    if (active) {
+        list.querySelectorAll(":scope > .recipe-edit-instruction-row").forEach(row => {
+            if (row.classList.contains("is-editing")) {
+                setRecipeInstructionEditMode(row, false);
+            }
+            setRecipeEditRowImageToolsVisible(row, false);
+        });
+    }
+
     const firstHandle = list.querySelector(".recipe-edit-instruction-row .recipe-edit-row-handle");
     if (active && firstHandle) {
         firstHandle.focus({ preventScroll: false });
@@ -31060,8 +31074,13 @@ function showRecipeEditorValidationErrors(errors, options = {}) {
         const card = optionRow.closest(".recipe-edit-alternative-card");
         if (card) setRecipeIngredientAlternativeEditMode(card, true, { restoreOtherEdits: false });
     } else if (firstErrorControl && firstErrorControl.closest) {
+        const instructionRow = firstErrorControl.closest(".recipe-edit-read-first-instruction");
         const ingredientRow = firstErrorControl.closest(".recipe-edit-read-first-row");
-        if (ingredientRow) setRecipeIngredientEditMode(ingredientRow, true, { restoreOtherEdits: false });
+        if (instructionRow) {
+            setRecipeInstructionEditMode(instructionRow, true, { restoreOtherEdits: false });
+        } else if (ingredientRow) {
+            setRecipeIngredientEditMode(ingredientRow, true, { restoreOtherEdits: false });
+        }
     }
 
     const firstControl = safeErrors.map(error => error.control).find(control => {
@@ -32457,6 +32476,13 @@ function scrollRecipeEditorToSection(sectionKey) {
         ".recipe-edit-reflection-note-row textarea, " +
         "input, textarea, select"
     );
+
+    const instructionRow = focusTarget && focusTarget.closest
+        ? focusTarget.closest(".recipe-edit-read-first-instruction")
+        : null;
+    if (instructionRow) {
+        setRecipeInstructionEditMode(instructionRow, true);
+    }
 
     if (focusTarget) {
         setTimeout(() => {
@@ -38647,9 +38673,13 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
         ? (value.step_image_generated_at || value.image_generated_at || "")
         : "";
     const nextStepNumber = sourceStepNumber || nextRecipeInstructionNumber();
+    const isNewBlankRow = arguments.length === 0 && !String(instruction || "").trim();
     const recipeUrl = recipeEditorCurrentUrl();
     const row = document.createElement("div");
     row.className = "recipe-edit-text-row recipe-edit-instruction-row";
+    if (isNewBlankRow) {
+        row.dataset.recipeInstructionNew = "true";
+    }
     row.innerHTML = `
         <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
         <label class="recipe-edit-step-number">
@@ -38790,7 +38820,6 @@ function recipeInstructionsHeaderHtml() {
             <span>Step</span>
             <span>Image</span>
             <span>Instruction</span>
-            <span>Options</span>
             <span>Actions</span>
         </div>
     `;
@@ -38802,9 +38831,9 @@ function resizeRecipeEditInstructionTextarea(textarea) {
     }
 
     textarea.style.height = "0px";
-    const nextHeight = Math.max(48, Math.min(72, textarea.scrollHeight));
+    const nextHeight = Math.max(88, Math.min(180, textarea.scrollHeight));
     textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY = textarea.scrollHeight > 72 ? "auto" : "hidden";
+    textarea.style.overflowY = textarea.scrollHeight > 180 ? "auto" : "hidden";
 }
 
 function organizeRecipeEditInstructionRow(row) {
@@ -38813,18 +38842,23 @@ function organizeRecipeEditInstructionRow(row) {
     }
 
     row.dataset.recipeEditCompactInstruction = "1";
+    row.classList.add("recipe-edit-read-first-instruction");
     const textarea = row.querySelector('[data-field="text"]');
+    const textField = row.querySelector(":scope > .recipe-edit-step-text");
     const panel = row.querySelector("[data-step-image-panel]");
-    const menuWrap = row.querySelector(":scope > .recipe-edit-row-menu-wrap");
+    const menuWrap = row.querySelector(
+        ":scope > .recipe-edit-row-menu-wrap, " +
+        ":scope > .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap"
+    );
     const optionsButton = menuWrap ? menuWrap.querySelector(".recipe-edit-row-menu-btn") : null;
     const actions = row.querySelector(":scope > .recipe-edit-compact-row-actions");
     const stepNumber = row.querySelector("[data-instruction-row-number]");
 
     if (optionsButton) {
-        optionsButton.classList.add("recipe-edit-instruction-options-button");
-        optionsButton.innerHTML = `<span>Options</span>${recipeEditSvgIcon("chevron-down")}`;
-        optionsButton.setAttribute("aria-label", "Step options");
-        optionsButton.title = "Step options";
+        optionsButton.classList.remove("recipe-edit-instruction-options-button");
+        optionsButton.innerHTML = '<span aria-hidden="true"></span>';
+        optionsButton.setAttribute("aria-label", "Step actions");
+        optionsButton.title = "Step actions";
     }
 
     if (panel) {
@@ -38854,12 +38888,186 @@ function organizeRecipeEditInstructionRow(row) {
         actions.insertBefore(detailsButton, actions.firstChild);
     }
 
+    let readText = row.querySelector(":scope > .recipe-edit-instruction-read-text");
+    if (!readText) {
+        readText = document.createElement("div");
+        readText.className = "recipe-edit-instruction-read-text";
+        readText.dataset.recipeEditInstructionReadText = "";
+        readText.setAttribute("role", "cell");
+        readText.setAttribute("aria-live", "polite");
+        if (panel) {
+            row.insertBefore(readText, panel);
+        } else {
+            row.appendChild(readText);
+        }
+    }
+
+    let editPanel = row.querySelector(":scope > [data-recipe-instruction-edit-panel]");
+    if (!editPanel) {
+        editPanel = document.createElement("div");
+        editPanel.className = "recipe-edit-instruction-edit-panel";
+        editPanel.dataset.recipeInstructionEditPanel = "";
+        editPanel.hidden = true;
+        editPanel.innerHTML = `
+            <div class="recipe-edit-instruction-edit-heading">
+                <strong>Edit instruction</strong>
+                <span>Step <span data-recipe-instruction-edit-step></span></span>
+            </div>
+            <div class="recipe-edit-instruction-edit-body"></div>
+            <div class="recipe-edit-instruction-edit-footer">
+                <button type="button"
+                        class="recipe-edit-inline-cancel"
+                        onclick="return cancelRecipeInstructionInlineEdit(this)">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="recipe-edit-inline-save"
+                        onclick="return saveRecipeInstructionInlineEdit(this)">
+                    Save Step
+                </button>
+            </div>
+        `;
+        const editBody = editPanel.querySelector(".recipe-edit-instruction-edit-body");
+        if (editBody && textField) {
+            editBody.appendChild(textField);
+        }
+        row.appendChild(editPanel);
+    }
+
+    if (!editPanel.id) {
+        let editorId = 1;
+        while (document.getElementById(`recipeEditInstructionEditor${editorId}`)) {
+            editorId += 1;
+        }
+        editPanel.id = `recipeEditInstructionEditor${editorId}`;
+    }
+    const editButton = actions ? actions.querySelector(".recipe-edit-compact-row-edit") : null;
+    if (editButton) {
+        editButton.setAttribute("aria-controls", editPanel.id);
+        editButton.setAttribute("aria-expanded", "false");
+    }
+
     if (textarea && textarea.dataset.recipeEditInstructionResizeBound !== "true") {
         textarea.dataset.recipeEditInstructionResizeBound = "true";
-        textarea.addEventListener("input", () => resizeRecipeEditInstructionTextarea(textarea));
+        textarea.addEventListener("input", () => {
+            textarea.setCustomValidity("");
+            textarea.removeAttribute("aria-invalid");
+            resizeRecipeEditInstructionTextarea(textarea);
+        });
     }
-    resizeRecipeEditInstructionTextarea(textarea);
+    updateRecipeInstructionReadSummary(row);
     updateRecipeEditInstructionDetailsState(row);
+
+    if (!String(textarea ? textarea.value : "").trim()) {
+        setRecipeInstructionEditMode(row, true);
+    }
+}
+
+function updateRecipeInstructionReadSummary(row) {
+    const textarea = row ? row.querySelector('[data-field="text"]') : null;
+    const summary = row ? row.querySelector("[data-recipe-edit-instruction-read-text]") : null;
+    if (!summary) {
+        return;
+    }
+    const text = String(textarea ? textarea.value : "").trim();
+    summary.textContent = text || "Add instruction text";
+    summary.classList.toggle("is-empty", !text);
+}
+
+function setRecipeInstructionEditMode(row, shouldEdit, options = {}) {
+    const editPanel = row ? row.querySelector("[data-recipe-instruction-edit-panel]") : null;
+    const textarea = editPanel ? editPanel.querySelector('[data-field="text"]') : null;
+    if (!row || !editPanel || !textarea) {
+        return false;
+    }
+
+    if (shouldEdit) {
+        const restoreOtherEdits = options.restoreOtherEdits === true;
+        document.querySelectorAll("#recipeEditInstructions > .recipe-edit-instruction-row.is-editing")
+            .forEach(otherRow => {
+                if (otherRow !== row) {
+                    setRecipeInstructionEditMode(otherRow, false, { restore: restoreOtherEdits });
+                }
+            });
+        if (!row.classList.contains("is-editing") || !editPanel.dataset.editSnapshot) {
+            editPanel.dataset.editSnapshot = JSON.stringify({ text: textarea.value });
+        }
+        setRecipeEditRowImageToolsVisible(row, false);
+    } else if (options.restore && editPanel.dataset.editSnapshot) {
+        try {
+            const snapshot = JSON.parse(editPanel.dataset.editSnapshot);
+            textarea.value = String(snapshot && snapshot.text != null ? snapshot.text : "");
+        } catch (error) {
+            console.warn("Unable to restore the instruction text.", error);
+        }
+    }
+
+    if (!shouldEdit && row.dataset.recipeInstructionNew === "true") {
+        if (!String(textarea.value || "").trim()) {
+            closeRecipeEditRowMenus();
+            row.remove();
+            updateRecipeInstructionStepNumbers();
+            updateRecipeEditContextPanels();
+            updateRecipeEditorDirtyState(document.getElementById("recipeEditForm"));
+            return false;
+        }
+        delete row.dataset.recipeInstructionNew;
+    }
+
+    row.classList.toggle("is-editing", Boolean(shouldEdit));
+    editPanel.hidden = !shouldEdit;
+    const editButton = row.querySelector(".recipe-edit-compact-row-edit");
+    if (editButton) {
+        editButton.setAttribute("aria-expanded", String(Boolean(shouldEdit)));
+    }
+
+    const stepNumber = row.querySelector("[data-instruction-row-number]");
+    const editStep = editPanel.querySelector("[data-recipe-instruction-edit-step]");
+    if (editStep) {
+        editStep.textContent = String(stepNumber ? stepNumber.textContent : "").trim();
+    }
+
+    if (shouldEdit) {
+        closeRecipeEditRowMenus();
+        requestAnimationFrame(() => {
+            resizeRecipeEditInstructionTextarea(textarea);
+            textarea.focus({ preventScroll: false });
+            if (typeof textarea.select === "function") textarea.select();
+        });
+    } else {
+        delete editPanel.dataset.editSnapshot;
+        textarea.setCustomValidity("");
+        textarea.removeAttribute("aria-invalid");
+        updateRecipeInstructionReadSummary(row);
+        updateRecipeEditorDirtyState(row.closest("#recipeEditForm"));
+    }
+    return false;
+}
+
+function saveRecipeInstructionInlineEdit(button) {
+    const row = button ? button.closest(".recipe-edit-instruction-row") : null;
+    const textarea = row ? row.querySelector('[data-field="text"]') : null;
+    if (!row || !textarea) {
+        return false;
+    }
+    if (!String(textarea.value || "").trim()) {
+        textarea.setCustomValidity("Enter instruction text.");
+        textarea.setAttribute("aria-invalid", "true");
+        textarea.reportValidity();
+        textarea.focus({ preventScroll: false });
+        return false;
+    }
+    textarea.setCustomValidity("");
+    textarea.removeAttribute("aria-invalid");
+    updateRecipeInstructionReadSummary(row);
+    setRecipeInstructionEditMode(row, false);
+    updateRecipeEditorDirtyState(row.closest("#recipeEditForm"));
+    return false;
+}
+
+function cancelRecipeInstructionInlineEdit(button) {
+    const row = button ? button.closest(".recipe-edit-instruction-row") : null;
+    return setRecipeInstructionEditMode(row, false, { restore: true });
 }
 
 function updateRecipeEditInstructionDetailsState(row) {
@@ -38907,6 +39115,7 @@ function updateRecipeInstructionStepNumbers() {
         .forEach((row, index) => {
             const input = row.querySelector('[data-field="step_number"]');
             const number = row.querySelector("[data-instruction-row-number]");
+            const editStep = row.querySelector("[data-recipe-instruction-edit-step]");
             const panel = row.querySelector("[data-step-image-panel]");
             const value = String(index + 1);
 
@@ -38916,6 +39125,10 @@ function updateRecipeInstructionStepNumbers() {
 
             if (number) {
                 number.textContent = value;
+            }
+
+            if (editStep) {
+                editStep.textContent = value;
             }
 
             if (panel) {

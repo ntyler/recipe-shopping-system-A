@@ -119,7 +119,8 @@ def test_validation_reveals_invalid_nested_editor_without_restoring_other_live_e
         script.index("function replaceRecipeIngredientWithAlternativeCard")
     ]
 
-    assert reveal.count("{ restoreOtherEdits: false }") == 3
+    assert reveal.count("{ restoreOtherEdits: false }") == 4
+    assert "setRecipeInstructionEditMode(instructionRow, true, { restoreOtherEdits: false });" in reveal
     assert "const restoreOtherEdits = options.restoreOtherEdits !== false;" in main_edit
     assert "restore: restoreOtherEdits" in main_edit
     assert '!row.classList.contains("is-editing") || !panel.dataset.editSnapshot' in main_edit

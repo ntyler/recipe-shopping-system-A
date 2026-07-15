@@ -48116,3 +48116,374 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Instruction editor v2: compact read-first rows with isolated inline editing. */
+body.recipe-edit-standalone-page #recipeEditInstructions {
+    --recipe-edit-instruction-grid:
+        28px
+        48px
+        64px
+        minmax(320px, 1fr)
+        116px;
+    --recipe-edit-instruction-gap: 12px;
+    display: block;
+    flex: 0 0 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
+    align-content: start;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-instructions-header,
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row {
+    grid-template-columns: var(--recipe-edit-instruction-grid) !important;
+    column-gap: var(--recipe-edit-instruction-gap);
+    width: 100%;
+    min-width: 720px;
+    box-sizing: border-box;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-instructions-header {
+    position: static;
+    display: grid;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 14px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row {
+    align-items: center;
+    min-height: 72px;
+    padding: 8px 14px !important;
+    row-gap: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row:is(.is-editing, .recipe-edit-instruction-expanded) {
+    row-gap: 10px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-row-handle {
+    grid-column: 1;
+    grid-row: 1;
+    width: 28px;
+    min-width: 28px;
+    min-height: 36px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-step-number {
+    grid-column: 2;
+    grid-row: 1;
+    width: 48px;
+    min-width: 48px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row .recipe-edit-row-number {
+    width: 34px;
+    height: 34px;
+    font-size: 12px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel {
+    grid-column: 3;
+    grid-row: 1;
+    width: 52px;
+    min-width: 52px;
+    max-width: 52px;
+    height: 52px;
+    min-height: 52px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel:not(.recipe-image-tools-visible) .recipe-step-image {
+    width: 52px;
+    height: 52px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-instruction-read-text {
+    display: -webkit-box;
+    grid-column: 4;
+    grid-row: 1;
+    align-self: center;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--app-text);
+    font-size: 11px;
+    font-weight: 550;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-instruction-read-text.is-empty {
+    color: var(--app-muted);
+    font-style: italic;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row.is-editing > .recipe-edit-instruction-read-text {
+    display: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-compact-row-actions {
+    grid-column: 5;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    width: 116px;
+    min-width: 116px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > :is(button, .recipe-edit-row-menu-wrap),
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    margin: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap {
+    position: relative;
+    flex: 0 0 36px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn {
+    padding: 0;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--app-muted);
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn::before {
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn:hover,
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn:focus-visible,
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn[aria-expanded="true"] {
+    background: var(--app-surface-soft);
+    color: var(--app-primary-hover);
+    outline: 2px solid color-mix(in srgb, var(--app-primary) 46%, transparent);
+    outline-offset: 1px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-instruction-edit-panel {
+    display: grid;
+    grid-column: 4 / 6;
+    grid-row: 2;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px 12px;
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 42%, var(--app-border));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--app-bg-soft) 88%, var(--app-surface));
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-instruction-edit-panel[hidden] {
+    display: none !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-heading {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--app-text);
+    font-size: 10px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-heading > span {
+    color: var(--app-muted);
+    font-size: 9px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-body {
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-body > .recipe-edit-step-text {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-body .recipe-edit-step-text textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 88px;
+    height: 88px;
+    max-height: 180px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    overflow-y: hidden;
+    resize: vertical;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-surface);
+    color: var(--app-text);
+    font-size: 11px;
+    font-weight: 550;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-body .recipe-edit-step-text textarea:focus {
+    min-height: 88px;
+    max-height: 180px;
+    border-color: color-mix(in srgb, var(--app-primary) 68%, var(--app-border));
+    background: var(--app-surface);
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-footer {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-footer > button {
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-footer > .recipe-edit-inline-cancel {
+    background: transparent;
+    color: var(--app-muted);
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-edit-footer > .recipe-edit-inline-save {
+    border-color: color-mix(in srgb, var(--app-primary) 62%, var(--app-border));
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel.recipe-image-tools-visible {
+    grid-column: 2 / 6;
+    grid-row: 2;
+}
+
+body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row.is-editing > .recipe-step-image-panel.recipe-image-tools-visible {
+    grid-row: 3;
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+    body.recipe-edit-standalone-page #recipeEditInstructions {
+        --recipe-edit-instruction-grid:
+            28px
+            44px
+            60px
+            minmax(260px, 1fr)
+            116px;
+        --recipe-edit-instruction-gap: 10px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-instructions-header,
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row {
+        min-width: 660px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-step-number {
+        width: 44px;
+        min-width: 44px;
+    }
+}
+
+@media (max-width: 760px) {
+    body.recipe-edit-standalone-page #recipeEditInstructions {
+        overflow-x: hidden;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-instructions-header {
+        display: none;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row {
+        grid-template-columns: 28px 42px 56px minmax(0, 1fr) !important;
+        min-width: 0;
+        min-height: 72px;
+        padding: 10px !important;
+        column-gap: 8px;
+        row-gap: 8px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-step-number {
+        grid-column: 2;
+        width: 42px;
+        min-width: 42px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel:not(.recipe-image-tools-visible) {
+        grid-column: 3;
+        width: 48px;
+        min-width: 48px;
+        max-width: 48px;
+        height: 48px;
+        min-height: 48px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel:not(.recipe-image-tools-visible) .recipe-step-image {
+        width: 48px;
+        height: 48px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-compact-row-actions {
+        grid-column: 4;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-instruction-read-text {
+        grid-column: 2 / 5;
+        grid-row: 2;
+        padding: 2px 0 4px;
+        -webkit-line-clamp: 3;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-instruction-edit-panel {
+        grid-column: 2 / 5;
+        grid-row: 2;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel.recipe-image-tools-visible {
+        grid-column: 2 / 5;
+        grid-row: 3;
+    }
+}
+
+@media (max-width: 360px) {
+    body.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-edit-compact-row-actions {
+        gap: 2px;
+        width: 100px;
+        min-width: 100px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > :is(button, .recipe-edit-row-menu-wrap),
+    body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn {
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        min-height: 32px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap {
+        flex-basis: 32px;
+    }
+}
