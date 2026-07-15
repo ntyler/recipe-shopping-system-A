@@ -6547,6 +6547,357 @@ def save_editable_recipe(original_url, payload, require_existing=False):
     return result
 
 
+def editable_recipe_ingredient_reference_name(item):
+    if not isinstance(item, dict):
+        return ""
+    return nullable_string(
+        item.get("ingredient")
+        or item.get("name")
+        or item.get("original_text")
+        or item.get("purchasable_item")
+        or item.get("buy_as")
+    ) or ""
+
+
+def editable_recipe_ingredient_name_matches(item, reference_name):
+    reference_key = instruction_match_text_key(reference_name)
+    if not reference_key or not isinstance(item, dict):
+        return False
+    return any(
+        instruction_match_text_key(item.get(field)) == reference_key
+        for field in (
+            "ingredient",
+            "name",
+            "original_text",
+            "parsed_name",
+            "normalized_name",
+            "purchasable_item",
+            "buy_as",
+        )
+        if item.get(field)
+    )
+
+
+def resolve_editable_recipe_ingredient_index(ingredients, ingredient, ingredient_ref=None):
+    ingredients = ingredients if isinstance(ingredients, list) else []
+    ingredient = ingredient if isinstance(ingredient, dict) else {}
+    ingredient_ref = ingredient_ref if isinstance(ingredient_ref, dict) else {}
+    stable_fields = ("recipe_ingredient_id", "row_id", "id")
+    stable_values = {}
+    for field in stable_fields:
+        value = nullable_string(ingredient_ref.get(field))
+        if not value:
+            value = nullable_string(ingredient.get(field))
+        if value:
+            stable_values[field] = value
+
+    if stable_values:
+        match_sets = []
+        for field, expected in stable_values.items():
+            match_sets.append({
+                index
+                for index, item in enumerate(ingredients)
+                if isinstance(item, dict)
+                and nullable_string(item.get(field)) == expected
+            })
+        matching = set.intersection(*match_sets) if match_sets else set()
+        if len(matching) == 1:
+            return {"ok": True, "index": matching.pop(), "matched_by": "stable_id"}
+        if not matching and all(match_set for match_set in match_sets):
+            return recipe_save_error(
+                "ingredient_conflict",
+                "Ingredient identifiers do not refer to the same saved row.",
+                {"ingredient_ref": "Reload the recipe before saving this ingredient."},
+                status_code=409,
+            )
+        if not matching:
+            return recipe_save_error(
+                "ingredient_not_found",
+                "The ingredient could not be found. Reload the recipe and try again.",
+                {"ingredient_ref": "Saved ingredient identifiers no longer match."},
+                status_code=404,
+            )
+        return recipe_save_error(
+            "ingredient_conflict",
+            "More than one ingredient has the same saved identifier.",
+            {"ingredient_ref": "Reload the recipe before saving this ingredient."},
+            status_code=409,
+        )
+
+    raw_index = ingredient_ref.get("index")
+    if raw_index in (None, ""):
+        raw_index = ingredient_ref.get("ingredient_index")
+    reference_name = editable_recipe_ingredient_reference_name(ingredient_ref)
+    submitted_name = editable_recipe_ingredient_reference_name(ingredient)
+
+    if raw_index not in (None, ""):
+        try:
+            target_index = int(raw_index)
+        except (TypeError, ValueError):
+            target_index = -1
+        if isinstance(raw_index, bool) or target_index < 0 or target_index >= len(ingredients):
+            return recipe_save_error(
+                "ingredient_not_found",
+                "The ingredient position is no longer available.",
+                {"ingredient_ref.index": "Reload the recipe before saving this ingredient."},
+                status_code=404,
+            )
+        expected_name = reference_name or submitted_name
+        if not expected_name or not editable_recipe_ingredient_name_matches(
+            ingredients[target_index],
+            expected_name,
+        ):
+            return recipe_save_error(
+                "ingredient_conflict",
+                "The ingredient at that position has changed.",
+                {"ingredient_ref": "Include the original ingredient name or reload the recipe."},
+                status_code=409,
+            )
+        return {"ok": True, "index": target_index, "matched_by": "index_and_name"}
+
+    expected_name = reference_name or submitted_name
+    if not expected_name:
+        return recipe_save_error(
+            "validation_error",
+            "An ingredient identifier is required.",
+            {"ingredient_ref": "Provide a saved ingredient ID or its original position and name."},
+            status_code=422,
+        )
+    matching = [
+        index
+        for index, item in enumerate(ingredients)
+        if editable_recipe_ingredient_name_matches(item, expected_name)
+    ]
+    if len(matching) == 1:
+        return {"ok": True, "index": matching[0], "matched_by": "unique_name"}
+    if not matching:
+        return recipe_save_error(
+            "ingredient_not_found",
+            "The ingredient could not be found. Reload the recipe and try again.",
+            {"ingredient_ref": "No saved ingredient matches that name."},
+            status_code=404,
+        )
+    return recipe_save_error(
+        "ingredient_conflict",
+        "More than one ingredient has that name.",
+        {"ingredient_ref": "Use a saved ingredient ID to choose the correct row."},
+        status_code=409,
+    )
+
+
+def save_editable_recipe_ingredient(
+    original_url,
+    ingredient,
+    *,
+    ingredient_ref=None,
+    recipe_id="",
+):
+    original_url = str(original_url or "").strip()
+    ingredient = ingredient if isinstance(ingredient, dict) else None
+    ingredient_ref = ingredient_ref if isinstance(ingredient_ref, dict) else {}
+    if not original_url:
+        return recipe_save_error(
+            "validation_error",
+            "Some fields need attention.",
+            {"original_url": "Recipe URL is required."},
+            status_code=422,
+        )
+    if ingredient is None:
+        return recipe_save_error(
+            "validation_error",
+            "Some fields need attention.",
+            {"ingredient": "Ingredient data must be a JSON object."},
+            status_code=422,
+        )
+
+    with _RECIPE_OUTPUT_WRITE_LOCK:
+        existing_data = load_recipe_output(original_url)
+        if not isinstance(existing_data, dict) or not existing_data:
+            return recipe_save_error(
+                "not_found",
+                "The recipe could not be found. Reload the recipe and try again.",
+                {"original_url": "Recipe was not found."},
+                status_code=404,
+            )
+
+        saved_recipe_id = nullable_string(existing_data.get("recipe_id")) or ""
+        requested_recipe_id = nullable_string(recipe_id) or ""
+        if saved_recipe_id and requested_recipe_id and saved_recipe_id != requested_recipe_id:
+            return recipe_save_error(
+                "recipe_conflict",
+                "Recipe identity does not match the open recipe.",
+                {"recipe_id": "Reload the recipe before saving this ingredient."},
+                status_code=409,
+            )
+
+        existing_ingredients = (
+            existing_data.get("ingredients")
+            if isinstance(existing_data.get("ingredients"), list)
+            else []
+        )
+        creating = truthy(ingredient_ref.get("create"))
+        if creating:
+            raw_index = ingredient_ref.get("index", len(existing_ingredients))
+            try:
+                target_index = int(raw_index)
+            except (TypeError, ValueError):
+                target_index = -1
+            if (
+                isinstance(raw_index, bool)
+                or target_index < 0
+                or target_index > len(existing_ingredients)
+            ):
+                return recipe_save_error(
+                    "validation_error",
+                    "Some fields need attention.",
+                    {"ingredient_ref.index": "New ingredient position is invalid."},
+                    status_code=422,
+                )
+            resolved = {"ok": True, "index": target_index, "matched_by": "create"}
+            existing_ingredient = {}
+            merged_ingredient = deepcopy(ingredient)
+            for field in ("recipe_ingredient_id", "row_id", "id"):
+                merged_ingredient.pop(field, None)
+        else:
+            resolved = resolve_editable_recipe_ingredient_index(
+                existing_ingredients,
+                ingredient,
+                ingredient_ref,
+            )
+            if not resolved.get("ok"):
+                return resolved
+            target_index = resolved["index"]
+            existing_ingredient = existing_ingredients[target_index]
+            merged_ingredient = {
+                **deepcopy(existing_ingredient),
+                **deepcopy(ingredient),
+            }
+            for field in ("recipe_ingredient_id", "row_id", "id"):
+                if existing_ingredient.get(field) not in (None, ""):
+                    merged_ingredient[field] = existing_ingredient[field]
+        substitution_fields = (
+            "substitutions",
+            "substitution_options",
+            "alternatives",
+            "substitutions_text",
+        )
+        substitutions_supplied = any(field in ingredient for field in substitution_fields)
+
+        if not str(merged_ingredient.get("ingredient") or "").strip():
+            return recipe_save_error(
+                "validation_error",
+                "Some fields need attention.",
+                {"ingredient.ingredient": "Ingredient name is required."},
+                status_code=422,
+            )
+        amount = (
+            merged_ingredient.get("quantity")
+            if "quantity" in merged_ingredient
+            else merged_ingredient.get("recipe_qty")
+        )
+        if not recipe_amount_is_valid(amount):
+            return recipe_save_error(
+                "validation_error",
+                "Some fields need attention.",
+                {"ingredient.amount": "Ingredient amount is invalid."},
+                status_code=422,
+            )
+
+        sanitized = sanitize_ingredients([merged_ingredient], [existing_ingredient])
+        if not sanitized:
+            return recipe_save_error(
+                "validation_error",
+                "Some fields need attention.",
+                {"ingredient": "Ingredient data could not be saved."},
+                status_code=422,
+            )
+        substitution_metadata = deepcopy(sanitized[0].get("substitutions") or [])
+        normalization_context = {
+            **existing_data,
+            "ingredients": sanitized,
+        }
+        normalize_extracted_ingredient_fields(normalization_context)
+        saved_ingredient = normalization_context["ingredients"][0]
+        if creating:
+            for field in ("recipe_ingredient_id", "row_id", "id"):
+                saved_ingredient.pop(field, None)
+        if substitutions_supplied:
+            saved_ingredient["substitutions"] = normalize_ingredient_substitutions(
+                saved_ingredient.get("substitutions"),
+                substitution_metadata,
+                parent_item=saved_ingredient,
+            )
+        else:
+            saved_ingredient["substitutions"] = deepcopy(
+                existing_ingredient.get("substitutions")
+                or existing_ingredient.get("substitution_options")
+                or existing_ingredient.get("alternatives")
+                or []
+            )
+
+        recipe_data = deepcopy(existing_data)
+        recipe_data["ingredients"] = deepcopy(existing_ingredients)
+        if creating:
+            recipe_data["ingredients"].insert(target_index, saved_ingredient)
+        else:
+            recipe_data["ingredients"][target_index] = saved_ingredient
+        recipe_data["updated_at"] = now_iso()
+        source_url = str(recipe_data.get("source_url") or original_url).strip() or original_url
+        previous_recipe_data = load_recipe_ingredients()
+        previous_ingredients = recipe_ingredients_for_key(
+            normalize_recipe_url_key(source_url),
+            previous_recipe_data,
+        )
+        recipe_meta = previous_recipe_data.get(normalize_recipe_url_key(source_url), {})
+        quantity = normalize_recipe_quantity(
+            recipe_meta.get("quantity", 1) if isinstance(recipe_meta, dict) else 1
+        )
+        save_recipe_output(source_url, recipe_data)
+
+    warnings = []
+    derived_syncs = (
+        ("Ingredient and equipment master data", lambda: update_recipe_ingredient_record(source_url, quantity, recipe_data)),
+        ("Scaled recipe quantities", lambda: update_recipe_quantity(source_url, quantity)),
+        ("Shopping list", lambda: sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients)),
+    )
+    for label, sync_callback in derived_syncs:
+        try:
+            sync_callback()
+        except Exception:
+            LOGGER.exception("%s synchronization failed after the ingredient was saved.", label)
+            warnings.append(f"{label} could not be synchronized.")
+
+    try:
+        normalized_response_ingredient = normalize_edit_ingredients(
+            [saved_ingredient],
+            recipe_url=source_url,
+        )[0]
+        response_ingredient = {
+            **deepcopy(saved_ingredient),
+            **normalized_response_ingredient,
+        }
+    except Exception:
+        LOGGER.exception("The saved ingredient could not be normalized for the response.")
+        response_ingredient = deepcopy(saved_ingredient)
+        warnings.append("The saved ingredient could not be refreshed in the response.")
+
+    result = {
+        "ok": True,
+        "success": True,
+        "message": "Ingredient saved successfully",
+        "recipe_id": saved_recipe_id,
+        "source_url": source_url,
+        "updated_at": recipe_data["updated_at"],
+        "ingredient_index": target_index,
+        "matched_by": resolved.get("matched_by") or "",
+        "ingredient": response_ingredient,
+        "warnings": warnings,
+    }
+    if creating:
+        result["created"] = True
+    return result
+
+
 def save_recipe_cover_image_upload(original_url, uploaded_file, source_url="", fallback_alt=""):
     original_url = str(original_url or "").strip()
     source_url = str(source_url or original_url).strip() or original_url

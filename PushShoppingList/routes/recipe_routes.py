@@ -111,6 +111,7 @@ from PushShoppingList.services.recipe_edit_service import create_editable_recipe
 from PushShoppingList.services.recipe_edit_service import delete_editable_recipe_pdf
 from PushShoppingList.services.recipe_edit_service import decide_recipe_categories_with_chatgpt
 from PushShoppingList.services.recipe_edit_service import estimate_recipe_nutrition
+from PushShoppingList.services.recipe_edit_service import editable_recipe_ingredient_reference_name
 from PushShoppingList.services.recipe_edit_service import generate_recipe_cover_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_equipment_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_ingredient_image
@@ -123,6 +124,7 @@ from PushShoppingList.services.recipe_edit_service import remove_recipe_cover_im
 from PushShoppingList.services.recipe_edit_service import remove_recipe_detail_image
 from PushShoppingList.services.recipe_edit_service import review_recipe_store_sections
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
+from PushShoppingList.services.recipe_edit_service import save_editable_recipe_ingredient
 from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
 from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
 from PushShoppingList.services.recipe_edit_service import save_recipe_output
@@ -3971,6 +3973,63 @@ def api_recipe_route():
     status = 200 if result.get("ok") else int(result.get("status_code") or 400)
     result.pop("status_code", None)
 
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe/ingredient", methods=["POST"])
+def api_recipe_ingredient_route():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "invalid_request",
+            "message": "Request body must be a JSON object.",
+            "field_errors": {"request": "Valid JSON is required."},
+        }), 400
+
+    ingredient_ref_value = data.get("ingredient_ref")
+    if ingredient_ref_value is not None and not isinstance(ingredient_ref_value, dict):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "validation_error",
+            "message": "Some fields need attention.",
+            "field_errors": {"ingredient_ref": "Ingredient reference must be a JSON object."},
+        }), 422
+    ingredient_ref = dict(ingredient_ref_value or {})
+    if "index" not in ingredient_ref and "ingredient_index" in data:
+        ingredient_ref["index"] = data.get("ingredient_index")
+    if not editable_recipe_ingredient_reference_name(ingredient_ref):
+        ingredient_name = str(data.get("ingredient_name") or "").strip()
+        if ingredient_name:
+            ingredient_ref["ingredient"] = ingredient_name
+
+    original_url = str(
+        data.get("original_url")
+        or data.get("recipe_url")
+        or data.get("url")
+        or ""
+    ).strip()
+    try:
+        result = save_editable_recipe_ingredient(
+            original_url,
+            data.get("ingredient"),
+            ingredient_ref=ingredient_ref,
+            recipe_id=str(data.get("recipe_id") or "").strip(),
+        )
+    except Exception:
+        current_app.logger.exception("Ingredient save failed.")
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "save_failed",
+            "message": "The ingredient could not be saved.",
+            "field_errors": {},
+        }), 500
+
+    status = 200 if result.get("ok") else int(result.get("status_code") or 400)
+    result.pop("status_code", None)
     return jsonify(result), status
 
 

@@ -174,9 +174,10 @@ def test_ingredient_modal_commit_has_single_flight_busy_and_failure_contract():
     guard = commit.index('panel.dataset.saving === "true"')
     set_saving = commit.index('panel.dataset.saving = "true";')
     validate = commit.index("validateRecipeIngredientModal(row, panel)")
-    update_summary = commit.index("updateRecipeIngredientSummary(row)")
-    update_dirty = commit.index('updateRecipeEditorDirtyState(row.closest("#recipeEditForm"))')
-    assert guard < set_saving < validate < update_summary < update_dirty
+    persist = commit.index("await persistRecipeIngredientModal(row, panel)")
+    saved_guard = commit.index("if (!saved)")
+    snapshot = commit.index("panel.dataset.editSnapshot = JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row));")
+    assert guard < set_saving < validate < persist < saved_guard < snapshot
     assert "setRecipeIngredientModalSaving(panel, true);" in commit
     assert "panel.dataset.editSnapshot = JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row));" in commit
     assert "switchRecipeIngredientModal(row, nextRow)" in commit
@@ -192,6 +193,51 @@ def test_ingredient_modal_commit_has_single_flight_busy_and_failure_contract():
     assert 'panel.toggleAttribute("aria-busy", Boolean(saving));' in saving_state
     assert "button.disabled = Boolean(saving)" in saving_state
     assert 'status.textContent = saving ? "Saving ingredient\\u2026" : "";' in saving_state
+
+
+def test_ingredient_modal_uses_scoped_persistence_without_saving_unrelated_recipe_drafts():
+    script = read_text("PushShoppingList/static/js/app.js")
+    scoped_save = script[
+        script.index("function recipeIngredientModalReference"):
+        script.index("function updateRecipeIngredientModalNavigation")
+    ]
+
+    assert 'fetch("/api/recipe/ingredient"' in scoped_save
+    assert 'credentials: "same-origin"' in scoped_save
+    assert "ingredient_ref: recipeIngredientModalReference(row, panel)" in scoped_save
+    assert "ingredient: recipeIngredientModalRequestItem(row)" in scoped_save
+    assert "collectRecipeEditorPayload" not in scoped_save
+    assert 'fetch("/api/recipe"' not in scoped_save
+    assert "delete item.substitutions;" in scoped_save
+    assert "delete item.substitutions_text;" in scoped_save
+    assert "applyRecipeIngredientModalServerErrors(row, panel, fieldErrors);" in scoped_save
+    assert "if (!response.ok || !(data.ok || data.success))" in scoped_save
+    assert "return null;" in scoped_save
+    assert "applySavedRecipeIngredientToModalRow(row, ingredient);" in scoped_save
+    assert "rememberRecipeIngredientModalSave(row, ingredient, persistedIndex, created);" in scoped_save
+    assert "invalidateRecipeEditorCache(originalUrl);" in scoped_save
+
+    baseline = scoped_save[
+        scoped_save.index("function rememberRecipeIngredientModalSave"):
+        scoped_save.index("async function persistRecipeIngredientModal")
+    ]
+    assert "recipeEditSavedFormSnapshots.get(form)" in baseline
+    assert "previousIngredient.substitutions" in baseline
+    assert "savedIngredients.splice(persistedIndex, 0, baselineIngredient);" in baseline
+    assert "savedIngredients[persistedIndex] = baselineIngredient;" in baseline
+    assert "updateRecipeEditorDirtyState(form);" in baseline
+
+    creation = scoped_save[
+        scoped_save.index("function recipeIngredientModalReference"):
+        scoped_save.index("function recipeIngredientModalRequestItem")
+    ]
+    assert 'row.dataset.recipeIngredientNew === "true"' in creation
+    assert "recipeIngredientModalInsertionIndex(row)" in creation
+    assert 'recipe_ingredient_id: create ? ""' in creation
+    assert 'row.dataset.recipeIngredientNew = isNewIngredient ? "true" : "false";' in script
+    assert 'row.dataset.recipeIngredientPersistedIndex = String(persistedIndex);' in script
+    assert "addRecipeIngredientRow(item, { persistedIndex: index });" in script
+    assert script.count("markRecipeIngredientRowsPersisted();") >= 2
 
 
 def test_live_payload_preserves_nested_ids_order_and_metadata():

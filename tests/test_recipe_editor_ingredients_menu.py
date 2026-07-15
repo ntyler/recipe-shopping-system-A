@@ -553,6 +553,13 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert 'returnFocus.focus({ preventScroll: true });' in edit_mode
     assert "updateRecipeIngredientSummary(row);" in edit_mode
     assert "updateRecipeEditorDirtyState" in edit_mode
+    open_branch = edit_mode[
+        edit_mode.index("if (shouldEdit) {"):
+        edit_mode.index("} else if (options.restore && panel.dataset.editSnapshot)")
+    ]
+    assert "setRecipeIngredientSubstitutionsExpanded" not in open_branch
+    assert "recipeIngredientSubstitutionContainer" not in open_branch
+    assert ".recipe-edit-alternative-card.is-editing" not in open_branch
 
     modal_css = css[css.index("/* Ingredient editor v12:"):]
     assert css.index("/* Ingredient editor v12:") > css.index("/* Instruction editor v2:")
@@ -567,6 +574,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
 
 def test_recipe_editor_ingredient_modal_guards_row_clicks_and_dirty_close_state():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     row_open = script[
         script.index("function bindRecipeIngredientModalRowOpen"):
@@ -607,15 +615,33 @@ def test_recipe_editor_ingredient_modal_guards_row_clicks_and_dirty_close_state(
     assert 'editPanel.addEventListener("click"' not in organize
 
     scroll = script[
-        script.index("function captureRecipeIngredientModalScrollState"):
+        script.index("const RECIPE_INGREDIENT_MODAL_SCROLL_LOCK_CLASS"):
         script.index("function recipeIngredientModalImagePanel")
     ]
+    assert '"[data-app-content]"' in scroll
+    assert '".app-sidebar"' in scroll
+    assert '".recipe-edit-ingredient-table-scroll"' in scroll
+    assert "element.classList.add(RECIPE_INGREDIENT_MODAL_SCROLL_LOCK_CLASS);" in scroll
+    assert "wasLocked" in scroll
+    assert "element.classList.remove(RECIPE_INGREDIENT_MODAL_SCROLL_LOCK_CLASS);" in scroll
     assert "scrollLeft: element.scrollLeft" in scroll
     assert "scrollTop: element.scrollTop" in scroll
     assert "windowX: window.scrollX" in scroll
     assert "windowY: window.scrollY" in scroll
     assert "window.scrollTo" in scroll
     assert "window.requestAnimationFrame?.(restore);" in scroll
+
+    modal_css = css[css.index("/* Ingredient editor v12:"):]
+    scroll_lock_rule = modal_css[
+        modal_css.index("body.recipe-ingredient-modal-open :is("):
+        modal_css.index("body.recipe-edit-standalone-page #recipeEditIngredients", modal_css.index("body.recipe-ingredient-modal-open :is("))
+    ]
+    assert "[data-app-content]" in scroll_lock_rule
+    assert ".app-sidebar" in scroll_lock_rule
+    assert ".recipe-edit-ingredient-table-scroll" in scroll_lock_rule
+    assert ").recipe-ingredient-modal-scroll-locked" in scroll_lock_rule
+    assert "overflow: hidden !important;" in scroll_lock_rule
+    assert "overscroll-behavior: none !important;" in scroll_lock_rule
 
 
 def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():

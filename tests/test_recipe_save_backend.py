@@ -231,6 +231,308 @@ def test_recipe_save_accepts_match_analysis_metadata_without_coercing_values(mon
         } == submitted_metadata
 
 
+def test_single_ingredient_save_patches_only_the_stable_target_and_runs_existing_syncs(
+    monkeypatch,
+    tmp_path,
+):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/single-ingredient-save"
+    match_metadata = {
+        "match_confidence": 0.96,
+        "matched_master_ingredient": "Cultured buttermilk",
+        "best_available_match": True,
+        "alternative_matches": ["Plain yogurt", "Milk and lemon juice"],
+        "match_source": "ingredient_master",
+        "match_reason": "Exact normalized-name match",
+    }
+    seed_recipe(
+        url,
+        recipe_title="Persisted Recipe Title",
+        description="Persisted description",
+        ingredients=[
+            {
+                "id": "ingredient-potato",
+                "recipe_ingredient_id": "recipe-row-potato",
+                "ingredient": "Potato",
+                "quantity": "4",
+                "unit": "medium",
+                "notes": "Leave unchanged",
+            },
+            {
+                "id": "ingredient-buttermilk",
+                "recipe_ingredient_id": "recipe-row-buttermilk",
+                "ingredient": "Buttermilk",
+                "quantity": "1",
+                "unit": "cup",
+                "store_section": "DAIRY",
+                "store_section_custom": True,
+                "substitutions": [{
+                    "id": "substitution-yogurt",
+                    "ingredient": "Plain yogurt",
+                    "quantity": "1",
+                    "unit": "cup",
+                }],
+                **match_metadata,
+            },
+        ],
+        instructions=[{"step_number": 1, "instruction": "Mix gently."}],
+    )
+    before = recipe_edit_service.load_recipe_output(url)
+    sync_calls = []
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "update_recipe_ingredient_record",
+        lambda saved_url, quantity, recipe: sync_calls.append(
+            ("master", saved_url, quantity, recipe["ingredients"][1]["notes"])
+        ),
+    )
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "update_recipe_quantity",
+        lambda saved_url, quantity: sync_calls.append(("quantity", saved_url, quantity)),
+    )
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "sync_saved_recipe_with_shopping_list",
+        lambda recipe, previous: sync_calls.append(
+            ("shopping", recipe["ingredients"][1]["notes"], list(previous))
+        ),
+    )
+
+    response = recipe_route_client().post(
+        "/api/recipe/ingredient",
+        json={
+            "original_url": url,
+            "recipe_id": "recipe-stable-id",
+            "ingredient_index": 0,
+            "ingredient_ref": {"recipe_ingredient_id": "recipe-row-buttermilk"},
+            "ingredient": {
+                "id": "ingredient-buttermilk",
+                "recipe_ingredient_id": "recipe-row-buttermilk",
+                "ingredient": "Buttermilk",
+                "quantity": "2",
+                "notes": "Use full-fat when available.",
+            },
+            "recipe": {
+                "recipe_title": "Unsaved unrelated draft title",
+                "instructions": [{"instruction": "Unsaved unrelated draft instruction"}],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.get_json()
+    assert result["ok"] is True
+    assert result["success"] is True
+    assert result["ingredient_index"] == 1
+    assert result["matched_by"] == "stable_id"
+    assert result["ingredient"]["id"] == "ingredient-buttermilk"
+    assert result["ingredient"]["recipe_ingredient_id"] == "recipe-row-buttermilk"
+    assert result["ingredient"]["quantity"] == "2"
+    assert result["ingredient"]["notes"] == "Use full-fat when available."
+    assert {field: result["ingredient"].get(field) for field in match_metadata} == match_metadata
+
+    saved = recipe_edit_service.load_recipe_output(url)
+    assert saved["recipe_title"] == "Persisted Recipe Title"
+    assert saved["description"] == "Persisted description"
+    assert saved["instructions"] == before["instructions"]
+    assert saved["ingredients"][0] == before["ingredients"][0]
+    assert saved["ingredients"][1]["quantity"] == "2"
+    assert saved["ingredients"][1]["unit"] == "cup"
+    assert saved["ingredients"][1]["store_section"] == "DAIRY"
+    assert saved["ingredients"][1]["store_section_custom"] is True
+    assert saved["ingredients"][1]["notes"] == "Use full-fat when available."
+    assert saved["ingredients"][1]["substitutions"] == before["ingredients"][1]["substitutions"]
+    assert {field: saved["ingredients"][1].get(field) for field in match_metadata} == match_metadata
+    assert [call[0] for call in sync_calls] == ["master", "quantity", "shopping"]
+
+
+def test_single_ingredient_save_explicit_create_inserts_without_reusing_an_existing_row(
+    monkeypatch,
+    tmp_path,
+):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/single-ingredient-create"
+    seed_recipe(
+        url,
+        ingredients=[
+            {
+                "id": "ingredient-pepper",
+                "recipe_ingredient_id": "recipe-row-pepper",
+                "ingredient": "Pepper",
+                "notes": "First existing row",
+            },
+            {
+                "id": "ingredient-salt",
+                "recipe_ingredient_id": "recipe-row-salt",
+                "ingredient": "Salt",
+                "notes": "Existing same-name row",
+            },
+        ],
+        instructions=[{"step_number": 1, "instruction": "Season."}],
+    )
+    before = recipe_edit_service.load_recipe_output(url)
+
+    response = recipe_route_client().post(
+        "/api/recipe/ingredient",
+        json={
+            "original_url": url,
+            "recipe_id": "recipe-stable-id",
+            "ingredient_ref": {"create": True, "index": 1},
+            "ingredient": {
+                "id": "ingredient-salt",
+                "recipe_ingredient_id": "recipe-row-salt",
+                "row_id": "stale-row-id",
+                "ingredient": "Salt",
+                "quantity": "1",
+                "unit": "pinch",
+                "notes": "New same-name row",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.get_json()
+    assert result["created"] is True
+    assert result["ingredient_index"] == 1
+    assert result["matched_by"] == "create"
+    assert result["ingredient"]["notes"] == "New same-name row"
+    assert not any(
+        result["ingredient"].get(field)
+        for field in ("id", "recipe_ingredient_id", "row_id")
+    )
+
+    saved = recipe_edit_service.load_recipe_output(url)
+    assert len(saved["ingredients"]) == 3
+    assert saved["ingredients"][0] == before["ingredients"][0]
+    assert saved["ingredients"][2] == before["ingredients"][1]
+    assert saved["ingredients"][1]["ingredient"] == "Salt"
+    assert saved["ingredients"][1]["notes"] == "New same-name row"
+    assert not any(
+        saved["ingredients"][1].get(field)
+        for field in ("id", "recipe_ingredient_id", "row_id")
+    )
+
+
+def test_single_ingredient_save_supports_safe_index_and_original_name_fallback(
+    monkeypatch,
+    tmp_path,
+):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/single-ingredient-index-fallback"
+    seed_recipe(
+        url,
+        ingredients=[
+            {"ingredient": "Crema", "quantity": "1", "unit": "cup"},
+            {"ingredient": "Salt", "quantity_text": "to taste"},
+        ],
+        instructions=[{"step_number": 1, "instruction": "Mix."}],
+    )
+
+    response = recipe_route_client().post(
+        "/api/recipe/ingredient",
+        json={
+            "original_url": url,
+            "recipe_id": "recipe-stable-id",
+            "ingredient_ref": {"index": 0, "ingredient": "Crema"},
+            "ingredient": {
+                "ingredient": "Mexican crema",
+                "quantity": "1.5",
+                "unit": "cups",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.get_json()
+    assert result["matched_by"] == "index_and_name"
+    saved = recipe_edit_service.load_recipe_output(url)
+    assert saved["ingredients"][0]["ingredient"] == "Mexican crema"
+    assert saved["ingredients"][0]["quantity"] == "1.5"
+    assert saved["ingredients"][1]["ingredient"] == "Salt"
+
+
+def test_single_ingredient_save_rejects_stale_recipe_or_ingredient_identity(monkeypatch, tmp_path):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/single-ingredient-conflicts"
+    seed_recipe(
+        url,
+        ingredients=[{
+            "id": "ingredient-potato",
+            "recipe_ingredient_id": "recipe-row-potato",
+            "ingredient": "Potato",
+            "quantity": "4",
+        }],
+        instructions=[{"step_number": 1, "instruction": "Boil."}],
+    )
+    before = recipe_edit_service.load_recipe_output(url)
+    client = recipe_route_client()
+
+    recipe_conflict = client.post(
+        "/api/recipe/ingredient",
+        json={
+            "original_url": url,
+            "recipe_id": "different-recipe-id",
+            "ingredient_ref": {"recipe_ingredient_id": "recipe-row-potato"},
+            "ingredient": {"ingredient": "Potato", "quantity": "8"},
+        },
+    )
+    ingredient_missing = client.post(
+        "/api/recipe/ingredient",
+        json={
+            "original_url": url,
+            "recipe_id": "recipe-stable-id",
+            "ingredient_ref": {"recipe_ingredient_id": "missing-row"},
+            "ingredient": {"ingredient": "Potato", "quantity": "8"},
+        },
+    )
+
+    assert recipe_conflict.status_code == 409
+    assert recipe_conflict.get_json()["error"] == "recipe_conflict"
+    assert ingredient_missing.status_code == 404
+    assert ingredient_missing.get_json()["error"] == "ingredient_not_found"
+    assert recipe_edit_service.load_recipe_output(url) == before
+
+
+def test_single_ingredient_save_rejects_ambiguous_name_and_blank_required_name(monkeypatch, tmp_path):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/single-ingredient-validation"
+    seed_recipe(
+        url,
+        ingredients=[
+            {"id": "salt-one", "ingredient": "Salt", "quantity_text": "to taste"},
+            {"id": "salt-two", "ingredient": "Salt", "quantity": "1", "unit": "teaspoon"},
+        ],
+        instructions=[{"step_number": 1, "instruction": "Season."}],
+    )
+    before = recipe_edit_service.load_recipe_output(url)
+    client = recipe_route_client()
+
+    ambiguous = client.post(
+        "/api/recipe/ingredient",
+        json={
+            "original_url": url,
+            "ingredient": {"ingredient": "Salt", "notes": "Ambiguous edit"},
+        },
+    )
+    blank_name = client.post(
+        "/api/recipe/ingredient",
+        json={
+            "original_url": url,
+            "ingredient_ref": {"id": "salt-one"},
+            "ingredient": {"ingredient": ""},
+        },
+    )
+
+    assert ambiguous.status_code == 409
+    assert ambiguous.get_json()["error"] == "ingredient_conflict"
+    assert blank_name.status_code == 422
+    assert blank_name.get_json()["field_errors"] == {
+        "ingredient.ingredient": "Ingredient name is required."
+    }
+    assert recipe_edit_service.load_recipe_output(url) == before
+
+
 def test_double_encoded_original_url_is_rejected_without_duplicate(monkeypatch, tmp_path):
     output_dir = configure_recipe_save_storage(monkeypatch, tmp_path)
     url = "https://example.test/menu?category=Small%20Plates&menu_item=Soup%20%26%20Salad"
