@@ -42453,8 +42453,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions {
     grid-row: 1;
 }
 
-.recipe-edit-standalone-page #recipeEditEquipment > .recipe-edit-equipment-row > .recipe-equipment-image-panel:not(.recipe-image-tools-visible),
-.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel:has(.recipe-step-image:not([hidden])) {
+.recipe-edit-standalone-page #recipeEditEquipment > .recipe-edit-equipment-row > .recipe-equipment-image-panel:not(.recipe-image-tools-visible) {
     grid-column: 2;
     grid-row: 1;
     align-self: center;
@@ -42469,8 +42468,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions {
     background: var(--app-bg-soft);
 }
 
-.recipe-edit-standalone-page #recipeEditEquipment > .recipe-edit-equipment-row > .recipe-equipment-image-panel:not(.recipe-image-tools-visible) .recipe-equipment-image,
-.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel .recipe-step-image:not([hidden]) {
+.recipe-edit-standalone-page #recipeEditEquipment > .recipe-edit-equipment-row > .recipe-equipment-image-panel:not(.recipe-image-tools-visible) .recipe-equipment-image {
     display: block;
     width: 30px;
     height: 30px;
@@ -42482,12 +42480,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions {
     display: none;
 }
 
-.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel:not(:has(.recipe-step-image:not([hidden]))) {
-    display: none;
-}
-
-.recipe-edit-standalone-page #recipeEditEquipment > .recipe-edit-equipment-row > .recipe-equipment-image-panel.recipe-image-tools-visible,
-.recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row > .recipe-step-image-panel.recipe-image-tools-visible {
+.recipe-edit-standalone-page #recipeEditEquipment > .recipe-edit-equipment-row > .recipe-equipment-image-panel.recipe-image-tools-visible {
     display: grid;
     grid-column: 3 / 7;
     grid-row: 2;
@@ -44956,6 +44949,8 @@ body.recipe-edit-standalone-page .recipe-edit-substitution-view-all {
     padding: 0;
     gap: 0;
     flex: 1 1 auto;
+    align-content: start;
+    grid-auto-rows: max-content;
     overflow: auto;
     overscroll-behavior: contain;
     border: 1px solid var(--app-border);
@@ -45184,6 +45179,18 @@ body.recipe-edit-standalone-page .recipe-edit-substitution-view-all {
     font-size: 9px;
     font-weight: 700;
     white-space: nowrap;
+}
+
+.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-options-button > span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-options-button::before {
+    display: none;
+    content: none;
 }
 
 .recipe-edit-standalone-page #recipeEditInstructions .recipe-edit-instruction-options-button:hover,

@@ -903,6 +903,8 @@ def test_recipe_editor_instructions_use_compact_step_grid_and_preserve_handlers(
     ):
         assert column in instructions_css
     assert "grid-template-columns: var(--recipe-edit-instruction-grid) !important;" in instructions_css
+    assert "align-content: start;" in instructions_css
+    assert "grid-auto-rows: max-content;" in instructions_css
     assert "min-height: 84px;" in instructions_css
     assert "position: sticky;" in instructions_css
     assert "min-height: 48px;" in instructions_css
@@ -910,6 +912,11 @@ def test_recipe_editor_instructions_use_compact_step_grid_and_preserve_handlers(
     assert "width: 60px;" in instructions_css
     assert "min-width: 88px;" in instructions_css
     assert "width: 36px;" in instructions_css
+    assert """.recipe-edit-instruction-options-button > span {
+    display: block;""" in instructions_css
+    assert """.recipe-edit-instruction-options-button::before {
+    display: none;
+    content: none;""" in instructions_css
     assert "recipe-edit-instruction-expanded" in instructions_css
     assert "recipe-edit-instruction-reorder-mode" in instructions_css
     assert "recipe-edit-row-dragging" in instructions_css
@@ -926,6 +933,8 @@ def test_recipe_editor_instructions_use_compact_step_grid_and_preserve_handlers(
         'data-field="step_image_generated_at"',
     ):
         assert preserved_field in row_code
+    assert "data-instruction-row-number" in row_code
+    assert "number.textContent = value;" in row_code
     assert "organizeRecipeEditInstructionRow(row);" in row_code
     assert "bindRecipeEditDragAndDrop(row);" in row_code
     assert "function resizeRecipeEditInstructionTextarea" in row_code
@@ -947,6 +956,15 @@ def test_recipe_editor_instructions_use_compact_step_grid_and_preserve_handlers(
     image_tools = script[image_tools_start:image_tools_end]
     assert "[data-step-image-panel]" in image_tools
     assert "updateRecipeEditInstructionDetailsState(row);" in image_tools
+
+    assert (
+        "#recipeEditInstructions > .recipe-edit-instruction-row > "
+        ".recipe-step-image-panel:has(.recipe-step-image:not([hidden]))"
+    ) not in css
+    assert (
+        "#recipeEditInstructions > .recipe-edit-instruction-row > "
+        ".recipe-step-image-panel:not(:has(.recipe-step-image:not([hidden])))"
+    ) not in css
 
 
 def test_recipe_editor_redesign_javascript_wiring():
