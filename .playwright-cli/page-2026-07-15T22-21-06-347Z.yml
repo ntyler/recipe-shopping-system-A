@@ -1,0 +1,111 @@
+- generic [active] [ref=f1e1]:
+  - link "Skip to content" [ref=f1e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=f1e3]:
+    - complementary "Primary navigation" [ref=f1e4]:
+      - link "AI Pantry home" [ref=f1e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f1e13]:
+          - strong [ref=f1e14]: AI Pantry
+          - generic [ref=f1e15]: Recipe Shopping List
+      - button "Collapse sidebar" [ref=f1e16] [cursor=pointer]:
+        - generic [ref=f1e17]: ‹ <
+      - navigation "App sections" [ref=f1e18]:
+        - generic [ref=f1e19]: MAIN
+        - link "Home" [ref=f1e20] [cursor=pointer]:
+          - /url: "#appPageHeader"
+        - link "Recipes" [ref=f1e26] [cursor=pointer]:
+          - /url: "#recipesPage"
+        - link "Menus" [ref=f1e31] [cursor=pointer]:
+          - /url: "#menusPage"
+        - link "Cookbooks" [ref=f1e35] [cursor=pointer]:
+          - /url: "#cookbooksCard"
+        - link "Shopping Lists" [ref=f1e40] [cursor=pointer]:
+          - /url: "#shoppingViewsSection"
+        - link "Pantry" [ref=f1e47] [cursor=pointer]:
+          - /url: "#aiPantrySection"
+        - link "Meal Planner" [ref=f1e53] [cursor=pointer]:
+          - /url: "#mealPlannerPage"
+        - generic [ref=f1e58]: SHOP
+        - link "Stores" [ref=f1e59] [cursor=pointer]:
+          - /url: "#storesPage"
+        - link "Compare Prices" [ref=f1e66] [cursor=pointer]:
+          - /url: "#priceComparisonPage"
+        - generic [ref=f1e72]: TOOLS
+        - link "Import" [ref=f1e73] [cursor=pointer]:
+          - /url: "#importPage"
+        - link "Scan Barcode" [ref=f1e79] [cursor=pointer]:
+          - /url: /pantry/coming-soon
+        - generic [ref=f1e83]: ACCOUNT
+        - link "Usage and Billing" [ref=f1e84] [cursor=pointer]:
+          - /url: "#accountUsageDashboardPanel"
+          - generic [ref=f1e88]: Usage & Billing
+        - link "Help and Support" [ref=f1e89] [cursor=pointer]:
+          - /url: "#feedbackSupportSection"
+          - generic [ref=f1e94]: Help & Support
+        - link "Settings" [ref=f1e95] [cursor=pointer]:
+          - /url: "#settingsWorkspaceSection"
+      - complementary "AI Pantry Pro" [ref=f1e101]:
+        - generic [ref=f1e105]:
+          - strong [ref=f1e106]: AI Pantry Pro
+          - generic [ref=f1e107]: Unlock more from your pantry.
+          - list "Plan benefits" [ref=f1e108]:
+            - listitem [ref=f1e109]: More imports
+            - listitem [ref=f1e110]: Advanced AI tools
+            - listitem [ref=f1e111]: Faster processing
+        - link "View AI Pantry Pro plans" [ref=f1e112] [cursor=pointer]:
+          - /url: "#accountUsageDashboardPanel"
+          - generic [ref=f1e113]: View Plans
+    - generic [ref=f1e114]:
+      - banner "App toolbar" [ref=f1e115]:
+        - search [ref=f1e116]:
+          - generic [ref=f1e117]: Search AI Pantry
+          - combobox "Search AI Pantry" [ref=f1e118]
+          - generic: Ctrl + K
+          - button "Search" [ref=f1e119] [cursor=pointer]
+        - generic "Quick actions" [ref=f1e121]:
+          - link "Import" [ref=f1e122] [cursor=pointer]:
+            - /url: "#importPage"
+          - link "Notifications" [ref=f1e125] [cursor=pointer]:
+            - /url: "#notificationsPage"
+          - link "Open Guest Demo account" [ref=f1e130] [cursor=pointer]:
+            - /url: "#userAccountSection"
+            - generic [ref=f1e131]: G
+            - generic [ref=f1e132]:
+              - strong [ref=f1e133]: Guest Demo
+              - generic [ref=f1e134]: Temporary workspace
+      - main [ref=f1e135]:
+        - status [ref=f1e136]:
+          - generic [ref=f1e137]:
+            - strong [ref=f1e138]: Guest Demo Mode
+            - generic [ref=f1e139]: your data is temporary and will be deleted after 24 hours.
+            - generic [ref=f1e140]:
+              - text: "Expires in:"
+              - strong [ref=f1e141]: 23:59:54
+          - generic [ref=f1e142]:
+            - link "Create a full account from this guest demo" [ref=f1e143] [cursor=pointer]:
+              - /url: "#userAccountSection"
+              - text: Create Full Account
+            - link "Sign in to an existing account from this guest demo" [ref=f1e144] [cursor=pointer]:
+              - /url: "#userAccountSection"
+              - text: Sign In
+        - text: "> >"
+        - generic [ref=f1e145]:
+          - heading "User Account" [level=2] [ref=f1e147]
+          - paragraph [ref=f1e148]: You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
+          - generic [ref=f1e149]:
+            - generic [ref=f1e150]: ✨ Guest Demo
+            - button "Start temporary guest demo session" [ref=f1e151] [cursor=pointer]: Try Demo Without Password
+            - paragraph [ref=f1e152]: Explore with temporary demo data. Nothing is saved permanently.
+          - generic [ref=f1e153]:
+            - generic [ref=f1e154]:
+              - generic [ref=f1e155]: Demo auto-deletes in
+              - strong [ref=f1e156]: 23:59:54
+            - button "Delete temporary demo session" [ref=f1e158] [cursor=pointer]: Delete Demo Session
+          - generic "Guest demo account options" [ref=f1e160]:
+            - button "Create Full Account" [ref=f1e161] [cursor=pointer]
+            - button "Sign In" [ref=f1e162] [cursor=pointer]
+        - button "💬 Feedback & Support 0 requests" [ref=f1e164] [cursor=pointer]:
+          - generic [ref=f1e165]:
+            - generic [ref=f1e166]: 💬 Feedback & Support
+            - generic [ref=f1e167]: 0 requests
