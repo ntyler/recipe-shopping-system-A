@@ -26525,9 +26525,13 @@ function updateRecipeIngredientModalNavigation(row) {
     const rows = recipeEditIngredientRows();
     const index = rows.indexOf(row);
     const previousButton = panel.querySelector("[data-recipe-ingredient-modal-previous]");
+    const forwardButton = panel.querySelector("[data-recipe-ingredient-modal-forward]");
     const nextButton = panel.querySelector("[data-recipe-ingredient-modal-next]");
     if (previousButton) {
         previousButton.disabled = index <= 0;
+    }
+    if (forwardButton) {
+        forwardButton.disabled = index < 0 || index >= rows.length - 1;
     }
     if (nextButton) {
         const isFinal = index < 0 || index >= rows.length - 1;
@@ -26541,7 +26545,8 @@ function setRecipeIngredientModalSaving(panel, saving) {
     panel.toggleAttribute("aria-busy", Boolean(saving));
     panel.querySelectorAll(
         "[data-recipe-ingredient-modal-save], [data-recipe-ingredient-modal-next], "
-        + "[data-recipe-ingredient-modal-previous], [data-recipe-ingredient-modal-close], "
+        + "[data-recipe-ingredient-modal-previous], [data-recipe-ingredient-modal-forward], "
+        + "[data-recipe-ingredient-modal-close], "
         + "[data-recipe-ingredient-modal-delete]"
     ).forEach(button => { button.disabled = Boolean(saving); });
     if (saving) setRecipeIngredientModalStatus(panel, "saving");
@@ -26637,6 +26642,23 @@ function previousRecipeIngredientModal(button) {
     const rows = recipeEditIngredientRows();
     const index = rows.indexOf(row);
     const targetRow = index > 0 ? rows[index - 1] : null;
+    if (!panel || !row || !targetRow || panel.dataset.saving === "true") return false;
+    if (recipeIngredientModalHasChanges(row)) {
+        return showRecipeIngredientDiscardConfirmation(
+            panel,
+            { type: "navigate", targetRow },
+            button
+        );
+    }
+    return switchRecipeIngredientModal(row, targetRow);
+}
+
+function nextRecipeIngredientModal(button) {
+    const panel = button ? button.closest("[data-recipe-ingredient-edit-panel]") : null;
+    const row = panel ? panel.closest(".recipe-edit-ingredient-row") : null;
+    const rows = recipeEditIngredientRows();
+    const index = rows.indexOf(row);
+    const targetRow = index >= 0 && index < rows.length - 1 ? rows[index + 1] : null;
     if (!panel || !row || !targetRow || panel.dataset.saving === "true") return false;
     if (recipeIngredientModalHasChanges(row)) {
         return showRecipeIngredientDiscardConfirmation(
@@ -27145,6 +27167,10 @@ function organizeRecipeEditIngredientRow(row) {
                             class="recipe-edit-ingredient-modal-previous"
                             data-recipe-ingredient-modal-previous
                             onclick="return previousRecipeIngredientModal(this)">Previous</button>
+                    <button type="button"
+                            class="recipe-edit-ingredient-modal-forward"
+                            data-recipe-ingredient-modal-forward
+                            onclick="return nextRecipeIngredientModal(this)">Next</button>
                     <button type="button"
                             class="recipe-edit-ingredient-edit-save"
                             data-recipe-ingredient-modal-save

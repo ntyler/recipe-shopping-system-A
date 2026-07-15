@@ -49320,7 +49320,7 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel > .rec
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer-actions .recipe-edit-ingredient-modal-next {
-        grid-column: 1 / -1;
+        grid-column: auto;
     }
 
     body.recipe-edit-standalone-page :is(
@@ -49847,7 +49847,7 @@ body.recipe-edit-standalone-page :is(
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer-actions .recipe-edit-ingredient-modal-next {
-        grid-column: 1 / -1;
+        grid-column: auto;
     }
 
     body.recipe-edit-standalone-page :is(
@@ -50717,7 +50717,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer-actions .recipe-edit-ingredient-modal-next {
-        grid-column: 1 / -1;
+        grid-column: auto;
     }
 
     body.recipe-edit-standalone-page :is(

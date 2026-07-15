@@ -472,9 +472,12 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert "The grocery item that should be added to the shopping list." in organize
     assert 'typeLabel.textContent = "Ingredient Type";' in organize
     assert ">Previous</button>" in organize
+    assert ">Next</button>" in organize
     assert "Save Changes" in organize
     assert "Save &amp; Next" in organize
-    assert organize.index(">Cancel</button>") < organize.index(">Save Changes</button>")
+    assert organize.index(">Cancel</button>") < organize.index(">Previous</button>")
+    assert organize.index(">Previous</button>") < organize.index(">Next</button>")
+    assert organize.index(">Next</button>") < organize.index(">Save Changes</button>")
     assert "optional.hidden = true;" in organize
     assert 'matchDetails.className = "recipe-edit-ingredient-match-details";' in organize
     assert 'matchDetails.dataset.ingredientMatchDetails = "";' in organize
@@ -611,6 +614,7 @@ def test_recipe_editor_ingredient_modal_guards_row_clicks_and_dirty_close_state(
     assert 'panel.dataset.saving === "true"' in close_contract
     assert "requestRecipeIngredientModalClose" in close_contract
     assert "previousRecipeIngredientModal" in close_contract
+    assert "nextRecipeIngredientModal" in close_contract
     assert 'event.key === "Escape"' in close_contract
     assert 'event.key !== "Tab"' in close_contract
     assert "focusTarget.focus({ preventScroll: true })" in close_contract
@@ -664,6 +668,7 @@ def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
     ]
     assert "const rows = recipeEditIngredientRows();" in navigation
     assert "previousButton.disabled = index <= 0;" in navigation
+    assert "forwardButton.disabled = index < 0 || index >= rows.length - 1;" in navigation
     assert 'nextButton.textContent = "Save & Next";' in navigation
     assert 'nextButton.dataset.recipeIngredientFinal = isFinal ? "true" : "false";' in navigation
     assert 'panel.toggleAttribute("aria-busy", Boolean(saving));' in navigation
@@ -671,6 +676,7 @@ def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
         "[data-recipe-ingredient-modal-save]",
         "[data-recipe-ingredient-modal-next]",
         "[data-recipe-ingredient-modal-previous]",
+        "[data-recipe-ingredient-modal-forward]",
         "[data-recipe-ingredient-modal-close]",
     ):
         assert selector in navigation
@@ -890,6 +896,7 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
 
     assert 'onclick="return cancelRecipeIngredientInlineEdit(this)"' in organize
     assert 'onclick="return previousRecipeIngredientModal(this)"' in organize
+    assert 'onclick="return nextRecipeIngredientModal(this)"' in organize
     assert 'onclick="return saveRecipeIngredientInlineEdit(this)"' in organize
     assert 'onclick="return saveRecipeIngredientAndNext(this)"' in organize
     assert 'role="radiogroup" aria-label="Ingredient Type"' in organize
