@@ -49250,14 +49250,12 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-section-surface {
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-identity-grid {
     grid-template-columns: 180px minmax(0, 1fr);
     grid-template-rows: auto;
+    grid-template-areas: "image fields";
     align-items: start;
     gap: 16px 22px;
 }
 
-body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
-    .recipe-edit-ingredient-modal-identity-grid,
-    .recipe-edit-ingredient-modal-field-grid
-) > * {
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-field-grid > * {
     grid-column: auto !important;
     grid-row: auto !important;
     width: auto !important;
@@ -49266,14 +49264,14 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
     align-self: stretch;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-image-slot {
-    grid-column: 1 !important;
-    grid-row: 1 !important;
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-slot {
+    grid-area: image !important;
 }
 
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields {
-    grid-column: 2 !important;
-    display: grid;
+    grid-area: fields !important;
+    display: flex;
+    flex-direction: column;
     align-content: start;
     gap: 16px;
     width: 100% !important;
@@ -49572,12 +49570,9 @@ body.recipe-edit-standalone-page :is(
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-identity-grid {
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: auto;
-    }
-
-    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-slot,
-    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields {
-        grid-column: 1 !important;
-        grid-row: auto !important;
+        grid-template-areas:
+            "image"
+            "fields";
     }
 
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-slot {

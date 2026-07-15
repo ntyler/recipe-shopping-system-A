@@ -747,8 +747,10 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert ".recipe-edit-ingredient-modal-section-surface" in compact
     assert "border-radius: 16px;" in compact
     assert "grid-template-columns: 180px minmax(0, 1fr);" in compact
+    assert 'grid-template-areas: "image fields";' in compact
     assert ".recipe-edit-ingredient-modal-identity-fields" in compact
-    assert "grid-column: 2 !important;" in compact
+    assert "grid-area: fields !important;" in compact
+    assert "flex-direction: column;" in compact
     assert "gap: 16px;" in compact
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in compact
     assert "grid-template-columns: minmax(0, 2.1fr) minmax(240px, 1fr);" in compact
@@ -764,6 +766,12 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert "@media (max-width: 860px)" in compact
     assert "@media (max-width: 760px)" in compact
     assert "@media (max-width: 620px)" in compact
+    identity_reset = compact[
+        compact.index(".recipe-edit-ingredient-modal-field-grid > * {"):
+        compact.index("}", compact.index(".recipe-edit-ingredient-modal-field-grid > * {"))
+    ]
+    assert "identity-grid" not in identity_reset
+    assert '"image"\n            "fields";' in compact
 
     status = script[
         script.index("function setRecipeIngredientModalStatus"):
