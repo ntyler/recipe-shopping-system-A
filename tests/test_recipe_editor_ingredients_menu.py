@@ -410,8 +410,6 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         "Drag / Image",
         "Ingredient",
         "Quantity",
-        "Preparation",
-        "Buy As",
         "Store Section",
         "Type",
         "Alternatives",
@@ -420,7 +418,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert tools.count('role="columnheader"') == len(headers)
     positions = [tools.index(f">{header}</span>") for header in headers]
     assert positions == sorted(positions)
-    for removed_header in ("Match / Status", "Amount", "Unit", "Substitutions"):
+    for removed_header in ("Match / Status", "Amount", "Unit", "Preparation", "Buy As", "Substitutions"):
         assert f">{removed_header}</span>" not in tools
 
     organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
@@ -430,10 +428,9 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert 'readCell.className = "recipe-edit-ingredient-read-cell";' in organize
     assert "data-ingredient-read-name" in organize
     assert "data-ingredient-read-status" in organize
+    assert "data-ingredient-read-buy-as" in organize
     for summary_class in (
         "recipe-edit-ingredient-quantity-summary",
-        "recipe-edit-ingredient-preparation-summary",
-        "recipe-edit-ingredient-buy-as-summary",
         "recipe-edit-ingredient-store-summary",
         "recipe-edit-ingredient-type-summary",
     ):
@@ -441,14 +438,17 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
 
     assert 'editPanel.className = "recipe-edit-ingredient-edit-panel";' in organize
     assert "editPanel.hidden = true;" in organize
-    assert "[name, buyAs]" in organize
-    assert "[quantity, unit, size, quantityText]" in organize
-    assert "[preparation, storeSection, type]" in organize
-    assert "[notes]" in organize
+    assert '["Identity", [name, buyAs]]' in organize
+    assert '["Quantity", [quantity, unit, size, quantityText]]' in organize
+    assert '["Usage", [preparation, storeSection, type]]' in organize
+    assert '["Additional", [notes]]' in organize
+    assert "recipe-edit-ingredient-edit-header" in organize
+    assert "recipe-edit-ingredient-edit-group-title" in organize
     assert 'imageEditor.innerHTML = `<span>Image</span>' in organize
     assert "Manage image" in organize
     assert "Save Changes" in organize
     assert ">Cancel</button>" in organize
+    assert organize.index(">Cancel</button>") < organize.index(">Save Changes</button>")
     assert "optional.hidden = true;" in organize
     assert 'matchDetails.className = "recipe-edit-ingredient-match-details";' in organize
     assert 'matchDetails.dataset.ingredientMatchDetails = "";' in organize
@@ -661,9 +661,11 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'optionRow.classList.add("recipe-edit-alternative-component");' in substitution
     assert 'summary.className = "recipe-edit-alternative-component-summary";' in substitution
     assert "data-alternative-component-name" in substitution
-    assert "data-alternative-component-meta" in substitution
+    assert "data-alternative-component-status" in substitution
+    assert "data-alternative-component-facts" in substitution
+    assert "data-alternative-component-buy-as" in substitution
     assert 'editGrid.className = "recipe-edit-alternative-component-edit-grid";' in substitution
-    assert "[name, quantity, unit, size, quantityText, preparation, buyAs, storeSection, notes, preferred, originalText]" in substitution
+    assert "[name, quantity, unit, size, quantityText, preparation, buyAs, storeSection, preferred, notes, originalText]" in substitution
     assert "optional.hidden = true;" in substitution
     assert "Remove ingredient" in substitution
     assert "updateRecipeIngredientAlternativeComponentSummary(optionRow);" in substitution
@@ -686,12 +688,13 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "data-alternative-card-status" in card
     assert "data-alternative-card-preferred" in card
     assert "data-alternative-card-replaces" in card
-    assert 'rows.length > 1' in card
-    assert '"Replacement ingredient"' in card
+    assert 'card.classList.toggle("is-single-alternative", singleIngredient);' in card
+    assert "recipeIngredientAlternativeStatusLabel(firstValues)" in card
+    assert "replaceSummary.hidden = singleIngredient;" in card
     assert "`Replaces ${parentQuantity" in card
     assert "recipe-edit-alternative-components" in card
     assert "Edit alternative" in card
-    assert "Add replacement ingredient" in card
+    assert "Add Replacement Ingredient" in card
     assert "Save Alternative" in card
     assert ">Cancel</button>" in card
     assert "recipeIngredientSubstitutionDomGroups(optionRows)" in card
@@ -709,7 +712,7 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "display: none;" in edit_grid_rule
 
 
-def test_recipe_editor_v10_prioritizes_readable_read_first_columns():
+def test_recipe_editor_v10_prioritizes_seven_readable_read_first_groups():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     assert css.index("/* Ingredient editor v10:") > css.index("/* Ingredient editor v9:")
@@ -717,26 +720,28 @@ def test_recipe_editor_v10_prioritizes_readable_read_first_columns():
 
     assert "--recipe-edit-ingredient-grid:" in polish
     for priority in (
-        "minmax(220px, 1.6fr)",
-        "minmax(120px, .8fr)",
-        "minmax(170px, 1.2fr)",
-        "minmax(140px, 1fr)",
+        "minmax(220px, 1.9fr)",
+        "minmax(126px, .85fr)",
+        "126px",
+        "74px",
     ):
         assert priority in polish
     assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in polish
     assert "overflow-x: auto;" in polish
     assert ".recipe-edit-ingredient-read-cell" in polish
     assert ".recipe-edit-ingredient-quantity-summary" in polish
-    assert ".recipe-edit-ingredient-preparation-summary" in polish
-    assert ".recipe-edit-ingredient-buy-as-summary" in polish
     assert ".recipe-edit-ingredient-store-summary" in polish
     assert ".recipe-edit-ingredient-type-summary" in polish
     assert ".recipe-edit-ingredient-substitution-cell" in polish
     assert ".recipe-edit-compact-row-actions" in polish
+    assert "min-width: 860px;" in polish
+    assert "min-height: 68px !important;" in polish
+    assert "container-name: recipe-ingredient-table;" in polish
+    assert "@container recipe-ingredient-table (max-width: 859px)" in polish
     assert "position: sticky" not in polish
 
     assert "function toggleRecipeIngredientSubstitutions(button, event = null)" in script
-    assert "function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen)" in script
+    assert "function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, options = {})" in script
     assert 'otherContainer.hidden = true;' in script
     assert 'optionsButton.setAttribute("aria-expanded", String(shouldOpen));' in script
     assert 'row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);' in script
@@ -768,7 +773,7 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organizer
     assert 'optionsButton.addEventListener("click"' in organizer
     assert 'substitutions.setAttribute("role", "cell");' in organizer
-    assert 'substitutions.setAttribute("aria-colspan", "10");' in organizer
+    assert 'substitutions.setAttribute("aria-colspan", "8");' in organizer
     assert "<span data-ingredient-options-label>None</span>" in organizer
     assert organizer.index("organizeRecipeEditCompactRowActions") < organizer.index("if (substitutions) row.appendChild(substitutions)")
 
@@ -782,7 +787,7 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert "optionsButton.disabled = false;" in state
     assert '`${action} alternatives for ${ingredientName}`' in state
     assert 'empty.hidden = optionRows.length !== 0;' in state
-    assert 'addLabel.textContent = optionRows.length ? "Add Alternative" : "Add First Alternative";' in state
+    assert 'addLabel.textContent = "Add Alternative";' in state
     assert "No alternatives have been added." in script
     assert "Add a single replacement ingredient or a replacement made from multiple ingredients." in script
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in state
@@ -911,10 +916,10 @@ def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value
         script.index("function recipeIngredientReadStatusHtml"):
         script.index("function recipeIngredientEditableFieldSnapshot")
     ]
-    assert 'match.attentionStatus || (pantryStaple ? "Pantry staple" : "Good match")' in status
-    assert '`${alternativeCount} ${alternativeCount === 1 ? "option" : "options"}`' in status
+    assert "const statusLabels = {" in status
+    assert '(pantryStaple ? "Pantry staple" : "Good match")' in status
     assert "recipe-edit-ingredient-read-match" in status
-    assert "recipe-edit-ingredient-read-option-count" in status
+    assert "recipe-edit-ingredient-read-preparation" in status
     assert "recipeIngredientBadgesHtml" not in status
 
     type_helpers = script[
@@ -931,9 +936,11 @@ def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value
     ]
     assert "readName.textContent" in summary
     assert "readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem)" in summary
+    assert "meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values)" in summary
+    assert "readBuyAs.hidden = !meaningfulBuyAs" in summary
     assert "quantitySummary.textContent = formatRecipeIngredientQuantity(values)" in summary
-    assert 'preparationSummary.textContent = String(values.preparation || "").trim() || "\\u2014"' in summary
-    assert "values.purchasable_item || values.buy_as || values.ingredient" in summary
+    assert "preparationSummary" not in summary
+    assert "buyAsSummary" not in summary
     assert "recipeIngredientStoreSectionIconHtml(values.store_section || \"\")" in summary
     assert "const typeLabel = recipeIngredientTypeLabel(values)" in summary
     assert "typeSummary.textContent = typeLabel" in summary
@@ -945,6 +952,137 @@ def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value
     assert "display: none !important;" in v10[hidden_status_start:hidden_status_end]
     assert ".recipe-edit-ingredient-edit-support > .recipe-edit-ingredient-legacy-optional" in v10
     assert ".recipe-edit-ingredient-type-summary.is-optional" in v10
+
+
+def test_recipe_editor_secondary_metadata_hides_redundant_buy_as_and_empty_preparation():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    comparison = script[
+        script.index("function recipeIngredientComparableText"):
+        script.index("function recipeIngredientReadStatusHtml")
+    ]
+    assert '.normalize("NFKD")' in comparison
+    assert ".toLowerCase()" in comparison
+    assert ".replace(/[^a-z0-9]+/g, \" \")" in comparison
+    assert "recipeIngredientComparableText(ingredient) === recipeIngredientComparableText(buyAs)" in comparison
+    assert 'return "";' in comparison
+
+    summary = script[
+        script.index("function updateRecipeIngredientSummary"):
+        script.index("function recipeEditIngredientRows")
+    ]
+    assert '`Buy as: ${meaningfulBuyAs}`' in summary
+    assert "readBuyAs.hidden = !meaningfulBuyAs" in summary
+    assert "recipeIngredientReadStatusHtml(matchItem)" in summary
+
+    v10 = css[css.index("/* Ingredient editor v10:"):]
+    assert ".recipe-edit-ingredient-read-buy-as[hidden]" in v10
+    assert ".recipe-edit-ingredient-read-separator" in v10
+
+
+def test_recipe_editor_compact_alternative_cards_cleanup_cancelled_blank_rows():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    editing = script[
+        script.index("function setRecipeIngredientAlternativeEditMode"):
+        script.index("function replaceRecipeIngredientWithAlternativeCard")
+    ]
+    state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
+
+    assert 'options.restore && card.dataset.newAlternative === "1"' in editing
+    assert 'card.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => optionRow.remove());' in editing
+    assert "card.remove();" in editing
+    assert "updateRecipeIngredientSubstitutionState(ingredientRow);" in editing
+    assert 'list.hidden = optionRows.length === 0;' in state
+    assert 'addLabel.textContent = "Add Alternative";' in state
+    assert "viewAll.hidden = true;" in state
+
+    v10 = css[css.index("/* Ingredient editor v10:"):]
+    assert ".recipe-edit-alternative-card.is-single-alternative:not(.is-editing)" in v10
+    assert "min-height: 74px;" in v10
+    assert ".recipe-edit-substitution-list[hidden]" in v10
+
+
+def test_recipe_editor_alternative_cancel_preserves_false_normalization_flags():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    option_markup = script[
+        script.index("function recipeIngredientSubstitutionOptionRowHtml"):
+        script.index("function recipeIngredientSubstitutionOptionsHtml")
+    ]
+    ingredient_markup = script[
+        script.index("function addRecipeIngredientRow"):
+        script.index("function bindRecipeIngredientSummaryUpdates")
+    ]
+
+    for scope, value_name in ((option_markup, "option"), (ingredient_markup, "item")):
+        for field in ("unit_review_required", "unit_custom", "store_section_custom"):
+            assert f"recipeIngredientMatchFlag({value_name}.{field})" in scope
+            assert f"{value_name}.{field} ? \"true\" : \"false\"" not in scope
+
+
+def test_recipe_editor_multi_ingredient_alternative_uses_one_preferred_control():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    card = script[
+        script.index("function updateRecipeIngredientAlternativeCard"):
+        script.index("function createRecipeIngredientAlternativeCard")
+    ]
+    markup = script[
+        script.index("function createRecipeIngredientAlternativeCard"):
+        script.index("function ensureRecipeIngredientAlternativeCards")
+    ]
+    binding = script[
+        script.index("function bindRecipeIngredientSubstitutionRow"):
+        script.index("function recipeIngredientOptionsMenuForRow")
+    ]
+
+    assert "const preferredInputs = rows" in card
+    assert 'labelElement.hidden = index > 0;' in card
+    assert 'input.dataset.alternativePreferredBound' not in card
+    assert 'input.dataset.field === "preferred"' in binding
+    assert 'card?.querySelectorAll(\'[data-field="preferred"]\')' in binding
+    assert "preferredInput.checked = input.checked;" in binding
+    assert binding.index('input.dataset.field === "preferred"') < binding.index("updateRecipeIngredientSubstitutionRowSummary(optionRow)")
+    assert "Add Replacement Ingredient" in markup
+    assert ">Add replacement ingredient</button>" not in markup
+
+
+def test_recipe_editor_compact_table_responsive_priority_keeps_critical_columns():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    v10 = css[css.index("/* Ingredient editor v10:"):]
+    narrow = v10[v10.index("@container recipe-ingredient-table (max-width: 859px)"):]
+    narrow = narrow[:narrow.index("@media (max-width: 760px)")]
+
+    assert ".recipe-edit-ingredient-store-summary" in narrow
+    assert "display: none !important;" in narrow
+    for critical in (
+        ".recipe-edit-ingredient-type-summary",
+        ".recipe-edit-ingredient-substitution-cell",
+        ".recipe-edit-compact-row-actions",
+    ):
+        assert critical in narrow
+    assert ".recipe-edit-ingredient-read-cell" not in narrow
+    assert ".recipe-edit-ingredient-quantity-summary" not in narrow
+    assert "box-sizing: border-box;" in v10
+    assert "grid-template-rows: minmax(52px, auto) auto auto;" in v10
+    assert "row-gap: 0 !important;" in v10
+    assert "padding-inline: 14px;" in v10
+    assert ".recipe-edit-ingredient-edit-row > .recipe-edit-ingredient-edit-field" in v10
+    assert ".recipe-edit-ingredient-edit-support > *" in v10
+    assert "grid-column: auto !important;" in v10
+    assert "grid-row: auto !important;" in v10
+    assert '.recipe-edit-ingredient-name-label textarea[data-field="ingredient"]' in v10
+    assert ".recipe-edit-alternative-component-edit-grid > .recipe-edit-alternative-edit-field" in v10
+    assert ".recipe-edit-alternative-component-edit-grid > .recipe-edit-alternative-component-remove" in v10
+    mobile = v10[v10.index("@media (max-width: 760px)"):]
+    assert "grid-template-rows: repeat(6, auto);" in mobile
+    assert ".recipe-edit-ingredient-edit-support" in mobile
+    assert ".recipe-ingredient-image-panel.recipe-image-tools-visible" in mobile
+    assert "grid-row: 6 !important;" in mobile
+    assert ".recipe-edit-alternative-card.is-single-alternative:not(.is-editing)" in mobile
 
 
 def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_value():

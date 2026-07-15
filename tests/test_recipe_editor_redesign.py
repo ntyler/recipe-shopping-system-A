@@ -775,7 +775,7 @@ def test_recipe_editor_ingredient_options_use_inline_accessible_disclosure():
 
     v10_css = css[css.index("/* Ingredient editor v10:"):]
     assert ".recipe-edit-ingredient-substitution-cell" in v10_css
-    assert "grid-column: 9 !important;" in v10_css
+    assert "grid-column: 7 !important;" in v10_css
     assert "> .recipe-edit-ingredient-options-panel" in v10_css
     assert "grid-column: 1 / -1 !important;" in v10_css
     assert "grid-row: 2 !important;" in v10_css

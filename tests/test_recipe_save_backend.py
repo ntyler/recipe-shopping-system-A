@@ -440,6 +440,106 @@ def test_grouped_substitution_alternative_round_trips_as_flat_component_rows(mon
     assert all("ingredients" not in row for row in substitutions)
 
 
+def test_single_component_alternative_preserves_normalized_fields_across_two_saves(
+    monkeypatch,
+    tmp_path,
+):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/single-alternative-two-save-round-trip"
+    seed_recipe(
+        url,
+        ingredients=[{"id": "ingredient-potato", "ingredient": "Potato"}],
+        instructions=[{"step_number": 1, "instruction": "Roast."}],
+    )
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            ingredients=[{
+                "id": "ingredient-potato",
+                "ingredient": "Potato",
+                "quantity": "4",
+                "unit": "",
+                "size": "medium",
+                "substitutions": [{
+                    "alternative_id": "alternative-sweet-potato",
+                    "alternative_order": 0,
+                    "alternative_label": "Sweet potato",
+                    "match_status": "best_match",
+                    "preferred": True,
+                    "ingredients": [{
+                        "id": "substitution-sweet-potato",
+                        "substitution_id": "substitution-stable-id",
+                        "ingredient": "Sweet Potato",
+                        "parsed_name": "sweet potato",
+                        "normalized_name": "sweet_potato",
+                        "quantity": "4",
+                        "quantity_text": "",
+                        "unit": "",
+                        "size": "medium",
+                        "preparation": "peeled",
+                        "purchasable_item": "Orange sweet potatoes",
+                        "store_section": "PRODUCE",
+                        "store_section_custom": False,
+                        "notes": "Use an equal total weight.",
+                        "ingredient_image_url": "/static/generated/ingredients/sweet-potato.webp",
+                        "ingredient_image_generated_at": "2026-07-14T12:00:00Z",
+                        "ingredient_image_prompt": "Four orange sweet potatoes",
+                    }],
+                }],
+            }],
+        ),
+        require_existing=True,
+    )
+
+    assert result["ok"] is True
+    first_ingredient = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+    first_alternative = first_ingredient["substitutions"][0]
+
+    second_result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(url, ingredients=[first_ingredient]),
+        require_existing=True,
+    )
+
+    assert second_result["ok"] is True
+    second_alternative = recipe_edit_service.load_recipe_output(url)["ingredients"][0]["substitutions"][0]
+    preserved_fields = (
+        "id",
+        "substitution_id",
+        "alternative_id",
+        "alternative_order",
+        "alternative_component_order",
+        "alternative_label",
+        "ingredient",
+        "parsed_name",
+        "normalized_name",
+        "quantity",
+        "quantity_text",
+        "unit",
+        "size",
+        "preparation",
+        "purchasable_item",
+        "store_section",
+        "store_section_custom",
+        "notes",
+        "match_status",
+        "preferred",
+        "ingredient_image_url",
+        "ingredient_image_generated_at",
+        "ingredient_image_prompt",
+    )
+    assert {field: second_alternative.get(field) for field in preserved_fields} == {
+        field: first_alternative.get(field) for field in preserved_fields
+    }
+    assert second_alternative["alternative_id"] == "alternative-sweet-potato"
+    assert second_alternative["alternative_component_order"] == 0
+    assert second_alternative["ingredient"] == "Sweet Potato"
+    assert second_alternative["purchasable_item"] == "Orange sweet potatoes"
+    assert second_alternative["preferred"] is True
+
+
 def test_read_first_ingredient_and_multi_component_alternative_preserve_normalized_fields(
     monkeypatch,
     tmp_path,
@@ -603,6 +703,40 @@ def test_read_first_ingredient_and_multi_component_alternative_preserve_normaliz
         "store_section": "PRODUCE",
         "notes": "Add gradually.",
         "ingredient_image_url": "/static/generated/ingredients/lemon.webp",
+    }
+
+    lemon_before_second_save = dict(lemon)
+    milk["notes"] = "Use whole milk; avoid skim milk."
+    second_result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(url, ingredients=[ingredient]),
+        require_existing=True,
+    )
+
+    assert second_result["ok"] is True
+    second_substitutions = recipe_edit_service.load_recipe_output(url)["ingredients"][0]["substitutions"]
+    assert [row["ingredient"] for row in second_substitutions] == ["Milk", "Lemon Juice"]
+    assert {row["alternative_id"] for row in second_substitutions} == {"alternative-milk-lemon"}
+    assert [row["alternative_component_order"] for row in second_substitutions] == [0, 1]
+    assert {row["alternative_label"] for row in second_substitutions} == {"Milk and lemon juice"}
+    assert {row["match_status"] for row in second_substitutions} == {"good_match"}
+    assert all(row["preferred"] is True for row in second_substitutions)
+    assert second_substitutions[0]["notes"] == "Use whole milk; avoid skim milk."
+    untouched_fields = (
+        "id",
+        "ingredient",
+        "quantity",
+        "quantity_text",
+        "unit",
+        "size",
+        "preparation",
+        "purchasable_item",
+        "store_section",
+        "notes",
+        "ingredient_image_url",
+    )
+    assert {field: second_substitutions[1].get(field) for field in untouched_fields} == {
+        field: lemon_before_second_save.get(field) for field in untouched_fields
     }
 
 

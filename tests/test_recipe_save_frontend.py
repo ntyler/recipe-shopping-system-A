@@ -77,6 +77,8 @@ def test_save_validation_and_dirty_state_cover_nested_editors():
     assert "Add at least one ingredient." in validation
     assert "Ingredient ${index + 1} has an invalid amount." in validation
     assert "Alternative ${optionIndex + 1}" in validation
+    assert "const scope = recipeIngredientSubstitutionContainer(row) || row;" in validation
+    assert "recipeIngredientOptionsMenuForRow(row)" not in validation
     assert "Add at least one instruction step." in validation
     assert "Instruction ${index + 1} needs instruction text." in validation
     assert '"step_image_url"' in validation
@@ -96,6 +98,35 @@ def test_save_validation_and_dirty_state_cover_nested_editors():
     assert "rememberRecipeEditorSubmittedState(form, submittedSnapshot, savedIdentity)" in script
     assert "recipeEditorCurrentSaveSnapshot(form) !== savedBaselineSnapshot" in script
     assert "{ updateSourceField: false }" in script
+
+
+def test_validation_reveals_invalid_nested_editor_without_restoring_other_live_edits():
+    script = read_text("PushShoppingList/static/js/app.js")
+    reveal = script[
+        script.index("function showRecipeEditorValidationErrors"):
+        script.index("function validateRecipeEditor", script.index("function showRecipeEditorValidationErrors"))
+    ]
+    main_edit = script[
+        script.index("function setRecipeIngredientEditMode"):
+        script.index("function saveRecipeIngredientInlineEdit")
+    ]
+    disclosure = script[
+        script.index("function setRecipeIngredientSubstitutionsExpanded"):
+        script.index("function toggleRecipeIngredientSubstitutions")
+    ]
+    alternative_edit = script[
+        script.index("function setRecipeIngredientAlternativeEditMode"):
+        script.index("function replaceRecipeIngredientWithAlternativeCard")
+    ]
+
+    assert reveal.count("{ restoreOtherEdits: false }") == 3
+    assert "const restoreOtherEdits = options.restoreOtherEdits !== false;" in main_edit
+    assert "restore: restoreOtherEdits" in main_edit
+    assert '!row.classList.contains("is-editing") || !panel.dataset.editSnapshot' in main_edit
+    assert "const restoreOtherEdits = options.restoreOtherEdits !== false;" in disclosure
+    assert disclosure.count("restore: restoreOtherEdits") >= 3
+    assert "const restoreOtherEdits = options.restoreOtherEdits !== false;" in alternative_edit
+    assert alternative_edit.count("restore: restoreOtherEdits") >= 2
 
 
 def test_live_payload_preserves_nested_ids_order_and_metadata():
