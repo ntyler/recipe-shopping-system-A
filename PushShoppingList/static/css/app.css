@@ -28163,7 +28163,7 @@ img[data-deferred-src] {
 
 .recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-favorite {
     z-index: 4;
-    top: 10px;
+    top: 6px;
     right: 10px;
     width: 38px;
     min-width: 38px;

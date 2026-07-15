@@ -1298,6 +1298,7 @@ async function toggleRecipeFavorite(button, event = null) {
     const wasFavorite = button.getAttribute("aria-pressed") === "true";
     const nextFavorite = !wasFavorite;
     setRecipeFavoriteStateForUrl(recipeUrl, nextFavorite);
+    rememberRecipeFavoriteState([recipeUrl], nextFavorite);
     button.disabled = true;
 
     try {
@@ -1318,10 +1319,17 @@ async function toggleRecipeFavorite(button, event = null) {
             throw new Error((data && data.error) || "Unable to update favorite.");
         }
 
-        setRecipeFavoriteStateForUrl(recipeUrl, Boolean(data.favorite));
+        const savedFavorite = Boolean(data.favorite);
+        const savedRecipeUrl = String(data.url || recipeUrl).trim();
+        setRecipeFavoriteStateForUrl(recipeUrl, savedFavorite);
+        if (savedRecipeUrl && savedRecipeUrl !== recipeUrl) {
+            setRecipeFavoriteStateForUrl(savedRecipeUrl, savedFavorite);
+        }
+        rememberRecipeFavoriteState([recipeUrl, savedRecipeUrl], savedFavorite);
     } catch (err) {
         console.warn("Unable to update recipe favorite.", err);
         setRecipeFavoriteStateForUrl(recipeUrl, wasFavorite);
+        rememberRecipeFavoriteState([recipeUrl], wasFavorite);
         window.alert(err.message || "Unable to update favorite.");
     } finally {
         document
@@ -22521,6 +22529,43 @@ function rememberRecipeEditorData(url, data) {
     });
 
     return recipe;
+}
+
+function rememberRecipeFavoriteState(recipeUrls, favorite) {
+    const targetUrls = new Set(
+        (Array.isArray(recipeUrls) ? recipeUrls : [recipeUrls])
+            .map(url => normalizedRecipeEditorCacheKey(url))
+            .filter(Boolean)
+    );
+    if (!targetUrls.size) {
+        return;
+    }
+
+    const isFavorite = Boolean(favorite);
+    recipeEditorDataCache.forEach((entry, cacheUrl) => {
+        const recipe = entry && entry.recipe;
+        if (!recipe || typeof recipe !== "object") {
+            return;
+        }
+        const candidateUrls = [
+            cacheUrl,
+            recipe.source_url,
+            recipe.url,
+            recipe.original_url,
+            recipe.recipe_url,
+        ].map(url => normalizedRecipeEditorCacheKey(url)).filter(Boolean);
+        if (!candidateUrls.some(url => targetUrls.has(url))) {
+            return;
+        }
+        recipe.favorite = isFavorite;
+        entry.savedAt = Date.now();
+    });
+
+    const editorFavoriteButton = document.getElementById("recipeEditFavoriteButton");
+    const editorRecipeUrl = normalizedRecipeEditorCacheKey(editorFavoriteButton?.dataset.recipeUrl || "");
+    if (recipeEditOriginalSnapshot && targetUrls.has(editorRecipeUrl)) {
+        recipeEditOriginalSnapshot.favorite = isFavorite;
+    }
 }
 
 function applyRecipeEditorDataContext(entry) {

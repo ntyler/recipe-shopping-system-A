@@ -191,10 +191,15 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert 'Object.prototype.hasOwnProperty.call(recipe, "favorite")' in script
     assert "previousUrl === recipeUrl" in script
     assert "setRecipeFavoriteButtonState(button, favorite);" in script
+    assert "function rememberRecipeFavoriteState" in script
+    assert "rememberRecipeFavoriteState([recipeUrl], nextFavorite);" in script
+    assert "rememberRecipeFavoriteState([recipeUrl, savedRecipeUrl], savedFavorite);" in script
+    assert "recipe.favorite = isFavorite;" in script
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "background: var(--app-surface);" in css
     assert ".recipe-edit-image-card .recipe-edit-cover-favorite" in css
     assert '.recipe-edit-cover-favorite[aria-pressed="true"]' in css
+    assert "top: 6px;" in css
     assert "position: absolute;" in css
     assert "bottom: calc(100% + 8px);" in css
     assert "function closeRecipeImageChangeActions(options = {})" in script
