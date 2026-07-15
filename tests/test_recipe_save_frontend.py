@@ -265,6 +265,7 @@ def test_live_payload_preserves_nested_ids_order_and_metadata():
     ]
     assert 'recipe_id: recipeId' in payload
     assert 'cover_image_prompt: coverImage.prompt || coverImage.image_prompt || ""' in payload
+    assert "rating: currentRecipeRating()" in payload
     assert "ingredients: collectRecipeIngredientRows()" in payload
     assert "equipment: collectRecipeEquipmentRows()" in payload
     assert "instructions: collectRecipeInstructionRows()" in payload

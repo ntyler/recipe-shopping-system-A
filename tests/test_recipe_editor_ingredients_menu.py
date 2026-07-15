@@ -1628,6 +1628,22 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert ".recipe-edit-store-section-icon.is-paw" in css
 
 
+def test_store_section_summary_icon_stays_inside_its_table_cell():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    broad_positioning_selector = (
+        ".recipe-edit-standalone-page #recipeEditIngredients "
+        ".recipe-edit-store-section-icon {"
+    )
+    edit_field_selector = (
+        ".recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > "
+        ".recipe-edit-store-section-label .recipe-edit-store-section-icon {"
+    )
+
+    assert broad_positioning_selector not in css
+    assert edit_field_selector in css
+    assert "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary .recipe-edit-store-section-icon {" in css
+
+
 def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

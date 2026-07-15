@@ -100,12 +100,16 @@ def test_recipe_save_route_round_trips_encoded_source_url(monkeypatch, tmp_path)
     assert data["message"] == "Recipe saved successfully"
     assert data["recipe_id"] == "recipe-stable-id"
     assert data["updated_at"]
-    assert recipe_edit_service.load_recipe_output(url)["recipe_title"] == "Saved Soup"
+    saved_recipe = recipe_edit_service.load_recipe_output(url)
+    assert saved_recipe["recipe_title"] == "Saved Soup"
+    assert saved_recipe["rating"] == 4
     assert len(list(output_dir.glob("*.json"))) == 1
 
     loaded = client.get("/api/recipe", query_string={"url": url})
     assert loaded.status_code == 200
-    assert loaded.get_json()["recipe"]["source_url"] == url
+    loaded_recipe = loaded.get_json()["recipe"]
+    assert loaded_recipe["source_url"] == url
+    assert loaded_recipe["rating"] == 4
 
 
 def test_recipe_load_and_save_preserve_ingredient_match_analysis_metadata(monkeypatch, tmp_path):

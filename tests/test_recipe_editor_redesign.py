@@ -37,6 +37,8 @@ def configure_recipe_editor_storage(monkeypatch, tmp_path):
 
 def test_restaurant_rating_macro_renders_exactly_five_toggleable_stars_without_clear_button():
     environment = Environment(loader=FileSystemLoader(ROOT / "PushShoppingList" / "templates"))
+    editor_template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
     template = environment.from_string(
         '{% import "includes/app_shell_macros.html" as shell %}'
         '{{ shell.rating_control("restaurantRating", "Restaurant rating", mode="restaurant") }}'
@@ -60,6 +62,9 @@ def test_restaurant_rating_macro_renders_exactly_five_toggleable_stars_without_c
     assert 'data-rating-toggle-selected="true"' in recipe_rendered
     assert recipe_rendered.count("click again to clear") == 5
     assert "recipe-edit-rating-clear" not in recipe_rendered
+    assert editor_template.count("shell.rating_control(") == 2
+    assert 'class="recipe-edit-rating-star"' not in editor_template
+    assert macros.count('data-rating-value="{{ rating_value }}"') == 1
 
 
 def test_standalone_recipe_editor_uses_app_shell_navigation():
@@ -429,11 +434,11 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert "{ allowToggle: false }" in script
     assert "color: #fbbf24;" in css
     assert "color: #9ca3af;" in css
-    assert ".recipe-edit-restaurant-rating-editor .recipe-edit-rating-star.active" in css
-    assert '.recipe-edit-restaurant-rating-editor .recipe-edit-rating-star[aria-checked="true"]' in css
     assert "border-radius: 7px;" in css
-    assert ':is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star' in css
-    assert '.recipe-edit-rating-star[aria-checked="true"]' in css
+    assert css.count("[data-shared-rating-control] .recipe-edit-rating-star {") == 1
+    assert '[data-shared-rating-control] .recipe-edit-rating-star[aria-checked="true"]' in css
+    assert ".recipe-edit-header-rating .recipe-edit-rating-star {" not in css
+    assert ".recipe-edit-restaurant-rating-editor .recipe-edit-rating-star {" not in css
     assert "function handleSharedRatingKeydown(button, event)" in script
     assert "function updateRecipeRestaurantStructuredHours(control)" in script
     assert "function toggleRecipeRestaurantSplitHours(button)" in script
@@ -530,12 +535,9 @@ def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     assert template.index("data-restaurant-edit-modal") > card_end
 
 
-def test_restaurant_selected_rating_star_has_no_persistent_gold_frame():
+def test_shared_selected_rating_star_has_no_persistent_gold_frame():
     css = read_text("PushShoppingList/static/css/app.css")
-    selector = (
-        '.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor '
-        '.recipe-edit-rating-star[aria-checked="true"] {'
-    )
+    selector = '[data-shared-rating-control] .recipe-edit-rating-star[aria-checked="true"] {'
     rule_start = css.index(selector)
     selected_rule = css[rule_start:css.index("}", rule_start)]
 
@@ -544,14 +546,14 @@ def test_restaurant_selected_rating_star_has_no_persistent_gold_frame():
     assert "box-shadow: none;" in selected_rule
     assert "251, 191, 36" not in selected_rule
 
-    focus_selector = (
-        ".recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor "
-        ".recipe-edit-rating-star:focus-visible {"
-    )
+    focus_selector = "[data-shared-rating-control] .recipe-edit-rating-star:focus-visible {"
     focus_start = css.index(focus_selector)
     focus_rule = css[focus_start:css.index("}", focus_start)]
     assert "156, 163, 175" in focus_rule
     assert "251, 191, 36" not in focus_rule
+
+    assert ".recipe-edit-header-rating .recipe-edit-rating-star {" not in css
+    assert ".recipe-edit-restaurant-rating-editor .recipe-edit-rating-star {" not in css
 
 
 def test_restaurant_rating_stars_start_directly_below_rating_label():
@@ -1268,6 +1270,14 @@ def test_recipe_editor_wide_ingredients_workspace_grows_without_sticky_headers()
     assert ".recipe-edit-ingredients-section:not([hidden]) {\n        display: block;" in wide_workspace
     assert ".recipe-edit-ingredients-section .recipe-edit-ingredient-table-scroll {" in wide_workspace
     assert "overflow-x: auto;\n        overflow-y: visible;" in wide_workspace
+    wide_table_start = wide_workspace.index(
+        ".recipe-edit-standalone-page .recipe-edit-ingredients-section .recipe-edit-ingredient-table-scroll {"
+    )
+    wide_table_end = wide_workspace.index("}", wide_table_start)
+    wide_table_rule = wide_workspace[wide_table_start:wide_table_end]
+    assert "overscroll-behavior-inline: contain;" in wide_table_rule
+    assert "overscroll-behavior-block: auto;" in wide_table_rule
+    assert "overscroll-behavior: contain;" not in wide_table_rule
     ingredient_polish = wide_workspace[wide_workspace.index("/* Ingredient editor v7:"):]
     assert ".recipe-edit-standalone-page .recipe-edit-tab-list," in ingredient_polish
     assert ".recipe-edit-standalone-page .recipe-edit-ingredient-table-head {\n    position: static;" in ingredient_polish

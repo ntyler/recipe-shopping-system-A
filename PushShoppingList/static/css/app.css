@@ -10344,52 +10344,67 @@ body {
             text-transform: uppercase;
         }
 
-        .recipe-edit-rating-stars {
+        [data-shared-rating-control] {
             display: flex;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 6px;
+            flex-wrap: nowrap;
+            gap: 2px;
         }
 
-        .recipe-edit-rating-star,
-        .recipe-edit-rating-clear {
-            width: auto;
-            min-width: 38px;
-            height: 38px;
+        [data-shared-rating-control] .recipe-edit-rating-star {
+            width: 26px;
+            min-width: 26px;
+            height: 26px;
+            min-height: 26px;
             margin: 0;
-            border-radius: 6px;
-            border: 1px solid #3f4750;
-            background: #1b2021;
-            color: #818996;
-            line-height: 1;
-        }
-
-        .recipe-edit-rating-star {
             padding: 0;
-            font-size: 22px;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            background: transparent;
+            color: #9ca3af;
+            font-size: 19px;
             letter-spacing: 0;
+            line-height: 1;
+            transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
         }
 
-        .recipe-edit-rating-clear {
-            min-width: 70px;
-            padding: 0 12px;
-            font-size: 13px;
-            font-weight: 800;
-        }
-
-        .recipe-edit-rating-star.active {
-            border-color: #a16207;
-            background: #211d11;
+        [data-shared-rating-control] .recipe-edit-rating-star.active {
+            border-color: transparent;
+            background: transparent;
             color: #fbbf24;
         }
 
-        .recipe-edit-rating-star:hover,
-        .recipe-edit-rating-star:focus-visible,
-        .recipe-edit-rating-clear:hover,
-        .recipe-edit-rating-clear:focus-visible {
-            border-color: #fbbf24;
+        [data-shared-rating-control] .recipe-edit-rating-star.is-preview {
+            color: #fcd34d;
+        }
+
+        [data-shared-rating-control] .recipe-edit-rating-star[aria-checked="true"] {
+            border-color: transparent;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        [data-shared-rating-control] .recipe-edit-rating-star:hover {
+            border-color: transparent;
             outline: none;
-            box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.22);
+            box-shadow: none;
+            transform: translateY(-1px);
+        }
+
+        [data-shared-rating-control] .recipe-edit-rating-star:focus-visible {
+            border-color: rgba(156, 163, 175, .62);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(156, 163, 175, .18);
+        }
+
+        [data-shared-rating-control] .recipe-edit-rating-star:active {
+            transform: scale(.94);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            [data-shared-rating-control] .recipe-edit-rating-star {
+                transition: none;
+            }
         }
 
         .recipe-edit-pdf-panel {
@@ -34929,101 +34944,6 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     gap: 8px;
 }
 
-.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-stars {
-    flex-wrap: nowrap;
-    gap: 2px;
-}
-
-.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star {
-    width: 26px;
-    min-width: 26px;
-    height: 26px;
-    min-height: 26px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 50%;
-    background: transparent;
-    font-size: 19px;
-    transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
-}
-
-.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star.active {
-    border-color: transparent;
-    background: transparent;
-    color: #fbbf24;
-}
-
-.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star.is-preview {
-    color: #fcd34d;
-}
-
-.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star[aria-checked="true"] {
-    border-color: transparent;
-    background: transparent;
-    box-shadow: none;
-}
-
-.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star:hover {
-    transform: translateY(-1px);
-}
-
-.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star:active {
-    transform: scale(.94);
-}
-
-.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-stars {
-    gap: 2px;
-}
-
-.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star {
-    border-radius: 7px;
-    background: transparent;
-    color: #9ca3af;
-}
-
-.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star.active {
-    background: transparent;
-    color: #fbbf24;
-}
-
-.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star.is-preview {
-    color: #fcd34d;
-}
-
-.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star[aria-checked="true"] {
-    border-color: transparent;
-    background: transparent;
-    box-shadow: none;
-}
-
-.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star:hover {
-    border-color: transparent;
-    box-shadow: none;
-}
-
-.recipe-edit-standalone-page .recipe-edit-restaurant-rating-editor .recipe-edit-rating-star:focus-visible {
-    border-color: rgba(156, 163, 175, .62);
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(156, 163, 175, .18);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-star {
-        transition: none;
-    }
-}
-
-.recipe-edit-standalone-page :is(.recipe-edit-header-rating, .recipe-edit-restaurant-rating-editor) .recipe-edit-rating-clear {
-    min-width: 0;
-    height: 26px;
-    min-height: 26px;
-    padding: 0 5px;
-    border: 0;
-    background: transparent;
-    color: var(--app-muted);
-    font-size: 9px;
-}
-
 .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-primary-fields {
     grid-template-columns: minmax(0, 1.4fr) minmax(150px, .9fr) minmax(150px, .9fr);
     gap: 12px;
@@ -42040,7 +41960,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions .recipe-ed
     position: relative;
 }
 
-.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-icon {
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-store-section-label .recipe-edit-store-section-icon {
     position: absolute;
     left: 6px;
     top: 50%;
@@ -42058,7 +41978,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions .recipe-ed
     transform: translateY(-50%);
 }
 
-.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-icon svg {
+.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-store-section-label .recipe-edit-store-section-icon svg {
     width: 15px;
     height: 15px;
     fill: none;
@@ -42478,7 +42398,8 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions {
         min-height: 0;
         overflow-x: auto;
         overflow-y: visible;
-        overscroll-behavior: contain;
+        overscroll-behavior-inline: contain;
+        overscroll-behavior-block: auto;
     }
 }
 
@@ -51024,14 +50945,6 @@ body.recipe-edit-standalone-page .recipe-edit-header-rating {
 
 body.recipe-edit-standalone-page .recipe-edit-header-rating > .recipe-edit-rating-label {
     display: none;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-header-rating .recipe-edit-rating-star {
-    width: 24px;
-    min-width: 24px;
-    height: 24px;
-    min-height: 24px;
-    font-size: 19px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-summary-identity .recipe-edit-tag-row {
