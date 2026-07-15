@@ -150,7 +150,7 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     ]
     assert 'const restaurantCard = document.querySelector(".recipe-edit-restaurant-card");' in organizer
     sidebar_order = organizer[organizer.index("appendRecipeEditWorkspaceChildren(sidebar"):]
-    card_names = ["imageCard", "restaurantCard", "aiCard", "sourceCard", "galleryCard", "healthCard"]
+    card_names = ["imageCard", "restaurantCard", "aiCard", "sourceCard", "galleryCard", "healthCard", "confidenceCard"]
     assert [sidebar_order.index(card_name) for card_name in card_names] == sorted(
         sidebar_order.index(card_name) for card_name in card_names
     )
@@ -1164,6 +1164,13 @@ def test_recipe_health_dashboard_is_compact_and_separate_from_ai_confidence():
     health_start = template.index('class="recipe-edit-context-card recipe-edit-health-card"')
     confidence_start = template.index('id="recipeEditAiConfidenceCard"')
     assert health_start < confidence_start
+    organizer = script[
+        script.index("function organizeRecipeEditStandaloneWorkspace()"):
+        script.index("function syncRecipeEditDocumentRows()")
+    ]
+    sidebar_order = organizer[organizer.index("appendRecipeEditWorkspaceChildren(sidebar"):]
+    assert sidebar_order.index("healthCard") < sidebar_order.index("confidenceCard")
+    assert "healthCard.appendChild(confidenceCard)" not in organizer
     assert 'id="recipeEditHealthRing"' in template
     assert 'role="progressbar"' in template
     assert 'id="recipeEditHealthLabel"' in template

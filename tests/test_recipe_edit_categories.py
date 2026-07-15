@@ -25,6 +25,7 @@ def read_text(relative_path):
 def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
 
     assert "recipeEditCategoriesSection" in template
     assert "Edit Recipe Categories" in template
@@ -47,7 +48,17 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "recipe-edit-category-menu" in template
     assert "Have ChatGPT Decide All" in template
     assert "Have ChatGPT Decide Missing" in template
+    category_start = template.index('id="recipeEditCategoriesSection"')
+    tabs_start = template.index('class="recipe-edit-tabs-card"')
+    assert template.index('class="recipe-edit-info-panel"') < category_start < tabs_start
+    assert template.count('id="recipeEditCategoriesSection"') == 1
     assert template.index("recipeEditCategoriesSection") < template.index("recipeEditIngredientsTitle")
+    assert 'aria-labelledby="recipeEditCategoriesTitle"' in template
+    assert 'id="recipeEditCategoriesTitle">Edit Recipe Categories</h3>' in template
+    assert 'id="recipeEditCategoriesBody"' in template
+    assert 'aria-controls="recipeEditCategoriesBody"' in template
+    assert 'aria-expanded="true"' in template
+    assert "data-recipe-edit-category-collapse" in template
     assert template.index("recipeEditCategoryPrepTimeGroup") < template.index("recipeEditCategoryCustomCategories")
     assert template.index("recipeEditMenuItemDetails") < template.index("recipeEditCategoryMenuSection")
     assert template.index("recipeEditCategoryMenuSection") < template.index("recipeEditMenuOrderUrl")
@@ -84,6 +95,66 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "ChatGPT will replace the current category selections. Continue?" in script
     assert "saveRecipeEditorCategories(sourceUrl, payload.original_url)" in script
     assert "cookbook_category_overwrite" in script
+
+    target_field_order = [
+        "recipeEditCategoryMealType",
+        "recipeEditCategoryMainIngredient",
+        "recipeEditCategoryCookingMethod",
+        "recipeEditCategoryOccasion",
+        "recipeEditCategoryDietaryPreference",
+        "recipeEditCategoryPrepTimeGroup",
+        "recipeEditCategoryCustomCategories",
+    ]
+    category_markup = template[category_start:tabs_start]
+    assert [category_markup.index(field_id) for field_id in target_field_order] == sorted(
+        category_markup.index(field_id) for field_id in target_field_order
+    )
+
+    organizer = script[
+        script.index("function organizeRecipeEditInformationCard"):
+        script.index("function organizeRecipeEditAiAssistant")
+    ]
+    technical_children = organizer[
+        organizer.index("appendRecipeEditWorkspaceChildren(technicalBody"):
+        organizer.index("grid.replaceChildren()")
+    ]
+    assert "categoriesPanel" not in technical_children
+    assert 'infoPanel.insertAdjacentElement("afterend", categoriesPanel);' in organizer
+    assert "appendRecipeEditWorkspaceChildren(tagRow, [cuisineField, tagActions]);" in organizer
+    assert "appendRecipeEditWorkspaceChildren(selectors, [cookbookField, sectionField]);" in organizer
+
+    collapse = script[
+        script.index("function setRecipeEditCategoriesExpanded"):
+        script.index("function applyRecipeEditCategorySuggestions")
+    ]
+    assert 'toggle.setAttribute("aria-expanded"' in collapse
+    assert 'region.setAttribute("aria-hidden"' in collapse
+    assert 'region.toggleAttribute("inert"' in collapse
+    assert "function toggleRecipeEditCategories" in collapse
+    assert "dispatchEvent" not in collapse
+    for forbidden in (
+        "populateRecipeEditCategories(",
+        "setCookbookCategoryFieldValue(",
+        "updateRecipeEditorDirtyState(",
+        "saveRecipeEditorCategories(",
+    ):
+        assert forbidden not in collapse
+
+    assert "function formatRecipeEditCategorySourceLabel" in script
+    assert 'return /^ai[\\s_-]*inferred$/i.test(normalized) ? "AI Inferred" : normalized;' in script
+    populate_categories = script[
+        script.index("function populateRecipeEditCategories"):
+        script.index("function bindRecipeEditCategorySourceTracking")
+    ]
+    assert "setRecipeEditCategorySourceLabel(sourceLabel);" in populate_categories
+
+    assert "body.recipe-edit-standalone-page .recipe-edit-categories-panel" in css
+    assert ".recipe-edit-source-files-details .recipe-edit-categories-panel" not in css
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
+    assert "body.recipe-edit-standalone-page .recipe-edit-category-custom-field" in css
+    category_mobile = css[css.rindex("@media (max-width: 820px)"):]
+    assert "body.recipe-edit-standalone-page .recipe-edit-category-grid" in category_mobile
+    assert "grid-template-columns: minmax(0, 1fr);" in category_mobile
 
 
 def test_recipe_editor_mobile_footer_uses_compact_ai_controls():

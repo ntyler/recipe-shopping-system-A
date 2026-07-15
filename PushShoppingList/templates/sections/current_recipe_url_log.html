@@ -1407,12 +1407,13 @@
             {% set editor_category_choices = cookbook_view.category_choices if cookbook_view and cookbook_view.category_choices else {} %}
             <section id="recipeEditCategoriesSection"
                      class="recipe-edit-info-panel recipe-edit-categories-panel"
+                     aria-labelledby="recipeEditCategoriesTitle"
                      data-recipe-edit-categories>
                 <div class="recipe-edit-panel-heading">
                     <div class="recipe-edit-panel-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-categories" aria-hidden="true"></span>
                         <div>
-                            <h3>Edit Recipe Categories</h3>
+                            <h3 id="recipeEditCategoriesTitle">Edit Recipe Categories</h3>
                             <p id="recipeEditCategoryRecipeName" class="recipe-edit-category-recipe-name"></p>
                         </div>
                     </div>
@@ -1442,8 +1443,21 @@
                                 </div>
                             </div>
                         </div>
+                        <button type="button"
+                                class="recipe-edit-category-collapse-button"
+                                aria-label="Collapse recipe categories"
+                                title="Collapse recipe categories"
+                                aria-expanded="true"
+                                aria-controls="recipeEditCategoriesBody"
+                                data-recipe-edit-category-collapse
+                                onclick="return toggleRecipeEditCategories(this)">
+                            <span class="recipe-edit-category-chevron" aria-hidden="true"></span>
+                        </button>
                     </div>
                 </div>
+                <div id="recipeEditCategoriesBody"
+                     class="recipe-edit-category-collapse-region"
+                     aria-hidden="false">
                 <div class="cookbook-category-grid recipe-edit-category-grid">
                     <label for="recipeEditCategoryMealType">
                         <span>Meal Type</span>
@@ -1594,6 +1608,7 @@
                                placeholder="Sophia's Favorites, Weeknight Dinners"
                                autocomplete="off">
                     </label>
+                </div>
                 </div>
             </section>
 

@@ -22972,7 +22972,6 @@ function populateRecipeEditCategories(recipe = {}) {
     const values = recipeEditCategoryValuesFromRecipe(recipe);
     const sources = recipeEditCategorySourcesFromRecipe(recipe, values);
     const recipeName = document.getElementById("recipeEditCategoryRecipeName");
-    const source = document.getElementById("recipeEditCategorySource");
 
     if (!form) {
         return;
@@ -22993,11 +22992,9 @@ function populateRecipeEditCategories(recipe = {}) {
         recipeName.textContent = recipe.display_name || recipe.recipe_title || "Recipe";
     }
 
-    if (source) {
-        const sourceLabel = recipe.category_metadata_source
-            || (recipe.category_metadata_user_set ? "Saved" : "Blank");
-        source.textContent = `Categories: ${sourceLabel}`;
-    }
+    const sourceLabel = recipe.category_metadata_source
+        || (recipe.category_metadata_user_set ? "Saved" : "Blank");
+    setRecipeEditCategorySourceLabel(sourceLabel);
     renderRecipeEditCuisineChips();
 }
 
@@ -23134,12 +23131,44 @@ function recipeEditCategorySuggestionValue(categories, field) {
     return String(value || "").trim();
 }
 
+function formatRecipeEditCategorySourceLabel(label) {
+    const normalized = String(label || "Blank").trim() || "Blank";
+    return /^ai[\s_-]*inferred$/i.test(normalized) ? "AI Inferred" : normalized;
+}
+
 function setRecipeEditCategorySourceLabel(label) {
     const source = document.getElementById("recipeEditCategorySource");
 
     if (source) {
-        source.textContent = `Categories: ${label || "Blank"}`;
+        const formattedLabel = formatRecipeEditCategorySourceLabel(label);
+        source.textContent = `Categories: ${formattedLabel}`;
+        source.dataset.categoryStatus = formattedLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     }
+}
+
+function setRecipeEditCategoriesExpanded(expanded, button = null) {
+    const section = document.getElementById("recipeEditCategoriesSection");
+    const region = document.getElementById("recipeEditCategoriesBody");
+    const toggle = button || (section ? section.querySelector("[data-recipe-edit-category-collapse]") : null);
+    const isExpanded = Boolean(expanded);
+
+    if (!section || !region || !toggle) {
+        return false;
+    }
+
+    section.classList.toggle("is-collapsed", !isExpanded);
+    toggle.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+    toggle.setAttribute("aria-label", isExpanded ? "Collapse recipe categories" : "Expand recipe categories");
+    toggle.title = isExpanded ? "Collapse recipe categories" : "Expand recipe categories";
+    region.setAttribute("aria-hidden", isExpanded ? "false" : "true");
+    region.toggleAttribute("inert", !isExpanded);
+    return true;
+}
+
+function toggleRecipeEditCategories(button) {
+    const isExpanded = button && button.getAttribute("aria-expanded") === "true";
+    setRecipeEditCategoriesExpanded(!isExpanded, button);
+    return false;
 }
 
 function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
@@ -25770,13 +25799,16 @@ function organizeRecipeEditInformationCard() {
     appendRecipeEditWorkspaceChildren(menuMetadataState, [restaurantDetails, menuItemDetails]);
     appendRecipeEditWorkspaceChildren(technicalBody, [
         titleField,
-        categoriesPanel,
         mobilePdfActions,
         legacyPdfActions,
     ]);
 
     grid.replaceChildren();
     appendRecipeEditWorkspaceChildren(grid, [primaryRow, metadataRow, descriptionRow, technicalDetails]);
+    if (categoriesPanel) {
+        infoPanel.insertAdjacentElement("afterend", categoriesPanel);
+        setRecipeEditCategoriesExpanded(true);
+    }
     renderRecipeEditCuisineChips();
     updateRecipeEditMetadataUnits();
 }
@@ -27711,9 +27743,6 @@ function organizeRecipeEditStandaloneWorkspace() {
     const galleryCard = document.querySelector(".recipe-edit-ingredient-gallery-card");
     const healthCard = document.querySelector(".recipe-edit-health-card");
     const confidenceCard = document.querySelector(".recipe-edit-confidence-card");
-    if (healthCard && confidenceCard) {
-        healthCard.appendChild(confidenceCard);
-    }
     if (sidebar) {
         appendRecipeEditWorkspaceChildren(sidebar, [
             imageCard,
@@ -27722,6 +27751,7 @@ function organizeRecipeEditStandaloneWorkspace() {
             sourceCard,
             galleryCard,
             healthCard,
+            confidenceCard,
         ]);
     }
 }
