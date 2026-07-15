@@ -168,9 +168,11 @@ def test_recipe_notes_are_editable_between_instructions_and_nutrition():
 
     assert 'id="recipeEditRecipeNotes"' in current_recipes
     assert "recipe-edit-recipe-notes-section" in current_recipes
+    assert "recipe-edit-notes-layout" in current_recipes
+    assert current_recipes.count('data-recipe-edit-tab-panel="notes"') == 1
     assert current_recipes.index('id="recipeEditInstructions"') < current_recipes.index('id="recipeEditRecipeNotes"')
-    assert current_recipes.index('id="recipeEditRecipeNotes"') < current_recipes.index('id="recipeEditNutrition"')
-    assert current_recipes.index('id="recipeEditNutrition"') < current_recipes.index('id="recipeEditReflectionNotes"')
+    assert current_recipes.index('id="recipeEditRecipeNotes"') < current_recipes.index('id="recipeEditReflectionNotes"')
+    assert current_recipes.index('id="recipeEditReflectionNotes"') < current_recipes.index('id="recipeEditNutrition"')
     assert 'data-recipe-note-preset="Substitutions & Variations"' in current_recipes
     assert 'data-recipe-note-preset="Storing & Reheating"' in current_recipes
     assert 'data-recipe-note-preset="Top Tips"' in current_recipes
@@ -205,6 +207,10 @@ def test_recipe_notes_are_editable_between_instructions_and_nutrition():
     assert ".recipe-edit-note-count" in css
     assert ".recipe-edit-recipe-notes-empty" in css
     assert ".recipe-edit-panel-icon-notes" in css
+    assert "/* Notes editor v2:" in css
+    assert "grid-template-columns: minmax(0, 1.45fr) minmax(320px, .8fr);" in css
+    assert ".recipe-edit-tabs-card .recipe-edit-notes-card .recipe-edit-section-title p" in css
+    assert "#recipeEditReflectionNotes:empty::before" in css
     assert "from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections" in service
     assert "recipe_notes = normalize_recipe_note_sections" in service
     assert '"recipe_notes": recipe_notes' in service

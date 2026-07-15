@@ -34441,6 +34441,153 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     }
 }
 
+/* Notes editor v2: one coordinated workspace instead of competing tab panels. */
+.recipe-edit-standalone-page .recipe-edit-notes-panel:not([hidden]) {
+    display: block;
+    width: 100%;
+}
+
+.recipe-edit-standalone-page .recipe-edit-notes-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, .8fr);
+    gap: 16px;
+    align-items: start;
+    min-width: 0;
+}
+
+.recipe-edit-standalone-page .recipe-edit-notes-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--app-surface) 92%, var(--app-bg-soft));
+}
+
+.recipe-edit-standalone-page .recipe-edit-notes-card > .recipe-edit-notes-card-header {
+    position: static;
+    top: auto;
+    z-index: auto;
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    padding: 11px 12px;
+    border: 0;
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-bg-soft);
+    box-shadow: none;
+    backdrop-filter: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-notes-card .recipe-edit-section-title {
+    min-width: 0;
+}
+
+.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-notes-card .recipe-edit-section-title h3 {
+    color: var(--app-text);
+    font-size: 12px;
+    font-weight: 760;
+}
+
+.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-notes-card .recipe-edit-section-title p {
+    display: block;
+    margin: 3px 0 0;
+    overflow: hidden;
+    color: var(--app-muted);
+    font-size: 9px;
+    font-weight: 550;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recipe-edit-standalone-page .recipe-edit-notes-card .recipe-edit-section-actions > button {
+    min-height: 32px;
+    padding: 0 10px;
+    white-space: nowrap;
+}
+
+.recipe-edit-standalone-page .recipe-edit-recipe-notes-section .recipe-edit-note-presets {
+    gap: 6px;
+    margin: 0;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--app-border);
+    background: color-mix(in srgb, var(--app-bg-soft) 52%, transparent);
+}
+
+.recipe-edit-standalone-page .recipe-edit-recipe-notes-section .recipe-edit-note-presets > span {
+    margin-right: 2px;
+    color: var(--app-muted);
+    font-size: 8px;
+    letter-spacing: .04em;
+}
+
+.recipe-edit-standalone-page .recipe-edit-recipe-notes-section .recipe-edit-note-presets button {
+    min-height: 26px;
+    padding: 0 9px;
+    border-color: var(--app-border-strong);
+    background: transparent;
+    color: var(--app-text-soft);
+    font-size: 8px;
+}
+
+.recipe-edit-standalone-page #recipeEditRecipeNotes,
+.recipe-edit-standalone-page #recipeEditReflectionNotes {
+    display: grid;
+    min-width: 0;
+    align-content: start;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+}
+
+.recipe-edit-standalone-page #recipeEditRecipeNotes > .recipe-edit-note-section-row,
+.recipe-edit-standalone-page #recipeEditReflectionNotes > .recipe-edit-reflection-note-row {
+    align-self: start;
+}
+
+.recipe-edit-standalone-page #recipeEditReflectionNotes:empty {
+    display: block;
+    padding: 18px 16px;
+}
+
+.recipe-edit-standalone-page #recipeEditReflectionNotes:empty::before {
+    display: block;
+    color: var(--app-muted);
+    font-size: 10px;
+    line-height: 1.45;
+    content: "No reflection notes yet. Add one after cooking to remember what worked or what to change next time.";
+}
+
+@media (max-width: 980px) {
+    .recipe-edit-standalone-page .recipe-edit-notes-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-notes-card .recipe-edit-section-title p {
+        white-space: normal;
+    }
+}
+
+@media (max-width: 620px) {
+    .recipe-edit-standalone-page .recipe-edit-notes-layout {
+        gap: 12px;
+    }
+
+    .recipe-edit-standalone-page .recipe-edit-notes-card > .recipe-edit-notes-card-header {
+        min-height: 0;
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .recipe-edit-standalone-page .recipe-edit-notes-card .recipe-edit-section-actions {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+    }
+}
+
 @media (max-width: 520px) {
     .public-legal-page .public-auth-header {
         flex-wrap: wrap;

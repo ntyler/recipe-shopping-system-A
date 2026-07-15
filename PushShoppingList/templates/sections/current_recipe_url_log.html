@@ -1971,16 +1971,19 @@
             </section>
 
             <section id="recipeEditPanelNotes"
-                     class="recipe-edit-section recipe-edit-recipe-notes-section"
+                     class="recipe-edit-section recipe-edit-notes-panel"
                      role="tabpanel"
                      aria-labelledby="recipeEditTabNotes"
                      data-recipe-edit-tab-panel="notes"
                      hidden>
-                <div class="recipe-edit-section-header">
+                <div class="recipe-edit-notes-layout">
+                <section class="recipe-edit-notes-card recipe-edit-recipe-notes-section"
+                         aria-labelledby="recipeEditRecipeNotesTitle">
+                <div class="recipe-edit-section-header recipe-edit-notes-card-header">
                     <div class="recipe-edit-section-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-notes" aria-hidden="true"></span>
                         <div>
-                            <h3>Recipe Notes</h3>
+                            <h3 id="recipeEditRecipeNotesTitle">Recipe Notes</h3>
                             <p>Source notes such as substitutions, storage, reheating, and tips.</p>
                         </div>
                     </div>
@@ -2040,6 +2043,28 @@
                         Add source notes for substitutions, storage, reheating, or tips.
                     </div>
                 </div>
+                </section>
+
+                <section class="recipe-edit-notes-card recipe-edit-reflection-section"
+                         aria-labelledby="recipeEditReflectionNotesTitle">
+                    <div class="recipe-edit-section-header recipe-edit-notes-card-header">
+                        <div class="recipe-edit-section-title">
+                            <span class="recipe-edit-panel-icon recipe-edit-panel-icon-reflection" aria-hidden="true"></span>
+                            <div>
+                                <h3 id="recipeEditReflectionNotesTitle">Reflection Notes</h3>
+                                <p>What worked, what changed, and what to try next time.</p>
+                            </div>
+                        </div>
+                        <div class="recipe-edit-section-actions">
+                            <button type="button" onclick="addRecipeReflectionNoteRow()">
+                                <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                                <span>Add Note</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="recipeEditReflectionNotes" class="recipe-edit-reflection-notes"></div>
+                </section>
+                </div>
             </section>
 
             <section id="recipeEditPanelNutrition"
@@ -2079,29 +2104,6 @@
                         <span>Delete</span>
                     </div>
                 </div>
-            </section>
-
-            <section class="recipe-edit-section recipe-edit-reflection-section"
-                     role="tabpanel"
-                     aria-labelledby="recipeEditTabNotes"
-                     data-recipe-edit-tab-panel="notes"
-                     hidden>
-                <div class="recipe-edit-section-header">
-                    <div class="recipe-edit-section-title">
-                        <span class="recipe-edit-panel-icon recipe-edit-panel-icon-reflection" aria-hidden="true"></span>
-                        <div>
-                            <h3>Reflection Notes</h3>
-                            <p>Timestamped notes about what worked, what changed, and what to try next time.</p>
-                        </div>
-                    </div>
-                    <div class="recipe-edit-section-actions">
-                        <button type="button" onclick="addRecipeReflectionNoteRow()">
-                            <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
-                            <span>Add Note</span>
-                        </button>
-                    </div>
-                </div>
-                <div id="recipeEditReflectionNotes" class="recipe-edit-reflection-notes"></div>
             </section>
 
                 </div>
