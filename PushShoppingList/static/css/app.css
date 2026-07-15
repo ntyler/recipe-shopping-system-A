@@ -49469,6 +49469,20 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recip
     max-width: none !important;
 }
 
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field .recipe-edit-ingredient-title-line {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    align-self: stretch !important;
+    width: 100% !important;
+    padding-right: 0 !important;
+}
+
 /* Keep older, already-organized modal markup aligned until it is normalized on open. */
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-image-slot {
     grid-area: auto !important;

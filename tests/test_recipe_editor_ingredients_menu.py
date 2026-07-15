@@ -766,6 +766,19 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert "@media (max-width: 860px)" in compact
     assert "@media (max-width: 760px)" in compact
     assert "@media (max-width: 620px)" in compact
+    modal_name_field = compact[
+        compact.index("dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field {"):
+        compact.index("}", compact.index("dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field {"))
+    ]
+    assert "display: flex !important;" in modal_name_field
+    assert "flex-direction: column;" in modal_name_field
+    modal_name_title = compact[
+        compact.index(".recipe-edit-ingredient-modal-name-field .recipe-edit-ingredient-title-line {"):
+        compact.index("}", compact.index(".recipe-edit-ingredient-modal-name-field .recipe-edit-ingredient-title-line {"))
+    ]
+    assert "grid-column: auto !important;" in modal_name_title
+    assert "grid-row: auto !important;" in modal_name_title
+    assert "width: 100% !important;" in modal_name_title
     identity_reset = compact[
         compact.index(".recipe-edit-ingredient-modal-field-grid > * {"):
         compact.index("}", compact.index(".recipe-edit-ingredient-modal-field-grid > * {"))
