@@ -48815,7 +48815,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-error {
     margin: -4px 0 0;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-image-slot {
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-slot {
     display: grid;
     min-width: 0;
     align-content: start;
@@ -49249,7 +49249,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-section-surface {
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-identity-grid {
     grid-template-columns: 180px minmax(0, 1fr);
-    grid-template-rows: auto auto;
+    grid-template-rows: auto;
     align-items: start;
     gap: 16px 22px;
 }
@@ -49268,12 +49268,24 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-image-slot {
     grid-column: 1 !important;
-    grid-row: 1 / span 2 !important;
+    grid-row: 1 !important;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-name-field,
-body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-buy-as-field {
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields {
     grid-column: 2 !important;
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields > * {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-field-grid {
@@ -49562,14 +49574,13 @@ body.recipe-edit-standalone-page :is(
         grid-template-rows: auto;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-image-slot,
-    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-name-field,
-    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-buy-as-field {
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-slot,
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields {
         grid-column: 1 !important;
         grid-row: auto !important;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-image-slot {
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-slot {
         width: min(100%, 360px) !important;
         max-width: 360px !important;
     }

@@ -747,7 +747,9 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert ".recipe-edit-ingredient-modal-section-surface" in compact
     assert "border-radius: 16px;" in compact
     assert "grid-template-columns: 180px minmax(0, 1fr);" in compact
-    assert "grid-row: 1 / span 2 !important;" in compact
+    assert ".recipe-edit-ingredient-modal-identity-fields" in compact
+    assert "grid-column: 2 !important;" in compact
+    assert "gap: 16px;" in compact
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in compact
     assert "grid-template-columns: minmax(0, 2.1fr) minmax(240px, 1fr);" in compact
     assert "height: 40px;" in compact
@@ -772,6 +774,8 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert "recipeIngredientModalHasChanges(row) ? \"dirty\" : \"\"" in status
 
     assert "Ingredient ${Math.max(ingredientIndex, 0) + 1} of ${Math.max(rows.length, 1)}" in script
+    assert 'identityFields.className = "recipe-edit-ingredient-modal-identity-fields";' in script
+    assert script.index("identityFields.appendChild(name);") < script.index("identityFields.appendChild(buyAs);")
 
 
 def test_recipe_editor_ingredient_polish_uses_professional_grid_and_command_bar():

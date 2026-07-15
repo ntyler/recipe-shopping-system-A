@@ -26722,7 +26722,10 @@ function organizeRecipeEditIngredientRow(row) {
     imageSlot.className = "recipe-edit-ingredient-modal-image-slot";
     imageSlot.dataset.recipeIngredientModalImageSlot = "";
     imageSlot.innerHTML = '<span class="recipe-edit-ingredient-modal-field-label">Ingredient Image</span>';
+    const identityFields = document.createElement("div");
+    identityFields.className = "recipe-edit-ingredient-modal-identity-fields";
     identityGrid?.appendChild(imageSlot);
+    identityGrid?.appendChild(identityFields);
     if (name) {
         name.classList.add("recipe-edit-ingredient-edit-field", "recipe-edit-ingredient-modal-name-field");
         const nameLabel = name.querySelector(":scope > .sr-only");
@@ -26736,7 +26739,7 @@ function organizeRecipeEditIngredientRow(row) {
             nameInput.required = true;
             nameInput.setAttribute("aria-required", "true");
         }
-        identityGrid?.appendChild(name);
+        identityFields.appendChild(name);
     }
     if (buyAs) {
         buyAs.classList.add("recipe-edit-ingredient-edit-field", "recipe-edit-ingredient-modal-buy-as-field");
@@ -26744,7 +26747,7 @@ function organizeRecipeEditIngredientRow(row) {
         helper.className = "recipe-edit-ingredient-field-helper";
         helper.textContent = "The grocery item that should be added to the shopping list.";
         buyAs.appendChild(helper);
-        identityGrid?.appendChild(buyAs);
+        identityFields.appendChild(buyAs);
     }
     [
         [quantity, "amount"],
