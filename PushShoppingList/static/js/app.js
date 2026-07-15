@@ -44,6 +44,13 @@ const CATEGORY_SOURCE_AI_INFERRED = "ai_inferred";
 const CATEGORY_SOURCE_BLANK = "blank";
 const RECIPE_EDIT_PAGE_RETURN_STATE_KEY = "recipe-edit-page-return-state";
 const RECIPE_EDIT_PENDING_ACTION_KEY = "recipe-edit-pending-action";
+const RECIPE_FAVORITE_SYNC_STORAGE_KEY = "shopping-recipe-favorite-sync";
+const RECIPE_FAVORITE_SYNC_CHANNEL_NAME = "shopping-recipe-favorites";
+const RECIPE_FAVORITE_SYNC_MIN_INTERVAL_MS = 1500;
+let recipeFavoriteSyncChannel = null;
+const recipeFavoriteSyncRequests = new Map();
+const recipeFavoriteLastSyncedAt = new Map();
+const recipeFavoriteLastChangedAt = new Map();
 const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const USER_ACCOUNT_OPEN_PANEL_KEY = "user-account-open-panel";
@@ -1258,6 +1265,166 @@ function setRecipeFavoriteStateForUrl(recipeUrl, favorite) {
         .forEach(button => setRecipeFavoriteButtonState(button, favorite));
 }
 
+function recipeFavoriteSyncUrls(value) {
+    const urls = Array.isArray(value) ? value : [value];
+    return [...new Set(urls.map(url => String(url || "").trim()).filter(Boolean))];
+}
+
+function recipeFavoriteSyncScope() {
+    return String(document.body?.dataset.userId || "guest").trim() || "guest";
+}
+
+function applyRecipeFavoriteSyncPayload(payload = {}) {
+    if (!payload || typeof payload !== "object" || typeof payload.favorite !== "boolean") {
+        return false;
+    }
+    if (payload.scope && payload.scope !== recipeFavoriteSyncScope()) {
+        return false;
+    }
+
+    const urls = recipeFavoriteSyncUrls(payload.urls || payload.url);
+    if (!urls.length) {
+        return false;
+    }
+
+    urls.forEach(url => setRecipeFavoriteStateForUrl(url, payload.favorite));
+    rememberRecipeFavoriteState(urls, payload.favorite);
+    const updatedAt = Number(payload.updatedAt) || Date.now();
+    urls.forEach(url => recipeFavoriteLastChangedAt.set(url, updatedAt));
+    return true;
+}
+
+function publishRecipeFavoriteState(recipeUrls, favorite) {
+    const urls = recipeFavoriteSyncUrls(recipeUrls);
+    if (!urls.length) {
+        return;
+    }
+
+    const payload = {
+        urls,
+        favorite: Boolean(favorite),
+        scope: recipeFavoriteSyncScope(),
+        updatedAt: Date.now(),
+    };
+    if (recipeFavoriteSyncChannel) {
+        try {
+            recipeFavoriteSyncChannel.postMessage(payload);
+        } catch (error) {
+            console.debug("Recipe favorite broadcast sync is unavailable.", error);
+        }
+    }
+    try {
+        localStorage.setItem(RECIPE_FAVORITE_SYNC_STORAGE_KEY, JSON.stringify(payload));
+        localStorage.removeItem(RECIPE_FAVORITE_SYNC_STORAGE_KEY);
+    } catch (error) {
+        console.debug("Recipe favorite cross-page storage sync is unavailable.", error);
+    }
+}
+
+function recipeFavoriteControlUrls() {
+    return recipeFavoriteSyncUrls(
+        [...document.querySelectorAll("[data-recipe-favorite][data-recipe-url]")]
+            .map(button => button.dataset.recipeUrl)
+    );
+}
+
+async function syncRecipeFavoriteStateFromServer(recipeUrl, options = {}) {
+    const url = String(recipeUrl || "").trim();
+    if (!url) {
+        return false;
+    }
+
+    const now = Date.now();
+    const requestedAt = now;
+    const lastSyncedAt = recipeFavoriteLastSyncedAt.get(url) || 0;
+    if (options.force !== true && now - lastSyncedAt < RECIPE_FAVORITE_SYNC_MIN_INTERVAL_MS) {
+        return true;
+    }
+    if (recipeFavoriteSyncRequests.has(url)) {
+        return recipeFavoriteSyncRequests.get(url);
+    }
+
+    const request = fetch(`/api/recipe_favorite?url=${encodeURIComponent(url)}`, {
+        method: "GET",
+        headers: { "X-Requested-With": "fetch" },
+        cache: "no-store",
+    }).then(async response => {
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to refresh favorite state.");
+        }
+
+        const savedUrl = String(data.url || url).trim();
+        const urls = recipeFavoriteSyncUrls([url, savedUrl]);
+        if (urls.some(candidate => (recipeFavoriteLastChangedAt.get(candidate) || 0) > requestedAt)) {
+            return true;
+        }
+        applyRecipeFavoriteSyncPayload({
+            urls,
+            favorite: Boolean(data.favorite),
+            scope: recipeFavoriteSyncScope(),
+            updatedAt: Date.now(),
+        });
+        const syncedAt = Date.now();
+        urls.forEach(candidate => recipeFavoriteLastSyncedAt.set(candidate, syncedAt));
+        return true;
+    }).catch(error => {
+        console.debug("Unable to refresh recipe favorite state.", error);
+        return false;
+    }).finally(() => {
+        recipeFavoriteSyncRequests.delete(url);
+    });
+
+    recipeFavoriteSyncRequests.set(url, request);
+    return request;
+}
+
+function refreshRecipeFavoriteControls(options = {}) {
+    return Promise.all(
+        recipeFavoriteControlUrls().map(url => syncRecipeFavoriteStateFromServer(url, options))
+    );
+}
+
+function initRecipeFavoriteSync() {
+    if (!document.documentElement || document.documentElement.dataset.recipeFavoriteSyncBound === "1") {
+        return;
+    }
+    document.documentElement.dataset.recipeFavoriteSyncBound = "1";
+
+    if (typeof BroadcastChannel === "function") {
+        try {
+            recipeFavoriteSyncChannel = new BroadcastChannel(RECIPE_FAVORITE_SYNC_CHANNEL_NAME);
+            recipeFavoriteSyncChannel.addEventListener("message", event => {
+                applyRecipeFavoriteSyncPayload(event.data);
+            });
+        } catch (error) {
+            recipeFavoriteSyncChannel = null;
+            console.debug("Recipe favorite broadcast sync is unavailable.", error);
+        }
+    }
+    window.addEventListener("storage", event => {
+        if (event.key !== RECIPE_FAVORITE_SYNC_STORAGE_KEY || !event.newValue) {
+            return;
+        }
+        try {
+            applyRecipeFavoriteSyncPayload(JSON.parse(event.newValue));
+        } catch (error) {
+            console.debug("Unable to read synchronized recipe favorite state.", error);
+        }
+    });
+    window.addEventListener("pageshow", () => {
+        void refreshRecipeFavoriteControls({ force: true });
+    });
+    window.addEventListener("focus", () => {
+        void refreshRecipeFavoriteControls();
+    });
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            void refreshRecipeFavoriteControls();
+        }
+    });
+}
+
 function syncRecipeEditorFavoriteControl(recipe = {}, originalUrl = "") {
     const button = document.getElementById("recipeEditFavoriteButton");
     if (!button) return;
@@ -1297,8 +1464,12 @@ async function toggleRecipeFavorite(button, event = null) {
 
     const wasFavorite = button.getAttribute("aria-pressed") === "true";
     const nextFavorite = !wasFavorite;
-    setRecipeFavoriteStateForUrl(recipeUrl, nextFavorite);
-    rememberRecipeFavoriteState([recipeUrl], nextFavorite);
+    applyRecipeFavoriteSyncPayload({
+        urls: [recipeUrl],
+        favorite: nextFavorite,
+        scope: recipeFavoriteSyncScope(),
+        updatedAt: Date.now(),
+    });
     button.disabled = true;
 
     try {
@@ -1321,15 +1492,21 @@ async function toggleRecipeFavorite(button, event = null) {
 
         const savedFavorite = Boolean(data.favorite);
         const savedRecipeUrl = String(data.url || recipeUrl).trim();
-        setRecipeFavoriteStateForUrl(recipeUrl, savedFavorite);
-        if (savedRecipeUrl && savedRecipeUrl !== recipeUrl) {
-            setRecipeFavoriteStateForUrl(savedRecipeUrl, savedFavorite);
-        }
-        rememberRecipeFavoriteState([recipeUrl, savedRecipeUrl], savedFavorite);
+        applyRecipeFavoriteSyncPayload({
+            urls: [recipeUrl, savedRecipeUrl],
+            favorite: savedFavorite,
+            scope: recipeFavoriteSyncScope(),
+            updatedAt: Date.now(),
+        });
+        publishRecipeFavoriteState([recipeUrl, savedRecipeUrl], savedFavorite);
     } catch (err) {
         console.warn("Unable to update recipe favorite.", err);
-        setRecipeFavoriteStateForUrl(recipeUrl, wasFavorite);
-        rememberRecipeFavoriteState([recipeUrl], wasFavorite);
+        applyRecipeFavoriteSyncPayload({
+            urls: [recipeUrl],
+            favorite: wasFavorite,
+            scope: recipeFavoriteSyncScope(),
+            updatedAt: Date.now(),
+        });
         window.alert(err.message || "Unable to update favorite.");
     } finally {
         document
@@ -48330,6 +48507,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
         ["initJobActivityPanel", initJobActivityPanel],
         ["initAppShellNavigation", initAppShellNavigation],
+        ["initRecipeFavoriteSync", initRecipeFavoriteSync],
         ["consumePostAuthenticationHomeReset", consumePostAuthenticationHomeReset],
         ["initGlobalAppSearch", initGlobalAppSearch],
         ["initSettingsWorkspace", () => initSettingsWorkspace({ scroll: false })],

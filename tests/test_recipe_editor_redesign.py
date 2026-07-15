@@ -192,8 +192,9 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert "previousUrl === recipeUrl" in script
     assert "setRecipeFavoriteButtonState(button, favorite);" in script
     assert "function rememberRecipeFavoriteState" in script
-    assert "rememberRecipeFavoriteState([recipeUrl], nextFavorite);" in script
-    assert "rememberRecipeFavoriteState([recipeUrl, savedRecipeUrl], savedFavorite);" in script
+    assert "favorite: nextFavorite," in script
+    assert "applyRecipeFavoriteSyncPayload({" in script
+    assert "publishRecipeFavoriteState([recipeUrl, savedRecipeUrl], savedFavorite);" in script
     assert "recipe.favorite = isFavorite;" in script
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "background: var(--app-surface);" in css

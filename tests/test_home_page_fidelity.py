@@ -60,6 +60,10 @@ def test_recipe_favorite_route_updates_saved_recipe_state(monkeypatch):
                     "/api/recipe_favorite",
                     json={"url": recipe_url, "favorite": True},
                 )
+                read_response = client.get(
+                    "/api/recipe_favorite",
+                    query_string={"url": recipe_url},
+                )
 
             saved = json.loads(
                 (output_dir / f"{safe_filename(recipe_url)}.json").read_text(encoding="utf-8")
@@ -67,7 +71,50 @@ def test_recipe_favorite_route_updates_saved_recipe_state(monkeypatch):
 
     assert response.status_code == 200
     assert response.get_json()["favorite"] is True
+    assert read_response.status_code == 200
+    assert read_response.get_json()["favorite"] is True
+    assert read_response.headers["Cache-Control"] == "no-store, no-cache, must-revalidate, private"
     assert saved["favorite"] is True
+
+
+def test_recipe_favorite_state_synchronizes_across_home_and_editor_pages():
+    script = read_text("PushShoppingList/static/js/app.js")
+    route = read_text("PushShoppingList/routes/recipe_routes.py")
+    editor_page = read_text("PushShoppingList/templates/recipe_edit_page.html")
+
+    for token in (
+        "RECIPE_FAVORITE_SYNC_STORAGE_KEY",
+        "RECIPE_FAVORITE_SYNC_CHANNEL_NAME",
+        "function recipeFavoriteSyncScope",
+        "function applyRecipeFavoriteSyncPayload",
+        "function publishRecipeFavoriteState",
+        "function syncRecipeFavoriteStateFromServer",
+        "function refreshRecipeFavoriteControls",
+        "function initRecipeFavoriteSync",
+        'new BroadcastChannel(RECIPE_FAVORITE_SYNC_CHANNEL_NAME)',
+        'window.addEventListener("storage"',
+        'window.addEventListener("pageshow"',
+        'window.addEventListener("focus"',
+        'document.addEventListener("visibilitychange"',
+        'publishRecipeFavoriteState([recipeUrl, savedRecipeUrl], savedFavorite);',
+        '["initRecipeFavoriteSync", initRecipeFavoriteSync]',
+    ):
+        assert token in script
+    assert "payload.scope !== recipeFavoriteSyncScope()" in script
+    assert "recipeFavoriteLastChangedAt" in script
+    assert "> requestedAt" in script
+    assert 'data-user-id="{{ current_user.user_id if current_user else \'\' }}"' in editor_page
+
+    favorite_refresh = script[
+        script.index("async function syncRecipeFavoriteStateFromServer"):
+        script.index("function refreshRecipeFavoriteControls")
+    ]
+    assert 'method: "GET"' in favorite_refresh
+    assert 'cache: "no-store"' in favorite_refresh
+    assert "applyRecipeFavoriteSyncPayload" in favorite_refresh
+    assert '@recipe_bp.route("/api/recipe_favorite", methods=["GET", "POST"])' in route
+    assert 'data = request.args if request.method == "GET"' in route
+    assert 'response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"' in route
 
 
 def test_home_recipe_badge_uses_real_metadata_priority():

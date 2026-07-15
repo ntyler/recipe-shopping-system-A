@@ -4392,9 +4392,9 @@ def api_source_url_pdf_route():
     return jsonify(result), status
 
 
-@recipe_bp.route("/api/recipe_favorite", methods=["POST"])
+@recipe_bp.route("/api/recipe_favorite", methods=["GET", "POST"])
 def api_recipe_favorite_route():
-    data = request.get_json(silent=True) or {}
+    data = request.args if request.method == "GET" else (request.get_json(silent=True) or {})
     url = str(data.get("url") or data.get("recipe_url") or "").strip()
 
     if not url:
@@ -4404,16 +4404,21 @@ def api_recipe_favorite_route():
     if not recipe_data:
         return jsonify({"ok": False, "error": "Recipe was not found."}), 404
 
-    favorite_value = data.get("favorite")
-    favorite = not bool(recipe_data.get("favorite")) if favorite_value is None else bool(favorite_value)
-    recipe_data["favorite"] = favorite
-    save_recipe_output(recipe_data.get("source_url") or url, recipe_data)
+    if request.method == "POST":
+        favorite_value = data.get("favorite")
+        favorite = not bool(recipe_data.get("favorite")) if favorite_value is None else bool(favorite_value)
+        recipe_data["favorite"] = favorite
+        save_recipe_output(recipe_data.get("source_url") or url, recipe_data)
+    else:
+        favorite = bool(recipe_data.get("favorite"))
 
-    return jsonify({
+    response = jsonify({
         "ok": True,
         "favorite": favorite,
         "url": recipe_data.get("source_url") or url,
     })
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+    return response
 
 
 @recipe_bp.route("/api/recipe_pdf/delete", methods=["POST"])
