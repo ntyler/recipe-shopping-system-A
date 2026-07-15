@@ -50039,6 +50039,17 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     object-fit: cover;
 }
 
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel > .recipe-image-lightbox {
+    position: absolute;
+    inset: 0;
+    z-index: 20000;
+    border-radius: inherit;
+}
+
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-panel .recipe-ingredient-image:not([hidden]) {
+    cursor: zoom-in;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-preview > strong {
     overflow: hidden;
     color: var(--app-text);

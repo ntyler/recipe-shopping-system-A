@@ -704,6 +704,8 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert 'generateButton.textContent = "Generate Image";' in image_contract
     assert 'recipeIngredientModalHasImage(imagePanel) ? "Change Image" : "Add Image"' in image_contract
     assert 'removeButton.textContent = "Remove";' in image_contract
+    assert 'image.setAttribute("aria-label", "Enlarge ingredient image");' in image_contract
+    assert 'image.title = "Click to enlarge ingredient image";' in image_contract
     assert 'slot.appendChild(imagePanel);' in image_contract
     assert "recipeIngredientModalPlaceholder" in image_contract
     assert '"recipe-ingredient-image-prompt-requested"' in image_contract
@@ -732,6 +734,32 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert ".recipe-ingredient-image-prompt-requested .recipe-image-prompt:not([hidden])" in modal_css
     assert "dialog.recipe-edit-ingredient-edit-panel > .recipe-edit-floating-menu" in modal_css
     assert "z-index: 40 !important;" in modal_css
+
+
+def test_recipe_editor_ingredient_image_lightbox_stays_above_the_modal_and_restores_focus():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    lightbox = script[
+        script.index("function ensureRecipeImageLightbox"):
+        script.index("function buildAddressSummaryFromForm")
+    ]
+    assert 'const dialogHost = image.closest("dialog[open]");' in lightbox
+    assert "const lightboxHost = dialogHost || document.body;" in lightbox
+    assert "lightboxHost.appendChild(lightbox);" in lightbox
+    assert "lightbox.recipeImageLightboxTrigger = image;" in lightbox
+    assert "lightbox.parentNode !== document.body" in lightbox
+    assert "document.body.appendChild(lightbox);" in lightbox
+    assert "trigger.focus({ preventScroll: true });" in lightbox
+    assert "event.stopImmediatePropagation();" in lightbox
+
+    modal_lightbox = css[css.index(
+        "dialog.recipe-edit-ingredient-edit-panel > .recipe-image-lightbox"
+    ):]
+    modal_lightbox = modal_lightbox[:modal_lightbox.index("}")]
+    assert "position: absolute;" in modal_lightbox
+    assert "inset: 0;" in modal_lightbox
+    assert "z-index: 20000;" in modal_lightbox
 
 
 def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive():

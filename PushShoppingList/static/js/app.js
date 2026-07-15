@@ -26207,6 +26207,13 @@ function syncRecipeIngredientModalImageActions(imagePanel) {
         removeButton.textContent = "Remove";
         removeButton.title = "Remove ingredient image";
     }
+    const image = imagePanel.querySelector(".recipe-ingredient-image:not([hidden])");
+    if (image) {
+        image.tabIndex = 0;
+        image.setAttribute("role", "button");
+        image.setAttribute("aria-label", "Enlarge ingredient image");
+        image.title = "Click to enlarge ingredient image";
+    }
 }
 
 function mountRecipeIngredientModalImage(row, panel) {
@@ -48642,6 +48649,13 @@ function openRecipeImageLightbox(image) {
         return;
     }
 
+    const dialogHost = image.closest("dialog[open]");
+    const lightboxHost = dialogHost || document.body;
+    if (lightbox.parentNode !== lightboxHost) {
+        lightboxHost.appendChild(lightbox);
+    }
+
+    lightbox.recipeImageLightboxTrigger = image;
     lightboxImage.src = image.dataset.fullSrc || image.currentSrc || image.src;
     lightboxImage.alt = image.alt || "Recipe image";
     lightbox.classList.add("open");
@@ -48662,6 +48676,8 @@ function closeRecipeImageLightbox() {
         return;
     }
 
+    const trigger = lightbox.recipeImageLightboxTrigger;
+    delete lightbox.recipeImageLightboxTrigger;
     lightbox.classList.remove("open");
     lightbox.setAttribute("aria-hidden", "true");
     document.body.classList.remove("image-lightbox-open");
@@ -48669,6 +48685,12 @@ function closeRecipeImageLightbox() {
     if (lightboxImage) {
         lightboxImage.removeAttribute("src");
         lightboxImage.alt = "";
+    }
+    if (lightbox.parentNode !== document.body) {
+        document.body.appendChild(lightbox);
+    }
+    if (trigger && trigger.isConnected) {
+        trigger.focus({ preventScroll: true });
     }
 }
 
@@ -48701,9 +48723,11 @@ function handleRecipeCoverImageKeydown(event) {
 }
 
 function closeRecipeImageLightboxOnEscape(event) {
-    if (event.key === "Escape") {
-        closeRecipeImageLightbox();
-    }
+    const lightbox = document.getElementById("recipeImageLightbox");
+    if (event.key !== "Escape" || !lightbox?.classList.contains("open")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeRecipeImageLightbox();
 }
 
 function decorateRecipeCoverImages() {
