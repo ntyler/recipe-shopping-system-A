@@ -199,7 +199,20 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert "background: var(--app-surface);" in css
     assert ".recipe-edit-image-card .recipe-edit-cover-favorite" in css
     assert '.recipe-edit-cover-favorite[aria-pressed="true"]' in css
-    assert "top: 6px;" in css
+    favorite_rule = css[
+        css.index(".recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-favorite {"):
+        css.index("}", css.index(".recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-favorite {"))
+    ]
+    for declaration in (
+        "top: 8px;",
+        "right: 8px;",
+        "width: 30px;",
+        "height: 30px;",
+        "border-radius: 50%;",
+        "background: rgba(22, 27, 29, .88);",
+    ):
+        assert declaration in favorite_rule
+    assert "width: 17px;" in css
     assert "position: absolute;" in css
     assert "bottom: calc(100% + 8px);" in css
     assert "function closeRecipeImageChangeActions(options = {})" in script
