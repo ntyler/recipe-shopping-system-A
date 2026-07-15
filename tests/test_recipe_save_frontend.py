@@ -120,6 +120,7 @@ def test_validation_reveals_invalid_nested_editor_without_restoring_other_live_e
     ]
 
     assert reveal.count("{ restoreOtherEdits: false }") == 4
+    assert "setRecipeIngredientEditMode(ingredientRow, true, { restoreOtherEdits: false });" in reveal
     assert "setRecipeInstructionEditMode(instructionRow, true, { restoreOtherEdits: false });" in reveal
     assert "const restoreOtherEdits = options.restoreOtherEdits !== false;" in main_edit
     assert "restore: restoreOtherEdits" in main_edit
@@ -128,6 +129,69 @@ def test_validation_reveals_invalid_nested_editor_without_restoring_other_live_e
     assert disclosure.count("restore: restoreOtherEdits") >= 3
     assert "const restoreOtherEdits = options.restoreOtherEdits !== false;" in alternative_edit
     assert alternative_edit.count("restore: restoreOtherEdits") >= 2
+
+
+def test_ingredient_modal_validation_is_inline_and_preserves_entered_values_on_failure():
+    script = read_text("PushShoppingList/static/js/app.js")
+    validation = script[
+        script.index("function recipeIngredientModalFieldError"):
+        script.index("function updateRecipeIngredientModalNavigation")
+    ]
+
+    assert 'error.setAttribute("role", "alert");' in validation
+    assert 'input.toggleAttribute("aria-invalid", Boolean(text));' in validation
+    assert "clearRecipeIngredientModalErrors(panel);" in validation
+    assert 'setRecipeIngredientModalFieldError(ingredient, "Ingredient Name is required.");' in validation
+    assert "canonicalizeRecipeIngredientUnitControl(unit, { allowCustom: true })" in validation
+    assert "Choose a unit from the list, add a custom unit, or leave it blank." in validation
+    assert 'setRecipeIngredientModalError(panel, "Review the highlighted field before saving.");' in validation
+    assert 'firstInvalid.focus({ preventScroll: true });' in validation
+    assert 'firstInvalid.scrollIntoView({ block: "center", behavior: "smooth" });' in validation
+    assert ".value = \"\"" not in validation
+
+    snapshots = script[
+        script.index("const RECIPE_INGREDIENT_MODAL_IMMEDIATE_FIELDS"):
+        script.index("function captureRecipeIngredientModalScrollState")
+    ]
+    assert "recipeIngredientEditableFieldSnapshot(scope)" in snapshots
+    for image_field in (
+        "ingredient_image_url",
+        "ingredient_image_generated_at",
+        "ingredient_image_prompt",
+    ):
+        assert f'"{image_field}"' in snapshots
+    assert "RECIPE_INGREDIENT_MODAL_IMMEDIATE_FIELDS.forEach(field => delete values[field]);" in snapshots
+    assert "JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row)) !== panel.dataset.editSnapshot" in snapshots
+
+
+def test_ingredient_modal_commit_has_single_flight_busy_and_failure_contract():
+    script = read_text("PushShoppingList/static/js/app.js")
+    commit = script[
+        script.index("async function commitRecipeIngredientModal"):
+        script.index("function updateRecipeIngredientAlternativeComponentSummary")
+    ]
+
+    guard = commit.index('panel.dataset.saving === "true"')
+    set_saving = commit.index('panel.dataset.saving = "true";')
+    validate = commit.index("validateRecipeIngredientModal(row, panel)")
+    update_summary = commit.index("updateRecipeIngredientSummary(row)")
+    update_dirty = commit.index('updateRecipeEditorDirtyState(row.closest("#recipeEditForm"))')
+    assert guard < set_saving < validate < update_summary < update_dirty
+    assert "setRecipeIngredientModalSaving(panel, true);" in commit
+    assert "panel.dataset.editSnapshot = JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row));" in commit
+    assert "switchRecipeIngredientModal(row, nextRow)" in commit
+    assert "setRecipeIngredientEditMode(row, false)" in commit
+    assert "Unable to save this ingredient. Please try again." in commit
+    assert "delete panel.dataset.saving;" in commit
+    assert "setRecipeIngredientModalSaving(panel, false);" in commit
+
+    saving_state = script[
+        script.index("function setRecipeIngredientModalSaving"):
+        script.index("function hideRecipeIngredientDiscardConfirmation")
+    ]
+    assert 'panel.toggleAttribute("aria-busy", Boolean(saving));' in saving_state
+    assert "button.disabled = Boolean(saving)" in saving_state
+    assert 'status.textContent = saving ? "Saving ingredient\\u2026" : "";' in saving_state
 
 
 def test_live_payload_preserves_nested_ids_order_and_metadata():
@@ -164,6 +228,14 @@ def test_live_payload_preserves_nested_ids_order_and_metadata():
     assert 'document.querySelectorAll("#recipeEditEquipment .recipe-edit-equipment-row")' in script
     assert 'document.querySelectorAll("#recipeEditNutrition .recipe-edit-nutrition-row")' in script
     assert "item.substitutions = collectRecipeIngredientSubstitutionRows(row)" in script
+    ingredient_collection = script[
+        script.index("function collectRecipeIngredientRows"):
+        script.index("function collectRecipeNutritionRows")
+    ]
+    assert "const item = fieldValuesFromRow(row);" in ingredient_collection
+    assert "Object.assign(item, recipeIngredientMatchSnapshot(recipeIngredientMatchItemFromRow(row, item)));" in ingredient_collection
+    assert "item.substitutions = collectRecipeIngredientSubstitutionRows(row);" in ingredient_collection
+    assert ".filter(item => item.ingredient || item.original_text)" in ingredient_collection
     assert 'updateRecipeEditorDirtyState(parentRow ? parentRow.closest("#recipeEditForm") : null)' in script
     assert "step_id: values.step_id || \"\"" in script
     assert "row_id: values.row_id || \"\"" in script

@@ -436,18 +436,41 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     ):
         assert summary_class in organize
 
+    assert 'const editPanel = document.createElement("dialog");' in organize
     assert 'editPanel.className = "recipe-edit-ingredient-edit-panel";' in organize
+    assert 'editPanel.setAttribute("role", "dialog");' in organize
+    assert 'editPanel.setAttribute("aria-modal", "true");' in organize
+    assert 'editPanel.setAttribute("aria-labelledby", modalTitleId);' in organize
+    assert 'editPanel.setAttribute("aria-describedby", modalSubtitleId);' in organize
     assert "editPanel.hidden = true;" in organize
-    assert '["Identity", [name, buyAs]]' in organize
-    assert '["Quantity", [quantity, unit, size, quantityText]]' in organize
-    assert '["Usage", [preparation, storeSection, type]]' in organize
-    assert '["Additional", [notes]]' in organize
-    assert "recipe-edit-ingredient-edit-header" in organize
-    assert "recipe-edit-ingredient-edit-group-title" in organize
-    assert 'imageEditor.innerHTML = `<span>Image</span>' in organize
-    assert "Manage image" in organize
+    for class_name in (
+        "recipe-edit-ingredient-modal-shell",
+        "recipe-edit-ingredient-modal-header",
+        "recipe-edit-ingredient-modal-body",
+        "recipe-edit-ingredient-modal-content",
+        "recipe-edit-ingredient-modal-footer",
+    ):
+        assert class_name in organize
+    section_labels = (
+        ">Identity</h3>",
+        ">Quantity</h3>",
+        ">Usage</h3>",
+        ">Notes</h3>",
+        "AI Analysis &amp; Source Details",
+    )
+    positions = [organize.index(label) for label in section_labels]
+    assert positions == sorted(positions)
+    assert "Edit Ingredient" in organize
+    assert 'aria-label="Close Edit Ingredient"' in organize
+    assert 'data-recipe-ingredient-edit-subtitle' in organize
+    assert 'imageSlot.dataset.recipeIngredientModalImageSlot = "";' in organize
+    assert 'nameInput.setAttribute("aria-required", "true");' in organize
+    assert 'nameLabel.textContent = "Ingredient Name";' in organize
+    assert "The grocery item that should be added to the shopping list." in organize
+    assert 'typeLabel.textContent = "Requirement";' in organize
+    assert "Previous Ingredient" in organize
     assert "Save Changes" in organize
-    assert ">Cancel</button>" in organize
+    assert "Save &amp; Next" in organize
     assert organize.index(">Cancel</button>") < organize.index(">Save Changes</button>")
     assert "optional.hidden = true;" in organize
     assert 'matchDetails.className = "recipe-edit-ingredient-match-details";' in organize
@@ -472,9 +495,22 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         "ingredient_image_url",
         "ingredient_image_generated_at",
         "ingredient_image_prompt",
+        "unit_id",
+        "unit_raw",
+        "unit_review_required",
+        "unit_review_value",
+        "unit_custom",
+        "store_section_custom",
+        "parsed_name",
+        "normalized_name",
+        "master_normalized_name",
+        "confidence",
         "match_status",
     ):
         assert f'data-field="{field}"' in row_markup
+    assert 'textarea data-field="ingredient" rows="1" required aria-required="true"' in row_markup
+    assert 'placeholder="e.g. For sautéing onions."' in row_markup
+    assert "Add preparation notes, purchasing guidance, or ingredient-specific details." in row_markup
 
     formatter = script[
         script.index("function formatRecipeIngredientQuantity"):
@@ -504,20 +540,161 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         script.index("function organizeRecipeEditHeaderActions")
     ]
     assert 'row.classList.toggle("is-editing", Boolean(shouldEdit));' in edit_mode
-    assert "recipeIngredientEditableFieldSnapshot(row)" in edit_mode
+    assert "recipeIngredientModalEditableFieldSnapshot(row)" in edit_mode
     assert "restoreRecipeIngredientEditableFieldSnapshot" in edit_mode
+    assert 'document.body.classList.add("recipe-ingredient-modal-open");' in edit_mode
+    assert 'document.body.classList.remove("recipe-ingredient-modal-open");' in edit_mode
+    assert "captureRecipeIngredientModalScrollState()" in edit_mode
+    assert "restoreRecipeIngredientModalScrollState();" in edit_mode
+    assert "mountRecipeIngredientModalImage(row, panel);" in edit_mode
+    assert "restoreRecipeIngredientModalImage(row);" in edit_mode
+    assert "panel.showModal();" in edit_mode
+    assert "panel.close();" in edit_mode
+    assert 'returnFocus.focus({ preventScroll: true });' in edit_mode
     assert "updateRecipeIngredientSummary(row);" in edit_mode
     assert "updateRecipeEditorDirtyState" in edit_mode
 
-    v10 = css[css.index("/* Ingredient editor v10:"):]
-    assert css.index("/* Ingredient editor v10:") > css.index("/* Ingredient editor v9:")
-    assert ".recipe-edit-ingredient-read-cell" in v10
-    assert ".recipe-edit-ingredient-edit-panel" in v10
-    assert ".recipe-edit-ingredient-row.is-editing" in v10
-    assert ".recipe-edit-ingredient-legacy-optional" in v10
-    edit_panel_rule = v10[v10.index(".recipe-edit-ingredient-edit-panel {"):]
+    modal_css = css[css.index("/* Ingredient editor v12:"):]
+    assert css.index("/* Ingredient editor v12:") > css.index("/* Instruction editor v2:")
+    assert "body.recipe-ingredient-modal-open" in modal_css
+    assert "dialog.recipe-edit-ingredient-edit-panel" in modal_css
+    assert "dialog.recipe-edit-ingredient-edit-panel[open]" in modal_css
+    assert "dialog.recipe-edit-ingredient-edit-panel::backdrop" in modal_css
+    edit_panel_rule = modal_css[modal_css.index("dialog.recipe-edit-ingredient-edit-panel {"):]
     edit_panel_rule = edit_panel_rule[:edit_panel_rule.index("}")]
     assert "display: none;" in edit_panel_rule
+
+
+def test_recipe_editor_ingredient_modal_guards_row_clicks_and_dirty_close_state():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    row_open = script[
+        script.index("function bindRecipeIngredientModalRowOpen"):
+        script.index("function setRecipeIngredientEditMode", script.index("function bindRecipeIngredientModalRowOpen"))
+    ]
+    assert 'row.addEventListener("click", event =>' in row_open
+    assert 'row.classList.contains("is-editing")' in row_open
+    for guarded_target in (
+        "button, a, input, textarea, select, label, details, summary",
+        "[role=button], [role=combobox], [contenteditable=true]",
+        ".recipe-edit-row-handle, .recipe-edit-row-menu",
+        "[data-recipe-ingredient-edit-panel], [data-ingredient-substitutions]",
+    ):
+        assert guarded_target in row_open
+    assert 'setRecipeIngredientEditMode(row, true, { trigger });' in row_open
+
+    close_contract = script[
+        script.index("function recipeIngredientModalHasChanges"):
+        script.index("async function commitRecipeIngredientModal")
+    ]
+    assert "recipeIngredientModalEditableFieldSnapshot(row)" in close_contract
+    assert "showRecipeIngredientDiscardConfirmation" in close_contract
+    assert 'panel.dataset.saving === "true"' in close_contract
+    assert "requestRecipeIngredientModalClose" in close_contract
+    assert "previousRecipeIngredientModal" in close_contract
+    assert 'event.key === "Escape"' in close_contract
+    assert 'event.key !== "Tab"' in close_contract
+    assert "focusTarget.focus({ preventScroll: true })" in close_contract
+
+    organize = script[
+        script.index("function organizeRecipeEditIngredientRow(row)"):
+        script.index("function organizeRecipeEditCompactRowActions", script.index("function organizeRecipeEditIngredientRow(row)"))
+    ]
+    assert "Discard unsaved ingredient changes?" in organize
+    assert 'role="alertdialog"' in organize
+    assert 'editPanel.addEventListener("cancel", event =>' in organize
+    assert "requestRecipeIngredientModalClose(editPanel);" in organize
+    assert 'editPanel.addEventListener("click"' not in organize
+
+    scroll = script[
+        script.index("function captureRecipeIngredientModalScrollState"):
+        script.index("function recipeIngredientModalImagePanel")
+    ]
+    assert "scrollLeft: element.scrollLeft" in scroll
+    assert "scrollTop: element.scrollTop" in scroll
+    assert "windowX: window.scrollX" in scroll
+    assert "windowY: window.scrollY" in scroll
+    assert "window.scrollTo" in scroll
+    assert "window.requestAnimationFrame?.(restore);" in scroll
+
+
+def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    navigation = script[
+        script.index("function updateRecipeIngredientModalNavigation"):
+        script.index("function hideRecipeIngredientDiscardConfirmation")
+    ]
+    assert "const rows = recipeEditIngredientRows();" in navigation
+    assert "previousButton.disabled = index <= 0;" in navigation
+    assert 'nextButton.textContent = isFinal ? "Save & Close" : "Save & Next";' in navigation
+    assert 'nextButton.dataset.recipeIngredientFinal = isFinal ? "true" : "false";' in navigation
+    assert 'panel.toggleAttribute("aria-busy", Boolean(saving));' in navigation
+    for selector in (
+        "[data-recipe-ingredient-modal-save]",
+        "[data-recipe-ingredient-modal-next]",
+        "[data-recipe-ingredient-modal-previous]",
+        "[data-recipe-ingredient-modal-close]",
+    ):
+        assert selector in navigation
+    assert 'status.textContent = saving ? "Saving ingredient\\u2026" : "";' in navigation
+
+    commit = script[
+        script.index("async function commitRecipeIngredientModal"):
+        script.index("function updateRecipeIngredientAlternativeComponentSummary")
+    ]
+    assert 'panel.dataset.saving === "true"' in commit
+    assert 'panel.dataset.saving = "true";' in commit
+    assert "setRecipeIngredientModalSaving(panel, true);" in commit
+    assert "validateRecipeIngredientModal(row, panel)" in commit
+    assert "panel.dataset.editSnapshot = JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row));" in commit
+    assert "const nextRow = index >= 0 && index < rows.length - 1 ? rows[index + 1] : null;" in commit
+    assert "switchRecipeIngredientModal(row, nextRow)" in commit
+    assert "setRecipeIngredientEditMode(row, false)" in commit
+    assert "Unable to save this ingredient. Please try again." in commit
+    assert "delete panel.dataset.saving;" in commit
+    assert "setRecipeIngredientModalSaving(panel, false);" in commit
+
+
+def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals_popups_inside_dialog():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    image_contract = script[
+        script.index("function recipeIngredientModalImagePanel"):
+        script.index("function recipeIngredientModalFieldError")
+    ]
+    assert 'generateButton.textContent = "Generate with AI";' in image_contract
+    assert 'recipeIngredientModalHasImage(imagePanel) ? "Replace Image" : "Add Image"' in image_contract
+    assert 'removeButton.textContent = "Remove";' in image_contract
+    assert 'slot.appendChild(imagePanel);' in image_contract
+    assert "recipeIngredientModalPlaceholder" in image_contract
+    assert '"recipe-ingredient-image-prompt-requested"' in image_contract
+
+    organizer = script[
+        script.index("function organizeRecipeEditIngredientRow(row)"):
+        script.index("function organizeRecipeEditCompactRowActions", script.index("function organizeRecipeEditIngredientRow(row)"))
+    ]
+    assert 'imagePanel.classList.add("recipe-ingredient-image-prompt-requested");' in organizer
+    assert 'data-ingredient-image-generate' in organizer
+
+    portal = script[
+        script.index("function portalRecipeEditPopupMenu"):
+        script.index("function restoreRecipeEditPopupMenu")
+    ]
+    assert 'button.closest("[data-recipe-ingredient-edit-panel][open]")' in portal
+    assert "const portalHost = ingredientDialog || document.body;" in portal
+    assert "portalHost.appendChild(menu);" in portal
+
+    modal_css = css[css.index("/* Ingredient editor v12:"):]
+    assert "width: 112px !important;" in modal_css
+    assert "height: 112px !important;" in modal_css
+    assert ".recipe-step-image-download" in modal_css
+    assert "display: none !important;" in modal_css
+    assert ".recipe-image-prompt" in modal_css
+    assert ".recipe-ingredient-image-prompt-requested .recipe-image-prompt:not([hidden])" in modal_css
+    assert "dialog.recipe-edit-ingredient-edit-panel > .recipe-edit-floating-menu" in modal_css
+    assert "z-index: 40 !important;" in modal_css
 
 
 def test_recipe_editor_ingredient_polish_uses_professional_grid_and_command_bar():
@@ -716,7 +893,8 @@ def test_recipe_editor_v10_prioritizes_seven_readable_read_first_groups():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     assert css.index("/* Ingredient editor v10:") > css.index("/* Ingredient editor v9:")
-    polish = css[css.index("/* Ingredient editor v10:"):]
+    v10_start = css.index("/* Ingredient editor v10:")
+    polish = css[v10_start:css.index("/* Ingredient editor v11:", v10_start)]
 
     assert "--recipe-edit-ingredient-grid:" in polish
     for priority in (
@@ -1070,19 +1248,46 @@ def test_recipe_editor_compact_table_responsive_priority_keeps_critical_columns(
     assert "grid-template-rows: minmax(52px, auto) auto auto;" in v10
     assert "row-gap: 0 !important;" in v10
     assert "padding-inline: 14px;" in v10
-    assert ".recipe-edit-ingredient-edit-row > .recipe-edit-ingredient-edit-field" in v10
-    assert ".recipe-edit-ingredient-edit-support > *" in v10
-    assert "grid-column: auto !important;" in v10
-    assert "grid-row: auto !important;" in v10
-    assert '.recipe-edit-ingredient-name-label textarea[data-field="ingredient"]' in v10
     assert ".recipe-edit-alternative-component-edit-grid > .recipe-edit-alternative-edit-field" in v10
     assert ".recipe-edit-alternative-component-edit-grid > .recipe-edit-alternative-component-remove" in v10
     mobile = v10[v10.index("@media (max-width: 760px)"):]
     assert "grid-template-rows: repeat(6, auto);" in mobile
-    assert ".recipe-edit-ingredient-edit-support" in mobile
     assert ".recipe-ingredient-image-panel.recipe-image-tools-visible" in mobile
     assert "grid-row: 6 !important;" in mobile
     assert ".recipe-edit-alternative-card.is-single-alternative:not(.is-editing)" in mobile
+
+    modal = css[css.index("/* Ingredient editor v12:"):]
+    dialog_rule = modal[modal.index("dialog.recipe-edit-ingredient-edit-panel {"):]
+    dialog_rule = dialog_rule[:dialog_rule.index("}")]
+    assert "width: 90vw;" in dialog_rule
+    assert "max-width: 90vw;" in dialog_rule
+    assert "height: min(90dvh, 860px);" in dialog_rule
+    assert "max-height: 90dvh;" in dialog_rule
+    assert "overflow: hidden;" in dialog_rule
+    assert ".recipe-edit-ingredient-modal-body" in modal
+    assert "overflow: auto;" in modal
+    assert ".recipe-edit-ingredient-modal-header" in modal
+    assert ".recipe-edit-ingredient-modal-footer" in modal
+    assert modal.count("position: sticky;") >= 2
+    assert "grid-template-columns: minmax(260px, 1.35fr) minmax(260px, 1fr) minmax(164px, 190px);" in modal
+    assert "grid-template-columns: repeat(2, minmax(260px, 1fr));" in modal
+    assert "min-width: 240px !important;" in modal
+
+    tablet = modal[modal.index("@media (max-width: 860px)"):modal.index("@media (max-width: 760px)")]
+    assert ".recipe-edit-ingredient-modal-identity-grid" in tablet
+    assert ".recipe-edit-ingredient-modal-field-grid" in tablet
+    assert "grid-template-columns: minmax(0, 1fr);" in tablet
+    assert "min-width: 0 !important;" in tablet
+
+    modal_mobile = modal[modal.index("@media (max-width: 760px)"):]
+    for dimension in ("width: 100vw;", "max-width: 100vw;", "height: 100dvh;", "max-height: 100dvh;"):
+        assert dimension in modal_mobile
+    assert "border-radius: 0;" in modal_mobile
+    assert "overflow-x: hidden;" in modal_mobile
+    assert "grid-template-columns: minmax(0, 1fr);" in modal_mobile
+    assert "min-height: 44px;" in modal_mobile
+
+    assert css.index("/* Ingredient editor v12:") > css.index("/* Instruction editor v2:")
 
 
 def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_value():

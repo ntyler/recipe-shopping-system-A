@@ -9330,6 +9330,47 @@ def recipe_edit_master_image_url(item, master_record):
     )
 
 
+RECIPE_INGREDIENT_MATCH_METADATA_FIELDS = (
+    "matching_status",
+    "match_confidence",
+    "master_match_confidence",
+    "normalization_confidence",
+    "matched_master_ingredient",
+    "master_ingredient_name",
+    "matched_ingredient",
+    "best_match",
+    "is_best_match",
+    "best_available_match",
+    "alternative_matches",
+    "match_alternatives",
+    "match_candidates",
+    "candidates",
+    "match_source",
+    "matching_source",
+    "match_reason",
+    "matching_reason",
+    "match_attempted",
+    "needs_match_review",
+    "review_match",
+    "multiple_matches",
+    "pantry_staple",
+    "is_pantry_staple",
+)
+
+
+def recipe_ingredient_match_metadata(item, existing=None):
+    """Return matching-analysis fields without interpreting or recalculating them."""
+    item = item if isinstance(item, dict) else {}
+    existing = existing if isinstance(existing, dict) else {}
+    metadata = {}
+    for field in RECIPE_INGREDIENT_MATCH_METADATA_FIELDS:
+        if field in item:
+            metadata[field] = deepcopy(item[field])
+        elif field in existing:
+            metadata[field] = deepcopy(existing[field])
+    return metadata
+
+
 def normalize_edit_ingredients(ingredients, recipe_url=None):
     if not isinstance(ingredients, list):
         return []
@@ -9378,6 +9419,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "notes": item.get("notes") or "",
             "confidence": item.get("confidence") or "",
             "match_status": item.get("match_status") or "",
+            **recipe_ingredient_match_metadata(item),
             "inferred": truthy(item.get("inferred")),
             "warning": item.get("warning") or "",
             "food_review": normalize_food_review_payload(item.get("food_review")),
@@ -9788,6 +9830,7 @@ def sanitize_ingredients(value, existing_value=None):
             "notes": nullable_string(item.get("notes")),
             "confidence": nullable_string(item.get("confidence")),
             "match_status": nullable_string(item.get("match_status")),
+            **recipe_ingredient_match_metadata(item, existing),
             "inferred": truthy(item.get("inferred")),
             "warning": nullable_string(item.get("warning")),
             "food_review": normalize_food_review_payload(item.get("food_review")),

@@ -108,6 +108,129 @@ def test_recipe_save_route_round_trips_encoded_source_url(monkeypatch, tmp_path)
     assert loaded.get_json()["recipe"]["source_url"] == url
 
 
+def test_recipe_load_and_save_preserve_ingredient_match_analysis_metadata(monkeypatch, tmp_path):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/ingredient-match-analysis-round-trip"
+    match_metadata = {
+        "matching_status": "best available",
+        "match_confidence": 0.94,
+        "master_match_confidence": "high",
+        "normalization_confidence": 0.98,
+        "matched_master_ingredient": "Yukon Gold potato",
+        "master_ingredient_name": "Potato",
+        "matched_ingredient": "Yukon Gold potato",
+        "best_match": True,
+        "is_best_match": False,
+        "best_available_match": True,
+        "alternative_matches": [
+            {"ingredient": "Russet potato", "confidence": 0.82},
+            "Red potato",
+        ],
+        "match_alternatives": ["Russet potato", "Red potato"],
+        "match_candidates": [{"name": "Yukon Gold potato", "score": 0.94}],
+        "candidates": ["Yukon Gold potato", "Russet potato"],
+        "match_source": "ingredient_master",
+        "matching_source": "normalized ingredient master",
+        "match_reason": "Exact normalized-name match",
+        "matching_reason": "Normalized name and store section agree",
+        "match_attempted": True,
+        "needs_match_review": False,
+        "review_match": False,
+        "multiple_matches": False,
+        "pantry_staple": False,
+        "is_pantry_staple": False,
+    }
+    seed_recipe(
+        url,
+        ingredients=[{
+            "id": "ingredient-potato",
+            "ingredient": "Potato",
+            "quantity": "4",
+            "unit": "medium",
+            **match_metadata,
+        }],
+        instructions=[{"step_number": 1, "instruction": "Boil."}],
+    )
+
+    client = recipe_route_client()
+    loaded_response = client.get("/api/recipe", query_string={"url": url})
+
+    assert loaded_response.status_code == 200
+    loaded_ingredient = loaded_response.get_json()["recipe"]["ingredients"][0]
+    assert {
+        field: loaded_ingredient.get(field)
+        for field in match_metadata
+    } == match_metadata
+
+    save_response = client.post(
+        "/api/recipe",
+        json={
+            "original_url": url,
+            "recipe": editable_payload(
+                url,
+                ingredients=[{
+                    "id": "ingredient-potato",
+                    "ingredient": "Potato",
+                    "quantity": "5",
+                    "unit": "medium",
+                }],
+            ),
+        },
+    )
+
+    assert save_response.status_code == 200
+    response_ingredient = save_response.get_json()["recipe"]["ingredients"][0]
+    saved_ingredient = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+    for ingredient in (response_ingredient, saved_ingredient):
+        assert {
+            field: ingredient.get(field)
+            for field in match_metadata
+        } == match_metadata
+
+
+def test_recipe_save_accepts_match_analysis_metadata_without_coercing_values(monkeypatch, tmp_path):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/submitted-ingredient-match-analysis"
+    seed_recipe(
+        url,
+        ingredients=[{"id": "ingredient-broth", "ingredient": "Broth"}],
+        instructions=[{"step_number": 1, "instruction": "Simmer."}],
+    )
+    submitted_metadata = {
+        "match_confidence": "87%",
+        "master_match_confidence": 0.87,
+        "matched_master_ingredient": "Low-sodium chicken broth",
+        "best_match": False,
+        "is_best_match": True,
+        "best_available_match": False,
+        "alternative_matches": ["Vegetable broth", "Chicken stock"],
+        "match_source": "recipe import",
+        "match_reason": "Two close candidates; user selected this match",
+    }
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            ingredients=[{
+                "id": "ingredient-broth",
+                "ingredient": "Broth",
+                **submitted_metadata,
+            }],
+        ),
+        require_existing=True,
+    )
+
+    assert result["ok"] is True
+    saved_ingredient = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+    returned_ingredient = result["recipe"]["ingredients"][0]
+    for ingredient in (saved_ingredient, returned_ingredient):
+        assert {
+            field: ingredient.get(field)
+            for field in submitted_metadata
+        } == submitted_metadata
+
+
 def test_double_encoded_original_url_is_rejected_without_duplicate(monkeypatch, tmp_path):
     output_dir = configure_recipe_save_storage(monkeypatch, tmp_path)
     url = "https://example.test/menu?category=Small%20Plates&menu_item=Soup%20%26%20Salad"
