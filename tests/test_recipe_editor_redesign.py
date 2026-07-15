@@ -131,7 +131,7 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "Preview Recipe" in template
     assert "recipe-edit-layout" in template
     assert "recipe-edit-main-workspace" in template
-    assert "recipeEditUtilityColumn" in template
+    assert "recipeEditUtilityColumn" not in template
     assert "recipe-edit-context-sidebar" in template
     assert "recipeEditBreadcrumbName" in template
     assert "recipeEditImageCardContent" in template
@@ -149,9 +149,11 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
         script.index("function syncRecipeEditDocumentRows()")
     ]
     assert 'const restaurantCard = document.querySelector(".recipe-edit-restaurant-card");' in organizer
-    assert 'restaurantCard.insertAdjacentElement("afterend", sourceCard);' in organizer
-    assert "appendRecipeEditWorkspaceChildren(utility, [aiCard]);" in organizer
-    assert "appendRecipeEditWorkspaceChildren(utility, [sourceCard, aiCard]);" not in organizer
+    sidebar_order = organizer[organizer.index("appendRecipeEditWorkspaceChildren(sidebar"):]
+    card_names = ["imageCard", "restaurantCard", "aiCard", "sourceCard", "galleryCard", "healthCard"]
+    assert [sidebar_order.index(card_name) for card_name in card_names] == sorted(
+        sidebar_order.index(card_name) for card_name in card_names
+    )
     assert "recipeEditIngredientGallery" in template
     assert "recipeEditHealthList" in template
     assert "recipe-edit-ai-assistant-card" in template
@@ -185,7 +187,7 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert 'onclick="return toggleRecipeImageChangeActions(this)"' in cover
     assert 'onclick="return removeRecipeCoverImage(this)"' in cover
     assert 'onclick="return generateRecipeCoverImage(this)"' in cover
-    assert '? "Change Image"' in script
+    assert '? "Replace Image"' in script
     assert "function syncRecipeEditorFavoriteControl" in script
     assert "syncRecipeEditorFavoriteControl(recipe, originalUrl);" in script
     assert 'Object.prototype.hasOwnProperty.call(recipe, "favorite")' in script
@@ -323,7 +325,9 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'metadataRow.className = "recipe-edit-metadata-strip"' in organizer
     assert 'descriptionRow.className = "recipe-edit-description-row"' in organizer
     assert "addRecipeEditMetadataIcon(servingsField, \"servings\")" in organizer
-    assert "[servingsField, totalField, prepField, cookField, inactiveField].forEach(organizeRecipeEditMetadataField)" in organizer
+    assert "[servingsField, totalField, prepField, cookField, inactiveField, levelField, scaleField]" in organizer
+    assert 'setRecipeEditFieldLabel(levelField, "Difficulty")' in organizer
+    assert 'setRecipeEditFieldLabel(scaleField, "Scale")' in organizer
     assert 'heading.className = "recipe-edit-metadata-heading"' in script
     assert 'data-recipe-metadata-icon="servings"' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert 'shell.svg_icon("utensils")' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
@@ -332,14 +336,14 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "renderRecipeEditCuisineChips" in script
     assert "recipe-edit-price-control" in organizer
     assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer
-    assert "panelHeading.appendChild(ratingField)" in organizer
+    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, tagRow])" in organizer
     assert 'class="recipe-edit-rating-label">Rating</span>' in template
     assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")' in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
     assert 'data-rating-toggle-selected="true"' in macros
     assert 'class="recipe-edit-rating-clear"' not in macros
     assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
-    assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, tagRow, metadataRow, descriptionRow, technicalDetails])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, metadataRow, descriptionRow, technicalDetails])" in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer
     assert "technicalDetails.open = false;" in organizer
     assert "grid-template-columns: repeat(5, minmax(0, 1fr));" in css
@@ -1212,7 +1216,8 @@ def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
 
     assert "Recipe workspace v3: editor content uses its dark tokens without restyling AppLayout chrome" in css
     assert ".recipe-edit-standalone-page .recipe-edit-layout {" in css
-    assert "grid-template-columns: minmax(0, 1.95fr) minmax(250px, 1fr) minmax(240px, .9fr);" in css
+    assert "grid-template-columns: minmax(0, 3fr) minmax(300px, 1fr);" in css
+    assert "recipe-edit-utility-column" not in css
     assert ".recipe-edit-context-sidebar {" in css
     assert ".recipe-edit-tab-list {" in css
     assert ".recipe-edit-ingredient-table-head," in css
@@ -1229,7 +1234,7 @@ def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     assert "@media (max-width: 767px)" in css
 
 
-def test_recipe_editor_ingredients_workspace_spans_both_desktop_editing_columns():
+def test_recipe_editor_wide_workspace_preserves_exactly_two_content_columns():
     css = read_text("PushShoppingList/static/css/app.css")
 
     wide_workspace_start = css.index("/* Wide recipe workspace:")
@@ -1237,11 +1242,10 @@ def test_recipe_editor_ingredients_workspace_spans_both_desktop_editing_columns(
     wide_workspace = css[wide_workspace_start:wide_workspace_end]
 
     assert "@media (min-width: 1500px)" in wide_workspace
-    assert ".recipe-edit-standalone-page .recipe-edit-main-workspace {\n        display: contents;" in wide_workspace
-    assert ".recipe-edit-standalone-page .recipe-edit-info-panel {\n        grid-column: 1;\n        grid-row: 1;" in wide_workspace
-    assert ".recipe-edit-standalone-page .recipe-edit-utility-column {\n        grid-column: 2;\n        grid-row: 1;" in wide_workspace
-    assert ".recipe-edit-standalone-page .recipe-edit-tabs-card {\n        grid-column: 1 / 3;\n        grid-row: 2;" in wide_workspace
-    assert ".recipe-edit-standalone-page .recipe-edit-context-sidebar {\n        grid-column: 3;\n        grid-row: 1 / 3;" in wide_workspace
+    assert "grid-template-columns: minmax(0, 3fr) minmax(300px, 1fr);" in wide_workspace
+    assert ".recipe-edit-standalone-page .recipe-edit-main-workspace {\n        display: block;\n        grid-column: 1;\n        grid-row: 1;" in wide_workspace
+    assert ".recipe-edit-standalone-page .recipe-edit-context-sidebar {\n        grid-column: 2;\n        grid-row: 1;" in wide_workspace
+    assert "recipe-edit-utility-column" not in wide_workspace
 
 
 def test_recipe_editor_wide_ingredients_workspace_grows_without_sticky_headers():
@@ -1251,12 +1255,12 @@ def test_recipe_editor_wide_ingredients_workspace_grows_without_sticky_headers()
     wide_workspace = css[wide_workspace_start:]
 
     assert ".recipe-edit-standalone-page .recipe-edit-backdrop.open {\n        display: flex;\n        min-height: 100%;" in wide_workspace
-    assert "grid-template-rows: auto minmax(360px, 1fr);" in wide_workspace
+    assert "grid-template-rows: none;" in wide_workspace
     assert ".recipe-edit-standalone-page .recipe-edit-tab-list {\n        position: static;" in wide_workspace
     assert ".recipe-edit-ingredients-section > .recipe-edit-section-header {\n        position: static;" in wide_workspace
-    assert ".recipe-edit-ingredients-section:not([hidden]) {\n        display: flex;" in wide_workspace
+    assert ".recipe-edit-ingredients-section:not([hidden]) {\n        display: block;" in wide_workspace
     assert ".recipe-edit-ingredients-section .recipe-edit-ingredient-table-scroll {" in wide_workspace
-    assert "flex: 1 1 auto;\n        overflow: auto;" in wide_workspace
+    assert "overflow-x: auto;\n        overflow-y: visible;" in wide_workspace
     ingredient_polish = wide_workspace[wide_workspace.index("/* Ingredient editor v7:"):]
     assert ".recipe-edit-standalone-page .recipe-edit-tab-list," in ingredient_polish
     assert ".recipe-edit-standalone-page .recipe-edit-ingredient-table-head {\n    position: static;" in ingredient_polish

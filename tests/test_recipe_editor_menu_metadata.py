@@ -237,11 +237,9 @@ def test_recipe_editor_saves_ingredient_substitutions(monkeypatch, tmp_path):
     assert all(item["store_section"] for item in saved["ingredients"][0]["substitutions"])
 
 
-def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
+def test_recipe_editor_menu_metadata_state_is_hidden_outside_technical_details():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     js = read_text("PushShoppingList/static/js/app.js")
-    css = read_text("PushShoppingList/static/css/app.css")
-
     restaurant_panel = template.index("recipeEditRestaurantMenuSourceDetails")
     menu_item_panel = template.index("recipeEditMenuItemDetails")
     recipe_amount = template.index("recipeEditScaleMultiplier")
@@ -249,8 +247,10 @@ def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     menu_item_markup = template[menu_item_panel:recipe_amount]
 
     assert source_files_panel < restaurant_panel < menu_item_panel < recipe_amount
-    assert "Restaurant / Menu Source Info" in template
-    assert "Menu Item Details" in template
+    assert "Restaurant / Menu Source Info" not in template
+    assert "Menu Item Details" not in template
+    assert 'class="recipe-edit-menu-metadata-state"' in template
+    assert template.count('aria-hidden="true"\n                         hidden') == 2
     assert 'id="recipeEditMenuSourceSelect"' in template
     assert 'id="recipeEditRestaurantId"' in template
     assert 'id="recipeEditMenuId"' in template
@@ -268,15 +268,18 @@ def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     assert "recipe-edit-row-menu-btn" not in menu_item_markup[menu_section_button_start:menu_section_button_end]
     assert 'id="recipeEditMenuSection"' not in template
     assert '<textarea id="recipeEditMenuDescription" rows="3">' in template
-    assert "panel.hidden = !showPanels;" in js
+    assert "panel.hidden = true;" in js
+    assert 'panel.dataset.recipeMenuMetadataAvailable = metadataAvailable ? "true" : "false";' in js
     assert "RECIPE_EDIT_MENU_RELATION_INPUT_IDS" in js
     assert "function applyRecipeMenuSourceSelection" in js
     assert "function populateRecipeMenuSourceSelect" in js
-    assert "function recipeMenuMetadataPanelsVisible()" in js
+    assert "function recipeMenuMetadataStateAvailable()" in js
+    organizer = js[js.index("function organizeRecipeEditInformationCard"):js.index("function organizeRecipeEditAiAssistant")]
+    assert "appendRecipeEditWorkspaceChildren(menuMetadataState, [restaurantDetails, menuItemDetails]);" in organizer
+    technical_children = organizer[organizer.index("appendRecipeEditWorkspaceChildren(technicalBody"):organizer.index("grid.replaceChildren()")]
+    assert "restaurantDetails" not in technical_children
+    assert "menuItemDetails" not in technical_children
     assert "return payload;" in js[js.index("function collectRecipeMenuMetadataPayload"):js.index("function currentRecipeEditorPdfFieldValues")]
-    assert ".recipe-edit-menu-metadata-details" in css
-    assert ".recipe-edit-menu-metadata-grid" in css
-    assert ".recipe-edit-menu-source-select-field" in css
 
 
 def test_menu_order_icon_hooks_and_row_data_are_present(monkeypatch):

@@ -149,7 +149,7 @@ def test_recipe_editor_match_column_only_surfaces_attention_states():
         "Alternative matches",
         "Source / matching reason",
     ):
-        assert label in details
+        assert label.lower() in details.lower()
 
     row_start = script.index("function addRecipeIngredientRow")
     row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
@@ -410,14 +410,17 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         "Drag / Image",
         "Ingredient",
         "Quantity",
+        "Unit",
         "Store Section",
         "Type",
         "Alternatives",
     )
-    assert tools.count('role="columnheader"') == len(headers)
+    assert tools.count('role="columnheader"') == len(headers) + 1
     positions = [tools.index(f">{header}</span>") for header in headers]
     assert positions == sorted(positions)
-    for removed_header in ("Match / Status", "Amount", "Unit", "Preparation", "Buy As", "Substitutions"):
+    assert 'role="columnheader" aria-label="Row actions"' in tools
+    assert ">Actions</span>" not in tools
+    for removed_header in ("Match / Status", "Amount", "Preparation", "Buy As", "Substitutions"):
         assert f">{removed_header}</span>" not in tools
 
     organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
@@ -430,6 +433,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert "data-ingredient-read-buy-as" in organize
     for summary_class in (
         "recipe-edit-ingredient-quantity-summary",
+        "recipe-edit-ingredient-unit-summary",
         "recipe-edit-ingredient-store-summary",
         "recipe-edit-ingredient-type-summary",
     ):
@@ -452,7 +456,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         assert class_name in organize
     section_labels = (
         ">Identity</h3>",
-        ">Quantity</h3>",
+        ">Quantity &amp; Details</h3>",
         ">Usage</h3>",
         ">Notes</h3>",
         "AI Analysis &amp; Source Details",
@@ -466,7 +470,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert 'nameInput.setAttribute("aria-required", "true");' in organize
     assert 'nameLabel.textContent = "Ingredient Name";' in organize
     assert "The grocery item that should be added to the shopping list." in organize
-    assert 'typeLabel.textContent = "Requirement";' in organize
+    assert 'typeLabel.textContent = "Ingredient Type";' in organize
     assert ">Previous</button>" in organize
     assert "Save Changes" in organize
     assert "Save &amp; Next" in organize
@@ -476,10 +480,12 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert 'matchDetails.dataset.ingredientMatchDetails = "";' in organize
     assert 'typeSelect.value = "optional";' in organize
     assert 'String(typeSelect.value || "").trim().toLowerCase() === "optional"' in organize
-    assert 'role="radiogroup" aria-label="Requirement"' in organize
+    assert 'role="radiogroup" aria-label="Ingredient Type"' in organize
     assert 'data-recipe-ingredient-requirement="required"' in organize
     assert 'data-recipe-ingredient-requirement="optional"' in organize
-    assert "Original text, match confidence, alternatives, and source metadata." in organize
+    assert ">View Details</button>" in organize
+    assert "support.appendChild(originalText)" not in organize
+    assert "[originalText, choiceReview, warning].filter(Boolean).forEach(field => support.appendChild(field));" in organize
 
     row_start = script.index("function addRecipeIngredientRow")
     row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
@@ -826,6 +832,83 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert ".recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-name-field" in compact
     assert ".recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-buy-as-field" in compact
     assert "grid-row: 2 !important;" in compact
+
+
+def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_changing_handlers():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    workspace = css[css.index("/* Ingredient editor v14:"):]
+    organize = script[
+        script.index("function organizeRecipeEditIngredientRow(row)"):
+        script.index("function organizeRecipeEditCompactRowActions", script.index("function organizeRecipeEditIngredientRow(row)"))
+    ]
+
+    for label in ("Overview", "Quantity &amp; Details", "Usage", "Notes", "AI Analysis"):
+        assert f"<span>{label}</span>" in organize
+    for section in ("overview", "quantity", "usage", "notes", "analysis"):
+        assert f'data-recipe-ingredient-modal-nav="{section}"' in organize
+        assert f'data-recipe-ingredient-modal-section="{section}"' in organize
+    assert 'class="recipe-edit-ingredient-modal-sidebar"' in organize
+    assert 'class="recipe-edit-ingredient-modal-scroll"' in organize
+    assert 'data-recipe-ingredient-modal-preview-media' in organize
+    assert 'data-recipe-ingredient-modal-preview-name' in organize
+    assert 'data-recipe-ingredient-modal-preview-buy-as' in organize
+    assert 'data-recipe-ingredient-modal-preview-store' in organize
+    assert 'class="recipe-edit-ingredient-modal-bottom-grid"' in organize
+    assert 'class="recipe-edit-ingredient-analysis-summary"' in organize
+    assert 'onclick="return toggleRecipeIngredientModalAnalysis(this)"' in organize
+    assert 'onclick="return removeRecipeIngredientFromModal(this)"' in organize
+    assert 'class="recipe-edit-ingredient-modal-delete"' in organize
+
+    assert 'onclick="return cancelRecipeIngredientInlineEdit(this)"' in organize
+    assert 'onclick="return previousRecipeIngredientModal(this)"' in organize
+    assert 'onclick="return saveRecipeIngredientInlineEdit(this)"' in organize
+    assert 'onclick="return saveRecipeIngredientAndNext(this)"' in organize
+    assert 'role="radiogroup" aria-label="Ingredient Type"' in organize
+    assert "identityFields.appendChild(requirementField);" in organize
+    assert "previewMedia?.appendChild(imageSlot);" in organize
+    assert "analysisSummary?.appendChild(matchDetails);" in organize
+    assert "[originalText, choiceReview, warning].filter(Boolean).forEach(field => support.appendChild(field));" in organize
+
+    body_rule = workspace[workspace.index(".recipe-edit-ingredient-modal-body {"):]
+    body_rule = body_rule[:body_rule.index("}")]
+    assert "grid-template-columns: 292px minmax(0, 1fr);" in body_rule
+    assert "overflow: hidden;" in body_rule
+    scroll_rule = workspace[workspace.index(".recipe-edit-ingredient-modal-scroll {"):]
+    scroll_rule = scroll_rule[:scroll_rule.index("}")]
+    assert "overflow-y: auto;" in scroll_rule
+    assert "overflow-x: hidden;" in scroll_rule
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in workspace
+    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);" in workspace
+    assert "padding: 24px 28px;" in workspace
+    assert "gap: 20px;" in workspace
+    assert ".recipe-edit-ingredient-modal-nav button.is-active" in workspace
+    assert ".recipe-edit-ingredient-analysis-toggle" in workspace
+    assert ".recipe-edit-ingredient-match-details-grid > div" in workspace
+    assert "border-bottom:" in workspace
+    assert ".recipe-edit-ingredient-modal-footer" in workspace
+    assert ".recipe-edit-ingredient-modal-delete" in workspace
+    assert "@media (max-width: 980px)" in workspace
+    assert "@media (max-width: 760px)" in workspace
+    mobile = workspace[workspace.index("@media (max-width: 760px)"):]
+    assert ".recipe-edit-ingredient-modal-nav" in mobile
+    assert "display: flex;" in mobile
+    assert "grid-template-columns: minmax(0, 1fr);" in mobile
+
+    match_details = script[
+        script.index("function recipeIngredientMatchDetailsHtml"):
+        script.index("function recipeIngredientBadgesHtml", script.index("function recipeIngredientMatchDetailsHtml"))
+    ]
+    match_labels = (
+        "Status",
+        "Match Confidence",
+        "Best Available Match",
+        "Selected Matched Ingredient",
+        "Alternative Matches",
+        "Source / Matching Reason",
+    )
+    match_positions = [match_details.index(label) for label in match_labels]
+    assert match_positions == sorted(match_positions)
 
 
 def test_recipe_editor_ingredient_polish_uses_professional_grid_and_command_bar():
@@ -1249,7 +1332,8 @@ def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value
     assert "readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem)" in summary
     assert "meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values)" in summary
     assert "readBuyAs.hidden = !meaningfulBuyAs" in summary
-    assert "quantitySummary.textContent = formatRecipeIngredientQuantity(values)" in summary
+    assert "quantitySummary.textContent = formatRecipeIngredientQuantityColumn(values)" in summary
+    assert "unitSummary.textContent = formatRecipeIngredientUnitColumn(values)" in summary
     assert "preparationSummary" not in summary
     assert "buyAsSummary" not in summary
     assert "recipeIngredientStoreSectionIconHtml(values.store_section || \"\")" in summary

@@ -561,6 +561,7 @@
             <div class="recipe-edit-header">
                 <div class="recipe-edit-title-block">
                     <nav class="recipe-edit-breadcrumb" aria-label="Breadcrumb">
+                        <span class="recipe-edit-breadcrumb-icon" aria-hidden="true">{{ shell.svg_icon("lock") }}</span>
                         <a href="{{ url_for('main_bp.index') }}#currentRecipeUrlLogCard">Recipes</a>
                         <span aria-hidden="true">/</span>
                         <span id="recipeEditBreadcrumbName">Recipe</span>
@@ -852,6 +853,8 @@
                         <template data-recipe-metadata-icon="prep">{{ shell.svg_icon("shopping") }}</template>
                         <template data-recipe-metadata-icon="cook">{{ shell.svg_icon("cooking-pot") }}</template>
                         <template data-recipe-metadata-icon="inactive">{{ shell.svg_icon("timer") }}</template>
+                        <template data-recipe-metadata-icon="difficulty">{{ shell.svg_icon("settings") }}</template>
+                        <template data-recipe-metadata-icon="scale">{{ shell.svg_icon("sort") }}</template>
                         <template data-recipe-metadata-icon="plus">{{ shell.svg_icon("plus") }}</template>
                         <template data-recipe-metadata-icon="x">{{ shell.svg_icon("x") }}</template>
                     </div>
@@ -859,7 +862,7 @@
                 <div class="recipe-edit-grid">
                     <label>
                         <span>Display Name</span>
-                        <input type="text" name="display_name" id="recipeEditDisplayName">
+                        <input type="text" name="display_name" id="recipeEditDisplayName" placeholder="Untitled Recipe">
                     </label>
                     <label>
                         <span>Recipe Title</span>
@@ -1073,13 +1076,10 @@
                             </label>
                         </div>
                     </details>
-                    <details id="recipeEditRestaurantMenuSourceDetails"
-                             class="recipe-edit-menu-metadata-details recipe-edit-wide"
-                             hidden>
-                        <summary class="recipe-edit-menu-metadata-summary">
-                            <span>Restaurant / Menu Source Info</span>
-                            <span class="recipe-edit-source-files-chevron" aria-hidden="true"></span>
-                        </summary>
+                    <div id="recipeEditRestaurantMenuSourceDetails"
+                         class="recipe-edit-menu-metadata-state"
+                         aria-hidden="true"
+                         hidden>
                         <div class="recipe-edit-menu-metadata-grid">
                             <label class="recipe-edit-file-field recipe-edit-menu-source-select-field recipe-edit-menu-metadata-wide">
                                 <span>Restaurant Source</span>
@@ -1163,14 +1163,11 @@
                                 </select>
                             </label>
                         </div>
-                    </details>
-                    <details id="recipeEditMenuItemDetails"
-                             class="recipe-edit-menu-metadata-details recipe-edit-wide"
-                             hidden>
-                        <summary class="recipe-edit-menu-metadata-summary">
-                            <span>Menu Item Details</span>
-                            <span class="recipe-edit-source-files-chevron" aria-hidden="true"></span>
-                        </summary>
+                    </div>
+                    <div id="recipeEditMenuItemDetails"
+                         class="recipe-edit-menu-metadata-state"
+                         aria-hidden="true"
+                         hidden>
                         <div class="recipe-edit-menu-metadata-grid">
                             <label class="recipe-edit-file-field">
                                 <span>Menu Item Name</span>
@@ -1281,7 +1278,7 @@
                                 <textarea id="recipeEditMenuDescription" rows="3"></textarea>
                             </label>
                         </div>
-                    </details>
+                    </div>
                     <label>
                         <span class="recipe-edit-label-line">
                             <span>Recipe Amount</span>
@@ -1296,7 +1293,13 @@
                             <span>Level</span>
                             <span class="recipe-edit-label-description">&mdash; Estimated recipe difficulty.</span>
                         </span>
-                        <input type="text" name="level" id="recipeEditLevel">
+                        <select name="level" id="recipeEditLevel">
+                            <option value="">Not set</option>
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                            <option value="expert">Expert</option>
+                        </select>
                     </label>
                     <label>
                         <span class="recipe-edit-label-line">
@@ -2110,9 +2113,6 @@
             </section>
 
                 </div>
-                <aside id="recipeEditUtilityColumn"
-                       class="recipe-edit-utility-column"
-                       aria-label="Recipe source and AI tools"></aside>
                 <aside class="recipe-edit-context-sidebar" aria-label="Recipe context">
                     <section class="recipe-edit-context-card recipe-edit-image-card" aria-labelledby="recipeEditImageCardTitle">
                         <div class="recipe-edit-context-card-heading">
@@ -2312,9 +2312,9 @@
                             </div>
                         </div>
                         <div class="recipe-edit-restaurant-actions" data-restaurant-readonly>
-                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="website" hidden><span aria-hidden="true">&#8599;</span> Open Website</a>
-                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="menu" hidden><span aria-hidden="true">&#9776;</span> Open Menu</a>
-                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="map" hidden><span aria-hidden="true">&#9906;</span> Google Maps</a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="website" hidden><span aria-hidden="true">&#8599;</span> Website</a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="menu" hidden><span aria-hidden="true">&#9776;</span> Menu</a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" data-restaurant-action="map" hidden><span aria-hidden="true">&#9906;</span> Maps</a>
                         </div>
                     </details>
                     <div class="recipe-edit-restaurant-modal-backdrop" data-restaurant-edit-modal onclick="if (event.target === this) return closeRecipeRestaurantSourceModal({ force: false })" hidden>
@@ -2588,7 +2588,7 @@
                         </section>
                     </div>
 
-                    <details class="recipe-edit-context-card recipe-edit-ingredient-gallery-card" open>
+                    <details class="recipe-edit-context-card recipe-edit-ingredient-gallery-card">
                         <summary>
                             <span>Ingredient Gallery</span>
                             <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
@@ -2607,11 +2607,13 @@
                         </button>
                     </details>
 
-                    <section class="recipe-edit-context-card recipe-edit-health-card"
+                    <details class="recipe-edit-context-card recipe-edit-health-card"
                              aria-labelledby="recipeEditHealthTitle">
-                        <div class="recipe-edit-context-card-heading">
+                        <summary class="recipe-edit-context-card-heading">
                             <span id="recipeEditHealthTitle">Recipe Health</span>
-                        </div>
+                            <span id="recipeEditHealthAttention" class="recipe-edit-health-attention" aria-live="polite"></span>
+                            <span class="recipe-edit-context-chevron" aria-hidden="true"></span>
+                        </summary>
                         <div class="recipe-edit-health-dashboard">
                             <div class="recipe-edit-health-score">
                                 <div id="recipeEditHealthRing"
@@ -2633,7 +2635,7 @@
                                  class="recipe-edit-health-list"
                                  aria-live="polite"></div>
                         </div>
-                    </section>
+                    </details>
 
                     <section id="recipeEditAiConfidenceCard"
                              class="recipe-edit-context-card recipe-edit-confidence-card"
@@ -2767,7 +2769,7 @@
 
             <section class="recipe-edit-ai-assistant-card recipe-edit-sticky-action-footer" aria-labelledby="recipeEditAiAssistantTitle">
                 <div class="recipe-edit-ai-assistant-heading">
-                    <h3 id="recipeEditAiAssistantTitle">AI Assistant</h3>
+                    <h3 id="recipeEditAiAssistantTitle">{{ shell.svg_icon("sparkles") }}<span>AI Assistant</span></h3>
                     <p>Complete missing recipe details with the existing AI workflow.</p>
                 </div>
                 <div id="recipeEditAiMissingFields" class="recipe-edit-ai-missing-fields" aria-live="polite"></div>
