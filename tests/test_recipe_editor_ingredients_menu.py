@@ -95,7 +95,7 @@ def test_recipe_editor_ingredient_alternatives_are_wired_without_changing_collec
     assert 'data-field="substitutions_text"' not in row_block
     assert "bindRecipeIngredientSubstitutionRows(row);" in row_block
     assert "data-ingredient-substitution-count" in row_block
-    assert 'badges.push([`${substitutionCount} ${substitutionCount === 1 ? "option" : "alternatives"}`, "substitution"]);' in script
+    assert 'badges.push([`${substitutionCount} alternative group${substitutionCount === 1 ? "" : "s"}`, "substitution"]);' in script
     assert "function recipeEditIngredientRows()" in script
     assert "function collectRecipeIngredientSubstitutionRows(row)" in script
     assert "item.substitutions = collectRecipeIngredientSubstitutionRows(row);" in collect_block
@@ -130,7 +130,7 @@ def test_recipe_editor_match_column_only_surfaces_attention_states():
         "Optional",
     ):
         assert status in badges
-    assert 'badges.push([`${substitutionCount} ${substitutionCount === 1 ? "option" : "alternatives"}`, "substitution"]);' in badges
+    assert 'badges.push([`${substitutionCount} alternative group${substitutionCount === 1 ? "" : "s"}`, "substitution"]);' in badges
 
     details_start = script.index("function recipeIngredientMatchDetails(item = {})")
     details_end = script.index("function recipeIngredientBadgesHtml", details_start)
@@ -1073,7 +1073,7 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert "buttonRect.left + menuWidth <= rightLimit" in position
 
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in script
-    assert '`${alternativeCount} alternative${alternativeCount === 1 ? "" : "s"}`' in script
+    assert '`${alternativeCount} Alternative Group${alternativeCount === 1 ? "" : "s"}`' in script
     assert "document.body.appendChild(menu);" in script
 
 
@@ -1094,6 +1094,8 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "[name, quantity, unit, size, quantityText, preparation, buyAs, storeSection, preferred, notes, originalText]" in substitution
     assert "optional.hidden = true;" in substitution
     assert "Remove ingredient" in substitution
+    assert "editRecipeIngredientAlternativeComponent(this)" in substitution
+    assert "data-alternative-component-remove" in substitution
     assert "updateRecipeIngredientAlternativeComponentSummary(optionRow);" in substitution
 
     alternative_markup = script[
@@ -1112,17 +1114,24 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "recipe-edit-alternative-card-header" in card
     assert "data-alternative-card-title" in card
     assert "data-alternative-card-status" in card
+    assert "data-alternative-card-type" in card
     assert "data-alternative-card-preferred" in card
     assert "data-alternative-card-replaces" in card
     assert 'card.classList.toggle("is-single-alternative", singleIngredient);' in card
     assert "recipeIngredientAlternativeStatusLabel(firstValues)" in card
-    assert "replaceSummary.hidden = singleIngredient;" in card
-    assert "`Replaces ${parentQuantity" in card
+    assert 'replaceSummary.textContent = `Replaces: ${quantity}${ingredientValues.ingredient || "this ingredient"}`;' in card
+    assert "replaceSummary.hidden = false;" in card
     assert "recipe-edit-alternative-components" in card
-    assert "Edit alternative" in card
-    assert "Add Replacement Ingredient" in card
-    assert "Save Alternative" in card
+    assert "Edit Group" in card
+    assert "Duplicate Group" in card
+    assert 'aria-label="Edit Group"' in card
+    assert 'aria-label="Duplicate Group"' in card
+    assert "Delete Group" in card
+    assert "Add Ingredient" in card
+    assert "Save Group" in card
     assert ">Cancel</button>" in card
+    assert "setRecipeIngredientAlternativePreferred(this)" in card
+    assert "duplicateRecipeIngredientAlternative(this)" in card
     assert "recipeIngredientSubstitutionDomGroups(optionRows)" in card
     assert "group.rows.forEach(optionRow => components.appendChild(optionRow));" in card
 
@@ -1214,13 +1223,13 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert "event.stopPropagation();" in toggle
 
     assert "optionsButton.disabled = false;" in state
-    assert '`${action} alternatives for ${ingredientName}`' in state
+    assert '`${action} alternative groups for ${ingredientName}${tooltip}`' in state
     assert 'empty.hidden = optionRows.length !== 0;' in state
-    assert 'addLabel.textContent = "Add Alternative";' in state
+    assert 'addLabel.textContent = "Add Alternative Group";' in state
     assert "No alternatives have been added." in script
     assert "Add a single replacement ingredient or a replacement made from multiple ingredients." in script
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in state
-    assert '`${alternativeCount} alternative${alternativeCount === 1 ? "" : "s"}`' in state
+    assert '`${alternativeCount} Alternative Group${alternativeCount === 1 ? "" : "s"}`' in state
     assert "ensureRecipeIngredientAlternativeCards(container)" in state
     assert "viewAll.hidden = true;" in state
 
@@ -1258,6 +1267,12 @@ def test_recipe_editor_renders_and_serializes_multi_ingredient_alternative_group
     assert "componentIndex" in row_html
     assert "recipeIngredientSubstitutionDomGroups(optionRows)" in collect
     assert "option.inferred = recipeIngredientInferredValue(option) === \"true\";" in collect
+
+    groups = script[
+        script.index("function recipeIngredientSubstitutionGroups"):
+        script.index("function nextRecipeIngredientAlternativeId")
+    ]
+    assert 'const key = alternativeId ? `id:${alternativeId}` : `legacy:${rowIndex}`;' in groups
 
 
 def test_recipe_editor_substitution_thumbnails_reuse_image_resolution_and_fallbacks():
@@ -1315,8 +1330,22 @@ def test_recipe_editor_alternative_editing_is_scoped_to_one_group_and_serializab
     assert "existingRows.forEach(optionRow" in editing
     assert "alternative_id: alternativeId" in editing
     assert "componentIndex: existingRows.length" in editing
-    assert 'window.confirm("Delete this alternative and all of its replacement ingredients?")' in editing
+    assert "function editRecipeIngredientAlternativeComponent(button)" in editing
+    assert "function setRecipeIngredientAlternativePreferred(button)" in editing
+    assert "function duplicateRecipeIngredientAlternative(button)" in editing
+    assert 'id: ""' in editing
+    assert 'substitution_id: ""' in editing
+    assert "card.after(template.content);" in editing
+    assert "preferred: false" in editing
+    assert 'window.confirm("Delete this replacement group and all of its ingredients?")' in editing
     assert 'card.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => optionRow.remove());' in editing
+
+    add_group = script[
+        script.index("function addRecipeIngredientSubstitutionRow"):
+        script.index("function removeRecipeIngredientSubstitutionRow")
+    ]
+    assert 'list.lastElementChild?.matches("[data-substitution-option-row]")' in add_group
+    assert 'list.querySelector("[data-substitution-option-row]:last-child")' not in add_group
 
     collect = script[
         script.index("function collectRecipeIngredientSubstitutionRows"):
@@ -1336,6 +1365,14 @@ def test_recipe_editor_alternative_editing_is_scoped_to_one_group_and_serializab
     assert ".recipe-edit-alternative-component-edit-grid" in v10
     assert ".recipe-edit-alternative-edit-footer" in v10
     assert ".recipe-edit-alternative-add-component" in v10
+
+    v16 = css[css.index("/* Ingredient editor v16:"):]
+    assert ".recipe-edit-alternative-card-type" in v16
+    assert ".recipe-edit-alternative-component-actions" in v16
+    assert ".recipe-edit-alternative-card-footer" in v16
+    assert 'content: "+";' in v16
+    assert "grid-template-columns: minmax(0, 1fr);" in v16
+    assert "@media (max-width: 760px)" in v16
 
 
 def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value():
@@ -1428,7 +1465,7 @@ def test_recipe_editor_compact_alternative_cards_cleanup_cancelled_blank_rows():
     assert "card.remove();" in editing
     assert "updateRecipeIngredientSubstitutionState(ingredientRow);" in editing
     assert 'list.hidden = optionRows.length === 0;' in state
-    assert 'addLabel.textContent = "Add Alternative";' in state
+    assert 'addLabel.textContent = "Add Alternative Group";' in state
     assert "viewAll.hidden = true;" in state
 
     v10 = css[css.index("/* Ingredient editor v10:"):]
@@ -1476,7 +1513,7 @@ def test_recipe_editor_multi_ingredient_alternative_uses_one_preferred_control()
     assert 'card?.querySelectorAll(\'[data-field="preferred"]\')' in binding
     assert "preferredInput.checked = input.checked;" in binding
     assert binding.index('input.dataset.field === "preferred"') < binding.index("updateRecipeIngredientSubstitutionRowSummary(optionRow)")
-    assert "Add Replacement Ingredient" in markup
+    assert "Add Ingredient" in markup
     assert ">Add replacement ingredient</button>" not in markup
 
 

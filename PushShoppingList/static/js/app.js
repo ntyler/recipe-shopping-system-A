@@ -26817,6 +26817,23 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
             <span class="recipe-edit-alternative-component-meta" data-alternative-component-facts></span>
             <span class="recipe-edit-alternative-component-buy-as" data-alternative-component-buy-as hidden></span>
         </span>
+        <span class="recipe-edit-alternative-component-actions">
+            <button type="button"
+                    class="recipe-edit-alternative-component-edit"
+                    aria-label="Edit replacement ingredient"
+                    title="Edit Ingredient"
+                    onclick="return editRecipeIngredientAlternativeComponent(this)">
+                ${recipeEditSvgIcon("edit")}<span>Edit Ingredient</span>
+            </button>
+            <button type="button"
+                    class="recipe-edit-alternative-component-read-remove"
+                    data-alternative-component-remove
+                    aria-label="Remove replacement ingredient"
+                    title="Remove Ingredient"
+                    onclick="return removeRecipeIngredientAlternativeComponent(this)">
+                ${recipeEditSvgIcon("trash")}<span>Remove Ingredient</span>
+            </button>
+        </span>
     `;
     if (image) {
         summary.insertBefore(image, summary.firstChild);
@@ -26841,6 +26858,7 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     const removeComponent = document.createElement("button");
     removeComponent.type = "button";
     removeComponent.className = "recipe-edit-alternative-component-remove";
+    removeComponent.dataset.alternativeComponentRemove = "";
     removeComponent.textContent = "Remove ingredient";
     removeComponent.addEventListener("click", () => removeRecipeIngredientAlternativeComponent(removeComponent));
     editGrid.appendChild(removeComponent);
@@ -34410,6 +34428,8 @@ function recipeEditSvgIcon(name) {
         search: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>',
         nutrition: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 21c4-4 8-8 8-12a8 8 0 0 0-16 0c0 4 4 8 8 12Z"></path><path d="M12 8v5"></path><path d="M9.5 10.5h5"></path></svg>',
         edit: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20Z"></path><path d="m13.5 6.5 3.5 3.5"></path></svg>',
+        copy: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>',
+        plus: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>',
         trash: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 14h10l1-14"></path><path d="M9 7V4h6v3"></path></svg>',
         check: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>',
         warning: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>',
@@ -34725,7 +34745,7 @@ function recipeIngredientBadgesHtml(item = {}, options = {}) {
         recipeIngredientSubstitutionRows(item)
     ).length;
     if (substitutionCount) {
-        badges.push([`${substitutionCount} ${substitutionCount === 1 ? "option" : "alternatives"}`, "substitution"]);
+        badges.push([`${substitutionCount} alternative group${substitutionCount === 1 ? "" : "s"}`, "substitution"]);
     }
 
     if (
@@ -36856,7 +36876,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                     <span data-ingredient-substitution-count hidden>${escapeHtml(substitutionCountText)}</span>
                     <button type="button" onclick="return addRecipeIngredientSubstitutionRow(this)">
                         ${recipeEditSvgIcon("plus")}
-                        <span data-ingredient-substitution-add-label>Add Alternative</span>
+                        <span data-ingredient-substitution-add-label>Add Alternative Group</span>
                     </button>
                 </div>
                 <div class="recipe-edit-substitution-list" data-ingredient-substitution-list>
@@ -37243,25 +37263,34 @@ function updateRecipeIngredientAlternativeCard(card, groupIndex = 0) {
     rows.forEach(updateRecipeIngredientAlternativeComponentSummary);
     const firstValues = fieldValuesFromRow(rows[0]);
     const singleIngredient = rows.length === 1;
-    const label = singleIngredient
-        ? String(firstValues.ingredient || "").trim() || `Alternative ${groupIndex + 1}`
-        : `Alternative ${groupIndex + 1}`;
+    const label = `Replacement Option ${groupIndex + 1}`;
     const matchStatus = recipeIngredientAlternativeStatusLabel(firstValues);
     const preferred = rows.some(optionRow => Boolean(fieldValuesFromRow(optionRow).preferred));
     const title = card.querySelector("[data-alternative-card-title]");
     const status = card.querySelector("[data-alternative-card-status]");
+    const type = card.querySelector("[data-alternative-card-type]");
     const preferredIndicator = card.querySelector("[data-alternative-card-preferred]");
     const replaceSummary = card.querySelector("[data-alternative-card-replaces]");
     const replaceAction = card.querySelector("[data-replace-with-alternative]");
+    const preferredAction = card.querySelector("[data-set-alternative-preferred]");
     card.classList.toggle("is-single-alternative", singleIngredient);
+    card.setAttribute(
+        "aria-label",
+        `${label}: ${rows.map(optionRow => fieldValuesFromRow(optionRow).ingredient).filter(Boolean).join(" plus ")}`
+    );
     if (title) title.textContent = label;
     if (status) status.textContent = matchStatus;
+    if (type) type.textContent = singleIngredient ? "One Ingredient" : "Ingredient Combination";
     if (preferredIndicator) preferredIndicator.hidden = !preferred;
+    if (preferredAction) {
+        preferredAction.textContent = preferred ? "Preferred Group" : "Set as Preferred";
+        preferredAction.disabled = preferred;
+    }
     if (replaceAction) {
         replaceAction.hidden = rows.length !== 1;
         replaceAction.disabled = rows.length !== 1;
     }
-    card.querySelectorAll(".recipe-edit-alternative-component-remove").forEach(button => {
+    card.querySelectorAll("[data-alternative-component-remove]").forEach(button => {
         button.disabled = rows.length <= 1;
         button.title = rows.length <= 1 ? "An alternative needs at least one replacement ingredient." : "Remove ingredient";
     });
@@ -37280,10 +37309,9 @@ function updateRecipeIngredientAlternativeCard(card, groupIndex = 0) {
         const ingredientRow = card.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])");
         const ingredientValues = ingredientRow ? fieldValuesFromRow(ingredientRow) : {};
         const parentQuantity = formatRecipeIngredientQuantity(ingredientValues);
-        replaceSummary.textContent = singleIngredient
-            ? ""
-            : `Replaces ${parentQuantity === "\u2014" ? "this ingredient" : parentQuantity} ${ingredientValues.ingredient || "ingredient"} with:`;
-        replaceSummary.hidden = singleIngredient;
+        const quantity = parentQuantity === "\u2014" ? "" : `${parentQuantity} `;
+        replaceSummary.textContent = `Replaces: ${quantity}${ingredientValues.ingredient || "this ingredient"}`;
+        replaceSummary.hidden = false;
     }
 }
 
@@ -37296,30 +37324,35 @@ function createRecipeIngredientAlternativeCard(group, groupIndex) {
         <div class="recipe-edit-alternative-card-header">
             <div class="recipe-edit-alternative-card-heading">
                 <strong class="recipe-edit-alternative-card-title" data-alternative-card-title></strong>
-                <span class="recipe-edit-alternative-card-status" data-alternative-card-status></span>
+                <span class="recipe-edit-alternative-card-meta">
+                    <span class="recipe-edit-alternative-preferred" data-alternative-card-preferred hidden>Preferred</span>
+                    <span class="recipe-edit-alternative-card-status" data-alternative-card-status></span>
+                    <span class="recipe-edit-alternative-card-type" data-alternative-card-type></span>
+                </span>
             </div>
-            <span class="recipe-edit-alternative-preferred" data-alternative-card-preferred hidden>Preferred</span>
             <div class="recipe-edit-alternative-actions">
-                <button type="button" class="recipe-edit-alternative-edit" onclick="return setRecipeIngredientAlternativeEditMode(this, true)">${recipeEditSvgIcon("edit")}<span>Edit alternative</span></button>
+                <button type="button" class="recipe-edit-alternative-edit" aria-label="Edit Group" title="Edit Group" onclick="return setRecipeIngredientAlternativeEditMode(this, true)">${recipeEditSvgIcon("edit")}<span>Edit Group</span></button>
+                <button type="button" class="recipe-edit-alternative-duplicate" aria-label="Duplicate Group" title="Duplicate Group" onclick="return duplicateRecipeIngredientAlternative(this)">${recipeEditSvgIcon("copy")}<span>Duplicate Group</span></button>
+                <button type="button" class="recipe-edit-alternative-delete" aria-label="Delete Group" title="Delete Group" onclick="return removeRecipeIngredientAlternative(this)">${recipeEditSvgIcon("trash")}<span>Delete Group</span></button>
                 <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap">
-                    <button type="button" class="recipe-edit-row-menu-btn" aria-label="Alternative actions" title="Alternative actions" aria-haspopup="true" aria-expanded="false" onclick="return toggleRecipeEditRowMenu(this, event)"><span aria-hidden="true"></span></button>
+                    <button type="button" class="recipe-edit-row-menu-btn" aria-label="More group actions" title="More" aria-haspopup="true" aria-expanded="false" onclick="return toggleRecipeEditRowMenu(this, event)"><span aria-hidden="true"></span></button>
                     <div class="recipe-edit-row-menu recipe-edit-alternative-menu" hidden>
                         <div class="recipe-edit-menu-group">
-                            <div class="recipe-edit-menu-group-label">Alternative</div>
-                            <button type="button" data-replace-with-alternative onclick="return replaceRecipeIngredientWithAlternativeCard(this)">Replace ingredient with this alternative</button>
-                        </div>
-                        <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
-                            <button type="button" class="delete" onclick="return removeRecipeIngredientAlternative(this)">Delete alternative</button>
+                            <div class="recipe-edit-menu-group-label">Replacement Group</div>
+                            <button type="button" data-set-alternative-preferred onclick="return setRecipeIngredientAlternativePreferred(this)">Set as Preferred</button>
+                            <button type="button" data-replace-with-alternative onclick="return replaceRecipeIngredientWithAlternativeCard(this)">Use this one-ingredient replacement</button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <p class="recipe-edit-alternative-replaces" data-alternative-card-replaces></p>
         <div class="recipe-edit-alternative-components"></div>
-        <button type="button" class="recipe-edit-alternative-add-component" onclick="return addRecipeIngredientAlternativeComponent(this)" hidden>${recipeEditSvgIcon("plus")}<span>Add Replacement Ingredient</span></button>
+        <div class="recipe-edit-alternative-card-footer">
+            <p class="recipe-edit-alternative-replaces" data-alternative-card-replaces></p>
+            <button type="button" class="recipe-edit-alternative-add-component" onclick="return addRecipeIngredientAlternativeComponent(this)">${recipeEditSvgIcon("plus")}<span>Add Ingredient</span></button>
+        </div>
         <div class="recipe-edit-alternative-edit-footer" hidden>
-            <button type="button" class="recipe-edit-alternative-save" onclick="return saveRecipeIngredientAlternativeEdit(this)">Save Alternative</button>
+            <button type="button" class="recipe-edit-alternative-save" onclick="return saveRecipeIngredientAlternativeEdit(this)">Save Group</button>
             <button type="button" class="recipe-edit-alternative-cancel" onclick="return cancelRecipeIngredientAlternativeEdit(this)">Cancel</button>
         </div>
     `;
@@ -37410,7 +37443,7 @@ function setRecipeIngredientAlternativeEditMode(control, shouldEdit, options = {
     });
     const addComponentButton = card.querySelector(".recipe-edit-alternative-add-component");
     const editFooter = card.querySelector(".recipe-edit-alternative-edit-footer");
-    if (addComponentButton) addComponentButton.hidden = !shouldEdit;
+    if (addComponentButton) addComponentButton.hidden = false;
     if (editFooter) editFooter.hidden = !shouldEdit;
     if (!shouldEdit) {
         delete card.dataset.editSnapshot;
@@ -37465,6 +37498,91 @@ function saveRecipeIngredientAlternativeEdit(button) {
 function cancelRecipeIngredientAlternativeEdit(button) {
     const card = recipeIngredientAlternativeCardFromControl(button);
     return setRecipeIngredientAlternativeEditMode(card || button, false, { restore: true });
+}
+
+function editRecipeIngredientAlternativeComponent(button) {
+    const optionRow = button ? button.closest("[data-substitution-option-row]") : null;
+    const card = recipeIngredientAlternativeCardFromControl(button);
+    if (!optionRow || !card) {
+        return false;
+    }
+    setRecipeIngredientAlternativeEditMode(card, true);
+    const field = optionRow.querySelector('[data-field="ingredient"]');
+    window.requestAnimationFrame(() => {
+        if (!field) return;
+        field.focus({ preventScroll: false });
+        if (typeof field.select === "function") field.select();
+    });
+    return false;
+}
+
+function setRecipeIngredientAlternativePreferred(button) {
+    const card = recipeIngredientAlternativeCardFromControl(button);
+    const ingredientRow = card ? card.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])") : null;
+    const container = card ? card.closest("[data-ingredient-substitutions]") : null;
+    if (!card || !ingredientRow || !container) {
+        return false;
+    }
+    container.querySelectorAll(".recipe-edit-alternative-card").forEach(candidate => {
+        const isPreferred = candidate === card;
+        candidate.querySelectorAll('[data-field="preferred"]').forEach(input => {
+            input.checked = isPreferred;
+        });
+        updateRecipeIngredientAlternativeCard(candidate, Number(candidate.dataset.alternativeGroupIndex || 0));
+    });
+    closeRecipeEditRowMenus();
+    updateRecipeIngredientSummary(ingredientRow);
+    updateRecipeEditorDirtyState(card.closest("#recipeEditForm"));
+    setRecipeEditStatus("Preferred replacement group updated. Save Recipe to keep it.");
+    return false;
+}
+
+function duplicateRecipeIngredientAlternative(button) {
+    const card = recipeIngredientAlternativeCardFromControl(button);
+    const ingredientRow = card ? card.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])") : null;
+    const form = ingredientRow ? ingredientRow.closest("#recipeEditForm") : null;
+    const list = card ? card.closest("[data-ingredient-substitution-list]") : null;
+    const sourceRows = card ? [...card.querySelectorAll("[data-substitution-option-row]")] : [];
+    if (!card || !ingredientRow || !list || !sourceRows.length) {
+        return false;
+    }
+
+    const alternativeId = nextRecipeIngredientAlternativeId();
+    const groupIndex = Number(card.dataset.alternativeGroupIndex || 0) + 1;
+    const template = document.createElement("template");
+    template.innerHTML = sourceRows.map((optionRow, componentIndex) => {
+        const values = {
+            ...fieldValuesFromRow(optionRow),
+            id: "",
+            substitution_id: "",
+            alternative_id: alternativeId,
+            alternative_order: groupIndex,
+            alternative_component_order: componentIndex,
+            preferred: false,
+        };
+        return recipeIngredientSubstitutionOptionRowHtml(values, componentIndex, {
+            index: groupIndex,
+            componentIndex,
+        });
+    }).join("");
+    const duplicateRows = [...template.content.querySelectorAll("[data-substitution-option-row]")];
+    card.after(template.content);
+    duplicateRows.forEach(optionRow => {
+        organizeRecipeEditSubstitutionOptionRow(optionRow);
+        bindRecipeIngredientSubstitutionRow(optionRow);
+    });
+
+    updateRecipeIngredientSubstitutionState(ingredientRow);
+    updateRecipeIngredientSummary(ingredientRow);
+    const duplicateCard = [...list.querySelectorAll(":scope > .recipe-edit-alternative-card")]
+        .find(candidate => candidate.dataset.alternativeId === alternativeId);
+    if (duplicateCard) {
+        setRecipeIngredientAlternativeEditMode(duplicateCard, true);
+    }
+    closeRecipeEditRowMenus();
+    updateRecipeEditorDirtyState(form);
+    setRecipeEditStatus("Replacement group duplicated. Save Recipe to keep it.");
+    return false;
 }
 
 function addRecipeIngredientAlternativeComponent(button) {
@@ -37531,7 +37649,7 @@ function removeRecipeIngredientAlternative(button) {
     if (!card || !ingredientRow) {
         return false;
     }
-    if (!window.confirm("Delete this alternative and all of its replacement ingredients?")) {
+    if (!window.confirm("Delete this replacement group and all of its ingredients?")) {
         return false;
     }
     card.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => optionRow.remove());
@@ -37605,11 +37723,11 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
 
     if (count) {
         count.textContent = alternativeCount
-            ? `${alternativeCount} alternative${alternativeCount === 1 ? "" : "s"}`
-            : "No alternatives";
+            ? `${alternativeCount} alternative group${alternativeCount === 1 ? "" : "s"}`
+            : "No alternative groups";
     }
     if (addLabel) {
-        addLabel.textContent = "Add Alternative";
+        addLabel.textContent = "Add Alternative Group";
     }
 
     const ingredientField = row ? row.querySelector('[data-field="ingredient"]') : null;
@@ -37633,7 +37751,18 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     const optionsButton = row ? row.querySelector(".recipe-edit-ingredient-options-button") : null;
     if (optionsButton) {
         const label = optionsButton.querySelector("[data-ingredient-options-label]");
-        const optionLabel = `${alternativeCount} alternative${alternativeCount === 1 ? "" : "s"}`;
+        const optionLabel = `${alternativeCount} Alternative Group${alternativeCount === 1 ? "" : "s"}`;
+        const groupSummaries = alternativeGroups.map(group => (
+            group.rows
+                .map(optionRow => String(fieldValuesFromRow(optionRow).ingredient || "").trim())
+                .filter(Boolean)
+                .join(" + ") || "Unnamed replacement group"
+        ));
+        const preferredGroupIndex = alternativeGroups.findIndex(group => (
+            group.rows.some(optionRow => Boolean(fieldValuesFromRow(optionRow).preferred))
+        ));
+        const preferredSummary = preferredGroupIndex >= 0 ? groupSummaries[preferredGroupIndex] : "None selected";
+        const otherSummaries = groupSummaries.filter((_, index) => index !== preferredGroupIndex);
         if (label) {
             label.textContent = alternativeCount ? optionLabel : "None";
         }
@@ -37642,8 +37771,11 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         const isExpanded = Boolean(container && !container.hidden);
         optionsButton.setAttribute("aria-expanded", String(isExpanded));
         const action = isExpanded ? "Hide" : "Show";
-        optionsButton.title = `${action} alternatives for ${ingredientName}`;
-        optionsButton.setAttribute("aria-label", `${action} alternatives for ${ingredientName}`);
+        const tooltip = alternativeCount
+            ? `\n\nPreferred:\n${preferredSummary}\n\nOther options:\n${otherSummaries.join("\n") || "None"}`
+            : "";
+        optionsButton.title = `${action} alternative groups for ${ingredientName}${tooltip}`;
+        optionsButton.setAttribute("aria-label", `${action} ${optionLabel.toLowerCase()} for ${ingredientName}`);
     }
 }
 
@@ -37669,7 +37801,9 @@ function addRecipeIngredientSubstitutionRow(button) {
         index: nextAlternativeIndex,
         componentIndex: 0,
     }));
-    const optionRow = list.querySelector("[data-substitution-option-row]:last-child");
+    const optionRow = list.lastElementChild?.matches("[data-substitution-option-row]")
+        ? list.lastElementChild
+        : null;
     bindRecipeIngredientSubstitutionRow(optionRow);
     organizeRecipeEditSubstitutionOptionRow(optionRow);
     updateRecipeIngredientSummary(row);
