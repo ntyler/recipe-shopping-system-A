@@ -25756,7 +25756,6 @@ function organizeRecipeEditIngredientTools() {
             <span role="columnheader">Store Section</span>
             <span role="columnheader">Type</span>
             <span role="columnheader">Alternatives</span>
-            <span role="columnheader">Actions</span>
         `;
     }
     tableScroll.appendChild(tableHead);
@@ -26493,7 +26492,7 @@ function switchRecipeIngredientModal(currentRow, targetRow, options = {}) {
         restoreScroll: false,
         keepModalSession: true,
     });
-    const trigger = targetRow.querySelector(".recipe-edit-compact-row-edit");
+    const trigger = targetRow;
     return setRecipeIngredientEditMode(targetRow, true, {
         trigger,
         reuseModalSession: true,
@@ -27142,12 +27141,7 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
             <span class="sr-only" data-recipe-edit-details-label>More details</span>
         </button>
     ` : "";
-    const actions = document.createElement("div");
-    actions.className = "recipe-edit-compact-row-actions";
-    actions.dataset.recipeEditCompactRowActions = "";
-    actions.setAttribute("role", "cell");
-    actions.innerHTML = `
-        ${detailsButton}
+    const editButtonHtml = isIngredientRow ? "" : `
         <button type="button"
                 class="recipe-edit-compact-row-edit"
                 data-recipe-edit-focus-selector="${escapeAttribute(focusSelector || "input, textarea, select")}"
@@ -27156,6 +27150,14 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
                 onclick="return focusRecipeEditCompactRow(this)">
             ${recipeEditSvgIcon("edit")}
         </button>
+    `;
+    const actions = document.createElement("div");
+    actions.className = "recipe-edit-compact-row-actions";
+    actions.dataset.recipeEditCompactRowActions = "";
+    actions.setAttribute("role", "cell");
+    actions.innerHTML = `
+        ${detailsButton}
+        ${editButtonHtml}
         ${menuInActions ? "" : `<button type="button"
                 class="recipe-edit-compact-row-delete"
                 aria-label="Delete ${escapeAttribute(label)}"
@@ -27179,6 +27181,10 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
         const accessibleName = label === "ingredient" && fieldValue ? fieldValue : label;
         const editButton = actions.querySelector(".recipe-edit-compact-row-edit");
         const deleteButton = actions.querySelector(".recipe-edit-compact-row-delete");
+        if (isIngredientRow) {
+            row.tabIndex = 0;
+            row.setAttribute("aria-label", `Edit ${accessibleName}`);
+        }
         if (editButton) {
             editButton.setAttribute("aria-label", `Edit ${accessibleName}`);
             editButton.title = `Edit ${accessibleName}`;
@@ -27257,7 +27263,14 @@ function bindRecipeIngredientModalRowOpen(row) {
         )) {
             return;
         }
-        const trigger = row.querySelector(".recipe-edit-compact-row-edit");
+        const trigger = row;
+        setRecipeIngredientEditMode(row, true, { trigger });
+    });
+    row.addEventListener("keydown", event => {
+        if (event.target !== row || row.classList.contains("is-editing")) return;
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        const trigger = row;
         setRecipeIngredientEditMode(row, true, { trigger });
     });
 }

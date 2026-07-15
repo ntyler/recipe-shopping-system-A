@@ -413,7 +413,6 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         "Store Section",
         "Type",
         "Alternatives",
-        "Actions",
     )
     assert tools.count('role="columnheader"') == len(headers)
     positions = [tools.index(f">{header}</span>") for header in headers]
@@ -585,7 +584,9 @@ def test_recipe_editor_ingredient_modal_guards_row_clicks_and_dirty_close_state(
         script.index("function setRecipeIngredientEditMode", script.index("function bindRecipeIngredientModalRowOpen"))
     ]
     assert 'row.addEventListener("click", event =>' in row_open
+    assert 'row.addEventListener("keydown", event =>' in row_open
     assert 'row.classList.contains("is-editing")' in row_open
+    assert 'event.key !== "Enter" && event.key !== " "' in row_open
     for guarded_target in (
         "button, a, input, textarea, select, label, details, summary",
         "[role=button], [role=combobox], [contenteditable=true]",
@@ -750,6 +751,19 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert 'grid-template-areas: "image fields";' in compact
     assert ".recipe-edit-ingredient-modal-identity-fields" in compact
     assert "grid-area: fields !important;" in compact
+    modal_image_slot_selector = "body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-image-slot {"
+    modal_image_slot = compact[
+        compact.index(modal_image_slot_selector):
+        compact.index("}", compact.index(modal_image_slot_selector))
+    ]
+    assert "grid-template-columns: minmax(0, 1fr);" in modal_image_slot
+    modal_image_panel = compact[
+        compact.index("dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-panel {"):
+        compact.index("}", compact.index("dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-panel {"))
+    ]
+    assert "grid-column: 1 !important;" in modal_image_panel
+    assert "grid-row: auto !important;" in modal_image_panel
+    assert "justify-self: stretch !important;" in modal_image_panel
     assert "flex-direction: column;" in compact
     assert "gap: 16px;" in compact
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in compact
@@ -1006,7 +1020,7 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "display: none;" in edit_grid_rule
 
 
-def test_recipe_editor_v10_prioritizes_seven_readable_read_first_groups():
+def test_recipe_editor_v10_prioritizes_six_readable_groups_and_overflow_menu():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     assert css.index("/* Ingredient editor v10:") > css.index("/* Ingredient editor v9:")
@@ -1018,7 +1032,7 @@ def test_recipe_editor_v10_prioritizes_seven_readable_read_first_groups():
         "minmax(220px, 1.9fr)",
         "minmax(126px, .85fr)",
         "126px",
-        "74px",
+        "40px",
     ):
         assert priority in polish
     assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in polish
@@ -1029,7 +1043,7 @@ def test_recipe_editor_v10_prioritizes_seven_readable_read_first_groups():
     assert ".recipe-edit-ingredient-type-summary" in polish
     assert ".recipe-edit-ingredient-substitution-cell" in polish
     assert ".recipe-edit-compact-row-actions" in polish
-    assert "min-width: 860px;" in polish
+    assert "min-width: 826px;" in polish
     assert "min-height: 68px !important;" in polish
     assert "container-name: recipe-ingredient-table;" in polish
     assert "@container recipe-ingredient-table (max-width: 859px)" in polish
@@ -1041,6 +1055,8 @@ def test_recipe_editor_v10_prioritizes_seven_readable_read_first_groups():
     assert 'optionsButton.setAttribute("aria-expanded", String(shouldOpen));' in script
     assert 'row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);' in script
     assert 'const isIngredientRow = label === "ingredient";' in script
+    assert 'const editButtonHtml = isIngredientRow ? "" :' in script
+    assert 'row.setAttribute("aria-label", `Edit ${accessibleName}`);' in script
     assert 'actions.appendChild(menuWrap);' in script
     assert 'class="recipe-edit-compact-row-delete"' in script
     assert '${menuInActions ? "" : `<button type="button"' in script
