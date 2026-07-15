@@ -341,7 +341,9 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "renderRecipeEditCuisineChips" in script
     assert "recipe-edit-price-control" in organizer
     assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer
-    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, tagRow])" in organizer
+    assert 'inlineImageSlot.className = "recipe-edit-inline-image-slot"' in organizer
+    assert 'inlineImageSlot.dataset.recipeEditInlineImageSlot = ""' in organizer
+    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, inlineImageSlot, tagRow])" in organizer
     assert 'class="recipe-edit-rating-label">Rating</span>' in template
     assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")' in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
@@ -364,6 +366,37 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "width: 68px;" in css
     assert "position: static;" in css
     assert "if (clear) clear.hidden = normalizedRating <= 0;" in script
+
+
+def test_recipe_image_uses_one_node_and_moves_below_rating_at_narrow_widths():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    placement_start = script.index("function syncRecipeEditImageCardPlacement()")
+    placement_end = script.index("function organizeRecipeEditInformationCard()", placement_start)
+    placement = script[placement_start:placement_end]
+
+    assert template.count('id="recipeEditImageCardContent"') == 1
+    assert template.count('id="recipeEditCoverField"') == 1
+    assert 'window.matchMedia("(max-width: 1099px)").matches' in placement
+    assert "inlineSlot.appendChild(imageCard)" in placement
+    assert "sidebar.insertBefore(imageCard, sidebar.firstElementChild)" in placement
+    assert 'imageCard.classList.toggle("recipe-edit-image-card-inline", shouldInline)' in placement
+    assert "organizeRecipeEditImageCard();" in script
+    assert "organizeRecipeEditInformationCard();" in script
+    assert "syncRecipeEditImageCardPlacement();" in script
+    assert 'window.addEventListener("resize", syncRecipeEditImageCardPlacement)' in script
+    assert 'window.addEventListener("orientationchange", syncRecipeEditImageCardPlacement)' in script
+
+    responsive_start = css.index("/* Narrow recipe editor: keep the single Recipe Image card")
+    responsive = css[responsive_start:]
+    assert "@media (max-width: 1099px)" in responsive
+    assert "grid-template-columns: minmax(0, 1fr);" in responsive
+    assert ".recipe-edit-inline-image-slot" in responsive
+    assert ".recipe-edit-image-card-inline" in responsive
+    assert "aspect-ratio: 16 / 9;" in responsive
+    assert "object-fit: cover;" in responsive
+    assert "flex-wrap: wrap;" in responsive
 
 
 def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():

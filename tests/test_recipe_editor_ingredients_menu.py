@@ -1073,7 +1073,7 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert "buttonRect.left + menuWidth <= rightLimit" in position
 
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in script
-    assert '`${alternativeCount} Alternative Group${alternativeCount === 1 ? "" : "s"}`' in script
+    assert '`${alternativeCount} Alternative${alternativeCount === 1 ? "" : "s"}`' in script
     assert "document.body.appendChild(menu);" in script
 
 
@@ -1088,6 +1088,7 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'summary.className = "recipe-edit-alternative-component-summary";' in substitution
     assert "data-alternative-component-name" in substitution
     assert "data-alternative-component-status" in substitution
+    assert "data-alternative-component-amount" in substitution
     assert "data-alternative-component-facts" in substitution
     assert "data-alternative-component-buy-as" in substitution
     assert 'editGrid.className = "recipe-edit-alternative-component-edit-grid";' in substitution
@@ -1105,6 +1106,9 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'data-field="ingredient_image_url"' in alternative_markup
     assert 'data-field="ingredient_image_generated_at"' in alternative_markup
     assert 'data-field="ingredient_image_prompt"' in alternative_markup
+    assert 'data-field="confidence_score"' in alternative_markup
+    assert 'data-field="match_confidence"' in alternative_markup
+    assert 'data-field="reason"' in alternative_markup
 
     card = script[
         script.index("function updateRecipeIngredientAlternativeCard"):
@@ -1112,22 +1116,37 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     ]
     assert 'card.className = "recipe-edit-alternative-card";' in card
     assert "recipe-edit-alternative-card-header" in card
+    assert "data-alternative-card-recommendation" in card
     assert "data-alternative-card-title" in card
-    assert "data-alternative-card-status" in card
+    assert "data-alternative-card-confidence" in card
+    assert "data-alternative-card-name" in card
     assert "data-alternative-card-type" in card
-    assert "data-alternative-card-preferred" in card
-    assert "data-alternative-card-replaces" in card
+    assert "data-alternative-original-amount" in card
+    assert "data-alternative-equivalency-original" in card
+    assert "data-alternative-equivalency-replacement" in card
+    assert "data-alternative-together" in card
+    assert "data-alternative-explanation" in card
     assert 'card.classList.toggle("is-single-alternative", singleIngredient);' in card
-    assert "recipeIngredientAlternativeStatusLabel(firstValues)" in card
-    assert 'replaceSummary.textContent = `Replaces: ${quantity}${ingredientValues.ingredient || "this ingredient"}`;' in card
-    assert "replaceSummary.hidden = false;" in card
+    assert 'card.classList.toggle("is-multi-alternative", !singleIngredient);' in card
+    assert "recipeIngredientAlternativeRecommendation(firstValues, preferred)" in card
+    assert "recipeIngredientSubstitutionConfidencePercent(firstValues)" in card
+    assert 'confidence.hidden = confidencePercent == null;' in card
+    assert 'explanation.textContent = notes || "No substitution notes added.";' in card
+    assert 'together.hidden = singleIngredient;' in card
+    assert "Replacement Option" not in card
     assert "recipe-edit-alternative-components" in card
+    assert ">Original</span>" in card
+    assert ">Replace With</span>" in card
+    assert ">Equivalent To</span>" in card
+    assert ">Why It Works</span>" in card
+    assert "Use all ingredients in this group together." in card
     assert "Edit Group" in card
     assert "Duplicate Group" in card
     assert 'aria-label="Edit Group"' in card
     assert 'aria-label="Duplicate Group"' in card
     assert "Delete Group" in card
-    assert "Add Ingredient" in card
+    assert "Add Ingredient to This Group" in card
+    assert "editRecipeIngredientAlternativeNotes(this)" in card
     assert "Save Group" in card
     assert ">Cancel</button>" in card
     assert "setRecipeIngredientAlternativePreferred(this)" in card
@@ -1135,13 +1154,14 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "recipeIngredientSubstitutionDomGroups(optionRows)" in card
     assert "group.rows.forEach(optionRow => components.appendChild(optionRow));" in card
 
+    v17 = css[css.index("/* Ingredient editor v17:"):]
+    assert ".recipe-edit-alternative-card" in v17
+    assert ".recipe-edit-alternative-relationship" in v17
+    assert ".recipe-edit-alternative-equivalency" in v17
+    assert ".recipe-edit-alternative-explanation-block" in v17
+    assert "grid-template-columns: minmax(170px, .72fr) 42px minmax(0, 1.4fr);" in v17
+    assert "@media (max-width: 920px)" in v17
     v10 = css[css.index("/* Ingredient editor v10:"):]
-    assert ".recipe-edit-alternative-card" in v10
-    assert ".recipe-edit-alternative-component-summary" in v10
-    assert ".recipe-edit-alternative-card:not(.is-editing)" in v10
-    assert ".recipe-edit-alternative-card.is-editing" in v10
-    assert ".recipe-edit-substitution-table-head" in v10
-    assert "display: none !important;" in v10
     edit_grid_rule = v10[v10.index(".recipe-edit-alternative-component-edit-grid {"):]
     edit_grid_rule = edit_grid_rule[:edit_grid_rule.index("}")]
     assert "display: none;" in edit_grid_rule
@@ -1229,7 +1249,11 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert "No alternatives have been added." in script
     assert "Add a single replacement ingredient or a replacement made from multiple ingredients." in script
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in state
-    assert '`${alternativeCount} Alternative Group${alternativeCount === 1 ? "" : "s"}`' in state
+    assert '`${alternativeCount} Alternative${alternativeCount === 1 ? "" : "s"}`' in state
+    assert 'optionsButton.querySelector("[data-ingredient-options-summary]")' in state
+    assert "recipeIngredientAlternativeRecommendation" in state
+    assert "recipeIngredientSubstitutionConfidencePercent" in state
+    assert 'summary.hidden = !replacement;' in state
     assert "ensureRecipeIngredientAlternativeCards(container)" in state
     assert "viewAll.hidden = true;" in state
 
