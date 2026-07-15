@@ -876,6 +876,18 @@
                                  alt="Recipe title image"
                                  loading="lazy"
                                  hidden>
+                            <button type="button"
+                                    id="recipeEditFavoriteButton"
+                                    class="app-recipe-favorite recipe-edit-cover-favorite"
+                                    data-recipe-favorite
+                                    data-recipe-url=""
+                                    data-recipe-name="recipe"
+                                    aria-label="Add recipe to favorites"
+                                    aria-pressed="false"
+                                    onclick="return toggleRecipeFavorite(this, event)"
+                                    hidden>
+                                {{ shell.svg_icon("heart") }}
+                            </button>
                             <div id="recipeEditCoverEmpty" class="recipe-edit-cover-empty">
                                 No title image saved.
                             </div>

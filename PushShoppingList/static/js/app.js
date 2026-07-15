@@ -1258,6 +1258,32 @@ function setRecipeFavoriteStateForUrl(recipeUrl, favorite) {
         .forEach(button => setRecipeFavoriteButtonState(button, favorite));
 }
 
+function syncRecipeEditorFavoriteControl(recipe = {}, originalUrl = "") {
+    const button = document.getElementById("recipeEditFavoriteButton");
+    if (!button) return;
+    const previousUrl = String(button.dataset.recipeUrl || "").trim();
+    const recipeUrl = String(
+        originalUrl
+        || recipe.url
+        || recipe.original_url
+        || recipe.source_url
+        || ""
+    ).trim();
+    const recipeName = String(
+        recipe.recipe_title
+        || recipe.display_name
+        || "recipe"
+    ).trim() || "recipe";
+    const hasFavoriteState = Object.prototype.hasOwnProperty.call(recipe, "favorite");
+    const favorite = hasFavoriteState
+        ? Boolean(recipe.favorite)
+        : (previousUrl === recipeUrl && button.getAttribute("aria-pressed") === "true");
+    button.dataset.recipeUrl = recipeUrl;
+    button.dataset.recipeName = recipeName;
+    button.hidden = !recipeUrl;
+    setRecipeFavoriteButtonState(button, favorite);
+}
+
 async function toggleRecipeFavorite(button, event = null) {
     if (event) {
         event.preventDefault();
@@ -23710,6 +23736,7 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
     }
     setValue("recipeEditTitleInput", recipe.recipe_title || "");
     setValue("recipeEditDescription", recipe.description || "");
+    syncRecipeEditorFavoriteControl(recipe, originalUrl);
     updateRecipeEditDescriptionCount();
     updateRecipeDescriptionAiActionLabel();
     setRecipeEditorSourceUrlField(recipe, originalUrl);
