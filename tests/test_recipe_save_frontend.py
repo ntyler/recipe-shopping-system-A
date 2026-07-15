@@ -192,7 +192,9 @@ def test_ingredient_modal_commit_has_single_flight_busy_and_failure_contract():
     ]
     assert 'panel.toggleAttribute("aria-busy", Boolean(saving));' in saving_state
     assert "button.disabled = Boolean(saving)" in saving_state
-    assert 'status.textContent = saving ? "Saving ingredient\\u2026" : "";' in saving_state
+    assert 'setRecipeIngredientModalStatus(panel, "saving")' in saving_state
+    assert 'setRecipeIngredientModalStatus(panel, "saved")' in commit
+    assert "window.setTimeout(resolve, 320)" in commit
 
 
 def test_ingredient_modal_uses_scoped_persistence_without_saving_unrelated_recipe_drafts():

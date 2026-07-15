@@ -468,7 +468,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert 'nameLabel.textContent = "Ingredient Name";' in organize
     assert "The grocery item that should be added to the shopping list." in organize
     assert 'typeLabel.textContent = "Requirement";' in organize
-    assert "Previous Ingredient" in organize
+    assert ">Previous</button>" in organize
     assert "Save Changes" in organize
     assert "Save &amp; Next" in organize
     assert organize.index(">Cancel</button>") < organize.index(">Save Changes</button>")
@@ -477,6 +477,10 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert 'matchDetails.dataset.ingredientMatchDetails = "";' in organize
     assert 'typeSelect.value = "optional";' in organize
     assert 'String(typeSelect.value || "").trim().toLowerCase() === "optional"' in organize
+    assert 'role="radiogroup" aria-label="Requirement"' in organize
+    assert 'data-recipe-ingredient-requirement="required"' in organize
+    assert 'data-recipe-ingredient-requirement="optional"' in organize
+    assert "Original text, match confidence, alternatives, and source metadata." in organize
 
     row_start = script.index("function addRecipeIngredientRow")
     row_end = script.index("function bindRecipeIngredientSummaryUpdates", row_start)
@@ -653,7 +657,7 @@ def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
     ]
     assert "const rows = recipeEditIngredientRows();" in navigation
     assert "previousButton.disabled = index <= 0;" in navigation
-    assert 'nextButton.textContent = isFinal ? "Save & Close" : "Save & Next";' in navigation
+    assert 'nextButton.textContent = "Save & Next";' in navigation
     assert 'nextButton.dataset.recipeIngredientFinal = isFinal ? "true" : "false";' in navigation
     assert 'panel.toggleAttribute("aria-busy", Boolean(saving));' in navigation
     for selector in (
@@ -663,7 +667,7 @@ def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
         "[data-recipe-ingredient-modal-close]",
     ):
         assert selector in navigation
-    assert 'status.textContent = saving ? "Saving ingredient\\u2026" : "";' in navigation
+    assert 'setRecipeIngredientModalStatus(panel, "saving")' in navigation
 
     commit = script[
         script.index("async function commitRecipeIngredientModal"):
@@ -690,8 +694,8 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
         script.index("function recipeIngredientModalImagePanel"):
         script.index("function recipeIngredientModalFieldError")
     ]
-    assert 'generateButton.textContent = "Generate with AI";' in image_contract
-    assert 'recipeIngredientModalHasImage(imagePanel) ? "Replace Image" : "Add Image"' in image_contract
+    assert 'generateButton.textContent = "Generate Image";' in image_contract
+    assert 'recipeIngredientModalHasImage(imagePanel) ? "Change Image" : "Add Image"' in image_contract
     assert 'removeButton.textContent = "Remove";' in image_contract
     assert 'slot.appendChild(imagePanel);' in image_contract
     assert "recipeIngredientModalPlaceholder" in image_contract
@@ -721,6 +725,53 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert ".recipe-ingredient-image-prompt-requested .recipe-image-prompt:not([hidden])" in modal_css
     assert "dialog.recipe-edit-ingredient-edit-panel > .recipe-edit-floating-menu" in modal_css
     assert "z-index: 40 !important;" in modal_css
+
+
+def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    compact = css[css.index("/* Ingredient editor v13:"):]
+
+    dialog_rule = compact[compact.index("dialog.recipe-edit-ingredient-edit-panel {"):]
+    dialog_rule = dialog_rule[:dialog_rule.index("}")]
+    for declaration in (
+        "width: calc(100vw - 80px);",
+        "max-width: 1220px;",
+        "height: min(88dvh, 820px);",
+        "max-height: 88dvh;",
+    ):
+        assert declaration in dialog_rule
+
+    assert "width: min(100%, 1040px);" in compact
+    assert "padding: 24px 28px 28px;" in compact
+    assert ".recipe-edit-ingredient-modal-section-surface" in compact
+    assert "border-radius: 16px;" in compact
+    assert "grid-template-columns: 180px minmax(0, 1fr);" in compact
+    assert "grid-row: 1 / span 2 !important;" in compact
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in compact
+    assert "grid-template-columns: minmax(0, 2.1fr) minmax(240px, 1fr);" in compact
+    assert "height: 40px;" in compact
+    assert "font-size: 14px;" in compact
+    assert "min-height: 96px;" in compact
+    assert ".recipe-edit-ingredient-requirement-control" in compact
+    assert ".recipe-edit-ingredient-requirement-control button.is-selected" in compact
+    assert ".recipe-edit-ingredient-analysis-heading" in compact
+    assert '.recipe-edit-ingredient-modal-status[data-state="dirty"]' in compact
+    assert '.recipe-edit-ingredient-modal-status[data-state="saved"]' in compact
+    assert '.recipe-edit-ingredient-modal-status[data-state="error"]' in compact
+    assert "@media (max-width: 860px)" in compact
+    assert "@media (max-width: 760px)" in compact
+    assert "@media (max-width: 620px)" in compact
+
+    status = script[
+        script.index("function setRecipeIngredientModalStatus"):
+        script.index("const RECIPE_INGREDIENT_MODAL_SCROLL_LOCK_CLASS")
+    ]
+    for text in ("Unsaved changes", "Saving\\u2026", "Saved"):
+        assert text in status
+    assert "recipeIngredientModalHasChanges(row) ? \"dirty\" : \"\"" in status
+
+    assert "Ingredient ${Math.max(ingredientIndex, 0) + 1} of ${Math.max(rows.length, 1)}" in script
 
 
 def test_recipe_editor_ingredient_polish_uses_professional_grid_and_command_bar():

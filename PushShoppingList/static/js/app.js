@@ -25756,6 +25756,28 @@ function recipeIngredientModalHasChanges(row) {
     }
 }
 
+function setRecipeIngredientModalStatus(panel, state = "", message = "") {
+    const status = panel ? panel.querySelector("[data-recipe-ingredient-modal-status]") : null;
+    if (!status) return;
+    const labels = {
+        dirty: "Unsaved changes",
+        saving: "Saving\u2026",
+        saved: "Saved",
+    };
+    const normalizedState = String(state || "").trim();
+    status.dataset.state = normalizedState;
+    status.textContent = String(message || labels[normalizedState] || "");
+}
+
+function updateRecipeIngredientModalDirtyStatus(row) {
+    const panel = row ? row.querySelector("[data-recipe-ingredient-edit-panel]") : null;
+    if (!panel || panel.dataset.saving === "true") return;
+    setRecipeIngredientModalStatus(
+        panel,
+        recipeIngredientModalHasChanges(row) ? "dirty" : ""
+    );
+}
+
 const RECIPE_INGREDIENT_MODAL_SCROLL_LOCK_CLASS = "recipe-ingredient-modal-scroll-locked";
 const RECIPE_INGREDIENT_MODAL_SCROLL_CONTAINER_SELECTOR = [
     "[data-app-content]",
@@ -25828,11 +25850,11 @@ function syncRecipeIngredientModalImageActions(imagePanel) {
     const uploadButton = imagePanel.querySelector("[data-recipe-image-upload-button]");
     const removeButton = imagePanel.querySelector("[data-ingredient-image-remove]");
     if (generateButton) {
-        generateButton.textContent = "Generate with AI";
+        generateButton.textContent = "Generate Image";
         generateButton.title = "Generate an ingredient image with AI";
     }
     if (uploadButton) {
-        uploadButton.textContent = recipeIngredientModalHasImage(imagePanel) ? "Replace Image" : "Add Image";
+        uploadButton.textContent = recipeIngredientModalHasImage(imagePanel) ? "Change Image" : "Add Image";
         uploadButton.title = uploadButton.textContent;
     }
     if (removeButton) {
@@ -25922,6 +25944,9 @@ function setRecipeIngredientModalError(panel, message = "") {
     if (!error) return;
     error.textContent = String(message || "");
     error.hidden = !error.textContent;
+    if (error.textContent) {
+        setRecipeIngredientModalStatus(panel, "error", error.textContent);
+    }
 }
 
 function validateRecipeIngredientModal(row, panel) {
@@ -26153,7 +26178,7 @@ function updateRecipeIngredientModalNavigation(row) {
     }
     if (nextButton) {
         const isFinal = index < 0 || index >= rows.length - 1;
-        nextButton.textContent = isFinal ? "Save & Close" : "Save & Next";
+        nextButton.textContent = "Save & Next";
         nextButton.dataset.recipeIngredientFinal = isFinal ? "true" : "false";
     }
 }
@@ -26165,10 +26190,7 @@ function setRecipeIngredientModalSaving(panel, saving) {
         "[data-recipe-ingredient-modal-save], [data-recipe-ingredient-modal-next], "
         + "[data-recipe-ingredient-modal-previous], [data-recipe-ingredient-modal-close]"
     ).forEach(button => { button.disabled = Boolean(saving); });
-    const status = panel.querySelector("[data-recipe-ingredient-modal-status]");
-    if (status) {
-        status.textContent = saving ? "Saving ingredient\u2026" : "";
-    }
+    if (saving) setRecipeIngredientModalStatus(panel, "saving");
     if (!saving) {
         updateRecipeIngredientModalNavigation(panel.closest(".recipe-edit-ingredient-row"));
     }
@@ -26317,6 +26339,8 @@ async function commitRecipeIngredientModal(button, options = {}) {
             return false;
         }
         panel.dataset.editSnapshot = JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row));
+        setRecipeIngredientModalStatus(panel, "saved");
+        await new Promise(resolve => window.setTimeout(resolve, 320));
         const rows = recipeEditIngredientRows();
         const index = rows.indexOf(row);
         const nextRow = index >= 0 && index < rows.length - 1 ? rows[index + 1] : null;
@@ -26579,22 +26603,34 @@ function organizeRecipeEditIngredientRow(row) {
                 <div class="recipe-edit-ingredient-modal-content">
                     <section class="recipe-edit-ingredient-modal-section is-identity" aria-labelledby="${modalId}IdentityTitle">
                         <h3 id="${modalId}IdentityTitle">Identity</h3>
-                        <div class="recipe-edit-ingredient-modal-identity-grid" data-recipe-ingredient-modal-identity></div>
+                        <div class="recipe-edit-ingredient-modal-section-surface">
+                            <div class="recipe-edit-ingredient-modal-identity-grid" data-recipe-ingredient-modal-identity></div>
+                        </div>
                     </section>
                     <section class="recipe-edit-ingredient-modal-section is-quantity" aria-labelledby="${modalId}QuantityTitle">
                         <h3 id="${modalId}QuantityTitle">Quantity</h3>
-                        <div class="recipe-edit-ingredient-modal-field-grid" data-recipe-ingredient-modal-quantity></div>
+                        <div class="recipe-edit-ingredient-modal-section-surface">
+                            <div class="recipe-edit-ingredient-modal-field-grid" data-recipe-ingredient-modal-quantity></div>
+                        </div>
                     </section>
                     <section class="recipe-edit-ingredient-modal-section is-usage" aria-labelledby="${modalId}UsageTitle">
                         <h3 id="${modalId}UsageTitle">Usage</h3>
-                        <div class="recipe-edit-ingredient-modal-field-grid" data-recipe-ingredient-modal-usage></div>
+                        <div class="recipe-edit-ingredient-modal-section-surface">
+                            <div class="recipe-edit-ingredient-modal-field-grid" data-recipe-ingredient-modal-usage></div>
+                        </div>
                     </section>
                     <section class="recipe-edit-ingredient-modal-section is-notes" aria-labelledby="${modalId}NotesTitle">
                         <h3 id="${modalId}NotesTitle">Notes</h3>
-                        <div data-recipe-ingredient-modal-notes></div>
+                        <div class="recipe-edit-ingredient-modal-section-surface" data-recipe-ingredient-modal-notes></div>
                     </section>
                     <details class="recipe-edit-ingredient-analysis" data-recipe-ingredient-modal-analysis>
-                        <summary>AI Analysis &amp; Source Details</summary>
+                        <summary>
+                            <span class="recipe-edit-ingredient-analysis-heading">
+                                <strong>AI Analysis &amp; Source Details</strong>
+                                <small>Original text, match confidence, alternatives, and source metadata.</small>
+                            </span>
+                            ${recipeEditSvgIcon("chevron-down")}
+                        </summary>
                         <div class="recipe-edit-ingredient-edit-support"></div>
                     </details>
                     <p class="recipe-edit-ingredient-modal-error"
@@ -26605,16 +26641,18 @@ function organizeRecipeEditIngredientRow(row) {
                 </div>
             </div>
             <footer class="recipe-edit-ingredient-edit-footer recipe-edit-ingredient-modal-footer">
-                <button type="button"
-                        class="recipe-edit-ingredient-edit-cancel"
-                        data-recipe-ingredient-modal-close
-                        onclick="return cancelRecipeIngredientInlineEdit(this)">Cancel</button>
-                <span class="recipe-edit-ingredient-modal-status" data-recipe-ingredient-modal-status aria-live="polite"></span>
+                <div class="recipe-edit-ingredient-modal-footer-start">
+                    <button type="button"
+                            class="recipe-edit-ingredient-edit-cancel"
+                            data-recipe-ingredient-modal-close
+                            onclick="return cancelRecipeIngredientInlineEdit(this)">Cancel</button>
+                    <span class="recipe-edit-ingredient-modal-status" data-recipe-ingredient-modal-status aria-live="polite"></span>
+                </div>
                 <div class="recipe-edit-ingredient-modal-footer-actions">
                     <button type="button"
                             class="recipe-edit-ingredient-modal-previous"
                             data-recipe-ingredient-modal-previous
-                            onclick="return previousRecipeIngredientModal(this)">Previous Ingredient</button>
+                            onclick="return previousRecipeIngredientModal(this)">Previous</button>
                     <button type="button"
                             class="recipe-edit-ingredient-edit-save"
                             data-recipe-ingredient-modal-save
@@ -26651,10 +26689,13 @@ function organizeRecipeEditIngredientRow(row) {
     const usageGrid = editPanel.querySelector("[data-recipe-ingredient-modal-usage]");
     const notesSlot = editPanel.querySelector("[data-recipe-ingredient-modal-notes]");
     const support = editPanel.querySelector(".recipe-edit-ingredient-edit-support");
+    const typeSelect = type ? type.querySelector('[data-field="section"]') : null;
+    const optionalInput = optional ? optional.querySelector('[data-field="optional"]') : null;
     const imageSlot = document.createElement("div");
     imageSlot.className = "recipe-edit-ingredient-modal-image-slot";
     imageSlot.dataset.recipeIngredientModalImageSlot = "";
     imageSlot.innerHTML = '<span class="recipe-edit-ingredient-modal-field-label">Ingredient Image</span>';
+    identityGrid?.appendChild(imageSlot);
     if (name) {
         name.classList.add("recipe-edit-ingredient-edit-field", "recipe-edit-ingredient-modal-name-field");
         const nameLabel = name.querySelector(":scope > .sr-only");
@@ -26678,20 +26719,65 @@ function organizeRecipeEditIngredientRow(row) {
         buyAs.appendChild(helper);
         identityGrid?.appendChild(buyAs);
     }
-    identityGrid?.appendChild(imageSlot);
-
-    [quantity, unit, size, quantityText].filter(Boolean).forEach(field => {
-        field.classList.add("recipe-edit-ingredient-edit-field");
+    [
+        [quantity, "amount"],
+        [unit, "unit"],
+        [size, "size"],
+        [quantityText, "quantity-text"],
+    ].forEach(([field, role]) => {
+        if (!field) return;
+        field.classList.add("recipe-edit-ingredient-edit-field", `is-${role}`);
         quantityGrid?.appendChild(field);
     });
-    [preparation, storeSection, type].filter(Boolean).forEach(field => {
-        field.classList.add("recipe-edit-ingredient-edit-field");
+    [
+        [preparation, "preparation"],
+        [storeSection, "store-section"],
+    ].forEach(([field, role]) => {
+        if (!field) return;
+        field.classList.add("recipe-edit-ingredient-edit-field", `is-${role}`);
         usageGrid?.appendChild(field);
     });
     if (type) {
-        type.classList.add("recipe-edit-ingredient-modal-requirement-field");
         const typeLabel = type.querySelector(":scope > span");
         if (typeLabel) typeLabel.textContent = "Requirement";
+        type.hidden = true;
+        type.classList.add("recipe-edit-ingredient-modal-requirement-source");
+        const requirementField = document.createElement("div");
+        requirementField.className = "recipe-edit-ingredient-edit-field recipe-edit-ingredient-modal-requirement-field";
+        requirementField.dataset.recipeIngredientModalRequirement = "";
+        requirementField.innerHTML = `
+            <span class="recipe-edit-ingredient-modal-field-label">Requirement</span>
+            <div class="recipe-edit-ingredient-requirement-control" role="radiogroup" aria-label="Requirement">
+                <button type="button" role="radio" data-recipe-ingredient-requirement="required">Required</button>
+                <button type="button" role="radio" data-recipe-ingredient-requirement="optional">Optional</button>
+            </div>
+        `;
+        requirementField.appendChild(type);
+        const chooseRequirement = button => {
+            if (!button || !typeSelect) return;
+            const requirement = button.dataset.recipeIngredientRequirement;
+            if (requirement === "optional") {
+                typeSelect.value = "optional";
+            } else if (recipeIngredientTypeKey(typeSelect.value) === "optional") {
+                typeSelect.value = "main";
+            }
+            if (optionalInput) optionalInput.checked = requirement === "optional";
+            typeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            button.focus({ preventScroll: true });
+        };
+        requirementField.querySelectorAll("[data-recipe-ingredient-requirement]").forEach(button => {
+            button.addEventListener("click", () => chooseRequirement(button));
+        });
+        requirementField.querySelector(".recipe-edit-ingredient-requirement-control")?.addEventListener("keydown", event => {
+            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+            event.preventDefault();
+            const buttons = Array.from(event.currentTarget.querySelectorAll("[data-recipe-ingredient-requirement]"));
+            const currentIndex = buttons.indexOf(document.activeElement);
+            const direction = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+            const nextButton = buttons[(currentIndex + direction + buttons.length) % buttons.length];
+            chooseRequirement(nextButton);
+        });
+        usageGrid?.appendChild(requirementField);
     }
     if (notes) {
         notes.classList.add("recipe-edit-ingredient-edit-field", "recipe-edit-ingredient-modal-notes-field");
@@ -26714,6 +26800,12 @@ function organizeRecipeEditIngredientRow(row) {
         requestRecipeIngredientModalClose(editPanel);
     });
     editPanel.addEventListener("keydown", event => handleRecipeIngredientModalKeydown(event, editPanel));
+    const updateModalDirtyState = event => {
+        if (!event.target || !event.target.matches("[data-field]")) return;
+        window.requestAnimationFrame(() => updateRecipeIngredientModalDirtyStatus(row));
+    };
+    editPanel.addEventListener("input", updateModalDirtyState);
+    editPanel.addEventListener("change", updateModalDirtyState);
     const generateImageButton = imagePanel ? imagePanel.querySelector("[data-ingredient-image-generate]") : null;
     if (generateImageButton) {
         generateImageButton.addEventListener("click", () => {
@@ -26723,8 +26815,6 @@ function organizeRecipeEditIngredientRow(row) {
         }, { capture: true });
     }
 
-    const typeSelect = type ? type.querySelector('[data-field="section"]') : null;
-    const optionalInput = optional ? optional.querySelector('[data-field="optional"]') : null;
     if (typeSelect && optionalInput) {
         optionalInput.checked = recipeIngredientTypeValue({ section: typeSelect.value, optional: optionalInput.checked }) === "optional";
         if (optionalInput.checked) typeSelect.value = "optional";
@@ -26732,6 +26822,7 @@ function organizeRecipeEditIngredientRow(row) {
             optionalInput.checked = String(typeSelect.value || "").trim().toLowerCase() === "optional";
             optionalInput.dispatchEvent(new Event("change", { bubbles: true }));
         });
+        syncRecipeIngredientTypeControl(typeSelect);
     }
 
     organizeRecipeEditCompactRowActions(row, '[data-field="ingredient"]', "ingredient");
@@ -26962,6 +27053,7 @@ function setRecipeIngredientEditMode(row, shouldEdit, options = {}) {
         panel.hidden = false;
         mountRecipeIngredientModalImage(row, panel);
         clearRecipeIngredientModalErrors(panel);
+        setRecipeIngredientModalStatus(panel, "");
         const analysis = panel.querySelector("[data-recipe-ingredient-modal-analysis]");
         if (analysis) analysis.open = false;
         const body = panel.querySelector(".recipe-edit-ingredient-modal-body");
@@ -34751,6 +34843,14 @@ function syncRecipeIngredientTypeControl(select) {
     if (dot) {
         dot.className = `recipe-edit-type-dot${builtIn && builtIn.value === "optional" ? " is-optional" : ""}${!builtIn ? " is-custom" : ""}`;
     }
+    const requirementField = label ? label.closest("[data-recipe-ingredient-modal-requirement]") : null;
+    const isOptional = recipeIngredientTypeKey(selectedValue) === "optional";
+    requirementField?.querySelectorAll("[data-recipe-ingredient-requirement]").forEach(button => {
+        const selected = (button.dataset.recipeIngredientRequirement === "optional") === isOptional;
+        button.setAttribute("aria-checked", String(selected));
+        button.classList.toggle("is-selected", selected);
+        button.tabIndex = selected ? 0 : -1;
+    });
 }
 
 function ensureRecipeIngredientTypeMenu() {
@@ -37150,7 +37250,12 @@ function updateRecipeIngredientSummary(row) {
         readBuyAs.textContent = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "";
         readBuyAs.hidden = !meaningfulBuyAs;
     }
-    if (editSubtitle) editSubtitle.textContent = ingredientName;
+    if (editSubtitle) {
+        const rows = recipeEditIngredientRows();
+        const ingredientIndex = rows.indexOf(row);
+        const displayName = recipeIngredientSentenceCase(ingredientName) || "Ingredient";
+        editSubtitle.textContent = `${displayName} \u00b7 Ingredient ${Math.max(ingredientIndex, 0) + 1} of ${Math.max(rows.length, 1)}`;
+    }
     if (quantitySummary) quantitySummary.textContent = formatRecipeIngredientQuantity(values);
     if (storeSummary) {
         const storeLabel = recipeStoreSectionDisplayLabel(values.store_section || "");
