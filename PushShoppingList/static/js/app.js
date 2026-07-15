@@ -26554,6 +26554,34 @@ function editRecipeIngredientSubstitutionFields(button) {
     return setRecipeIngredientAlternativeEditMode(button, true);
 }
 
+function ensureRecipeIngredientModalIdentityStack(editPanel) {
+    const identityGrid = editPanel
+        ? editPanel.querySelector("[data-recipe-ingredient-modal-identity]")
+        : null;
+    if (!identityGrid) {
+        return null;
+    }
+
+    let identityFields = identityGrid.querySelector(":scope > .recipe-edit-ingredient-modal-identity-fields");
+    if (!identityFields) {
+        identityFields = document.createElement("div");
+        identityFields.className = "recipe-edit-ingredient-modal-identity-fields";
+        identityGrid.appendChild(identityFields);
+    }
+
+    const name = identityGrid.querySelector(":scope > .recipe-edit-ingredient-modal-name-field")
+        || identityFields.querySelector(":scope > .recipe-edit-ingredient-modal-name-field");
+    const buyAs = identityGrid.querySelector(":scope > .recipe-edit-ingredient-modal-buy-as-field")
+        || identityFields.querySelector(":scope > .recipe-edit-ingredient-modal-buy-as-field");
+    if (name) {
+        identityFields.appendChild(name);
+    }
+    if (buyAs) {
+        identityFields.appendChild(buyAs);
+    }
+    return identityFields;
+}
+
 function organizeRecipeEditIngredientRow(row) {
     if (!recipeEditorStandalonePageIsActive() || !row || row.dataset.recipeEditCompactRow === "1") {
         return;
@@ -26794,6 +26822,7 @@ function organizeRecipeEditIngredientRow(row) {
         buyAs.appendChild(helper);
         identityFields.appendChild(buyAs);
     }
+    ensureRecipeIngredientModalIdentityStack(editPanel);
     [
         [quantity, "amount"],
         [unit, "unit"],
@@ -27126,6 +27155,7 @@ function setRecipeIngredientEditMode(row, shouldEdit, options = {}) {
         recipeEditIngredientModalReturnFocus = options.trigger || editButton || recipeEditIngredientModalReturnFocus;
         document.body.classList.add("recipe-ingredient-modal-open");
         panel.hidden = false;
+        ensureRecipeIngredientModalIdentityStack(panel);
         mountRecipeIngredientModalImage(row, panel);
         clearRecipeIngredientModalErrors(panel);
         setRecipeIngredientModalStatus(panel, "");

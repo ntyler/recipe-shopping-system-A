@@ -49433,6 +49433,23 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recip
     max-width: none !important;
 }
 
+/* Keep older, already-organized modal markup aligned until it is normalized on open. */
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-image-slot {
+    grid-area: auto !important;
+    grid-column: 1 !important;
+    grid-row: 1 / span 2 !important;
+}
+
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-name-field {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+}
+
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-buy-as-field {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px 20px;
@@ -49725,6 +49742,21 @@ body.recipe-edit-standalone-page :is(
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-slot {
         width: min(100%, 360px) !important;
         max-width: 360px !important;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-image-slot {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-name-field {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-buy-as-field {
+        grid-column: 1 !important;
+        grid-row: 3 !important;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-section.is-quantity .recipe-edit-ingredient-modal-field-grid {

@@ -784,6 +784,21 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert "Ingredient ${Math.max(ingredientIndex, 0) + 1} of ${Math.max(rows.length, 1)}" in script
     assert 'identityFields.className = "recipe-edit-ingredient-modal-identity-fields";' in script
     assert script.index("identityFields.appendChild(name);") < script.index("identityFields.appendChild(buyAs);")
+    identity_repair = script[
+        script.index("function ensureRecipeIngredientModalIdentityStack"):
+        script.index("function organizeRecipeEditIngredientRow")
+    ]
+    assert ':scope > .recipe-edit-ingredient-modal-name-field' in identity_repair
+    assert ':scope > .recipe-edit-ingredient-modal-buy-as-field' in identity_repair
+    assert identity_repair.index("identityFields.appendChild(name);") < identity_repair.index("identityFields.appendChild(buyAs);")
+    modal_open = script[
+        script.index("function setRecipeIngredientEditMode"):
+        script.index("function saveRecipeIngredientInlineEdit")
+    ]
+    assert "ensureRecipeIngredientModalIdentityStack(panel);" in modal_open
+    assert ".recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-name-field" in compact
+    assert ".recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-buy-as-field" in compact
+    assert "grid-row: 2 !important;" in compact
 
 
 def test_recipe_editor_ingredient_polish_uses_professional_grid_and_command_bar():
