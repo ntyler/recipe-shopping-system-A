@@ -210,6 +210,10 @@ def test_recipe_notes_are_editable_between_instructions_and_nutrition():
     assert "/* Notes editor v2:" in css
     assert "grid-template-columns: minmax(0, 1.45fr) minmax(320px, .8fr);" in css
     assert ".recipe-edit-tabs-card .recipe-edit-notes-card .recipe-edit-section-title p" in css
+    assert ".recipe-edit-section.recipe-edit-notes-card > .recipe-edit-notes-card-header" in css
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in css
+    assert ".recipe-edit-section-title > div" in css
+    assert "overflow-wrap: anywhere;" in css
     assert "#recipeEditReflectionNotes:empty::before" in css
     assert "from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections" in service
     assert "recipe_notes = normalize_recipe_note_sections" in service

@@ -34508,6 +34508,31 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     white-space: nowrap;
 }
 
+/* Reserve a separate action column so note subtitles never run beneath buttons. */
+.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section.recipe-edit-notes-card > .recipe-edit-notes-card-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section.recipe-edit-notes-card .recipe-edit-section-title,
+.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section.recipe-edit-notes-card .recipe-edit-section-title > div {
+    width: 100%;
+    min-width: 0;
+}
+
+.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section.recipe-edit-notes-card .recipe-edit-section-title p {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section.recipe-edit-notes-card > .recipe-edit-notes-card-header > .recipe-edit-section-actions {
+    align-self: center;
+    justify-self: end;
+    margin-left: 0;
+}
+
 .recipe-edit-standalone-page .recipe-edit-recipe-notes-section .recipe-edit-note-presets {
     gap: 6px;
     margin: 0;
@@ -34581,10 +34606,15 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
         flex-direction: column;
     }
 
-    .recipe-edit-standalone-page .recipe-edit-notes-card .recipe-edit-section-actions {
+    .recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section.recipe-edit-notes-card > .recipe-edit-notes-card-header {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section.recipe-edit-notes-card .recipe-edit-section-actions {
         width: 100%;
         margin-left: 0;
         justify-content: flex-start;
+        justify-self: start;
     }
 }
 
