@@ -1587,6 +1587,10 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert 'source.dispatchEvent(new Event(eventName, { bubbles: true }));' in binding
     assert 'control.tagName === "SELECT"' in binding
     assert 'control.replaceChildren(...[...source.options].map(option => option.cloneNode(true)));' in script
+    assert 'bindRecipeIngredientUnitPickerTrigger(control);' in binding
+    assert "function bindRecipeIngredientUnitPickerTrigger(input)" in script
+    assert 'input.removeAttribute("list");' in script
+    assert 'openRecipeIngredientUnitPicker(input, { showAll: true })' in script
     assert "syncRecipeIngredientInlineEditor(row)" in summary
     assert "readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem)" in summary
     assert "meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values)" in summary

@@ -27187,6 +27187,8 @@ function bindRecipeIngredientInlineEditor(row) {
         if (!source) return;
         if (fieldName === "store_section") {
             ensureRecipeIngredientInlineStoreSectionTrigger(control, source);
+        } else if (fieldName === "unit") {
+            bindRecipeIngredientUnitPickerTrigger(control);
         }
 
         const applyValue = eventName => {
@@ -36554,6 +36556,31 @@ function handleRecipeIngredientUnitKeydown(event, input) {
     }
 }
 
+function bindRecipeIngredientUnitPickerTrigger(input) {
+    if (!input || input.dataset.recipeEditUnitPickerBound === "true") {
+        return;
+    }
+    input.dataset.recipeEditUnitPickerBound = "true";
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-haspopup", "listbox");
+    input.setAttribute("aria-controls", "recipeIngredientUnitMenu");
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("list");
+    input.dataset.recipeEditUnitTrigger = "true";
+    input.addEventListener("click", () => openRecipeIngredientUnitPicker(input, { showAll: true }));
+    input.addEventListener("keydown", event => handleRecipeIngredientUnitKeydown(event, input));
+    input.addEventListener("input", () => {
+        input.setCustomValidity("");
+        input.removeAttribute("aria-invalid");
+        const menu = document.getElementById("recipeIngredientUnitMenu");
+        if (menu && !menu.hidden && menu.recipeEditAnchorButton === input) {
+            renderRecipeIngredientUnitMenu(menu, input);
+            positionRecipeEditPopupMenu(menu, input);
+        }
+    });
+}
+
 function bindRecipeIngredientUnitControls(scope) {
     ensureRecipeIngredientUnitOption();
     scope.querySelectorAll('[data-field="unit"]').forEach(input => {
@@ -36568,26 +36595,9 @@ function bindRecipeIngredientUnitControls(scope) {
         if (savedAsCustom && selectedValue) {
             saveRecipeIngredientCustomUnitName(selectedValue);
         }
-        input.setAttribute("role", "combobox");
-        input.setAttribute("aria-autocomplete", "list");
-        input.setAttribute("aria-haspopup", "listbox");
-        input.setAttribute("aria-controls", "recipeIngredientUnitMenu");
-        input.setAttribute("aria-expanded", "false");
-        input.removeAttribute("list");
-        input.dataset.recipeEditUnitTrigger = "true";
-        input.addEventListener("click", () => openRecipeIngredientUnitPicker(input, { showAll: true }));
-        input.addEventListener("keydown", event => handleRecipeIngredientUnitKeydown(event, input));
+        bindRecipeIngredientUnitPickerTrigger(input);
         input.addEventListener("change", () => canonicalizeRecipeIngredientUnitControl(input, { report: true }));
         input.addEventListener("blur", () => canonicalizeRecipeIngredientUnitControl(input));
-        input.addEventListener("input", () => {
-            input.setCustomValidity("");
-            input.removeAttribute("aria-invalid");
-            const menu = document.getElementById("recipeIngredientUnitMenu");
-            if (menu && !menu.hidden && menu.recipeEditAnchorButton === input) {
-                renderRecipeIngredientUnitMenu(menu, input);
-                positionRecipeEditPopupMenu(menu, input);
-            }
-        });
         canonicalizeRecipeIngredientUnitControl(input);
     });
 }
