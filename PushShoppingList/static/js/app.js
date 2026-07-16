@@ -36768,7 +36768,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
                 </label>
             </div>
             <label class="recipe-edit-qty-label">
-                <span>Amount</span>
+                <span>Quantity</span>
                 <input type="text" data-field="quantity" value="${escapeAttribute(option.quantity || "")}">
             </label>
             <label class="recipe-edit-quantity-text-inline">

@@ -1149,6 +1149,8 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'data-field="ingredient_image_generated_at"' in alternative_markup
     assert 'data-field="ingredient_image_prompt"' in alternative_markup
     assert '<textarea data-field="ingredient" rows="1" aria-label="Ingredient">' in alternative_markup
+    assert '<span>Quantity</span>' in alternative_markup
+    assert '<span>Amount</span>' not in alternative_markup
     assert 'data-field="confidence_score"' in alternative_markup
     assert 'data-field="match_confidence"' in alternative_markup
     assert 'data-field="reason"' in alternative_markup
