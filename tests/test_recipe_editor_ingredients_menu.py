@@ -915,6 +915,27 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert "overflow-x: hidden;" in scroll_rule
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in workspace
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);" in workspace
+    bottom_grid_rule = workspace[workspace.index(".recipe-edit-ingredient-modal-bottom-grid {"):]
+    bottom_grid_rule = bottom_grid_rule[:bottom_grid_rule.index("}")]
+    assert "align-items: start;" in bottom_grid_rule
+    assert "align-items: stretch;" not in bottom_grid_rule
+    bottom_card_rule = workspace[
+        workspace.index(
+            ".recipe-edit-ingredient-modal-bottom-grid > .recipe-edit-ingredient-modal-section {"
+        ):
+    ]
+    bottom_card_rule = bottom_card_rule[:bottom_card_rule.index("}")]
+    assert "align-self: start;" in bottom_card_rule
+    assert "height: fit-content;" in bottom_card_rule
+    bottom_surface_rule = workspace[
+        workspace.index(
+            ".recipe-edit-ingredient-modal-bottom-grid .recipe-edit-ingredient-modal-section-surface {"
+        ):
+    ]
+    bottom_surface_rule = bottom_surface_rule[:bottom_surface_rule.index("}")]
+    assert "min-height: 0;" in bottom_surface_rule
+    assert "height: fit-content;" in bottom_surface_rule
+    assert "min-height: 100%;" not in bottom_surface_rule
     assert "padding: 24px 28px;" in workspace
     assert "gap: 20px;" in workspace
     assert ".recipe-edit-ingredient-modal-nav button.is-active" in workspace

@@ -50212,13 +50212,18 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-requirement-control but
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-bottom-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
-    align-items: stretch;
+    align-items: start;
     gap: 20px;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-bottom-grid > .recipe-edit-ingredient-modal-section,
+body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-bottom-grid > .recipe-edit-ingredient-modal-section {
+    align-self: start;
+    height: fit-content;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-bottom-grid .recipe-edit-ingredient-modal-section-surface {
-    min-height: 100%;
+    min-height: 0;
+    height: fit-content;
 }
 
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-notes-field textarea {
