@@ -27113,6 +27113,71 @@ function removeRecipeIngredientFromModal(button) {
     return removeRecipeEditRow(button);
 }
 
+function recipeIngredientInlineOptionSignature(select) {
+    return JSON.stringify([...select.options].map(option => [
+        option.value,
+        option.textContent,
+        option.disabled,
+        option.dataset.custom || "",
+    ]));
+}
+
+function syncRecipeIngredientInlineEditor(row) {
+    if (!row) return;
+    row.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
+        const fieldName = control.dataset.recipeIngredientInlineField;
+        const source = recipeIngredientDirectField(row, fieldName);
+        if (!source) return;
+
+        if (control.tagName === "SELECT" && source.tagName === "SELECT") {
+            const optionSignature = recipeIngredientInlineOptionSignature(source);
+            if (control.dataset.recipeIngredientOptionSignature !== optionSignature) {
+                control.replaceChildren(...[...source.options].map(option => option.cloneNode(true)));
+                control.dataset.recipeIngredientOptionSignature = optionSignature;
+            }
+        }
+
+        control.value = source.value;
+        if (source.hasAttribute("aria-invalid")) {
+            control.setAttribute("aria-invalid", source.getAttribute("aria-invalid") || "true");
+        } else {
+            control.removeAttribute("aria-invalid");
+        }
+        if (typeof control.setCustomValidity === "function") {
+            control.setCustomValidity(source.validationMessage || "");
+        }
+    });
+}
+
+function bindRecipeIngredientInlineEditor(row) {
+    if (!row) return;
+    row.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
+        if (control.dataset.recipeIngredientInlineBound === "true") return;
+        control.dataset.recipeIngredientInlineBound = "true";
+        const fieldName = control.dataset.recipeIngredientInlineField;
+        const source = recipeIngredientDirectField(row, fieldName);
+        if (!source) return;
+
+        const applyValue = eventName => {
+            source.value = control.value;
+            source.dispatchEvent(new Event(eventName, { bubbles: true }));
+            syncRecipeIngredientInlineEditor(row);
+        };
+        const primaryEvent = control.tagName === "SELECT" ? "change" : "input";
+        control.addEventListener(primaryEvent, () => applyValue(primaryEvent));
+        if (control.tagName !== "SELECT") {
+            control.addEventListener("change", () => applyValue("change"));
+            control.addEventListener("blur", () => {
+                source.dispatchEvent(new Event("blur"));
+                syncRecipeIngredientInlineEditor(row);
+            });
+        }
+        source.addEventListener("input", () => syncRecipeIngredientInlineEditor(row));
+        source.addEventListener("change", () => syncRecipeIngredientInlineEditor(row));
+    });
+    syncRecipeIngredientInlineEditor(row);
+}
+
 function organizeRecipeEditIngredientRow(row) {
     if (!recipeEditorStandalonePageIsActive() || !row || row.dataset.recipeEditCompactRow === "1") {
         return;
@@ -27156,23 +27221,40 @@ function organizeRecipeEditIngredientRow(row) {
     readCell.className = "recipe-edit-ingredient-read-cell";
     readCell.setAttribute("role", "cell");
     readCell.innerHTML = `
-        <strong class="recipe-edit-ingredient-read-name" data-ingredient-read-name></strong>
+        <input type="text"
+               class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-name"
+               data-ingredient-read-name
+               data-recipe-ingredient-inline-field="ingredient"
+               aria-label="Ingredient"
+               autocomplete="off">
         <span class="recipe-edit-ingredient-read-status" data-ingredient-read-status></span>
         <span class="recipe-edit-ingredient-read-buy-as" data-ingredient-read-buy-as hidden></span>
     `;
     row.appendChild(readCell);
 
     const summaryDefinitions = [
-        ["recipe-edit-ingredient-quantity-summary", "ingredientQuantitySummary"],
-        ["recipe-edit-ingredient-unit-summary", "ingredientUnitSummary"],
-        ["recipe-edit-ingredient-store-summary", "ingredientStoreSummary"],
-        ["recipe-edit-ingredient-type-summary", "ingredientTypeSummary"],
+        ["recipe-edit-ingredient-quantity-summary", "ingredientQuantitySummary", "quantity", "input"],
+        ["recipe-edit-ingredient-unit-summary", "ingredientUnitSummary", "unit", "input"],
+        ["recipe-edit-ingredient-store-summary", "ingredientStoreSummary", "store_section", "select"],
+        ["recipe-edit-ingredient-type-summary", "ingredientTypeSummary", "section", "select"],
     ];
-    summaryDefinitions.forEach(([className, dataName]) => {
+    summaryDefinitions.forEach(([className, dataName, fieldName, tagName]) => {
         const summary = document.createElement("div");
         summary.className = className;
         summary.dataset[dataName] = "";
         summary.setAttribute("role", "cell");
+        const control = document.createElement(tagName);
+        if (tagName === "input") control.type = "text";
+        control.className = "recipe-edit-ingredient-inline-control";
+        control.dataset.recipeIngredientInlineField = fieldName;
+        control.setAttribute("aria-label", {
+            quantity: "Quantity",
+            unit: "Unit",
+            store_section: "Store Section",
+            section: "Type",
+        }[fieldName]);
+        if (fieldName === "unit") control.setAttribute("list", "recipeIngredientUnitOptions");
+        summary.appendChild(control);
         row.appendChild(summary);
     });
 
@@ -37221,6 +37303,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
     bindRecipeIngredientSummaryUpdates(row);
+    bindRecipeIngredientInlineEditor(row);
     bindRecipeIngredientSubstitutionRows(row);
     bindRecipeEditDragAndDrop(row);
     updateRecipeIngredientFoodRuleWarning(row);
@@ -38410,16 +38493,12 @@ function cancelRecipeIngredientSubstitutionMenu() {
 function updateRecipeIngredientSummary(row) {
     const badges = row ? row.querySelector("[data-ingredient-badges]") : null;
     const matchDetails = row ? row.querySelector("[data-ingredient-match-details]") : null;
-    const readName = row ? row.querySelector("[data-ingredient-read-name]") : null;
     const readStatus = row ? row.querySelector("[data-ingredient-read-status]") : null;
     const readBuyAs = row ? row.querySelector("[data-ingredient-read-buy-as]") : null;
     const editSubtitle = row ? row.querySelector("[data-recipe-ingredient-edit-subtitle]") : null;
     const previewName = row ? row.querySelector("[data-recipe-ingredient-modal-preview-name]") : null;
     const previewBuyAs = row ? row.querySelector("[data-recipe-ingredient-modal-preview-buy-as]") : null;
     const previewStore = row ? row.querySelector("[data-recipe-ingredient-modal-preview-store]") : null;
-    const quantitySummary = row ? row.querySelector("[data-ingredient-quantity-summary]") : null;
-    const unitSummary = row ? row.querySelector("[data-ingredient-unit-summary]") : null;
-    const storeSummary = row ? row.querySelector("[data-ingredient-store-summary]") : null;
     const typeSummary = row ? row.querySelector("[data-ingredient-type-summary]") : null;
     const container = recipeIngredientSubstitutionContainer(row);
     const substitutionCount = container ? container.querySelector("[data-ingredient-substitution-count]") : null;
@@ -38435,7 +38514,6 @@ function updateRecipeIngredientSummary(row) {
     }
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
     const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
-    if (readName) readName.textContent = ingredientName;
     if (previewName) previewName.textContent = recipeIngredientSentenceCase(ingredientName) || ingredientName;
     if (previewBuyAs) previewBuyAs.textContent = `Buy as: ${meaningfulBuyAs || "—"}`;
     if (previewStore) {
@@ -38453,12 +38531,7 @@ function updateRecipeIngredientSummary(row) {
         const displayName = recipeIngredientSentenceCase(ingredientName) || "Ingredient";
         editSubtitle.textContent = `${displayName} \u00b7 Ingredient ${Math.max(ingredientIndex, 0) + 1} of ${Math.max(rows.length, 1)}`;
     }
-    if (quantitySummary) quantitySummary.textContent = formatRecipeIngredientQuantityColumn(values);
-    if (unitSummary) unitSummary.textContent = formatRecipeIngredientUnitColumn(values);
-    if (storeSummary) {
-        const storeLabel = recipeStoreSectionDisplayLabel(values.store_section || "");
-        storeSummary.innerHTML = `${recipeIngredientStoreSectionIconHtml(values.store_section || "")}<span>${escapeHtml(storeLabel || "\u2014")}</span>`;
-    }
+    syncRecipeIngredientInlineEditor(row);
     if (typeSummary) {
         const typeValue = recipeIngredientTypeValue(values);
         const typeLabel = recipeIngredientTypeLabel(values);
@@ -38466,7 +38539,6 @@ function updateRecipeIngredientSummary(row) {
             .replace(/[^a-z0-9 ]/g, "")
             .replace(/\s+/g, "-") || "main";
         typeSummary.className = `recipe-edit-ingredient-type-summary is-${typeClass}`;
-        typeSummary.textContent = typeLabel;
         typeSummary.title = typeLabel;
         typeSummary.setAttribute("aria-label", `Type: ${typeLabel}`);
     }

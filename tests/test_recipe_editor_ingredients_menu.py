@@ -1543,7 +1543,7 @@ def test_recipe_editor_alternative_editing_is_scoped_to_one_group_and_serializab
     assert "@media (max-width: 760px)" in v16
 
 
-def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value():
+def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_status():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     status = script[
@@ -1568,17 +1568,35 @@ def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value
         script.index("function updateRecipeIngredientSummary"):
         script.index("function recipeEditIngredientRows")
     ]
-    assert "readName.textContent" in summary
+    organize = script[
+        script.index("function organizeRecipeEditIngredientRow"):
+        script.index("function organizeRecipeEditCompactRowActions")
+    ]
+    binding = script[
+        script.index("function bindRecipeIngredientInlineEditor"):
+        script.index("function organizeRecipeEditIngredientRow")
+    ]
+    for field_name in ("ingredient", "quantity", "unit", "store_section", "section"):
+        assert f'data-recipe-ingredient-inline-field="{field_name}"' in organize or (
+            f'control.dataset.recipeIngredientInlineField = fieldName' in organize
+            and f'"{field_name}"' in organize
+        )
+    for label in ("Ingredient", "Quantity", "Unit", "Store Section", "Type"):
+        assert f'aria-label="{label}"' in organize or f'"{label}"' in organize
+    assert 'const source = recipeIngredientDirectField(row, fieldName);' in binding
+    assert 'source.dispatchEvent(new Event(eventName, { bubbles: true }));' in binding
+    assert 'control.tagName === "SELECT"' in binding
+    assert 'control.replaceChildren(...[...source.options].map(option => option.cloneNode(true)));' in script
+    assert "syncRecipeIngredientInlineEditor(row)" in summary
     assert "readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem)" in summary
     assert "meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values)" in summary
     assert "readBuyAs.hidden = !meaningfulBuyAs" in summary
-    assert "quantitySummary.textContent = formatRecipeIngredientQuantityColumn(values)" in summary
-    assert "unitSummary.textContent = formatRecipeIngredientUnitColumn(values)" in summary
+    assert "quantitySummary.textContent" not in summary
+    assert "unitSummary.textContent" not in summary
     assert "preparationSummary" not in summary
     assert "buyAsSummary" not in summary
-    assert "recipeIngredientStoreSectionIconHtml(values.store_section || \"\")" in summary
     assert "const typeLabel = recipeIngredientTypeLabel(values)" in summary
-    assert "typeSummary.textContent = typeLabel" in summary
+    assert "typeSummary.textContent = typeLabel" not in summary
 
     v10 = css[css.index("/* Ingredient editor v10:"):]
     hidden_status_start = v10.index(".recipe-edit-ingredient-role-summary")
@@ -1587,6 +1605,10 @@ def test_recipe_editor_read_summaries_combine_status_quantity_and_one_type_value
     assert "display: none !important;" in v10[hidden_status_start:hidden_status_end]
     assert ".recipe-edit-ingredient-edit-support > .recipe-edit-ingredient-legacy-optional" in v10
     assert ".recipe-edit-ingredient-type-summary.is-optional" in v10
+    v20 = css[css.index("/* Ingredient editor v20:"):]
+    assert ".recipe-edit-ingredient-inline-control" in v20
+    assert ".recipe-edit-ingredient-inline-control:focus" in v20
+    assert "width: 100%;" in v20
 
 
 def test_recipe_editor_secondary_metadata_hides_redundant_buy_as_and_empty_preparation():
