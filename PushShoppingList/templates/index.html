@@ -2,7 +2,7 @@
 {% import "includes/app_shell_macros.html" as shell %}
 {% set app_page_title = "Shopping List" %}
 {% set app_shell_mode = "spa" %}
-{% set app_active_nav_item = "home" %}
+{% set app_active_nav_item = "meal-planner" if initial_app_page|default("") == "mealPlannerPage" else "home" %}
 {% set app_search_id = "appGlobalSearch" %}
 {% set app_body_class = "account-action-token" if password_reset_token|default("") or two_factor_recovery_token|default("") or account_delete_token|default("") else "" %}
 
@@ -44,6 +44,7 @@
 {% block app_body_attributes %}
 data-performance-diagnostics="{{ '1' if performance_diagnostics_enabled else '0' }}"
 data-user-id="{{ current_user.user_id if current_user else '' }}"
+data-app-initial-page="{{ initial_app_page|default('') }}"
 {% endblock %}
 
 {% block app_overlays %}
@@ -56,7 +57,7 @@ data-user-id="{{ current_user.user_id if current_user else '' }}"
 {% endblock %}
 
 {% block app_content %}
-    <header id="appPageHeader" class="app-page-header" data-app-home-header>
+    <header id="appPageHeader" class="app-page-header" data-app-home-header{% if initial_app_page|default("") == "mealPlannerPage" %} hidden{% endif %}>
         <div class="app-home-hero-copy">
             <h1>Welcome back{% if current_user %}, {{ current_user.first_name or current_user.display_name }}{% elif is_guest_demo %}, Guest{% endif %}! <span aria-hidden="true">&#128075;</span></h1>
             <p>Let's get cooking. Here's what's happening in your kitchen.</p>
@@ -115,7 +116,7 @@ data-user-id="{{ current_user.user_id if current_user else '' }}"
     <div class="message">{{ message }}</div>
     {% endif %}
 
-    <section class="app-home-dashboard" data-app-home-dashboard aria-label="Home dashboard">
+    <section class="app-home-dashboard" data-app-home-dashboard aria-label="Home dashboard"{% if initial_app_page|default("") == "mealPlannerPage" %} hidden{% endif %}>
         <div class="app-home-summary-grid">
             <a class="app-home-summary-card"
                href="#shoppingViewsSection"

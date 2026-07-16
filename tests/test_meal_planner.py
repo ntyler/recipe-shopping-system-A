@@ -504,6 +504,20 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
         page = client.get("/?meal_week=2026-07-10")
         assert page.status_code == 200
         html = page.get_data(as_text=True)
+        home_header_start = html.index('<header id="appPageHeader"')
+        home_header = html[home_header_start:html.index(">", home_header_start) + 1]
+        home_dashboard_start = html.index('<section class="app-home-dashboard"')
+        home_dashboard = html[home_dashboard_start:html.index(">", home_dashboard_start) + 1]
+        meal_planner_start = html.index('<section id="mealPlannerPage"')
+        meal_planner = html[meal_planner_start:html.index(">", meal_planner_start) + 1]
+        assert " hidden" in home_header
+        assert " hidden" in home_dashboard
+        assert "hidden" not in meal_planner
+        assert 'data-app-initial-page="mealPlannerPage"' in html
+        meal_nav_label = html.index('aria-label="Meal Planner"')
+        meal_nav = html[html.rfind("<a ", 0, meal_nav_label):html.index(">", meal_nav_label) + 1]
+        assert "is-active" in meal_nav
+        assert 'aria-current="page"' in meal_nav
         preview_start = html.index('aria-label="Upcoming meal plan"')
         preview_end = html.index("</section>", preview_start)
         preview_html = html[preview_start:preview_end]
@@ -551,6 +565,20 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
         assert 'data-yield-label="2.5 servings"' in salad_option
         assert preview_batches[0] == [f"recipe://filler-{index}" for index in range(8)]
         assert preview_batches[1] == ["recipe://soup", "recipe://salad"]
+
+        home_page = client.get("/")
+        assert home_page.status_code == 200
+        home_html = home_page.get_data(as_text=True)
+        default_header_start = home_html.index('<header id="appPageHeader"')
+        default_header = home_html[default_header_start:home_html.index(">", default_header_start) + 1]
+        default_dashboard_start = home_html.index('<section class="app-home-dashboard"')
+        default_dashboard = home_html[default_dashboard_start:home_html.index(">", default_dashboard_start) + 1]
+        default_meal_planner_start = home_html.index('<section id="mealPlannerPage"')
+        default_meal_planner = home_html[default_meal_planner_start:home_html.index(">", default_meal_planner_start) + 1]
+        assert " hidden" not in default_header
+        assert " hidden" not in default_dashboard
+        assert "hidden" in default_meal_planner
+        assert 'data-app-initial-page=""' in home_html
 
         response = client.delete(f"/api/meal-plan/{soup_id}")
         assert response.status_code == 200
@@ -620,6 +648,8 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     assert "function updateMealPlannerServingControls" in script
     assert "Recipe yields ${yieldLabel}." in script
     assert "planned_servings: plannedServings" in script
+    assert "document.body.dataset.appInitialPage" in script
+    assert "openAppPage(initialPage" in script
 
 
 def test_homepage_syncs_browser_local_calendar_date_without_utc_conversion():

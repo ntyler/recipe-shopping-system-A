@@ -27,7 +27,8 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert '{% include "includes/app_header.html" %}' in layout
     assert '<aside class="app-sidebar' in sidebar
     assert '<header class="app-topbar" aria-label="App toolbar" data-app-header>' in header
-    assert '<header id="appPageHeader" class="app-page-header" data-app-home-header>' in template
+    assert '<header id="appPageHeader" class="app-page-header" data-app-home-header' in template
+    assert 'initial_app_page|default("") == "mealPlannerPage" %} hidden' in template
     assert '<nav class="app-mobile-bottom-nav" aria-label="Mobile navigation">' in mobile_navigation
     assert '{% include "includes/app_navigation_sections.html" %}' in sidebar
     assert '{% include "includes/app_navigation_sections.html" %}' in mobile_navigation

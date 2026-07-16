@@ -881,6 +881,15 @@ function initAppShellInitialWorkspace() {
         return;
     }
 
+    const initialPage = String(document.body.dataset.appInitialPage || "").trim();
+    if (initialPage && document.getElementById(initialPage)) {
+        openAppPage(initialPage, {
+            updateHash: false,
+            scroll: false,
+        });
+        return;
+    }
+
     if (document.body.classList.contains("account-action-token")) {
         openUserAccountWorkspace({
             updateHash: false,

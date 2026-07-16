@@ -611,8 +611,9 @@ def shell_context(active_public_user=None):
     store_settings = load_store_settings()
     pantry_items = pantry_items_for_view()
     local_calendar_date = request_local_calendar_date()
+    requested_meal_week = str(request.args.get("meal_week") or "").strip()
     meal_plan = meal_plan_for_week(
-        request.args.get("meal_week"),
+        requested_meal_week,
         reference_date=local_calendar_date,
     )
     home_meal_plan = meal_plan_home_preview(reference_date=local_calendar_date)
@@ -732,6 +733,7 @@ def shell_context(active_public_user=None):
         "meal_plan": meal_plan,
         "home_meal_plan": home_meal_plan,
         "meal_plan_recipe_options": recipe_options,
+        "initial_app_page": "mealPlannerPage" if requested_meal_week else "",
     }
 
 

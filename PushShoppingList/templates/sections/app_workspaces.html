@@ -640,7 +640,7 @@
 <section id="mealPlannerPage"
          class="app-page-workspace app-page-workspace-meal-planner"
          data-app-page-workspace
-         hidden>
+         {% if initial_app_page|default("") != "mealPlannerPage" %}hidden{% endif %}>
     <div class="app-page-heading-row">
         <div>
             <h2>Meal Planner</h2>
