@@ -1113,7 +1113,15 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "data-alternative-component-facts" in substitution
     assert "data-alternative-component-buy-as" in substitution
     assert 'editGrid.className = "recipe-edit-alternative-component-edit-grid";' in substitution
-    assert "[name, quantity, unit, size, quantityText, preparation, buyAs, storeSection, preferred, notes, originalText]" in substitution
+    assert '[name, "field-ingredient"]' in substitution
+    assert '[quantityText, "field-quantity-text"]' in substitution
+    assert 'sourceDetails.className = "recipe-edit-alternative-source-details";' in substitution
+    assert ">Source details</summary>" in substitution
+    assert 'buyAsLabel.textContent = "Purchasing name (if different)";' in substitution
+    assert 'ingredientLabel.textContent = "Ingredient / Buy As";' in substitution
+    assert '["Match source",' in substitution
+    assert '["Match confidence",' in substitution
+    assert '["AI reasoning",' in substitution
     assert "optional.hidden = true;" in substitution
     assert "Remove ingredient" in substitution
     assert "editRecipeIngredientAlternativeComponent(this)" in substitution
@@ -1142,7 +1150,9 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "data-alternative-card-confidence" in card
     assert "data-alternative-card-name" in card
     assert "data-alternative-card-type" in card
+    assert "data-alternative-card-quality" in card
     assert "data-alternative-original-amount" in card
+    assert "data-alternative-summary-replacement" in card
     assert "data-alternative-equivalency-original" in card
     assert "data-alternative-equivalency-replacement" in card
     assert "data-alternative-together" in card
@@ -1158,7 +1168,7 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "recipe-edit-alternative-components" in card
     assert ">Original</span>" in card
     assert ">Replace With</span>" in card
-    assert ">Equivalent To</span>" in card
+    assert ">Equivalent result</span>" in card
     assert ">Why It Works</span>" in card
     assert "Use all ingredients in this group together." in card
     assert "Edit Group" in card
@@ -1166,7 +1176,7 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'aria-label="Edit Group"' in card
     assert 'aria-label="Duplicate Group"' in card
     assert "Delete Group" in card
-    assert "Add Ingredient to This Group" in card
+    assert "Add another replacement ingredient" in card
     assert "editRecipeIngredientAlternativeNotes(this)" in card
     assert "Save Group" in card
     assert ">Cancel</button>" in card
@@ -1174,14 +1184,19 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "duplicateRecipeIngredientAlternative(this)" in card
     assert "recipeIngredientSubstitutionDomGroups(optionRows)" in card
     assert "group.rows.forEach(optionRow => components.appendChild(optionRow));" in card
+    assert '<details class="recipe-edit-alternative-explanation-block">' in card
+    assert 'class="recipe-edit-alternative-remove"' in card
 
-    v17 = css[css.index("/* Ingredient editor v17:"):]
-    assert ".recipe-edit-alternative-card" in v17
-    assert ".recipe-edit-alternative-relationship" in v17
-    assert ".recipe-edit-alternative-equivalency" in v17
-    assert ".recipe-edit-alternative-explanation-block" in v17
-    assert "grid-template-columns: minmax(170px, .72fr) 42px minmax(0, 1.4fr);" in v17
-    assert "@media (max-width: 920px)" in v17
+    v18 = css[css.index("/* Ingredient editor v18:"):]
+    assert ".recipe-edit-alternative-card" in v18
+    assert ".recipe-edit-alternative-relationship" in v18
+    assert ".recipe-edit-alternative-editor" in v18
+    assert ".recipe-edit-alternative-equivalency" in v18
+    assert ".recipe-edit-alternative-explanation-block" in v18
+    assert "grid-template-columns: minmax(180px, 1fr) auto minmax(240px, 1.3fr);" in v18
+    assert "grid-template-columns: minmax(90px, .65fr) minmax(130px, .9fr) minmax(130px, .9fr) minmax(180px, 1.25fr);" in v18
+    assert "@media (max-width: 1100px)" in v18
+    assert "@media (max-width: 760px)" in v18
     v10 = css[css.index("/* Ingredient editor v10:"):]
     edit_grid_rule = v10[v10.index(".recipe-edit-alternative-component-edit-grid {"):]
     edit_grid_rule = edit_grid_rule[:edit_grid_rule.index("}")]
@@ -1558,7 +1573,7 @@ def test_recipe_editor_multi_ingredient_alternative_uses_one_preferred_control()
     assert 'card?.querySelectorAll(\'[data-field="preferred"]\')' in binding
     assert "preferredInput.checked = input.checked;" in binding
     assert binding.index('input.dataset.field === "preferred"') < binding.index("updateRecipeIngredientSubstitutionRowSummary(optionRow)")
-    assert "Add Ingredient" in markup
+    assert "Add another replacement ingredient" in markup
     assert ">Add replacement ingredient</button>" not in markup
 
 
