@@ -1108,13 +1108,16 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'optionRow.classList.add("recipe-edit-alternative-component");' in substitution
     assert 'summary.className = "recipe-edit-alternative-component-summary";' in substitution
     assert "data-alternative-component-name" in substitution
-    assert "data-alternative-component-status" in substitution
-    assert "data-alternative-component-amount" in substitution
-    assert "data-alternative-component-facts" in substitution
+    assert "data-alternative-component-quantity" in substitution
+    assert "data-alternative-component-unit" in substitution
+    assert "data-alternative-component-store" in substitution
+    assert "data-alternative-component-role" in substitution
+    assert "data-alternative-component-metadata" in substitution
     assert "data-alternative-component-buy-as" in substitution
     assert 'editGrid.className = "recipe-edit-alternative-component-edit-grid";' in substitution
-    assert '[name, "field-ingredient"]' in substitution
-    assert '[quantityText, "field-quantity-text"]' in substitution
+    assert 'identity.className = "recipe-edit-alternative-edit-field field-ingredient";' in substitution
+    assert 'compactMetadata.className = "recipe-edit-alternative-metadata-inputs";' in substitution
+    assert "[preparation, size, quantityText, optional]" in substitution
     assert 'sourceDetails.className = "recipe-edit-alternative-source-details";' in substitution
     assert ">Source details</summary>" in substitution
     assert 'buyAsLabel.textContent = "Purchasing name (if different)";' in substitution
@@ -1122,9 +1125,13 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert '["Match source",' in substitution
     assert '["Match confidence",' in substitution
     assert '["AI reasoning",' in substitution
-    assert "optional.hidden = true;" in substitution
-    assert "Remove ingredient" in substitution
+    assert "optional.hidden = true;" not in substitution
+    assert "removeComponent" not in substitution
     assert "editRecipeIngredientAlternativeComponent(this)" in substitution
+    assert "duplicateRecipeIngredientAlternativeComponent(this)" in substitution
+    assert ">Edit details</button>" in substitution
+    assert ">Duplicate replacement ingredient</button>" in substitution
+    assert ">Remove replacement ingredient</button>" in substitution
     assert "data-alternative-component-remove" in substitution
     assert "updateRecipeIngredientAlternativeComponentSummary(optionRow);" in substitution
 
@@ -1176,7 +1183,8 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'aria-label="Edit Group"' in card
     assert 'aria-label="Duplicate Group"' in card
     assert "Delete Group" in card
-    assert "Add another replacement ingredient" in card
+    assert "Add replacement ingredient" in card
+    assert "Add another replacement ingredient" not in card
     assert "editRecipeIngredientAlternativeNotes(this)" in card
     assert "Save Group" in card
     assert ">Cancel</button>" in card
@@ -1197,6 +1205,23 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "grid-template-columns: minmax(90px, .65fr) minmax(130px, .9fr) minmax(130px, .9fr) minmax(180px, 1.25fr);" in v18
     assert "@media (max-width: 1100px)" in v18
     assert "@media (max-width: 760px)" in v18
+    v19 = css[css.rindex("/* Ingredient editor v19:"):]
+    assert "--recipe-edit-alternative-grid:" in v19
+    assert "minmax(240px, 2.5fr)" in v19
+    assert "minmax(64px, .62fr)" in v19
+    assert "minmax(78px, .72fr)" in v19
+    assert ".recipe-edit-alternative-component-quantity" in v19
+    assert ".recipe-edit-alternative-component-unit" in v19
+    assert ".recipe-edit-alternative-component-store" in v19
+    assert ".recipe-edit-alternative-component-type" in v19
+    assert ".recipe-edit-alternative-component-actions" in v19
+    assert "background: transparent;" in v19
+    assert ".is-component-editing > .recipe-edit-alternative-component-edit-grid" in v19
+    mobile_v19 = v19[v19.rindex("@media (max-width: 760px)"):]
+    assert "grid-template-rows: minmax(44px, auto) auto auto auto !important;" in mobile_v19
+    assert "grid-column: 2 / 5;" in mobile_v19
+    assert "grid-column: 4 / 6;" in mobile_v19
+    assert "max-width: 100%;" in mobile_v19
     v10 = css[css.index("/* Ingredient editor v10:"):]
     edit_grid_rule = v10[v10.index(".recipe-edit-alternative-component-edit-grid {"):]
     edit_grid_rule = edit_grid_rule[:edit_grid_rule.index("}")]
@@ -1243,6 +1268,47 @@ def test_recipe_editor_v10_prioritizes_six_readable_groups_and_overflow_menu():
     assert 'actions.appendChild(menuWrap);' in script
     assert 'class="recipe-edit-compact-row-delete"' in script
     assert '${menuInActions ? "" : `<button type="button"' in script
+
+
+def test_recipe_editor_replacement_rows_edit_and_duplicate_without_new_save_plumbing():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    component_lookup = script[
+        script.index("function recipeIngredientAlternativeComponentFromControl"):
+        script.index("function recipeIngredientSubstitutionConfidencePercent")
+    ]
+    assert 'control.closest("[data-substitution-option-row]")' in component_lookup
+    assert "menu.recipeEditAnchorButton" in component_lookup
+    assert 'anchor.closest("[data-substitution-option-row]")' in component_lookup
+
+    edit_mode = script[
+        script.index("function setRecipeIngredientAlternativeEditMode"):
+        script.index("function replaceRecipeIngredientWithAlternativeCard")
+    ]
+    assert "options.activeComponent" in edit_mode
+    assert 'optionRow.classList.toggle("is-component-editing"' in edit_mode
+    assert 'editGrid.hidden = !shouldEdit || !editGrid.closest(".is-component-editing");' in edit_mode
+    assert "card.dataset.editSnapshot = JSON.stringify(snapshots);" in edit_mode
+
+    component_edit = script[
+        script.index("function editRecipeIngredientAlternativeComponent"):
+        script.index("function editRecipeIngredientAlternativeNotes")
+    ]
+    assert "recipeIngredientAlternativeComponentFromControl(button)" in component_edit
+    assert "{ activeComponent: optionRow }" in component_edit
+
+    duplicate = script[
+        script.index("function duplicateRecipeIngredientAlternativeComponent"):
+        script.index("function addRecipeIngredientAlternativeComponent")
+    ]
+    assert 'id: ""' in duplicate
+    assert 'substitution_id: ""' in duplicate
+    assert "recipeIngredientAlternativeComponentFromControl(button)" in duplicate
+    assert "alternative_id: alternativeId" in duplicate
+    assert "recipeIngredientSubstitutionOptionRowHtml(" in duplicate
+    assert "updateRecipeIngredientSubstitutionState(ingredientRow);" in duplicate
+    assert "setRecipeIngredientAlternativeEditMode(updatedCard, true, { activeComponent: updatedDuplicate });" in duplicate
+    assert "/api/" not in duplicate
 
 
 def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inline():
@@ -1573,8 +1639,8 @@ def test_recipe_editor_multi_ingredient_alternative_uses_one_preferred_control()
     assert 'card?.querySelectorAll(\'[data-field="preferred"]\')' in binding
     assert "preferredInput.checked = input.checked;" in binding
     assert binding.index('input.dataset.field === "preferred"') < binding.index("updateRecipeIngredientSubstitutionRowSummary(optionRow)")
-    assert "Add another replacement ingredient" in markup
-    assert ">Add replacement ingredient</button>" not in markup
+    assert "Add another replacement ingredient" not in markup
+    assert ">Add replacement ingredient</span>" in markup
 
 
 def test_recipe_editor_compact_table_responsive_priority_keeps_critical_columns():
