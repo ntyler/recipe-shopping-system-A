@@ -26877,7 +26877,7 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     const ingredientLabel = name ? name.querySelector(":scope > .sr-only") : null;
     if (ingredientLabel) {
         ingredientLabel.className = "recipe-edit-alternative-field-label";
-        ingredientLabel.textContent = "Ingredient / Buy As";
+        ingredientLabel.textContent = "Ingredient";
     }
     const buyAsLabel = buyAs ? buyAs.querySelector(":scope > span") : null;
     if (buyAsLabel) {
@@ -26926,7 +26926,6 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     if (name) identity.appendChild(name);
     if (buyAs) {
         buyAs.classList.add("recipe-edit-alternative-edit-field", "field-buy-as");
-        identity.appendChild(buyAs);
     }
     const compactMetadata = document.createElement("div");
     compactMetadata.className = "recipe-edit-alternative-metadata-inputs";
@@ -26934,7 +26933,6 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
         field.classList.add("recipe-edit-alternative-edit-field");
         compactMetadata.appendChild(field);
     });
-    if (compactMetadata.children.length) identity.appendChild(compactMetadata);
     editGrid.appendChild(identity);
     [
         [quantity, "field-amount"],
@@ -26949,10 +26947,15 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     const sourceDetails = document.createElement("details");
     sourceDetails.className = "recipe-edit-alternative-source-details";
     sourceDetails.innerHTML = `
-        <summary>Source details</summary>
+        <summary>
+            <span>More details</span>
+            <span class="recipe-edit-alternative-details-hint">Purchasing, preparation, optional, and source</span>
+        </summary>
         <div class="recipe-edit-alternative-source-grid"></div>
     `;
     const sourceGrid = sourceDetails.querySelector(".recipe-edit-alternative-source-grid");
+    if (buyAs) sourceGrid.appendChild(buyAs);
+    if (compactMetadata.children.length) sourceGrid.appendChild(compactMetadata);
     [notes, originalText, preferred].filter(Boolean).forEach(field => {
         field.classList.add("recipe-edit-alternative-edit-field");
         sourceGrid.appendChild(field);
@@ -37806,6 +37809,8 @@ function setRecipeIngredientAlternativeEditMode(control, shouldEdit, options = {
         : null;
     componentRows.forEach(optionRow => {
         optionRow.classList.toggle("is-component-editing", Boolean(shouldEdit && (!activeComponent || optionRow === activeComponent)));
+        const secondaryDetails = optionRow.querySelector(".recipe-edit-alternative-source-details");
+        if (secondaryDetails && !shouldEdit) secondaryDetails.open = false;
     });
     card.querySelectorAll("[data-alternative-component-edit]").forEach(editGrid => {
         editGrid.hidden = !shouldEdit || !editGrid.closest(".is-component-editing");
@@ -37894,6 +37899,8 @@ function editRecipeIngredientAlternativeNotes(button) {
     setRecipeIngredientAlternativeEditMode(card, true, {
         activeComponent: notes ? notes.closest("[data-substitution-option-row]") : null,
     });
+    const secondaryDetails = notes ? notes.closest(".recipe-edit-alternative-source-details") : null;
+    if (secondaryDetails) secondaryDetails.open = true;
     window.requestAnimationFrame(() => {
         if (!notes) return;
         notes.focus({ preventScroll: false });

@@ -1119,9 +1119,14 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'compactMetadata.className = "recipe-edit-alternative-metadata-inputs";' in substitution
     assert "[preparation, size, quantityText, optional]" in substitution
     assert 'sourceDetails.className = "recipe-edit-alternative-source-details";' in substitution
-    assert ">Source details</summary>" in substitution
+    assert "<span>More details</span>" in substitution
+    assert "Purchasing, preparation, optional, and source" in substitution
     assert 'buyAsLabel.textContent = "Purchasing name (if different)";' in substitution
-    assert 'ingredientLabel.textContent = "Ingredient / Buy As";' in substitution
+    assert 'ingredientLabel.textContent = "Ingredient";' in substitution
+    assert "sourceGrid.appendChild(buyAs);" in substitution
+    assert "sourceGrid.appendChild(compactMetadata);" in substitution
+    assert "identity.appendChild(buyAs);" not in substitution
+    assert "identity.appendChild(compactMetadata);" not in substitution
     assert '["Match source",' in substitution
     assert '["Match confidence",' in substitution
     assert '["AI reasoning",' in substitution
@@ -1217,11 +1222,17 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert ".recipe-edit-alternative-component-actions" in v19
     assert "background: transparent;" in v19
     assert ".is-component-editing > .recipe-edit-alternative-component-edit-grid" in v19
+    assert ".recipe-edit-alternative-details-hint" in v19
+    assert "min-height: 30px;" in v19
+    assert ".field-buy-as," in v19
+    assert ".recipe-edit-alternative-metadata-inputs" in v19
     mobile_v19 = v19[v19.rindex("@media (max-width: 760px)"):]
     assert "grid-template-rows: minmax(44px, auto) auto auto auto !important;" in mobile_v19
     assert "grid-column: 2 / 5;" in mobile_v19
     assert "grid-column: 4 / 6;" in mobile_v19
     assert "max-width: 100%;" in mobile_v19
+    assert ".recipe-edit-alternative-details-hint" in mobile_v19
+    assert "display: none;" in mobile_v19
     v10 = css[css.index("/* Ingredient editor v10:"):]
     edit_grid_rule = v10[v10.index(".recipe-edit-alternative-component-edit-grid {"):]
     edit_grid_rule = edit_grid_rule[:edit_grid_rule.index("}")]
@@ -1288,6 +1299,7 @@ def test_recipe_editor_replacement_rows_edit_and_duplicate_without_new_save_plum
     assert "options.activeComponent" in edit_mode
     assert 'optionRow.classList.toggle("is-component-editing"' in edit_mode
     assert 'editGrid.hidden = !shouldEdit || !editGrid.closest(".is-component-editing");' in edit_mode
+    assert 'if (secondaryDetails && !shouldEdit) secondaryDetails.open = false;' in edit_mode
     assert "card.dataset.editSnapshot = JSON.stringify(snapshots);" in edit_mode
 
     component_edit = script[
@@ -1296,6 +1308,13 @@ def test_recipe_editor_replacement_rows_edit_and_duplicate_without_new_save_plum
     ]
     assert "recipeIngredientAlternativeComponentFromControl(button)" in component_edit
     assert "{ activeComponent: optionRow }" in component_edit
+
+    notes_edit = script[
+        script.index("function editRecipeIngredientAlternativeNotes"):
+        script.index("function setRecipeIngredientAlternativePreferred")
+    ]
+    assert 'notes.closest(".recipe-edit-alternative-source-details")' in notes_edit
+    assert "secondaryDetails.open = true;" in notes_edit
 
     duplicate = script[
         script.index("function duplicateRecipeIngredientAlternativeComponent"):

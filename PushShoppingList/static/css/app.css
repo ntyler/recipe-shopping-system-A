@@ -54054,6 +54054,29 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > 
     grid-row: 3 !important;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > .recipe-edit-alternative-source-details > summary {
+    min-height: 30px;
+    gap: 8px;
+    padding-block: 4px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-alternative-details-hint {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--app-muted);
+    font-size: 9px;
+    font-weight: 560;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-alternative-source-grid > :is(
+    .field-buy-as,
+    .recipe-edit-alternative-metadata-inputs
+) {
+    grid-column: 1 / -1;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-alternative-edit-field {
     gap: 4px;
 }
@@ -54126,7 +54149,7 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-metadata-inputs .recip
 }
 
 body.recipe-edit-standalone-page .recipe-edit-alternative-source-details {
-    margin-top: 7px;
+    margin-top: 3px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-alternative-add-component,
@@ -54319,6 +54342,10 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-card.is-editing .recip
     body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > .recipe-edit-alternative-source-details {
         grid-column: 1 / 6;
         grid-row: 4 !important;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-alternative-details-hint {
+        display: none;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-alternative-metadata-inputs {
