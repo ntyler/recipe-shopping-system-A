@@ -26876,7 +26876,7 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
 
     const ingredientLabel = name ? name.querySelector(":scope > .sr-only") : null;
     if (ingredientLabel) {
-        ingredientLabel.className = "recipe-edit-alternative-field-label";
+        ingredientLabel.className = "sr-only";
         ingredientLabel.textContent = "Ingredient";
     }
     const buyAsLabel = buyAs ? buyAs.querySelector(":scope > span") : null;
@@ -36738,7 +36738,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
             <div class="recipe-edit-ingredient-name-label">
                 <span class="sr-only">Alternative ingredient</span>
                 <span class="recipe-edit-ingredient-title-line">
-                    <textarea data-field="ingredient" rows="1">${escapeHtml(option.ingredient || "")}</textarea>
+                    <textarea data-field="ingredient" rows="1" aria-label="Ingredient">${escapeHtml(option.ingredient || "")}</textarea>
                     <span class="recipe-edit-ingredient-markers">
                         <span class="recipe-edit-ingredient-badges" data-substitution-badges>${recipeIngredientBadgesHtml(option, { includeMatchStatus: false })}</span>
                     </span>

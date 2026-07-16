@@ -1122,6 +1122,7 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert "<span>More details</span>" in substitution
     assert "Purchasing, preparation, optional, and source" in substitution
     assert 'buyAsLabel.textContent = "Purchasing name (if different)";' in substitution
+    assert 'ingredientLabel.className = "sr-only";' in substitution
     assert 'ingredientLabel.textContent = "Ingredient";' in substitution
     assert "sourceGrid.appendChild(buyAs);" in substitution
     assert "sourceGrid.appendChild(compactMetadata);" in substitution
@@ -1147,7 +1148,7 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'data-field="ingredient_image_url"' in alternative_markup
     assert 'data-field="ingredient_image_generated_at"' in alternative_markup
     assert 'data-field="ingredient_image_prompt"' in alternative_markup
-    assert '<textarea data-field="ingredient"' in alternative_markup
+    assert '<textarea data-field="ingredient" rows="1" aria-label="Ingredient">' in alternative_markup
     assert 'data-field="confidence_score"' in alternative_markup
     assert 'data-field="match_confidence"' in alternative_markup
     assert 'data-field="reason"' in alternative_markup
@@ -1233,6 +1234,7 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert ".field-ingredient > .recipe-edit-ingredient-name-label" in v19
     assert "grid-column: 1 !important;" in v19
     assert "grid-row: auto !important;" in v19
+    assert "grid-template-columns: minmax(0, 1fr) !important;" in v19
     assert "grid-template-columns: minmax(0, 1fr) auto;" in v19
     assert ".field-ingredient .recipe-edit-ingredient-markers" in v19
     assert "display: flex !important;" in v19

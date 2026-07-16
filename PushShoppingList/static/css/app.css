@@ -54098,6 +54098,10 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .f
     gap: 3px;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .field-ingredient > .recipe-edit-ingredient-name-label {
+    grid-template-columns: minmax(0, 1fr) !important;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .field-ingredient .recipe-edit-ingredient-title-line {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
