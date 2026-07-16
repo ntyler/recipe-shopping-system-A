@@ -1147,6 +1147,7 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'data-field="ingredient_image_url"' in alternative_markup
     assert 'data-field="ingredient_image_generated_at"' in alternative_markup
     assert 'data-field="ingredient_image_prompt"' in alternative_markup
+    assert '<textarea data-field="ingredient"' in alternative_markup
     assert 'data-field="confidence_score"' in alternative_markup
     assert 'data-field="match_confidence"' in alternative_markup
     assert 'data-field="reason"' in alternative_markup
@@ -1232,6 +1233,14 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert ".field-ingredient > .recipe-edit-ingredient-name-label" in v19
     assert "grid-column: 1 !important;" in v19
     assert "grid-row: auto !important;" in v19
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in v19
+    assert ".field-ingredient .recipe-edit-ingredient-markers" in v19
+    assert "display: flex !important;" in v19
+    assert "justify-self: end;" in v19
+    assert "justify-content: flex-end;" in v19
+    assert 'textarea[data-field="ingredient"]' in v19
+    assert "border: 1px solid var(--app-border-strong) !important;" in v19
+    assert "background: var(--app-bg-soft) !important;" in v19
     assert ".recipe-edit-alternative-details-hint" in v19
     assert "min-height: 30px;" in v19
     assert ".field-buy-as," in v19

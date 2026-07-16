@@ -54099,21 +54099,55 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .f
 }
 
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .field-ingredient .recipe-edit-ingredient-title-line {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .field-ingredient :is(
-    .recipe-edit-substitution-summary-meta,
-    .recipe-edit-ingredient-markers
-) {
+body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .field-ingredient .recipe-edit-substitution-summary-meta {
     display: none;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .field-ingredient .recipe-edit-ingredient-markers {
+    display: flex !important;
+    min-width: max-content;
+    align-items: center;
+    justify-self: end;
+    justify-content: flex-end;
+    overflow: visible;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .field-ingredient .recipe-edit-ingredient-badges {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .field-ingredient textarea[data-field="ingredient"] {
     display: block;
-    width: 100%;
-    min-height: 34px;
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    padding: 6px 8px !important;
+    overflow: hidden;
+    border: 1px solid var(--app-border-strong) !important;
+    border-radius: 6px;
+    background: var(--app-bg-soft) !important;
+    color: var(--app-text);
+    font-size: 10px;
+    font-weight: 650;
+    line-height: 20px;
     resize: none;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid .field-ingredient textarea[data-field="ingredient"]:focus {
+    border-color: var(--app-primary-hover) !important;
+    outline: 2px solid color-mix(in srgb, var(--app-primary-hover) 26%, transparent);
+    outline-offset: 1px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-alternative-metadata-inputs {
