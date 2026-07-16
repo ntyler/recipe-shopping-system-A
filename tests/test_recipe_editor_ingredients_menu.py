@@ -1612,6 +1612,12 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     v20 = css[css.index("/* Ingredient editor v20:"):]
     assert ".recipe-edit-ingredient-inline-control" in v20
     assert ".recipe-edit-ingredient-inline-control:focus" in v20
+    unit_idle = v20[v20.index(".recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control:not(:focus)"):]
+    unit_idle = unit_idle[:unit_idle.index("}")]
+    assert ':not([aria-expanded="true"])' in unit_idle
+    assert ':not([aria-invalid="true"])' in unit_idle
+    assert "border-color: transparent;" in unit_idle
+    assert "background: transparent;" in unit_idle
     assert "width: 100%;" in v20
 
 
