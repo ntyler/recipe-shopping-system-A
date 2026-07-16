@@ -27113,9 +27113,8 @@ img[data-deferred-src] {
     position: relative;
     top: auto;
     z-index: var(--app-layer-sticky-shell);
-    display: grid;
-    grid-template-columns: minmax(280px, 620px) minmax(0, 1fr) auto;
-    gap: 18px;
+    display: flex;
+    gap: 12px;
     align-items: center;
     width: 100%;
     height: var(--app-toolbar-height);
@@ -27136,6 +27135,7 @@ img[data-deferred-src] {
 
 .app-topbar-brand {
     display: none;
+    flex: 0 0 auto;
     font-size: 15px;
     font-weight: 900;
     white-space: nowrap;
@@ -27147,12 +27147,15 @@ img[data-deferred-src] {
     height: 38px;
 }
 
+.app-header-search {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .app-global-search {
     position: relative;
-    grid-column: 1;
     display: block;
-    width: min(100%, 620px);
-    justify-self: start;
+    width: min(100%, var(--app-search-preferred-width, 540px));
     margin: 0;
 }
 
@@ -27681,13 +27684,19 @@ img[data-deferred-src] {
 }
 
 .app-toolbar-actions {
-    grid-column: 3;
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: flex-end;
     gap: 10px;
-    min-width: 0;
     overflow: visible;
+}
+
+.app-header-profile {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    min-width: 0;
 }
 
 .app-toolbar-button {
@@ -27711,11 +27720,14 @@ img[data-deferred-src] {
 }
 
 .app-toolbar-button .app-icon-svg {
+    flex: 0 0 auto;
     width: 18px;
     height: 18px;
 }
 
 .app-toolbar-primary {
+    flex: 0 0 auto;
+    white-space: nowrap;
     border-color: rgba(7, 138, 47, 0.34);
     background: var(--app-primary);
     color: #ffffff;
@@ -27731,6 +27743,7 @@ img[data-deferred-src] {
 
 .app-toolbar-icon-button {
     position: relative;
+    flex: 0 0 auto;
     width: var(--app-control-height);
     padding: 0;
 }
@@ -27766,6 +27779,7 @@ img[data-deferred-src] {
 }
 
 .app-account-button {
+    flex: 0 0 auto;
     gap: 8px;
     min-width: 158px;
     max-width: 260px;
@@ -31137,28 +31151,52 @@ img[data-deferred-src] {
     }
 }
 
+@media (min-width: 768px) {
+    .app-header-search {
+        min-width: 220px;
+    }
+}
+
+@media (min-width: 1100px) and (max-width: 1280px) {
+    .app-topbar {
+        --app-search-preferred-width: 460px;
+    }
+}
+
+@media (max-width: 1150px) {
+    .app-global-search-shortcut {
+        display: none;
+    }
+
+    .app-global-search input {
+        padding-right: 16px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 980px) {
+    .app-header-profile .app-account-label small {
+        display: none;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 840px) {
+    .app-help-button {
+        display: none;
+    }
+}
+
 @media (min-width: 768px) and (max-width: 1099px) {
     .app-topbar {
-        grid-template-columns: auto minmax(240px, 1fr) auto;
         gap: 12px;
         padding-inline: 22px;
     }
 
     .app-topbar-brand {
         display: inline-flex;
-        grid-column: 1;
     }
 
     .app-topbar-brand span:not(.app-brand-mark) {
         display: none;
-    }
-
-    .app-global-search {
-        grid-column: 2;
-    }
-
-    .app-toolbar-actions {
-        grid-column: 3;
     }
 
     .app-content {
@@ -31173,7 +31211,8 @@ img[data-deferred-src] {
     }
 
     .app-topbar {
-        grid-template-columns: minmax(0, 1fr) auto;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
         gap: 10px;
         min-height: var(--app-toolbar-height);
         padding: 10px 12px;
@@ -31181,17 +31220,22 @@ img[data-deferred-src] {
 
     .app-topbar-brand {
         display: inline-flex;
+        grid-column: 1;
+        grid-row: 1;
     }
 
     .app-topbar-brand span:not(.app-brand-mark) {
         display: inline;
     }
 
-    .app-global-search {
+    .app-header-search {
         grid-column: 1 / -1;
         grid-row: 2;
+        min-width: 0;
+    }
+
+    .app-global-search {
         width: 100%;
-        order: 3;
     }
 
     .app-global-search-dropdown {
@@ -31226,11 +31270,21 @@ img[data-deferred-src] {
 
     .app-toolbar-actions {
         grid-column: 2;
+        grid-row: 1;
         gap: 6px;
     }
 
-    .app-toolbar-primary,
     .app-help-button {
+        display: none;
+    }
+
+    .app-toolbar-primary {
+        width: 44px;
+        min-width: 44px;
+        padding-inline: 8px;
+    }
+
+    .app-import-label {
         display: none;
     }
 
@@ -31245,11 +31299,16 @@ img[data-deferred-src] {
         padding-inline: 8px;
     }
 
-    .app-account-label {
-        display: none;
+    .app-header-profile {
+        grid-column: 3;
+        grid-row: 1;
     }
 
-    .app-profile-menu-trigger-chevron {
+    .app-account-label {
+        display: grid;
+    }
+
+    .app-account-label small {
         display: none;
     }
 
@@ -31288,6 +31347,18 @@ img[data-deferred-src] {
         right: 8px;
         bottom: 8px;
         left: 8px;
+    }
+}
+
+@media (max-width: 430px) {
+    .app-topbar-brand span:not(.app-brand-mark) {
+        display: none;
+    }
+
+    .app-header-profile,
+    .app-account-button {
+        min-width: 0;
+        max-width: calc(100vw - 176px);
     }
 }
 
@@ -31506,15 +31577,14 @@ img[data-deferred-src] {
     }
 
     .app-topbar {
-        grid-template-columns: minmax(300px, 570px) minmax(0, 1fr) auto;
-        gap: 18px;
+        gap: 12px;
         min-height: var(--app-toolbar-height);
         padding: 14px var(--app-page-padding-inline);
         background: rgba(255, 255, 255, .97);
     }
 
     .app-global-search {
-        width: min(100%, 540px);
+        width: min(100%, var(--app-search-preferred-width, 540px));
     }
 
     .app-global-search input {

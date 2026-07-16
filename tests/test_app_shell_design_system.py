@@ -41,6 +41,7 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert "Unlock more from your pantry." in plan_promo
     assert 'data-app-plan-link data-app-nav-action="usage-dashboard"' in plan_promo
     assert 'data-app-global-search' in header
+    assert '<div class="app-header-search">' in header
     assert "app-global-search-icon" in header
     assert "app-global-search-shortcut" in header
     assert "Ctrl + K" in header
@@ -50,6 +51,10 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert 'role="listbox"' in header
     assert "<datalist" not in header
     assert "app-toolbar-primary" in header
+    assert 'aria-label="Import"' in header
+    assert 'title="Import"' in header
+    assert '<span class="app-import-label">Import</span>' in header
+    assert '<div class="app-header-profile">' in header
     assert 'data-app-page-target="notificationsPage"' in header
     assert 'data-app-nav-action="account-workspace"' in shell_macros
     assert 'data-app-page-target="recipesPage"' in navigation
@@ -372,7 +377,8 @@ def test_home_and_recipe_editor_reuse_the_single_app_header_and_account_control(
     assert 'class="app-toolbar-button app-account-button"' not in recipe_editor
     assert "recipe-edit-page-topbar" not in recipe_editor
     assert "recipe-edit-page-topbar" not in css
-    assert "grid-template-columns: minmax(280px, 620px) minmax(0, 1fr) auto;" in css
+    assert ".app-header-search {" in css
+    assert "flex: 1 1 auto;" in css
     assert "from PushShoppingList.services.user_account_service import current_public_user" in routes
     assert "current_user=current_public_user()," in routes
 
@@ -628,11 +634,58 @@ def test_app_css_defines_scoped_design_tokens_and_responsive_shell():
         css.index("@media (min-width: 768px) and (max-width: 1099px)"):
         css.index("@media (max-width: 767px)")
     ]
-    assert "grid-template-columns: auto minmax(240px, 1fr) auto;" in tablet_shell
     assert ".app-topbar-brand {\n        display: inline-flex;" in tablet_shell
     assert ".app-topbar-brand span:not(.app-brand-mark) {\n        display: none;" in tablet_shell
-    assert ".app-global-search {\n        grid-column: 2;" in tablet_shell
-    assert ".app-toolbar-actions {\n        grid-column: 3;" in tablet_shell
+    assert ".app-header-search {\n        min-width: 220px;" in css
+    assert "grid-template-columns: minmax(0, 1fr) auto auto;" in css
+
+
+def test_app_header_preserves_import_and_profile_across_responsive_widths():
+    header = read_text("PushShoppingList/templates/includes/app_header.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert header.index('class="app-header-search"') < header.index('class="app-toolbar-actions"')
+    assert header.index('class="app-toolbar-actions"') < header.index('class="app-header-profile"')
+
+    search_start = css.index(".app-header-search {")
+    search_rule = css[search_start:css.index("}", search_start)]
+    assert "flex: 1 1 auto;" in search_rule
+    assert "min-width: 0;" in search_rule
+
+    actions_start = css.index(".app-toolbar-actions {")
+    actions_rule = css[actions_start:css.index("}", actions_start)]
+    assert "flex: 0 0 auto;" in actions_rule
+    assert "gap: 10px;" in actions_rule
+
+    profile_start = css.index(".app-header-profile {")
+    profile_rule = css[profile_start:css.index("}", profile_start)]
+    assert "flex: 0 0 auto;" in profile_rule
+
+    import_start = css.index(".app-toolbar-primary {")
+    import_rule = css[import_start:css.index("}", import_start)]
+    assert "flex: 0 0 auto;" in import_rule
+    assert "white-space: nowrap;" in import_rule
+
+    notification_start = css.index(".app-toolbar-icon-button {")
+    notification_rule = css[notification_start:css.index("}", notification_start)]
+    assert "flex: 0 0 auto;" in notification_rule
+
+    search_input_start = css.index(".app-global-search input {")
+    search_input_rule = css[search_input_start:css.index("}", search_input_start)]
+    assert "padding: 0 82px 0 46px;" in search_input_rule
+
+    preferred_width = css.index("@media (min-width: 1100px) and (max-width: 1280px)")
+    shortcut_hidden = css.index("@media (max-width: 1150px)")
+    plan_hidden = css.index("@media (min-width: 768px) and (max-width: 980px)")
+    mobile = css.index("@media (max-width: 767px)")
+    assert preferred_width < shortcut_hidden < plan_hidden < mobile
+
+    mobile_shell = css[mobile:css.index("/* Desktop mockup fidelity pass", mobile)]
+    assert ".app-import-label {\n        display: none;" in mobile_shell
+    assert ".app-toolbar-primary {\n        width: 44px;" in mobile_shell
+    assert ".app-account-label {\n        display: grid;" in mobile_shell
+    assert ".app-account-label small {\n        display: none;" in mobile_shell
+    assert "max-width: calc(100vw - 176px);" in mobile_shell
 
 
 def test_full_page_tools_size_against_the_shared_main_content_not_the_viewport():

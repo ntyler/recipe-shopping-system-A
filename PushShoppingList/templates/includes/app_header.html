@@ -13,14 +13,15 @@
         {{ shell.brand_mark() }}
         <span>AI Pantry</span>
     </a>
-    <form class="app-global-search"
-          role="search"
-          data-global-search-form
-          data-global-search-endpoint="/api/global-search"
-          data-global-search-recent-url="/api/global-search/recent"
-          data-global-search-results-url="/search"
-          data-global-search-spa="{{ 'true' if in_shell else 'false' }}"
-          onsubmit="return submitGlobalAppSearch(this)">
+    <div class="app-header-search">
+        <form class="app-global-search"
+              role="search"
+              data-global-search-form
+              data-global-search-endpoint="/api/global-search"
+              data-global-search-recent-url="/api/global-search/recent"
+              data-global-search-results-url="/search"
+              data-global-search-spa="{{ 'true' if in_shell else 'false' }}"
+              onsubmit="return submitGlobalAppSearch(this)">
         <label class="sr-only" for="{{ search_id }}">Search AI Pantry</label>
         <span class="app-global-search-icon" aria-hidden="true">{{ shell.svg_icon("search") }}</span>
         <input id="{{ search_id }}"
@@ -80,16 +81,19 @@
             <template data-global-search-icon-template="barcode">{{ shell.app_icon("barcode") }}</template>
             <template data-global-search-icon-template="pages">{{ shell.svg_icon("search") }}</template>
         </div>
-    </form>
+        </form>
+    </div>
     <div class="app-toolbar-actions" aria-label="Quick actions">
         <a class="app-toolbar-button app-toolbar-primary"
            href="{{ import_href }}"
+           aria-label="Import"
+           title="Import"
            {% if in_shell %}data-app-nav-link
            data-app-nav-action="app-page"
            data-app-page-target="importPage"
            data-app-nav-target="importPage"{% endif %}>
             {{ shell.svg_icon("plus") }}
-            <span>Import</span>
+            <span class="app-import-label">Import</span>
         </a>
         <a class="app-toolbar-button app-toolbar-icon-button"
            href="{{ notifications_href }}"
@@ -118,6 +122,8 @@
             <span>Help &amp; Support</span>
         </a>
         {% endif %}
+    </div>
+    <div class="app-header-profile">
         {{ shell.account_control(current_user, is_guest_demo|default(false), account_href, in_shell) }}
     </div>
 </header>
