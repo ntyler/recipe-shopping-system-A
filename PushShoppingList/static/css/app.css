@@ -51341,6 +51341,15 @@ body.recipe-edit-standalone-page .recipe-edit-image-card-content {
     padding: 0 13px 13px;
 }
 
+body.recipe-edit-standalone-page .recipe-image-desktop-slot {
+    display: block;
+}
+
+body.recipe-edit-standalone-page .recipe-image-mobile-slot {
+    display: none;
+    min-width: 0;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-image-card .recipe-edit-cover-preview {
     width: 100%;
     aspect-ratio: 16 / 9;
@@ -52949,104 +52958,120 @@ body.recipe-edit-standalone-page .recipe-edit-category-custom-field {
     }
 }
 
-/* Narrow recipe editor: keep the single Recipe Image card directly below title and rating. */
-body.recipe-edit-standalone-page .recipe-edit-inline-image-slot[hidden] {
-    display: none;
-}
+/* Narrow recipe editor: render the mobile Recipe Image view directly below title and rating. */
 
 @media (max-width: 1099px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-primary-fields {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-inline-image-slot {
-        display: block;
-        width: 100%;
-        min-width: 0;
-        margin: 8px 0 10px;
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-image-card.recipe-edit-image-card-inline {
-        width: 100%;
-        min-width: 0;
-        margin: 0;
-        padding: 0;
-        overflow: visible;
-        border: 0;
-        border-radius: 0;
-        background: transparent;
-        box-shadow: none;
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline > .recipe-edit-context-card-heading {
+    body.recipe-edit-standalone-page .recipe-image-desktop-slot {
         display: none;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline .recipe-edit-image-card-content {
-        padding: 0;
+    body.recipe-edit-standalone-page .recipe-image-mobile-slot {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        margin: 16px 0;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline .recipe-edit-cover-field {
+    body.recipe-edit-standalone-page .recipe-edit-image-mobile-card {
         display: grid;
         width: 100%;
         min-width: 0;
-        gap: 16px;
+        margin: 0;
+        gap: 12px;
+        padding: 12px;
+        overflow: hidden;
+        border: 1px solid var(--recipe-editor-border-soft);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--recipe-editor-surface-soft) 80%, transparent);
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline .recipe-edit-cover-preview {
+    body.recipe-edit-standalone-page .recipe-edit-mobile-cover-preview {
+        position: relative;
+        display: grid;
         width: 100%;
-        max-height: min(58vh, 520px);
-        aspect-ratio: 16 / 9;
+        min-width: 0;
+        aspect-ratio: 4 / 3;
         overflow: hidden;
         border-radius: 9px;
+        background: var(--recipe-editor-surface);
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline .recipe-cover-image {
+    body.recipe-edit-standalone-page .recipe-image-mobile-slot img.recipe-edit-mobile-cover-image {
         display: block;
         width: 100%;
-        height: 100%;
+        height: auto;
+        aspect-ratio: 4 / 3;
         object-fit: cover;
+        border-radius: inherit;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline :is(
-        .recipe-edit-cover-label,
-        .recipe-edit-cover-status
-    ) {
-        display: none;
+    body.recipe-edit-standalone-page .recipe-edit-mobile-cover-empty {
+        display: grid;
+        width: 100%;
+        min-width: 0;
+        place-items: center;
+        align-content: center;
+        gap: 10px;
+        padding: 24px;
+        color: var(--app-muted);
+        text-align: center;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline .recipe-edit-cover-primary-actions {
+    body.recipe-edit-standalone-page .recipe-edit-mobile-cover-empty svg {
+        width: 32px;
+        height: 32px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-mobile-cover-preview > .recipe-edit-cover-favorite {
+        position: absolute;
+        top: 9px;
+        right: 9px;
+        z-index: 1;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-mobile-image-actions {
         display: flex;
         width: 100%;
         min-width: 0;
-        align-items: stretch;
         flex-wrap: wrap;
         gap: 8px;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline .recipe-edit-cover-primary-actions > button {
-        flex: 1 1 150px;
+    body.recipe-edit-standalone-page .recipe-edit-mobile-image-actions > button {
+        display: flex;
+        flex: 1 1 140px;
         min-width: 0;
         min-height: 40px;
-        height: auto;
+        align-items: stretch;
+        justify-content: center;
+        gap: 8px;
         padding: 8px 10px;
         border-radius: 8px;
         font-size: 10px;
         white-space: normal;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline .recipe-edit-cover-primary-actions .recipe-edit-cover-remove-button {
-        border-left: 1px solid rgba(239, 68, 68, .48);
-        border-radius: 8px;
+    body.recipe-edit-standalone-page .recipe-edit-mobile-image-actions > button[hidden],
+    body.recipe-edit-standalone-page .recipe-edit-mobile-cover-preview > [hidden] {
+        display: none !important;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-inline-image-slot + .recipe-edit-tag-row {
+    body.recipe-edit-standalone-page .recipe-edit-mobile-image-actions .recipe-edit-cover-remove-button {
+        border-color: rgba(239, 68, 68, .48);
+        color: #f87171;
+    }
+
+    body.recipe-edit-standalone-page .recipe-image-mobile-slot + .recipe-edit-tag-row {
         margin-top: 18px;
     }
 }
 
 @media (max-width: 420px) {
-    body.recipe-edit-standalone-page .recipe-edit-image-card-inline .recipe-edit-cover-primary-actions > button {
+    body.recipe-edit-standalone-page .recipe-edit-mobile-image-actions > button {
         flex-basis: calc(50% - 4px);
     }
 }

@@ -872,17 +872,21 @@
                         <span>Description</span>
                         <textarea name="description" id="recipeEditDescription" rows="3"></textarea>
                     </label>
-                    <div class="recipe-edit-cover-field" id="recipeEditCoverField">
+                    <div class="recipe-edit-cover-field" id="recipeEditCoverField" data-recipe-edit-cover-view>
                         <div class="recipe-edit-cover-preview" id="recipeEditCoverPreview" data-recipe-edit-title-image-panel>
                             <img id="recipeEditCoverImage"
                                  class="recipe-cover-image"
+                                 data-recipe-edit-cover-image
                                  alt="Recipe title image"
                                  loading="lazy"
+                                 onload="return handleRecipeEditorCoverImageLoad(this)"
+                                 onerror="return handleRecipeEditorCoverImageError(this)"
                                  hidden>
                             <button type="button"
                                     id="recipeEditFavoriteButton"
                                     class="app-recipe-favorite recipe-edit-cover-favorite"
                                     data-recipe-favorite
+                                    data-recipe-edit-favorite
                                     data-recipe-url=""
                                     data-recipe-name="recipe"
                                     aria-label="Add recipe to favorites"
@@ -891,7 +895,7 @@
                                     hidden>
                                 {{ shell.svg_icon("heart") }}
                             </button>
-                            <div id="recipeEditCoverEmpty" class="recipe-edit-cover-empty">
+                            <div id="recipeEditCoverEmpty" class="recipe-edit-cover-empty" data-recipe-edit-cover-empty>
                                 No title image saved.
                             </div>
                         </div>
@@ -911,6 +915,7 @@
                                 <button type="button"
                                         id="recipeEditCoverRemove"
                                         class="recipe-edit-cover-upload-button recipe-edit-cover-remove-button"
+                                        data-recipe-edit-cover-remove
                                         onclick="return removeRecipeCoverImage(this)"
                                         hidden>
                                     {{ shell.svg_icon("trash") }}
@@ -961,6 +966,60 @@
                         <span class="recipe-edit-rating-label">Rating</span>
                         <input type="hidden" id="recipeEditRating" data-rating-input value="0">
                         {{ shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe") }}
+                    </div>
+                    <div class="recipe-edit-image-mobile-slot recipe-image-mobile-slot recipe-edit-wide"
+                         data-recipe-edit-mobile-image-slot
+                         data-recipe-edit-cover-view>
+                        <section class="recipe-edit-image-mobile-card" aria-label="Recipe Image">
+                            <div class="recipe-edit-mobile-cover-preview">
+                                <img id="recipeEditCoverImageMobile"
+                                     class="recipe-cover-image recipe-edit-mobile-cover-image"
+                                     data-recipe-edit-cover-image
+                                     alt="Recipe title image"
+                                     loading="lazy"
+                                     onload="return handleRecipeEditorCoverImageLoad(this)"
+                                     onerror="return handleRecipeEditorCoverImageError(this)"
+                                     hidden>
+                                <button type="button"
+                                        id="recipeEditFavoriteButtonMobile"
+                                        class="app-recipe-favorite recipe-edit-cover-favorite"
+                                        data-recipe-favorite
+                                        data-recipe-edit-favorite
+                                        data-recipe-url=""
+                                        data-recipe-name="recipe"
+                                        aria-label="Add recipe to favorites"
+                                        aria-pressed="false"
+                                        onclick="return toggleRecipeFavorite(this, event)"
+                                        hidden>
+                                    {{ shell.svg_icon("heart") }}
+                                </button>
+                                <div class="recipe-edit-mobile-cover-empty" data-recipe-edit-cover-empty>
+                                    {{ shell.svg_icon("image-copy") }}
+                                    <span>No recipe image available</span>
+                                </div>
+                            </div>
+                            <div class="recipe-edit-mobile-image-actions">
+                                <button type="button" onclick="return openRecipeCoverUpload()">
+                                    {{ shell.svg_icon("image-copy") }}
+                                    <span>Replace Image</span>
+                                </button>
+                                <button type="button"
+                                        class="recipe-edit-cover-generate-direct"
+                                        onclick="return generateRecipeCoverImage(this)">
+                                    {{ shell.svg_icon("sparkles") }}
+                                    <span data-recipe-edit-cover-generate-label
+                                          data-recipe-edit-mobile-generate-label>AI Generate</span>
+                                </button>
+                                <button type="button"
+                                        class="recipe-edit-cover-remove-button"
+                                        data-recipe-edit-cover-remove
+                                        onclick="return removeRecipeCoverImage(this)"
+                                        hidden>
+                                    {{ shell.svg_icon("trash") }}
+                                    <span>Remove</span>
+                                </button>
+                            </div>
+                        </section>
                     </div>
                     <div class="recipe-edit-mobile-pdf-actions recipe-edit-wide">
                         <a id="recipeEditPdfButtonMobile"
@@ -2129,7 +2188,7 @@
 
                 </div>
                 <aside class="recipe-edit-context-sidebar" aria-label="Recipe context">
-                    <section class="recipe-edit-context-card recipe-edit-image-card" aria-labelledby="recipeEditImageCardTitle">
+                    <section class="recipe-edit-context-card recipe-edit-image-card recipe-edit-image-desktop-slot recipe-image-desktop-slot" aria-labelledby="recipeEditImageCardTitle">
                         <div class="recipe-edit-context-card-heading">
                             <span id="recipeEditImageCardTitle">Recipe Image</span>
                         </div>

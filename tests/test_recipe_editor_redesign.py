@@ -172,7 +172,7 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
-    cover_start = template.index('<div class="recipe-edit-cover-field" id="recipeEditCoverField">')
+    cover_start = template.index('<div class="recipe-edit-cover-field" id="recipeEditCoverField"')
     cover_end = template.index('<div class="recipe-edit-rating-field', cover_start)
     cover = template[cover_start:cover_end]
 
@@ -341,9 +341,8 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "renderRecipeEditCuisineChips" in script
     assert "recipe-edit-price-control" in organizer
     assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer
-    assert 'inlineImageSlot.className = "recipe-edit-inline-image-slot"' in organizer
-    assert 'inlineImageSlot.dataset.recipeEditInlineImageSlot = ""' in organizer
-    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, inlineImageSlot, tagRow])" in organizer
+    assert 'const mobileImageSlot = document.querySelector("[data-recipe-edit-mobile-image-slot]")' in organizer
+    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, mobileImageSlot, tagRow])" in organizer
     assert 'class="recipe-edit-rating-label">Rating</span>' in template
     assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")' in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
@@ -368,42 +367,50 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "if (clear) clear.hidden = normalizedRating <= 0;" in script
 
 
-def test_recipe_image_uses_one_node_and_moves_below_rating_at_narrow_widths():
+def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
-    placement_start = script.index("function syncRecipeEditImageCardPlacement()")
-    placement_end = script.index("function organizeRecipeEditInformationCard()", placement_start)
-    placement = script[placement_start:placement_end]
 
+    assert template.count('data-recipe-edit-mobile-image-slot') == 1
     assert template.count('id="recipeEditImageCardContent"') == 1
     assert template.count('id="recipeEditCoverField"') == 1
-    assert 'window.matchMedia("(max-width: 1099px)").matches' in placement
-    assert "inlineSlot.appendChild(imageCard)" in placement
-    assert "sidebar.insertBefore(imageCard, sidebar.firstElementChild)" in placement
-    assert 'imageCard.classList.toggle("recipe-edit-image-card-inline", shouldInline)' in placement
+    assert template.count("data-recipe-edit-cover-image") == 2
+    assert 'class="recipe-edit-image-mobile-slot recipe-image-mobile-slot recipe-edit-wide"' in template
+    assert 'class="recipe-edit-context-card recipe-edit-image-card recipe-edit-image-desktop-slot recipe-image-desktop-slot"' in template
+    assert "No recipe image available" in template
+    assert "data-recipe-edit-mobile-generate-label" in template
+    assert template.count('onclick="return openRecipeCoverUpload()"') >= 2
+    assert template.count('onclick="return generateRecipeCoverImage(this)"') >= 2
+    assert template.count('onclick="return removeRecipeCoverImage(this)"') >= 2
+    assert template.count('onclick="return toggleRecipeFavorite(this, event)"') >= 2
+    assert template.count('onerror="return handleRecipeEditorCoverImageError(this)"') == 2
+    for state_field_id in (
+        "recipeEditCoverPath",
+        "recipeEditCoverUrl",
+        "recipeEditCoverAlt",
+        "recipeEditCoverMimeType",
+        "recipeEditCoverSource",
+    ):
+        assert template.count(f'id="{state_field_id}"') == 1
     assert "organizeRecipeEditImageCard();" in script
     assert "organizeRecipeEditInformationCard();" in script
-    assert "syncRecipeEditImageCardPlacement();" in script
-    assert 'window.addEventListener("resize", syncRecipeEditImageCardPlacement)' in script
-    assert 'window.addEventListener("orientationchange", syncRecipeEditImageCardPlacement)' in script
+    assert "syncRecipeEditImageCardPlacement" not in script
+    assert 'const mobileImageSlot = document.querySelector("[data-recipe-edit-mobile-image-slot]")' in script
+    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, mobileImageSlot, tagRow])" in script
+    assert 'document.querySelectorAll("[data-recipe-edit-cover-image]")' in script
+    assert 'document.querySelectorAll("[data-recipe-edit-cover-remove]")' in script
+    assert "function handleRecipeEditorCoverImageError(image)" in script
 
-    responsive_start = css.index("/* Narrow recipe editor: keep the single Recipe Image card")
+    responsive_start = css.index("/* Narrow recipe editor: render the mobile Recipe Image view")
     responsive = css[responsive_start:]
     assert "@media (max-width: 1099px)" in responsive
     assert "grid-template-columns: minmax(0, 1fr);" in responsive
-    assert ".recipe-edit-inline-image-slot" in responsive
-    assert ".recipe-edit-image-card-inline" in responsive
-    assert "aspect-ratio: 16 / 9;" in responsive
+    assert ".recipe-image-desktop-slot" in responsive
+    assert ".recipe-image-mobile-slot" in responsive
+    assert "aspect-ratio: 4 / 3;" in responsive
     assert "object-fit: cover;" in responsive
     assert "flex-wrap: wrap;" in responsive
-
-    workspace_start = script.index("function organizeRecipeEditStandaloneWorkspace()")
-    workspace_end = script.index("function syncRecipeEditDocumentRows()", workspace_start)
-    workspace = script[workspace_start:workspace_end]
-    assert workspace.index("appendRecipeEditWorkspaceChildren(sidebar") < workspace.rindex(
-        "syncRecipeEditImageCardPlacement();"
-    )
     assert "details.recipe-edit-context-card:not([open]) > :not(summary)" in css
     assert "\n    .recipe-edit-context-card:not([open]) > :not(summary)" not in css
 

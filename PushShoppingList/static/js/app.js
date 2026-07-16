@@ -1426,9 +1426,8 @@ function initRecipeFavoriteSync() {
 }
 
 function syncRecipeEditorFavoriteControl(recipe = {}, originalUrl = "") {
-    const button = document.getElementById("recipeEditFavoriteButton");
-    if (!button) return;
-    const previousUrl = String(button.dataset.recipeUrl || "").trim();
+    const buttons = [...document.querySelectorAll("[data-recipe-edit-favorite]")];
+    if (!buttons.length) return;
     const recipeUrl = String(
         originalUrl
         || recipe.url
@@ -1442,13 +1441,16 @@ function syncRecipeEditorFavoriteControl(recipe = {}, originalUrl = "") {
         || "recipe"
     ).trim() || "recipe";
     const hasFavoriteState = Object.prototype.hasOwnProperty.call(recipe, "favorite");
-    const favorite = hasFavoriteState
-        ? Boolean(recipe.favorite)
-        : (previousUrl === recipeUrl && button.getAttribute("aria-pressed") === "true");
-    button.dataset.recipeUrl = recipeUrl;
-    button.dataset.recipeName = recipeName;
-    button.hidden = !recipeUrl;
-    setRecipeFavoriteButtonState(button, favorite);
+    buttons.forEach(button => {
+        const previousUrl = String(button.dataset.recipeUrl || "").trim();
+        const favorite = hasFavoriteState
+            ? Boolean(recipe.favorite)
+            : (previousUrl === recipeUrl && button.getAttribute("aria-pressed") === "true");
+        button.dataset.recipeUrl = recipeUrl;
+        button.dataset.recipeName = recipeName;
+        button.hidden = !recipeUrl;
+        setRecipeFavoriteButtonState(button, favorite);
+    });
 }
 
 async function toggleRecipeFavorite(button, event = null) {
@@ -25640,24 +25642,6 @@ function organizeRecipeEditImageCard() {
 
 }
 
-function syncRecipeEditImageCardPlacement() {
-    const imageCard = document.querySelector(".recipe-edit-image-card");
-    const inlineSlot = document.querySelector("[data-recipe-edit-inline-image-slot]");
-    const sidebar = document.querySelector(".recipe-edit-context-sidebar");
-    if (!imageCard || !inlineSlot || !sidebar) {
-        return;
-    }
-
-    const shouldInline = window.matchMedia("(max-width: 1099px)").matches;
-    inlineSlot.hidden = !shouldInline;
-    imageCard.classList.toggle("recipe-edit-image-card-inline", shouldInline);
-    if (shouldInline && imageCard.parentElement !== inlineSlot) {
-        inlineSlot.appendChild(imageCard);
-    } else if (!shouldInline && imageCard.parentElement !== sidebar) {
-        sidebar.insertBefore(imageCard, sidebar.firstElementChild);
-    }
-}
-
 function organizeRecipeEditInformationCard() {
     const main = document.querySelector(".recipe-edit-main-workspace");
     const infoPanel = main ? main.querySelector(".recipe-edit-info-panel:not(.recipe-edit-categories-panel)") : null;
@@ -25674,6 +25658,7 @@ function organizeRecipeEditInformationCard() {
     const cookbookField = document.getElementById("recipeEditCookbookField");
     const sectionField = document.getElementById("recipeEditCategoryMenuSectionField");
     const cuisineField = recipeEditFieldContainer("recipeEditCategoryCuisine");
+    const mobileImageSlot = document.querySelector("[data-recipe-edit-mobile-image-slot]");
     const servingsField = recipeEditFieldContainer("recipeEditServings");
     const totalField = recipeEditFieldContainer("recipeEditTotalTime");
     const prepField = recipeEditFieldContainer("recipeEditPrepTime");
@@ -25751,10 +25736,6 @@ function organizeRecipeEditInformationCard() {
 
     const tagRow = document.createElement("div");
     tagRow.className = "recipe-edit-tag-row";
-    const inlineImageSlot = document.createElement("div");
-    inlineImageSlot.className = "recipe-edit-inline-image-slot";
-    inlineImageSlot.dataset.recipeEditInlineImageSlot = "";
-    inlineImageSlot.hidden = true;
     const tagActions = document.createElement("div");
     tagActions.className = "recipe-edit-tag-actions";
     const addTagIcon = document.querySelector('[data-recipe-metadata-icon="plus"]')?.innerHTML || "+";
@@ -25771,7 +25752,7 @@ function organizeRecipeEditInformationCard() {
         cuisineSelect?.addEventListener("change", renderRecipeEditCuisineChips);
     }
     appendRecipeEditWorkspaceChildren(tagRow, [cuisineField, tagActions]);
-    appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, inlineImageSlot, tagRow]);
+    appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, mobileImageSlot, tagRow]);
     appendRecipeEditWorkspaceChildren(primaryRow, [identity, selectors]);
 
     const metadataRow = document.createElement("div");
@@ -27797,7 +27778,6 @@ function organizeRecipeEditStandaloneWorkspace() {
             confidenceCard,
         ]);
     }
-    syncRecipeEditImageCardPlacement();
 }
 
 function syncRecipeEditDocumentRows() {
@@ -33000,27 +32980,49 @@ function setRecipeEditorCoverPrompt(imagePrompt, hasImage = false) {
     setRecipeImagePromptCollapsed(promptPanel, true);
 }
 
+function setRecipeEditorCoverImageViewLoaded(image, loaded) {
+    const view = image ? image.closest("[data-recipe-edit-cover-view]") : null;
+    const empty = view ? view.querySelector("[data-recipe-edit-cover-empty]") : null;
+    if (!image || !view) {
+        return false;
+    }
+
+    image.hidden = !loaded;
+    if (empty) empty.hidden = loaded;
+    view.classList.toggle("has-cover", loaded);
+    return false;
+}
+
+function handleRecipeEditorCoverImageLoad(image) {
+    return setRecipeEditorCoverImageViewLoaded(image, true);
+}
+
+function handleRecipeEditorCoverImageError(image) {
+    if (image) image.removeAttribute("srcset");
+    return setRecipeEditorCoverImageViewLoaded(image, false);
+}
+
 function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
     const normalized = normalizeRecipeEditorCoverImage(coverImage);
-    const field = document.getElementById("recipeEditCoverField");
-    const image = document.getElementById("recipeEditCoverImage");
-    const empty = document.getElementById("recipeEditCoverEmpty");
+    const fields = [...document.querySelectorAll("[data-recipe-edit-cover-view]")];
+    const images = [...document.querySelectorAll("[data-recipe-edit-cover-image]")];
+    const emptyStates = [...document.querySelectorAll("[data-recipe-edit-cover-empty]")];
     const status = document.getElementById("recipeEditCoverStatus");
     const uploadLabel = document.getElementById("recipeEditCoverUploadLabel");
     const generateLabel = document.getElementById("recipeEditCoverGenerateLabel");
     const generateButton = document.getElementById("recipeEditCoverGenerate");
-    const removeButton = document.getElementById("recipeEditCoverRemove");
+    const removeButtons = [...document.querySelectorAll("[data-recipe-edit-cover-remove]")];
     const alt = normalized.alt || fallbackAlt || "Recipe title image";
     const src = normalized.src || normalized.url || "";
     const displaySrc = normalized.card_url || normalized.thumb_url || src;
     const fullSrc = normalized.full_url || src;
     const hasImage = Boolean(src || normalized.path || normalized.url);
 
-    if (field) {
+    fields.forEach(field => {
         field.classList.toggle("has-cover", hasImage);
-    }
+    });
 
-    if (image) {
+    images.forEach(image => {
         const nextSrc = src || (
             normalized.path && recipeEditorCurrentUrl()
                 ? `/recipe_cover_image?url=${encodeURIComponent(recipeEditorCurrentUrl())}`
@@ -33045,11 +33047,11 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
             image.removeAttribute("data-full-src");
             image.hidden = true;
         }
-    }
+    });
 
-    if (empty) {
+    emptyStates.forEach(empty => {
         empty.hidden = hasImage;
-    }
+    });
 
     if (status) {
         status.textContent = hasImage
@@ -33073,10 +33075,16 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
         generateButton.dataset.hasCoverImage = hasImage ? "true" : "false";
     }
 
-    if (removeButton) {
+    removeButtons.forEach(removeButton => {
         removeButton.hidden = !hasImage;
         removeButton.disabled = !hasImage;
-    }
+    });
+
+    document.querySelectorAll("[data-recipe-edit-cover-generate-label]").forEach(label => {
+        label.textContent = label.hasAttribute("data-recipe-edit-mobile-generate-label")
+            ? "AI Generate"
+            : (hasImage ? "AI Regenerate" : "AI Generate");
+    });
 
     closeRecipeImageChangeActions();
 
@@ -33535,7 +33543,9 @@ async function generateRecipeCoverImage(button) {
     }
     recipeCoverImageGenerationPending = true;
 
-    const buttonLabel = document.getElementById("recipeEditCoverGenerateLabel");
+    const buttonLabel = button
+        ? button.querySelector("[data-recipe-edit-cover-generate-label], span:last-child")
+        : document.getElementById("recipeEditCoverGenerateLabel");
     const originalText = buttonLabel
         ? buttonLabel.textContent
         : (button ? button.textContent : "");
@@ -49286,8 +49296,6 @@ window.addEventListener("resize", updateViewSwitcherStickyOffset);
 window.addEventListener("resize", invalidateStoreLocationMaps);
 window.addEventListener("resize", handleRecipeEditRowMenuScrollOrResize);
 window.addEventListener("resize", scheduleAddStoreStickyVisibilityUpdate);
-window.addEventListener("resize", syncRecipeEditImageCardPlacement);
-window.addEventListener("orientationchange", syncRecipeEditImageCardPlacement);
 window.addEventListener("scroll", scheduleAddStoreStickyVisibilityUpdate, { passive: true });
 window.addEventListener("pageshow", () => {
     restoreRecipeEditPageReturnState();
