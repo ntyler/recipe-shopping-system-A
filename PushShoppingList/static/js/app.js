@@ -27145,6 +27145,29 @@ function ensureRecipeIngredientInlineStoreSectionTrigger(control, source) {
     return trigger;
 }
 
+function ensureRecipeIngredientInlineTypeTrigger(control, source) {
+    if (
+        !control
+        || !source
+        || control.dataset.recipeIngredientInlineField !== "section"
+        || source.tagName !== "SELECT"
+    ) {
+        return null;
+    }
+    const cell = control.closest("[data-ingredient-type-summary]");
+    if (!cell) return null;
+    let trigger = cell.querySelector("[data-recipe-ingredient-inline-type-trigger]");
+    if (!trigger) {
+        trigger = createRecipeIngredientTypeTrigger(source, { inline: true });
+        trigger.dataset.recipeIngredientInlineTypeTrigger = "true";
+        cell.insertBefore(trigger, control);
+    }
+    trigger.recipeEditTypeSelect = source;
+    control.hidden = true;
+    syncRecipeIngredientTypeTrigger(trigger, source, source.value);
+    return trigger;
+}
+
 function syncRecipeIngredientInlineEditor(row) {
     if (!row) return;
     row.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
@@ -27165,6 +27188,10 @@ function syncRecipeIngredientInlineEditor(row) {
             const trigger = control.closest("[data-ingredient-store-summary]")
                 ?.querySelector("[data-recipe-ingredient-inline-store-section-trigger]");
             if (trigger) syncRecipeIngredientStoreSectionTrigger(trigger, source.value);
+        } else if (fieldName === "section") {
+            const trigger = control.closest("[data-ingredient-type-summary]")
+                ?.querySelector("[data-recipe-ingredient-inline-type-trigger]");
+            if (trigger) syncRecipeIngredientTypeTrigger(trigger, source, source.value);
         }
         if (source.hasAttribute("aria-invalid")) {
             control.setAttribute("aria-invalid", source.getAttribute("aria-invalid") || "true");
@@ -27187,6 +27214,8 @@ function bindRecipeIngredientInlineEditor(row) {
         if (!source) return;
         if (fieldName === "store_section") {
             ensureRecipeIngredientInlineStoreSectionTrigger(control, source);
+        } else if (fieldName === "section") {
+            ensureRecipeIngredientInlineTypeTrigger(control, source);
         } else if (fieldName === "unit") {
             bindRecipeIngredientUnitPickerTrigger(control);
         }
@@ -35750,18 +35779,60 @@ function recipeIngredientTypeControlLabel(select, value) {
         : label;
 }
 
-function syncRecipeIngredientTypeControl(select) {
-    const label = select ? select.closest(".recipe-edit-section-label") : null;
-    const triggerLabel = label ? label.querySelector("[data-type-trigger-label]") : null;
-    const dot = label ? label.querySelector("[data-type-trigger-dot]") : null;
-    const selectedValue = String(select && select.value || "").trim() || "main";
-    const builtIn = recipeIngredientBuiltInType(selectedValue);
+function syncRecipeIngredientTypeTrigger(trigger, select, selectedValue) {
+    if (!trigger) return;
+    const triggerLabel = trigger.querySelector("[data-type-trigger-label]");
+    const dot = trigger.querySelector("[data-type-trigger-dot]");
+    const resolvedValue = String(selectedValue || "").trim() || "main";
+    const builtIn = recipeIngredientBuiltInType(resolvedValue);
+    const inline = trigger.dataset.recipeIngredientInlineTypeTrigger === "true";
     if (triggerLabel) {
-        triggerLabel.textContent = recipeIngredientTypeControlLabel(select, selectedValue);
+        triggerLabel.textContent = inline
+            ? recipeIngredientTypeLabel({ section: resolvedValue })
+            : recipeIngredientTypeControlLabel(select, resolvedValue);
     }
     if (dot) {
         dot.className = `recipe-edit-type-dot${builtIn && builtIn.value === "optional" ? " is-optional" : ""}${!builtIn ? " is-custom" : ""}`;
     }
+}
+
+function createRecipeIngredientTypeTrigger(select, options = {}) {
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "recipe-edit-store-section-trigger recipe-edit-type-trigger";
+    trigger.dataset.recipeEditTypeTrigger = "true";
+    if (options.inline) trigger.dataset.recipeIngredientInlineTypeTrigger = "true";
+    trigger.setAttribute("role", "combobox");
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-controls", "recipeIngredientTypeMenu");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.recipeEditTypeSelect = select;
+    trigger.innerHTML = `
+        <span class="recipe-edit-type-dot" data-type-trigger-dot aria-hidden="true"></span>
+        <span data-type-trigger-label></span>
+        <span class="recipe-edit-store-section-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
+    `;
+    trigger.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        openRecipeIngredientTypeMenu(trigger);
+    });
+    trigger.addEventListener("keydown", event => handleRecipeIngredientTypeKeydown(event, trigger));
+    syncRecipeIngredientTypeTrigger(trigger, select, select ? select.value : "main");
+    return trigger;
+}
+
+function syncRecipeIngredientTypeControl(select) {
+    const label = select ? select.closest(".recipe-edit-section-label") : null;
+    const row = select ? select.closest(".recipe-edit-ingredient-row") : null;
+    const selectedValue = String(select && select.value || "").trim() || "main";
+    const triggers = new Set();
+    const fieldTrigger = label ? label.querySelector("[data-recipe-edit-type-trigger]") : null;
+    if (fieldTrigger) triggers.add(fieldTrigger);
+    row?.querySelectorAll("[data-recipe-ingredient-inline-type-trigger]").forEach(trigger => {
+        if (trigger.recipeEditTypeSelect === select) triggers.add(trigger);
+    });
+    triggers.forEach(trigger => syncRecipeIngredientTypeTrigger(trigger, select, selectedValue));
     const requirementField = label ? label.closest("[data-recipe-ingredient-modal-requirement]") : null;
     const isOptional = recipeIngredientTypeKey(selectedValue) === "optional";
     requirementField?.querySelectorAll("[data-recipe-ingredient-requirement]").forEach(button => {
@@ -35793,7 +35864,8 @@ function renderRecipeIngredientTypeMenu(menu, select) {
     }
     refreshRecipeIngredientTypeSelectOptions(select);
     const selectedValue = recipeIngredientTypeKey(select.value);
-    menu.setAttribute("aria-label", select.closest("[data-recipe-ingredient-edit-panel]")
+    const inline = menu.recipeEditTypeInline === true;
+    menu.setAttribute("aria-label", !inline && select.closest("[data-recipe-ingredient-edit-panel]")
         ? "Ingredient requirement"
         : "Ingredient types");
     const optionMarkup = [...select.options].map((option, index) => {
@@ -35809,7 +35881,7 @@ function renderRecipeIngredientTypeMenu(menu, select) {
                     data-type-value="${escapeAttribute(value)}"
                     onclick="return chooseRecipeIngredientType(this)">
                 <span class="recipe-edit-type-option-dot" aria-hidden="true"></span>
-                <span class="recipe-edit-store-section-option-label recipe-edit-type-option-label">${escapeHtml(recipeIngredientTypeControlLabel(select, value) || option.textContent || value)}</span>
+                <span class="recipe-edit-store-section-option-label recipe-edit-type-option-label">${escapeHtml((inline ? recipeIngredientTypeLabel({ section: value }) : recipeIngredientTypeControlLabel(select, value)) || option.textContent || value)}</span>
                 <span class="recipe-edit-store-section-option-check recipe-edit-type-option-check" aria-hidden="true">${recipeEditSvgIcon("check")}</span>
             </button>
         `;
@@ -35870,7 +35942,9 @@ function renderRecipeIngredientTypeMenu(menu, select) {
 
 function openRecipeIngredientTypeMenu(trigger) {
     const label = trigger ? trigger.closest(".recipe-edit-section-label") : null;
-    const select = label ? label.querySelector('select[data-field="section"]') : null;
+    const select = trigger && trigger.recipeEditTypeSelect
+        ? trigger.recipeEditTypeSelect
+        : (label ? label.querySelector('select[data-field="section"]') : null);
     if (!trigger || !select) {
         return false;
     }
@@ -35882,6 +35956,7 @@ function openRecipeIngredientTypeMenu(trigger) {
     closeRecipeEditRowMenus();
     menu.recipeEditAnchorButton = trigger;
     menu.recipeEditTypeSelect = select;
+    menu.recipeEditTypeInline = trigger.dataset.recipeIngredientInlineTypeTrigger === "true";
     menu.hidden = false;
     trigger.setAttribute("aria-expanded", "true");
     renderRecipeIngredientTypeMenu(menu, select);
@@ -36033,25 +36108,7 @@ function bindRecipeIngredientTypeControls(scope) {
             return;
         }
         refreshRecipeIngredientTypeSelectOptions(select);
-        const trigger = document.createElement("button");
-        trigger.type = "button";
-        trigger.className = "recipe-edit-store-section-trigger recipe-edit-type-trigger";
-        trigger.dataset.recipeEditTypeTrigger = "true";
-        trigger.setAttribute("role", "combobox");
-        trigger.setAttribute("aria-haspopup", "listbox");
-        trigger.setAttribute("aria-controls", "recipeIngredientTypeMenu");
-        trigger.setAttribute("aria-expanded", "false");
-        trigger.innerHTML = `
-            <span class="recipe-edit-type-dot" data-type-trigger-dot aria-hidden="true"></span>
-            <span data-type-trigger-label>${escapeHtml(recipeIngredientTypeControlLabel(select, select.value))}</span>
-            <span class="recipe-edit-store-section-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
-        `;
-        trigger.addEventListener("click", event => {
-            event.preventDefault();
-            event.stopPropagation();
-            openRecipeIngredientTypeMenu(trigger);
-        });
-        trigger.addEventListener("keydown", event => handleRecipeIngredientTypeKeydown(event, trigger));
+        const trigger = createRecipeIngredientTypeTrigger(select);
         select.addEventListener("change", () => syncRecipeIngredientTypeControl(select));
         select.hidden = true;
         select.insertAdjacentElement("beforebegin", trigger);
@@ -39229,6 +39286,7 @@ function closeRecipeEditRowMenus() {
         }
         delete menu.recipeEditStoreSectionSelect;
         delete menu.recipeEditTypeSelect;
+        delete menu.recipeEditTypeInline;
         restoreRecipeEditPopupMenu(menu);
     });
     document.querySelectorAll(".recipe-edit-menu-wrap-open").forEach(wrap => {

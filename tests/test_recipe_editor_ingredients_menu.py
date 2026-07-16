@@ -1895,6 +1895,12 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync()
     assert "Open ingredient rows using it will be changed to Main." in script
 
     assert "function bindRecipeIngredientTypeControls(scope)" in script
+    assert "function createRecipeIngredientTypeTrigger(select, options = {})" in script
+    assert "function ensureRecipeIngredientInlineTypeTrigger(control, source)" in script
+    assert "trigger.recipeEditTypeSelect = select;" in script
+    assert "trigger && trigger.recipeEditTypeSelect" in script
+    assert "trigger.dataset.recipeIngredientInlineTypeTrigger" in script
+    assert "menu.recipeEditTypeInline" in script
     assert 'trigger.dataset.recipeEditTypeTrigger = "true";' in script
     assert 'trigger.setAttribute("role", "combobox");' in script
     assert 'trigger.setAttribute("aria-controls", "recipeIngredientTypeMenu");' in script
@@ -1909,6 +1915,8 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync()
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-custom-row" in css
     assert ".recipe-edit-ingredient-type-summary" in css
+    assert ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger" in css
+    assert 'border: 1px solid transparent;' in css
 
 
 def test_bulk_image_generation_menus_include_title_image_scope():

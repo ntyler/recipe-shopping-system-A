@@ -54442,6 +54442,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe
     display: none !important;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-ingredient-inline-control[hidden] {
+    display: none !important;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger {
     box-sizing: border-box;
     display: grid;
@@ -54471,6 +54475,46 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe
     outline: 0;
     background: var(--app-surface);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 22%, transparent);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: 7px minmax(0, 1fr) 14px;
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    min-height: 32px;
+    margin: 0;
+    padding: 0 7px;
+    gap: 7px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-text);
+    font: inherit;
+    line-height: 1.2;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger[aria-expanded="true"],
+body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger:focus-visible {
+    border-color: var(--app-primary-hover);
+    outline: 0;
+    background: var(--app-surface);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 22%, transparent);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger > [data-type-trigger-label] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary:has(> [data-recipe-ingredient-inline-type-trigger])::before {
+        display: none;
+    }
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-name {
@@ -54516,6 +54560,11 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control[aria-inv
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger {
+        height: 34px;
+        min-height: 34px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
         height: 34px;
         min-height: 34px;
     }
