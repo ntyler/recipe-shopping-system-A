@@ -1222,14 +1222,24 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert ".recipe-edit-alternative-component-actions" in v19
     assert "background: transparent;" in v19
     assert ".is-component-editing > .recipe-edit-alternative-component-edit-grid" in v19
+    for aligned_column in (
+        "grid-column: 2 !important;",
+        "grid-column: 3 !important;",
+        "grid-column: 4 !important;",
+        "grid-column: 5 !important;",
+    ):
+        assert aligned_column in v19
+    assert ".field-ingredient > .recipe-edit-ingredient-name-label" in v19
+    assert "grid-column: 1 !important;" in v19
+    assert "grid-row: auto !important;" in v19
     assert ".recipe-edit-alternative-details-hint" in v19
     assert "min-height: 30px;" in v19
     assert ".field-buy-as," in v19
     assert ".recipe-edit-alternative-metadata-inputs" in v19
     mobile_v19 = v19[v19.rindex("@media (max-width: 760px)"):]
     assert "grid-template-rows: minmax(44px, auto) auto auto auto !important;" in mobile_v19
-    assert "grid-column: 2 / 5;" in mobile_v19
-    assert "grid-column: 4 / 6;" in mobile_v19
+    assert "grid-column: 2 / 5 !important;" in mobile_v19
+    assert "grid-column: 4 / 6 !important;" in mobile_v19
     assert "max-width: 100%;" in mobile_v19
     assert ".recipe-edit-alternative-details-hint" in mobile_v19
     assert "display: none;" in mobile_v19
