@@ -27773,7 +27773,6 @@ function organizeRecipeEditStandaloneWorkspace() {
 
     organizeRecipeEditImageCard();
     organizeRecipeEditInformationCard();
-    syncRecipeEditImageCardPlacement();
     organizeRecipeEditAiAssistant();
     organizeRecipeEditIngredientTools();
     organizeRecipeEditEquipmentTools();
@@ -27798,6 +27797,7 @@ function organizeRecipeEditStandaloneWorkspace() {
             confidenceCard,
         ]);
     }
+    syncRecipeEditImageCardPlacement();
 }
 
 function syncRecipeEditDocumentRows() {

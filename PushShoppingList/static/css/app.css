@@ -40820,7 +40820,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
         grid-row: 2;
     }
 
-    .recipe-edit-context-card:not([open]) > :not(summary) {
+    details.recipe-edit-context-card:not([open]) > :not(summary) {
         display: none;
     }
 

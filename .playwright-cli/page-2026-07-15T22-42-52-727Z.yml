@@ -1,0 +1,332 @@
+- generic [ref=f3e1]:
+  - link "Skip to content" [ref=f3e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=f3e4]:
+    - banner "App toolbar" [ref=f3e5]:
+      - link "AI Pantry" [ref=f3e6] [cursor=pointer]:
+        - /url: /
+      - search [ref=f3e15]:
+        - generic [ref=f3e16]: Search AI Pantry
+        - combobox "Search AI Pantry" [ref=f3e17]
+        - generic: Ctrl + K
+        - button "Search" [ref=f3e18] [cursor=pointer]
+      - generic "Quick actions" [ref=f3e20]:
+        - link "Notifications" [ref=f3e21] [cursor=pointer]:
+          - /url: /#notificationsPage
+        - link "Open Guest Demo account" [ref=f3e26] [cursor=pointer]:
+          - /url: /#userAccountSection
+          - generic [ref=f3e27]: G
+    - main "Recipe editor" [ref=f3e28]:
+      - dialog "Edit Recipe" [ref=f3e30]:
+        - generic [ref=f3e31]:
+          - generic [ref=f3e32]:
+            - navigation "Breadcrumb" [ref=f3e34]:
+              - link "Recipes" [ref=f3e39] [cursor=pointer]:
+                - /url: /#currentRecipeUrlLogCard
+              - generic [ref=f3e40]: /
+              - generic [ref=f3e41]: New Recipe
+              - generic [ref=f3e42]: /
+              - generic [ref=f3e43]: Edit Recipe
+            - generic [ref=f3e44]:
+              - button "Preview Recipe" [ref=f3e45] [cursor=pointer]
+              - text: ↓
+              - button "Create recipe PDF" [ref=f3e414] [cursor=pointer]:
+                - text: ↓
+                - generic [ref=f3e54]: Recipe PDF
+              - generic [ref=f3e55]:
+                - button "More actions" [ref=f3e56] [cursor=pointer]
+                - text: "> >"
+              - button "Cancel" [ref=f3e58] [cursor=pointer]
+              - button "Save Recipe" [disabled] [ref=f3e59]
+          - generic [ref=f3e64]:
+            - generic [ref=f3e65]:
+              - generic [ref=f3e67]:
+                - generic [ref=f3e68]:
+                  - generic [ref=f3e69]:
+                    - generic [ref=f3e70]:
+                      - generic [ref=f3e71]:
+                        - generic [ref=f3e72]: Recipe Name
+                        - textbox "Recipe Name" [ref=f3e73]:
+                          - /placeholder: Untitled Recipe
+                          - text: New Recipe
+                      - button "Edit recipe name" [ref=f3e74] [cursor=pointer]
+                    - radiogroup "Recipe rating" [ref=f3e80]:
+                      - radio "1 star. Click the selected star again to clear the rating." [ref=f3e81] [cursor=pointer]: ☆
+                      - radio "2 stars. Click the selected star again to clear the rating." [ref=f3e82] [cursor=pointer]: ☆
+                      - radio "3 stars. Click the selected star again to clear the rating." [ref=f3e83] [cursor=pointer]: ☆
+                      - radio "4 stars. Click the selected star again to clear the rating." [ref=f3e84] [cursor=pointer]: ☆
+                      - radio "5 stars. Click the selected star again to clear the rating." [ref=f3e85] [cursor=pointer]: ☆
+                    - region "Recipe Image" [ref=f3e87]:
+                      - generic [ref=f3e89]:
+                        - generic [ref=f3e90]:
+                          - button "Add New Recipe to favorites" [ref=f3e415] [cursor=pointer]
+                          - generic [ref=f3e91]: No title image saved.
+                        - generic [ref=f3e92]:
+                          - generic [ref=f3e93]:
+                            - button "Replace Image" [expanded] [ref=f3e94] [cursor=pointer]
+                            - button "AI Generate" [ref=f3e101] [cursor=pointer]
+                          - menu [ref=f3e663]:
+                            - menuitem "Upload Image" [active] [ref=f3e664] [cursor=pointer]
+                            - menuitem "AI Regenerate" [ref=f3e665] [cursor=pointer]
+                    - generic [ref=f3e108]:
+                      - generic [ref=f3e109]:
+                        - combobox "No cuisine tags selected" [ref=f3e110]:
+                          - option "Use inferred" [selected]
+                          - option "🇺🇸 American"
+                          - option "🇲🇽 Mexican"
+                          - option "🇮🇹 Italian"
+                          - option "🇯🇵 Japanese"
+                          - option "🇹🇭 Thai"
+                          - option "🇨🇳 Chinese"
+                          - option "🇮🇳 Indian"
+                          - option "🇫🇷 French"
+                          - option "🌍 Other / Fusion"
+                        - generic [ref=f3e111]: No cuisine tags selected
+                      - button "Add Tag" [ref=f3e114] [cursor=pointer]
+                  - generic [ref=f3e117]:
+                    - generic [ref=f3e118]:
+                      - generic [ref=f3e119]: Cookbook
+                      - button "Cookbook actions" [ref=f3e121] [cursor=pointer]:
+                        - generic "unclassified" [ref=f3e419]
+                    - generic [ref=f3e123]:
+                      - generic [ref=f3e124]: Section
+                      - button "Menu section actions" [ref=f3e126] [cursor=pointer]:
+                        - generic [ref=f3e127]: No menu section
+                - generic [ref=f3e128]:
+                  - generic [ref=f3e129]:
+                    - generic [ref=f3e130]: Servings
+                    - generic [ref=f3e137]:
+                      - textbox "Servings people" [ref=f3e138]
+                      - generic [ref=f3e139]: people
+                  - generic [ref=f3e140]:
+                    - generic [ref=f3e141]: Total Time
+                    - generic [ref=f3e147]:
+                      - textbox "Total Time min" [ref=f3e148]
+                      - generic [ref=f3e149]: min
+                  - generic [ref=f3e150]:
+                    - generic [ref=f3e151]: Prep Time
+                    - generic [ref=f3e156]:
+                      - textbox "Prep Time min" [ref=f3e157]
+                      - generic [ref=f3e158]: min
+                  - generic [ref=f3e159]:
+                    - generic [ref=f3e160]: Cook Time
+                    - generic [ref=f3e166]:
+                      - textbox "Cook Time min" [ref=f3e167]
+                      - generic [ref=f3e168]: min
+                  - generic [ref=f3e169]:
+                    - generic [ref=f3e170]: Inactive Time
+                    - generic [ref=f3e175]:
+                      - textbox "Inactive Time min" [ref=f3e176]
+                      - generic [ref=f3e177]: min
+                  - generic [ref=f3e178]:
+                    - generic [ref=f3e179]: Difficulty
+                    - combobox "Difficulty" [ref=f3e189]:
+                      - option "Not set" [selected]
+                      - option "Easy"
+                      - option "Medium"
+                      - option "Hard"
+                      - option "Expert"
+                  - generic [ref=f3e190]:
+                    - generic [ref=f3e191]: Scale
+                    - combobox "Scale" [ref=f3e198]:
+                      - option "1/2x"
+                      - option "1x" [selected]
+                      - option "2x"
+                      - option "3x"
+                - generic [ref=f3e200]:
+                  - generic [ref=f3e201]: Description
+                  - textbox "Description 0 characters" [ref=f3e420]
+                  - generic: 0 characters
+                - group [ref=f3e206]:
+                  - generic "Technical Details" [ref=f3e207] [cursor=pointer]
+              - region [ref=f3e210]:
+                - generic [ref=f3e211]:
+                  - generic [ref=f3e214]:
+                    - heading "Edit Recipe Categories" [level=3] [ref=f3e215]
+                    - paragraph [ref=f3e421]: New Recipe
+                  - generic [ref=f3e216]:
+                    - generic [ref=f3e217]: "Categories: Blank"
+                    - button "Recipe category actions" [ref=f3e219] [cursor=pointer]
+                    - button "Collapse recipe categories" [expanded] [ref=f3e220] [cursor=pointer]
+                - generic [ref=f3e223]:
+                  - generic [ref=f3e224]:
+                    - generic [ref=f3e225]: Meal Type
+                    - combobox "Meal Type" [ref=f3e226]:
+                      - option "Use inferred" [selected]
+                      - option "🍳 Breakfast"
+                      - option "🥪 Lunch"
+                      - option "🍽️ Dinner"
+                      - option "🥗 Side Dish"
+                      - option "🍰 Dessert"
+                      - option "🍹 Drink"
+                      - option "🥣 Soup"
+                      - option "🍱 Meal Prep"
+                      - option "🍿 Snack"
+                  - generic [ref=f3e227]:
+                    - generic [ref=f3e228]: Main Ingredient
+                    - combobox "Main Ingredient" [ref=f3e229]:
+                      - option "Use inferred" [selected]
+                      - option "🐔 Chicken"
+                      - option "🥩 Beef"
+                      - option "🐷 Pork"
+                      - option "🐟 Seafood"
+                      - option "🥚 Eggs"
+                      - option "🫘 Beans"
+                      - option "🥬 Vegetarian"
+                      - option "🌱 Vegan"
+                      - option "🍝 Pasta"
+                      - option "🍚 Rice / Grains"
+                      - option "🥔 Potatoes"
+                      - option "🧀 Cheese"
+                  - generic [ref=f3e230]:
+                    - generic [ref=f3e231]: Cooking Method
+                    - combobox "Cooking Method" [ref=f3e232]:
+                      - option "Use inferred" [selected]
+                      - option "🔥 Grilled"
+                      - option "🍳 Skillet"
+                      - option "🥘 One Pot"
+                      - option "🍲 Slow Cooker"
+                      - option "♨️ Oven Baked"
+                      - option "🥗 No Cook"
+                      - option "🧊 Make Ahead"
+                      - option "⚡ Quick Meal"
+                  - generic [ref=f3e233]:
+                    - generic [ref=f3e234]: Occasion
+                    - combobox "Occasion" [ref=f3e235]:
+                      - option "Use inferred" [selected]
+                      - option "❤️ Date Night"
+                      - option "👨‍👩‍👧 Family Dinner"
+                      - option "🎉 Party Food"
+                      - option "🏈 Game Day"
+                      - option "🎄 Holiday"
+                      - option "☀️ Summer"
+                      - option "❄️ Winter"
+                      - option "🧺 Potluck"
+                  - generic [ref=f3e236]:
+                    - generic [ref=f3e237]: Dietary Preference
+                    - combobox "Dietary Preference" [ref=f3e238]:
+                      - option "Use inferred" [selected]
+                      - option "🥩 High Protein"
+                      - option "🥗 Low Carb"
+                      - option "🌱 Vegan"
+                      - option "🌱 Vegetarian"
+                      - option "🌾 Gluten Free"
+                      - option "🥛 Dairy Free"
+                      - option "🧂 Low Sodium"
+                      - option "🔥 Spicy"
+                      - option "🍬 Low Sugar"
+                  - generic [ref=f3e239]:
+                    - generic [ref=f3e240]: Prep Time
+                    - combobox "Prep Time" [ref=f3e241]:
+                      - option "Use inferred" [selected]
+                      - option "⚡ Under 15 Minutes"
+                      - option "⏱️ 15–30 Minutes"
+                      - option "🕐 30–60 Minutes"
+                      - option "⏳ Over 1 Hour"
+                      - option "🧊 Make Ahead"
+                  - generic [ref=f3e242]:
+                    - generic [ref=f3e243]: Custom Categories
+                    - textbox "Custom Categories" [ref=f3e244]:
+                      - /placeholder: Sophia's Favorites, Weeknight Dinners
+              - generic [ref=f3e245]:
+                - tablist "Recipe editor sections" [ref=f3e246]:
+                  - tab "Ingredients" [selected] [ref=f3e247] [cursor=pointer]
+                  - tab "Instructions" [ref=f3e248] [cursor=pointer]
+                  - tab "Equipment" [ref=f3e249] [cursor=pointer]
+                  - tab "Nutrition" [ref=f3e250] [cursor=pointer]
+                  - tab "Notes" [ref=f3e251] [cursor=pointer]
+                - generic [ref=f3e252]:
+                  - tabpanel "Ingredients" [ref=f3e253]:
+                    - generic [ref=f3e254]:
+                      - heading "Ingredients (1)" [level=3] [ref=f3e422]
+                      - generic [ref=f3e258]:
+                        - button "Add Ingredient" [ref=f3e259] [cursor=pointer]
+                        - button "Ingredient actions" [ref=f3e264] [cursor=pointer]
+                    - table "Ingredients" [ref=f3e265]:
+                      - rowgroup [ref=f3e266]:
+                        - row "Edit ingredient" [ref=f3e423]:
+                          - button "Drag to reorder" [ref=f3e424]
+                          - generic [ref=f3e433]: "1"
+                          - cell "Unnamed ingredient Good match" [ref=f3e434] [cursor=pointer]:
+                            - strong [ref=f3e435]: Unnamed ingredient
+                            - generic [ref=f3e436]: Good match
+                          - cell "Quantity —" [ref=f3e438] [cursor=pointer]
+                          - cell "Unit —" [ref=f3e439]
+                          - cell "Store section Produce" [ref=f3e440] [cursor=pointer]:
+                            - text: Store section
+                            - generic [ref=f3e662]: Produce
+                          - 'cell "Type: Main" [ref=f3e447] [cursor=pointer]': Type Main
+                          - cell [ref=f3e448]:
+                            - text: Alternatives
+                            - button "Show 0 alternatives for ingredient" [ref=f3e449] [cursor=pointer]:
+                              - generic [ref=f3e450]: None
+                          - cell [ref=f3e642]:
+                            - button "Ingredient actions" [ref=f3e644] [cursor=pointer]
+                    - generic [ref=f3e267]:
+                      - button "Reorder" [ref=f3e268] [cursor=pointer]
+                      - button "Group" [ref=f3e274] [cursor=pointer]
+                  - text: No image No reflection notes yet. Add one after cooking to remember what worked or what to change next time.
+            - complementary "Recipe context" [ref=f3e279]:
+              - group [ref=f3e280]:
+                - generic "Restaurant Source Edit" [ref=f3e281] [cursor=pointer]:
+                  - generic [ref=f3e282]: Restaurant Source
+                  - button "Edit" [ref=f3e283]
+                - generic [ref=f3e284]:
+                  - generic [ref=f3e285]: R
+                  - strong [ref=f3e288]: No restaurant source
+              - region [ref=f3e291]:
+                - generic [ref=f3e292]:
+                  - heading "AI Assistant" [level=3] [ref=f3e293]
+                  - paragraph [ref=f3e298]: Complete missing recipe details with the existing AI workflow.
+                - generic [ref=f3e645]:
+                  - generic [ref=f3e646]: "Missing or incomplete:"
+                  - strong [ref=f3e647]: Description
+                  - strong [ref=f3e648]: Ingredients
+                  - strong [ref=f3e649]: Instructions
+                  - strong [ref=f3e650]: Equipment
+                  - strong [ref=f3e651]: Recipe image
+                - generic [ref=f3e299]:
+                  - button "Infer Missing DetailsInfer" [ref=f3e300] [cursor=pointer]
+                  - button "Regenerate Recipe" [ref=f3e301] [cursor=pointer]
+                  - button "Regenerate Ingredients" [ref=f3e302] [cursor=pointer]
+                  - group [ref=f3e303]:
+                    - generic "More AI Actions" [ref=f3e304] [cursor=pointer]
+                    - text: Overwrite Preview
+              - group [ref=f3e305]:
+                - generic [ref=f3e306] [cursor=pointer]:
+                  - generic [ref=f3e307]:
+                    - text: Source & Documents
+                    - button "About Source and Documents" [ref=f3e308]
+                  - button "Edit" [ref=f3e312]
+                - generic [ref=f3e314]:
+                  - generic [ref=f3e320]:
+                    - strong [ref=f3e321]: Source URL
+                    - generic "manual://recipe/8f56a82da2384f698057d60e7142eea9 (click to copy)" [ref=f3e652]: 8f56a82da2384f698057d60e7142eea9
+                  - generic "This source is not currently openable" [ref=f3e653]: Open
+              - group [ref=f3e364]:
+                - generic "Ingredient Gallery" [ref=f3e365] [cursor=pointer]
+              - group [ref=f3e368]:
+                - generic "Recipe Health 5 items need attention" [ref=f3e654] [cursor=pointer]:
+                  - generic [ref=f3e370]: Recipe Health
+                  - generic [ref=f3e655]: 5 items need attention
+              - region "AI Confidence" [ref=f3e372]:
+                - generic [ref=f3e373]:
+                  - generic [ref=f3e374]: AI Confidence
+                  - strong [ref=f3e375]: Not available
+                - generic [ref=f3e376]:
+                  - progressbar "AI confidence" [ref=f3e377]
+                  - paragraph [ref=f3e378]: Confidence is calculated from source quality, extraction reliability, AI certainty, and user verification.
+                  - button "AI Quality Report" [ref=f3e379] [cursor=pointer]
+  - navigation "Mobile navigation" [ref=f3e380]:
+    - link "Home" [ref=f3e381] [cursor=pointer]:
+      - /url: /#appPageHeader
+    - link "Recipes" [ref=f3e388] [cursor=pointer]:
+      - /url: /#recipesPage
+    - link "Cookbooks" [ref=f3e394] [cursor=pointer]:
+      - /url: /#cookbooksCard
+    - link "Lists" [ref=f3e399] [cursor=pointer]:
+      - /url: /#shoppingViewsSection
+    - link "Pantry" [ref=f3e404] [cursor=pointer]:
+      - /url: /#aiPantrySection
+    - button "Open all navigation" [ref=f3e410] [cursor=pointer]:
+      - generic [ref=f3e413]: More

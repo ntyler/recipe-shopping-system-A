@@ -398,6 +398,15 @@ def test_recipe_image_uses_one_node_and_moves_below_rating_at_narrow_widths():
     assert "object-fit: cover;" in responsive
     assert "flex-wrap: wrap;" in responsive
 
+    workspace_start = script.index("function organizeRecipeEditStandaloneWorkspace()")
+    workspace_end = script.index("function syncRecipeEditDocumentRows()", workspace_start)
+    workspace = script[workspace_start:workspace_end]
+    assert workspace.index("appendRecipeEditWorkspaceChildren(sidebar") < workspace.rindex(
+        "syncRecipeEditImageCardPlacement();"
+    )
+    assert "details.recipe-edit-context-card:not([open]) > :not(summary)" in css
+    assert "\n    .recipe-edit-context-card:not([open]) > :not(summary)" not in css
+
 
 def test_restaurant_source_edit_uses_accessible_modal_and_save_wiring():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
