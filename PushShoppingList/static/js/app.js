@@ -27122,6 +27122,29 @@ function recipeIngredientInlineOptionSignature(select) {
     ]));
 }
 
+function ensureRecipeIngredientInlineStoreSectionTrigger(control, source) {
+    if (
+        !control
+        || !source
+        || control.dataset.recipeIngredientInlineField !== "store_section"
+        || source.tagName !== "SELECT"
+    ) {
+        return null;
+    }
+    const cell = control.closest("[data-ingredient-store-summary]");
+    if (!cell) return null;
+    let trigger = cell.querySelector("[data-recipe-ingredient-inline-store-section-trigger]");
+    if (!trigger) {
+        trigger = createRecipeIngredientStoreSectionTrigger(source);
+        trigger.dataset.recipeIngredientInlineStoreSectionTrigger = "true";
+        cell.insertBefore(trigger, control);
+    }
+    trigger.recipeEditStoreSectionSelect = source;
+    control.hidden = true;
+    syncRecipeIngredientStoreSectionTrigger(trigger, source.value);
+    return trigger;
+}
+
 function syncRecipeIngredientInlineEditor(row) {
     if (!row) return;
     row.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
@@ -27138,6 +27161,11 @@ function syncRecipeIngredientInlineEditor(row) {
         }
 
         control.value = source.value;
+        if (fieldName === "store_section") {
+            const trigger = control.closest("[data-ingredient-store-summary]")
+                ?.querySelector("[data-recipe-ingredient-inline-store-section-trigger]");
+            if (trigger) syncRecipeIngredientStoreSectionTrigger(trigger, source.value);
+        }
         if (source.hasAttribute("aria-invalid")) {
             control.setAttribute("aria-invalid", source.getAttribute("aria-invalid") || "true");
         } else {
@@ -27157,6 +27185,9 @@ function bindRecipeIngredientInlineEditor(row) {
         const fieldName = control.dataset.recipeIngredientInlineField;
         const source = recipeIngredientDirectField(row, fieldName);
         if (!source) return;
+        if (fieldName === "store_section") {
+            ensureRecipeIngredientInlineStoreSectionTrigger(control, source);
+        }
 
         const applyValue = eventName => {
             source.value = control.value;
@@ -35221,17 +35252,10 @@ function replaceRecipeIngredientCustomStoreSectionName(previousValue, nextValue)
     return true;
 }
 
-function syncRecipeIngredientStoreSectionControl(select) {
-    const label = select ? select.closest(".recipe-edit-store-section-label") : null;
-    const icon = label ? label.querySelector("[data-store-section-icon]") : null;
-    const triggerLabel = label ? label.querySelector("[data-store-section-trigger-label]") : null;
-    const row = select ? select.closest(".recipe-edit-ingredient-row") : null;
-    const customField = row ? recipeIngredientDirectField(row, "store_section_custom") : null;
-    const selectedValue = String(select && select.value || "").trim();
-    const isCustom = Boolean(selectedValue && !recipeIngredientBuiltInStoreSectionValue(selectedValue));
-    if (customField) {
-        customField.value = isCustom ? "true" : "false";
-    }
+function syncRecipeIngredientStoreSectionTrigger(trigger, selectedValue) {
+    if (!trigger) return;
+    const icon = trigger.querySelector("[data-store-section-icon]");
+    const triggerLabel = trigger.querySelector("[data-store-section-trigger-label]");
     if (icon) {
         const replacement = document.createElement("span");
         replacement.innerHTML = recipeIngredientStoreSectionIconHtml(selectedValue);
@@ -35240,6 +35264,48 @@ function syncRecipeIngredientStoreSectionControl(select) {
     if (triggerLabel) {
         triggerLabel.textContent = recipeStoreSectionDisplayLabel(selectedValue);
     }
+}
+
+function createRecipeIngredientStoreSectionTrigger(select) {
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "recipe-edit-store-section-trigger";
+    trigger.dataset.recipeEditStoreSectionTrigger = "true";
+    trigger.setAttribute("role", "combobox");
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-controls", "recipeIngredientStoreSectionMenu");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.recipeEditStoreSectionSelect = select;
+    trigger.innerHTML = `
+        ${recipeIngredientStoreSectionIconHtml(select ? select.value : "")}
+        <span data-store-section-trigger-label>${escapeHtml(recipeStoreSectionDisplayLabel(select ? select.value : ""))}</span>
+        <span class="recipe-edit-store-section-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
+    `;
+    trigger.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        openRecipeIngredientStoreSectionMenu(trigger);
+    });
+    trigger.addEventListener("keydown", event => handleRecipeIngredientStoreSectionKeydown(event, trigger));
+    return trigger;
+}
+
+function syncRecipeIngredientStoreSectionControl(select) {
+    const label = select ? select.closest(".recipe-edit-store-section-label") : null;
+    const row = select ? select.closest(".recipe-edit-ingredient-row") : null;
+    const customField = row ? recipeIngredientDirectField(row, "store_section_custom") : null;
+    const selectedValue = String(select && select.value || "").trim();
+    const isCustom = Boolean(selectedValue && !recipeIngredientBuiltInStoreSectionValue(selectedValue));
+    if (customField) {
+        customField.value = isCustom ? "true" : "false";
+    }
+    const triggers = new Set();
+    const fieldTrigger = label ? label.querySelector("[data-recipe-edit-store-section-trigger]") : null;
+    if (fieldTrigger) triggers.add(fieldTrigger);
+    row?.querySelectorAll("[data-recipe-ingredient-inline-store-section-trigger]").forEach(trigger => {
+        if (trigger.recipeEditStoreSectionSelect === select) triggers.add(trigger);
+    });
+    triggers.forEach(trigger => syncRecipeIngredientStoreSectionTrigger(trigger, selectedValue));
 }
 
 function ensureRecipeIngredientStoreSectionMenu() {
@@ -35340,7 +35406,9 @@ function renderRecipeIngredientStoreSectionMenu(menu, select) {
 
 function openRecipeIngredientStoreSectionMenu(trigger) {
     const label = trigger ? trigger.closest(".recipe-edit-store-section-label") : null;
-    const select = label ? label.querySelector('select[data-field="store_section"]') : null;
+    const select = trigger && trigger.recipeEditStoreSectionSelect
+        ? trigger.recipeEditStoreSectionSelect
+        : (label ? label.querySelector('select[data-field="store_section"]') : null);
     if (!trigger || !select) {
         return false;
     }
@@ -35525,25 +35593,7 @@ function bindRecipeIngredientStoreSectionControls(scope) {
         }
 
         label.querySelector("[data-store-section-icon]")?.remove();
-        const trigger = document.createElement("button");
-        trigger.type = "button";
-        trigger.className = "recipe-edit-store-section-trigger";
-        trigger.dataset.recipeEditStoreSectionTrigger = "true";
-        trigger.setAttribute("role", "combobox");
-        trigger.setAttribute("aria-haspopup", "listbox");
-        trigger.setAttribute("aria-controls", "recipeIngredientStoreSectionMenu");
-        trigger.setAttribute("aria-expanded", "false");
-        trigger.innerHTML = `
-            ${recipeIngredientStoreSectionIconHtml(select.value)}
-            <span data-store-section-trigger-label>${escapeHtml(recipeStoreSectionDisplayLabel(select.value))}</span>
-            <span class="recipe-edit-store-section-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
-        `;
-        trigger.addEventListener("click", event => {
-            event.preventDefault();
-            event.stopPropagation();
-            openRecipeIngredientStoreSectionMenu(trigger);
-        });
-        trigger.addEventListener("keydown", event => handleRecipeIngredientStoreSectionKeydown(event, trigger));
+        const trigger = createRecipeIngredientStoreSectionTrigger(select);
         select.addEventListener("change", () => syncRecipeIngredientStoreSectionControl(select));
         select.hidden = true;
         select.insertAdjacentElement("beforebegin", trigger);

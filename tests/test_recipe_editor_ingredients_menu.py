@@ -1794,6 +1794,12 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert "Add custom section…" in script
     assert "if (!custom)" in script
     assert "function bindRecipeIngredientStoreSectionControls(scope)" in script
+    assert "function createRecipeIngredientStoreSectionTrigger(select)" in script
+    assert "function ensureRecipeIngredientInlineStoreSectionTrigger(control, source)" in script
+    assert "trigger.recipeEditStoreSectionSelect = select;" in script
+    assert "trigger && trigger.recipeEditStoreSectionSelect" in script
+    assert "trigger.dataset.recipeIngredientInlineStoreSectionTrigger" in script
+    assert "control.hidden = true;" in script
     assert 'trigger.setAttribute("role", "combobox");' in script
     assert 'select.hidden = true;' in script
     assert 'bindRecipeIngredientStoreSectionControls(row);' in script
@@ -1813,6 +1819,7 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert ".recipe-edit-store-section-edit-button" in css
     assert ".recipe-edit-store-section-delete-button" in css
     assert ".recipe-edit-store-section-menu-footer" in css
+    assert ".recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger" in css
     assert ".recipe-edit-store-section-menu-list {\n    flex: 1 1 auto;" in css
     assert ".recipe-edit-store-section-icon.is-fish" in css
     assert ".recipe-edit-store-section-icon.is-paw" in css
