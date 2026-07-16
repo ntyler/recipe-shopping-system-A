@@ -4746,6 +4746,7 @@ def load_editable_recipe(url):
                 include_defaults=recipe_url_type(url) == "Manual",
             ),
             "rating": normalize_recipe_rating(recipe_data.get("rating")),
+            "favorite": bool(recipe_data.get("favorite")),
             "recipe_notes": recipe_notes,
             "reflection_notes": normalize_reflection_notes(recipe_data.get("reflection_notes")),
             "chatgpt_feedback": str(recipe_data.get("chatgpt_feedback") or "").strip(),

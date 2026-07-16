@@ -64,6 +64,10 @@ def test_recipe_favorite_route_updates_saved_recipe_state(monkeypatch):
                     "/api/recipe_favorite",
                     query_string={"url": recipe_url},
                 )
+                editor_response = client.get(
+                    "/api/recipe",
+                    query_string={"url": recipe_url},
+                )
 
             saved = json.loads(
                 (output_dir / f"{safe_filename(recipe_url)}.json").read_text(encoding="utf-8")
@@ -74,6 +78,8 @@ def test_recipe_favorite_route_updates_saved_recipe_state(monkeypatch):
     assert read_response.status_code == 200
     assert read_response.get_json()["favorite"] is True
     assert read_response.headers["Cache-Control"] == "no-store, no-cache, must-revalidate, private"
+    assert editor_response.status_code == 200
+    assert editor_response.get_json()["recipe"]["favorite"] is True
     assert saved["favorite"] is True
 
 
