@@ -1137,7 +1137,7 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert "display: flex;" in mobile
     assert "grid-template-columns: minmax(0, 1fr);" in mobile
     mobile_identity_selector = (
-        "#recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel "
+        "dialog.recipe-edit-ingredient-edit-panel "
         ".recipe-edit-ingredient-modal-identity-fields {"
     )
     mobile_identity = mobile[mobile.index(mobile_identity_selector):]
@@ -1149,12 +1149,14 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
         "align-items: stretch;",
     ):
         assert declaration in mobile_identity
-    mobile_name_selector = (
-        "#recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel "
-        ".recipe-edit-ingredient-modal-identity-fields > .recipe-edit-ingredient-modal-name-field {"
+    mobile_identity_width_selector = (
+        "dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-modal-identity-fields > :is("
     )
-    mobile_name = mobile[mobile.index(mobile_name_selector):]
-    mobile_name = mobile_name[:mobile_name.index("}")]
+    mobile_identity_width = mobile[mobile.index(mobile_identity_width_selector):]
+    mobile_identity_width = mobile_identity_width[:mobile_identity_width.index("}")]
+    assert ".recipe-edit-ingredient-modal-name-field" in mobile_identity_width
+    assert ".recipe-edit-ingredient-modal-buy-as-field" in mobile_identity_width
     for declaration in (
         "grid-column: 1 / -1 !important;",
         "justify-self: stretch;",
@@ -1164,9 +1166,9 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
         "align-items: stretch !important;",
         "text-align: left;",
     ):
-        assert declaration in mobile_name
+        assert declaration in mobile_identity_width
     mobile_name_control_selector = (
-        "#recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel "
+        "dialog.recipe-edit-ingredient-edit-panel "
         ".recipe-edit-ingredient-modal-name-field textarea[data-field=\"ingredient\"] {"
     )
     mobile_name_control_start = mobile.index(mobile_name_control_selector)
