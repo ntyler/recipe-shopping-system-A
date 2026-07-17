@@ -51126,6 +51126,59 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     white-space: nowrap;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-trigger {
+    display: inline-flex;
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    align-items: center;
+    justify-content: center;
+    margin-left: 1px;
+    border: 1px solid color-mix(in srgb, var(--app-muted) 58%, transparent);
+    border-radius: 50%;
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: help;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-trigger:is(:hover, :focus-visible),
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-open .recipe-edit-metadata-tooltip-trigger {
+    border-color: var(--app-primary-hover);
+    color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-trigger:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-primary-hover) 48%, transparent);
+    outline-offset: 2px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip[hidden] {
+    display: none !important;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip {
+    position: fixed;
+    z-index: 2200;
+    box-sizing: border-box;
+    max-width: calc(100vw - 24px);
+    padding: 9px 11px;
+    border: 1px solid color-mix(in srgb, var(--app-primary-hover) 44%, var(--recipe-editor-border));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--recipe-editor-surface) 96%, #000);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .32);
+    color: var(--app-text-strong);
+    font-size: 12px;
+    font-weight: 550;
+    line-height: 1.4;
+    text-align: left;
+    white-space: normal;
+    pointer-events: none;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-value {
     display: flex;
     min-width: 0;

@@ -25671,6 +25671,129 @@ function organizeRecipeEditMetadataField(field) {
     }
 }
 
+function closeRecipeEditMetadataTooltips(options = {}) {
+    document.querySelectorAll("[data-recipe-edit-metadata-tooltip-trigger]").forEach(trigger => {
+        if (trigger === options.except) return;
+        const tooltipId = trigger.getAttribute("aria-controls");
+        const tooltip = tooltipId ? document.getElementById(tooltipId) : null;
+        trigger.setAttribute("aria-expanded", "false");
+        trigger.dataset.recipeEditTooltipPinned = "false";
+        trigger.closest("label")?.classList.remove("recipe-edit-metadata-tooltip-open");
+        if (tooltip) tooltip.hidden = true;
+    });
+}
+
+function positionRecipeEditMetadataTooltip(trigger, tooltip) {
+    if (!trigger || !tooltip || tooltip.hidden) return;
+    const margin = 12;
+    const gap = 8;
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const width = Math.min(280, Math.max(0, viewportWidth - (margin * 2)));
+    tooltip.style.width = `${width}px`;
+    const triggerRect = trigger.getBoundingClientRect();
+    const tooltipHeight = tooltip.offsetHeight;
+    const left = Math.max(
+        margin,
+        Math.min(triggerRect.left + (triggerRect.width / 2) - (width / 2), viewportWidth - margin - width)
+    );
+    const belowTop = triggerRect.bottom + gap;
+    const aboveTop = triggerRect.top - gap - tooltipHeight;
+    const fitsBelow = belowTop + tooltipHeight <= viewportHeight - margin;
+    const top = fitsBelow || aboveTop < margin ? belowTop : aboveTop;
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(Math.max(margin, Math.min(top, viewportHeight - margin - tooltipHeight)))}px`;
+}
+
+function setRecipeEditMetadataTooltipOpen(trigger, open, options = {}) {
+    if (!trigger) return;
+    const tooltipId = trigger.getAttribute("aria-controls");
+    const tooltip = tooltipId ? document.getElementById(tooltipId) : null;
+    if (!tooltip) return;
+    const shouldOpen = Boolean(open);
+
+    if (shouldOpen) closeRecipeEditMetadataTooltips({ except: trigger });
+    trigger.setAttribute("aria-expanded", String(shouldOpen));
+    trigger.dataset.recipeEditTooltipPinned = shouldOpen && options.pinned ? "true" : "false";
+    trigger.closest("label")?.classList.toggle("recipe-edit-metadata-tooltip-open", shouldOpen);
+    tooltip.hidden = !shouldOpen;
+    if (shouldOpen) positionRecipeEditMetadataTooltip(trigger, tooltip);
+}
+
+function addRecipeEditMetadataTooltip(field, label, helpText) {
+    const heading = field ? field.querySelector(".recipe-edit-metadata-heading") : null;
+    const control = field ? field.querySelector("input, select") : null;
+    if (!heading || !control || !control.id || heading.querySelector("[data-recipe-edit-metadata-tooltip-trigger]")) return;
+    const tooltipId = `${control.id}Tooltip`;
+    const trigger = document.createElement("span");
+    const tooltip = document.createElement("span");
+    trigger.className = "recipe-edit-metadata-tooltip-trigger";
+    trigger.dataset.recipeEditMetadataTooltipTrigger = "";
+    trigger.dataset.recipeEditTooltipPinned = "false";
+    trigger.setAttribute("role", "button");
+    trigger.setAttribute("tabindex", "0");
+    trigger.setAttribute("aria-label", `About ${label}`);
+    trigger.setAttribute("aria-controls", tooltipId);
+    trigger.setAttribute("aria-describedby", tooltipId);
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.textContent = "?";
+    tooltip.id = tooltipId;
+    tooltip.className = "recipe-edit-metadata-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+    tooltip.textContent = helpText;
+    tooltip.hidden = true;
+    heading.append(trigger, tooltip);
+
+    const describedBy = new Set(String(control.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+    describedBy.add(tooltipId);
+    control.setAttribute("aria-describedby", Array.from(describedBy).join(" "));
+
+    trigger.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const pinned = trigger.dataset.recipeEditTooltipPinned === "true";
+        setRecipeEditMetadataTooltipOpen(trigger, !pinned, { pinned: !pinned });
+        if (!pinned) trigger.focus({ preventScroll: true });
+    });
+    trigger.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            setRecipeEditMetadataTooltipOpen(trigger, false);
+        } else if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            const pinned = trigger.dataset.recipeEditTooltipPinned === "true";
+            setRecipeEditMetadataTooltipOpen(trigger, !pinned, { pinned: !pinned });
+        }
+    });
+    trigger.addEventListener("pointerenter", () => {
+        if (trigger.dataset.recipeEditTooltipPinned !== "true") {
+            setRecipeEditMetadataTooltipOpen(trigger, true);
+        }
+    });
+    trigger.addEventListener("pointerleave", () => {
+        if (trigger.dataset.recipeEditTooltipPinned !== "true" && document.activeElement !== trigger) {
+            setRecipeEditMetadataTooltipOpen(trigger, false);
+        }
+    });
+    trigger.addEventListener("focus", () => {
+        if (trigger.dataset.recipeEditTooltipPinned !== "true") {
+            setRecipeEditMetadataTooltipOpen(trigger, true);
+        }
+    });
+    trigger.addEventListener("blur", () => {
+        if (trigger.dataset.recipeEditTooltipPinned !== "true") {
+            setRecipeEditMetadataTooltipOpen(trigger, false);
+        }
+    });
+}
+
+document.addEventListener("pointerdown", event => {
+    if (event.target.closest?.("[data-recipe-edit-metadata-tooltip-trigger]")) return;
+    closeRecipeEditMetadataTooltips();
+});
+document.addEventListener("scroll", () => closeRecipeEditMetadataTooltips(), true);
+window.addEventListener("resize", () => closeRecipeEditMetadataTooltips(), { passive: true });
+
 function normalizeRecipeEditPriceDisplay() {
     const input = document.getElementById("recipeEditMenuPrice");
     if (!input) return;
@@ -25805,6 +25928,15 @@ function organizeRecipeEditInformationCard() {
     addRecipeEditMetadataIcon(scaleField, "scale");
     [servingsField, totalField, prepField, cookField, inactiveField, levelField, scaleField]
         .forEach(organizeRecipeEditMetadataField);
+    [
+        [servingsField, "Servings", "Number of people or portions the recipe makes at the selected scale."],
+        [totalField, "Total Time", "Total elapsed time from start to finish, typically including prep, cooking, and inactive time."],
+        [prepField, "Prep Time", "Hands-on preparation time."],
+        [cookField, "Cook Time", "Time the food is actively cooking."],
+        [inactiveField, "Inactive Time", "Hands-off waiting time, such as resting, marinating, chilling, rising, or cooling."],
+        [levelField, "Difficulty", "Overall complexity based on skill, steps, timing, and equipment."],
+        [scaleField, "Scale", "Multiplier applied to the base recipe; updates servings and ingredient amounts."],
+    ].forEach(([field, label, helpText]) => addRecipeEditMetadataTooltip(field, label, helpText));
 
     if (infoActions) infoActions.hidden = true;
     if (panelHeading) panelHeading.hidden = true;

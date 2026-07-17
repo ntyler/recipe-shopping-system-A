@@ -367,6 +367,42 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "if (clear) clear.hidden = normalizedRating <= 0;" in script
 
 
+def test_recipe_metadata_fields_have_accessible_tooltips():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    organizer_start = script.index("function organizeRecipeEditInformationCard()")
+    organizer_end = script.index("function organizeRecipeEditAiAssistant()", organizer_start)
+    organizer = script[organizer_start:organizer_end]
+
+    expected_tooltips = {
+        "Servings": "Number of people or portions the recipe makes at the selected scale.",
+        "Total Time": "Total elapsed time from start to finish, typically including prep, cooking, and inactive time.",
+        "Prep Time": "Hands-on preparation time.",
+        "Cook Time": "Time the food is actively cooking.",
+        "Inactive Time": "Hands-off waiting time, such as resting, marinating, chilling, rising, or cooling.",
+        "Difficulty": "Overall complexity based on skill, steps, timing, and equipment.",
+        "Scale": "Multiplier applied to the base recipe; updates servings and ingredient amounts.",
+    }
+    for label, help_text in expected_tooltips.items():
+        assert f'"{label}", "{help_text}"' in organizer
+
+    assert "function addRecipeEditMetadataTooltip(field, label, helpText)" in script
+    assert 'trigger.setAttribute("role", "button")' in script
+    assert 'trigger.setAttribute("tabindex", "0")' in script
+    assert 'trigger.setAttribute("aria-describedby", tooltipId)' in script
+    assert 'control.setAttribute("aria-describedby", Array.from(describedBy).join(" "))' in script
+    assert 'tooltip.setAttribute("role", "tooltip")' in script
+    assert 'trigger.addEventListener("pointerenter"' in script
+    assert 'trigger.addEventListener("focus"' in script
+    assert 'trigger.addEventListener("click"' in script
+    assert 'event.key === "Enter" || event.key === " "' in script
+    assert 'document.addEventListener("pointerdown"' in script
+    assert ".recipe-edit-metadata-tooltip-trigger:focus-visible" in css
+    assert ".recipe-edit-metadata-tooltip[hidden]" in css
+    assert "position: fixed;" in css[css.index("body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip {"):]
+    assert "max-width: calc(100vw - 24px);" in css
+
+
 def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
