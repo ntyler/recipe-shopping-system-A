@@ -54579,6 +54579,12 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-preparation {
     font-weight: 500;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as {
+    box-sizing: border-box;
+    width: 100%;
+    padding-inline: 7px;
+}
+
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row:hover .recipe-edit-ingredient-inline-control {
     border-color: var(--app-border-strong);
     background: var(--app-bg-soft);

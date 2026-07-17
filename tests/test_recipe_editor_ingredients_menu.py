@@ -1644,6 +1644,11 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     preparation_rule = v20[v20.index("body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-preparation {"):]
     preparation_rule = preparation_rule[:preparation_rule.index("}")]
     assert "padding: 0 7px;" in preparation_rule
+    buy_as_rule = v20[v20.index("body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as {"):]
+    buy_as_rule = buy_as_rule[:buy_as_rule.index("}")]
+    assert "box-sizing: border-box;" in buy_as_rule
+    assert "width: 100%;" in buy_as_rule
+    assert "padding-inline: 7px;" in buy_as_rule
     alternatives_cell_rule = v20[v20.index(
         "body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > "
         ".recipe-edit-ingredient-substitution-cell {"
