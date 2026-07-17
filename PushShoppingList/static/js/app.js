@@ -26218,6 +26218,30 @@ function clearRecipeEditIngredientColumnDropTargets() {
     });
 }
 
+function applyRecipeEditIngredientColumnVisibility(layout) {
+    const hidden = new Set(Array.isArray(layout?.hidden) ? layout.hidden : []);
+    recipeEditIngredientColumnHeaders().forEach(header => {
+        if (hidden.has(header.dataset.ingredientColumn)) {
+            header.dataset.recipeEditIngredientColumnHidden = "true";
+        } else {
+            delete header.dataset.recipeEditIngredientColumnHidden;
+        }
+    });
+    recipeEditIngredientRows().forEach(row => {
+        Object.entries(RECIPE_EDIT_INGREDIENT_COLUMNS).forEach(([key, definition]) => {
+            definition.selectors.forEach(selector => {
+                const cell = row.querySelector(selector);
+                if (!cell) return;
+                if (hidden.has(key)) {
+                    cell.dataset.recipeEditIngredientColumnHidden = "true";
+                } else {
+                    delete cell.dataset.recipeEditIngredientColumnHidden;
+                }
+            });
+        });
+    });
+}
+
 function clearRecipeEditIngredientColumnLayoutStyles() {
     const tableScroll = document.querySelector("[data-recipe-edit-ingredient-table-scroll]");
     const tableHead = document.querySelector("[data-recipe-edit-ingredient-table-head]");
@@ -26342,6 +26366,9 @@ function refreshRecipeEditIngredientColumnLayout() {
         applyRecipeEditIngredientColumnLayout();
     } else {
         clearRecipeEditIngredientColumnLayoutStyles();
+        if (recipeEditIngredientColumnLayout) {
+            applyRecipeEditIngredientColumnVisibility(recipeEditIngredientColumnLayout);
+        }
     }
 }
 

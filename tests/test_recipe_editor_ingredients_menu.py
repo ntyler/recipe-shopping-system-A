@@ -1233,6 +1233,7 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
         "setRecipeEditIngredientColumnVisibility",
         "showAllRecipeEditIngredientColumns",
         "syncRecipeEditIngredientColumnVisibilityMenu",
+        "applyRecipeEditIngredientColumnVisibility",
         "handleRecipeEditIngredientColumnKeydown",
         "resetRecipeEditIngredientColumnLayout",
     ):
@@ -1268,6 +1269,19 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
     assert "checkbox.disabled = checkbox.checked && visibleCount === 1;" in interaction
     assert 'cell.dataset.recipeEditIngredientColumnHidden = "true";' in interaction
     assert 'header.dataset.recipeEditIngredientColumnHidden = "true";' in interaction
+    visibility = interaction[
+        interaction.index("function applyRecipeEditIngredientColumnVisibility"):
+        interaction.index("function clearRecipeEditIngredientColumnLayoutStyles")
+    ]
+    assert "Object.entries(RECIPE_EDIT_INGREDIENT_COLUMNS)" in visibility
+    assert "hidden.has(key)" in visibility
+    refresh = interaction[
+        interaction.index("function refreshRecipeEditIngredientColumnLayout"):
+        interaction.index("function moveRecipeEditIngredientColumn")
+    ]
+    assert refresh.index("clearRecipeEditIngredientColumnLayoutStyles();") < refresh.index(
+        "applyRecipeEditIngredientColumnVisibility(recipeEditIngredientColumnLayout);"
+    )
     assert 'tableScroll.setAttribute("aria-colcount", String(visibleOrder.length));' in interaction
     assert 'autoFitColumns.textContent = "Auto-fit column widths";' in interaction
     assert 'resetColumns.textContent = "Restore default columns";' in interaction
