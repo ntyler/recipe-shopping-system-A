@@ -50892,14 +50892,15 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     }
 
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields {
-        display: flex !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
         width: 100% !important;
-        flex-direction: column;
-        align-items: stretch;
+        align-items: start;
     }
 
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields > * {
-        flex: 0 0 auto;
+        box-sizing: border-box;
+        grid-column: 1 !important;
         width: 100% !important;
         max-width: none !important;
         margin-inline: 0 !important;
@@ -50912,6 +50913,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     ) {
         grid-column: 1 / -1 !important;
         justify-self: stretch;
+        box-sizing: border-box;
         width: 100% !important;
         max-width: none !important;
         margin-inline: 0 !important;
@@ -50921,6 +50923,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
 
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field .recipe-edit-ingredient-title-line,
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field textarea[data-field="ingredient"] {
+        box-sizing: border-box;
         width: 100% !important;
         max-width: none !important;
         margin-inline: 0 !important;

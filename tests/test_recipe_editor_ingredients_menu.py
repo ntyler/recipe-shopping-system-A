@@ -1143,12 +1143,22 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     mobile_identity = mobile[mobile.index(mobile_identity_selector):]
     mobile_identity = mobile_identity[:mobile_identity.index("}")]
     for declaration in (
-        "display: flex !important;",
+        "display: grid !important;",
+        "grid-template-columns: minmax(0, 1fr) !important;",
         "width: 100% !important;",
-        "flex-direction: column;",
-        "align-items: stretch;",
+        "align-items: start;",
     ):
         assert declaration in mobile_identity
+    assert "display: flex !important;" not in mobile_identity
+    mobile_identity_children_selector = (
+        "dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-modal-identity-fields > * {"
+    )
+    mobile_identity_children = mobile[mobile.index(mobile_identity_children_selector):]
+    mobile_identity_children = mobile_identity_children[:mobile_identity_children.index("}")]
+    assert "grid-column: 1 !important;" in mobile_identity_children
+    assert "width: 100% !important;" in mobile_identity_children
+    assert "max-width: none !important;" in mobile_identity_children
     mobile_identity_width_selector = (
         "dialog.recipe-edit-ingredient-edit-panel "
         ".recipe-edit-ingredient-modal-identity-fields > :is("
@@ -1160,6 +1170,7 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     for declaration in (
         "grid-column: 1 / -1 !important;",
         "justify-self: stretch;",
+        "box-sizing: border-box;",
         "width: 100% !important;",
         "max-width: none !important;",
         "margin-inline: 0 !important;",
@@ -1175,6 +1186,7 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     mobile_name_control = mobile[mobile_name_control_start:]
     mobile_name_control = mobile_name_control[:mobile_name_control.index("}")]
     for declaration in (
+        "box-sizing: border-box;",
         "width: 100% !important;",
         "max-width: none !important;",
         "margin-inline: 0 !important;",
