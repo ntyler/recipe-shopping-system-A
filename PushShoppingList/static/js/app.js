@@ -25948,7 +25948,12 @@ function normalizeRecipeEditIngredientColumnLayout(value, fallbackWidths = {}) {
         const requestedWidth = value?.widths?.[key] ?? fallbackWidths[key];
         widths[key] = clampRecipeEditIngredientColumnWidth(key, requestedWidth);
     });
-    return { order, widths };
+    const requestedHidden = Array.isArray(value?.hidden) ? value.hidden : [];
+    const hidden = order.filter(key => requestedHidden.includes(key));
+    if (hidden.length === order.length) {
+        hidden.splice(hidden.indexOf("ingredient"), 1);
+    }
+    return { order, widths, hidden };
 }
 
 function loadRecipeEditIngredientColumnLayout() {
@@ -26019,6 +26024,80 @@ function ensureRecipeEditIngredientColumnLayout() {
         );
     }
     return recipeEditIngredientColumnLayout;
+}
+
+function recipeEditIngredientVisibleColumnOrder(layout) {
+    const hidden = new Set(Array.isArray(layout?.hidden) ? layout.hidden : []);
+    return (Array.isArray(layout?.order) ? layout.order : RECIPE_EDIT_INGREDIENT_COLUMN_ORDER)
+        .filter(key => !hidden.has(key));
+}
+
+function syncRecipeEditIngredientColumnVisibilityMenu() {
+    const container = document.querySelector("[data-recipe-edit-ingredient-column-visibility]");
+    if (!container) return;
+    const layout = recipeEditIngredientColumnLayout || normalizeRecipeEditIngredientColumnLayout({
+        order: RECIPE_EDIT_INGREDIENT_COLUMN_ORDER,
+        widths: {},
+        hidden: [],
+    });
+    const hidden = new Set(layout.hidden);
+    const visibleCount = recipeEditIngredientVisibleColumnOrder(layout).length;
+    container.innerHTML = "";
+    layout.order.forEach(key => {
+        const definition = RECIPE_EDIT_INGREDIENT_COLUMNS[key];
+        if (!definition) return;
+        const label = document.createElement("label");
+        label.className = "recipe-edit-ingredient-column-option";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = !hidden.has(key);
+        checkbox.disabled = checkbox.checked && visibleCount === 1;
+        checkbox.dataset.recipeEditIngredientColumnVisibilityToggle = key;
+        checkbox.setAttribute("aria-label", `Show ${definition.label} column`);
+        if (checkbox.disabled) {
+            label.title = "At least one column must remain visible.";
+        }
+        checkbox.addEventListener("change", () => (
+            setRecipeEditIngredientColumnVisibility(key, checkbox.checked)
+        ));
+        const text = document.createElement("span");
+        text.textContent = definition.label;
+        label.append(checkbox, text);
+        container.appendChild(label);
+    });
+}
+
+function setRecipeEditIngredientColumnVisibility(key, visible) {
+    if (!RECIPE_EDIT_INGREDIENT_COLUMNS[key]) return false;
+    const layout = ensureRecipeEditIngredientColumnLayout();
+    const hidden = new Set(layout.hidden);
+    if (visible) {
+        hidden.delete(key);
+    } else if (recipeEditIngredientVisibleColumnOrder(layout).length > 1) {
+        hidden.add(key);
+    } else {
+        syncRecipeEditIngredientColumnVisibilityMenu();
+        setRecipeEditIngredientColumnStatus("At least one ingredient column must remain visible.");
+        return false;
+    }
+    layout.hidden = layout.order.filter(columnKey => hidden.has(columnKey));
+    applyRecipeEditIngredientColumnLayout();
+    saveRecipeEditIngredientColumnLayout();
+    syncRecipeEditIngredientColumnVisibilityMenu();
+    setRecipeEditIngredientColumnStatus(
+        `${RECIPE_EDIT_INGREDIENT_COLUMNS[key].label} column ${visible ? "shown" : "hidden"}.`,
+    );
+    return false;
+}
+
+function showAllRecipeEditIngredientColumns() {
+    const layout = ensureRecipeEditIngredientColumnLayout();
+    layout.hidden = [];
+    applyRecipeEditIngredientColumnLayout();
+    saveRecipeEditIngredientColumnLayout();
+    syncRecipeEditIngredientColumnVisibilityMenu();
+    setRecipeEditIngredientColumnStatus("All ingredient columns shown.");
+    return false;
 }
 
 function recipeEditIngredientColumnCellText(cell) {
@@ -26098,7 +26177,7 @@ function recipeEditIngredientColumnLayoutIsAvailable(tableScroll = null) {
 function recipeEditIngredientColumnPositions(layout) {
     const positions = {};
     let track = 1;
-    layout.order.forEach((key, logicalIndex) => {
+    recipeEditIngredientVisibleColumnOrder(layout).forEach((key, logicalIndex) => {
         const span = key === "media" ? 2 : 1;
         positions[key] = { logicalIndex, span, track };
         track += span;
@@ -26108,7 +26187,7 @@ function recipeEditIngredientColumnPositions(layout) {
 
 function recipeEditIngredientColumnGrid(layout, gap) {
     const tracks = [];
-    layout.order.forEach(key => {
+    recipeEditIngredientVisibleColumnOrder(layout).forEach(key => {
         const width = clampRecipeEditIngredientColumnWidth(key, layout.widths[key]);
         if (key === "media") {
             const handleWidth = 28;
@@ -26146,10 +26225,12 @@ function clearRecipeEditIngredientColumnLayoutStyles() {
     if (tableScroll) {
         delete tableScroll.dataset.recipeEditIngredientColumnsCustomized;
         tableScroll.style.removeProperty("--recipe-edit-ingredient-grid");
+        tableScroll.removeAttribute("aria-colcount");
     }
     orderRecipeEditIngredientColumnHeaders(RECIPE_EDIT_INGREDIENT_COLUMN_ORDER);
     [tableHead, ingredientList].filter(Boolean).forEach(element => element.style.removeProperty("min-width"));
     recipeEditIngredientColumnHeaders().forEach(header => {
+        delete header.dataset.recipeEditIngredientColumnHidden;
         header.style.removeProperty("grid-column");
         header.removeAttribute("aria-colindex");
     });
@@ -26159,6 +26240,7 @@ function clearRecipeEditIngredientColumnLayoutStyles() {
             definition.selectors.forEach(selector => {
                 const cell = row.querySelector(selector);
                 if (!cell) return;
+                delete cell.dataset.recipeEditIngredientColumnHidden;
                 cell.style.removeProperty("grid-column");
                 cell.removeAttribute("aria-colindex");
             });
@@ -26174,9 +26256,17 @@ function applyRecipeEditIngredientColumnLayoutToRow(row, layout, positions, minW
     layout.order.forEach(key => {
         const definition = RECIPE_EDIT_INGREDIENT_COLUMNS[key];
         const position = positions[key];
+        const isHidden = !position;
         definition.selectors.forEach((selector, selectorIndex) => {
             const cell = row.querySelector(selector);
             if (!cell) return;
+            if (isHidden) {
+                cell.dataset.recipeEditIngredientColumnHidden = "true";
+                cell.style.removeProperty("grid-column");
+                cell.removeAttribute("aria-colindex");
+                return;
+            }
+            delete cell.dataset.recipeEditIngredientColumnHidden;
             const track = position.track + (key === "media" ? selectorIndex : 0);
             cell.style.setProperty("grid-column", String(track), "important");
             cell.setAttribute("aria-colindex", String(position.logicalIndex + 1));
@@ -26199,19 +26289,26 @@ function applyRecipeEditIngredientColumnLayout() {
     );
     const gap = Number.isFinite(computedGap) ? computedGap : 10;
     const positions = recipeEditIngredientColumnPositions(layout);
+    const visibleOrder = recipeEditIngredientVisibleColumnOrder(layout);
     const tableWidth = Math.ceil(
-        layout.order.reduce((sum, key) => sum + layout.widths[key], 0)
-        + (gap * (layout.order.length - 1))
+        visibleOrder.reduce((sum, key) => sum + layout.widths[key], 0)
+        + (gap * Math.max(0, visibleOrder.length - 1))
         + 24,
     );
     tableScroll.dataset.recipeEditIngredientColumnsCustomized = "true";
     tableScroll.style.setProperty("--recipe-edit-ingredient-grid", recipeEditIngredientColumnGrid(layout, gap));
     tableHead.style.minWidth = `${tableWidth}px`;
     ingredientList.style.minWidth = `${tableWidth}px`;
-    tableScroll.setAttribute("aria-colcount", String(layout.order.length));
+    tableScroll.setAttribute("aria-colcount", String(visibleOrder.length));
     recipeEditIngredientColumnHeaders().forEach(header => {
         const position = positions[header.dataset.ingredientColumn];
-        if (!position) return;
+        if (!position) {
+            header.dataset.recipeEditIngredientColumnHidden = "true";
+            header.style.removeProperty("grid-column");
+            header.removeAttribute("aria-colindex");
+            return;
+        }
+        delete header.dataset.recipeEditIngredientColumnHidden;
         header.style.setProperty(
             "grid-column",
             `${position.track} / span ${position.span}`,
@@ -26257,6 +26354,7 @@ function moveRecipeEditIngredientColumn(key, targetKey, placeAfter = false) {
     layout.order = nextOrder;
     applyRecipeEditIngredientColumnLayout();
     saveRecipeEditIngredientColumnLayout();
+    syncRecipeEditIngredientColumnVisibilityMenu();
     setRecipeEditIngredientColumnStatus(
         `${RECIPE_EDIT_INGREDIENT_COLUMNS[key].label} column moved to position ${nextOrder.indexOf(key) + 1}.`,
     );
@@ -26381,12 +26479,14 @@ function finishRecipeEditIngredientColumnResize(event) {
     hideRecipeEditIngredientColumnResizeGuide(state.tableScroll);
     state.header.draggable = false;
     if (event?.type === "pointercancel") {
-        state.layout.widths[state.key] = state.startWidth;
+        const layout = ensureRecipeEditIngredientColumnLayout();
+        layout.widths[state.key] = state.startWidth;
         applyRecipeEditIngredientColumnLayout();
     } else {
         saveRecipeEditIngredientColumnLayout();
+        const width = recipeEditIngredientColumnLayout?.widths?.[state.key] ?? state.startWidth;
         setRecipeEditIngredientColumnStatus(
-            `${RECIPE_EDIT_INGREDIENT_COLUMNS[state.key].label} column width set to ${state.layout.widths[state.key]} pixels.`,
+            `${RECIPE_EDIT_INGREDIENT_COLUMNS[state.key].label} column width set to ${width} pixels.`,
         );
     }
     recipeEditIngredientColumnResizeState = null;
@@ -26395,7 +26495,8 @@ function finishRecipeEditIngredientColumnResize(event) {
 function updateRecipeEditIngredientColumnResize(event) {
     const state = recipeEditIngredientColumnResizeState;
     if (!state || (event.pointerId !== undefined && event.pointerId !== state.pointerId)) return;
-    state.layout.widths[state.key] = clampRecipeEditIngredientColumnWidth(
+    const layout = ensureRecipeEditIngredientColumnLayout();
+    layout.widths[state.key] = clampRecipeEditIngredientColumnWidth(
         state.key,
         state.startWidth + event.clientX - state.startX,
     );
@@ -26413,15 +26514,15 @@ function beginRecipeEditIngredientColumnResize(header, event) {
     event.stopPropagation();
     const key = header.dataset.ingredientColumn;
     const layout = ensureRecipeEditIngredientColumnLayout();
+    const startWidth = layout.widths[key];
     const handle = event.currentTarget;
     recipeEditIngredientColumnResizeState = {
         header,
         handle,
         tableScroll,
         key,
-        layout,
         pointerId: event.pointerId,
-        startWidth: layout.widths[key],
+        startWidth,
         startX: event.clientX,
     };
     bindRecipeEditIngredientColumnResizeTracking();
@@ -26526,8 +26627,9 @@ function resetRecipeEditIngredientColumnLayout() {
     }
     recipeEditIngredientColumnLayout = null;
     clearRecipeEditIngredientColumnLayoutStyles();
+    syncRecipeEditIngredientColumnVisibilityMenu();
     closeRecipeEditRowMenus();
-    setRecipeEditIngredientColumnStatus("Ingredient column order and widths reset.");
+    setRecipeEditIngredientColumnStatus("Ingredient column order, widths, and visibility reset.");
     return false;
 }
 
@@ -26624,6 +26726,7 @@ function organizeRecipeEditIngredientTools() {
         tableScroll.insertAdjacentElement("afterend", columnStatus);
     }
     recipeEditIngredientColumnLayout = loadRecipeEditIngredientColumnLayout();
+    syncRecipeEditIngredientColumnVisibilityMenu();
     if (typeof ResizeObserver === "function" && !recipeEditIngredientColumnResizeObserver) {
         recipeEditIngredientColumnResizeObserver = new ResizeObserver(refreshRecipeEditIngredientColumnLayout);
         recipeEditIngredientColumnResizeObserver.observe(tableScroll);

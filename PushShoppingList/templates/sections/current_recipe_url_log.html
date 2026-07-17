@@ -1777,8 +1777,15 @@
                                 <div class="overflow-menu-section">
                                     <div class="overflow-menu-section-title">Column Layout</div>
                                     <p class="recipe-edit-ingredient-column-help">
-                                        Drag a header grip to move it. Put the mouse on a vertical boundary and drag left or right to resize, or double-click it to auto-fit one column.
+                                        Choose which columns are visible. Drag a header grip to move it. Drag a vertical boundary to resize it, or double-click the boundary to auto-fit.
                                     </p>
+                                    <div class="recipe-edit-ingredient-column-visibility"
+                                         data-recipe-edit-ingredient-column-visibility
+                                         role="group"
+                                         aria-label="Visible ingredient columns"></div>
+                                    <button type="button" onclick="return showAllRecipeEditIngredientColumns()">
+                                        Show all columns
+                                    </button>
                                     <button type="button" onclick="return autoFitRecipeEditIngredientColumns()">
                                         Auto-fit column widths
                                     </button>

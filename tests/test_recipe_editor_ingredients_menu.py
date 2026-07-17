@@ -1147,7 +1147,7 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert "document.body.appendChild(menu);" in script
 
 
-def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
+def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_reset():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
@@ -1179,6 +1179,9 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
         "beginRecipeEditIngredientColumnResize",
         "updateRecipeEditIngredientColumnResize",
         "autoFitRecipeEditIngredientColumns",
+        "setRecipeEditIngredientColumnVisibility",
+        "showAllRecipeEditIngredientColumns",
+        "syncRecipeEditIngredientColumnVisibilityMenu",
         "handleRecipeEditIngredientColumnKeydown",
         "resetRecipeEditIngredientColumnLayout",
     ):
@@ -1198,19 +1201,41 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
     assert 'window.removeEventListener("mousemove", updateRecipeEditIngredientColumnResize, true);' in interaction
     assert 'window.removeEventListener("mouseup", finishRecipeEditIngredientColumnResize, true);' in interaction
     assert 'state.header.getBoundingClientRect().right' in interaction
+    resize_update = interaction[
+        interaction.index("function updateRecipeEditIngredientColumnResize"):
+        interaction.index("function beginRecipeEditIngredientColumnResize")
+    ]
+    assert "const layout = ensureRecipeEditIngredientColumnLayout();" in resize_update
+    assert "layout.widths[state.key] = clampRecipeEditIngredientColumnWidth(" in resize_update
+    assert "state.layout" not in resize_update
     assert 'window.localStorage.setItem(' in interaction
     assert 'window.localStorage.removeItem(' in interaction
+    assert "const requestedHidden = Array.isArray(value?.hidden) ? value.hidden : [];" in interaction
+    assert "return { order, widths, hidden };" in interaction
+    assert 'checkbox.type = "checkbox";' in interaction
+    assert "checkbox.checked = !hidden.has(key);" in interaction
+    assert "checkbox.disabled = checkbox.checked && visibleCount === 1;" in interaction
+    assert 'cell.dataset.recipeEditIngredientColumnHidden = "true";' in interaction
+    assert 'header.dataset.recipeEditIngredientColumnHidden = "true";' in interaction
+    assert 'tableScroll.setAttribute("aria-colcount", String(visibleOrder.length));' in interaction
     assert 'autoFitColumns.textContent = "Auto-fit column widths";' in interaction
     assert 'resetColumns.textContent = "Restore default columns";' in interaction
     assert 'window.matchMedia("(min-width: 768px)")' in interaction
     assert "table.clientWidth > 859" in interaction
     assert 'class="recipe-edit-ingredient-columns-button"' in template
+    assert "Choose which columns are visible." in template
+    assert "data-recipe-edit-ingredient-column-visibility" in template
+    assert "Show all columns" in template
     assert "Auto-fit column widths" in template
     assert "Restore default columns" in template
-    assert "vertical boundary and drag left or right to resize" in template
+    assert "Drag a vertical boundary to resize it" in template
+    assert "double-click the boundary to auto-fit" in template
 
     column_css = css[css.index("/* Ingredient editor v22:"):]
     assert ".recipe-edit-ingredient-column-menu" in column_css
+    assert ".recipe-edit-ingredient-column-visibility" in column_css
+    assert ".recipe-edit-ingredient-column-option" in column_css
+    assert '[data-recipe-edit-ingredient-column-hidden="true"]' in column_css
     assert ".recipe-edit-ingredient-column-move" in column_css
     assert ".recipe-edit-ingredient-column-resize" in column_css
     assert ".recipe-edit-ingredient-column-resize-guide" in column_css
