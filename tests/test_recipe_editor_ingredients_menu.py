@@ -2086,6 +2086,21 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "box-sizing: border-box;" in buy_as_rule
     assert "width: 100%;" in buy_as_rule
     assert "padding-inline: 7px;" in buy_as_rule
+    compact_buy_as = css[css.index("/* Ingredient editor v25:"):]
+    assert css.index("/* Ingredient editor v25:") > css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control:focus"
+    )
+    compact_buy_as_input = compact_buy_as[
+        compact_buy_as.index(
+            ".recipe-edit-ingredient-read-buy-as > .recipe-edit-ingredient-inline-buy-as {"
+        ):
+    ]
+    compact_buy_as_input = compact_buy_as_input[:compact_buy_as_input.index("}")]
+    assert "height: 16px !important;" in compact_buy_as_input
+    assert "border: 0 !important;" in compact_buy_as_input
+    assert "background: transparent !important;" in compact_buy_as_input
+    assert "color: var(--app-muted);" in compact_buy_as_input
+    assert "font-size: 10px !important;" in compact_buy_as_input
     alternatives_cell_rule = v20[v20.index(
         "body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > "
         ".recipe-edit-ingredient-substitution-cell {"
@@ -2673,8 +2688,8 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     mobile_css = css[mobile_start:]
     assert "@media (max-width: 767px)" in mobile_css
     assert "grid-template-columns: 40px minmax(0, 1fr) max-content 106px !important;" in mobile_css
-    assert "grid-template-rows: 50px !important;" in mobile_css
-    assert "min-height: 66px !important;" in mobile_css
+    assert "grid-template-rows: 44px !important;" in mobile_css
+    assert "min-height: 62px !important;" in mobile_css
     assert ".recipe-edit-ingredient-status-summary," in mobile_css
     assert ".recipe-edit-ingredient-quantity-summary," in mobile_css
     assert ".recipe-edit-ingredient-unit-summary," in mobile_css

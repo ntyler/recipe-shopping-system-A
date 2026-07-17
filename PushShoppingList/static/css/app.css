@@ -55695,8 +55695,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed {
         grid-template-columns: 40px minmax(0, 1fr) max-content 106px !important;
-        grid-template-rows: 50px !important;
-        min-height: 66px !important;
+        grid-template-rows: 44px !important;
+        min-height: 62px !important;
         column-gap: 6px !important;
         row-gap: 0 !important;
         padding: 8px 9px !important;
@@ -55787,6 +55787,47 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
         grid-template-columns: 44px minmax(0, 1fr) 106px !important;
     }
+}
+
+/* Ingredient editor v25: keep inline Buy As editable without losing its compact metadata styling. */
+body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    color: var(--app-muted);
+    font-size: 10px;
+    line-height: 1.35;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > span {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > .recipe-edit-ingredient-inline-buy-as {
+    flex: 1 1 0;
+    width: 0 !important;
+    min-width: 0;
+    height: 16px !important;
+    min-height: 16px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--app-muted);
+    font-size: 10px !important;
+    font-weight: 400;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > .recipe-edit-ingredient-inline-buy-as:focus {
+    border-bottom: 1px solid var(--app-primary-hover) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--app-text-soft);
 }
 
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */
