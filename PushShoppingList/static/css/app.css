@@ -55006,7 +55006,37 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
 
 /* Ingredient editor v23: compact, readable mobile ingredient cards. */
 @media (max-width: 767px) {
+    body.recipe-edit-standalone-page .recipe-edit-standalone-shell {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        padding-bottom: calc(112px + env(safe-area-inset-bottom));
+        overflow-x: clip;
+    }
+
+    body.recipe-edit-standalone-page :is(
+        #recipeEditModal,
+        .recipe-edit-dialog,
+        #recipeEditForm,
+        .recipe-edit-layout,
+        .recipe-edit-main-workspace,
+        .recipe-edit-tabs-card,
+        .recipe-edit-tab-panel,
+        .recipe-edit-ingredients-section,
+        .recipe-edit-ingredient-table-scroll,
+        #recipeEditIngredients
+    ) {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
         grid-template-columns: 46px minmax(0, 1fr) minmax(100px, .65fr) 72px !important;
         grid-template-rows: minmax(48px, auto) repeat(4, auto) !important;
         column-gap: 8px !important;
@@ -55083,7 +55113,7 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
         .recipe-edit-ingredient-substitution-cell
     ) {
         display: grid;
-        grid-template-columns: 64px minmax(0, 1fr);
+        grid-template-columns: 72px minmax(0, 1fr);
         align-items: center;
         gap: 8px;
     }
@@ -55093,6 +55123,7 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
         .recipe-edit-ingredient-quantity-summary,
         .recipe-edit-ingredient-unit-summary,
         .recipe-edit-ingredient-store-summary,
+        .recipe-edit-ingredient-type-summary,
         .recipe-edit-ingredient-substitution-cell
     )::before {
         margin: 0;
@@ -55106,6 +55137,16 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary::before {
         content: "Store";
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary::before {
+        width: auto;
+        height: auto;
+        min-width: 0;
+        flex: none;
+        border-radius: 0;
+        background: transparent;
+        content: "Type";
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-read-cell > .recipe-edit-ingredient-inline-name {
@@ -55137,5 +55178,104 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
     body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
         padding-inline: 5px;
         gap: 4px;
+    }
+}
+
+@media (max-width: 420px) {
+    body.recipe-edit-standalone-page .recipe-edit-header {
+        align-items: stretch;
+        gap: 9px;
+        flex-direction: column;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-breadcrumb {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-header-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);
+        width: 100%;
+        max-width: 100%;
+        margin-left: 0;
+        gap: 6px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-header-actions > :is(
+        .recipe-edit-preview-button,
+        .recipe-edit-header-cancel,
+        .recipe-edit-header-save
+    ) {
+        width: 100%;
+        padding-inline: 8px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-header-menu-wrap {
+        grid-column: 2;
+        grid-row: 1;
+        margin-right: 0;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-header-actions .recipe-edit-header-cancel {
+        grid-column: 3;
+        grid-row: 1;
+        min-width: 0;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-header-actions .recipe-edit-header-save {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        min-width: 0;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-tab-list {
+        gap: 12px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-tab {
+        font-size: 11px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+        grid-template-columns: 44px minmax(0, 1fr) 72px !important;
+        grid-template-rows: minmax(46px, auto) repeat(5, auto) !important;
+        column-gap: 8px !important;
+        padding: 8px !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-read-cell {
+        grid-column: 2 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-compact-row-actions {
+        grid-column: 3 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-status-summary {
+        grid-column: 1 / 4 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-quantity-summary {
+        grid-column: 1 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-unit-summary {
+        grid-column: 2 / 4 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-store-summary {
+        grid-column: 1 / 4 !important;
+        grid-row: 4 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-type-summary {
+        grid-column: 1 / 4 !important;
+        grid-row: 5 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-substitution-cell {
+        grid-column: 1 / 4 !important;
+        grid-row: 6 !important;
     }
 }

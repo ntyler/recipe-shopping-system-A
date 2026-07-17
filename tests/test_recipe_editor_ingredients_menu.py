@@ -708,6 +708,14 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     mobile = css[css.index("/* Ingredient editor v23:"):]
 
     assert "@media (max-width: 767px)" in mobile
+    assert ".recipe-edit-standalone-shell {\n        width: 100%;" in mobile
+    assert "padding-bottom: calc(112px + env(safe-area-inset-bottom));" in mobile
+    assert "overflow-x: clip;" in mobile
+    assert "#recipeEditForm," in mobile
+    assert ".recipe-edit-layout," in mobile
+    assert ".recipe-edit-main-workspace," in mobile
+    assert ".recipe-edit-tabs-card," in mobile
+    assert ".recipe-edit-ingredient-table-scroll," in mobile
     assert "grid-template-columns: 46px minmax(0, 1fr) minmax(100px, .65fr) 72px !important;" in mobile
     assert "grid-template-rows: minmax(48px, auto) repeat(4, auto) !important;" in mobile
     assert ".recipe-edit-row-handle {\n        display: none !important;" in mobile
@@ -717,9 +725,26 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 3 !important;" in mobile
     assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 3 / 5 !important;" in mobile
     assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 5 !important;" in mobile
-    assert "grid-template-columns: 64px minmax(0, 1fr);" in mobile
+    assert "grid-template-columns: 72px minmax(0, 1fr);" in mobile
     assert '.recipe-edit-ingredient-quantity-summary::before {\n        content: "Amount";' in mobile
     assert '.recipe-edit-ingredient-store-summary::before {\n        content: "Store";' in mobile
+    assert ".recipe-edit-ingredient-type-summary::before {" in mobile
+    assert "width: auto;" in mobile
+    assert "height: auto;" in mobile
+    assert "background: transparent;" in mobile
+    assert 'content: "Type";' in mobile
+    narrow = mobile[mobile.index("@media (max-width: 420px)"):]
+    assert "grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);" in narrow
+    assert ".recipe-edit-header-actions .recipe-edit-header-save {" in narrow
+    assert "grid-column: 1 / -1;" in narrow
+    assert "grid-row: 2;" in narrow
+    assert "grid-template-columns: 44px minmax(0, 1fr) 72px !important;" in narrow
+    assert "grid-template-rows: minmax(46px, auto) repeat(5, auto) !important;" in narrow
+    assert ".recipe-edit-ingredient-read-cell {\n        grid-column: 2 !important;" in narrow
+    assert ".recipe-edit-ingredient-status-summary {\n        grid-column: 1 / 4 !important;" in narrow
+    assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 4 !important;" in narrow
+    assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 1 / 4 !important;" in narrow
+    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 4 !important;" in narrow
     assert 'onclick="moveRecipeEditRow(this, -1)">Move ingredient up</button>' in script
     assert 'onclick="moveRecipeEditRow(this, 1)">Move ingredient down</button>' in script
 
