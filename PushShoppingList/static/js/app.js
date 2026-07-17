@@ -28366,7 +28366,6 @@ function organizeRecipeEditIngredientRow(row) {
                 <span data-ingredient-options-label>None</span>
                 <span data-ingredient-options-summary hidden></span>
             </span>
-            ${recipeEditSvgIcon("chevron-down")}
         `;
         optionsButton.addEventListener("click", event => toggleRecipeIngredientSubstitutions(optionsButton, event));
         optionsCell.appendChild(optionsButton);

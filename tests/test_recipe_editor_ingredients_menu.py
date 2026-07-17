@@ -1605,6 +1605,11 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert 'substitutions.setAttribute("role", "cell");' in organizer
     assert 'substitutions.setAttribute("aria-colspan", "9");' in organizer
     assert "<span data-ingredient-options-label>None</span>" in organizer
+    options_button_markup = organizer[
+        organizer.index("optionsButton.innerHTML"):
+        organizer.index('optionsButton.addEventListener("click"')
+    ]
+    assert 'recipeEditSvgIcon("chevron-down")' not in options_button_markup
     assert organizer.index("organizeRecipeEditCompactRowActions") < organizer.index("if (substitutions) row.appendChild(substitutions)")
 
     assert "!optionCount" not in toggle
@@ -1876,12 +1881,6 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "height: 32px;" in alternatives_button_rule
     assert "min-height: 32px;" in alternatives_button_rule
     assert "margin: 0;" in alternatives_button_rule
-    alternatives_chevron_rule = v20[v20.index(
-        "body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button > "
-        ".recipe-edit-inline-icon {"
-    ):]
-    alternatives_chevron_rule = alternatives_chevron_rule[:alternatives_chevron_rule.index("}")]
-    assert "align-self: center;" in alternatives_chevron_rule
     for summary_class in (
         "recipe-edit-ingredient-quantity-summary",
         "recipe-edit-ingredient-unit-summary",
