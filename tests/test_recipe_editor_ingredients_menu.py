@@ -1616,13 +1616,18 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
         "recipe-edit-ingredient-quantity-summary",
         "recipe-edit-ingredient-unit-summary",
     ):
-        idle_selector = f"#recipeEditIngredients > .recipe-edit-ingredient-row .{summary_class} > .recipe-edit-ingredient-inline-control:not(:focus)"
+        idle_selector = f"#recipeEditIngredients > .recipe-edit-ingredient-row .{summary_class} > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus)"
         idle_rule = v20[v20.index(idle_selector):]
         idle_rule = idle_rule[:idle_rule.index("}")]
         assert ':not([aria-expanded="true"])' in idle_rule
         assert ':not([aria-invalid="true"])' in idle_rule
         assert "border-color: transparent;" in idle_rule
         assert "background: transparent;" in idle_rule
+        hover_selector = f"#recipeEditIngredients > .recipe-edit-ingredient-row .{summary_class} > .recipe-edit-ingredient-inline-control:hover"
+        hover_rule = v20[v20.index(hover_selector):]
+        hover_rule = hover_rule[:hover_rule.index("}")]
+        assert "border-color: var(--app-border-strong);" in hover_rule
+        assert "background: var(--app-bg-soft);" in hover_rule
     assert "width: 100%;" in v20
 
 

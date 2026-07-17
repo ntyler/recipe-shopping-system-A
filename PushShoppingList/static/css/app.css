@@ -54536,11 +54536,17 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control:focus {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 22%, transparent);
 }
 
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-quantity-summary > .recipe-edit-ingredient-inline-control:not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]),
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control:not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]) {
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-quantity-summary > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]),
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]) {
     border-color: transparent;
     background: transparent;
     box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-quantity-summary > .recipe-edit-ingredient-inline-control:hover,
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control:hover {
+    border-color: var(--app-border-strong);
+    background: var(--app-bg-soft);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control[aria-invalid="true"] {
