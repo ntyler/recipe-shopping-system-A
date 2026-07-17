@@ -1174,6 +1174,8 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
         "finishRecipeEditIngredientColumnMove",
         "showRecipeEditIngredientColumnResizeGuide",
         "hideRecipeEditIngredientColumnResizeGuide",
+        "bindRecipeEditIngredientColumnResizeTracking",
+        "unbindRecipeEditIngredientColumnResizeTracking",
         "beginRecipeEditIngredientColumnResize",
         "updateRecipeEditIngredientColumnResize",
         "autoFitRecipeEditIngredientColumns",
@@ -1186,13 +1188,15 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
     assert 'header.addEventListener("pointerup"' in interaction
     assert 'header.addEventListener("pointercancel"' in interaction
     assert 'resizeHandle.addEventListener("pointerdown"' in interaction
-    assert 'resizeHandle.addEventListener("pointermove"' in interaction
-    assert 'resizeHandle.addEventListener("pointerup"' in interaction
-    assert 'resizeHandle.addEventListener("pointercancel"' in interaction
     assert 'resizeHandle.addEventListener("dblclick"' in interaction
     assert 'handle.setPointerCapture(event.pointerId)' in interaction
     assert "currentOrder.every((key, index) => key === order[index])" in interaction
-    assert "usesWindowFallback: false" in interaction
+    assert 'window.addEventListener("pointermove", updateRecipeEditIngredientColumnResize, true);' in interaction
+    assert 'window.addEventListener("mousemove", updateRecipeEditIngredientColumnResize, true);' in interaction
+    assert 'window.addEventListener("mouseup", finishRecipeEditIngredientColumnResize, true);' in interaction
+    assert 'window.removeEventListener("pointermove", updateRecipeEditIngredientColumnResize, true);' in interaction
+    assert 'window.removeEventListener("mousemove", updateRecipeEditIngredientColumnResize, true);' in interaction
+    assert 'window.removeEventListener("mouseup", finishRecipeEditIngredientColumnResize, true);' in interaction
     assert 'state.header.getBoundingClientRect().right' in interaction
     assert 'window.localStorage.setItem(' in interaction
     assert 'window.localStorage.removeItem(' in interaction

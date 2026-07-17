@@ -26353,14 +26353,26 @@ function hideRecipeEditIngredientColumnResizeGuide(tableScroll) {
     if (guide) guide.hidden = true;
 }
 
+function bindRecipeEditIngredientColumnResizeTracking() {
+    window.addEventListener("pointermove", updateRecipeEditIngredientColumnResize, true);
+    window.addEventListener("pointerup", finishRecipeEditIngredientColumnResize, true);
+    window.addEventListener("pointercancel", finishRecipeEditIngredientColumnResize, true);
+    window.addEventListener("mousemove", updateRecipeEditIngredientColumnResize, true);
+    window.addEventListener("mouseup", finishRecipeEditIngredientColumnResize, true);
+}
+
+function unbindRecipeEditIngredientColumnResizeTracking() {
+    window.removeEventListener("pointermove", updateRecipeEditIngredientColumnResize, true);
+    window.removeEventListener("pointerup", finishRecipeEditIngredientColumnResize, true);
+    window.removeEventListener("pointercancel", finishRecipeEditIngredientColumnResize, true);
+    window.removeEventListener("mousemove", updateRecipeEditIngredientColumnResize, true);
+    window.removeEventListener("mouseup", finishRecipeEditIngredientColumnResize, true);
+}
+
 function finishRecipeEditIngredientColumnResize(event) {
     const state = recipeEditIngredientColumnResizeState;
     if (!state || (event?.pointerId !== undefined && event.pointerId !== state.pointerId)) return;
-    if (state.usesWindowFallback) {
-        window.removeEventListener("pointermove", updateRecipeEditIngredientColumnResize);
-        window.removeEventListener("pointerup", finishRecipeEditIngredientColumnResize);
-        window.removeEventListener("pointercancel", finishRecipeEditIngredientColumnResize);
-    }
+    unbindRecipeEditIngredientColumnResizeTracking();
     document.body.classList.remove("recipe-edit-ingredient-column-resizing");
     state.handle.classList.remove("is-resizing");
     if (typeof state.handle.releasePointerCapture === "function" && state.handle.hasPointerCapture?.(state.pointerId)) {
@@ -26411,24 +26423,14 @@ function beginRecipeEditIngredientColumnResize(header, event) {
         pointerId: event.pointerId,
         startWidth: layout.widths[key],
         startX: event.clientX,
-        usesWindowFallback: false,
     };
-    let pointerCaptured = false;
+    bindRecipeEditIngredientColumnResizeTracking();
     if (typeof handle.setPointerCapture === "function") {
         try {
             handle.setPointerCapture(event.pointerId);
-            pointerCaptured = typeof handle.hasPointerCapture === "function"
-                ? handle.hasPointerCapture(event.pointerId)
-                : true;
         } catch (_error) {
-            pointerCaptured = false;
+            // Window-level tracking below keeps the drag active when capture is unavailable.
         }
-    }
-    recipeEditIngredientColumnResizeState.usesWindowFallback = !pointerCaptured;
-    if (!pointerCaptured) {
-        window.addEventListener("pointermove", updateRecipeEditIngredientColumnResize);
-        window.addEventListener("pointerup", finishRecipeEditIngredientColumnResize);
-        window.addEventListener("pointercancel", finishRecipeEditIngredientColumnResize);
     }
     handle.classList.add("is-resizing");
     applyRecipeEditIngredientColumnLayout();
@@ -26494,9 +26496,6 @@ function decorateRecipeEditIngredientColumnHeaders(tableHead) {
             resizeHandle.setAttribute("aria-hidden", "true");
             resizeHandle.title = `Resize ${RECIPE_EDIT_INGREDIENT_COLUMNS[key].label}; double-click to auto-fit`;
             resizeHandle.addEventListener("pointerdown", event => beginRecipeEditIngredientColumnResize(header, event));
-            resizeHandle.addEventListener("pointermove", updateRecipeEditIngredientColumnResize);
-            resizeHandle.addEventListener("pointerup", finishRecipeEditIngredientColumnResize);
-            resizeHandle.addEventListener("pointercancel", finishRecipeEditIngredientColumnResize);
             resizeHandle.addEventListener("dblclick", event => {
                 event.preventDefault();
                 event.stopPropagation();
