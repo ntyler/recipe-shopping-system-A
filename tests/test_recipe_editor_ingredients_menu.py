@@ -1147,6 +1147,51 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert "document.body.appendChild(menu);" in script
 
 
+def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert 'const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV1";' in script
+    assert 'const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [' in script
+    for column in (
+        "media", "ingredient", "status", "quantity", "unit",
+        "store", "type", "alternatives", "actions",
+    ):
+        assert f'data-ingredient-column="{column}"' in script
+
+    interaction_start = script.index("function recipeEditIngredientColumnStorageKey()")
+    interaction_end = script.index("function organizeRecipeEditEquipmentTools()", interaction_start)
+    interaction = script[interaction_start:interaction_end]
+    for behavior in (
+        "loadRecipeEditIngredientColumnLayout",
+        "saveRecipeEditIngredientColumnLayout",
+        "moveRecipeEditIngredientColumn",
+        "beginRecipeEditIngredientColumnResize",
+        "updateRecipeEditIngredientColumnResize",
+        "handleRecipeEditIngredientColumnKeydown",
+        "resetRecipeEditIngredientColumnLayout",
+    ):
+        assert f"function {behavior}" in interaction
+    assert 'header.addEventListener("dragstart"' in interaction
+    assert 'header.addEventListener("dragover"' in interaction
+    assert 'header.addEventListener("drop"' in interaction
+    assert 'resizeHandle.addEventListener("pointerdown"' in interaction
+    assert 'window.localStorage.setItem(' in interaction
+    assert 'window.localStorage.removeItem(' in interaction
+    assert 'resetColumns.textContent = "Reset column layout";' in interaction
+    assert 'window.matchMedia("(min-width: 768px)")' in interaction
+    assert "table.clientWidth > 859" in interaction
+
+    column_css = css[css.index("/* Ingredient editor v22:"):]
+    assert ".recipe-edit-ingredient-column-resize" in column_css
+    assert "cursor: col-resize;" in column_css
+    assert ".is-column-drop-before" in column_css
+    assert ".is-column-drop-after" in column_css
+    assert '[data-recipe-edit-ingredient-column-layout-enabled="true"]' in column_css
+    mobile = column_css[column_css.index("@media (max-width: 767px)"):]
+    assert "display: none !important;" in mobile
+
+
 def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fields():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
