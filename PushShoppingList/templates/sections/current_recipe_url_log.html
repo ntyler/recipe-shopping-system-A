@@ -1761,6 +1761,15 @@
                             <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
                             <span>Expand All</span>
                         </button>
+                        <button type="button"
+                                class="recipe-edit-mobile-ingredients-collapse-toggle"
+                                data-recipe-ingredients-collapse-toggle
+                                aria-label="Collapse all ingredients"
+                                title="Collapse all ingredients"
+                                onclick="return toggleRecipeIngredientsCollapsed(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
+                            <span class="sr-only" data-recipe-ingredients-collapse-label>Collapse All</span>
+                        </button>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-ingredient-column-menu-wrap">
                             <button type="button"
                                     class="recipe-edit-ingredient-columns-button"

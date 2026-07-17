@@ -28559,12 +28559,24 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
             ${recipeEditSvgIcon("edit")}
         </button>
     `;
+    const collapseButtonHtml = isIngredientRow ? `
+        <button type="button"
+                class="recipe-edit-compact-row-collapse"
+                data-recipe-edit-ingredient-collapse-toggle
+                aria-label="Collapse ingredient"
+                aria-expanded="true"
+                title="Collapse ingredient"
+                onclick="return toggleRecipeIngredientRowCollapsed(this)">
+            ${recipeEditSvgIcon("chevron-down")}
+        </button>
+    ` : "";
     const actions = document.createElement("div");
     actions.className = "recipe-edit-compact-row-actions";
     actions.dataset.recipeEditCompactRowActions = "";
     actions.setAttribute("role", "cell");
     actions.innerHTML = `
         ${detailsButton}
+        ${collapseButtonHtml}
         ${editButtonHtml}
         ${menuInActions ? "" : `<button type="button"
                 class="recipe-edit-compact-row-delete"
@@ -28605,6 +28617,9 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
     updateActionLabels();
     if (focusField && label === "ingredient") {
         focusField.addEventListener("input", updateActionLabels);
+    }
+    if (isIngredientRow) {
+        updateRecipeIngredientRowCollapseToggle(row);
     }
 }
 
@@ -40417,13 +40432,24 @@ function toggleRecipeIngredientRowCollapsed(button) {
 }
 
 function updateRecipeIngredientRowCollapseToggle(row) {
-    const button = row ? row.querySelector(".recipe-edit-row-collapse-toggle") : null;
+    const menuButton = row ? row.querySelector(".recipe-edit-row-collapse-toggle") : null;
+    const compactButton = row ? row.querySelector("[data-recipe-edit-ingredient-collapse-toggle]") : null;
 
-    if (!button) {
+    if (!menuButton && !compactButton) {
         return;
     }
 
-    button.textContent = isRecipeIngredientRowCollapsed(row) ? "Expand ingredient" : "Collapse ingredient";
+    const collapsed = isRecipeIngredientRowCollapsed(row);
+    const label = collapsed ? "Expand ingredient" : "Collapse ingredient";
+    if (menuButton) {
+        menuButton.textContent = label;
+    }
+    if (compactButton) {
+        compactButton.setAttribute("aria-expanded", String(!collapsed));
+        compactButton.setAttribute("aria-label", label);
+        compactButton.title = label;
+        compactButton.classList.toggle("is-expanded", !collapsed);
+    }
 }
 
 function updateRecipeViewCardCollapseMenuToggle(row) {
@@ -40463,19 +40489,23 @@ function moveRecipeIngredientRow(button, direction) {
 
 function updateRecipeIngredientsCollapsedToggle() {
     const list = document.getElementById("recipeEditIngredients");
-    const button = document.querySelector("[data-recipe-ingredients-collapse-toggle]");
-    const label = button ? button.querySelector("span:last-child") : null;
-    const icon = button ? button.querySelector(".recipe-edit-button-icon") : null;
     const collapsed = Boolean(list && list.classList.contains("recipe-edit-ingredients-collapsed"));
+    const actionLabel = collapsed ? "Expand all ingredients" : "Collapse all ingredients";
 
-    if (label) {
-        label.textContent = collapsed ? "Expand All" : "Collapse All";
-    }
-
-    if (icon) {
-        icon.innerHTML = recipeEditSvgIcon("chevron-down");
-        icon.classList.toggle("is-expanded", !collapsed);
-    }
+    document.querySelectorAll("[data-recipe-ingredients-collapse-toggle]").forEach(button => {
+        const label = button.querySelector("[data-recipe-ingredients-collapse-label]")
+            || button.querySelector("span:last-child");
+        const icon = button.querySelector(".recipe-edit-button-icon");
+        if (label) {
+            label.textContent = collapsed ? "Expand All" : "Collapse All";
+        }
+        if (icon) {
+            icon.innerHTML = recipeEditSvgIcon("chevron-down");
+            icon.classList.toggle("is-expanded", !collapsed);
+        }
+        button.setAttribute("aria-label", actionLabel);
+        button.title = actionLabel;
+    });
 }
 
 function setRecipeIngredientsCollapsed(collapsed) {
