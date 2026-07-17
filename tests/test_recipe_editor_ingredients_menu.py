@@ -1628,6 +1628,22 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
         hover_rule = hover_rule[:hover_rule.index("}")]
         assert "border-color: var(--app-border-strong);" in hover_rule
         assert "background: var(--app-bg-soft);" in hover_rule
+    ingredient_idle_selector = ".recipe-edit-ingredient-read-cell > .recipe-edit-ingredient-inline-name:not(:hover):not(:focus)"
+    ingredient_idle_rule = v20[v20.index(ingredient_idle_selector):]
+    ingredient_idle_rule = ingredient_idle_rule[:ingredient_idle_rule.index("}")]
+    assert ':not([aria-invalid="true"])' in ingredient_idle_rule
+    assert "border-color: transparent;" in ingredient_idle_rule
+    assert "background: transparent;" in ingredient_idle_rule
+    ingredient_hover_selector = ".recipe-edit-ingredient-read-cell > .recipe-edit-ingredient-inline-name:hover"
+    ingredient_hover_rule = v20[v20.index(ingredient_hover_selector):]
+    ingredient_hover_rule = ingredient_hover_rule[:ingredient_hover_rule.index("}")]
+    assert "border-color: var(--app-border-strong);" in ingredient_hover_rule
+    assert "background: var(--app-bg-soft);" in ingredient_hover_rule
+    preparation_hover_selector = ".recipe-edit-ingredient-read-preparation:hover"
+    preparation_hover_rule = v20[v20.index(preparation_hover_selector):]
+    preparation_hover_rule = preparation_hover_rule[:preparation_hover_rule.index("}")]
+    assert "border-color: var(--app-border-strong);" in preparation_hover_rule
+    assert "background: var(--app-bg-soft);" in preparation_hover_rule
     assert "width: 100%;" in v20
 
 

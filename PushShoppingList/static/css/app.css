@@ -54536,6 +54536,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control:focus {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 22%, transparent);
 }
 
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-read-cell > .recipe-edit-ingredient-inline-name:not(:hover):not(:focus):not([aria-invalid="true"]),
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-quantity-summary > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]),
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]) {
     border-color: transparent;
@@ -54543,8 +54544,25 @@ body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredien
     box-shadow: none;
 }
 
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-read-cell > .recipe-edit-ingredient-inline-name:hover,
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-quantity-summary > .recipe-edit-ingredient-inline-control:hover,
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control:hover {
+    border-color: var(--app-border-strong);
+    background: var(--app-bg-soft);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-read-preparation {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 0 3px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-read-preparation:hover {
     border-color: var(--app-border-strong);
     background: var(--app-bg-soft);
 }
