@@ -2104,7 +2104,15 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     compact_buy_as_layout = compact_buy_as_layout[:compact_buy_as_layout.index("}")]
     assert "display: grid !important;" in compact_buy_as_layout
     assert "grid-template-columns: max-content minmax(0, 1fr);" in compact_buy_as_layout
+    compact_buy_as_label = compact_buy_as[
+        compact_buy_as.index(".recipe-edit-ingredient-read-buy-as > span {"):
+    ]
+    compact_buy_as_label = compact_buy_as_label[:compact_buy_as_label.index("}")]
+    assert "grid-column: 1;" in compact_buy_as_label
+    assert "grid-row: 1;" in compact_buy_as_label
     assert "height: 16px !important;" in compact_buy_as_input
+    assert "grid-column: 2 !important;" in compact_buy_as_input
+    assert "grid-row: 1 !important;" in compact_buy_as_input
     assert "width: 100% !important;" in compact_buy_as_input
     assert "width: 0 !important;" not in compact_buy_as_input
     assert "border: 0 !important;" in compact_buy_as_input
@@ -2724,7 +2732,7 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
         ):
     ]
     collapsed_buy_as = collapsed_buy_as[:collapsed_buy_as.index("}")]
-    assert "display: flex !important;" in collapsed_buy_as
+    assert "display: grid !important;" in collapsed_buy_as
     assert ".recipe-edit-compact-row-edit" in mobile_css
     assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-edit" in mobile_css
     assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-collapse" in mobile_css
