@@ -28722,8 +28722,9 @@ function organizeRecipeEditIngredientRow(row) {
                     <button type="button"
                             class="recipe-edit-ingredient-modal-delete"
                             data-recipe-ingredient-modal-delete
+                            aria-label="Delete Ingredient"
                             onclick="return removeRecipeIngredientFromModal(this)">
-                        ${recipeEditSvgIcon("trash")}<span>Delete Ingredient</span>
+                        ${recipeEditSvgIcon("trash")}<span class="recipe-edit-ingredient-modal-delete-label-desktop">Delete Ingredient</span><span class="recipe-edit-ingredient-modal-delete-label-mobile" aria-hidden="true">Delete</span>
                     </button>
                     <span class="recipe-edit-ingredient-modal-status" data-recipe-ingredient-modal-status aria-live="polite"></span>
                 </div>

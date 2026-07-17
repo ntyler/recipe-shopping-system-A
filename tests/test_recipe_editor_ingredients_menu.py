@@ -1070,6 +1070,9 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert 'onclick="return toggleRecipeIngredientModalAnalysis(this)"' in organize
     assert 'onclick="return removeRecipeIngredientFromModal(this)"' in organize
     assert 'class="recipe-edit-ingredient-modal-delete"' in organize
+    assert 'aria-label="Delete Ingredient"' in organize
+    assert 'class="recipe-edit-ingredient-modal-delete-label-desktop">Delete Ingredient</span>' in organize
+    assert 'class="recipe-edit-ingredient-modal-delete-label-mobile" aria-hidden="true">Delete</span>' in organize
 
     assert 'onclick="return cancelRecipeIngredientInlineEdit(this)"' in organize
     assert 'onclick="return previousRecipeIngredientModal(this)"' in organize
@@ -1156,6 +1159,40 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert ".recipe-edit-ingredient-modal-nav" in mobile
     assert "display: flex;" in mobile
     assert "grid-template-columns: minmax(0, 1fr);" in mobile
+    mobile_footer_selector = ".recipe-edit-ingredient-modal-footer {"
+    mobile_footer = mobile[mobile.index(mobile_footer_selector):]
+    mobile_footer = mobile_footer[:mobile_footer.index("}")]
+    for declaration in (
+        "grid-template-columns: repeat(6, minmax(0, 1fr));",
+        "min-height: 0;",
+        "gap: 6px;",
+        "padding: 8px 12px max(8px, env(safe-area-inset-bottom));",
+    ):
+        assert declaration in mobile_footer
+    mobile_cancel_selector = (
+        ".recipe-edit-ingredient-modal-footer-actions .recipe-edit-ingredient-edit-cancel {"
+    )
+    mobile_cancel = mobile[mobile.index(mobile_cancel_selector):]
+    mobile_cancel = mobile_cancel[:mobile_cancel.index("}")]
+    assert "display: none;" in mobile_cancel
+    for selector, placement in (
+        (".recipe-edit-ingredient-modal-delete {", "grid-column: 1 / span 2;"),
+        (".recipe-edit-ingredient-modal-previous {", "grid-column: 3 / span 2;"),
+        (".recipe-edit-ingredient-modal-forward {", "grid-column: 5 / span 2;"),
+        (".recipe-edit-ingredient-edit-save {", "grid-column: 1 / span 3;"),
+        (
+            ".recipe-edit-ingredient-modal-footer-actions .recipe-edit-ingredient-modal-next {",
+            "grid-column: 4 / span 3;",
+        ),
+    ):
+        rule = mobile[mobile.index(selector):]
+        rule = rule[:rule.index("}")]
+        assert placement in rule
+    mobile_delete_label = mobile[
+        mobile.index(".recipe-edit-ingredient-modal-delete-label-mobile {"):
+    ]
+    mobile_delete_label = mobile_delete_label[:mobile_delete_label.index("}")]
+    assert "display: inline;" in mobile_delete_label
     mobile_identity_selector = (
         "dialog.recipe-edit-ingredient-edit-panel "
         ".recipe-edit-ingredient-modal-identity-fields {"

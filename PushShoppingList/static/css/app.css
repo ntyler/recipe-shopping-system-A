@@ -50423,6 +50423,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-delete .recipe-ed
     height: 17px;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-delete-label-mobile {
+    display: none;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer-actions {
     gap: 16px;
 }
@@ -50975,9 +50979,10 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-        padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        min-height: 0;
+        gap: 6px;
+        padding: 8px 12px max(8px, env(safe-area-inset-bottom));
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer-start,
@@ -50989,8 +50994,33 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         display: none;
     }
 
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer-actions .recipe-edit-ingredient-edit-cancel {
+        display: none;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-delete {
+        grid-column: 1 / span 2;
+        grid-row: 1;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-previous {
+        grid-column: 3 / span 2;
+        grid-row: 1;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-forward {
+        grid-column: 5 / span 2;
+        grid-row: 1;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-edit-save {
+        grid-column: 1 / span 3;
+        grid-row: 2;
+    }
+
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer-actions .recipe-edit-ingredient-modal-next {
-        grid-column: auto;
+        grid-column: 4 / span 3;
+        grid-row: 2;
     }
 
     body.recipe-edit-standalone-page :is(
@@ -50999,12 +51029,29 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     ) button {
         width: 100%;
         min-width: 0;
-        min-height: 42px;
+        min-height: 40px;
+        padding-inline: 8px;
+        font-size: 12px;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-delete {
         width: 100% !important;
         min-width: 0 !important;
+        gap: 6px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-delete .recipe-edit-inline-icon {
+        width: 15px;
+        min-width: 15px;
+        height: 15px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-delete-label-desktop {
+        display: none;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-delete-label-mobile {
+        display: inline;
     }
 }
 
