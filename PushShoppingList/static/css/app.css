@@ -54507,14 +54507,19 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-
 @media (min-width: 768px) {
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-substitution-cell {
         display: flex;
+        height: 32px;
         align-items: center;
+        align-self: center;
         min-height: 32px;
+        margin: 0;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button {
+        box-sizing: border-box;
         align-items: center;
         height: 32px;
         min-height: 32px;
+        margin: 0;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button > .recipe-edit-inline-icon {
