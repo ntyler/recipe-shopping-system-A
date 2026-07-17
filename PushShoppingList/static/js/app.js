@@ -26073,8 +26073,7 @@ function recipeIngredientReadStatusHtml(item = {}) {
     const statusClass = match.attentionStatus
         ? ` requires-review ${recipeIngredientTypeKey(match.attentionStatus).replace(/\s+/g, "-")}`
         : (pantryStaple ? " pantry-staple" : " good-match");
-    const preparation = recipeIngredientSentenceCase(item.preparation);
-    return `${preparation ? `<span class="recipe-edit-ingredient-read-preparation">${escapeHtml(preparation)}</span><span class="recipe-edit-ingredient-read-separator" aria-hidden="true">\u00b7</span>` : ""}<span class="recipe-edit-ingredient-read-match${statusClass}">${escapeHtml(status)}</span>`;
+    return `<span class="recipe-edit-ingredient-read-match${statusClass}">${escapeHtml(status)}</span>`;
 }
 
 function recipeIngredientEditableFieldSnapshot(scope) {
@@ -27289,7 +27288,15 @@ function organizeRecipeEditIngredientRow(row) {
                data-recipe-ingredient-inline-field="ingredient"
                aria-label="Ingredient"
                autocomplete="off">
-        <span class="recipe-edit-ingredient-read-status" data-ingredient-read-status></span>
+        <div class="recipe-edit-ingredient-read-details">
+            <input type="text"
+                   class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-preparation"
+                   data-recipe-ingredient-inline-field="preparation"
+                   aria-label="Preparation"
+                   placeholder="Add preparation"
+                   autocomplete="off">
+            <span class="recipe-edit-ingredient-read-status" data-ingredient-read-status></span>
+        </div>
         <span class="recipe-edit-ingredient-read-buy-as" data-ingredient-read-buy-as hidden></span>
     `;
     row.appendChild(readCell);

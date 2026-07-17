@@ -1553,7 +1553,7 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "const statusLabels = {" in status
     assert '(pantryStaple ? "Pantry staple" : "Good match")' in status
     assert "recipe-edit-ingredient-read-match" in status
-    assert "recipe-edit-ingredient-read-preparation" in status
+    assert "recipe-edit-ingredient-read-preparation" not in status
     assert "recipeIngredientBadgesHtml" not in status
 
     type_helpers = script[
@@ -1576,13 +1576,16 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
         script.index("function bindRecipeIngredientInlineEditor"):
         script.index("function organizeRecipeEditIngredientRow")
     ]
-    for field_name in ("ingredient", "quantity", "unit", "store_section", "section"):
+    for field_name in ("ingredient", "preparation", "quantity", "unit", "store_section", "section"):
         assert f'data-recipe-ingredient-inline-field="{field_name}"' in organize or (
             f'control.dataset.recipeIngredientInlineField = fieldName' in organize
             and f'"{field_name}"' in organize
         )
-    for label in ("Ingredient", "Quantity", "Unit", "Store Section", "Type"):
+    for label in ("Ingredient", "Preparation", "Quantity", "Unit", "Store Section", "Type"):
         assert f'aria-label="{label}"' in organize or f'"{label}"' in organize
+    assert 'class="recipe-edit-ingredient-read-details"' in organize
+    assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-preparation"' in organize
+    assert 'placeholder="Add preparation"' in organize
     assert 'const source = recipeIngredientDirectField(row, fieldName);' in binding
     assert 'source.dispatchEvent(new Event(eventName, { bubbles: true }));' in binding
     assert 'control.tagName === "SELECT"' in binding
@@ -1639,7 +1642,13 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     ingredient_hover_rule = ingredient_hover_rule[:ingredient_hover_rule.index("}")]
     assert "border-color: var(--app-border-strong);" in ingredient_hover_rule
     assert "background: var(--app-bg-soft);" in ingredient_hover_rule
-    preparation_hover_selector = ".recipe-edit-ingredient-read-preparation:hover"
+    preparation_idle_selector = ".recipe-edit-ingredient-read-details > .recipe-edit-ingredient-inline-preparation:not(:hover):not(:focus)"
+    preparation_idle_rule = v20[v20.index(preparation_idle_selector):]
+    preparation_idle_rule = preparation_idle_rule[:preparation_idle_rule.index("}")]
+    assert ':not([aria-invalid="true"])' in preparation_idle_rule
+    assert "border-color: transparent;" in preparation_idle_rule
+    assert "background: transparent;" in preparation_idle_rule
+    preparation_hover_selector = ".recipe-edit-ingredient-read-details > .recipe-edit-ingredient-inline-preparation:hover"
     preparation_hover_rule = v20[v20.index(preparation_hover_selector):]
     preparation_hover_rule = preparation_hover_rule[:preparation_hover_rule.index("}")]
     assert "border-color: var(--app-border-strong);" in preparation_hover_rule
