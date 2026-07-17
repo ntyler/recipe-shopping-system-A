@@ -1761,6 +1761,33 @@
                             <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
                             <span>Expand All</span>
                         </button>
+                        <div class="recipe-edit-section-menu-wrap recipe-edit-ingredient-column-menu-wrap">
+                            <button type="button"
+                                    class="recipe-edit-ingredient-columns-button"
+                                    aria-label="Adjust ingredient columns"
+                                    title="Adjust ingredient columns"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditSectionMenu(this, event)">
+                                <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("settings") }}</span>
+                                <span>Columns</span>
+                                <span class="recipe-edit-columns-chevron" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
+                            </button>
+                            <div class="recipe-edit-row-menu recipe-edit-section-menu recipe-edit-ingredient-column-menu" hidden>
+                                <div class="overflow-menu-section">
+                                    <div class="overflow-menu-section-title">Column Layout</div>
+                                    <p class="recipe-edit-ingredient-column-help">
+                                        Drag a header grip to move it. Drag a divider to resize, or double-click a divider to auto-fit one column.
+                                    </p>
+                                    <button type="button" onclick="return autoFitRecipeEditIngredientColumns()">
+                                        Auto-fit column widths
+                                    </button>
+                                    <button type="button" onclick="return resetRecipeEditIngredientColumnLayout()">
+                                        Restore default columns
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-ingredients-menu-wrap">
                             <button type="button"
                                     class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn"

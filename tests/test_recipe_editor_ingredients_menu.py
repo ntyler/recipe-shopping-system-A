@@ -1150,8 +1150,11 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
 def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8"
+    )
 
-    assert 'const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV1";' in script
+    assert 'const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV2";' in script
     assert 'const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [' in script
     for column in (
         "media", "ingredient", "status", "quantity", "unit",
@@ -1166,23 +1169,36 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
         "loadRecipeEditIngredientColumnLayout",
         "saveRecipeEditIngredientColumnLayout",
         "moveRecipeEditIngredientColumn",
+        "beginRecipeEditIngredientColumnMove",
+        "updateRecipeEditIngredientColumnMove",
+        "finishRecipeEditIngredientColumnMove",
         "beginRecipeEditIngredientColumnResize",
         "updateRecipeEditIngredientColumnResize",
+        "autoFitRecipeEditIngredientColumns",
         "handleRecipeEditIngredientColumnKeydown",
         "resetRecipeEditIngredientColumnLayout",
     ):
         assert f"function {behavior}" in interaction
-    assert 'header.addEventListener("dragstart"' in interaction
-    assert 'header.addEventListener("dragover"' in interaction
-    assert 'header.addEventListener("drop"' in interaction
+    assert 'header.addEventListener("pointerdown"' in interaction
+    assert 'header.addEventListener("pointermove"' in interaction
+    assert 'header.addEventListener("pointerup"' in interaction
+    assert 'header.addEventListener("pointercancel"' in interaction
     assert 'resizeHandle.addEventListener("pointerdown"' in interaction
+    assert 'resizeHandle.addEventListener("dblclick"' in interaction
     assert 'window.localStorage.setItem(' in interaction
     assert 'window.localStorage.removeItem(' in interaction
-    assert 'resetColumns.textContent = "Reset column layout";' in interaction
+    assert 'autoFitColumns.textContent = "Auto-fit column widths";' in interaction
+    assert 'resetColumns.textContent = "Restore default columns";' in interaction
     assert 'window.matchMedia("(min-width: 768px)")' in interaction
     assert "table.clientWidth > 859" in interaction
+    assert 'class="recipe-edit-ingredient-columns-button"' in template
+    assert "Auto-fit column widths" in template
+    assert "Restore default columns" in template
+    assert "double-click a divider to auto-fit one column" in template
 
     column_css = css[css.index("/* Ingredient editor v22:"):]
+    assert ".recipe-edit-ingredient-column-menu" in column_css
+    assert ".recipe-edit-ingredient-column-move" in column_css
     assert ".recipe-edit-ingredient-column-resize" in column_css
     assert "cursor: col-resize;" in column_css
     assert ".is-column-drop-before" in column_css

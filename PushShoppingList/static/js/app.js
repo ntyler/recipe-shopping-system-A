@@ -22621,7 +22621,7 @@ let recipeEditIngredientModalActiveRow = null;
 let recipeEditIngredientModalReturnFocus = null;
 let recipeEditIngredientModalScrollState = null;
 let recipeEditIngredientColumnLayout = null;
-let recipeEditIngredientColumnDragKey = "";
+let recipeEditIngredientColumnMoveState = null;
 let recipeEditIngredientColumnResizeState = null;
 let recipeEditIngredientColumnResizeObserver = null;
 let recipeEditReturnState = null;
@@ -22637,7 +22637,7 @@ const RECIPE_EDIT_MENU_SECTION_FIELD_NAME = "menu_section";
 const RECIPE_EDIT_CATEGORY_AI_FIELD_NAMES = CATEGORY_FIELD_NAMES;
 const RECIPE_EDIT_CATEGORY_FIELD_NAMES = [...CATEGORY_FIELD_NAMES, RECIPE_EDIT_MENU_SECTION_FIELD_NAME];
 const RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES = [...RECIPE_EDIT_CATEGORY_FIELD_NAMES, "custom_categories"];
-const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV1";
+const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV2";
 const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [
     "media",
     "ingredient",
@@ -22652,7 +22652,7 @@ const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [
 const RECIPE_EDIT_INGREDIENT_COLUMNS = {
     media: {
         label: "Drag / Image",
-        minWidth: 72,
+        minWidth: 88,
         maxWidth: 240,
         fallbackWidth: 88,
         selectors: [":scope > .recipe-edit-row-handle", ":scope > .recipe-ingredient-image-panel"],
@@ -22708,7 +22708,7 @@ const RECIPE_EDIT_INGREDIENT_COLUMNS = {
     },
     actions: {
         label: "Actions",
-        minWidth: 68,
+        minWidth: 76,
         maxWidth: 180,
         fallbackWidth: 76,
         selectors: [":scope > .recipe-edit-compact-row-actions"],
@@ -25979,6 +25979,18 @@ function recipeEditIngredientColumnHeaders() {
         : [];
 }
 
+function orderRecipeEditIngredientColumnHeaders(order) {
+    const tableHead = document.querySelector("[data-recipe-edit-ingredient-table-head]");
+    if (!tableHead) return;
+    const headers = new Map(
+        recipeEditIngredientColumnHeaders().map(header => [header.dataset.ingredientColumn, header]),
+    );
+    order.forEach(key => {
+        const header = headers.get(key);
+        if (header) tableHead.appendChild(header);
+    });
+}
+
 function captureRecipeEditIngredientColumnWidths() {
     const widths = {};
     recipeEditIngredientColumnHeaders().forEach(header => {
@@ -26000,6 +26012,71 @@ function ensureRecipeEditIngredientColumnLayout() {
         );
     }
     return recipeEditIngredientColumnLayout;
+}
+
+function recipeEditIngredientColumnCellText(cell) {
+    if (!cell) return "";
+    const controlText = Array.from(cell.querySelectorAll("input, select, button"))
+        .filter(control => control.type !== "hidden" && !control.hidden)
+        .map(control => {
+            if (control.tagName === "SELECT") {
+                return control.selectedOptions?.[0]?.textContent || control.value || "";
+            }
+            if (control.tagName === "INPUT") return control.value || control.placeholder || "";
+            return control.innerText || control.textContent || "";
+        })
+        .map(value => String(value || "").replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+    if (controlText.length) return [...new Set(controlText)].join(" ");
+    return String(cell.innerText || cell.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function measureRecipeEditIngredientColumnText(context, element, text) {
+    if (!text) return 0;
+    if (!context) return text.length * 7;
+    const style = window.getComputedStyle(element);
+    context.font = style.font || `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    return context.measureText(text).width;
+}
+
+function autoFitRecipeEditIngredientColumnWidth(key, context = null) {
+    const definition = RECIPE_EDIT_INGREDIENT_COLUMNS[key];
+    if (!definition) return 0;
+    if (key === "media" || key === "actions") return definition.fallbackWidth;
+    const header = document.querySelector(`[data-ingredient-column="${key}"]`);
+    let measuredWidth = measureRecipeEditIngredientColumnText(context, header || document.body, definition.label) + 34;
+    recipeEditIngredientRows().forEach(row => {
+        definition.selectors.forEach(selector => {
+            const cell = row.querySelector(selector);
+            const text = recipeEditIngredientColumnCellText(cell);
+            measuredWidth = Math.max(
+                measuredWidth,
+                measureRecipeEditIngredientColumnText(context, cell || document.body, text) + 30,
+            );
+        });
+    });
+    return clampRecipeEditIngredientColumnWidth(key, measuredWidth);
+}
+
+function autoFitRecipeEditIngredientColumns(columnKey = "") {
+    const layout = ensureRecipeEditIngredientColumnLayout();
+    const canvas = document.createElement("canvas");
+    const context = typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
+    const keys = RECIPE_EDIT_INGREDIENT_COLUMNS[columnKey]
+        ? [columnKey]
+        : RECIPE_EDIT_INGREDIENT_COLUMN_ORDER;
+    keys.forEach(key => {
+        layout.widths[key] = autoFitRecipeEditIngredientColumnWidth(key, context);
+    });
+    applyRecipeEditIngredientColumnLayout();
+    saveRecipeEditIngredientColumnLayout();
+    closeRecipeEditRowMenus();
+    setRecipeEditIngredientColumnStatus(
+        columnKey
+            ? `${RECIPE_EDIT_INGREDIENT_COLUMNS[columnKey].label} column fitted to its content.`
+            : "Ingredient columns fitted to their content.",
+    );
+    return false;
 }
 
 function recipeEditIngredientColumnLayoutIsAvailable(tableScroll = null) {
@@ -26063,6 +26140,7 @@ function clearRecipeEditIngredientColumnLayoutStyles() {
         delete tableScroll.dataset.recipeEditIngredientColumnsCustomized;
         tableScroll.style.removeProperty("--recipe-edit-ingredient-grid");
     }
+    orderRecipeEditIngredientColumnHeaders(RECIPE_EDIT_INGREDIENT_COLUMN_ORDER);
     [tableHead, ingredientList].filter(Boolean).forEach(element => element.style.removeProperty("min-width"));
     recipeEditIngredientColumnHeaders().forEach(header => {
         header.style.removeProperty("grid-column");
@@ -26108,6 +26186,7 @@ function applyRecipeEditIngredientColumnLayout() {
     if (!recipeEditIngredientColumnLayout || !tableScroll || !tableHead || !ingredientList) return;
     const layout = normalizeRecipeEditIngredientColumnLayout(recipeEditIngredientColumnLayout);
     recipeEditIngredientColumnLayout = layout;
+    orderRecipeEditIngredientColumnHeaders(layout.order);
     const computedGap = Number.parseFloat(
         window.getComputedStyle(tableScroll).getPropertyValue("--recipe-edit-ingredient-column-gap"),
     );
@@ -26143,6 +26222,18 @@ function refreshRecipeEditIngredientColumnLayout() {
     if (!tableScroll) return;
     const available = recipeEditIngredientColumnLayoutIsAvailable(tableScroll);
     tableScroll.dataset.recipeEditIngredientColumnLayoutEnabled = String(available);
+    if (!available && recipeEditIngredientColumnMoveState) {
+        finishRecipeEditIngredientColumnMove({
+            type: "pointercancel",
+            pointerId: recipeEditIngredientColumnMoveState.pointerId,
+        });
+    }
+    if (!available && recipeEditIngredientColumnResizeState) {
+        finishRecipeEditIngredientColumnResize({
+            type: "pointercancel",
+            pointerId: recipeEditIngredientColumnResizeState.pointerId,
+        });
+    }
     if (available && recipeEditIngredientColumnLayout) {
         applyRecipeEditIngredientColumnLayout();
     } else {
@@ -26165,43 +26256,66 @@ function moveRecipeEditIngredientColumn(key, targetKey, placeAfter = false) {
     return true;
 }
 
-function handleRecipeEditIngredientColumnDragStart(header, event) {
+function beginRecipeEditIngredientColumnMove(header, event) {
     const tableScroll = header.closest("[data-recipe-edit-ingredient-table-scroll]");
-    if (!recipeEditIngredientColumnLayoutIsAvailable(tableScroll) || recipeEditIngredientColumnResizeState) {
-        event.preventDefault();
+    if (
+        event.button !== 0
+        || event.target.closest("[data-ingredient-column-resize]")
+        || !recipeEditIngredientColumnLayoutIsAvailable(tableScroll)
+        || recipeEditIngredientColumnResizeState
+    ) {
         return;
     }
-    recipeEditIngredientColumnDragKey = header.dataset.ingredientColumn || "";
-    header.classList.add("is-column-dragging");
-    if (event.dataTransfer) {
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", recipeEditIngredientColumnDragKey);
+    event.preventDefault();
+    header.focus({ preventScroll: true });
+    if (typeof header.setPointerCapture === "function") header.setPointerCapture(event.pointerId);
+    recipeEditIngredientColumnMoveState = {
+        header,
+        key: header.dataset.ingredientColumn || "",
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        targetKey: "",
+        placeAfter: false,
+    };
+}
+
+function updateRecipeEditIngredientColumnMove(event) {
+    const state = recipeEditIngredientColumnMoveState;
+    if (!state || event.pointerId !== state.pointerId) return;
+    const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
+    if (!state.moved && distance < 6) return;
+    event.preventDefault();
+    state.moved = true;
+    document.body.classList.add("recipe-edit-ingredient-column-moving");
+    state.header.classList.add("is-column-dragging");
+    const target = document.elementFromPoint(event.clientX, event.clientY)
+        ?.closest?.("[data-recipe-edit-ingredient-table-head] > [data-ingredient-column]");
+    clearRecipeEditIngredientColumnDropTargets();
+    state.header.classList.add("is-column-dragging");
+    if (!target || target === state.header) {
+        state.targetKey = "";
+        return;
     }
+    const rect = target.getBoundingClientRect();
+    state.targetKey = target.dataset.ingredientColumn || "";
+    state.placeAfter = event.clientX >= rect.left + (rect.width / 2);
+    target.classList.add(state.placeAfter ? "is-column-drop-after" : "is-column-drop-before");
 }
 
-function handleRecipeEditIngredientColumnDragOver(header, event) {
-    if (!recipeEditIngredientColumnDragKey || recipeEditIngredientColumnDragKey === header.dataset.ingredientColumn) return;
-    event.preventDefault();
-    const placeAfter = event.clientX >= header.getBoundingClientRect().left + (header.getBoundingClientRect().width / 2);
+function finishRecipeEditIngredientColumnMove(event) {
+    const state = recipeEditIngredientColumnMoveState;
+    if (!state || event.pointerId !== state.pointerId) return;
+    if (typeof state.header.releasePointerCapture === "function" && state.header.hasPointerCapture?.(event.pointerId)) {
+        state.header.releasePointerCapture(event.pointerId);
+    }
+    document.body.classList.remove("recipe-edit-ingredient-column-moving");
     clearRecipeEditIngredientColumnDropTargets();
-    header.classList.add(placeAfter ? "is-column-drop-after" : "is-column-drop-before");
-    const draggingHeader = document.querySelector(
-        `[data-ingredient-column="${recipeEditIngredientColumnDragKey}"]`,
-    );
-    draggingHeader?.classList.add("is-column-dragging");
-}
-
-function handleRecipeEditIngredientColumnDrop(header, event) {
-    if (!recipeEditIngredientColumnDragKey) return;
-    event.preventDefault();
-    const rect = header.getBoundingClientRect();
-    moveRecipeEditIngredientColumn(
-        recipeEditIngredientColumnDragKey,
-        header.dataset.ingredientColumn || "",
-        event.clientX >= rect.left + (rect.width / 2),
-    );
-    recipeEditIngredientColumnDragKey = "";
-    clearRecipeEditIngredientColumnDropTargets();
+    recipeEditIngredientColumnMoveState = null;
+    if (event.type !== "pointercancel" && state.moved && state.targetKey) {
+        moveRecipeEditIngredientColumn(state.key, state.targetKey, state.placeAfter);
+    }
 }
 
 function finishRecipeEditIngredientColumnResize(event) {
@@ -26211,7 +26325,7 @@ function finishRecipeEditIngredientColumnResize(event) {
     window.removeEventListener("pointerup", finishRecipeEditIngredientColumnResize);
     window.removeEventListener("pointercancel", finishRecipeEditIngredientColumnResize);
     document.body.classList.remove("recipe-edit-ingredient-column-resizing");
-    state.header.draggable = true;
+    state.header.draggable = false;
     if (event?.type === "pointercancel") {
         state.layout.widths[state.key] = state.startWidth;
         applyRecipeEditIngredientColumnLayout();
@@ -26242,7 +26356,6 @@ function beginRecipeEditIngredientColumnResize(header, event) {
     const key = header.dataset.ingredientColumn;
     const layout = ensureRecipeEditIngredientColumnLayout();
     applyRecipeEditIngredientColumnLayout();
-    header.draggable = false;
     recipeEditIngredientColumnResizeState = {
         header,
         key,
@@ -26287,19 +26400,25 @@ function decorateRecipeEditIngredientColumnHeaders(tableHead) {
         const key = header.dataset.ingredientColumn || RECIPE_EDIT_INGREDIENT_COLUMN_ORDER[index];
         if (!RECIPE_EDIT_INGREDIENT_COLUMNS[key]) return;
         header.dataset.ingredientColumn = key;
-        header.draggable = true;
+        header.draggable = false;
         header.tabIndex = 0;
-        header.title = `${RECIPE_EDIT_INGREDIENT_COLUMNS[key].label}: drag to move; drag the right edge to resize. Alt+Arrow moves; Alt+Shift+Arrow resizes.`;
+        header.title = `${RECIPE_EDIT_INGREDIENT_COLUMNS[key].label}: drag the grip to move; drag the divider to resize; double-click the divider to auto-fit. Alt+Arrow moves; Alt+Shift+Arrow resizes.`;
         if (header.dataset.ingredientColumnBound !== "true") {
             header.dataset.ingredientColumnBound = "true";
-            header.addEventListener("dragstart", event => handleRecipeEditIngredientColumnDragStart(header, event));
-            header.addEventListener("dragover", event => handleRecipeEditIngredientColumnDragOver(header, event));
-            header.addEventListener("drop", event => handleRecipeEditIngredientColumnDrop(header, event));
-            header.addEventListener("dragend", () => {
-                recipeEditIngredientColumnDragKey = "";
-                clearRecipeEditIngredientColumnDropTargets();
-            });
+            header.addEventListener("pointerdown", event => beginRecipeEditIngredientColumnMove(header, event));
+            header.addEventListener("pointermove", updateRecipeEditIngredientColumnMove);
+            header.addEventListener("pointerup", finishRecipeEditIngredientColumnMove);
+            header.addEventListener("pointercancel", finishRecipeEditIngredientColumnMove);
+            header.addEventListener("selectstart", event => event.preventDefault());
             header.addEventListener("keydown", event => handleRecipeEditIngredientColumnKeydown(header, event));
+        }
+        let moveHandle = header.querySelector(":scope > [data-ingredient-column-move]");
+        if (!moveHandle) {
+            moveHandle = document.createElement("span");
+            moveHandle.className = "recipe-edit-ingredient-column-move";
+            moveHandle.dataset.ingredientColumnMove = "";
+            moveHandle.setAttribute("aria-hidden", "true");
+            header.insertBefore(moveHandle, header.firstChild);
         }
         let resizeHandle = header.querySelector(":scope > [data-ingredient-column-resize]");
         if (!resizeHandle) {
@@ -26307,14 +26426,31 @@ function decorateRecipeEditIngredientColumnHeaders(tableHead) {
             resizeHandle.className = "recipe-edit-ingredient-column-resize";
             resizeHandle.dataset.ingredientColumnResize = "";
             resizeHandle.setAttribute("aria-hidden", "true");
+            resizeHandle.title = `Resize ${RECIPE_EDIT_INGREDIENT_COLUMNS[key].label}; double-click to auto-fit`;
             resizeHandle.addEventListener("pointerdown", event => beginRecipeEditIngredientColumnResize(header, event));
-            resizeHandle.addEventListener("dragstart", event => event.preventDefault());
+            resizeHandle.addEventListener("dblclick", event => {
+                event.preventDefault();
+                event.stopPropagation();
+                autoFitRecipeEditIngredientColumns(key);
+            });
             header.appendChild(resizeHandle);
         }
     });
 }
 
 function resetRecipeEditIngredientColumnLayout() {
+    if (recipeEditIngredientColumnMoveState) {
+        finishRecipeEditIngredientColumnMove({
+            type: "pointercancel",
+            pointerId: recipeEditIngredientColumnMoveState.pointerId,
+        });
+    }
+    if (recipeEditIngredientColumnResizeState) {
+        finishRecipeEditIngredientColumnResize({
+            type: "pointercancel",
+            pointerId: recipeEditIngredientColumnResizeState.pointerId,
+        });
+    }
     try {
         window.localStorage.removeItem(recipeEditIngredientColumnStorageKey());
     } catch (_error) {
@@ -26391,12 +26527,21 @@ function organizeRecipeEditIngredientTools() {
             overflowMenu.appendChild(viewSection);
         }
         viewSection.appendChild(collapseToggle);
+        let autoFitColumns = viewSection.querySelector("[data-recipe-edit-auto-fit-ingredient-columns]");
+        if (!autoFitColumns) {
+            autoFitColumns = document.createElement("button");
+            autoFitColumns.type = "button";
+            autoFitColumns.dataset.recipeEditAutoFitIngredientColumns = "";
+            autoFitColumns.textContent = "Auto-fit column widths";
+            autoFitColumns.addEventListener("click", () => autoFitRecipeEditIngredientColumns());
+            viewSection.appendChild(autoFitColumns);
+        }
         let resetColumns = viewSection.querySelector("[data-recipe-edit-reset-ingredient-columns]");
         if (!resetColumns) {
             resetColumns = document.createElement("button");
             resetColumns.type = "button";
             resetColumns.dataset.recipeEditResetIngredientColumns = "";
-            resetColumns.textContent = "Reset column layout";
+            resetColumns.textContent = "Restore default columns";
             resetColumns.addEventListener("click", resetRecipeEditIngredientColumnLayout);
             viewSection.appendChild(resetColumns);
         }
