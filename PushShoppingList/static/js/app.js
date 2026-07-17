@@ -27256,6 +27256,66 @@ function recipeIngredientModalHasImage(imagePanel) {
     return Boolean(field && String(field.value || "").trim());
 }
 
+function setRecipeIngredientModalImageOptionsOpen(previewMedia, open, options = {}) {
+    const trigger = previewMedia
+        ? previewMedia.querySelector("[data-recipe-ingredient-image-options-trigger]")
+        : null;
+    const imagePanel = previewMedia
+        ? previewMedia.querySelector(".recipe-edit-ingredient-modal-image-panel")
+        : null;
+    const imageOptions = imagePanel
+        ? imagePanel.querySelector(":scope > .recipe-step-image-actions")
+        : null;
+    if (!previewMedia || !trigger || !imagePanel || !imageOptions) {
+        return false;
+    }
+
+    const shouldOpen = Boolean(open);
+    imagePanel.classList.toggle("recipe-ingredient-image-options-open", shouldOpen);
+    previewMedia.classList.toggle("is-image-options-open", shouldOpen);
+    trigger.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    imageOptions.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
+
+    if (shouldOpen && options.focusFirst) {
+        const firstAction = imageOptions.querySelector(
+            ":is(button, a, select):not([hidden]):not(:disabled)"
+        );
+        window.requestAnimationFrame?.(() => firstAction?.focus({ preventScroll: true }));
+    } else if (!shouldOpen && options.restoreFocus && trigger.isConnected) {
+        trigger.focus({ preventScroll: true });
+    }
+    return shouldOpen;
+}
+
+function closeRecipeIngredientModalImageOptions(options = {}) {
+    document.querySelectorAll(
+        "[data-recipe-ingredient-modal-preview-media].is-image-options-open"
+    ).forEach(previewMedia => {
+        if (previewMedia === options.except) return;
+        setRecipeIngredientModalImageOptionsOpen(previewMedia, false, {
+            restoreFocus: Boolean(options.restoreFocus),
+        });
+    });
+}
+
+function toggleRecipeIngredientModalImageOptions(previewMedia, options = {}) {
+    if (!previewMedia) return false;
+    const trigger = previewMedia.querySelector("[data-recipe-ingredient-image-options-trigger]");
+    const shouldOpen = trigger?.getAttribute("aria-expanded") !== "true";
+    closeRecipeIngredientModalImageOptions({ except: previewMedia });
+    return setRecipeIngredientModalImageOptionsOpen(previewMedia, shouldOpen, options);
+}
+
+function closeRecipeIngredientModalImageOptionsOnEscape(event) {
+    const previewMedia = document.querySelector(
+        "[data-recipe-ingredient-modal-preview-media].is-image-options-open"
+    );
+    if (event.key !== "Escape" || !previewMedia) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    setRecipeIngredientModalImageOptionsOpen(previewMedia, false, { restoreFocus: true });
+}
+
 function syncRecipeIngredientModalImageActions(imagePanel) {
     if (!imagePanel || !imagePanel.closest("[data-recipe-ingredient-edit-panel]")) {
         return;
@@ -27275,12 +27335,37 @@ function syncRecipeIngredientModalImageActions(imagePanel) {
         removeButton.textContent = "Remove";
         removeButton.title = "Remove ingredient image";
     }
+    const previewMedia = imagePanel.closest("[data-recipe-ingredient-modal-preview-media]");
+    const imageOptionsTrigger = previewMedia
+        ? previewMedia.querySelector("[data-recipe-ingredient-image-options-trigger]")
+        : null;
+    const imageOptions = imagePanel.querySelector(":scope > .recipe-step-image-actions");
+    if (previewMedia && imageOptionsTrigger && imageOptions) {
+        const imageOptionsId = `${imagePanel.closest("[data-recipe-ingredient-edit-panel]")?.id || "recipeIngredient"}ImageOptions`;
+        imageOptions.id = imageOptionsId;
+        imageOptions.classList.add("recipe-edit-ingredient-image-options-popover");
+        imageOptions.dataset.recipeIngredientImageOptions = "";
+        imageOptions.setAttribute("role", "dialog");
+        imageOptions.setAttribute("aria-label", "Ingredient image options");
+        imageOptions.setAttribute("aria-hidden", "true");
+        imageOptionsTrigger.setAttribute("aria-controls", imageOptionsId);
+        imageOptionsTrigger.setAttribute("aria-expanded", "false");
+
+        let heading = imageOptions.querySelector("[data-recipe-ingredient-image-options-title]");
+        if (!heading) {
+            heading = document.createElement("strong");
+            heading.className = "recipe-edit-ingredient-image-options-title";
+            heading.dataset.recipeIngredientImageOptionsTitle = "";
+            heading.textContent = "Image options";
+            imageOptions.prepend(heading);
+        }
+    }
     const image = imagePanel.querySelector(".recipe-ingredient-image:not([hidden])");
     if (image) {
-        image.tabIndex = 0;
-        image.setAttribute("role", "button");
-        image.setAttribute("aria-label", "Enlarge ingredient image");
-        image.title = "Click to enlarge ingredient image";
+        image.tabIndex = -1;
+        image.removeAttribute("role");
+        image.removeAttribute("aria-label");
+        image.title = "Open ingredient image options";
     }
 }
 
@@ -27301,6 +27386,12 @@ function mountRecipeIngredientModalImage(row, panel) {
 function restoreRecipeIngredientModalImage(row) {
     const imagePanel = recipeIngredientModalImagePanel(row);
     if (!imagePanel) return;
+    const previewMedia = imagePanel.closest("[data-recipe-ingredient-modal-preview-media]");
+    if (previewMedia) {
+        setRecipeIngredientModalImageOptionsOpen(previewMedia, false);
+        previewMedia.querySelector("[data-recipe-ingredient-image-options-trigger]")
+            ?.removeAttribute("aria-controls");
+    }
     const placeholder = imagePanel.recipeIngredientModalPlaceholder;
     if (placeholder && placeholder.parentNode) {
         placeholder.parentNode.insertBefore(imagePanel, placeholder);
@@ -27309,8 +27400,26 @@ function restoreRecipeIngredientModalImage(row) {
     delete imagePanel.recipeIngredientModalPlaceholder;
     imagePanel.classList.remove(
         "recipe-edit-ingredient-modal-image-panel",
-        "recipe-ingredient-image-prompt-requested"
+        "recipe-ingredient-image-prompt-requested",
+        "recipe-ingredient-image-options-open"
     );
+    const imageOptions = imagePanel.querySelector(":scope > .recipe-step-image-actions");
+    if (imageOptions) {
+        imageOptions.querySelector("[data-recipe-ingredient-image-options-title]")?.remove();
+        imageOptions.classList.remove("recipe-edit-ingredient-image-options-popover");
+        imageOptions.removeAttribute("id");
+        imageOptions.removeAttribute("role");
+        imageOptions.removeAttribute("aria-label");
+        imageOptions.removeAttribute("aria-hidden");
+        delete imageOptions.dataset.recipeIngredientImageOptions;
+    }
+    const image = imagePanel.querySelector(".recipe-ingredient-image:not([hidden])");
+    if (image) {
+        image.tabIndex = 0;
+        image.setAttribute("role", "button");
+        image.setAttribute("aria-label", "Enlarge ingredient image");
+        image.title = "Click to enlarge ingredient image";
+    }
     const generateButton = imagePanel.querySelector("[data-ingredient-image-generate]");
     if (generateButton) {
         generateButton.textContent = recipeIngredientModalHasImage(imagePanel)
@@ -28452,7 +28561,14 @@ function organizeRecipeEditIngredientRow(row) {
                     </nav>
                     <section class="recipe-edit-ingredient-modal-preview" aria-label="Ingredient preview">
                         <span class="recipe-edit-ingredient-modal-preview-label">Ingredient Preview</span>
-                        <div class="recipe-edit-ingredient-modal-preview-media" data-recipe-ingredient-modal-preview-media></div>
+                        <div class="recipe-edit-ingredient-modal-preview-media" data-recipe-ingredient-modal-preview-media>
+                            <button type="button"
+                                    class="recipe-edit-ingredient-image-options-trigger"
+                                    data-recipe-ingredient-image-options-trigger
+                                    aria-haspopup="dialog"
+                                    aria-expanded="false"
+                                    aria-label="Open ingredient image options"></button>
+                        </div>
                         <strong data-recipe-ingredient-modal-preview-name>Ingredient</strong>
                         <span data-recipe-ingredient-modal-preview-buy-as>Buy as: —</span>
                         <span class="recipe-edit-ingredient-modal-preview-store" data-recipe-ingredient-modal-preview-store></span>
@@ -50569,6 +50685,30 @@ function recipeLightboxImageSelector() {
 }
 
 function handleRecipeCoverImageClick(event) {
+    const previewMedia = event.target.closest
+        ? event.target.closest("[data-recipe-ingredient-modal-preview-media]")
+        : null;
+    if (previewMedia) {
+        const imageOptions = event.target.closest("[data-recipe-ingredient-image-options]");
+        if (imageOptions) {
+            previewMedia.querySelector("[data-recipe-ingredient-image-options-trigger]")
+                ?.focus({ preventScroll: true });
+            setRecipeIngredientModalImageOptionsOpen(previewMedia, false);
+            return;
+        }
+        const trigger = event.target.closest("[data-recipe-ingredient-image-options-trigger]");
+        const previewImage = event.target.closest(".recipe-ingredient-image");
+        if (trigger || previewImage) {
+            event.preventDefault();
+            event.stopPropagation();
+            trigger?.focus({ preventScroll: true });
+            toggleRecipeIngredientModalImageOptions(previewMedia, {
+                focusFirst: event.detail === 0,
+            });
+            return;
+        }
+    }
+    closeRecipeIngredientModalImageOptions();
     const image = event.target.closest ? event.target.closest(recipeLightboxImageSelector()) : null;
 
     if (!image) {
@@ -50730,6 +50870,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener("wheel", handleRecipeEditRowMenuScrollOrResize, { passive: true, capture: true });
     document.addEventListener("touchmove", handleRecipeEditRowMenuScrollOrResize, { passive: true, capture: true });
     document.addEventListener("keydown", handleRecipeCoverImageKeydown, true);
+    document.addEventListener("keydown", closeRecipeIngredientModalImageOptionsOnEscape, true);
     document.addEventListener("keydown", closeAddStoreModalOnEscape);
     document.addEventListener("keydown", closeRecipeImageLightboxOnEscape);
 });

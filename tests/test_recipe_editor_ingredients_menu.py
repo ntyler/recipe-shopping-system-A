@@ -817,8 +817,15 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert 'generateButton.textContent = "Generate Image";' in image_contract
     assert 'recipeIngredientModalHasImage(imagePanel) ? "Change Image" : "Add Image"' in image_contract
     assert 'removeButton.textContent = "Remove";' in image_contract
+    assert 'image.tabIndex = -1;' in image_contract
+    assert 'image.title = "Open ingredient image options";' in image_contract
     assert 'image.setAttribute("aria-label", "Enlarge ingredient image");' in image_contract
     assert 'image.title = "Click to enlarge ingredient image";' in image_contract
+    assert 'function toggleRecipeIngredientModalImageOptions' in image_contract
+    assert 'function closeRecipeIngredientModalImageOptionsOnEscape' in image_contract
+    assert 'imagePanel.classList.toggle("recipe-ingredient-image-options-open", shouldOpen);' in image_contract
+    assert 'imageOptions.setAttribute("role", "dialog");' in image_contract
+    assert 'heading.textContent = "Image options";' in image_contract
     assert 'slot.appendChild(imagePanel);' in image_contract
     assert "recipeIngredientModalPlaceholder" in image_contract
     assert '"recipe-ingredient-image-prompt-requested"' in image_contract
@@ -829,6 +836,21 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     ]
     assert 'imagePanel.classList.add("recipe-ingredient-image-prompt-requested");' in organizer
     assert 'data-ingredient-image-generate' in organizer
+    assert 'data-recipe-ingredient-modal-preview-media' in organizer
+    assert 'aria-haspopup="dialog"' in organizer
+    assert 'aria-label="Open ingredient image options"' in organizer
+
+    click_handler = script[
+        script.index("function handleRecipeCoverImageClick"):
+        script.index("function handleRecipeCoverImageKeydown")
+    ]
+    assert 'event.target.closest("[data-recipe-ingredient-modal-preview-media]")' in click_handler
+    assert 'event.target.closest("[data-recipe-ingredient-image-options]")' in click_handler
+    assert 'event.target.closest("[data-recipe-ingredient-image-options-trigger]")' in click_handler
+    assert "focusFirst: event.detail === 0" in click_handler
+    assert "toggleRecipeIngredientModalImageOptions(previewMedia," in click_handler
+    assert "closeRecipeIngredientModalImageOptions();" in click_handler
+    assert 'document.addEventListener("keydown", closeRecipeIngredientModalImageOptionsOnEscape, true);' in script
 
     portal = script[
         script.index("function portalRecipeEditPopupMenu"):
@@ -845,6 +867,11 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert "display: none !important;" in modal_css
     assert ".recipe-image-prompt" in modal_css
     assert ".recipe-ingredient-image-prompt-requested .recipe-image-prompt:not([hidden])" in modal_css
+    assert ".recipe-edit-ingredient-image-options-title" in modal_css
+    assert ".recipe-edit-ingredient-image-options-trigger" in modal_css
+    assert ".recipe-ingredient-image-options-open > .recipe-step-image-actions" in modal_css
+    assert "visibility: hidden;" in modal_css
+    assert "visibility: visible;" in modal_css
     assert "dialog.recipe-edit-ingredient-edit-panel > .recipe-edit-floating-menu" in modal_css
     assert "z-index: 40 !important;" in modal_css
 
@@ -1088,11 +1115,14 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     mobile_image_actions = mobile[mobile.index(mobile_image_actions_selector):]
     mobile_image_actions = mobile_image_actions[:mobile_image_actions.index("}")]
     for declaration in (
-        "display: none !important;",
-        "opacity: 0 !important;",
-        "pointer-events: none !important;",
+        "left: 0;",
+        "width: min(220px, calc(100vw - 52px));",
+        "transform: translateY(-5px);",
     ):
         assert declaration in mobile_image_actions
+    assert "display: none !important;" not in mobile_image_actions
+    assert ".recipe-ingredient-image-options-open > .recipe-step-image-actions" in mobile
+    assert "transform: translateY(0);" in mobile
 
     match_details = script[
         script.index("function recipeIngredientMatchDetailsHtml"):
