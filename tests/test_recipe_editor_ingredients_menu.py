@@ -2599,6 +2599,12 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert ".recipe-edit-ingredient-mobile-quantity-summary" in mobile_css
     assert "display: none !important;" in mobile_css
     assert ".recipe-edit-compact-row-edit" in mobile_css
+    assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-edit" in mobile_css
+    assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-collapse" in mobile_css
+    assert ".recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap" in mobile_css
+    assert mobile_css.count("order: 1;") >= 1
+    assert mobile_css.count("order: 2;") >= 1
+    assert mobile_css.count("order: 3;") >= 1
 
 
 def test_recipe_menu_edit_links_to_standalone_editor_page():

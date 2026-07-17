@@ -55581,6 +55581,19 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-compact-row-actions {
         width: 106px;
         min-width: 106px;
+        justify-content: flex-end;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-actions > .recipe-edit-compact-row-edit {
+        order: 1;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-actions > .recipe-edit-compact-row-collapse {
+        order: 2;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap {
+        order: 3;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
