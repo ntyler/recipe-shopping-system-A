@@ -1127,6 +1127,7 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert ".recipe-edit-ingredient-modal-buy-as-field" in identity_width_rule
     assert "width: 100% !important;" in identity_width_rule
     assert "max-width: none !important;" in identity_width_rule
+    assert "align-self: start !important;" in identity_width_rule
     name_control_width_rule = workspace[
         workspace.index(
             "dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field :is("

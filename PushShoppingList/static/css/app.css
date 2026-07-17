@@ -50149,6 +50149,7 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recip
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
+    align-self: start !important;
     justify-self: stretch;
 }
 
