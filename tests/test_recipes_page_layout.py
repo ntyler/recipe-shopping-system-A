@@ -17,6 +17,11 @@ def recipes_page_markup():
     return template[start:end]
 
 
+def css_rule_body(css, selector):
+    start = css.index(f"{selector} {{")
+    return css[start:css.index("}", start)]
+
+
 def test_recipes_page_follows_reference_layout_without_fake_pagination():
     recipes_page = recipes_page_markup()
 
@@ -74,8 +79,12 @@ def test_recipe_preview_link_opens_its_visible_parent_workspace():
     assert 'loadLazySection("recipe-view")' in jump_function
 
 
-def test_recipes_page_css_locks_reference_geometry_and_responsive_fallbacks():
+def test_recipes_page_css_keeps_cards_and_text_legible_at_normal_zoom():
     css = read_text("PushShoppingList/static/css/app.css")
+    grid_rule = css_rule_body(css, ".app-page-workspace-recipes .app-recipes-grid")
+    title_rule = css_rule_body(css, ".app-page-workspace-recipes .app-recipe-card-body h3")
+    metadata_rule = css_rule_body(css, ".app-page-workspace-recipes .app-recipe-card-metadata")
+    tab_rule = css_rule_body(css, ".app-page-workspace-recipes .app-page-tabs .app-page-tab-label")
 
     assert ".app-shell-body:has(#recipesPage:not([hidden]))" not in css
     assert "--app-sidebar-width: 274px;" not in css
@@ -83,8 +92,11 @@ def test_recipes_page_css_locks_reference_geometry_and_responsive_fallbacks():
     assert ".app-page-workspace-recipes .app-page-layout" in css
     assert "grid-template-columns: minmax(0, 1fr) 246px;" in css
     assert ".app-page-workspace-recipes .app-recipes-grid" in css
-    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in css
+    assert "grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));" in grid_rule
     assert "aspect-ratio: 13 / 10;" in css
+    assert "font-size: 17px;" in title_rule
+    assert "font-size: 14px;" in metadata_rule
+    assert "font-size: 14px;" in tab_rule
     assert ".app-recipes-suggestions-banner" in css
     assert "@media (max-width: 1040px)" in css
     assert "@media (max-width: 768px)" in css

@@ -15298,7 +15298,12 @@ body {
     min-height: 20px;
     padding: 0 7px;
     background: var(--app-primary-soft);
-    font-size: 10px;
+    font-size: 12px;
+}
+
+.app-page-workspace-recipes .app-page-tabs .app-page-tab-label {
+    min-height: 42px;
+    font-size: 14px;
 }
 
 .app-page-workspace-recipes .app-recipes-toolbar {
@@ -15310,12 +15315,12 @@ body {
 }
 
 .app-page-workspace-recipes .app-recipes-toolbar button {
-    min-height: 38px;
-    padding: 0 12px;
+    min-height: 42px;
+    padding: 0 14px;
     border-color: var(--app-border);
     background: #ffffff;
     color: var(--app-text);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 750;
     cursor: pointer;
 }
@@ -15352,7 +15357,7 @@ body {
 }
 
 .app-page-workspace-recipes .app-recipes-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 26px 20px;
     margin-top: 7px;
     margin-bottom: 0;
@@ -15375,10 +15380,10 @@ body {
 .app-page-workspace-recipes .app-recipe-favorite {
     top: 8px;
     right: 8px;
-    width: 30px;
-    min-width: 30px;
-    height: 30px;
-    min-height: 30px;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    min-height: 38px;
     border-color: rgba(223, 230, 226, 0.95);
     background: rgba(255, 255, 255, 0.94);
     color: #263449;
@@ -15407,31 +15412,32 @@ body {
 
 .app-page-workspace-recipes .app-recipe-card-body {
     grid-template-rows: auto auto 1fr;
-    gap: 7px;
-    min-height: 122px;
-    padding: 12px 12px 13px;
+    gap: 10px;
+    min-height: 148px;
+    padding: 16px;
 }
 
 .app-page-workspace-recipes .app-recipe-card-body h3 {
     display: -webkit-box;
-    min-height: 36px;
+    min-height: 43px;
     overflow: hidden;
-    font-size: 14px;
+    font-size: 17px;
     font-weight: 700;
-    line-height: 1.25;
+    line-height: 1.3;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
 }
 
 .app-page-workspace-recipes .app-recipe-card-rating {
-    font-size: 11px;
+    font-size: 15px;
     line-height: 1;
 }
 
 .app-page-workspace-recipes .app-recipe-card-metadata {
-    gap: 4px;
-    font-size: 10.5px;
+    gap: 7px;
+    font-size: 14px;
     font-weight: 650;
+    line-height: 1.4;
 }
 
 .app-page-workspace-recipes .app-recipe-card-meta-line-primary {
@@ -15449,7 +15455,7 @@ body {
     gap: 16px;
     min-height: 30px;
     color: var(--app-muted);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
 }
 
@@ -15465,8 +15471,8 @@ body {
 }
 
 .app-page-workspace-recipes .app-page-rail-card {
-    gap: 14px;
-    padding: 16px;
+    gap: 16px;
+    padding: 18px;
     border-color: #dfe6e2;
     border-radius: 12px;
     background: #ffffff;
@@ -15474,7 +15480,7 @@ body {
 }
 
 .app-page-workspace-recipes .app-page-rail-card h3 {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 850;
 }
 
@@ -15518,7 +15524,7 @@ body {
 .app-page-workspace-recipes .app-page-metric-heading div > span {
     margin-top: 6px;
     color: var(--app-muted);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 650;
 }
 
@@ -15536,14 +15542,14 @@ body {
     justify-content: space-between;
     gap: 10px;
     color: var(--app-muted);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 650;
 }
 
 .app-page-workspace-recipes .app-page-collection-breakdown strong {
     grid-column: auto;
     color: var(--app-text);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 800;
 }
 
@@ -15554,13 +15560,13 @@ body {
 .app-page-workspace-recipes .app-page-link-list a {
     align-items: center;
     color: var(--app-text);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
 }
 
 .app-page-workspace-recipes .app-page-link-list a > strong {
     color: var(--app-muted);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 750;
 }
 
@@ -15569,7 +15575,7 @@ body {
     align-items: center;
     gap: 8px;
     color: var(--app-text);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
 }
 
@@ -15600,7 +15606,7 @@ body {
     min-width: 0;
     gap: 8px;
     color: var(--app-text);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
 }
 
@@ -15614,7 +15620,7 @@ body {
 .app-recipes-top-ingredients small {
     flex: 0 0 auto;
     color: var(--app-muted);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
 }
 
@@ -15623,8 +15629,8 @@ body {
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 14px;
     align-items: center;
-    min-height: 68px;
-    padding: 13px 18px;
+    min-height: 76px;
+    padding: 16px 20px;
     border: 1px solid #d9e8dc;
     border-radius: 12px;
     background: linear-gradient(90deg, #f1f8f3, #fbfdfb);
@@ -15651,14 +15657,14 @@ body {
 
 .app-recipes-suggestions-banner h3 {
     color: var(--app-text-strong);
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 850;
 }
 
 .app-recipes-suggestions-banner p {
     margin-top: 3px;
     color: var(--app-muted);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
 }
 
@@ -15666,14 +15672,14 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 34px;
+    min-height: 40px;
     gap: 8px;
     padding: 0 13px;
     border: 1px solid var(--app-border);
     border-radius: 7px;
     background: #ffffff;
     color: var(--app-primary-hover);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 750;
     text-decoration: none;
 }
@@ -15691,10 +15697,6 @@ body {
     .app-page-workspace-recipes .app-page-layout {
         grid-template-columns: minmax(0, 1fr) 232px;
         gap: 22px;
-    }
-
-    .app-page-workspace-recipes .app-recipes-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .app-recipes-command-row {
@@ -39824,6 +39826,10 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
         font-weight: 600;
     }
 
+    .app-page-workspace-recipes .app-recipe-browse-filters label {
+        font-size: 13px;
+    }
+
     .app-recipe-browse-filters :where(input, select, button) {
         min-height: 37px;
         margin: 0;
@@ -39834,10 +39840,19 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
         font-size: 11px;
     }
 
+    .app-page-workspace-recipes .app-recipe-browse-filters :where(input, select, button) {
+        min-height: 42px;
+        font-size: 14px;
+    }
+
     .app-recipe-browse-filters > span {
         align-self: center;
         color: var(--app-muted);
         font-size: 11px;
+    }
+
+    .app-page-workspace-recipes .app-recipe-browse-filters > span {
+        font-size: 13px;
     }
 
     .app-profile-heading {
