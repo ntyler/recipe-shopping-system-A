@@ -49443,8 +49443,8 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recip
 }
 
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field {
-    display: flex !important;
-    flex-direction: column;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
 }
 

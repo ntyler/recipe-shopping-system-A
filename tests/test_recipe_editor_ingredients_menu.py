@@ -975,8 +975,9 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
         compact.index("dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field {"):
         compact.index("}", compact.index("dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field {"))
     ]
-    assert "display: flex !important;" in modal_name_field
-    assert "flex-direction: column;" in modal_name_field
+    assert "display: grid !important;" in modal_name_field
+    assert "grid-template-columns: minmax(0, 1fr);" in modal_name_field
+    assert "display: flex !important;" not in modal_name_field
     modal_name_title = compact[
         compact.index(".recipe-edit-ingredient-modal-name-field .recipe-edit-ingredient-title-line {"):
         compact.index("}", compact.index(".recipe-edit-ingredient-modal-name-field .recipe-edit-ingredient-title-line {"))
@@ -1011,11 +1012,23 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert ':scope > .recipe-edit-ingredient-modal-type-field' in identity_repair
     assert identity_repair.index("identityFields.appendChild(name);") < identity_repair.index("identityFields.appendChild(buyAs);")
     assert identity_repair.index("identityFields.appendChild(buyAs);") < identity_repair.index("identityFields.appendChild(type);")
+    assert "syncRecipeIngredientModalIdentityWidths(editPanel, identityFields);" in identity_repair
+    mobile_width_sync = script[
+        script.index("function setRecipeIngredientModalMobileFullWidth"):
+        script.index("function ensureRecipeIngredientModalIdentityStack")
+    ]
+    assert 'window.matchMedia("(max-width: 760px)").matches' in mobile_width_sync
+    assert '"grid-template-columns": "minmax(0, 1fr)"' in mobile_width_sync
+    assert '"grid-column": "1 / -1"' in mobile_width_sync
+    assert 'width: "100%"' in mobile_width_sync
+    assert 'element.style.setProperty(property, value, "important");' in mobile_width_sync
+    assert "[name, buyAs].forEach" in mobile_width_sync
     modal_open = script[
         script.index("function setRecipeIngredientEditMode"):
         script.index("function saveRecipeIngredientInlineEdit")
     ]
     assert "ensureRecipeIngredientModalIdentityStack(panel);" in modal_open
+    assert 'window.addEventListener("resize", syncRecipeIngredientModalIdentityWidthsForViewport);' in script
     assert ".recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-name-field" in compact
     assert ".recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-buy-as-field" in compact
     assert "grid-row: 2 !important;" in compact

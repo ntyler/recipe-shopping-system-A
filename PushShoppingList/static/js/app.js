@@ -28187,6 +28187,59 @@ function editRecipeIngredientSubstitutionFields(button) {
     return setRecipeIngredientAlternativeEditMode(button, true);
 }
 
+function setRecipeIngredientModalMobileFullWidth(element, declarations, active) {
+    if (!element) return;
+    if (active) {
+        Object.entries(declarations).forEach(([property, value]) => {
+            element.style.setProperty(property, value, "important");
+        });
+        element.dataset.recipeIngredientMobileFullWidth = "true";
+        return;
+    }
+    if (element.dataset.recipeIngredientMobileFullWidth !== "true") return;
+    Object.keys(declarations).forEach(property => element.style.removeProperty(property));
+    delete element.dataset.recipeIngredientMobileFullWidth;
+}
+
+function syncRecipeIngredientModalIdentityWidths(editPanel, identityFields = null) {
+    const fields = identityFields || (editPanel
+        ? editPanel.querySelector("[data-recipe-ingredient-modal-identity] > .recipe-edit-ingredient-modal-identity-fields")
+        : null);
+    if (!fields) return;
+
+    const isNarrow = window.matchMedia("(max-width: 760px)").matches;
+    const name = fields.querySelector(":scope > .recipe-edit-ingredient-modal-name-field");
+    const buyAs = fields.querySelector(":scope > .recipe-edit-ingredient-modal-buy-as-field");
+    const nameTitle = name ? name.querySelector(":scope > .recipe-edit-ingredient-title-line") : null;
+    const nameInput = name ? name.querySelector('[data-field="ingredient"]') : null;
+    setRecipeIngredientModalMobileFullWidth(fields, {
+        display: "grid",
+        "grid-template-columns": "minmax(0, 1fr)",
+        width: "100%",
+    }, isNarrow);
+    [name, buyAs].forEach(field => setRecipeIngredientModalMobileFullWidth(field, {
+        display: "grid",
+        "grid-column": "1 / -1",
+        width: "100%",
+        "min-width": "0",
+        "max-width": "none",
+        "margin-inline": "0",
+        "justify-self": "stretch",
+    }, isNarrow));
+    [nameTitle, nameInput].forEach(field => setRecipeIngredientModalMobileFullWidth(field, {
+        width: "100%",
+        "min-width": "0",
+        "max-width": "none",
+        "margin-inline": "0",
+        "align-self": "stretch",
+    }, isNarrow));
+}
+
+function syncRecipeIngredientModalIdentityWidthsForViewport() {
+    document.querySelectorAll("[data-recipe-ingredient-edit-panel]")
+        .forEach(panel => syncRecipeIngredientModalIdentityWidths(panel));
+}
+
 function ensureRecipeIngredientModalIdentityStack(editPanel) {
     const identityGrid = editPanel
         ? editPanel.querySelector("[data-recipe-ingredient-modal-identity]")
@@ -28217,6 +28270,7 @@ function ensureRecipeIngredientModalIdentityStack(editPanel) {
     if (type) {
         identityFields.appendChild(type);
     }
+    syncRecipeIngredientModalIdentityWidths(editPanel, identityFields);
     return identityFields;
 }
 
@@ -50912,6 +50966,7 @@ window.addEventListener("resize", updateViewSwitcherStickyOffset);
 window.addEventListener("resize", invalidateStoreLocationMaps);
 window.addEventListener("resize", handleRecipeEditRowMenuScrollOrResize);
 window.addEventListener("resize", syncRecipeIngredientModalImageActionsForViewport);
+window.addEventListener("resize", syncRecipeIngredientModalIdentityWidthsForViewport);
 window.addEventListener("resize", scheduleAddStoreStickyVisibilityUpdate);
 window.addEventListener("scroll", scheduleAddStoreStickyVisibilityUpdate, { passive: true });
 window.addEventListener("pageshow", () => {
