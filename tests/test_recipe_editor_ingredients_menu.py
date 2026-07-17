@@ -1113,6 +1113,20 @@ def test_recipe_editor_ingredient_polish_uses_professional_grid_and_command_bar(
     assert 'title="Delete ${escapeAttribute(label)}"' in action_block
 
 
+def test_recipe_editor_expanded_analysis_fields_ignore_collapsed_row_visibility():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    override = css[css.index("/* Keep expanded modal analysis fields visible") :]
+    assert "#recipeEditIngredients" in override
+    assert "> dialog.recipe-edit-ingredient-edit-panel" in override
+    assert ".recipe-edit-ingredient-analysis:not([hidden])" in override
+    assert ".recipe-edit-original-text-label" in override
+    assert ".recipe-edit-choice-review:not([hidden])" in override
+    assert ".recipe-edit-extraction-warning:not([hidden])" in override
+    assert "display: grid;" in override
+    assert "display: inline-flex;" in override
+
+
 def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8"

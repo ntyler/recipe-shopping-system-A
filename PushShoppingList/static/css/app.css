@@ -55537,3 +55537,28 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
         grid-template-columns: 44px minmax(0, 1fr) 106px !important;
     }
 }
+
+/* Keep expanded modal analysis fields visible even when their table row is collapsed. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-analysis:not([hidden])
+    .recipe-edit-original-text-label {
+    display: grid;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-analysis:not([hidden])
+    .recipe-edit-choice-review:not([hidden]) {
+    display: grid;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-analysis:not([hidden])
+    .recipe-edit-extraction-warning:not([hidden]) {
+    display: inline-flex;
+}
