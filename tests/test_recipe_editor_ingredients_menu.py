@@ -2055,8 +2055,10 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert 'openRecipeIngredientUnitPicker(input, { showAll: true })' in script
     assert "syncRecipeIngredientInlineEditor(row)" in summary
     assert "readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem)" in summary
+    assert 'const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();' in summary
     assert "meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values)" in summary
-    assert 'readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Edit Buy As";' in summary
+    assert "readBuyAs.value = buyAsValue;" in summary
+    assert 'readBuyAs.title = buyAsValue ? `Buy as: ${buyAsValue}` : "Edit Buy As";' in summary
     assert "readBuyAs.hidden" not in summary
     assert "quantitySummary.textContent" not in summary
     assert "unitSummary.textContent" not in summary
@@ -2096,7 +2098,15 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
         ):
     ]
     compact_buy_as_input = compact_buy_as_input[:compact_buy_as_input.index("}")]
+    compact_buy_as_layout = compact_buy_as[
+        compact_buy_as.index("body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as {"):
+    ]
+    compact_buy_as_layout = compact_buy_as_layout[:compact_buy_as_layout.index("}")]
+    assert "display: grid !important;" in compact_buy_as_layout
+    assert "grid-template-columns: max-content minmax(0, 1fr);" in compact_buy_as_layout
     assert "height: 16px !important;" in compact_buy_as_input
+    assert "width: 100% !important;" in compact_buy_as_input
+    assert "width: 0 !important;" not in compact_buy_as_input
     assert "border: 0 !important;" in compact_buy_as_input
     assert "background: transparent !important;" in compact_buy_as_input
     assert "color: var(--app-muted);" in compact_buy_as_input
@@ -2180,7 +2190,7 @@ def test_recipe_editor_secondary_metadata_normalizes_buy_as_for_summaries():
         script.index("function updateRecipeIngredientSummary"):
         script.index("function recipeEditIngredientRows")
     ]
-    assert '`Buy as: ${meaningfulBuyAs}`' in summary
+    assert '`Buy as: ${meaningfulBuyAs || "' in summary
     assert "readBuyAs.hidden" not in summary
     assert 'data-recipe-ingredient-inline-field="purchasable_item"' in script
     assert "recipeIngredientReadStatusHtml(matchItem)" in summary

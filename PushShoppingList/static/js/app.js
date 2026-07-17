@@ -39864,6 +39864,7 @@ function updateRecipeIngredientSummary(row) {
         matchDetails.innerHTML = recipeIngredientMatchDetailsHtml(matchItem);
     }
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
+    const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();
     const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
     const quantitySummaryText = formatRecipeIngredientQuantityUnit(values);
     if (previewName) previewName.textContent = recipeIngredientSentenceCase(ingredientName) || ingredientName;
@@ -39874,7 +39875,8 @@ function updateRecipeIngredientSummary(row) {
     }
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
     if (readBuyAs) {
-        readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Edit Buy As";
+        readBuyAs.value = buyAsValue;
+        readBuyAs.title = buyAsValue ? `Buy as: ${buyAsValue}` : "Edit Buy As";
     }
     if (mobileQuantitySummary) {
         mobileQuantitySummary.textContent = quantitySummaryText;

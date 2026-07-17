@@ -55791,9 +55791,12 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
 
 /* Ingredient editor v25: keep inline Buy As editable without losing its compact metadata styling. */
 body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as {
-    display: flex;
+    display: grid !important;
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
+    justify-content: stretch;
     gap: 3px;
+    width: 100%;
     min-width: 0;
     color: var(--app-muted);
     font-size: 10px;
@@ -55806,8 +55809,8 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > span {
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > .recipe-edit-ingredient-inline-buy-as {
-    flex: 1 1 0;
-    width: 0 !important;
+    display: block;
+    width: 100% !important;
     min-width: 0;
     height: 16px !important;
     min-height: 16px !important;
@@ -55820,7 +55823,9 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > .recipe-e
     font-size: 10px !important;
     font-weight: 400;
     line-height: 1.35;
+    overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > .recipe-edit-ingredient-inline-buy-as:focus {
