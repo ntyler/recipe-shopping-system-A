@@ -877,7 +877,9 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     ]
     assert ':scope > .recipe-edit-ingredient-modal-name-field' in identity_repair
     assert ':scope > .recipe-edit-ingredient-modal-buy-as-field' in identity_repair
+    assert ':scope > .recipe-edit-ingredient-modal-type-field' in identity_repair
     assert identity_repair.index("identityFields.appendChild(name);") < identity_repair.index("identityFields.appendChild(buyAs);")
+    assert identity_repair.index("identityFields.appendChild(buyAs);") < identity_repair.index("identityFields.appendChild(type);")
     modal_open = script[
         script.index("function setRecipeIngredientEditMode"):
         script.index("function saveRecipeIngredientInlineEdit")
@@ -886,6 +888,11 @@ def test_recipe_editor_ingredient_modal_v13_is_compact_readable_and_responsive()
     assert ".recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-name-field" in compact
     assert ".recipe-edit-ingredient-modal-identity-grid > .recipe-edit-ingredient-modal-buy-as-field" in compact
     assert "grid-row: 2 !important;" in compact
+    modal_type_order = compact[
+        compact.index("dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-type-field {"):
+    ]
+    modal_type_order = modal_type_order[:modal_type_order.index("}")]
+    assert "order: 3;" in modal_type_order
 
 
 def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_changing_handlers():

@@ -27047,16 +27047,16 @@ function ensureRecipeIngredientModalIdentityStack(editPanel) {
         || identityFields.querySelector(":scope > .recipe-edit-ingredient-modal-name-field");
     const buyAs = identityGrid.querySelector(":scope > .recipe-edit-ingredient-modal-buy-as-field")
         || identityFields.querySelector(":scope > .recipe-edit-ingredient-modal-buy-as-field");
-    const requirement = identityGrid.querySelector(":scope > .recipe-edit-ingredient-modal-requirement-field")
-        || identityFields.querySelector(":scope > .recipe-edit-ingredient-modal-requirement-field");
+    const type = identityGrid.querySelector(":scope > .recipe-edit-ingredient-modal-type-field")
+        || identityFields.querySelector(":scope > .recipe-edit-ingredient-modal-type-field");
     if (name) {
         identityFields.appendChild(name);
     }
     if (buyAs) {
         identityFields.appendChild(buyAs);
     }
-    if (requirement) {
-        identityFields.appendChild(requirement);
+    if (type) {
+        identityFields.appendChild(type);
     }
     return identityFields;
 }
