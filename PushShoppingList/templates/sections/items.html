@@ -1,3 +1,4 @@
+{% import "includes/app_shell_macros.html" as shell %}
 <div id="sectionView">
     <div class="items-title-row">
         <h2 class="items-title">Items</h2>
@@ -989,6 +990,15 @@
                                         <div class="item-main-line">
                                             <input type="checkbox" class="item-check">
                                             <span class="item-text">{{ display_name }}</span>
+                                            <a class="recipe-ingredient-edit-link"
+                                               href="{{ url_for('recipe_bp.edit_recipe_page_route', url=recipe.url) }}"
+                                               data-recipe-url="{{ recipe.url }}"
+                                               data-ingredient-name="{{ recipe_item.name or display_name }}"
+                                               aria-label="Edit recipe ingredient: {{ display_name }}"
+                                               title="Edit recipe ingredient"
+                                               onclick="return openRecipeIngredientEditPage(this, event)">
+                                                {{ shell.svg_icon("edit") }}
+                                            </a>
                                             {% if food_status.needs_review or text_review.needs_review %}
                                                 <button type="button"
                                                         class="food-rule-marker recipe-ingredient-food-review-btn"

@@ -23438,6 +23438,27 @@ function openRecipeEditPageFromMenu(link, event = null) {
     return true;
 }
 
+function openRecipeIngredientEditPage(link, event = null) {
+    if (event && shouldLetRecipeEditorLinkNavigate(event)) {
+        return true;
+    }
+
+    if (event) {
+        event.stopPropagation();
+    }
+
+    const recipeUrl = link ? String(link.dataset.recipeUrl || "").trim() : "";
+    const ingredientName = link ? String(link.dataset.ingredientName || "").trim() : "";
+
+    if (recipeUrl) {
+        rememberRecipeEditPageReturnState(link);
+        rememberRecipeEditPendingAction(recipeUrl, { scrollToIngredient: ingredientName });
+    }
+
+    closeRecipeEditRowMenus();
+    return true;
+}
+
 function shouldLetRecipeEditorLinkNavigate(event) {
     return Boolean(
         event.defaultPrevented
