@@ -55715,10 +55715,13 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-read-details,
-    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-read-buy-as,
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-read-details,
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-read-buy-as {
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-read-details {
         display: none !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-read-buy-as:not([hidden]),
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-read-buy-as:not([hidden]) {
+        display: -webkit-box !important;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > :is(

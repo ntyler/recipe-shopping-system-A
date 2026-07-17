@@ -2670,6 +2670,25 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert ".recipe-edit-ingredient-substitution-cell," in mobile_css
     assert ".recipe-edit-ingredient-mobile-quantity-summary" in mobile_css
     assert "display: none !important;" in mobile_css
+    collapsed_detail_selector = mobile_css[
+        mobile_css.index(
+            "#recipeEditIngredients.recipe-edit-ingredients-collapsed > "
+            ".recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) "
+            ".recipe-edit-ingredient-read-details"
+        ):
+    ]
+    collapsed_detail_selector = collapsed_detail_selector[:collapsed_detail_selector.index("{")]
+    assert ".recipe-edit-ingredient-read-details" in collapsed_detail_selector
+    assert ".recipe-edit-ingredient-read-buy-as" not in collapsed_detail_selector
+    collapsed_buy_as = mobile_css[
+        mobile_css.index(
+            "#recipeEditIngredients.recipe-edit-ingredients-collapsed > "
+            ".recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) "
+            ".recipe-edit-ingredient-read-buy-as:not([hidden])"
+        ):
+    ]
+    collapsed_buy_as = collapsed_buy_as[:collapsed_buy_as.index("}")]
+    assert "display: -webkit-box !important;" in collapsed_buy_as
     assert ".recipe-edit-compact-row-edit" in mobile_css
     assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-edit" in mobile_css
     assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-collapse" in mobile_css
