@@ -38313,7 +38313,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
             ${ingredientImagePanelHtml}
         </div>
         <label class="recipe-edit-qty-label">
-            <span>Amount</span>
+            <span>Quantity</span>
             <input type="text" data-field="quantity" value="${escapeAttribute(item.quantity || "")}">
         </label>
         <label class="recipe-edit-quantity-text-inline">

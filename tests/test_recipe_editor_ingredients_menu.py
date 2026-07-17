@@ -541,6 +541,8 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     ):
         assert f'data-field="{field}"' in row_markup
     assert 'textarea data-field="ingredient" rows="1" required aria-required="true"' in row_markup
+    assert '<span>Quantity</span>' in row_markup
+    assert '<span>Amount</span>' not in row_markup
     assert 'placeholder="e.g. For sautéing onions."' in row_markup
     assert "Add preparation notes, purchasing guidance, or ingredient-specific details." in row_markup
 
