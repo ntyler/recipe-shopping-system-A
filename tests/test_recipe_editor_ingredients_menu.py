@@ -1065,6 +1065,21 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert ".recipe-edit-ingredient-modal-nav" in mobile
     assert "display: flex;" in mobile
     assert "grid-template-columns: minmax(0, 1fr);" in mobile
+    mobile_name_selector = (
+        "dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-modal-identity-fields > .recipe-edit-ingredient-modal-name-field {"
+    )
+    mobile_name = mobile[mobile.index(mobile_name_selector):]
+    mobile_name = mobile_name[:mobile_name.index("}")]
+    for declaration in (
+        "grid-column: 1 / -1 !important;",
+        "justify-self: stretch;",
+        "width: 100% !important;",
+        "margin-inline: 0;",
+        "align-items: stretch !important;",
+        "text-align: left;",
+    ):
+        assert declaration in mobile_name
 
     match_details = script[
         script.index("function recipeIngredientMatchDetailsHtml"):

@@ -50704,6 +50704,15 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         grid-template-columns: minmax(0, 1fr);
     }
 
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields > .recipe-edit-ingredient-modal-name-field {
+        grid-column: 1 / -1 !important;
+        justify-self: stretch;
+        width: 100% !important;
+        margin-inline: 0;
+        align-items: stretch !important;
+        text-align: left;
+    }
+
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
