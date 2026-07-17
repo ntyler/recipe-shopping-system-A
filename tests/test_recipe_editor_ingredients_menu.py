@@ -1640,6 +1640,27 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     preparation_rule = v20[v20.index("body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-preparation {"):]
     preparation_rule = preparation_rule[:preparation_rule.index("}")]
     assert "padding: 0 7px;" in preparation_rule
+    alternatives_cell_rule = v20[v20.index(
+        "body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > "
+        ".recipe-edit-ingredient-substitution-cell {"
+    ):]
+    alternatives_cell_rule = alternatives_cell_rule[:alternatives_cell_rule.index("}")]
+    assert "display: flex;" in alternatives_cell_rule
+    assert "align-items: center;" in alternatives_cell_rule
+    assert "min-height: 32px;" in alternatives_cell_rule
+    alternatives_button_rule = v20[v20.index(
+        "body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button {"
+    ):]
+    alternatives_button_rule = alternatives_button_rule[:alternatives_button_rule.index("}")]
+    assert "align-items: center;" in alternatives_button_rule
+    assert "height: 32px;" in alternatives_button_rule
+    assert "min-height: 32px;" in alternatives_button_rule
+    alternatives_chevron_rule = v20[v20.index(
+        "body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button > "
+        ".recipe-edit-inline-icon {"
+    ):]
+    alternatives_chevron_rule = alternatives_chevron_rule[:alternatives_chevron_rule.index("}")]
+    assert "align-self: center;" in alternatives_chevron_rule
     for summary_class in (
         "recipe-edit-ingredient-quantity-summary",
         "recipe-edit-ingredient-unit-summary",

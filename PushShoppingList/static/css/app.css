@@ -54504,6 +54504,24 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-
     line-height: 1.2;
 }
 
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-substitution-cell {
+        display: flex;
+        align-items: center;
+        min-height: 32px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button {
+        align-items: center;
+        height: 32px;
+        min-height: 32px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button > .recipe-edit-inline-icon {
+        align-self: center;
+    }
+}
+
 body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger[aria-expanded="true"],
 body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger:focus-visible {
     border-color: var(--app-primary-hover);
