@@ -25951,11 +25951,15 @@ function recipeIngredientTypeValue(values = {}) {
     const explicitType = String(values.section || values.ingredient_type || values.type || "").trim();
     const optional = values.optional === true
         || ["1", "true", "yes", "on"].includes(String(values.optional || "").trim().toLowerCase());
-    if (optional) {
+    if (!explicitType && optional) {
         return "optional";
     }
     const builtIn = recipeIngredientBuiltInType(explicitType);
     return builtIn ? builtIn.value : explicitType || "main";
+}
+
+function recipeIngredientIsOptional(values = {}) {
+    return recipeIngredientTypeKey(recipeIngredientTypeValue(values)) === "optional";
 }
 
 function recipeIngredientTypeLabel(values = {}) {
@@ -27593,45 +27597,9 @@ function organizeRecipeEditIngredientRow(row) {
     });
     if (type) {
         const typeLabel = type.querySelector(":scope > span");
-        if (typeLabel) typeLabel.textContent = "Ingredient Type";
-        type.hidden = true;
-        type.classList.add("recipe-edit-ingredient-modal-requirement-source");
-        const requirementField = document.createElement("div");
-        requirementField.className = "recipe-edit-ingredient-edit-field recipe-edit-ingredient-modal-requirement-field";
-        requirementField.dataset.recipeIngredientModalRequirement = "";
-        requirementField.innerHTML = `
-            <span class="recipe-edit-ingredient-modal-field-label">Ingredient Type</span>
-            <div class="recipe-edit-ingredient-requirement-control" role="radiogroup" aria-label="Ingredient Type">
-                <button type="button" role="radio" data-recipe-ingredient-requirement="required">Required</button>
-                <button type="button" role="radio" data-recipe-ingredient-requirement="optional">Optional</button>
-            </div>
-        `;
-        requirementField.appendChild(type);
-        const chooseRequirement = button => {
-            if (!button || !typeSelect) return;
-            const requirement = button.dataset.recipeIngredientRequirement;
-            if (requirement === "optional") {
-                typeSelect.value = "optional";
-            } else if (recipeIngredientTypeKey(typeSelect.value) === "optional") {
-                typeSelect.value = "main";
-            }
-            if (optionalInput) optionalInput.checked = requirement === "optional";
-            typeSelect.dispatchEvent(new Event("change", { bubbles: true }));
-            button.focus({ preventScroll: true });
-        };
-        requirementField.querySelectorAll("[data-recipe-ingredient-requirement]").forEach(button => {
-            button.addEventListener("click", () => chooseRequirement(button));
-        });
-        requirementField.querySelector(".recipe-edit-ingredient-requirement-control")?.addEventListener("keydown", event => {
-            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-            event.preventDefault();
-            const buttons = Array.from(event.currentTarget.querySelectorAll("[data-recipe-ingredient-requirement]"));
-            const currentIndex = buttons.indexOf(document.activeElement);
-            const direction = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
-            const nextButton = buttons[(currentIndex + direction + buttons.length) % buttons.length];
-            chooseRequirement(nextButton);
-        });
-        identityFields.appendChild(requirementField);
+        if (typeLabel) typeLabel.textContent = "Type";
+        type.classList.add("recipe-edit-ingredient-edit-field", "recipe-edit-ingredient-modal-type-field");
+        identityFields.appendChild(type);
     }
     if (notes) {
         notes.classList.add("recipe-edit-ingredient-edit-field", "recipe-edit-ingredient-modal-notes-field");
@@ -27681,10 +27649,10 @@ function organizeRecipeEditIngredientRow(row) {
     }
 
     if (typeSelect && optionalInput) {
-        optionalInput.checked = recipeIngredientTypeValue({ section: typeSelect.value, optional: optionalInput.checked }) === "optional";
-        if (optionalInput.checked) typeSelect.value = "optional";
+        typeSelect.value = recipeIngredientTypeValue({ section: typeSelect.value, optional: optionalInput.checked });
+        optionalInput.checked = recipeIngredientIsOptional({ section: typeSelect.value });
         typeSelect.addEventListener("change", () => {
-            optionalInput.checked = String(typeSelect.value || "").trim().toLowerCase() === "optional";
+            optionalInput.checked = recipeIngredientIsOptional({ section: typeSelect.value });
             optionalInput.dispatchEvent(new Event("change", { bubbles: true }));
         });
         syncRecipeIngredientTypeControl(typeSelect);
@@ -35670,12 +35638,13 @@ function recipeIngredientCustomTypeNames() {
 
 function recipeIngredientTypeOptions(selected, optional = false) {
     const rawValue = String(selected || "").trim();
-    const builtInSelected = recipeIngredientBuiltInType(optional ? "optional" : rawValue);
+    const fallbackValue = rawValue || (optional ? "optional" : "");
+    const builtInSelected = recipeIngredientBuiltInType(fallbackValue);
     const customNames = recipeIngredientCustomTypeNames();
-    const savedCustom = customNames.find(name => recipeIngredientTypeKey(name) === recipeIngredientTypeKey(rawValue));
+    const savedCustom = customNames.find(name => recipeIngredientTypeKey(name) === recipeIngredientTypeKey(fallbackValue));
     const selectedValue = builtInSelected
         ? builtInSelected.value
-        : savedCustom || rawValue || "main";
+        : savedCustom || fallbackValue || "main";
     const values = [
         ...RECIPE_INGREDIENT_BUILT_IN_TYPES.map(type => ({ ...type, custom: false })),
         ...customNames.map(name => ({ value: name, label: name, custom: true })),
@@ -35786,11 +35755,7 @@ function replaceRecipeIngredientCustomTypeName(previousValue, nextValue) {
 
 function recipeIngredientTypeControlLabel(select, value) {
     const selectedValue = String(value || "").trim() || "main";
-    const label = recipeIngredientTypeLabel({ section: selectedValue });
-    return select && select.closest("[data-recipe-ingredient-edit-panel]")
-        && recipeIngredientTypeKey(selectedValue) === "main"
-        ? "Required"
-        : label;
+    return recipeIngredientTypeLabel({ section: selectedValue });
 }
 
 function recipeIngredientTypeDotClassModifier(value) {
@@ -35886,9 +35851,7 @@ function renderRecipeIngredientTypeMenu(menu, select) {
     refreshRecipeIngredientTypeSelectOptions(select);
     const selectedValue = recipeIngredientTypeKey(select.value);
     const inline = menu.recipeEditTypeInline === true;
-    menu.setAttribute("aria-label", !inline && select.closest("[data-recipe-ingredient-edit-panel]")
-        ? "Ingredient requirement"
-        : "Ingredient types");
+    menu.setAttribute("aria-label", "Ingredient types");
     const optionMarkup = [...select.options].map((option, index) => {
         const value = String(option.value || "");
         const selected = recipeIngredientTypeKey(value) === selectedValue;
@@ -37333,7 +37296,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         </label>
         <label class="recipe-edit-section-label">
             <span>Type</span>
-            <select data-field="section">${recipeIngredientTypeOptions(ingredientType, Boolean(item.optional))}</select>
+            <select data-field="section">${recipeIngredientTypeOptions(ingredientType)}</select>
         </label>
         <label class="recipe-edit-store-section-label">
             <span>Store Section</span>
@@ -37342,7 +37305,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         </label>
         <label class="recipe-edit-check-label recipe-edit-optional-label">
             <span>Optional</span>
-            <input type="checkbox" data-field="optional" ${item.optional ? "checked" : ""}>
+            <input type="checkbox" data-field="optional" ${recipeIngredientIsOptional({ section: ingredientType }) ? "checked" : ""}>
         </label>
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
@@ -43563,7 +43526,7 @@ function normalizeRecipeEditorSnapshot(recipe) {
             inferred: String(item.inferred || "").trim(),
             warning: String(item.warning || "").trim(),
             food_review: normalizeRecipeFoodReviewSnapshot(item.food_review || {}),
-            optional: Boolean(item.optional),
+            optional: recipeIngredientIsOptional(item),
             substitutions: recipeIngredientSubstitutionRows(item).map(option => normalizeRecipeIngredientAlternativeSnapshot(option)),
         })),
         equipment: (recipe.equipment || [])
@@ -44092,6 +44055,8 @@ function collectRecipeIngredientRows() {
     return recipeEditIngredientRows()
         .map(row => {
             const item = fieldValuesFromRow(row);
+            item.section = recipeIngredientTypeValue(item);
+            item.optional = recipeIngredientIsOptional(item);
             Object.assign(item, recipeIngredientMatchSnapshot(recipeIngredientMatchItemFromRow(row, item)));
             const foodReview = recipeIngredientFoodReviewPayload(row);
             item.substitutions = collectRecipeIngredientSubstitutionRows(row);

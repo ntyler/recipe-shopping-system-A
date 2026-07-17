@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from PushShoppingList.app import create_app
+from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
 
@@ -489,7 +490,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert 'nameInput.setAttribute("aria-required", "true");' in organize
     assert 'nameLabel.textContent = "Ingredient Name";' in organize
     assert "The grocery item that should be added to the shopping list." in organize
-    assert 'typeLabel.textContent = "Ingredient Type";' in organize
+    assert 'typeLabel.textContent = "Type";' in organize
     assert ">Previous</button>" in organize
     assert ">Next</button>" in organize
     assert "Save Changes" in organize
@@ -500,11 +501,11 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert "optional.hidden = true;" in organize
     assert 'matchDetails.className = "recipe-edit-ingredient-match-details";' in organize
     assert 'matchDetails.dataset.ingredientMatchDetails = "";' in organize
-    assert 'typeSelect.value = "optional";' in organize
-    assert 'String(typeSelect.value || "").trim().toLowerCase() === "optional"' in organize
-    assert 'role="radiogroup" aria-label="Ingredient Type"' in organize
-    assert 'data-recipe-ingredient-requirement="required"' in organize
-    assert 'data-recipe-ingredient-requirement="optional"' in organize
+    assert 'type.classList.add("recipe-edit-ingredient-edit-field", "recipe-edit-ingredient-modal-type-field");' in organize
+    assert "identityFields.appendChild(type);" in organize
+    assert 'role="radiogroup" aria-label="Ingredient Type"' not in organize
+    assert 'data-recipe-ingredient-requirement="required"' not in organize
+    assert 'data-recipe-ingredient-requirement="optional"' not in organize
     assert ">View Details</button>" in organize
     assert "support.appendChild(originalText)" not in organize
     assert "[originalText, choiceReview, warning].filter(Boolean).forEach(field => support.appendChild(field));" in organize
@@ -918,8 +919,9 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert 'onclick="return nextRecipeIngredientModal(this)"' in organize
     assert 'onclick="return saveRecipeIngredientInlineEdit(this)"' in organize
     assert 'onclick="return saveRecipeIngredientAndNext(this)"' in organize
-    assert 'role="radiogroup" aria-label="Ingredient Type"' in organize
-    assert "identityFields.appendChild(requirementField);" in organize
+    assert 'typeLabel.textContent = "Type";' in organize
+    assert "identityFields.appendChild(type);" in organize
+    assert "identityFields.appendChild(requirementField);" not in organize
     assert "previewMedia?.appendChild(imageSlot);" in organize
     assert "analysisSummary?.appendChild(matchDetails);" in organize
     assert "[originalText, choiceReview, warning].filter(Boolean).forEach(field => support.appendChild(field));" in organize
@@ -1580,6 +1582,8 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
         script.index("function recipeIngredientPluralUnit")
     ]
     assert 'return "optional";' in type_helpers
+    assert "if (!explicitType && optional)" in type_helpers
+    assert 'recipeIngredientTypeKey(recipeIngredientTypeValue(values)) === "optional"' in type_helpers
     assert 'return builtIn ? builtIn.value : explicitType || "main";' in type_helpers
     assert 'return builtIn ? builtIn.label : value;' in type_helpers
 
@@ -1950,7 +1954,7 @@ def test_store_section_summary_icon_stays_inside_its_table_cell():
         assert color_rule in css
 
 
-def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync():
+def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional_state():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -2009,7 +2013,8 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync()
     assert 'trigger.setAttribute("aria-controls", "recipeIngredientTypeMenu");' in script
     assert "select.hidden = true;" in script
     assert "bindRecipeIngredientStoreSectionControls(row);\n    bindRecipeIngredientTypeControls(row);" in script
-    assert 'optionalInput.checked = String(typeSelect.value || "").trim().toLowerCase() === "optional";' in script
+    assert 'optionalInput.checked = recipeIngredientIsOptional({ section: typeSelect.value });' in script
+    assert 'item.optional = recipeIngredientIsOptional(item);' in script
     assert 'syncRecipeIngredientTypeControl(input);' in script
     assert 'row.querySelector("[data-recipe-edit-type-trigger]")' in script
 
@@ -2022,6 +2027,22 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync()
     assert ".recipe-edit-ingredient-type-summary" in css
     assert ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger" in css
     assert 'border: 1px solid transparent;' in css
+
+
+def test_recipe_editor_type_is_authoritative_for_saved_optional_state():
+    rows = recipe_edit_service.sanitize_ingredients([
+        {"ingredient": "Required salt", "section": "main", "optional": True},
+        {"ingredient": "Optional parsley", "section": "optional", "optional": False},
+        {"ingredient": "Garnish", "section": "garnish", "optional": True},
+        {"ingredient": "Legacy optional", "optional": True},
+    ])
+
+    assert [(row["section"], row["optional"]) for row in rows] == [
+        ("main", False),
+        ("optional", True),
+        ("garnish", False),
+        ("optional", True),
+    ]
 
 
 def test_bulk_image_generation_menus_include_title_image_scope():

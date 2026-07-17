@@ -9723,6 +9723,27 @@ def recipe_ingredient_match_metadata(item, existing=None):
     return metadata
 
 
+def recipe_ingredient_type_value(item):
+    """Return the editor Type, using the legacy optional flag only when Type is absent."""
+    item = item if isinstance(item, dict) else {}
+    explicit_type = str(
+        item.get("section")
+        or item.get("ingredient_type")
+        or item.get("type")
+        or ""
+    ).strip()
+    if explicit_type:
+        return explicit_type
+    return "optional" if truthy(item.get("optional")) else "main"
+
+
+def recipe_ingredient_is_optional(item):
+    type_key = " ".join(
+        recipe_ingredient_type_value(item).lower().replace("_", " ").replace("-", " ").split()
+    )
+    return type_key == "optional"
+
+
 def normalize_edit_ingredients(ingredients, recipe_url=None):
     if not isinstance(ingredients, list):
         return []
@@ -9749,7 +9770,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
         ingredient_image_url = recipe_edit_master_image_url(item, master_record)
         rows.append(apply_purchase_mapping_to_ingredient({
             "ingredient_id": str(ingredient_id) if ingredient_id else "",
-            "section": item.get("section") or "",
+            "section": recipe_ingredient_type_value(item),
             "original_text": item.get("original_text") or "",
             "quantity": item.get("quantity") or "",
             "quantity_text": item.get("quantity_text") or "",
@@ -9775,7 +9796,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "inferred": truthy(item.get("inferred")),
             "warning": item.get("warning") or "",
             "food_review": normalize_food_review_payload(item.get("food_review")),
-            "optional": bool(item.get("optional")),
+            "optional": recipe_ingredient_is_optional(item),
             "store_section": store_section,
             "store_section_custom": truthy(item.get("store_section_custom")),
             "store_section_order": ingredient_store_section_sort_key(store_section),
@@ -10142,6 +10163,7 @@ def sanitize_ingredients(value, existing_value=None):
             or existing.get("alternatives"),
             parent_item={**existing, **item},
         )
+        ingredient_type = recipe_ingredient_type_value(item)
 
         row = {
             "id": nullable_string(item.get("id") or existing.get("id")),
@@ -10155,7 +10177,7 @@ def sanitize_ingredients(value, existing_value=None):
                 or existing.get("ingredient_id")
                 or existing.get("master_ingredient_id")
             ),
-            "section": nullable_string(item.get("section")),
+            "section": ingredient_type,
             "original_text": original_text,
             "quantity": nullable_string(item.get("quantity")),
             "quantity_text": nullable_string(item.get("quantity_text")),
@@ -10186,7 +10208,7 @@ def sanitize_ingredients(value, existing_value=None):
             "inferred": truthy(item.get("inferred")),
             "warning": nullable_string(item.get("warning")),
             "food_review": normalize_food_review_payload(item.get("food_review")),
-            "optional": bool(item.get("optional")),
+            "optional": recipe_ingredient_is_optional({**item, "section": ingredient_type}),
             "store_section": store_section,
             "store_section_custom": store_section_custom,
             "store_section_order": ingredient_store_section_sort_key(store_section),
