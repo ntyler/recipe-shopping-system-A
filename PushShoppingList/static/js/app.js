@@ -26966,12 +26966,12 @@ function recipeIngredientTypeLabel(values = {}) {
     return builtIn ? builtIn.label : value;
 }
 
-function recipeIngredientPluralUnit(unit, quantity) {
+function recipeIngredientPluralUnit(unit, quantity, options = {}) {
     const value = String(unit || "").trim();
     if (!value || /^(?:to taste|as needed)$/i.test(value)) {
         return value;
     }
-    if (/^pieces?$/i.test(value)) {
+    if (!options.includePieces && /^pieces?$/i.test(value)) {
         return "";
     }
     const numericQuantity = Number.parseFloat(String(quantity || "").trim());
@@ -27008,6 +27008,21 @@ function formatRecipeIngredientQuantity(values = {}) {
     }
     return [quantity, size, recipeIngredientPluralUnit(unit, quantity)]
         .filter((value, index, valuesList) => value && valuesList.indexOf(value) === index)
+        .join(" ") || "\u2014";
+}
+
+function formatRecipeIngredientQuantityUnit(values = {}) {
+    const quantityText = String(values.quantity_text || "").trim();
+    const quantity = String(values.quantity || values.amount || "").trim();
+    const unit = String(values.unit || "").trim();
+    const phrase = quantityText
+        || (!/\d/.test(quantity) ? quantity : "")
+        || (/^(?:to taste|as needed)$/i.test(unit) ? unit : "");
+    if (phrase) {
+        return phrase;
+    }
+    return [quantity, recipeIngredientPluralUnit(unit, quantity, { includePieces: true })]
+        .filter(Boolean)
         .join(" ") || "\u2014";
 }
 
@@ -28340,6 +28355,7 @@ function organizeRecipeEditIngredientRow(row) {
     mobileQuantitySummary.className = "recipe-edit-ingredient-mobile-quantity-summary";
     mobileQuantitySummary.dataset.ingredientMobileQuantitySummary = "";
     mobileQuantitySummary.setAttribute("role", "cell");
+    mobileQuantitySummary.setAttribute("aria-label", "Quantity Unit");
     row.appendChild(mobileQuantitySummary);
 
     if (substitutions) {
@@ -39637,7 +39653,7 @@ function updateRecipeIngredientSummary(row) {
     }
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
     const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
-    const quantitySummaryText = formatRecipeIngredientQuantity(values);
+    const quantitySummaryText = formatRecipeIngredientQuantityUnit(values);
     if (previewName) previewName.textContent = recipeIngredientSentenceCase(ingredientName) || ingredientName;
     if (previewBuyAs) previewBuyAs.textContent = `Buy as: ${meaningfulBuyAs || "—"}`;
     if (previewStore) {

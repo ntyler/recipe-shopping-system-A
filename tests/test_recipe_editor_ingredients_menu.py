@@ -2427,8 +2427,15 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert template.count("data-recipe-ingredients-collapse-toggle") >= 2
     assert "data-recipe-edit-ingredient-collapse-toggle" in script
     assert 'mobileQuantitySummary.className = "recipe-edit-ingredient-mobile-quantity-summary";' in script
-    assert "const quantitySummaryText = formatRecipeIngredientQuantity(values);" in script
+    assert 'mobileQuantitySummary.setAttribute("aria-label", "Quantity Unit");' in script
+    assert "const quantitySummaryText = formatRecipeIngredientQuantityUnit(values);" in script
     assert 'mobileQuantitySummary.textContent = quantitySummaryText;' in script
+    quantity_unit_formatter = script[
+        script.index("function formatRecipeIngredientQuantityUnit"):
+        script.index("function formatRecipeIngredientQuantityColumn")
+    ]
+    assert "values.size" not in quantity_unit_formatter
+    assert "recipeIngredientPluralUnit(unit, quantity, { includePieces: true })" in quantity_unit_formatter
     assert 'document.querySelectorAll("[data-recipe-ingredients-collapse-toggle]")' in script
     assert 'compactButton.setAttribute("aria-expanded", String(!collapsed));' in script
     assert "function recipeIngredientsShouldStartCollapsed()" in script
