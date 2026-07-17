@@ -50583,6 +50583,62 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     text-align: left;
 }
 
+/* Desktop keeps the earlier hover/focus image actions; mobile uses the click popup below. */
+@media (min-width: 761px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-image-options-trigger {
+        display: none;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-image-panel .recipe-ingredient-image {
+        pointer-events: auto;
+        cursor: zoom-in;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-preview-media .recipe-edit-ingredient-modal-image-panel > .recipe-step-image-actions {
+        z-index: 2;
+        top: auto;
+        right: 6px;
+        bottom: 6px;
+        left: 6px;
+        display: flex !important;
+        width: auto;
+        padding: 0;
+        justify-content: center;
+        gap: 5px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        opacity: 0;
+        visibility: visible;
+        pointer-events: none;
+        transform: none;
+        transition: opacity 140ms ease;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-preview-media:hover .recipe-step-image-actions,
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-preview-media:focus-within .recipe-step-image-actions {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-image-options-title {
+        display: none;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-preview-media .recipe-step-image-actions :is(button, a) {
+        width: auto !important;
+        min-width: 0 !important;
+        min-height: 28px !important;
+        justify-content: center;
+        padding: 0 7px !important;
+        border-radius: 6px;
+        background: color-mix(in srgb, var(--app-bg) 90%, black);
+        font-size: 9.5px !important;
+        text-align: center;
+    }
+}
+
 @media (max-width: 1240px) {
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-body {
         grid-template-columns: 240px minmax(0, 1fr);

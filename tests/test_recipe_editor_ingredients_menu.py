@@ -821,6 +821,12 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert 'image.title = "Open ingredient image options";' in image_contract
     assert 'image.setAttribute("aria-label", "Enlarge ingredient image");' in image_contract
     assert 'image.title = "Click to enlarge ingredient image";' in image_contract
+    assert 'function recipeIngredientModalUsesImageOptionsPopup' in image_contract
+    assert 'window.matchMedia("(max-width: 760px)").matches' in image_contract
+    assert 'if (usesImageOptionsPopup)' in image_contract
+    assert 'const imageOptionsOpen = imagePanel.classList.contains("recipe-ingredient-image-options-open");' in image_contract
+    assert 'imageOptions.setAttribute("aria-hidden", imageOptionsOpen ? "false" : "true");' in image_contract
+    assert 'imageOptionsTrigger.setAttribute("aria-expanded", imageOptionsOpen ? "true" : "false");' in image_contract
     assert 'function toggleRecipeIngredientModalImageOptions' in image_contract
     assert 'function closeRecipeIngredientModalImageOptionsOnEscape' in image_contract
     assert 'imagePanel.classList.toggle("recipe-ingredient-image-options-open", shouldOpen);' in image_contract
@@ -872,6 +878,17 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert ".recipe-ingredient-image-options-open > .recipe-step-image-actions" in modal_css
     assert "visibility: hidden;" in modal_css
     assert "visibility: visible;" in modal_css
+    desktop_image_actions = modal_css[modal_css.index("@media (min-width: 761px)"):]
+    desktop_image_actions = desktop_image_actions[:desktop_image_actions.index("@media (max-width: 1240px)")]
+    assert ".recipe-edit-ingredient-image-options-trigger" in desktop_image_actions
+    assert "display: none;" in desktop_image_actions
+    assert "pointer-events: auto;" in desktop_image_actions
+    assert "cursor: zoom-in;" in desktop_image_actions
+    assert "bottom: 6px;" in desktop_image_actions
+    assert "display: flex !important;" in desktop_image_actions
+    assert "visibility: visible;" in desktop_image_actions
+    assert ".recipe-edit-ingredient-modal-preview-media:hover .recipe-step-image-actions" in desktop_image_actions
+    assert "min-height: 28px !important;" in desktop_image_actions
     assert "dialog.recipe-edit-ingredient-edit-panel > .recipe-edit-floating-menu" in modal_css
     assert "z-index: 40 !important;" in modal_css
 
