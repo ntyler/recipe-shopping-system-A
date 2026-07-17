@@ -724,16 +724,27 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert ".recipe-edit-ingredient-status-summary {\n        grid-column: 1 / 5 !important;" in mobile
     assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 3 !important;" in mobile
     assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 3 / 5 !important;" in mobile
-    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 5 !important;" in mobile
-    assert ".recipe-edit-ingredient-options-panel {\n        grid-column: 1 / -1 !important;\n        grid-row: 6 !important;" in mobile
+    assert ".recipe-edit-ingredient-unit-summary {\n        grid-column: 2 / 3 !important;\n        grid-row: 3 !important;" in mobile
+    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 3 / 5 !important;\n        grid-row: 3 !important;" in mobile
+    assert ".recipe-edit-ingredient-options-panel {\n        grid-column: 1 / -1 !important;\n        grid-row: 5 !important;" in mobile
+    assert ".recipe-edit-ingredient-substitution-cell {\n        display: block;" in mobile
     assert "grid-template-columns: 72px minmax(0, 1fr);" in mobile
     assert '.recipe-edit-ingredient-quantity-summary::before {\n        content: "Amount";' in mobile
+    assert '.recipe-edit-ingredient-unit-summary::before {\n        content: "Unit";' in mobile
+    assert '.recipe-edit-ingredient-substitution-cell::before {\n        content: "Alternatives";' in mobile
     assert '.recipe-edit-ingredient-store-summary::before {\n        content: "Store";' in mobile
     assert ".recipe-edit-ingredient-type-summary::before {" in mobile
     assert "width: auto;" in mobile
     assert "height: auto;" in mobile
     assert "background: transparent;" in mobile
     assert 'content: "Type";' in mobile
+    assert ".recipe-edit-ingredient-inline-preparation {" in mobile
+    assert "color: var(--app-muted);" in mobile
+    assert "font-weight: 450;" in mobile
+    assert "text-overflow: ellipsis;" in mobile
+    assert "white-space: nowrap;" in mobile
+    assert ".recipe-edit-ingredient-options-copy > [data-ingredient-options-summary]" in mobile
+    assert "display: none !important;" in mobile
     narrow = mobile[mobile.index("@media (max-width: 420px)"):]
     assert "grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);" in narrow
     assert ".recipe-edit-header-actions .recipe-edit-header-save {" in narrow
