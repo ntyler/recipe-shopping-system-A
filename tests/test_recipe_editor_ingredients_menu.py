@@ -2662,7 +2662,7 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     mobile_start = css.index("/* Ingredient editor v24: real mobile folding for the current card-based layout. */")
     mobile_css = css[mobile_start:]
     assert "@media (max-width: 767px)" in mobile_css
-    assert "grid-template-columns: 40px minmax(0, 1fr) max-content 68px !important;" in mobile_css
+    assert "grid-template-columns: 40px minmax(0, 1fr) max-content 106px !important;" in mobile_css
     assert "grid-template-rows: 44px !important;" in mobile_css
     assert ".recipe-edit-ingredient-status-summary," in mobile_css
     assert ".recipe-edit-ingredient-quantity-summary," in mobile_css
@@ -2674,9 +2674,27 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-edit" in mobile_css
     assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-collapse" in mobile_css
     assert ".recipe-edit-compact-row-actions > .recipe-edit-row-menu-wrap" in mobile_css
-    assert mobile_css.count("order: 1;") >= 1
-    assert mobile_css.count("order: 2;") >= 1
+    collapse_order = mobile_css[
+        mobile_css.index(".recipe-edit-compact-row-actions > .recipe-edit-compact-row-collapse {"):
+    ]
+    collapse_order = collapse_order[:collapse_order.index("}")]
+    edit_order = mobile_css[
+        mobile_css.index(".recipe-edit-compact-row-actions > .recipe-edit-compact-row-edit {"):
+    ]
+    edit_order = edit_order[:edit_order.index("}")]
+    assert "order: 1;" in collapse_order
+    assert "order: 2;" in edit_order
     assert mobile_css.count("order: 3;") >= 1
+    collapsed_edit = mobile_css[
+        mobile_css.index(
+            "#recipeEditIngredients.recipe-edit-ingredients-collapsed > "
+            ".recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) "
+            ".recipe-edit-compact-row-edit"
+        ):
+    ]
+    collapsed_edit = collapsed_edit[:collapsed_edit.index("}")]
+    assert "display: inline-flex !important;" in collapsed_edit
+    assert "display: none !important;" not in collapsed_edit
 
 
 def test_recipe_menu_edit_links_to_standalone_editor_page():

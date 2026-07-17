@@ -55667,11 +55667,11 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
         justify-content: flex-end;
     }
 
-    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-actions > .recipe-edit-compact-row-edit {
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-actions > .recipe-edit-compact-row-collapse {
         order: 1;
     }
 
-    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-actions > .recipe-edit-compact-row-collapse {
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-actions > .recipe-edit-compact-row-edit {
         order: 2;
     }
 
@@ -55685,7 +55685,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
 
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed {
-        grid-template-columns: 40px minmax(0, 1fr) max-content 68px !important;
+        grid-template-columns: 40px minmax(0, 1fr) max-content 106px !important;
         grid-template-rows: 44px !important;
         min-height: 62px !important;
         column-gap: 6px !important;
@@ -55760,14 +55760,14 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed > .recipe-edit-compact-row-actions {
         grid-column: 4 !important;
         grid-row: 1 !important;
-        width: 68px;
-        min-width: 68px;
+        width: 106px;
+        min-width: 106px;
         gap: 4px;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-compact-row-edit,
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-compact-row-edit {
-        display: none !important;
+        display: inline-flex !important;
     }
 }
 
