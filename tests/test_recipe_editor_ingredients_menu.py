@@ -392,6 +392,12 @@ def test_recipe_editor_ingredient_row_menu_is_grouped():
     assert 'class="recipe-edit-menu-group recipe-edit-menu-group-danger"' in row_block
     for label in ("Review", "Images", "Row", "Move"):
         assert f'<div class="recipe-edit-menu-group-label">{label}</div>' in row_block
+    row_menu = row_block[
+        row_block.index('<div class="recipe-edit-menu-group-label">Row</div>'):
+        row_block.index('<div class="recipe-edit-menu-group-label">Move</div>')
+    ]
+    assert 'onclick="return focusRecipeEditCompactRow(this)">Edit ingredient</button>' in row_menu
+    assert row_menu.index("Edit ingredient") < row_menu.index("Add alternative")
     assert ".recipe-edit-row-menu.recipe-edit-ingredient-row-menu" in css
     assert ".recipe-edit-row-menu .recipe-edit-menu-group" in css
     assert ".recipe-edit-row-menu .recipe-edit-menu-group-label" in css

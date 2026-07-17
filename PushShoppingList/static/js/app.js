@@ -38589,6 +38589,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                 </div>
                 <div class="recipe-edit-menu-group">
                     <div class="recipe-edit-menu-group-label">Row</div>
+                    <button type="button" onclick="return focusRecipeEditCompactRow(this)">Edit ingredient</button>
                     <button type="button" onclick="return addRecipeIngredientSubstitutionRow(this)">Add alternative</button>
                     <button type="button" onclick="duplicateRecipeIngredientRow(this)">Duplicate ingredient</button>
                     <button type="button" class="recipe-edit-row-collapse-toggle" onclick="toggleRecipeIngredientRowCollapsed(this)">Collapse ingredient</button>
