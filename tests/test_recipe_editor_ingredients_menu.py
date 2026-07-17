@@ -1221,14 +1221,21 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     mobile_image_actions = mobile[mobile.index(mobile_image_actions_selector):]
     mobile_image_actions = mobile_image_actions[:mobile_image_actions.index("}")]
     for declaration in (
-        "left: 0;",
-        "width: min(220px, calc(100vw - 52px));",
-        "transform: translateY(-5px);",
+        "position: fixed;",
+        "right: 12px;",
+        "bottom: max(12px, env(safe-area-inset-bottom));",
+        "left: 12px;",
+        "max-width: 480px;",
+        "max-height: calc(100dvh - 88px);",
+        "transform: translateY(16px);",
     ):
         assert declaration in mobile_image_actions
     assert "display: none !important;" not in mobile_image_actions
     assert ".recipe-ingredient-image-options-open > .recipe-step-image-actions" in mobile
     assert "transform: translateY(0);" in mobile
+    assert ".recipe-edit-ingredient-modal-preview-media.is-image-options-open::after" in mobile
+    assert "background: rgba(0, 0, 0, .52);" in mobile
+    assert "min-height: 44px !important;" in mobile
 
     match_details = script[
         script.index("function recipeIngredientMatchDetailsHtml"):
