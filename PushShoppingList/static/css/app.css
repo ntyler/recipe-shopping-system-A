@@ -54907,7 +54907,11 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-column-option:has(input
     cursor: not-allowed;
 }
 
-body.recipe-edit-standalone-page [data-recipe-edit-ingredient-column-hidden="true"] {
+body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head
+    > [data-recipe-edit-ingredient-column-hidden="true"],
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > [data-recipe-edit-ingredient-column-hidden="true"] {
     display: none !important;
 }
 

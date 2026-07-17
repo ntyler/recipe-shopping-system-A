@@ -26385,6 +26385,13 @@ function applyRecipeEditIngredientColumnVisibility(layout) {
     });
 }
 
+function clearRecipeIngredientModalColumnVisibility(panel) {
+    if (!panel) return;
+    panel.querySelectorAll("[data-recipe-edit-ingredient-column-hidden]").forEach(field => {
+        delete field.dataset.recipeEditIngredientColumnHidden;
+    });
+}
+
 function clearRecipeEditIngredientColumnLayoutStyles() {
     const tableScroll = document.querySelector("[data-recipe-edit-ingredient-table-scroll]");
     const tableHead = document.querySelector("[data-recipe-edit-ingredient-table-head]");
@@ -28636,6 +28643,7 @@ function organizeRecipeEditIngredientRow(row) {
     matchDetails.dataset.ingredientMatchDetails = "";
     analysisSummary?.appendChild(matchDetails);
     row.appendChild(editPanel);
+    clearRecipeIngredientModalColumnVisibility(editPanel);
     editPanel.addEventListener("cancel", event => {
         event.preventDefault();
         requestRecipeIngredientModalClose(editPanel);
@@ -28931,6 +28939,7 @@ function setRecipeIngredientEditMode(row, shouldEdit, options = {}) {
         recipeEditIngredientModalActiveRow = row;
         recipeEditIngredientModalReturnFocus = options.trigger || editButton || recipeEditIngredientModalReturnFocus;
         document.body.classList.add("recipe-ingredient-modal-open");
+        clearRecipeIngredientModalColumnVisibility(panel);
         panel.hidden = false;
         ensureRecipeIngredientModalIdentityStack(panel);
         mountRecipeIngredientModalImage(row, panel);

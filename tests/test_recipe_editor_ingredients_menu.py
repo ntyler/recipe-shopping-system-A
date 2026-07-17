@@ -1325,6 +1325,41 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
     assert "display: none !important;" in mobile
 
 
+def test_recipe_editor_ingredient_modal_ignores_table_column_visibility_filters():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    helper_start = script.index("function clearRecipeIngredientModalColumnVisibility")
+    helper_end = script.index("function clearRecipeEditIngredientColumnLayoutStyles", helper_start)
+    helper = script[helper_start:helper_end]
+    assert 'panel.querySelectorAll("[data-recipe-edit-ingredient-column-hidden]")' in helper
+    assert "delete field.dataset.recipeEditIngredientColumnHidden;" in helper
+
+    organize_start = script.index("function organizeRecipeEditIngredientRow")
+    organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
+    organize = script[organize_start:organize_end]
+    assert organize.index("row.appendChild(editPanel);") < organize.index(
+        "clearRecipeIngredientModalColumnVisibility(editPanel);"
+    )
+
+    edit_mode_start = script.index("function setRecipeIngredientEditMode")
+    edit_mode_end = script.index("function saveRecipeIngredientInlineEdit", edit_mode_start)
+    edit_mode = script[edit_mode_start:edit_mode_end]
+    assert edit_mode.index("clearRecipeIngredientModalColumnVisibility(panel);") < edit_mode.index(
+        "panel.hidden = false;"
+    )
+
+    column_css = css[css.index("/* Ingredient editor v22:"):]
+    visibility_start = column_css.index(
+        'body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head'
+    )
+    visibility_end = column_css.index("}", visibility_start)
+    visibility_rule = column_css[visibility_start:visibility_end]
+    assert "> [data-recipe-edit-ingredient-column-hidden=\"true\"]" in visibility_rule
+    assert "> .recipe-edit-ingredient-row" in visibility_rule
+    assert "recipe-edit-ingredient-edit-panel" not in visibility_rule
+
+
 def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fields():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
