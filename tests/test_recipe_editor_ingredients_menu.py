@@ -1172,6 +1172,8 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
         "beginRecipeEditIngredientColumnMove",
         "updateRecipeEditIngredientColumnMove",
         "finishRecipeEditIngredientColumnMove",
+        "showRecipeEditIngredientColumnResizeGuide",
+        "hideRecipeEditIngredientColumnResizeGuide",
         "beginRecipeEditIngredientColumnResize",
         "updateRecipeEditIngredientColumnResize",
         "autoFitRecipeEditIngredientColumns",
@@ -1184,7 +1186,14 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
     assert 'header.addEventListener("pointerup"' in interaction
     assert 'header.addEventListener("pointercancel"' in interaction
     assert 'resizeHandle.addEventListener("pointerdown"' in interaction
+    assert 'resizeHandle.addEventListener("pointermove"' in interaction
+    assert 'resizeHandle.addEventListener("pointerup"' in interaction
+    assert 'resizeHandle.addEventListener("pointercancel"' in interaction
     assert 'resizeHandle.addEventListener("dblclick"' in interaction
+    assert 'handle.setPointerCapture(event.pointerId)' in interaction
+    assert "currentOrder.every((key, index) => key === order[index])" in interaction
+    assert "usesWindowFallback: false" in interaction
+    assert 'state.header.getBoundingClientRect().right' in interaction
     assert 'window.localStorage.setItem(' in interaction
     assert 'window.localStorage.removeItem(' in interaction
     assert 'autoFitColumns.textContent = "Auto-fit column widths";' in interaction
@@ -1194,12 +1203,15 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_and_reset():
     assert 'class="recipe-edit-ingredient-columns-button"' in template
     assert "Auto-fit column widths" in template
     assert "Restore default columns" in template
-    assert "double-click a divider to auto-fit one column" in template
+    assert "vertical boundary and drag left or right to resize" in template
 
     column_css = css[css.index("/* Ingredient editor v22:"):]
     assert ".recipe-edit-ingredient-column-menu" in column_css
     assert ".recipe-edit-ingredient-column-move" in column_css
     assert ".recipe-edit-ingredient-column-resize" in column_css
+    assert ".recipe-edit-ingredient-column-resize-guide" in column_css
+    assert "inset-block: -12px;" in column_css
+    assert "width: 18px;" in column_css
     assert "cursor: col-resize;" in column_css
     assert ".is-column-drop-before" in column_css
     assert ".is-column-drop-after" in column_css

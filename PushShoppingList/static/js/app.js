@@ -25982,6 +25982,13 @@ function recipeEditIngredientColumnHeaders() {
 function orderRecipeEditIngredientColumnHeaders(order) {
     const tableHead = document.querySelector("[data-recipe-edit-ingredient-table-head]");
     if (!tableHead) return;
+    const currentOrder = recipeEditIngredientColumnHeaders().map(header => header.dataset.ingredientColumn);
+    if (
+        currentOrder.length === order.length
+        && currentOrder.every((key, index) => key === order[index])
+    ) {
+        return;
+    }
     const headers = new Map(
         recipeEditIngredientColumnHeaders().map(header => [header.dataset.ingredientColumn, header]),
     );
@@ -26318,13 +26325,48 @@ function finishRecipeEditIngredientColumnMove(event) {
     }
 }
 
+function recipeEditIngredientColumnResizeGuide(tableScroll) {
+    if (!tableScroll) return null;
+    let guide = tableScroll.querySelector(":scope > [data-ingredient-column-resize-guide]");
+    if (!guide) {
+        guide = document.createElement("span");
+        guide.className = "recipe-edit-ingredient-column-resize-guide";
+        guide.dataset.ingredientColumnResizeGuide = "";
+        guide.setAttribute("aria-hidden", "true");
+        guide.hidden = true;
+        tableScroll.appendChild(guide);
+    }
+    return guide;
+}
+
+function showRecipeEditIngredientColumnResizeGuide(tableScroll, clientX) {
+    const guide = recipeEditIngredientColumnResizeGuide(tableScroll);
+    if (!guide) return;
+    const tableRect = tableScroll.getBoundingClientRect();
+    guide.style.left = `${Math.round(clientX - tableRect.left + tableScroll.scrollLeft)}px`;
+    guide.style.height = `${Math.max(tableScroll.scrollHeight, tableScroll.clientHeight)}px`;
+    guide.hidden = false;
+}
+
+function hideRecipeEditIngredientColumnResizeGuide(tableScroll) {
+    const guide = tableScroll?.querySelector(":scope > [data-ingredient-column-resize-guide]");
+    if (guide) guide.hidden = true;
+}
+
 function finishRecipeEditIngredientColumnResize(event) {
     const state = recipeEditIngredientColumnResizeState;
-    if (!state) return;
-    window.removeEventListener("pointermove", updateRecipeEditIngredientColumnResize);
-    window.removeEventListener("pointerup", finishRecipeEditIngredientColumnResize);
-    window.removeEventListener("pointercancel", finishRecipeEditIngredientColumnResize);
+    if (!state || (event?.pointerId !== undefined && event.pointerId !== state.pointerId)) return;
+    if (state.usesWindowFallback) {
+        window.removeEventListener("pointermove", updateRecipeEditIngredientColumnResize);
+        window.removeEventListener("pointerup", finishRecipeEditIngredientColumnResize);
+        window.removeEventListener("pointercancel", finishRecipeEditIngredientColumnResize);
+    }
     document.body.classList.remove("recipe-edit-ingredient-column-resizing");
+    state.handle.classList.remove("is-resizing");
+    if (typeof state.handle.releasePointerCapture === "function" && state.handle.hasPointerCapture?.(state.pointerId)) {
+        state.handle.releasePointerCapture(state.pointerId);
+    }
+    hideRecipeEditIngredientColumnResizeGuide(state.tableScroll);
     state.header.draggable = false;
     if (event?.type === "pointercancel") {
         state.layout.widths[state.key] = state.startWidth;
@@ -26346,6 +26388,10 @@ function updateRecipeEditIngredientColumnResize(event) {
         state.startWidth + event.clientX - state.startX,
     );
     applyRecipeEditIngredientColumnLayout();
+    showRecipeEditIngredientColumnResizeGuide(
+        state.tableScroll,
+        state.header.getBoundingClientRect().right,
+    );
 }
 
 function beginRecipeEditIngredientColumnResize(header, event) {
@@ -26355,19 +26401,39 @@ function beginRecipeEditIngredientColumnResize(header, event) {
     event.stopPropagation();
     const key = header.dataset.ingredientColumn;
     const layout = ensureRecipeEditIngredientColumnLayout();
-    applyRecipeEditIngredientColumnLayout();
+    const handle = event.currentTarget;
     recipeEditIngredientColumnResizeState = {
         header,
+        handle,
+        tableScroll,
         key,
         layout,
         pointerId: event.pointerId,
         startWidth: layout.widths[key],
         startX: event.clientX,
+        usesWindowFallback: false,
     };
+    let pointerCaptured = false;
+    if (typeof handle.setPointerCapture === "function") {
+        try {
+            handle.setPointerCapture(event.pointerId);
+            pointerCaptured = typeof handle.hasPointerCapture === "function"
+                ? handle.hasPointerCapture(event.pointerId)
+                : true;
+        } catch (_error) {
+            pointerCaptured = false;
+        }
+    }
+    recipeEditIngredientColumnResizeState.usesWindowFallback = !pointerCaptured;
+    if (!pointerCaptured) {
+        window.addEventListener("pointermove", updateRecipeEditIngredientColumnResize);
+        window.addEventListener("pointerup", finishRecipeEditIngredientColumnResize);
+        window.addEventListener("pointercancel", finishRecipeEditIngredientColumnResize);
+    }
+    handle.classList.add("is-resizing");
+    applyRecipeEditIngredientColumnLayout();
     document.body.classList.add("recipe-edit-ingredient-column-resizing");
-    window.addEventListener("pointermove", updateRecipeEditIngredientColumnResize);
-    window.addEventListener("pointerup", finishRecipeEditIngredientColumnResize);
-    window.addEventListener("pointercancel", finishRecipeEditIngredientColumnResize);
+    showRecipeEditIngredientColumnResizeGuide(tableScroll, header.getBoundingClientRect().right);
 }
 
 function handleRecipeEditIngredientColumnKeydown(header, event) {
@@ -26428,6 +26494,9 @@ function decorateRecipeEditIngredientColumnHeaders(tableHead) {
             resizeHandle.setAttribute("aria-hidden", "true");
             resizeHandle.title = `Resize ${RECIPE_EDIT_INGREDIENT_COLUMNS[key].label}; double-click to auto-fit`;
             resizeHandle.addEventListener("pointerdown", event => beginRecipeEditIngredientColumnResize(header, event));
+            resizeHandle.addEventListener("pointermove", updateRecipeEditIngredientColumnResize);
+            resizeHandle.addEventListener("pointerup", finishRecipeEditIngredientColumnResize);
+            resizeHandle.addEventListener("pointercancel", finishRecipeEditIngredientColumnResize);
             resizeHandle.addEventListener("dblclick", event => {
                 event.preventDefault();
                 event.stopPropagation();
