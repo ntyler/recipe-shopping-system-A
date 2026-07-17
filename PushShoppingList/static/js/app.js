@@ -27890,7 +27890,6 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     const notes = metadata ? metadata.querySelector(".recipe-edit-notes-inline") : null;
     const originalText = name ? name.querySelector(".recipe-edit-original-text-label") : null;
     const quantity = optionRow.querySelector(":scope > .recipe-edit-qty-label");
-    const quantityText = optionRow.querySelector(":scope > .recipe-edit-quantity-text-inline");
     const unit = optionRow.querySelector(":scope > .recipe-edit-unit-label");
     const buyAs = optionRow.querySelector(":scope > .recipe-edit-buy-as-label");
     const storeSection = optionRow.querySelector(":scope > .recipe-edit-store-section-label");
@@ -27953,7 +27952,7 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     }
     const compactMetadata = document.createElement("div");
     compactMetadata.className = "recipe-edit-alternative-metadata-inputs";
-    [preparation, size, quantityText, optional].filter(Boolean).forEach(field => {
+    [preparation, size, optional].filter(Boolean).forEach(field => {
         field.classList.add("recipe-edit-alternative-edit-field");
         compactMetadata.appendChild(field);
     });
@@ -28284,7 +28283,6 @@ function organizeRecipeEditIngredientRow(row) {
     const warning = name ? name.querySelector(".recipe-edit-extraction-warning") : null;
     const imagePanel = name ? name.querySelector("[data-ingredient-image-panel]") : row.querySelector("[data-ingredient-image-panel]");
     const quantity = row.querySelector(":scope > .recipe-edit-qty-label");
-    const quantityText = row.querySelector(":scope > .recipe-edit-quantity-text-inline");
     const unit = row.querySelector(":scope > .recipe-edit-unit-label");
     const buyAs = row.querySelector(":scope > .recipe-edit-buy-as-label");
     const storeSection = row.querySelector(":scope > .recipe-edit-store-section-label");
@@ -28604,10 +28602,9 @@ function organizeRecipeEditIngredientRow(row) {
     }
     ensureRecipeIngredientModalIdentityStack(editPanel);
     [
-        [quantity, "amount"],
+        [quantity, "quantity"],
         [unit, "unit"],
         [size, "size"],
-        [quantityText, "quantity-text"],
     ].forEach(([field, role]) => {
         if (!field) return;
         field.classList.add("recipe-edit-ingredient-edit-field", `is-${role}`);
@@ -37997,10 +37994,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
                 <span>Quantity</span>
                 <input type="text" data-field="quantity" value="${escapeAttribute(option.quantity || "")}">
             </label>
-            <label class="recipe-edit-quantity-text-inline">
-                <span>Quantity Text</span>
-                <input type="text" data-field="quantity_text" value="${escapeAttribute(option.quantity_text || "")}" placeholder="e.g. to taste">
-            </label>
+            <input type="hidden" data-field="quantity_text" value="${escapeAttribute(option.quantity_text || "")}">
             <label class="recipe-edit-unit-label">
                 <span>Unit</span>
                 <input type="text" data-field="unit" list="recipeIngredientUnitOptions" value="${escapeAttribute(option.unit || "")}">
@@ -38316,10 +38310,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
             <span>Quantity</span>
             <input type="text" data-field="quantity" value="${escapeAttribute(item.quantity || "")}">
         </label>
-        <label class="recipe-edit-quantity-text-inline">
-            <span>Quantity Text</span>
-            <input type="text" data-field="quantity_text" value="${escapeAttribute(item.quantity_text || "")}" placeholder="e.g. to taste">
-        </label>
+        <input type="hidden" data-field="quantity_text" value="${escapeAttribute(item.quantity_text || "")}">
         <label class="recipe-edit-unit-label">
             <span>Unit</span>
             <input type="text"

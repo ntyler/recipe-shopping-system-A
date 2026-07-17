@@ -47894,7 +47894,6 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > 
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > .recipe-edit-qty-label { grid-column: 5 / 7; }
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > .recipe-edit-unit-label { grid-column: 7 / 9; }
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > .recipe-edit-size-inline { grid-column: 9 / 11; }
-body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > .recipe-edit-quantity-text-inline { grid-column: 11 / 13; }
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > .recipe-edit-preparation-inline { grid-column: 1 / 4; }
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > .recipe-edit-buy-as-label { grid-column: 4 / 8; }
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-edit-grid > .recipe-edit-store-section-label { grid-column: 8 / 11; }
@@ -50168,7 +50167,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-field-grid {
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-section.is-quantity .recipe-edit-ingredient-modal-field-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-section.is-usage .recipe-edit-ingredient-modal-field-grid {
@@ -55539,6 +55538,13 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
 }
 
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-edit-field {
+    display: grid !important;
+}
+
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row
     > dialog.recipe-edit-ingredient-edit-panel

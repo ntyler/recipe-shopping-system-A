@@ -543,6 +543,8 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert 'textarea data-field="ingredient" rows="1" required aria-required="true"' in row_markup
     assert '<span>Quantity</span>' in row_markup
     assert '<span>Amount</span>' not in row_markup
+    assert '<input type="hidden" data-field="quantity_text"' in row_markup
+    assert '<span>Quantity Text</span>' not in row_markup
     assert 'placeholder="e.g. For sautéing onions."' in row_markup
     assert "Add preparation notes, purchasing guidance, or ingredient-specific details." in row_markup
 
@@ -1026,7 +1028,7 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     scroll_rule = scroll_rule[:scroll_rule.index("}")]
     assert "overflow-y: auto;" in scroll_rule
     assert "overflow-x: hidden;" in scroll_rule
-    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in workspace
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in workspace
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);" in workspace
     bottom_grid_rule = workspace[workspace.index(".recipe-edit-ingredient-modal-bottom-grid {"):]
     bottom_grid_rule = bottom_grid_rule[:bottom_grid_rule.index("}")]
@@ -1121,6 +1123,8 @@ def test_recipe_editor_expanded_analysis_fields_ignore_collapsed_row_visibility(
     override = css[css.index("/* Keep expanded modal analysis fields visible") :]
     assert "#recipeEditIngredients" in override
     assert "> dialog.recipe-edit-ingredient-edit-panel" in override
+    assert ".recipe-edit-ingredient-edit-field" in override
+    assert "display: grid !important;" in override
     assert ".recipe-edit-ingredient-analysis:not([hidden])" in override
     assert ".recipe-edit-original-text-label" in override
     assert ".recipe-edit-choice-review:not([hidden])" in override
@@ -1395,7 +1399,8 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert 'editGrid.className = "recipe-edit-alternative-component-edit-grid";' in substitution
     assert 'identity.className = "recipe-edit-alternative-edit-field field-ingredient";' in substitution
     assert 'compactMetadata.className = "recipe-edit-alternative-metadata-inputs";' in substitution
-    assert "[preparation, size, quantityText, optional]" in substitution
+    assert "[preparation, size, optional]" in substitution
+    assert "quantityText" not in substitution
     assert 'sourceDetails.className = "recipe-edit-alternative-source-details";' in substitution
     assert "<span>More details</span>" in substitution
     assert "Purchasing, preparation, optional, and source" in substitution
@@ -1429,6 +1434,8 @@ def test_recipe_editor_alternatives_use_read_first_cards_without_losing_edit_fie
     assert '<textarea data-field="ingredient" rows="1" aria-label="Ingredient">' in alternative_markup
     assert '<span>Quantity</span>' in alternative_markup
     assert '<span>Amount</span>' not in alternative_markup
+    assert '<input type="hidden" data-field="quantity_text"' in alternative_markup
+    assert '<span>Quantity Text</span>' not in alternative_markup
     assert 'data-field="confidence_score"' in alternative_markup
     assert 'data-field="match_confidence"' in alternative_markup
     assert 'data-field="reason"' in alternative_markup
