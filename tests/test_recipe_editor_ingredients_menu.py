@@ -2033,16 +2033,18 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
         script.index("function bindRecipeIngredientInlineEditor"):
         script.index("function organizeRecipeEditIngredientRow")
     ]
-    for field_name in ("ingredient", "preparation", "quantity", "unit", "store_section", "section"):
+    for field_name in ("ingredient", "preparation", "purchasable_item", "quantity", "unit", "store_section", "section"):
         assert f'data-recipe-ingredient-inline-field="{field_name}"' in organize or (
             f'control.dataset.recipeIngredientInlineField = fieldName' in organize
             and f'"{field_name}"' in organize
         )
-    for label in ("Ingredient", "Preparation", "Quantity", "Unit", "Store Section", "Type"):
+    for label in ("Ingredient", "Preparation", "Buy As", "Quantity", "Unit", "Store Section", "Type"):
         assert f'aria-label="{label}"' in organize or f'"{label}"' in organize
     assert 'class="recipe-edit-ingredient-read-details"' in organize
     assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-preparation"' in organize
+    assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-buy-as"' in organize
     assert 'placeholder="Add preparation"' in organize
+    assert 'placeholder="Add buy as"' in organize
     assert 'const source = recipeIngredientDirectField(row, fieldName);' in binding
     assert 'source.dispatchEvent(new Event(eventName, { bubbles: true }));' in binding
     assert 'control.tagName === "SELECT"' in binding
@@ -2054,7 +2056,8 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "syncRecipeIngredientInlineEditor(row)" in summary
     assert "readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem)" in summary
     assert "meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values)" in summary
-    assert "readBuyAs.hidden = !meaningfulBuyAs" in summary
+    assert 'readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Edit Buy As";' in summary
+    assert "readBuyAs.hidden" not in summary
     assert "quantitySummary.textContent" not in summary
     assert "unitSummary.textContent" not in summary
     assert "preparationSummary" not in summary
@@ -2144,7 +2147,7 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "width: 100%;" in v20
 
 
-def test_recipe_editor_secondary_metadata_hides_redundant_buy_as_and_empty_preparation():
+def test_recipe_editor_secondary_metadata_normalizes_buy_as_for_summaries():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -2163,11 +2166,12 @@ def test_recipe_editor_secondary_metadata_hides_redundant_buy_as_and_empty_prepa
         script.index("function recipeEditIngredientRows")
     ]
     assert '`Buy as: ${meaningfulBuyAs}`' in summary
-    assert "readBuyAs.hidden = !meaningfulBuyAs" in summary
+    assert "readBuyAs.hidden" not in summary
+    assert 'data-recipe-ingredient-inline-field="purchasable_item"' in script
     assert "recipeIngredientReadStatusHtml(matchItem)" in summary
 
     v10 = css[css.index("/* Ingredient editor v10:"):]
-    assert ".recipe-edit-ingredient-read-buy-as[hidden]" in v10
+    assert ".recipe-edit-ingredient-read-buy-as > .recipe-edit-ingredient-inline-buy-as" in v10
     assert ".recipe-edit-ingredient-read-separator" in v10
 
 
@@ -2669,7 +2673,8 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     mobile_css = css[mobile_start:]
     assert "@media (max-width: 767px)" in mobile_css
     assert "grid-template-columns: 40px minmax(0, 1fr) max-content 106px !important;" in mobile_css
-    assert "grid-template-rows: 44px !important;" in mobile_css
+    assert "grid-template-rows: 50px !important;" in mobile_css
+    assert "min-height: 66px !important;" in mobile_css
     assert ".recipe-edit-ingredient-status-summary," in mobile_css
     assert ".recipe-edit-ingredient-quantity-summary," in mobile_css
     assert ".recipe-edit-ingredient-unit-summary," in mobile_css
@@ -2694,7 +2699,7 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
         ):
     ]
     collapsed_buy_as = collapsed_buy_as[:collapsed_buy_as.index("}")]
-    assert "display: -webkit-box !important;" in collapsed_buy_as
+    assert "display: flex !important;" in collapsed_buy_as
     assert ".recipe-edit-compact-row-edit" in mobile_css
     assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-edit" in mobile_css
     assert ".recipe-edit-compact-row-actions > .recipe-edit-compact-row-collapse" in mobile_css

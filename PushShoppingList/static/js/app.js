@@ -28513,7 +28513,17 @@ function organizeRecipeEditIngredientRow(row) {
                    placeholder="Add preparation"
                    autocomplete="off">
         </div>
-        <span class="recipe-edit-ingredient-read-buy-as" data-ingredient-read-buy-as hidden></span>
+        <label class="recipe-edit-ingredient-read-buy-as">
+            <span>Buy as:</span>
+            <input type="text"
+                   class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-buy-as"
+                   data-ingredient-read-buy-as
+                   data-recipe-ingredient-inline-field="purchasable_item"
+                   aria-label="Buy As"
+                   list="itemQtyBuyAsOptions"
+                   placeholder="Add buy as"
+                   autocomplete="off">
+        </label>
     `;
     row.appendChild(readCell);
 
@@ -39864,8 +39874,7 @@ function updateRecipeIngredientSummary(row) {
     }
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
     if (readBuyAs) {
-        readBuyAs.textContent = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "";
-        readBuyAs.hidden = !meaningfulBuyAs;
+        readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Edit Buy As";
     }
     if (mobileQuantitySummary) {
         mobileQuantitySummary.textContent = quantitySummaryText;

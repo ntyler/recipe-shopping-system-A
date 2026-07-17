@@ -47241,19 +47241,28 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-separator {
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as {
-    display: -webkit-box;
+    display: flex;
+    align-items: center;
+    gap: 4px;
     min-width: 0;
-    overflow: hidden;
     color: var(--app-muted);
     font-size: 10px;
     line-height: 1.35;
-    overflow-wrap: anywhere;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as[hidden] {
-    display: none !important;
+body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > span {
+    flex: 0 0 auto;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > .recipe-edit-ingredient-inline-buy-as {
+    flex: 1 1 auto;
+    width: auto;
+    height: 22px;
+    min-height: 22px;
+    padding: 0 5px;
+    color: var(--app-text-soft);
+    font-size: 10px;
+    font-weight: 500;
 }
 
 body.recipe-edit-standalone-page :is(
@@ -55686,8 +55695,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed {
         grid-template-columns: 40px minmax(0, 1fr) max-content 106px !important;
-        grid-template-rows: 44px !important;
-        min-height: 62px !important;
+        grid-template-rows: 50px !important;
+        min-height: 66px !important;
         column-gap: 6px !important;
         row-gap: 0 !important;
         padding: 8px 9px !important;
@@ -55721,7 +55730,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-
 
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-read-buy-as:not([hidden]),
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-read-buy-as:not([hidden]) {
-        display: -webkit-box !important;
+        display: flex !important;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > :is(
