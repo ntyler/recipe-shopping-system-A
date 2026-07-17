@@ -23534,6 +23534,17 @@ function recipeEditorStandalonePageIsActive() {
     return Boolean(document.body && document.body.dataset.recipeEditPage === "true");
 }
 
+function recipeIngredientsShouldStartCollapsed() {
+    const mobileViewport = window.matchMedia
+        ? window.matchMedia("(max-width: 767px)").matches
+        : window.innerWidth <= 767;
+    const mobilePreview = Boolean(
+        document.body && document.body.classList.contains("screen-preview-mobile-frame")
+    );
+
+    return !recipeEditorStandalonePageIsActive() || mobileViewport || mobilePreview;
+}
+
 function recipeEditorSurfaceIsActive(modal) {
     return Boolean(modal && (modal.classList.contains("open") || recipeEditorStandalonePageIsActive()));
 }
@@ -24115,7 +24126,7 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
             (recipe.ingredients || []).forEach((item, index) => {
                 addRecipeIngredientRow(item, { persistedIndex: index });
             });
-            setRecipeIngredientsCollapsed(!recipeEditorStandalonePageIsActive());
+            setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());
         } else {
             setRecipeIngredientsCollapsed(false);
             addRecipeIngredientRow({}, { expanded: true });
@@ -24209,7 +24220,7 @@ function replaceRecipeEditorIngredients(ingredients = []) {
         setRecipeIngredientsCollapsed(false);
         addRecipeIngredientRow({}, { expanded: true });
     } else {
-        setRecipeIngredientsCollapsed(!recipeEditorStandalonePageIsActive());
+        setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());
     }
     updateRecipeIngredientRowIndexes();
     updateRecipeEditorDirtyState();

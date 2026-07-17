@@ -1204,7 +1204,7 @@ def test_recipe_editor_redesign_javascript_wiring():
     assert "[\"initRecipeEditContextPanels\", initRecipeEditContextPanels]" in script
     assert 'data-field="section"' in script
     assert "Replace ingredient with this alternative" in script
-    assert script.count("setRecipeIngredientsCollapsed(!recipeEditorStandalonePageIsActive());") == 2
+    assert script.count("setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());") == 2
 
 
 def test_recipe_health_dashboard_is_compact_and_separate_from_ai_confidence():

@@ -2393,7 +2393,7 @@ def test_recipe_editor_equipment_uses_same_compact_expand_controls_as_ingredient
     assert "function setRecipeEquipmentCollapsed" in script
     assert "function toggleRecipeEquipmentRowCollapsed" in script
     assert "function isRecipeEquipmentRowCollapsed" in script
-    assert script.count("setRecipeIngredientsCollapsed(!recipeEditorStandalonePageIsActive());") == 2
+    assert script.count("setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());") == 2
     assert "setRecipeEquipmentCollapsed(true);" in script
     assert "addRecipeIngredientRow({}, { expanded: true });" in script
     assert 'addRecipeEquipmentRow("", { expanded: false });' in script
@@ -2432,6 +2432,10 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert 'mobileQuantitySummary.textContent = quantitySummaryText;' in script
     assert 'document.querySelectorAll("[data-recipe-ingredients-collapse-toggle]")' in script
     assert 'compactButton.setAttribute("aria-expanded", String(!collapsed));' in script
+    assert "function recipeIngredientsShouldStartCollapsed()" in script
+    assert 'window.matchMedia("(max-width: 767px)").matches' in script
+    assert 'document.body.classList.contains("screen-preview-mobile-frame")' in script
+    assert script.count("setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());") == 2
 
     mobile_start = css.index("/* Ingredient editor v24: real mobile folding for the current card-based layout. */")
     mobile_css = css[mobile_start:]
