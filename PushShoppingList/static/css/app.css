@@ -55003,3 +55003,115 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
         display: none !important;
     }
 }
+
+/* Ingredient editor v23: compact, readable mobile ingredient cards. */
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+        grid-template-columns: 24px 46px minmax(0, 1fr) 72px !important;
+        grid-template-rows: minmax(48px, auto) repeat(4, auto) !important;
+        column-gap: 8px !important;
+        row-gap: 6px !important;
+        padding: 9px !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-row-handle {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        width: 24px;
+        min-width: 24px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-ingredient-image-panel {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        width: 44px !important;
+        min-width: 44px !important;
+        max-width: 44px !important;
+        height: 44px !important;
+        min-height: 44px !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-read-cell {
+        grid-column: 3 !important;
+        grid-row: 1 !important;
+        align-self: start;
+        padding-right: 0;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-compact-row-actions {
+        grid-column: 4 !important;
+        grid-row: 1 !important;
+        align-self: start;
+        width: 72px;
+        min-width: 72px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-status-summary {
+        grid-column: 2 / 5 !important;
+        grid-row: 2 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-quantity-summary {
+        grid-column: 2 !important;
+        grid-row: 3 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-unit-summary {
+        grid-column: 3 / 5 !important;
+        grid-row: 3 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-store-summary {
+        grid-column: 2 / 4 !important;
+        grid-row: 4 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-type-summary {
+        grid-column: 4 !important;
+        grid-row: 4 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-substitution-cell {
+        grid-column: 2 / 5 !important;
+        grid-row: 5 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > :is(
+        .recipe-edit-ingredient-status-summary,
+        .recipe-edit-ingredient-store-summary,
+        .recipe-edit-ingredient-substitution-cell
+    ) {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > :is(
+        .recipe-edit-ingredient-status-summary,
+        .recipe-edit-ingredient-quantity-summary,
+        .recipe-edit-ingredient-unit-summary,
+        .recipe-edit-ingredient-store-summary,
+        .recipe-edit-ingredient-substitution-cell
+    )::before {
+        margin: 0;
+        font-size: 9px;
+        line-height: 1.2;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-type-summary::before {
+        display: none !important;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control,
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger,
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
+        height: 32px;
+        min-height: 32px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
+        padding-inline: 5px;
+        gap: 4px;
+    }
+}

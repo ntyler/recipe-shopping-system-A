@@ -700,6 +700,24 @@ def test_recipe_editor_ingredient_rows_restore_visible_pencil_action():
     assert "overscroll-behavior: none !important;" in scroll_lock_rule
 
 
+def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readable():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert css.index("/* Ingredient editor v23:") > css.index("/* Ingredient editor v22:")
+    mobile = css[css.index("/* Ingredient editor v23:"):]
+
+    assert "@media (max-width: 767px)" in mobile
+    assert "grid-template-columns: 24px 46px minmax(0, 1fr) 72px !important;" in mobile
+    assert "grid-template-rows: minmax(48px, auto) repeat(4, auto) !important;" in mobile
+    assert "padding-right: 0;" in mobile
+    assert ".recipe-edit-ingredient-status-summary {\n        grid-column: 2 / 5 !important;" in mobile
+    assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 2 / 4 !important;" in mobile
+    assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 4 !important;" in mobile
+    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 2 / 5 !important;" in mobile
+    assert "grid-template-columns: 72px minmax(0, 1fr);" in mobile
+    assert ".recipe-edit-ingredient-type-summary::before {\n        display: none !important;" in mobile
+
+
 def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
