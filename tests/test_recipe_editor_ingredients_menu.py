@@ -725,6 +725,7 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 3 !important;" in mobile
     assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 3 / 5 !important;" in mobile
     assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 5 !important;" in mobile
+    assert ".recipe-edit-ingredient-options-panel {\n        grid-column: 1 / -1 !important;\n        grid-row: 6 !important;" in mobile
     assert "grid-template-columns: 72px minmax(0, 1fr);" in mobile
     assert '.recipe-edit-ingredient-quantity-summary::before {\n        content: "Amount";' in mobile
     assert '.recipe-edit-ingredient-store-summary::before {\n        content: "Store";' in mobile
@@ -745,6 +746,7 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 4 !important;" in narrow
     assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 1 / 4 !important;" in narrow
     assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 4 !important;" in narrow
+    assert ".recipe-edit-ingredient-options-panel {\n        grid-column: 1 / -1 !important;\n        grid-row: 7 !important;" in narrow
     assert 'onclick="moveRecipeEditRow(this, -1)">Move ingredient up</button>' in script
     assert 'onclick="moveRecipeEditRow(this, 1)">Move ingredient down</button>' in script
 

@@ -55106,6 +55106,11 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
         grid-row: 5 !important;
     }
 
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-options-panel {
+        grid-column: 1 / -1 !important;
+        grid-row: 6 !important;
+    }
+
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > :is(
         .recipe-edit-ingredient-status-summary,
         .recipe-edit-ingredient-store-summary,
@@ -55277,5 +55282,10 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-substitution-cell {
         grid-column: 1 / 4 !important;
         grid-row: 6 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-options-panel {
+        grid-column: 1 / -1 !important;
+        grid-row: 7 !important;
     }
 }
