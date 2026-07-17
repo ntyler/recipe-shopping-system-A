@@ -1885,6 +1885,24 @@ def test_store_section_summary_icon_stays_inside_its_table_cell():
     assert edit_field_selector in css
     assert "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary .recipe-edit-store-section-icon {" in css
 
+    summary_icon_size_start = css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
+        ":is(.recipe-edit-inline-icon, svg) {"
+    )
+    summary_icon_size_end = css.index("\n}", summary_icon_size_start)
+    summary_icon_size_rule = css[summary_icon_size_start:summary_icon_size_end]
+
+    # The SVG must inherit the category color from its is-* icon wrapper.
+    assert "color:" not in summary_icon_size_rule
+    for color_rule in (
+        ".recipe-edit-store-section-icon.is-leaf { color: #4ade80; }",
+        ".recipe-edit-store-section-icon.is-dairy { color: #60a5fa; }",
+        ".recipe-edit-store-section-icon.is-can { color: #fb923c; }",
+        ".recipe-edit-store-section-icon.is-jar { color: #f87171; }",
+        ".recipe-edit-store-section-icon.is-oil { color: #fbbf24; }",
+    ):
+        assert color_rule in css
+
 
 def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")

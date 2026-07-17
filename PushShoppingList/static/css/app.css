@@ -47277,7 +47277,6 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary :is(.reci
     width: 17px;
     min-width: 17px;
     height: 17px;
-    color: var(--app-primary-hover);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary .recipe-edit-store-section-icon {
