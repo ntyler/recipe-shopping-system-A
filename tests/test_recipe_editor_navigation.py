@@ -176,28 +176,3 @@ def test_recipe_edit_page_consumes_pending_editor_action():
 
     assert "consumeRecipeEditPendingAction(recipeUrl)" in template
     assert "openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions);" in template
-
-
-def test_recipe_view_ingredient_rows_have_pencil_links_to_standalone_editor():
-    template = read_text("PushShoppingList/templates/sections/items.html")
-    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
-    script = read_text("PushShoppingList/static/js/app.js")
-    css = read_text("PushShoppingList/static/css/app.css")
-
-    row_start = template.index('<div class="row recipe-ingredient-row"')
-    row_block = template[row_start:template.index('<div class="source-line item-qty-line">', row_start)]
-    handler_start = script.index("function openRecipeIngredientEditPage")
-    handler_block = script[handler_start:script.index("function shouldLetRecipeEditorLinkNavigate", handler_start)]
-
-    assert 'class="recipe-ingredient-edit-link"' in row_block
-    assert "url_for('recipe_bp.edit_recipe_page_route', url=recipe.url)" in row_block
-    assert 'data-ingredient-name="{{ recipe_item.name or display_name }}"' in row_block
-    assert 'aria-label="Edit recipe ingredient: {{ display_name }}"' in row_block
-    assert 'onclick="return openRecipeIngredientEditPage(this, event)"' in row_block
-    assert '{{ shell.svg_icon("edit") }}' in row_block
-    assert '{% elif name == "edit" %}' in macros
-    assert "rememberRecipeEditPageReturnState(link);" in handler_block
-    assert "rememberRecipeEditPendingAction(recipeUrl, { scrollToIngredient: ingredientName });" in handler_block
-    assert "return true;" in handler_block
-    assert ".recipe-ingredient-edit-link {" in css
-    assert ".recipe-ingredient-edit-link:focus-visible" in css

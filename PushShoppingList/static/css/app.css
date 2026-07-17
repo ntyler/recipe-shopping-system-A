@@ -5076,36 +5076,6 @@ body {
             flex-wrap: wrap;
         }
 
-        .recipe-ingredient-edit-link {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            flex: 0 0 auto;
-            width: 30px;
-            height: 30px;
-            margin: 0;
-            padding: 0;
-            border: 1px solid transparent;
-            border-radius: 7px;
-            background: transparent;
-            color: #94a3b8;
-            text-decoration: none;
-            box-sizing: border-box;
-        }
-
-        .recipe-ingredient-edit-link .app-icon-svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .recipe-ingredient-edit-link:hover,
-        .recipe-ingredient-edit-link:focus-visible {
-            border-color: rgba(52, 211, 153, 0.56);
-            background: rgba(16, 185, 129, 0.12);
-            color: #34d399;
-            outline: none;
-        }
-
         .food-rule-marker {
             display: inline-flex;
             align-items: center;
@@ -54650,6 +54620,85 @@ body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredien
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control[aria-invalid="true"] {
     border-color: var(--app-danger, #ef4444);
+}
+
+/* Ingredient editor v21: restore the explicit pencil action beside each row menu. */
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-compact-row-actions {
+    width: 76px;
+    min-width: 76px;
+    gap: 4px;
+}
+
+@media (min-width: 1400px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-table-scroll {
+        --recipe-edit-ingredient-grid:
+            28px
+            50px
+            minmax(240px, 2.5fr)
+            minmax(90px, .8fr)
+            minmax(64px, .62fr)
+            minmax(78px, .72fr)
+            minmax(120px, 1fr)
+            minmax(86px, .78fr)
+            minmax(110px, 1fr)
+            76px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head,
+    body.recipe-edit-standalone-page #recipeEditIngredients,
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+        min-width: 1074px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1399px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-table-scroll {
+        --recipe-edit-ingredient-grid:
+            28px
+            46px
+            minmax(200px, 1.7fr)
+            96px
+            minmax(116px, .85fr)
+            82px
+            118px
+            76px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head,
+    body.recipe-edit-standalone-page #recipeEditIngredients,
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+        min-width: 784px;
+    }
+}
+
+@media (min-width: 768px) {
+    @container recipe-ingredient-table (max-width: 859px) {
+        body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head,
+        body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+            grid-template-columns: 28px 46px minmax(200px, 1.7fr) 96px 82px 118px 76px !important;
+        }
+
+        body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head,
+        body.recipe-edit-standalone-page #recipeEditIngredients,
+        body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+            min-width: 704px;
+        }
+    }
+}
+
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+        grid-template-columns: 28px 52px minmax(0, 1fr) 76px !important;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-read-cell {
+        padding-right: 76px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-compact-row-actions {
+        width: 76px;
+        min-width: 76px;
+    }
 }
 
 @media (max-width: 767px) {

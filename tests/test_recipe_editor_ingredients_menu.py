@@ -639,6 +639,27 @@ def test_recipe_editor_ingredient_modal_guards_row_clicks_and_dirty_close_state(
     assert 'event.key !== "Tab"' in close_contract
     assert "focusTarget.focus({ preventScroll: true })" in close_contract
 
+
+def test_recipe_editor_ingredient_rows_restore_visible_pencil_action():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    actions_start = script.index("function organizeRecipeEditCompactRowActions")
+    actions_end = script.index("function updateRecipeEditIngredientDetailsState", actions_start)
+    actions = script[actions_start:actions_end]
+    pencil_css = css[css.index("/* Ingredient editor v21:"):]
+
+    assert 'const editButtonHtml = `' in actions
+    assert 'const editButtonHtml = isIngredientRow ? "" :' not in actions
+    assert 'class="recipe-edit-compact-row-edit"' in actions
+    assert 'onclick="return focusRecipeEditCompactRow(this)"' in actions
+    assert '${recipeEditSvgIcon("edit")}' in actions
+    assert 'return setRecipeIngredientEditMode(row, true, { trigger: button });' in script
+    assert "width: 76px;" in pencil_css
+    assert "min-width: 76px;" in pencil_css
+    assert "gap: 4px;" in pencil_css
+    assert "76px;" in pencil_css
+
     organize = script[
         script.index("function organizeRecipeEditIngredientRow(row)"):
         script.index("function organizeRecipeEditCompactRowActions", script.index("function organizeRecipeEditIngredientRow(row)"))
@@ -1325,7 +1346,8 @@ def test_recipe_editor_v10_prioritizes_six_readable_groups_and_overflow_menu():
     assert 'optionsButton.setAttribute("aria-expanded", String(shouldOpen));' in script
     assert 'row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);' in script
     assert 'const isIngredientRow = label === "ingredient";' in script
-    assert 'const editButtonHtml = isIngredientRow ? "" :' in script
+    assert 'const editButtonHtml = `' in script
+    assert 'const editButtonHtml = isIngredientRow ? "" :' not in script
     assert 'row.setAttribute("aria-label", `Edit ${accessibleName}`);' in script
     assert 'actions.appendChild(menuWrap);' in script
     assert 'class="recipe-edit-compact-row-delete"' in script

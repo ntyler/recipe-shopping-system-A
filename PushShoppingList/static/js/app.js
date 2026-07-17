@@ -23438,27 +23438,6 @@ function openRecipeEditPageFromMenu(link, event = null) {
     return true;
 }
 
-function openRecipeIngredientEditPage(link, event = null) {
-    if (event && shouldLetRecipeEditorLinkNavigate(event)) {
-        return true;
-    }
-
-    if (event) {
-        event.stopPropagation();
-    }
-
-    const recipeUrl = link ? String(link.dataset.recipeUrl || "").trim() : "";
-    const ingredientName = link ? String(link.dataset.ingredientName || "").trim() : "";
-
-    if (recipeUrl) {
-        rememberRecipeEditPageReturnState(link);
-        rememberRecipeEditPendingAction(recipeUrl, { scrollToIngredient: ingredientName });
-    }
-
-    closeRecipeEditRowMenus();
-    return true;
-}
-
 function shouldLetRecipeEditorLinkNavigate(event) {
     return Boolean(
         event.defaultPrevented
@@ -27715,7 +27694,7 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
             <span class="sr-only" data-recipe-edit-details-label>More details</span>
         </button>
     ` : "";
-    const editButtonHtml = isIngredientRow ? "" : `
+    const editButtonHtml = `
         <button type="button"
                 class="recipe-edit-compact-row-edit"
                 data-recipe-edit-focus-selector="${escapeAttribute(focusSelector || "input, textarea, select")}"
