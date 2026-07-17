@@ -25870,6 +25870,7 @@ function organizeRecipeEditIngredientTools() {
         tableHead.innerHTML = `
             <span role="columnheader" class="recipe-edit-ingredient-media-header">Drag / Image</span>
             <span role="columnheader">Ingredient</span>
+            <span role="columnheader">Status</span>
             <span role="columnheader">Quantity</span>
             <span role="columnheader">Unit</span>
             <span role="columnheader">Store Section</span>
@@ -27295,11 +27296,17 @@ function organizeRecipeEditIngredientRow(row) {
                    aria-label="Preparation"
                    placeholder="Add preparation"
                    autocomplete="off">
-            <span class="recipe-edit-ingredient-read-status" data-ingredient-read-status></span>
         </div>
         <span class="recipe-edit-ingredient-read-buy-as" data-ingredient-read-buy-as hidden></span>
     `;
     row.appendChild(readCell);
+
+    const statusSummary = document.createElement("div");
+    statusSummary.className = "recipe-edit-ingredient-status-summary";
+    statusSummary.dataset.ingredientStatusSummary = "";
+    statusSummary.setAttribute("role", "cell");
+    statusSummary.innerHTML = '<span class="recipe-edit-ingredient-read-status" data-ingredient-read-status></span>';
+    row.appendChild(statusSummary);
 
     const summaryDefinitions = [
         ["recipe-edit-ingredient-quantity-summary", "ingredientQuantitySummary", "quantity", "input"],
@@ -27330,7 +27337,7 @@ function organizeRecipeEditIngredientRow(row) {
     if (substitutions) {
         substitutions.classList.add("recipe-edit-ingredient-options-panel");
         substitutions.setAttribute("role", "cell");
-        substitutions.setAttribute("aria-colspan", "8");
+        substitutions.setAttribute("aria-colspan", "9");
         substitutions.hidden = true;
         substitutions.querySelectorAll("[data-substitution-option-row]")
             .forEach(organizeRecipeEditSubstitutionOptionRow);

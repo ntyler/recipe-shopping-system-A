@@ -51287,6 +51287,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-table-scroll {
         28px
         50px
         minmax(240px, 2.5fr)
+        minmax(90px, .8fr)
         minmax(64px, .62fr)
         minmax(78px, .72fr)
         minmax(120px, 1fr)
@@ -51307,7 +51308,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-table-scroll {
 body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head,
 body.recipe-edit-standalone-page #recipeEditIngredients,
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
-    min-width: 946px;
+    min-width: 1040px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head,
@@ -51334,7 +51335,8 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head > :nth-child
 body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head > :nth-child(5) { grid-column: 6; }
 body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head > :nth-child(6) { grid-column: 7; }
 body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head > :nth-child(7) { grid-column: 8; }
-body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head > :nth-child(8) { grid-column: 9; text-align: center; }
+body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head > :nth-child(8) { grid-column: 9; }
+body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head > :nth-child(9) { grid-column: 10; text-align: center; }
 
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
     grid-template-rows: minmax(58px, auto) auto auto;
@@ -51352,14 +51354,16 @@ body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredien
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-row-handle { grid-column: 1 !important; }
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-ingredient-image-panel { grid-column: 2 !important; }
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-read-cell { grid-column: 3 !important; }
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-quantity-summary { grid-column: 4 !important; }
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-unit-summary { grid-column: 5 !important; }
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-store-summary { grid-column: 6 !important; }
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-type-summary { grid-column: 7 !important; }
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-substitution-cell { grid-column: 8 !important; }
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-compact-row-actions { grid-column: 9 !important; }
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-status-summary { grid-column: 4 !important; }
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-quantity-summary { grid-column: 5 !important; }
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-unit-summary { grid-column: 6 !important; }
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-store-summary { grid-column: 7 !important; }
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-type-summary { grid-column: 8 !important; }
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-substitution-cell { grid-column: 9 !important; }
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-compact-row-actions { grid-column: 10 !important; }
 
 body.recipe-edit-standalone-page :is(
+    .recipe-edit-ingredient-status-summary,
     .recipe-edit-ingredient-quantity-summary,
     .recipe-edit-ingredient-unit-summary,
     .recipe-edit-ingredient-store-summary,
@@ -51811,7 +51815,7 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
 
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
         grid-template-columns: 28px 52px minmax(0, 1fr) 38px !important;
-        grid-template-rows: minmax(54px, auto) repeat(3, auto) !important;
+        grid-template-rows: minmax(54px, auto) repeat(4, auto) !important;
         column-gap: 9px !important;
         row-gap: 7px !important;
         min-height: 0 !important;
@@ -51829,13 +51833,15 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-ingredient-image-panel { grid-column: 2 !important; grid-row: 1 !important; }
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-read-cell { grid-column: 3 !important; grid-row: 1 !important; }
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-compact-row-actions { grid-column: 4 !important; grid-row: 1 !important; }
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-quantity-summary { grid-column: 2 !important; grid-row: 2 !important; }
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-unit-summary { grid-column: 3 / 5 !important; grid-row: 2 !important; }
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-store-summary { grid-column: 2 / 5 !important; grid-row: 3 !important; }
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-type-summary { grid-column: 2 !important; grid-row: 4 !important; }
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-substitution-cell { grid-column: 3 / 5 !important; grid-row: 4 !important; }
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-status-summary { grid-column: 2 / 5 !important; grid-row: 2 !important; }
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-quantity-summary { grid-column: 2 !important; grid-row: 3 !important; }
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-unit-summary { grid-column: 3 / 5 !important; grid-row: 3 !important; }
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-store-summary { grid-column: 2 / 5 !important; grid-row: 4 !important; }
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-type-summary { grid-column: 2 !important; grid-row: 5 !important; }
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-substitution-cell { grid-column: 3 / 5 !important; grid-row: 5 !important; }
 
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > :is(
+        .recipe-edit-ingredient-status-summary,
         .recipe-edit-ingredient-quantity-summary,
         .recipe-edit-ingredient-unit-summary,
         .recipe-edit-ingredient-store-summary,
@@ -51851,6 +51857,7 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
         text-transform: uppercase;
     }
 
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-status-summary::before { content: "Status"; }
     body.recipe-edit-standalone-page .recipe-edit-ingredient-quantity-summary::before { content: "Quantity"; }
     body.recipe-edit-standalone-page .recipe-edit-ingredient-unit-summary::before { content: "Unit"; }
     body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary::before { content: "Store section"; }
@@ -54524,6 +54531,17 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-name {
     font-weight: 750;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-ingredient-status-summary {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-status-summary > [data-ingredient-read-status] {
+    width: 100%;
+    white-space: nowrap;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-ingredient-read-details {
     display: flex;
     align-items: center;
@@ -54541,10 +54559,6 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-preparation {
     color: var(--app-text-soft);
     font-size: 11px;
     font-weight: 500;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-ingredient-read-details > [data-ingredient-read-status] {
-    flex: 0 0 auto;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row:hover .recipe-edit-ingredient-inline-control {

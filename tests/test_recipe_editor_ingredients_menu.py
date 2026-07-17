@@ -409,6 +409,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     headers = (
         "Drag / Image",
         "Ingredient",
+        "Status",
         "Quantity",
         "Unit",
         "Store Section",
@@ -428,9 +429,12 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     organize = script[organize_start:organize_end]
     assert 'row.classList.add("recipe-edit-read-first-row");' in organize
     assert 'readCell.className = "recipe-edit-ingredient-read-cell";' in organize
+    assert 'statusSummary.className = "recipe-edit-ingredient-status-summary";' in organize
     assert "data-ingredient-read-name" in organize
     assert "data-ingredient-read-status" in organize
     assert "data-ingredient-read-buy-as" in organize
+    assert organize.index("row.appendChild(readCell);") < organize.index("row.appendChild(statusSummary);")
+    assert organize.index("row.appendChild(statusSummary);") < organize.index("const summaryDefinitions = [")
     for summary_class in (
         "recipe-edit-ingredient-quantity-summary",
         "recipe-edit-ingredient-unit-summary",
@@ -438,6 +442,21 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         "recipe-edit-ingredient-type-summary",
     ):
         assert summary_class in organize
+    assert 'substitutions.setAttribute("aria-colspan", "9");' in organize
+
+    workspace = css[css.index("/* Ingredient editor v14:"):]
+    grid_rule = workspace[workspace.index(".recipe-edit-ingredient-table-scroll {"):]
+    grid_rule = grid_rule[:grid_rule.index("}")]
+    assert "minmax(240px, 2.5fr)\n        minmax(90px, .8fr)" in grid_rule
+    assert "min-width: 1040px;" in workspace
+    assert ".recipe-edit-ingredient-table-head > :nth-child(3) { grid-column: 4; }" in workspace
+    assert ".recipe-edit-ingredient-row > .recipe-edit-ingredient-status-summary { grid-column: 4 !important; }" in workspace
+    assert ".recipe-edit-ingredient-table-head > :nth-child(4) { grid-column: 5; }" in workspace
+    assert ".recipe-edit-ingredient-row > .recipe-edit-ingredient-quantity-summary { grid-column: 5 !important; }" in workspace
+    mobile = workspace[workspace.index("@media (max-width: 767px)"):]
+    assert "grid-template-rows: minmax(54px, auto) repeat(4, auto) !important;" in mobile
+    assert ".recipe-edit-ingredient-status-summary { grid-column: 2 / 5 !important; grid-row: 2 !important; }" in mobile
+    assert '.recipe-edit-ingredient-status-summary::before { content: "Status"; }' in mobile
 
     assert 'const editPanel = document.createElement("dialog");' in organize
     assert 'editPanel.className = "recipe-edit-ingredient-edit-panel";' in organize
@@ -1375,7 +1394,7 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organizer
     assert 'optionsButton.addEventListener("click"' in organizer
     assert 'substitutions.setAttribute("role", "cell");' in organizer
-    assert 'substitutions.setAttribute("aria-colspan", "8");' in organizer
+    assert 'substitutions.setAttribute("aria-colspan", "9");' in organizer
     assert "<span data-ingredient-options-label>None</span>" in organizer
     assert organizer.index("organizeRecipeEditCompactRowActions") < organizer.index("if (substitutions) row.appendChild(substitutions)")
 
