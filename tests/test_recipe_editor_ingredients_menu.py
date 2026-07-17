@@ -1081,6 +1081,19 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     ):
         assert declaration in mobile_name
 
+    mobile_image_actions_selector = (
+        ".recipe-edit-ingredient-modal-preview-media "
+        ".recipe-edit-ingredient-modal-image-panel > .recipe-step-image-actions {"
+    )
+    mobile_image_actions = mobile[mobile.index(mobile_image_actions_selector):]
+    mobile_image_actions = mobile_image_actions[:mobile_image_actions.index("}")]
+    for declaration in (
+        "display: none !important;",
+        "opacity: 0 !important;",
+        "pointer-events: none !important;",
+    ):
+        assert declaration in mobile_image_actions
+
     match_details = script[
         script.index("function recipeIngredientMatchDetailsHtml"):
         script.index("function recipeIngredientBadgesHtml", script.index("function recipeIngredientMatchDetailsHtml"))

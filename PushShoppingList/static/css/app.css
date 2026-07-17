@@ -50665,8 +50665,10 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         border-radius: 8px;
     }
 
-    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-preview-media .recipe-step-image-actions {
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-preview-media .recipe-edit-ingredient-modal-image-panel > .recipe-step-image-actions {
         display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-preview > strong {
