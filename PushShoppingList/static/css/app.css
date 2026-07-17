@@ -50142,6 +50142,26 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recip
     gap: 20px 28px;
 }
 
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields > :is(
+    .recipe-edit-ingredient-modal-name-field,
+    .recipe-edit-ingredient-modal-buy-as-field
+) {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    justify-self: stretch;
+}
+
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field :is(
+    .recipe-edit-ingredient-title-line,
+    textarea[data-field="ingredient"]
+) {
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields > * {
     grid-column: auto !important;
 }

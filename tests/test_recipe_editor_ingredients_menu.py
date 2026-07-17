@@ -1080,6 +1080,33 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert "min-height: 100%;" not in bottom_surface_rule
     assert "padding: 24px 28px;" in workspace
     assert "gap: 20px;" in workspace
+    identity_fields_rule = workspace[
+        workspace.index(
+            "dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields {"
+        ):
+    ]
+    identity_fields_rule = identity_fields_rule[:identity_fields_rule.index("}")]
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in identity_fields_rule
+    identity_width_rule = workspace[
+        workspace.index(
+            "dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields > :is("
+        ):
+    ]
+    identity_width_rule = identity_width_rule[:identity_width_rule.index("}")]
+    assert ".recipe-edit-ingredient-modal-name-field" in identity_width_rule
+    assert ".recipe-edit-ingredient-modal-buy-as-field" in identity_width_rule
+    assert "width: 100% !important;" in identity_width_rule
+    assert "max-width: none !important;" in identity_width_rule
+    name_control_width_rule = workspace[
+        workspace.index(
+            "dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field :is("
+        ):
+    ]
+    name_control_width_rule = name_control_width_rule[:name_control_width_rule.index("}")]
+    assert 'textarea[data-field="ingredient"]' in name_control_width_rule
+    assert "box-sizing: border-box;" in name_control_width_rule
+    assert "width: 100% !important;" in name_control_width_rule
+    assert "max-width: none !important;" in name_control_width_rule
     assert ".recipe-edit-ingredient-modal-nav button.is-active" in workspace
     assert ".recipe-edit-ingredient-analysis-toggle" in workspace
     assert ".recipe-edit-ingredient-match-details-grid > div" in workspace
