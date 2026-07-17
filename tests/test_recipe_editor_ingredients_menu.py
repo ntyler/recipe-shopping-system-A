@@ -1092,8 +1092,21 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert ".recipe-edit-ingredient-modal-nav" in mobile
     assert "display: flex;" in mobile
     assert "grid-template-columns: minmax(0, 1fr);" in mobile
+    mobile_identity_selector = (
+        "#recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-modal-identity-fields {"
+    )
+    mobile_identity = mobile[mobile.index(mobile_identity_selector):]
+    mobile_identity = mobile_identity[:mobile_identity.index("}")]
+    for declaration in (
+        "display: flex !important;",
+        "width: 100% !important;",
+        "flex-direction: column;",
+        "align-items: stretch;",
+    ):
+        assert declaration in mobile_identity
     mobile_name_selector = (
-        "dialog.recipe-edit-ingredient-edit-panel "
+        "#recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel "
         ".recipe-edit-ingredient-modal-identity-fields > .recipe-edit-ingredient-modal-name-field {"
     )
     mobile_name = mobile[mobile.index(mobile_name_selector):]
@@ -1102,11 +1115,26 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
         "grid-column: 1 / -1 !important;",
         "justify-self: stretch;",
         "width: 100% !important;",
-        "margin-inline: 0;",
+        "max-width: none !important;",
+        "margin-inline: 0 !important;",
         "align-items: stretch !important;",
         "text-align: left;",
     ):
         assert declaration in mobile_name
+    mobile_name_control_selector = (
+        "#recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-modal-name-field textarea[data-field=\"ingredient\"] {"
+    )
+    mobile_name_control_start = mobile.index(mobile_name_control_selector)
+    mobile_name_control = mobile[mobile_name_control_start:]
+    mobile_name_control = mobile_name_control[:mobile_name_control.index("}")]
+    for declaration in (
+        "width: 100% !important;",
+        "max-width: none !important;",
+        "margin-inline: 0 !important;",
+        "align-self: stretch !important;",
+    ):
+        assert declaration in mobile_name_control
 
     mobile_image_actions_selector = (
         ".recipe-edit-ingredient-modal-preview-media "

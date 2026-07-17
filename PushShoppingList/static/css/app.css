@@ -50810,19 +50810,42 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         border-radius: 12px;
     }
 
-    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields,
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-section.is-usage .recipe-edit-ingredient-modal-field-grid,
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-bottom-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields > .recipe-edit-ingredient-modal-name-field {
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields {
+        display: flex !important;
+        width: 100% !important;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields > * {
+        flex: 0 0 auto;
+        width: 100% !important;
+        max-width: none !important;
+        margin-inline: 0 !important;
+        align-self: stretch !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields > .recipe-edit-ingredient-modal-name-field {
         grid-column: 1 / -1 !important;
         justify-self: stretch;
         width: 100% !important;
-        margin-inline: 0;
+        max-width: none !important;
+        margin-inline: 0 !important;
         align-items: stretch !important;
         text-align: left;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field .recipe-edit-ingredient-title-line,
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field textarea[data-field="ingredient"] {
+        width: 100% !important;
+        max-width: none !important;
+        margin-inline: 0 !important;
+        align-self: stretch !important;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer {
