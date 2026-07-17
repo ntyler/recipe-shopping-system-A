@@ -399,6 +399,24 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
     assert 'document.addEventListener("pointerdown"' in script
     assert ".recipe-edit-metadata-tooltip-trigger:focus-visible" in css
     assert ".recipe-edit-metadata-tooltip[hidden]" in css
+    tooltip_trigger_rule = css[
+        css.index("body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-trigger {"):
+    ]
+    tooltip_trigger_rule = tooltip_trigger_rule[:tooltip_trigger_rule.index("}")]
+    for declaration in (
+        "width: 16px;",
+        "min-width: 16px;",
+        "max-width: 16px;",
+        "height: 16px;",
+        "min-height: 16px;",
+        "max-height: 16px;",
+        "flex: 0 0 16px;",
+        "aspect-ratio: 1 / 1;",
+        "padding: 0;",
+        "box-sizing: border-box;",
+        "border-radius: 50%;",
+    ):
+        assert declaration in tooltip_trigger_rule
     assert "position: fixed;" in css[css.index("body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip {"):]
     assert "max-width: calc(100vw - 24px);" in css
 

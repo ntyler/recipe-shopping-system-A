@@ -51130,10 +51130,17 @@ body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-trigger {
     display: inline-flex;
     width: 16px;
     min-width: 16px;
+    max-width: 16px;
     height: 16px;
+    min-height: 16px;
+    max-height: 16px;
+    flex: 0 0 16px;
+    aspect-ratio: 1 / 1;
     align-items: center;
     justify-content: center;
     margin-left: 1px;
+    padding: 0;
+    box-sizing: border-box;
     border: 1px solid color-mix(in srgb, var(--app-muted) 58%, transparent);
     border-radius: 50%;
     color: var(--app-muted);
