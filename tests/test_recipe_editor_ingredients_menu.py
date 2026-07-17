@@ -1615,6 +1615,12 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     v20 = css[css.index("/* Ingredient editor v20:"):]
     assert ".recipe-edit-ingredient-inline-control" in v20
     assert ".recipe-edit-ingredient-inline-control:focus" in v20
+    read_cell_rule = v20[v20.index("body.recipe-edit-standalone-page .recipe-edit-ingredient-read-cell {"):]
+    read_cell_rule = read_cell_rule[:read_cell_rule.index("}")]
+    assert "gap: 0;" in read_cell_rule
+    preparation_rule = v20[v20.index("body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-preparation {"):]
+    preparation_rule = preparation_rule[:preparation_rule.index("}")]
+    assert "padding: 0 7px;" in preparation_rule
     for summary_class in (
         "recipe-edit-ingredient-quantity-summary",
         "recipe-edit-ingredient-unit-summary",

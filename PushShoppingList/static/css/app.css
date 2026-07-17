@@ -54402,7 +54402,7 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-card.is-editing .recip
 
 /* Ingredient editor v20: edit the five visible ingredient columns in place. */
 body.recipe-edit-standalone-page .recipe-edit-ingredient-read-cell {
-    gap: 3px;
+    gap: 0;
 }
 
 body.recipe-edit-standalone-page :is(
@@ -54537,7 +54537,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-preparation {
     width: auto;
     height: 22px;
     min-height: 22px;
-    padding: 0 3px;
+    padding: 0 7px;
     color: var(--app-text-soft);
     font-size: 11px;
     font-weight: 500;
