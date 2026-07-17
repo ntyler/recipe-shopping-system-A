@@ -2427,16 +2427,22 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert 'class="recipe-edit-mobile-ingredients-collapse-toggle"' in template
     assert template.count("data-recipe-ingredients-collapse-toggle") >= 2
     assert "data-recipe-edit-ingredient-collapse-toggle" in script
+    assert 'mobileQuantitySummary.className = "recipe-edit-ingredient-mobile-quantity-summary";' in script
+    assert "const quantitySummaryText = formatRecipeIngredientQuantity(values);" in script
+    assert 'mobileQuantitySummary.textContent = quantitySummaryText;' in script
     assert 'document.querySelectorAll("[data-recipe-ingredients-collapse-toggle]")' in script
     assert 'compactButton.setAttribute("aria-expanded", String(!collapsed));' in script
 
     mobile_start = css.index("/* Ingredient editor v24: real mobile folding for the current card-based layout. */")
     mobile_css = css[mobile_start:]
     assert "@media (max-width: 767px)" in mobile_css
-    assert "grid-template-columns: 40px minmax(0, 1fr) 44px 58px 68px !important;" in mobile_css
+    assert "grid-template-columns: 40px minmax(0, 1fr) max-content 68px !important;" in mobile_css
     assert "grid-template-rows: 44px !important;" in mobile_css
     assert ".recipe-edit-ingredient-status-summary," in mobile_css
+    assert ".recipe-edit-ingredient-quantity-summary," in mobile_css
+    assert ".recipe-edit-ingredient-unit-summary," in mobile_css
     assert ".recipe-edit-ingredient-substitution-cell," in mobile_css
+    assert ".recipe-edit-ingredient-mobile-quantity-summary" in mobile_css
     assert "display: none !important;" in mobile_css
     assert ".recipe-edit-compact-row-edit" in mobile_css
 

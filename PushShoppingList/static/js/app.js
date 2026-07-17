@@ -28193,6 +28193,12 @@ function organizeRecipeEditIngredientRow(row) {
         row.appendChild(summary);
     });
 
+    const mobileQuantitySummary = document.createElement("span");
+    mobileQuantitySummary.className = "recipe-edit-ingredient-mobile-quantity-summary";
+    mobileQuantitySummary.dataset.ingredientMobileQuantitySummary = "";
+    mobileQuantitySummary.setAttribute("role", "cell");
+    row.appendChild(mobileQuantitySummary);
+
     if (substitutions) {
         substitutions.classList.add("recipe-edit-ingredient-options-panel");
         substitutions.setAttribute("role", "cell");
@@ -39474,6 +39480,7 @@ function updateRecipeIngredientSummary(row) {
     const previewBuyAs = row ? row.querySelector("[data-recipe-ingredient-modal-preview-buy-as]") : null;
     const previewStore = row ? row.querySelector("[data-recipe-ingredient-modal-preview-store]") : null;
     const typeSummary = row ? row.querySelector("[data-ingredient-type-summary]") : null;
+    const mobileQuantitySummary = row ? row.querySelector("[data-ingredient-mobile-quantity-summary]") : null;
     const container = recipeIngredientSubstitutionContainer(row);
     const substitutionCount = container ? container.querySelector("[data-ingredient-substitution-count]") : null;
     const values = row ? fieldValuesFromRow(row) : {};
@@ -39488,6 +39495,7 @@ function updateRecipeIngredientSummary(row) {
     }
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
     const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
+    const quantitySummaryText = formatRecipeIngredientQuantity(values);
     if (previewName) previewName.textContent = recipeIngredientSentenceCase(ingredientName) || ingredientName;
     if (previewBuyAs) previewBuyAs.textContent = `Buy as: ${meaningfulBuyAs || "—"}`;
     if (previewStore) {
@@ -39498,6 +39506,14 @@ function updateRecipeIngredientSummary(row) {
     if (readBuyAs) {
         readBuyAs.textContent = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "";
         readBuyAs.hidden = !meaningfulBuyAs;
+    }
+    if (mobileQuantitySummary) {
+        mobileQuantitySummary.textContent = quantitySummaryText;
+        mobileQuantitySummary.title = quantitySummaryText === "\u2014" ? "Amount not specified" : quantitySummaryText;
+        mobileQuantitySummary.setAttribute(
+            "aria-label",
+            quantitySummaryText === "\u2014" ? "Amount not specified" : `Amount: ${quantitySummaryText}`,
+        );
     }
     if (editSubtitle) {
         const rows = recipeEditIngredientRows();

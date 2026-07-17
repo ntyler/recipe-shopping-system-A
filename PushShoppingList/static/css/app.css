@@ -55320,7 +55320,8 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
 
 /* Ingredient editor v24: real mobile folding for the current card-based layout. */
 .recipe-edit-mobile-ingredients-collapse-toggle,
-body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-collapse {
+body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-collapse,
+body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-mobile-quantity-summary {
     display: none;
 }
 
@@ -55381,7 +55382,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row
 
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed {
-        grid-template-columns: 40px minmax(0, 1fr) 44px 58px 68px !important;
+        grid-template-columns: 40px minmax(0, 1fr) max-content 68px !important;
         grid-template-rows: 44px !important;
         min-height: 62px !important;
         column-gap: 6px !important;
@@ -55419,6 +55420,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row
 
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > :is(
         .recipe-edit-ingredient-status-summary,
+        .recipe-edit-ingredient-quantity-summary,
+        .recipe-edit-ingredient-unit-summary,
         .recipe-edit-ingredient-store-summary,
         .recipe-edit-ingredient-type-summary,
         .recipe-edit-ingredient-substitution-cell,
@@ -55426,6 +55429,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row
     ),
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed > :is(
         .recipe-edit-ingredient-status-summary,
+        .recipe-edit-ingredient-quantity-summary,
+        .recipe-edit-ingredient-unit-summary,
         .recipe-edit-ingredient-store-summary,
         .recipe-edit-ingredient-type-summary,
         .recipe-edit-ingredient-substitution-cell,
@@ -55434,55 +55439,23 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row
         display: none !important;
     }
 
-    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > .recipe-edit-ingredient-quantity-summary,
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed > .recipe-edit-ingredient-quantity-summary {
+    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > .recipe-edit-ingredient-mobile-quantity-summary,
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed > .recipe-edit-ingredient-mobile-quantity-summary {
+        display: block;
         grid-column: 3 !important;
         grid-row: 1 !important;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > .recipe-edit-ingredient-unit-summary,
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed > .recipe-edit-ingredient-unit-summary {
-        grid-column: 4 !important;
-        grid-row: 1 !important;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > :is(
-        .recipe-edit-ingredient-quantity-summary,
-        .recipe-edit-ingredient-unit-summary
-    )::before,
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed > :is(
-        .recipe-edit-ingredient-quantity-summary,
-        .recipe-edit-ingredient-unit-summary
-    )::before {
-        display: none !important;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > :is(
-        .recipe-edit-ingredient-quantity-summary,
-        .recipe-edit-ingredient-unit-summary
-    ) > .recipe-edit-ingredient-inline-control,
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed > :is(
-        .recipe-edit-ingredient-quantity-summary,
-        .recipe-edit-ingredient-unit-summary
-    ) > .recipe-edit-ingredient-inline-control {
-        height: 30px;
-        min-height: 30px;
-        padding: 0 2px;
-        overflow: hidden;
-        border-color: transparent;
-        background: transparent;
-        font-size: 12px;
-        text-overflow: ellipsis;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > .recipe-edit-ingredient-quantity-summary > .recipe-edit-ingredient-inline-control,
-    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed > .recipe-edit-ingredient-quantity-summary > .recipe-edit-ingredient-inline-control {
-        text-align: right;
+        align-self: center;
+        min-width: 0;
+        color: var(--app-text);
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.2;
+        white-space: nowrap;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) > .recipe-edit-compact-row-actions,
     body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row.recipe-edit-row-collapsed > .recipe-edit-compact-row-actions {
-        grid-column: 5 !important;
+        grid-column: 4 !important;
         grid-row: 1 !important;
         width: 68px;
         min-width: 68px;
