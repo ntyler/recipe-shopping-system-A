@@ -48269,11 +48269,13 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-type-dot,
     background: var(--app-primary-hover);
 }
 
-body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-type-dot.is-optional {
+body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-type-dot.is-optional,
+.recipe-edit-type-menu .recipe-edit-type-option-dot.is-optional {
     background: var(--app-muted);
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-type-dot.is-custom,
+.recipe-edit-type-menu .recipe-edit-type-option-dot.is-custom,
 .recipe-edit-type-menu .recipe-edit-type-custom-row .recipe-edit-type-option-dot {
     background: #60a5fa;
 }

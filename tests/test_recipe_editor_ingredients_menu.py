@@ -1872,6 +1872,11 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync()
     assert 'menu.setAttribute("role", "listbox");' in script
     assert "function renderRecipeIngredientTypeMenu(menu, select)" in script
     assert 'class="recipe-edit-store-section-option recipe-edit-type-option${selected ? " is-selected" : ""}"' in script
+    assert "function recipeIngredientTypeDotClassModifier(value)" in script
+    assert 'return " is-custom";' in script
+    assert 'return builtIn.value === "optional" ? " is-optional" : "";' in script
+    assert 'class="recipe-edit-type-option-dot${recipeIngredientTypeDotClassModifier(value)}"' in script
+    assert "`recipe-edit-type-dot${recipeIngredientTypeDotClassModifier(resolvedValue)}`" in script
     assert "if (!custom)" in script
     assert 'data-type-action="add-custom"' in script
     assert 'data-type-action="edit-custom"' in script
@@ -1913,6 +1918,8 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_optional_sync()
     assert "/* Ingredient editor v11: managed custom Type picker. */" in css
     assert ".recipe-edit-type-trigger > [data-type-trigger-label]" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot" in css
+    assert ".recipe-edit-type-menu .recipe-edit-type-option-dot.is-optional" in css
+    assert ".recipe-edit-type-menu .recipe-edit-type-option-dot.is-custom" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-custom-row" in css
     assert ".recipe-edit-ingredient-type-summary" in css
     assert ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger" in css

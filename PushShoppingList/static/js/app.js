@@ -35779,12 +35779,19 @@ function recipeIngredientTypeControlLabel(select, value) {
         : label;
 }
 
+function recipeIngredientTypeDotClassModifier(value) {
+    const builtIn = recipeIngredientBuiltInType(value);
+    if (!builtIn) {
+        return " is-custom";
+    }
+    return builtIn.value === "optional" ? " is-optional" : "";
+}
+
 function syncRecipeIngredientTypeTrigger(trigger, select, selectedValue) {
     if (!trigger) return;
     const triggerLabel = trigger.querySelector("[data-type-trigger-label]");
     const dot = trigger.querySelector("[data-type-trigger-dot]");
     const resolvedValue = String(selectedValue || "").trim() || "main";
-    const builtIn = recipeIngredientBuiltInType(resolvedValue);
     const inline = trigger.dataset.recipeIngredientInlineTypeTrigger === "true";
     if (triggerLabel) {
         triggerLabel.textContent = inline
@@ -35792,7 +35799,7 @@ function syncRecipeIngredientTypeTrigger(trigger, select, selectedValue) {
             : recipeIngredientTypeControlLabel(select, resolvedValue);
     }
     if (dot) {
-        dot.className = `recipe-edit-type-dot${builtIn && builtIn.value === "optional" ? " is-optional" : ""}${!builtIn ? " is-custom" : ""}`;
+        dot.className = `recipe-edit-type-dot${recipeIngredientTypeDotClassModifier(resolvedValue)}`;
     }
 }
 
@@ -35880,7 +35887,7 @@ function renderRecipeIngredientTypeMenu(menu, select) {
                     class="recipe-edit-store-section-option recipe-edit-type-option${selected ? " is-selected" : ""}"
                     data-type-value="${escapeAttribute(value)}"
                     onclick="return chooseRecipeIngredientType(this)">
-                <span class="recipe-edit-type-option-dot" aria-hidden="true"></span>
+                <span class="recipe-edit-type-option-dot${recipeIngredientTypeDotClassModifier(value)}" aria-hidden="true"></span>
                 <span class="recipe-edit-store-section-option-label recipe-edit-type-option-label">${escapeHtml((inline ? recipeIngredientTypeLabel({ section: value }) : recipeIngredientTypeControlLabel(select, value)) || option.textContent || value)}</span>
                 <span class="recipe-edit-store-section-option-check recipe-edit-type-option-check" aria-hidden="true">${recipeEditSvgIcon("check")}</span>
             </button>
