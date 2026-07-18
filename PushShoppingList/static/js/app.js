@@ -48640,7 +48640,7 @@ function keepRecipeEditorIngredientImagesVisible(scope = document) {
     const editor = scope.matches && scope.matches("#recipeEditModal")
         ? scope
         : scope.querySelector("#recipeEditModal");
-    if (!recipeEditorSurfaceIsActive(editor)) {
+    if (!editor) {
         return;
     }
 
