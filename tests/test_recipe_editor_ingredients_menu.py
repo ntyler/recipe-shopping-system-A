@@ -2967,6 +2967,54 @@ def test_recipe_editor_type_is_authoritative_for_saved_optional_state():
     ]
 
 
+def test_recipe_editor_dropdowns_support_shared_keyboard_typeahead_search():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    assert "const RECIPE_EDIT_LISTBOX_TYPEAHEAD_RESET_MS = 700;" in script
+    assert "function recipeEditListboxTypeaheadText(value)" in script
+    assert '.normalize("NFKD")' in script
+    assert "function recipeEditListboxTypeaheadKey(event)" in script
+    assert "!event.isComposing" in script
+    assert "!event.ctrlKey" in script
+    assert "!event.metaKey" in script
+    assert "!event.altKey" in script
+    assert "function recipeEditListboxOptionTypeaheadText(option)" in script
+    assert "option.dataset.unitValue" in script
+    assert "option.dataset.typeValue" in script
+    assert "option.dataset.storeSectionValue" in script
+
+    helper_start = script.index("function moveRecipeEditListboxToTypeaheadMatch(event, menu)")
+    helper_end = script.index("function renderRecipeIngredientUnitMenu", helper_start)
+    helper = script[helper_start:helper_end]
+    assert "event.preventDefault();" in helper
+    assert 'menu.dataset.typeaheadBuffer || ""' in helper
+    assert "previousBuffer" in helper
+    assert "repeatedKey" in helper
+    assert "candidate.text.startsWith(searchQuery)" in helper
+    assert "word.startsWith(searchQuery)" in helper
+    assert "candidate.text.includes(searchQuery)" in helper
+    assert 'option.matches("[data-unit-action], [data-type-action], [data-store-section-action]")' in helper
+    assert "setRecipeEditListboxActiveOption(menu, match.index);" in helper
+
+    handlers = (
+        ("function handleRecipeIngredientStoreSectionKeydown", "function bindRecipeIngredientStoreSectionControls", "openRecipeIngredientStoreSectionMenu(trigger);"),
+        ("function handleRecipeIngredientTypeKeydown", "function bindRecipeIngredientTypeControls", "openRecipeIngredientTypeMenu(trigger);"),
+        ("function handleRecipeIngredientUnitKeydown", "function bindRecipeIngredientUnitPickerTrigger", "openRecipeIngredientUnitPicker(input, { showAll: true });"),
+    )
+    for start_marker, end_marker, open_call in handlers:
+        start = script.index(start_marker)
+        handler = script[start:script.index(end_marker, start)]
+        assert "recipeEditListboxTypeaheadKey(event)" in handler
+        assert open_call in handler
+        assert "moveRecipeEditListboxToTypeaheadMatch(event, menu);" in handler
+
+    close_start = script.index("function closeRecipeEditRowMenus()")
+    close_end = script.index("function closeRecipeViewGenerateSubmenus", close_start)
+    close_handler = script[close_start:close_end]
+    assert "delete menu.dataset.typeaheadBuffer;" in close_handler
+    assert "delete menu.recipeEditTypeaheadAt;" in close_handler
+
+
 def test_bulk_image_generation_menus_include_title_image_scope():
     recipe_view = (ROOT / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
     current_log = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")

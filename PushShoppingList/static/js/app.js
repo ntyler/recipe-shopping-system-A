@@ -36937,7 +36937,7 @@ function handleRecipeIngredientStoreSectionKeydown(event, trigger) {
         return;
     }
 
-    const menu = document.getElementById("recipeIngredientStoreSectionMenu");
+    let menu = document.getElementById("recipeIngredientStoreSectionMenu");
     const isOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === trigger);
     if (["ArrowDown", "ArrowUp"].includes(event.key)) {
         event.preventDefault();
@@ -36947,6 +36947,14 @@ function handleRecipeIngredientStoreSectionKeydown(event, trigger) {
         }
         const currentIndex = Number(menu.dataset.activeIndex || 0);
         setRecipeEditListboxActiveOption(menu, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+        return;
+    }
+    if (recipeEditListboxTypeaheadKey(event)) {
+        if (!isOpen) {
+            openRecipeIngredientStoreSectionMenu(trigger);
+            menu = document.getElementById("recipeIngredientStoreSectionMenu");
+        }
+        moveRecipeEditListboxToTypeaheadMatch(event, menu);
         return;
     }
     if (!isOpen) {
@@ -37437,7 +37445,7 @@ function handleRecipeIngredientTypeKeydown(event, trigger) {
     if (!event || !trigger) {
         return;
     }
-    const menu = document.getElementById("recipeIngredientTypeMenu");
+    let menu = document.getElementById("recipeIngredientTypeMenu");
     const isOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === trigger);
     if (["ArrowDown", "ArrowUp"].includes(event.key)) {
         event.preventDefault();
@@ -37447,6 +37455,14 @@ function handleRecipeIngredientTypeKeydown(event, trigger) {
         }
         const currentIndex = Number(menu.dataset.activeIndex || 0);
         setRecipeEditListboxActiveOption(menu, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+        return;
+    }
+    if (recipeEditListboxTypeaheadKey(event)) {
+        if (!isOpen) {
+            openRecipeIngredientTypeMenu(trigger);
+            menu = document.getElementById("recipeIngredientTypeMenu");
+        }
+        moveRecipeEditListboxToTypeaheadMatch(event, menu);
         return;
     }
     if (!isOpen) {
@@ -37749,6 +37765,93 @@ function setRecipeEditListboxActiveOption(menu, index) {
     }
 }
 
+const RECIPE_EDIT_LISTBOX_TYPEAHEAD_RESET_MS = 700;
+
+function recipeEditListboxTypeaheadText(value) {
+    return String(value || "")
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLocaleLowerCase();
+}
+
+function recipeEditListboxTypeaheadKey(event) {
+    return Boolean(
+        event
+        && !event.isComposing
+        && !event.ctrlKey
+        && !event.metaKey
+        && !event.altKey
+        && String(event.key || "").length === 1
+        && String(event.key || "").trim()
+    );
+}
+
+function recipeEditListboxOptionTypeaheadText(option) {
+    if (!option) return "";
+    const value = option.dataset.unitValue
+        || option.dataset.typeValue
+        || option.dataset.storeSectionValue
+        || option.textContent;
+    return recipeEditListboxTypeaheadText(value);
+}
+
+function moveRecipeEditListboxToTypeaheadMatch(event, menu) {
+    if (!recipeEditListboxTypeaheadKey(event) || !menu) {
+        return false;
+    }
+
+    event.preventDefault();
+    const options = recipeEditListboxOptions(menu);
+    const candidates = options
+        .map((option, index) => ({ option, index, text: recipeEditListboxOptionTypeaheadText(option) }))
+        .filter(({ option, text }) => (
+            text
+            && !option.matches("[data-unit-action], [data-type-action], [data-store-section-action]")
+        ));
+    if (!candidates.length) {
+        return true;
+    }
+
+    const now = Date.now();
+    const key = recipeEditListboxTypeaheadText(event.key);
+    const previousAt = Number(menu.recipeEditTypeaheadAt || 0);
+    const previousBuffer = now - previousAt <= RECIPE_EDIT_LISTBOX_TYPEAHEAD_RESET_MS
+        ? String(menu.dataset.typeaheadBuffer || "")
+        : "";
+    const repeatedKey = Boolean(
+        previousBuffer
+        && [...previousBuffer].every(character => character === key)
+    );
+    let query = repeatedKey ? key : `${previousBuffer}${key}`;
+    const currentIndex = Number(menu.dataset.activeIndex || 0);
+
+    const findMatch = (searchQuery, startIndex) => {
+        const ordered = [
+            ...candidates.filter(candidate => candidate.index >= startIndex),
+            ...candidates.filter(candidate => candidate.index < startIndex),
+        ];
+        const prefixMatch = ordered.find(candidate => (
+            candidate.text.startsWith(searchQuery)
+            || candidate.text.split(/\s+/).some(word => word.startsWith(searchQuery))
+        ));
+        return prefixMatch || ordered.find(candidate => candidate.text.includes(searchQuery)) || null;
+    };
+
+    let match = findMatch(query, query.length === 1 ? currentIndex + 1 : 0);
+    if (!match && query !== key) {
+        query = key;
+        match = findMatch(query, currentIndex + 1);
+    }
+
+    menu.dataset.typeaheadBuffer = query;
+    menu.recipeEditTypeaheadAt = now;
+    if (match) {
+        setRecipeEditListboxActiveOption(menu, match.index);
+    }
+    return true;
+}
+
 function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
     if (!menu || !input) {
         return;
@@ -37963,7 +38066,7 @@ function handleRecipeIngredientUnitKeydown(event, input) {
         return;
     }
 
-    const menu = document.getElementById("recipeIngredientUnitMenu");
+    let menu = document.getElementById("recipeIngredientUnitMenu");
     const isOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === input);
     if (["ArrowDown", "ArrowUp"].includes(event.key)) {
         event.preventDefault();
@@ -37973,6 +38076,14 @@ function handleRecipeIngredientUnitKeydown(event, input) {
         }
         const currentIndex = Number(menu.dataset.activeIndex || 0);
         setRecipeEditListboxActiveOption(menu, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+        return;
+    }
+    if (recipeEditListboxTypeaheadKey(event)) {
+        if (!isOpen) {
+            openRecipeIngredientUnitPicker(input, { showAll: true });
+            menu = document.getElementById("recipeIngredientUnitMenu");
+        }
+        moveRecipeEditListboxToTypeaheadMatch(event, menu);
         return;
     }
     if (!isOpen) {
@@ -40669,6 +40780,8 @@ function closeRecipeEditRowMenus() {
         menu.style.right = "";
         menu.style.minWidth = "";
         menu.dataset.activeIndex = "";
+        delete menu.dataset.typeaheadBuffer;
+        delete menu.recipeEditTypeaheadAt;
         if (anchorButton && menu.matches(".recipe-edit-unit-menu, .recipe-edit-store-section-menu, .recipe-edit-type-menu")) {
             anchorButton.setAttribute("aria-expanded", "false");
             anchorButton.removeAttribute("aria-activedescendant");
