@@ -28715,6 +28715,15 @@ function organizeRecipeEditIngredientRow(row) {
         }[fieldName]);
         if (fieldName === "unit") control.setAttribute("list", "recipeIngredientUnitOptions");
         summary.appendChild(control);
+        if (fieldName === "unit" || fieldName === "section") {
+            const chevron = document.createElement("span");
+            chevron.className = fieldName === "section"
+                ? "recipe-edit-unit-chevron recipe-edit-type-chevron recipe-edit-inline-picker-chevron"
+                : "recipe-edit-unit-chevron recipe-edit-inline-picker-chevron";
+            chevron.setAttribute("aria-hidden", "true");
+            chevron.innerHTML = recipeEditSvgIcon("chevron-down");
+            summary.appendChild(chevron);
+        }
         row.appendChild(summary);
     });
 

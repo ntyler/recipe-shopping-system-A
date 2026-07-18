@@ -2844,6 +2844,13 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     bind_type = script[bind_start:bind_end]
     assert 'chevron.className = "recipe-edit-unit-chevron recipe-edit-type-chevron";' in bind_type
     assert 'trigger.insertAdjacentElement("afterend", chevron);' in bind_type
+    summary_start = script.index("const summaryDefinitions = [")
+    summary_end = script.index("const mobileQuantitySummary", summary_start)
+    summary_controls = script[summary_start:summary_end]
+    assert 'if (fieldName === "unit" || fieldName === "section")' in summary_controls
+    assert '"recipe-edit-unit-chevron recipe-edit-type-chevron recipe-edit-inline-picker-chevron"' in summary_controls
+    assert '"recipe-edit-unit-chevron recipe-edit-inline-picker-chevron"' in summary_controls
+    assert 'chevron.innerHTML = recipeEditSvgIcon("chevron-down");' in summary_controls
     assert "bindRecipeIngredientStoreSectionControls(row);\n    bindRecipeIngredientTypeControls(row);" in script
     assert 'optionalInput.checked = recipeIngredientIsOptional({ section: typeSelect.value });' in script
     assert 'item.optional = recipeIngredientIsOptional(item);' in script
@@ -2883,8 +2890,18 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert ".recipe-edit-ingredient-modal-type-field > .recipe-edit-type-trigger" in modal_type
     assert "padding: 9px 40px 9px 12px;" in modal_type
     assert "cursor: pointer;" in modal_type
-    assert ".recipe-edit-ingredient-modal-type-field > .recipe-edit-type-chevron" in modal_type
+    assert "[data-recipe-edit-unit-trigger]:is(:hover, :focus-visible, [aria-expanded=\"true\"])" in modal_type
+    assert "[data-recipe-edit-type-trigger]:is(:hover, :focus-visible, [aria-expanded=\"true\"])" in modal_type
+    assert "~ .recipe-edit-unit-chevron" in modal_type
+    assert "~ .recipe-edit-type-chevron" in modal_type
     assert "opacity: 1;" in modal_type
+
+    unit_chevron_start = css.index(
+        ".recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-unit-chevron {"
+    )
+    unit_chevron_rule = css[unit_chevron_start:css.index("}", unit_chevron_start)]
+    assert "opacity: 0;" in unit_chevron_rule
+    assert "transition: opacity 120ms ease;" in unit_chevron_rule
 
     mobile_type_start = css.index(
         "body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-type-trigger {",

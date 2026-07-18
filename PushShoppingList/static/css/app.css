@@ -42041,7 +42041,9 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-more-actions .recipe-ed
     color: var(--app-muted);
     white-space: normal;
     pointer-events: none;
+    opacity: 0;
     transform: translateY(-50%);
+    transition: opacity 120ms ease;
 }
 
 .recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-unit-chevron .recipe-edit-inline-icon,
@@ -56192,7 +56194,26 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recip
     cursor: pointer;
 }
 
-body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-type-field > .recipe-edit-type-chevron {
+body.recipe-edit-standalone-page #recipeEditIngredients :is(
+    .recipe-edit-ingredient-unit-summary,
+    .recipe-edit-ingredient-type-summary
+) {
+    position: relative;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
+    padding-right: 22px;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    [data-recipe-edit-unit-trigger]:is(:hover, :focus-visible, [aria-expanded="true"])
+    ~ .recipe-edit-unit-chevron,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    [data-recipe-edit-type-trigger]:is(:hover, :focus-visible, [aria-expanded="true"])
+    ~ .recipe-edit-type-chevron {
     opacity: 1;
 }
 
