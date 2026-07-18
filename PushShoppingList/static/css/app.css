@@ -38413,8 +38413,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     border-radius: 7px;
     background: var(--app-bg-soft);
     color: var(--app-text);
-    font-size: 9px;
-    font-weight: 700;
+    font: inherit;
     text-align: left;
 }
 
@@ -51040,8 +51039,9 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
     }
 
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-store-section-trigger {
-        font-size: 14px;
-        font-weight: 600;
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.25;
     }
 
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-type-trigger {
@@ -56215,6 +56215,16 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     [data-recipe-edit-type-trigger]:is(:hover, :focus-visible, [aria-expanded="true"])
     ~ .recipe-edit-type-chevron {
     opacity: 1;
+}
+
+/* Ingredient editor v30: keep Store Section typography identical to Type. */
+body.recipe-edit-standalone-page #recipeEditIngredients :is(
+    .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger,
+    .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger
+) {
+    font: inherit;
+    line-height: 1.2;
+    letter-spacing: inherit;
 }
 
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */

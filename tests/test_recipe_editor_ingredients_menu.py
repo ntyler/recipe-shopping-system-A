@@ -2732,6 +2732,31 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert "> .recipe-edit-store-section-chevron" in active_chevron_rule
     assert "opacity: 1;" in active_chevron_rule
 
+    matching_type = css[css.index("/* Ingredient editor v30:"):]
+    assert ".recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger" in matching_type
+    assert ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger" in matching_type
+    table_font_rule = matching_type[:matching_type.index("}")]
+    assert "font: inherit;" in table_font_rule
+    assert "line-height: 1.2;" in table_font_rule
+    assert "letter-spacing: inherit;" in table_font_rule
+
+    store_trigger_start = css.index(
+        ".recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-trigger {"
+    )
+    store_trigger_rule = css[store_trigger_start:css.index("}", store_trigger_start)]
+    assert "font: inherit;" in store_trigger_rule
+    assert "font-size:" not in store_trigger_rule
+    assert "font-weight:" not in store_trigger_rule
+
+    mobile_store_start = css.index(
+        "body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-store-section-trigger {",
+        css.index("/* Use a calmer mobile type hierarchy and keep editable text phone-friendly. */"),
+    )
+    mobile_store_rule = css[mobile_store_start:css.index("}", mobile_store_start)]
+    assert "font-size: 16px;" in mobile_store_rule
+    assert "font-weight: 500;" in mobile_store_rule
+    assert "line-height: 1.25;" in mobile_store_rule
+
 
 def test_store_section_summary_icon_stays_inside_its_table_cell():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
