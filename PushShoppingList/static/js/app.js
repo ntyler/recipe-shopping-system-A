@@ -26335,28 +26335,9 @@ function fitRecipeEditIngredientColumnWidthsToBudget(keys, requestedWidths, budg
         total = keys.reduce((sum, key) => sum + widths[key], 0);
     }
 
-    if (total < target) {
-        const growthOrder = [
-            "ingredient",
-            "alternatives",
-            "store",
-            "status",
-            "type",
-            "unit",
-            "size",
-            "quantity",
-            "media",
-            "actions",
-        ].filter(key => keys.includes(key));
-        let remaining = target - total;
-        growthOrder.forEach(key => {
-            if (!remaining) return;
-            const definition = RECIPE_EDIT_INGREDIENT_COLUMNS[key];
-            const growth = Math.min(remaining, definition.maxWidth - widths[key]);
-            widths[key] += growth;
-            remaining -= growth;
-        });
-    }
+    // Preserve content-fitted widths when the visible columns already fit.
+    // Any unused table space should trail the active columns instead of being
+    // assigned to Ingredient and creating a large gap before the next field.
 
     return widths;
 }
@@ -26408,7 +26389,7 @@ function autoFitRecipeEditIngredientColumns(columnKey = "") {
     setRecipeEditIngredientColumnStatus(
         columnKey
             ? `${RECIPE_EDIT_INGREDIENT_COLUMNS[columnKey].label} column fitted to its content.`
-            : "Visible ingredient columns fitted to the table width.",
+            : "Visible ingredient columns fitted to their content within the table width.",
     );
     return false;
 }

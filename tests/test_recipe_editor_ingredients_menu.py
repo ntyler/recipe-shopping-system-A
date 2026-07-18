@@ -1718,7 +1718,11 @@ def test_recipe_editor_auto_fit_keeps_visible_columns_inside_the_table_width():
     assert "recipeEditIngredientColumnWidthBudget(tableScroll, visibleKeys.length, gap)" in auto_fit
     assert "Object.assign(layout.widths, fittedWidths);" in auto_fit
     assert 'tableScroll.clientWidth' in auto_fit
-    assert 'Visible ingredient columns fitted to the table width.' in auto_fit
+    assert 'Visible ingredient columns fitted to their content within the table width.' in auto_fit
+    assert "if (total > target)" in auto_fit
+    assert "if (total < target)" not in auto_fit
+    assert "const growthOrder" not in auto_fit
+    assert "Preserve content-fitted widths when the visible columns already fit." in auto_fit
 
     alternatives_css = css[css.index("@media (min-width: 768px) {", css.index("/* Ingredient editor v20:")):]
     assert ".recipe-edit-ingredient-options-button" in alternatives_css
