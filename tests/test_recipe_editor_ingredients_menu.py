@@ -2103,9 +2103,11 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem)" in summary
     assert 'const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();' in summary
     assert "meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values)" in summary
+    assert 'readBuyAs.closest(".recipe-edit-ingredient-read-buy-as")' in summary
+    assert "readBuyAsField.hidden = !meaningfulBuyAs;" in summary
     assert "readBuyAs.value = buyAsValue;" in summary
-    assert 'readBuyAs.title = buyAsValue ? `Buy as: ${buyAsValue}` : "Edit Buy As";' in summary
-    assert "readBuyAs.hidden" not in summary
+    assert 'readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Buy As matches Ingredient Name";' in summary
+    assert "previewBuyAs.hidden = !meaningfulBuyAs;" in summary
     assert "quantitySummary.textContent" not in summary
     assert "unitSummary.textContent" not in summary
     assert "preparationSummary" not in summary
@@ -2150,6 +2152,13 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     compact_buy_as_layout = compact_buy_as_layout[:compact_buy_as_layout.index("}")]
     assert "display: grid !important;" in compact_buy_as_layout
     assert "grid-template-columns: max-content minmax(0, 1fr);" in compact_buy_as_layout
+    compact_buy_as_hidden = compact_buy_as[
+        compact_buy_as.index(
+            "body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as[hidden] {"
+        ):
+    ]
+    compact_buy_as_hidden = compact_buy_as_hidden[:compact_buy_as_hidden.index("}")]
+    assert "display: none !important;" in compact_buy_as_hidden
     compact_buy_as_label = compact_buy_as[
         compact_buy_as.index(".recipe-edit-ingredient-read-buy-as > span {"):
     ]
@@ -2244,8 +2253,9 @@ def test_recipe_editor_secondary_metadata_normalizes_buy_as_for_summaries():
         script.index("function updateRecipeIngredientSummary"):
         script.index("function recipeEditIngredientRows")
     ]
-    assert '`Buy as: ${meaningfulBuyAs || "' in summary
-    assert "readBuyAs.hidden" not in summary
+    assert 'previewBuyAs.textContent = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "";' in summary
+    assert "previewBuyAs.hidden = !meaningfulBuyAs;" in summary
+    assert "readBuyAsField.hidden = !meaningfulBuyAs;" in summary
     assert 'data-recipe-ingredient-inline-field="purchasable_item"' in script
     assert "recipeIngredientReadStatusHtml(matchItem)" in summary
 

@@ -55859,6 +55859,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as {
     line-height: 1.35;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as[hidden] {
+    display: none !important;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > span {
     grid-column: 1;
     grid-row: 1;

@@ -39846,6 +39846,7 @@ function updateRecipeIngredientSummary(row) {
     const matchDetails = row ? row.querySelector("[data-ingredient-match-details]") : null;
     const readStatus = row ? row.querySelector("[data-ingredient-read-status]") : null;
     const readBuyAs = row ? row.querySelector("[data-ingredient-read-buy-as]") : null;
+    const readBuyAsField = readBuyAs ? readBuyAs.closest(".recipe-edit-ingredient-read-buy-as") : null;
     const editSubtitle = row ? row.querySelector("[data-recipe-ingredient-edit-subtitle]") : null;
     const previewName = row ? row.querySelector("[data-recipe-ingredient-modal-preview-name]") : null;
     const previewBuyAs = row ? row.querySelector("[data-recipe-ingredient-modal-preview-buy-as]") : null;
@@ -39869,15 +39870,19 @@ function updateRecipeIngredientSummary(row) {
     const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
     const quantitySummaryText = formatRecipeIngredientQuantityUnit(values);
     if (previewName) previewName.textContent = recipeIngredientSentenceCase(ingredientName) || ingredientName;
-    if (previewBuyAs) previewBuyAs.textContent = `Buy as: ${meaningfulBuyAs || "—"}`;
+    if (previewBuyAs) {
+        previewBuyAs.textContent = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "";
+        previewBuyAs.hidden = !meaningfulBuyAs;
+    }
     if (previewStore) {
         const storeLabel = recipeStoreSectionDisplayLabel(values.store_section || "") || "Misc";
         previewStore.innerHTML = `${recipeIngredientStoreSectionIconHtml(values.store_section || "")}<span>${escapeHtml(storeLabel)}</span>`;
     }
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
+    if (readBuyAsField) readBuyAsField.hidden = !meaningfulBuyAs;
     if (readBuyAs) {
         readBuyAs.value = buyAsValue;
-        readBuyAs.title = buyAsValue ? `Buy as: ${buyAsValue}` : "Edit Buy As";
+        readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Buy As matches Ingredient Name";
     }
     if (mobileQuantitySummary) {
         mobileQuantitySummary.textContent = quantitySummaryText;
