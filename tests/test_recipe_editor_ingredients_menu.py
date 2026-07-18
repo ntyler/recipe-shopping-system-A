@@ -826,6 +826,37 @@ def test_mobile_and_desktop_recipe_editor_use_the_same_app_font_family():
     assert 'font-family: "Segoe UI Variable Text"' not in desktop_shell_rule
 
 
+def test_mobile_ingredient_status_value_stacks_beneath_its_label():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    v33_start = css.index("/* Ingredient editor v33:")
+    assert v33_start > css.index("/* Ingredient editor v32:")
+    v33 = css[v33_start:css.index("/* Keep expanded modal analysis", v33_start)]
+    assert "@media (max-width: 767px)" in v33
+
+    status_start = v33.index(
+        "#recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-status-summary {"
+    )
+    status_rule = v33[status_start:v33.index("}", status_start)]
+    assert "grid-template-columns: minmax(0, 1fr);" in status_rule
+    assert "align-items: stretch;" in status_rule
+    assert "gap: 2px;" in status_rule
+
+    label_start = v33.index(".recipe-edit-ingredient-status-summary::before {")
+    label_rule = v33[label_start:v33.index("}", label_start)]
+    assert "grid-column: 1;" in label_rule
+    assert "grid-row: 1;" in label_rule
+
+    value_start = v33.index(
+        ".recipe-edit-ingredient-status-summary > [data-ingredient-read-status] {"
+    )
+    value_rule = v33[value_start:v33.index("}", value_start)]
+    assert "display: block;" in value_rule
+    assert "grid-column: 1;" in value_rule
+    assert "grid-row: 2;" in value_rule
+    assert "width: 100%;" in value_rule
+
+
 def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 

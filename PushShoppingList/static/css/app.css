@@ -56324,6 +56324,31 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-inline-pick
     }
 }
 
+/* Ingredient editor v33: stack mobile Status beneath its label like Size. */
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-status-summary {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-content: start;
+        align-items: stretch;
+        gap: 2px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-status-summary::before {
+        display: block;
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-status-summary > [data-ingredient-read-status] {
+        display: block;
+        grid-column: 1;
+        grid-row: 2;
+        width: 100%;
+        min-width: 0;
+    }
+}
+
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row
