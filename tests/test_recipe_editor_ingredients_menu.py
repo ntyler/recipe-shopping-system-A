@@ -30,20 +30,21 @@ def test_ingredients_header_has_image_overflow_menu():
     assert "Sort Ingredients" in ingredient_section
     assert "By Ingredient Name" in ingredient_section
     assert "By Store Section" in ingredient_section
-    assert "Show or Hide Images" in ingredient_section
+    assert "Show or Hide Images" not in ingredient_section
+    assert "Show ingredient images" not in ingredient_section
+    assert "Hide ingredient images" not in ingredient_section
     assert "Thumbnail Size" in ingredient_section
     assert ingredient_section.index("Generate Images") < ingredient_section.index("Sort Ingredients")
     assert ingredient_section.index("Regenerate Ingredients") < ingredient_section.index("Food Rules")
     assert ingredient_section.index("Food Rules") < ingredient_section.index("Sort Ingredients")
-    assert ingredient_section.index("Sort Ingredients") < ingredient_section.index("Show or Hide Images")
-    assert ingredient_section.index("Show or Hide Images") < ingredient_section.index("Thumbnail Size")
+    assert ingredient_section.index("Sort Ingredients") < ingredient_section.index("Thumbnail Size")
     assert "generateRecipeImagesFromEditor(this, { imageScope: 'ingredients' })" in ingredient_section
     assert "generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'ingredients' })" in ingredient_section
     assert "regenerateRecipeIngredientsSection(this)" in ingredient_section
     assert "autoSortRecipeIngredients('ingredient')" in ingredient_section
     assert "autoSortRecipeIngredients('store_section')" in ingredient_section
-    assert "setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'ingredients' })" in ingredient_section
-    assert "setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'ingredients' })" in ingredient_section
+    assert "setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'ingredients' })" not in ingredient_section
+    assert "setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'ingredients' })" not in ingredient_section
     assert "data-recipe-thumbnail-size-decrease" in ingredient_section
     assert "changeRecipeImageThumbnailSize(this, -1)" in ingredient_section
     assert "data-recipe-thumbnail-size-value" in ingredient_section
@@ -186,7 +187,7 @@ def test_recipe_editor_match_column_only_surfaces_attention_states():
         assert selector in css
 
 
-def test_recipe_editor_hide_all_images_keeps_title_image_visible():
+def test_recipe_editor_hide_all_images_keeps_title_and_ingredient_images_visible():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     function_start = script.index("function setRecipeEditorImagesVisibleFromMenu")
     function_end = script.index("function recipeEditorImagePanelSelector", function_start)
@@ -194,8 +195,17 @@ def test_recipe_editor_hide_all_images_keeps_title_image_visible():
 
     assert "const scope = options.imageScope || options.scope || \"all\";" in function_block
     assert "modal.querySelectorAll(recipeEditorImagePanelSelector(options))" in function_block
+    assert "keepRecipeEditorIngredientImagesVisible(modal);" in function_block
     assert "if (!visible && scope === \"all\")" in function_block
     assert "keepRecipeCoverImagesVisible(modal);" in function_block
+
+    defaults_start = script.index("function applyRecipeImageDefaultVisibility")
+    defaults_end = script.index("function recipeImageContainersForCard", defaults_start)
+    defaults_block = script[defaults_start:defaults_end]
+    assert "keepRecipeEditorIngredientImagesVisible(scope);" in defaults_block
+    assert "function keepRecipeEditorIngredientImagesVisible(scope = document)" in defaults_block
+    assert 'editor.querySelectorAll("[data-ingredient-image-panel]")' in defaults_block
+    assert "true" in defaults_block
 
 
 def test_recipe_editor_ingredient_images_use_thumbnail_previews():
@@ -211,6 +221,15 @@ def test_recipe_editor_ingredient_images_use_thumbnail_previews():
     assert "setRecipeEditRowImageToolsVisibleFromMenu(this, true)" in row_block
     assert "data-recipe-edit-row-image-tools-hide" in row_block
     assert "setRecipeEditRowImageToolsVisibleFromMenu(this, false)" in row_block
+    assert "data-recipe-edit-row-image-show" not in row_block
+    assert "data-recipe-edit-row-image-hide" not in row_block
+    assert "Show ingredient image" not in row_block
+    assert "Hide ingredient image" not in row_block
+    visibility_start = script.index("function setRecipeEditRowImageVisible(row, visible)")
+    visibility_end = script.index("function updateRecipeEditRowImageMenu", visibility_start)
+    visibility_block = script[visibility_start:visibility_end]
+    assert 'row.classList.contains("recipe-edit-ingredient-row") || visible' in visibility_block
+    assert "setRecipeImageContainersVisible([panel], shouldShow);" in visibility_block
     assert ".recipe-edit-ingredient-row .recipe-ingredient-image-panel .recipe-ingredient-image" in css
     assert "width: 120px;" in css
     assert "height: 120px;" in css

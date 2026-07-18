@@ -38632,17 +38632,6 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                         ${ingredientImageUrl ? "Regenerate ingredient image" : "Generate ingredient image"}
                     </button>
                     <button type="button"
-                            data-recipe-edit-row-image-show
-                            onclick="return setRecipeEditRowImageVisibleFromMenu(this, true)"
-                            hidden>
-                        Show ingredient image
-                    </button>
-                    <button type="button"
-                            data-recipe-edit-row-image-hide
-                            onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
-                        Hide ingredient image
-                    </button>
-                    <button type="button"
                             data-recipe-edit-row-image-tools-show
                             onclick="return setRecipeEditRowImageToolsVisibleFromMenu(this, true)">
                         Show image tools
@@ -47653,6 +47642,7 @@ function setRecipeEditorImagesVisibleFromMenu(button, visible, options = {}) {
         modal.querySelectorAll(recipeEditorImagePanelSelector(options)),
         visible
     );
+    keepRecipeEditorIngredientImagesVisible(modal);
 
     if (!visible && scope === "all") {
         keepRecipeCoverImagesVisible(modal);
@@ -47734,7 +47724,8 @@ function setRecipeEditRowImageVisible(row, visible) {
         return false;
     }
 
-    setRecipeImageContainersVisible([panel], visible);
+    const shouldShow = row.classList.contains("recipe-edit-ingredient-row") || visible;
+    setRecipeImageContainersVisible([panel], shouldShow);
     updateRecipeEditRowImageMenu(row);
     return true;
 }
@@ -48637,7 +48628,26 @@ function applyRecipeImageDefaultVisibility(scope = document) {
         scope.querySelectorAll("[data-ingredient-image-panel], [data-equipment-image-panel], [data-step-image-panel]"),
         recipeImagesShownByDefault()
     );
+    keepRecipeEditorIngredientImagesVisible(scope);
     keepRecipeCoverImagesVisible(scope);
+}
+
+function keepRecipeEditorIngredientImagesVisible(scope = document) {
+    if (!scope || !scope.querySelectorAll) {
+        return;
+    }
+
+    const editor = scope.matches && scope.matches("#recipeEditModal")
+        ? scope
+        : scope.querySelector("#recipeEditModal");
+    if (!recipeEditorSurfaceIsActive(editor)) {
+        return;
+    }
+
+    setRecipeImageContainersVisible(
+        editor.querySelectorAll("[data-ingredient-image-panel]"),
+        true
+    );
 }
 
 function recipeImageContainersForCard(card) {
