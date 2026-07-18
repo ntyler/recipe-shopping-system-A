@@ -50861,48 +50861,14 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         font-size: 13px;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-preview-media.is-image-options-open::after {
-        content: "";
-        position: fixed;
-        z-index: 19;
-        inset: 0;
-        background: rgba(0, 0, 0, .52);
-        backdrop-filter: blur(1px);
-    }
-
     body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-preview-media .recipe-edit-ingredient-modal-image-panel > .recipe-step-image-actions {
-        position: fixed;
-        z-index: 20;
-        top: auto;
-        right: 12px;
-        bottom: max(12px, env(safe-area-inset-bottom));
-        left: 12px;
-        width: auto;
-        max-width: 480px;
-        max-height: calc(100dvh - 88px);
-        margin-inline: auto;
-        padding: 12px;
-        gap: 8px;
-        overflow-y: auto;
-        border-radius: 14px;
-        box-shadow: 0 22px 60px rgba(0, 0, 0, .58);
-        transform: translateY(16px);
+        left: 0;
+        width: min(220px, calc(100vw - 52px));
+        transform: translateY(-5px);
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-preview-media .recipe-edit-ingredient-modal-image-panel.recipe-ingredient-image-options-open > .recipe-step-image-actions {
         transform: translateY(0);
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-ingredient-image-options-title {
-        padding: 3px 4px 9px;
-        font-size: 13px;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-preview-media .recipe-step-image-actions :is(button, a) {
-        min-height: 44px !important;
-        padding-inline: 13px !important;
-        border-radius: 8px;
-        font-size: 13px !important;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-preview > strong {
