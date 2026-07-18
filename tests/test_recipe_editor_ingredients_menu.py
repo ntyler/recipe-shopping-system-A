@@ -772,7 +772,7 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert ".recipe-edit-ingredient-options-panel {\n        grid-column: 1 / -1 !important;\n        grid-row: 6 !important;" in mobile
     assert ".recipe-edit-ingredient-substitution-cell {\n        display: block;" in mobile
     assert "grid-template-columns: 72px minmax(0, 1fr);" in mobile
-    assert '.recipe-edit-ingredient-quantity-summary::before {\n        content: "Amount";' in mobile
+    assert '.recipe-edit-ingredient-quantity-summary::before {\n        content: "Quantity";' in mobile
     assert '.recipe-edit-ingredient-unit-summary::before {\n        content: "Unit";' in mobile
     assert '.recipe-edit-ingredient-size-summary::before {\n        content: "Size";' in mobile
     assert '.recipe-edit-ingredient-substitution-cell::before {\n        content: "Alternatives";' in mobile

@@ -55682,7 +55682,7 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-quantity-summary::before {
-        content: "Amount";
+        content: "Quantity";
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-unit-summary::before {
