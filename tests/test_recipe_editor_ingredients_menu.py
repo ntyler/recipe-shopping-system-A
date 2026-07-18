@@ -2825,17 +2825,32 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     quiet_type = css[css.index("/* Ingredient editor v28:"):]
     assert "@media (min-width: 768px)" in quiet_type
     assert "#recipeEditIngredients .recipe-edit-ingredient-type-summary:has(> [data-recipe-ingredient-inline-type-trigger])" in quiet_type
-    assert ".recipe-edit-ingredient-modal-type-field" in quiet_type
     assert "display: block;" in quiet_type
     assert "grid-template-columns: minmax(0, 1fr);" in quiet_type
     assert "width: 100%;" in quiet_type
     assert "max-width: none;" in quiet_type
-    assert "padding: 0 22px 0 7px;" in quiet_type
+    assert "padding: 0 7px;" in quiet_type
     assert "font: inherit;" in quiet_type
     assert "text-align: left;" in quiet_type
-    assert "opacity: 0;" in quiet_type
-    assert ':is(:hover, :focus-visible, [aria-expanded="true"])' in quiet_type
-    assert "opacity: .82;" in quiet_type
+    assert "transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;" in quiet_type
+    assert "display: none;" in quiet_type
+
+    modal_type = css[css.index("/* Ingredient editor v29:"):]
+    assert ".recipe-edit-ingredient-modal-type-field > .recipe-edit-type-trigger" in modal_type
+    assert "padding: 9px 40px 9px 12px;" in modal_type
+    assert "right: 4px;" in modal_type
+    assert "width: 12px;" in modal_type
+    assert "height: 12px;" in modal_type
+    assert "opacity: 1;" in modal_type
+
+    mobile_type_start = css.index(
+        "body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-type-trigger {",
+        css.index("/* Use a calmer mobile type hierarchy and keep editable text phone-friendly. */"),
+    )
+    mobile_type = css[mobile_type_start:css.index("}", mobile_type_start)]
+    assert "font-size: 16px;" in mobile_type
+    assert "font-weight: 500;" in mobile_type
+    assert "line-height: 1.25;" in mobile_type
 
 
 def test_recipe_editor_type_is_authoritative_for_saved_optional_state():
