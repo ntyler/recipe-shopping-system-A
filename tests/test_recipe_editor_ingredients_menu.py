@@ -806,6 +806,26 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert 'onclick="moveRecipeEditRow(this, 1)">Move ingredient down</button>' in script
 
 
+def test_mobile_and_desktop_recipe_editor_use_the_same_app_font_family():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    font_declaration = '--app-font-family: "Segoe UI Variable Text", Inter, "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;'
+    font_declaration_start = css.index(font_declaration)
+    root_start = css.rfind(":root {", 0, font_declaration_start)
+    root_rule = css[root_start:css.index("}", font_declaration_start)]
+    assert font_declaration in root_rule
+
+    shell_start = css.index(".app-shell-body {")
+    shell_rule = css[shell_start:css.index("}", shell_start)]
+    assert "font-family: var(--app-font-family);" in shell_rule
+
+    desktop_start = css.index("/* Desktop mockup fidelity pass:")
+    desktop_shell_start = css.index(".app-shell-body {", desktop_start)
+    desktop_shell_rule = css[desktop_shell_start:css.index("}", desktop_shell_start)]
+    assert "font-family: var(--app-font-family);" in desktop_shell_rule
+    assert 'font-family: "Segoe UI Variable Text"' not in desktop_shell_rule
+
+
 def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
