@@ -2925,14 +2925,22 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert "opacity: 1;" in modal_type
 
     separate_chevron = css[css.index("/* Ingredient editor v31:"):]
-    separate_field_rule = separate_chevron[:separate_chevron.index("}")]
-    assert ".recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control" in separate_field_rule
-    assert ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger" in separate_field_rule
-    assert "width: calc(100% - 16px);" in separate_field_rule
-    assert "padding-right: 7px;" in separate_field_rule
+    separate_unit_rule = separate_chevron[:separate_chevron.index("}")]
+    assert ".recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control" in separate_unit_rule
+    assert "width: calc(100% - 16px);" in separate_unit_rule
+    assert "padding-right: 7px;" in separate_unit_rule
+    separate_type_start = separate_chevron.index(
+        ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger"
+    )
+    separate_type_rule = separate_chevron[separate_type_start:separate_chevron.index("}", separate_type_start)]
+    assert "width: calc(100% - 24px);" in separate_type_rule
+    assert "padding-right: 7px;" in separate_type_rule
     separate_icon_start = separate_chevron.index(".recipe-edit-inline-picker-chevron")
     separate_icon_rule = separate_chevron[separate_icon_start:separate_chevron.index("}", separate_icon_start)]
     assert "right: 0;" in separate_icon_rule
+    type_icon_start = separate_chevron.index(".recipe-edit-type-chevron")
+    type_icon_rule = separate_chevron[type_icon_start:separate_chevron.index("}", type_icon_start)]
+    assert "right: 9px;" in type_icon_rule
 
     unit_chevron_start = css.index(
         ".recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-unit-chevron {"
