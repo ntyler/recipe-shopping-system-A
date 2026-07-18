@@ -53491,20 +53491,28 @@ body.recipe-edit-standalone-page .recipe-edit-category-custom-field {
     }
 
     body.recipe-edit-standalone-page .recipe-edit-categories-panel .recipe-edit-panel-heading {
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 10px;
+        align-items: center;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-categories-panel .recipe-edit-panel-title {
+        flex: 1 1 auto;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-category-actions {
-        width: calc(100% - 34px);
-        max-width: calc(100% - 34px);
-        margin-left: 34px;
-        justify-content: flex-start;
+        width: auto;
+        max-width: none;
+        margin-left: auto;
+        justify-content: flex-end;
+        gap: 6px;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-category-source {
-        max-width: calc(100% - 74px);
+        flex: 0 1 112px;
+        min-width: 0;
+        max-width: 112px;
         overflow: hidden;
         text-overflow: ellipsis;
     }
