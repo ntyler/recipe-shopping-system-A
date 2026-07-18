@@ -2933,8 +2933,8 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
         ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger"
     )
     separate_type_rule = separate_chevron[separate_type_start:separate_chevron.index("}", separate_type_start)]
-    assert "width: calc(100% - 24px);" in separate_type_rule
-    assert "padding-right: 7px;" in separate_type_rule
+    assert "width: 100%;" in separate_type_rule
+    assert "padding-right: 22px;" in separate_type_rule
     separate_icon_start = separate_chevron.index(".recipe-edit-inline-picker-chevron")
     separate_icon_rule = separate_chevron[separate_icon_start:separate_chevron.index("}", separate_icon_start)]
     assert "right: 0;" in separate_icon_rule
