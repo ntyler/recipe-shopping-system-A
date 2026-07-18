@@ -53299,18 +53299,18 @@ body.recipe-edit-standalone-page .recipe-edit-categories-panel .recipe-edit-pane
 
 body.recipe-edit-standalone-page .recipe-edit-categories-panel .recipe-edit-panel-heading h3 {
     color: var(--app-text-strong);
-    font-size: 14px;
-    font-weight: 780;
-    line-height: 1.25;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.3;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-category-recipe-name {
     margin: 3px 0 0;
     overflow: hidden;
-    color: var(--app-muted);
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.3;
+    color: color-mix(in srgb, var(--app-text) 78%, var(--app-muted));
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.4;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -53334,10 +53334,10 @@ body.recipe-edit-standalone-page .recipe-edit-category-source {
     border: 1px solid color-mix(in srgb, var(--app-primary-hover) 42%, var(--recipe-editor-border));
     border-radius: 999px;
     background: color-mix(in srgb, var(--app-primary-soft) 42%, transparent);
-    color: var(--app-text);
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 1.1;
+    color: var(--app-text-strong);
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
     text-align: left;
     white-space: nowrap;
 }
@@ -53415,8 +53415,8 @@ body.recipe-edit-standalone-page .recipe-edit-categories-panel.is-collapsed .rec
 body.recipe-edit-standalone-page .recipe-edit-category-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 16px;
-    row-gap: 12px;
+    column-gap: 24px;
+    row-gap: 14px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-category-grid > * {
@@ -53431,11 +53431,11 @@ body.recipe-edit-standalone-page .recipe-edit-category-grid label {
 
 body.recipe-edit-standalone-page .recipe-edit-category-grid label > span:first-child,
 body.recipe-edit-standalone-page .recipe-edit-category-grid .recipe-edit-cookbook-label {
-    color: var(--app-muted);
-    font-size: 10px;
-    font-weight: 720;
-    letter-spacing: .045em;
-    line-height: 1.2;
+    color: color-mix(in srgb, var(--app-text-strong) 78%, var(--app-muted));
+    font-size: 11px;
+    font-weight: 760;
+    letter-spacing: .035em;
+    line-height: 1.3;
     text-transform: uppercase;
 }
 
@@ -53450,9 +53450,9 @@ body.recipe-edit-standalone-page .recipe-edit-category-grid :is(input, select, .
     background: var(--recipe-editor-surface-soft);
     color: var(--app-text-strong);
     font-family: inherit;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 650;
-    line-height: 1.2;
+    line-height: 1.3;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-category-grid :is(input, select, .recipe-edit-cookbook-select):focus-visible {

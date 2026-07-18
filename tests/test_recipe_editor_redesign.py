@@ -542,6 +542,44 @@ def test_recipe_editor_standard_fields_are_quiet_until_active():
     assert "#recipeEditMenuPrice:is([aria-invalid=\"true\"], [data-recipe-edit-validation-invalid=\"true\"])" in quiet_fields
 
 
+def test_recipe_category_panel_uses_readable_visual_hierarchy():
+    css = read_text("PushShoppingList/static/css/app.css")
+    marker = "/* Recipe editor: full-width category card between summary and content tabs. */"
+    marker_start = css.index(marker)
+    category_styles = css[marker_start:css.index("/* Narrow recipe editor:", marker_start)]
+
+    title_start = category_styles.index(
+        ".recipe-edit-categories-panel .recipe-edit-panel-heading h3 {"
+    )
+    title_rule = category_styles[title_start:category_styles.index("}", title_start)]
+    assert "font-size: 16px;" in title_rule
+    assert "font-weight: 800;" in title_rule
+
+    subtitle_start = category_styles.index(".recipe-edit-category-recipe-name {")
+    subtitle_rule = category_styles[subtitle_start:category_styles.index("}", subtitle_start)]
+    assert "font-size: 12px;" in subtitle_rule
+    assert "font-weight: 650;" in subtitle_rule
+
+    source_start = category_styles.index(".recipe-edit-category-source {")
+    source_rule = category_styles[source_start:category_styles.index("}", source_start)]
+    assert "font-size: 11px;" in source_rule
+    assert "color: var(--app-text-strong);" in source_rule
+
+    label_start = category_styles.index(
+        ".recipe-edit-category-grid label > span:first-child,"
+    )
+    label_rule = category_styles[label_start:category_styles.index("}", label_start)]
+    assert "font-size: 11px;" in label_rule
+    assert "font-weight: 760;" in label_rule
+
+    value_start = category_styles.index(
+        ".recipe-edit-category-grid :is(input, select, .recipe-edit-cookbook-select) {"
+    )
+    value_rule = category_styles[value_start:category_styles.index("}", value_start)]
+    assert "font-size: 14px;" in value_rule
+    assert "font-weight: 650;" in value_rule
+
+
 def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
