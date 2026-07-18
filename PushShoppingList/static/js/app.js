@@ -29056,7 +29056,6 @@ function organizeRecipeEditIngredientRow(row) {
         actionMenuButton.setAttribute("aria-label", "Ingredient actions");
         actionMenuButton.title = "Ingredient actions";
     }
-    bindRecipeIngredientModalRowOpen(row);
     if (substitutions) row.appendChild(substitutions);
     if (metadata && !metadata.children.length) metadata.remove();
     updateRecipeIngredientSubstitutionState(row);
@@ -29138,8 +29137,8 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
         const editButton = actions.querySelector(".recipe-edit-compact-row-edit");
         const deleteButton = actions.querySelector(".recipe-edit-compact-row-delete");
         if (isIngredientRow) {
-            row.tabIndex = 0;
-            row.setAttribute("aria-label", `Edit ${accessibleName}`);
+            row.removeAttribute("tabindex");
+            row.removeAttribute("aria-label");
         }
         if (editButton) {
             editButton.setAttribute("aria-label", `Edit ${accessibleName}`);
@@ -29206,32 +29205,6 @@ function focusRecipeEditCompactRow(button) {
         }
     }
     return false;
-}
-
-function bindRecipeIngredientModalRowOpen(row) {
-    if (!row || row.dataset.recipeIngredientModalRowBound === "true") return;
-    row.dataset.recipeIngredientModalRowBound = "true";
-    row.addEventListener("click", event => {
-        const target = event.target;
-        if (!target || row.classList.contains("is-editing")) return;
-        if (target.closest(
-            "button, a, input, textarea, select, label, details, summary, "
-            + "[role=button], [role=combobox], [contenteditable=true], "
-            + ".recipe-edit-row-handle, .recipe-edit-row-menu, "
-            + "[data-recipe-ingredient-edit-panel], [data-ingredient-substitutions]"
-        )) {
-            return;
-        }
-        const trigger = row;
-        setRecipeIngredientEditMode(row, true, { trigger });
-    });
-    row.addEventListener("keydown", event => {
-        if (event.target !== row || row.classList.contains("is-editing")) return;
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        const trigger = row;
-        setRecipeIngredientEditMode(row, true, { trigger });
-    });
 }
 
 function setRecipeIngredientEditMode(row, shouldEdit, options = {}) {

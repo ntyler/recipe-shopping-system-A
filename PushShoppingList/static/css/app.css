@@ -48717,7 +48717,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-read-firs
     .recipe-edit-ingredient-store-summary,
     .recipe-edit-ingredient-type-summary
 ) {
-    cursor: pointer;
+    cursor: default;
 }
 
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel {

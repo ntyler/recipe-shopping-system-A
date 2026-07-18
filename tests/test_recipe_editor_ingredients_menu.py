@@ -636,26 +636,36 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert "display: none;" in edit_panel_rule
 
 
-def test_recipe_editor_ingredient_modal_guards_row_clicks_and_dirty_close_state():
+def test_recipe_editor_ingredient_modal_requires_pencil_and_preserves_dirty_close_state():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
-    row_open = script[
-        script.index("function bindRecipeIngredientModalRowOpen"):
-        script.index("function setRecipeIngredientEditMode", script.index("function bindRecipeIngredientModalRowOpen"))
+    organize = script[
+        script.index("function organizeRecipeEditIngredientRow"):
+        script.index("function organizeRecipeEditCompactRowActions")
     ]
-    assert 'row.addEventListener("click", event =>' in row_open
-    assert 'row.addEventListener("keydown", event =>' in row_open
-    assert 'row.classList.contains("is-editing")' in row_open
-    assert 'event.key !== "Enter" && event.key !== " "' in row_open
-    for guarded_target in (
-        "button, a, input, textarea, select, label, details, summary",
-        "[role=button], [role=combobox], [contenteditable=true]",
-        ".recipe-edit-row-handle, .recipe-edit-row-menu",
-        "[data-recipe-ingredient-edit-panel], [data-ingredient-substitutions]",
-    ):
-        assert guarded_target in row_open
-    assert 'setRecipeIngredientEditMode(row, true, { trigger });' in row_open
+    actions = script[
+        script.index("function organizeRecipeEditCompactRowActions"):
+        script.index("function updateRecipeEditIngredientDetailsState")
+    ]
+    focus_row = script[
+        script.index("function focusRecipeEditCompactRow"):
+        script.index("function setRecipeIngredientEditMode")
+    ]
+    assert "bindRecipeIngredientModalRowOpen" not in script
+    assert "bindRecipeIngredientModalRowOpen(row);" not in organize
+    assert 'row.removeAttribute("tabindex");' in actions
+    assert 'row.removeAttribute("aria-label");' in actions
+    assert 'return setRecipeIngredientEditMode(row, true, { trigger: button });' in focus_row
+
+    row_cursor_selector = (
+        "body.recipe-edit-standalone-page #recipeEditIngredients > "
+        ".recipe-edit-read-first-row:not(.is-editing) :is("
+    )
+    row_cursor = css[css.index(row_cursor_selector):]
+    row_cursor = row_cursor[:row_cursor.index("}")]
+    assert "cursor: default;" in row_cursor
+    assert "cursor: pointer;" not in row_cursor
 
     close_contract = script[
         script.index("function recipeIngredientModalHasChanges"):
@@ -2046,7 +2056,9 @@ def test_recipe_editor_v10_prioritizes_six_readable_groups_and_overflow_menu():
     assert 'const isIngredientRow = label === "ingredient";' in script
     assert 'const editButtonHtml = `' in script
     assert 'const editButtonHtml = isIngredientRow ? "" :' not in script
-    assert 'row.setAttribute("aria-label", `Edit ${accessibleName}`);' in script
+    assert 'row.removeAttribute("tabindex");' in script
+    assert 'row.removeAttribute("aria-label");' in script
+    assert 'editButton.setAttribute("aria-label", `Edit ${accessibleName}`);' in script
     assert 'actions.appendChild(menuWrap);' in script
     assert 'class="recipe-edit-compact-row-delete"' in script
     assert '${menuInActions ? "" : `<button type="button"' in script
