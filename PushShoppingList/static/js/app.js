@@ -26259,7 +26259,7 @@ function recipeEditIngredientColumnCellText(cell, key = "") {
     if (!cell) return "";
     if (key === "type") {
         const typeLabels = Array.from(cell.querySelectorAll("[data-type-trigger-label]"))
-            .map(label => String(label.textContent || "").replace(/\s+/g, " ").trim())
+            .map(label => String(("value" in label ? label.value : label.textContent) || "").replace(/\s+/g, " ").trim())
             .filter(Boolean);
         if (typeLabels.length) return [...new Set(typeLabels)].join(" ");
     }
@@ -37148,33 +37148,41 @@ function recipeIngredientTypeDotClassModifier(value) {
 
 function syncRecipeIngredientTypeTrigger(trigger, select, selectedValue) {
     if (!trigger) return;
-    const triggerLabel = trigger.querySelector("[data-type-trigger-label]");
+    const triggerLabel = trigger.matches("[data-type-trigger-label]")
+        ? trigger
+        : trigger.querySelector("[data-type-trigger-label]");
     const resolvedValue = String(selectedValue || "").trim() || "main";
     const inline = trigger.dataset.recipeIngredientInlineTypeTrigger === "true";
     if (triggerLabel) {
-        triggerLabel.textContent = inline
+        const displayLabel = inline
             ? recipeIngredientTypeLabel({ section: resolvedValue })
             : recipeIngredientTypeControlLabel(select, resolvedValue);
+        if ("value" in triggerLabel) {
+            triggerLabel.value = displayLabel;
+        } else {
+            triggerLabel.textContent = displayLabel;
+        }
     }
 }
 
 function createRecipeIngredientTypeTrigger(select, options = {}) {
-    const trigger = document.createElement("button");
-    trigger.type = "button";
-    trigger.className = "recipe-edit-store-section-trigger recipe-edit-type-trigger";
+    const trigger = document.createElement("input");
+    trigger.type = "text";
+    trigger.className = options.inline
+        ? "recipe-edit-ingredient-inline-control recipe-edit-type-trigger"
+        : "recipe-edit-type-trigger";
+    trigger.readOnly = true;
+    trigger.autocomplete = "off";
+    trigger.spellcheck = false;
     trigger.dataset.recipeEditTypeTrigger = "true";
+    trigger.dataset.typeTriggerLabel = "";
     if (options.inline) trigger.dataset.recipeIngredientInlineTypeTrigger = "true";
     trigger.setAttribute("role", "combobox");
     trigger.setAttribute("aria-haspopup", "listbox");
     trigger.setAttribute("aria-controls", "recipeIngredientTypeMenu");
     trigger.setAttribute("aria-expanded", "false");
     trigger.recipeEditTypeSelect = select;
-    trigger.innerHTML = `
-        <span data-type-trigger-label></span>
-        <span class="recipe-edit-store-section-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
-    `;
     trigger.addEventListener("click", event => {
-        event.preventDefault();
         event.stopPropagation();
         openRecipeIngredientTypeMenu(trigger);
     });
@@ -37471,6 +37479,13 @@ function bindRecipeIngredientTypeControls(scope) {
         select.addEventListener("change", () => syncRecipeIngredientTypeControl(select));
         select.hidden = true;
         select.insertAdjacentElement("beforebegin", trigger);
+        if (!label.querySelector(":scope > .recipe-edit-type-chevron")) {
+            const chevron = document.createElement("span");
+            chevron.className = "recipe-edit-unit-chevron recipe-edit-type-chevron";
+            chevron.setAttribute("aria-hidden", "true");
+            chevron.innerHTML = recipeEditSvgIcon("chevron-down");
+            trigger.insertAdjacentElement("afterend", chevron);
+        }
         syncRecipeIngredientTypeControl(select);
     });
 }

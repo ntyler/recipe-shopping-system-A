@@ -1752,6 +1752,7 @@ def test_recipe_editor_auto_fit_keeps_visible_columns_inside_the_table_width():
     assert "Preserve content-fitted widths when the visible columns already fit." in auto_fit
     assert 'function recipeEditIngredientColumnCellText(cell, key = "")' in script
     assert 'cell.querySelectorAll("[data-type-trigger-label]")' in script
+    assert '"value" in label ? label.value : label.textContent' in script
     assert 'const contentAllowances = { store: 64, type: 46 };' in script
     assert 'const contentAllowance = contentAllowances[key] || 30;' in script
     assert "recipeEditIngredientColumnCellText(cell, key)" in script
@@ -2803,6 +2804,19 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert "function bindRecipeIngredientTypeControls(scope)" in script
     assert "function createRecipeIngredientTypeTrigger(select, options = {})" in script
     assert "function ensureRecipeIngredientInlineTypeTrigger(control, source)" in script
+    create_start = script.index("function createRecipeIngredientTypeTrigger(select, options = {})")
+    create_end = script.index("function syncRecipeIngredientTypeControl(select)", create_start)
+    create_trigger = script[create_start:create_end]
+    assert 'document.createElement("input")' in create_trigger
+    assert 'document.createElement("button")' not in create_trigger
+    assert 'trigger.type = "text";' in create_trigger
+    assert "trigger.readOnly = true;" in create_trigger
+    assert '"recipe-edit-ingredient-inline-control recipe-edit-type-trigger"' in create_trigger
+    assert 'trigger.dataset.typeTriggerLabel = "";' in create_trigger
+    assert "trigger.innerHTML" not in create_trigger
+    assert "event.preventDefault();" not in create_trigger
+    assert 'trigger.matches("[data-type-trigger-label]")' in script
+    assert '"value" in triggerLabel' in script
     assert "trigger.recipeEditTypeSelect = select;" in script
     assert "trigger && trigger.recipeEditTypeSelect" in script
     assert "trigger.dataset.recipeIngredientInlineTypeTrigger" in script
@@ -2811,6 +2825,11 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert 'trigger.setAttribute("role", "combobox");' in script
     assert 'trigger.setAttribute("aria-controls", "recipeIngredientTypeMenu");' in script
     assert "select.hidden = true;" in script
+    bind_start = script.index("function bindRecipeIngredientTypeControls(scope)")
+    bind_end = script.index("let recipeIngredientUnitRegistryCache", bind_start)
+    bind_type = script[bind_start:bind_end]
+    assert 'chevron.className = "recipe-edit-unit-chevron recipe-edit-type-chevron";' in bind_type
+    assert 'trigger.insertAdjacentElement("afterend", chevron);' in bind_type
     assert "bindRecipeIngredientStoreSectionControls(row);\n    bindRecipeIngredientTypeControls(row);" in script
     assert 'optionalInput.checked = recipeIngredientIsOptional({ section: typeSelect.value });' in script
     assert 'item.optional = recipeIngredientIsOptional(item);' in script
@@ -2818,7 +2837,6 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert 'row.querySelector("[data-recipe-edit-type-trigger]")' in script
 
     assert "/* Ingredient editor v11: managed custom Type picker. */" in css
-    assert ".recipe-edit-type-trigger > [data-type-trigger-label]" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot.is-optional" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot.is-custom" in css
@@ -2831,28 +2849,27 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
         "body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {"
     )
     trigger_rule = css[trigger_rule_start:css.index("}", trigger_rule_start)]
-    assert "grid-template-columns: minmax(0, 1fr) 14px;" in trigger_rule
-    assert "grid-template-columns: 7px minmax(0, 1fr) 14px;" not in trigger_rule
+    assert "display: block;" in trigger_rule
+    assert "grid-template-columns:" not in trigger_rule
+    assert "font: inherit;" in trigger_rule
+    assert "cursor: pointer;" in trigger_rule
 
     quiet_type = css[css.index("/* Ingredient editor v28:"):]
     assert "@media (min-width: 768px)" in quiet_type
     assert "#recipeEditIngredients .recipe-edit-ingredient-type-summary:has(> [data-recipe-ingredient-inline-type-trigger])" in quiet_type
     assert "display: block;" in quiet_type
-    assert "grid-template-columns: minmax(0, 1fr);" in quiet_type
     assert "width: 100%;" in quiet_type
     assert "max-width: none;" in quiet_type
     assert "padding: 0 7px;" in quiet_type
     assert "font: inherit;" in quiet_type
     assert "text-align: left;" in quiet_type
     assert "transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;" in quiet_type
-    assert "display: none;" in quiet_type
 
     modal_type = css[css.index("/* Ingredient editor v29:"):]
     assert ".recipe-edit-ingredient-modal-type-field > .recipe-edit-type-trigger" in modal_type
     assert "padding: 9px 40px 9px 12px;" in modal_type
-    assert "right: 4px;" in modal_type
-    assert "width: 12px;" in modal_type
-    assert "height: 12px;" in modal_type
+    assert "cursor: pointer;" in modal_type
+    assert ".recipe-edit-ingredient-modal-type-field > .recipe-edit-type-chevron" in modal_type
     assert "opacity: 1;" in modal_type
 
     mobile_type_start = css.index(
@@ -3183,13 +3200,8 @@ def test_wide_desktop_ingredient_overview_uses_one_page_compact_grid():
     )
     assert "gap: 16px;" in identity_fields
 
-    type_trigger = compact[
-        compact.index(
-            ".recipe-edit-ingredient-modal-type-field .recipe-edit-type-trigger {"
-        ):
-    ]
-    type_trigger = type_trigger[:type_trigger.index("}")]
-    assert "font-weight: 650;" in type_trigger
+    wide_desktop = compact[:compact.index("/* Ingredient editor v28:")]
+    assert ".recipe-edit-ingredient-modal-type-field .recipe-edit-type-trigger" not in wide_desktop
 
     placements = {
         ".recipe-edit-ingredient-modal-section.is-identity {": ("grid-column: 1;", "grid-row: 1;"),

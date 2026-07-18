@@ -54946,21 +54946,20 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
     box-sizing: border-box;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 14px;
+    display: block;
     width: 100%;
     min-width: 0;
     height: 32px;
     min-height: 32px;
     margin: 0;
     padding: 0 7px;
-    gap: 7px;
     border: 1px solid transparent;
     border-radius: 6px;
     background: transparent;
     color: var(--app-text);
     font: inherit;
     line-height: 1.2;
+    cursor: pointer;
 }
 
 @media (min-width: 768px) {
@@ -55080,7 +55079,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredien
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-read-details > .recipe-edit-ingredient-inline-preparation:not(:hover):not(:focus):not([aria-invalid="true"]),
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-quantity-summary > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]),
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]),
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-size-summary > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]) {
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-size-summary > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]),
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-type-summary > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus):not([aria-expanded="true"]):not([aria-invalid="true"]) {
     border-color: transparent;
     background: transparent;
     box-shadow: none;
@@ -55090,7 +55090,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredien
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-read-details > .recipe-edit-ingredient-inline-preparation:hover,
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-quantity-summary > .recipe-edit-ingredient-inline-control:hover,
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control:hover,
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-size-summary > .recipe-edit-ingredient-inline-control:hover {
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-size-summary > .recipe-edit-ingredient-inline-control:hover,
+body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-type-summary > .recipe-edit-ingredient-inline-control:hover {
     border-color: var(--app-border-strong);
     background: var(--app-bg-soft);
 }
@@ -56125,10 +56126,6 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional:not([hidd
         gap: 16px;
     }
 
-    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-type-field .recipe-edit-type-trigger {
-        font-weight: 650;
-    }
-
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-section.is-identity {
         grid-column: 1;
         grid-row: 1;
@@ -56154,7 +56151,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional:not([hidd
     }
 }
 
-/* Ingredient editor v28: make desktop table Type read like the quiet Unit field. */
+/* Ingredient editor v28: make desktop table Type use the quiet Unit input. */
 @media (min-width: 768px) {
     body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-type-summary:has(> [data-recipe-ingredient-inline-type-trigger]) {
         display: block;
@@ -56165,22 +56162,11 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional:not([hidd
     body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
         position: relative;
         display: block;
-        grid-template-columns: minmax(0, 1fr);
         width: 100%;
         padding: 0 7px;
         font: inherit;
         text-align: left;
         transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger > [data-type-trigger-label] {
-        display: block;
-        width: 100%;
-        text-align: left;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger > .recipe-edit-store-section-chevron {
-        display: none;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger:hover {
@@ -56189,30 +56175,17 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional:not([hidd
     }
 }
 
-/* Ingredient editor v29: make modal Type use the same box geometry as Unit. */
+/* Ingredient editor v29: make modal Type use the same input geometry as Unit. */
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-type-field > .recipe-edit-type-trigger {
     position: relative;
     display: block;
-    grid-template-columns: minmax(0, 1fr);
     padding: 9px 40px 9px 12px;
     text-align: left;
+    cursor: pointer;
 }
 
-body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-type-field > .recipe-edit-type-trigger > [data-type-trigger-label] {
-    display: block;
-    width: 100%;
-    text-align: left;
-}
-
-body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-type-field > .recipe-edit-type-trigger > .recipe-edit-store-section-chevron {
-    position: absolute;
-    top: 50%;
-    right: 4px;
-    display: inline-flex;
-    width: 12px;
-    height: 12px;
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-type-field > .recipe-edit-type-chevron {
     opacity: 1;
-    transform: translateY(-50%);
 }
 
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */
