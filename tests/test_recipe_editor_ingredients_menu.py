@@ -460,6 +460,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert "data-ingredient-read-name" in organize
     assert "data-ingredient-read-status" in organize
     assert "data-ingredient-read-buy-as" in organize
+    assert "data-ingredient-read-optional" in organize
     assert organize.index("row.appendChild(readCell);") < organize.index("row.appendChild(statusSummary);")
     assert organize.index("row.appendChild(statusSummary);") < organize.index("const summaryDefinitions = [")
     for summary_class in (
@@ -2329,6 +2330,8 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values)" in summary
     assert 'readBuyAs.closest(".recipe-edit-ingredient-read-buy-as")' in summary
     assert "readBuyAsField.hidden = !meaningfulBuyAs;" in summary
+    assert 'const readOptional = row ? row.querySelector("[data-ingredient-read-optional]") : null;' in summary
+    assert "readOptional.hidden = !recipeIngredientIsOptional(values);" in summary
     assert "readBuyAs.value = buyAsValue;" in summary
     assert 'readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Buy As matches Ingredient Name";' in summary
     assert "previewBuyAs.hidden = !meaningfulBuyAs;" in summary
@@ -3040,6 +3043,36 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     collapsed_edit = collapsed_edit[:collapsed_edit.index("}")]
     assert "display: inline-flex !important;" in collapsed_edit
     assert "display: none !important;" not in collapsed_edit
+
+
+def test_collapsed_mobile_ingredient_cards_label_optional_rows_beneath_buy_as():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
+    organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
+    organize = script[organize_start:organize_end]
+    optional_badge = organize.index('class="recipe-edit-ingredient-read-optional"')
+    buy_as = organize.index('class="recipe-edit-ingredient-read-buy-as"')
+    assert buy_as < optional_badge
+    assert "data-ingredient-read-optional" in organize
+    assert 'aria-label="Optional ingredient"' in organize
+    assert "hidden>Optional</span>" in organize
+
+    summary_start = script.index("function updateRecipeIngredientSummary(row)")
+    summary_end = script.index("function recipeEditIngredientRows()", summary_start)
+    summary = script[summary_start:summary_end]
+    assert 'row.querySelector("[data-ingredient-read-optional]")' in summary
+    assert "readOptional.hidden = !recipeIngredientIsOptional(values);" in summary
+
+    optional_css = css[css.index("/* Ingredient editor v26:"):]
+    assert "@media (max-width: 767px)" in optional_css
+    assert ".recipe-edit-ingredient-read-optional:not([hidden])" in optional_css
+    assert ":has(.recipe-edit-ingredient-read-optional:not([hidden]))" in optional_css
+    assert "grid-template-rows: 56px !important;" in optional_css
+    assert "min-height: 74px !important;" in optional_css
+    assert "display: inline-flex;" in optional_css
+    assert "text-transform: uppercase;" in optional_css
 
 
 def test_recipe_menu_edit_links_to_standalone_editor_page():

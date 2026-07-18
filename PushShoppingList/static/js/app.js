@@ -28674,6 +28674,10 @@ function organizeRecipeEditIngredientRow(row) {
                    placeholder="Add buy as"
                    autocomplete="off">
         </label>
+        <span class="recipe-edit-ingredient-read-optional"
+              data-ingredient-read-optional
+              aria-label="Optional ingredient"
+              hidden>Optional</span>
     `;
     row.appendChild(readCell);
 
@@ -39985,6 +39989,7 @@ function updateRecipeIngredientSummary(row) {
     const readStatus = row ? row.querySelector("[data-ingredient-read-status]") : null;
     const readBuyAs = row ? row.querySelector("[data-ingredient-read-buy-as]") : null;
     const readBuyAsField = readBuyAs ? readBuyAs.closest(".recipe-edit-ingredient-read-buy-as") : null;
+    const readOptional = row ? row.querySelector("[data-ingredient-read-optional]") : null;
     const editSubtitle = row ? row.querySelector("[data-recipe-ingredient-edit-subtitle]") : null;
     const previewName = row ? row.querySelector("[data-recipe-ingredient-modal-preview-name]") : null;
     const previewBuyAs = row ? row.querySelector("[data-recipe-ingredient-modal-preview-buy-as]") : null;
@@ -40018,6 +40023,7 @@ function updateRecipeIngredientSummary(row) {
     }
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
     if (readBuyAsField) readBuyAsField.hidden = !meaningfulBuyAs;
+    if (readOptional) readOptional.hidden = !recipeIngredientIsOptional(values);
     if (readBuyAs) {
         readBuyAs.value = buyAsValue;
         readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Buy As matches Ingredient Name";

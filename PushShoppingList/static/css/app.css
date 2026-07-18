@@ -56072,6 +56072,45 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as > .recipe-e
     color: var(--app-text-soft);
 }
 
+/* Ingredient editor v26: identify optional ingredients in collapsed mobile cards. */
+body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed
+        > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded):has(.recipe-edit-ingredient-read-optional:not([hidden])),
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.recipe-edit-row-collapsed:has(.recipe-edit-ingredient-read-optional:not([hidden])) {
+        grid-template-rows: 56px !important;
+        min-height: 74px !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed
+        > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded)
+        .recipe-edit-ingredient-read-optional:not([hidden]),
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.recipe-edit-row-collapsed
+        .recipe-edit-ingredient-read-optional:not([hidden]) {
+        display: inline-flex;
+        align-items: center;
+        justify-self: start;
+        width: max-content;
+        min-height: 16px;
+        margin-top: 2px;
+        padding: 1px 5px;
+        border: 1px solid color-mix(in srgb, #818cf8 72%, transparent);
+        border-radius: 4px;
+        background: color-mix(in srgb, #312e81 38%, transparent);
+        color: #a5b4fc;
+        font-size: 8px;
+        font-weight: 750;
+        letter-spacing: .04em;
+        line-height: 1.2;
+        text-transform: uppercase;
+    }
+}
+
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row
