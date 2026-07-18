@@ -56349,6 +56349,131 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-inline-pick
     }
 }
 
+/* Ingredient editor v34: keep compact mobile metadata editable and easy to scan. */
+body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-status-control {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row
+        > .recipe-edit-ingredient-status-summary > [data-ingredient-read-status] {
+        display: none;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-status-control {
+        position: relative;
+        display: grid;
+        grid-column: 1;
+        grid-row: 2;
+        grid-template-columns: 24px minmax(0, 1fr) 24px;
+        align-items: center;
+        width: min(180px, 100%);
+        min-width: 0;
+        height: 30px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-inline-status {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        width: 100%;
+        min-width: 0;
+        height: 30px;
+        min-height: 30px;
+        padding: 0 28px;
+        appearance: none;
+        border-color: transparent;
+        background: transparent;
+        color: var(--app-text);
+        font: inherit;
+        line-height: 1.2;
+        cursor: pointer;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-status-dot {
+        z-index: 1;
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: center;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        pointer-events: none;
+        background: var(--app-muted);
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-status-control[data-match-status="matched"]
+        .recipe-edit-ingredient-status-dot,
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-status-control[data-match-status="pantry_staple"]
+        .recipe-edit-ingredient-status-dot {
+        background: var(--app-primary-hover);
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-status-control:is(
+            [data-match-status="review_match"],
+            [data-match-status="multiple_matches"]
+        ) .recipe-edit-ingredient-status-dot {
+        background: var(--app-warning, #d4a017);
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-status-control:is(
+            [data-match-status="low_confidence"],
+            [data-match-status="unmatched"]
+        ) .recipe-edit-ingredient-status-dot {
+        background: var(--app-danger, #ef4444);
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-status-chevron {
+        z-index: 1;
+        display: inline-flex;
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: center;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-status-control:is(:hover, :focus-within)
+        .recipe-edit-status-chevron {
+        opacity: 1;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-status-control:is(:hover, :focus-within)
+        .recipe-edit-ingredient-inline-status {
+        border-color: var(--app-border-strong);
+        background: var(--app-bg-soft);
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-copy {
+        width: auto;
+        min-width: 0;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button::after {
+        margin-left: auto;
+        color: var(--app-muted);
+        font-size: 18px;
+        line-height: 1;
+        content: "\203A";
+        transition: transform 120ms ease;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button[aria-expanded="true"]::after {
+        transform: rotate(90deg);
+    }
+}
+
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row
