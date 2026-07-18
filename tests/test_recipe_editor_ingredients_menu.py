@@ -1224,6 +1224,11 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     ):
         assert declaration in mobile_identity
     assert "display: flex !important;" not in mobile_identity
+    mobile_dialog = mobile[
+        mobile.index("dialog.recipe-edit-ingredient-edit-panel {"):
+    ]
+    mobile_dialog = mobile_dialog[:mobile_dialog.index("}")]
+    assert 'font-family: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;' in mobile_dialog
     mobile_identity_children_selector = (
         "dialog.recipe-edit-ingredient-edit-panel "
         ".recipe-edit-ingredient-modal-identity-fields > * {"
@@ -1267,6 +1272,28 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
         "align-self: stretch !important;",
     ):
         assert declaration in mobile_name_control
+
+    mobile_field_type_selector = (
+        "dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-edit-field :is(input, textarea, select) {"
+    )
+    mobile_field_type = mobile[mobile.index(mobile_field_type_selector):]
+    mobile_field_type = mobile_field_type[:mobile_field_type.index("}")]
+    assert "font-size: 16px;" in mobile_field_type
+    assert "font-weight: 500;" in mobile_field_type
+    assert "line-height: 1.25;" in mobile_field_type
+    mobile_name_type_selector = (
+        "dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-modal-name-field textarea[data-field=\"ingredient\"] {"
+    )
+    mobile_name_type_start = mobile.index(mobile_name_type_selector, mobile_name_control_start + len(mobile_name_control))
+    mobile_name_type = mobile[mobile_name_type_start:]
+    mobile_name_type = mobile_name_type[:mobile_name_type.index("}")]
+    assert "font-size: 16px !important;" in mobile_name_type
+    assert ".recipe-edit-ingredient-modal-section-surface > h3" in mobile
+    assert "font-weight: 700;" in mobile
+    assert ".recipe-edit-ingredient-field-helper" in mobile
+    assert "font-weight: 400;" in mobile
 
     mobile_quiet_field_selector = (
         "dialog.recipe-edit-ingredient-edit-panel "

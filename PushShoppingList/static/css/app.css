@@ -50748,6 +50748,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         height: 100dvh;
         max-height: 100dvh;
         border-radius: 0;
+        font-family: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-shell {
@@ -50951,6 +50952,51 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         max-width: none !important;
         margin-inline: 0 !important;
         align-self: stretch !important;
+    }
+
+    /* Use a calmer mobile type hierarchy and keep editable text phone-friendly. */
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-heading h2 {
+        font-weight: 700;
+        letter-spacing: -.01em;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-section-surface > h3,
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-analysis-heading > h3 {
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
+        .recipe-edit-ingredient-modal-field-label,
+        .recipe-edit-ingredient-edit-field > span:first-child
+    ) {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: .005em;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-edit-field :is(input, textarea, select) {
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.25;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-name-field textarea[data-field="ingredient"] {
+        font-size: 16px !important;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
+        .recipe-edit-store-section-trigger,
+        .recipe-edit-type-trigger
+    ) {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-field-helper {
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 1.45;
     }
 
     /* Keep mobile fields visually quiet until the user interacts with them. */
