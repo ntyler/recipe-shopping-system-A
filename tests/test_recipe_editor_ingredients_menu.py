@@ -3136,10 +3136,18 @@ def test_wide_desktop_ingredient_overview_uses_one_page_compact_grid():
     ]
     identity_fields = identity_fields[:identity_fields.index("}")]
     assert (
-        "grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(120px, .72fr);"
+        "grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(164px, .9fr);"
         in identity_fields
     )
     assert "gap: 16px;" in identity_fields
+
+    type_trigger = compact[
+        compact.index(
+            ".recipe-edit-ingredient-modal-type-field .recipe-edit-type-trigger {"
+        ):
+    ]
+    type_trigger = type_trigger[:type_trigger.index("}")]
+    assert "font-weight: 650;" in type_trigger
 
     placements = {
         ".recipe-edit-ingredient-modal-section.is-identity {": ("grid-column: 1;", "grid-row: 1;"),
