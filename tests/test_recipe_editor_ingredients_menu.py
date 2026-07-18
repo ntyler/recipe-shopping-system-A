@@ -2831,6 +2831,7 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert "width: 100%;" in quiet_type
     assert "max-width: none;" in quiet_type
     assert "padding: 0 22px 0 7px;" in quiet_type
+    assert "font: inherit;" in quiet_type
     assert "text-align: left;" in quiet_type
     assert "opacity: 0;" in quiet_type
     assert ':is(:hover, :focus-visible, [aria-expanded="true"])' in quiet_type

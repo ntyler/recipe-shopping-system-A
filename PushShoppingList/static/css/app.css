@@ -56168,6 +56168,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional:not([hidd
         grid-template-columns: minmax(0, 1fr);
         width: 100%;
         padding: 0 22px 0 7px;
+        font: inherit;
         text-align: left;
     }
 
