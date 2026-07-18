@@ -1733,12 +1733,17 @@ def test_recipe_editor_auto_fit_keeps_visible_columns_inside_the_table_width():
     assert 'tableScroll.clientWidth' in auto_fit
     assert 'Visible ingredient columns fitted to their content within the table width.' in auto_fit
     assert "if (total > target)" in auto_fit
+    assert 'const shrinkTiers = [' in auto_fit
+    assert '["ingredient", "alternatives"]' in auto_fit
+    assert '["store", "type"]' in auto_fit
+    assert auto_fit.index('["ingredient", "alternatives"]') < auto_fit.index('["store", "type"]')
     assert "if (total < target)" not in auto_fit
     assert "const growthOrder" not in auto_fit
     assert "Preserve content-fitted widths when the visible columns already fit." in auto_fit
     assert 'function recipeEditIngredientColumnCellText(cell, key = "")' in script
     assert 'cell.querySelectorAll("[data-type-trigger-label]")' in script
-    assert 'const contentAllowance = key === "type" ? 46 : 30;' in script
+    assert 'const contentAllowances = { store: 64, type: 46 };' in script
+    assert 'const contentAllowance = contentAllowances[key] || 30;' in script
     assert "recipeEditIngredientColumnCellText(cell, key)" in script
     assert "text) + contentAllowance" in script
 

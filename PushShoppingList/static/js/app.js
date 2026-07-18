@@ -26292,7 +26292,8 @@ function autoFitRecipeEditIngredientColumnWidth(key, context = null) {
     if (key === "media" || key === "actions") return definition.fallbackWidth;
     const header = document.querySelector(`[data-ingredient-column="${key}"]`);
     let measuredWidth = measureRecipeEditIngredientColumnText(context, header || document.body, definition.label) + 34;
-    const contentAllowance = key === "type" ? 46 : 30;
+    const contentAllowances = { store: 64, type: 46 };
+    const contentAllowance = contentAllowances[key] || 30;
     recipeEditIngredientRows().forEach(row => {
         definition.selectors.forEach(selector => {
             const cell = row.querySelector(selector);
@@ -26319,25 +26320,38 @@ function fitRecipeEditIngredientColumnWidthsToBudget(keys, requestedWidths, budg
     let total = keys.reduce((sum, key) => sum + widths[key], 0);
 
     if (total > target) {
-        const capacities = keys.map(key => Math.max(
-            0,
-            widths[key] - RECIPE_EDIT_INGREDIENT_COLUMNS[key].minWidth,
-        ));
-        const totalCapacity = capacities.reduce((sum, capacity) => sum + capacity, 0);
-        let remaining = Math.min(total - target, totalCapacity);
-        capacities.forEach((capacity, index) => {
-            if (!capacity || !remaining) return;
-            const proportional = Math.floor(((total - target) * capacity) / totalCapacity);
-            const reduction = Math.min(capacity, proportional, remaining);
-            widths[keys[index]] -= reduction;
-            remaining -= reduction;
-        });
-        keys.forEach(key => {
+        const shrinkTiers = [
+            ["ingredient", "alternatives"],
+            ["status", "quantity", "unit", "size"],
+            ["media", "actions"],
+            ["store", "type"],
+        ];
+        let remaining = total - target;
+        shrinkTiers.forEach(tier => {
             if (!remaining) return;
-            const definition = RECIPE_EDIT_INGREDIENT_COLUMNS[key];
-            const reduction = Math.min(remaining, widths[key] - definition.minWidth);
-            widths[key] -= reduction;
-            remaining -= reduction;
+            const tierKeys = tier.filter(key => keys.includes(key));
+            const capacities = tierKeys.map(key => Math.max(
+                0,
+                widths[key] - RECIPE_EDIT_INGREDIENT_COLUMNS[key].minWidth,
+            ));
+            const tierCapacity = capacities.reduce((sum, capacity) => sum + capacity, 0);
+            const tierReduction = Math.min(remaining, tierCapacity);
+            let tierRemaining = tierReduction;
+            capacities.forEach((capacity, index) => {
+                if (!capacity || !tierRemaining) return;
+                const proportional = Math.floor((tierReduction * capacity) / tierCapacity);
+                const reduction = Math.min(capacity, proportional, tierRemaining);
+                widths[tierKeys[index]] -= reduction;
+                tierRemaining -= reduction;
+            });
+            tierKeys.forEach(key => {
+                if (!tierRemaining) return;
+                const definition = RECIPE_EDIT_INGREDIENT_COLUMNS[key];
+                const reduction = Math.min(tierRemaining, widths[key] - definition.minWidth);
+                widths[key] -= reduction;
+                tierRemaining -= reduction;
+            });
+            remaining -= tierReduction;
         });
         total = keys.reduce((sum, key) => sum + widths[key], 0);
     }
