@@ -231,6 +231,59 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert 'if (upload) upload.setAttribute("aria-expanded", "false");' in script
 
 
+def test_recipe_image_actions_render_as_one_balanced_toolbar():
+    css = read_text("PushShoppingList/static/css/app.css")
+    marker = "/* Recipe image actions: one balanced toolbar instead of three competing boxes. */"
+    image_actions = css[css.index(marker):]
+
+    assert ".recipe-edit-image-card .recipe-edit-cover-primary-actions" in image_actions
+    assert ".recipe-edit-mobile-image-actions" in image_actions
+
+    toolbar_rule = image_actions[:image_actions.index("}")]
+    for declaration in (
+        "display: grid;",
+        "grid-template-columns: repeat(3, minmax(0, 1fr));",
+        "gap: 4px;",
+        "width: 100%;",
+        "padding: 3px;",
+        "border: 1px solid var(--recipe-editor-border-soft);",
+        "border-radius: 10px;",
+    ):
+        assert declaration in toolbar_rule
+
+    assert "):has(> .recipe-edit-cover-remove-button[hidden])" in image_actions
+    hidden_remove_rule_start = image_actions.index(
+        "):has(> .recipe-edit-cover-remove-button[hidden])"
+    )
+    hidden_remove_rule = image_actions[
+        hidden_remove_rule_start:image_actions.index("}", hidden_remove_rule_start)
+    ]
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in hidden_remove_rule
+
+    button_rule_start = image_actions.index(
+        ".recipe-edit-cover-primary-actions > .recipe-edit-cover-upload-button,"
+    )
+    button_rule = image_actions[button_rule_start:image_actions.index("}", button_rule_start)]
+    for declaration in (
+        "display: inline-flex;",
+        "width: 100%;",
+        "height: 40px;",
+        "align-items: center;",
+        "justify-content: center;",
+        "gap: 6px;",
+        "border: 1px solid transparent;",
+        "background: transparent;",
+        "white-space: nowrap;",
+    ):
+        assert declaration in button_rule
+
+    assert "> button:is(:hover, :focus-visible)" in image_actions
+    assert "> .recipe-edit-cover-remove-button:is(:hover, :focus-visible)" in image_actions
+    assert "background: color-mix(in srgb, var(--app-danger, #ef4444) 11%, transparent);" in image_actions
+    assert "> .recipe-edit-cover-remove-button:not([hidden])" in image_actions
+    assert "grid-column: 1 / -1;" in image_actions
+
+
 def test_recipe_editor_header_actions_match_the_mockup_order_and_icons():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     css = read_text("PushShoppingList/static/css/app.css")
