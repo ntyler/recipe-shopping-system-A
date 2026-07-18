@@ -1364,12 +1364,25 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert "background: color-mix(in srgb, var(--app-bg) 68%, var(--app-surface-soft));" in shared_quiet_field
     assert "box-shadow: none;" in shared_quiet_field
 
+    shared_hover_field_selector = (
+        "dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-edit-field :is(input, textarea, select):not([aria-invalid=\"true\"]):hover,"
+    )
+    shared_hover_field = workspace[workspace.index(shared_hover_field_selector):]
+    shared_hover_field = shared_hover_field[:shared_hover_field.index("}")]
+    assert workspace.index(shared_quiet_field_selector) < workspace.index(shared_hover_field_selector)
+    assert ".recipe-edit-store-section-trigger" in shared_hover_field
+    assert ".recipe-edit-type-trigger" in shared_hover_field
+    assert "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));" in shared_hover_field
+    assert "box-shadow: 0 0 0 1px" in shared_hover_field
+
     shared_active_field_selector = (
         "dialog.recipe-edit-ingredient-edit-panel "
         ".recipe-edit-ingredient-edit-field :is(input, textarea, select):focus,"
     )
     shared_active_field = workspace[workspace.index(shared_active_field_selector):]
     shared_active_field = shared_active_field[:shared_active_field.index("}")]
+    assert workspace.index(shared_hover_field_selector) < workspace.index(shared_active_field_selector)
     assert ':is(:focus-visible, [aria-expanded="true"])' in shared_active_field
     assert "border-color: var(--app-primary-hover);" in shared_active_field
     assert "box-shadow: 0 0 0 2px" in shared_active_field

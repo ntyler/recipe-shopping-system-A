@@ -50625,6 +50625,16 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
     box-shadow: none;
 }
 
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-edit-field :is(input, textarea, select):not([aria-invalid="true"]):hover,
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
+    .recipe-edit-store-section-trigger,
+    .recipe-edit-type-trigger
+):not([aria-invalid="true"]):hover {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
+    background: color-mix(in srgb, var(--app-bg) 78%, var(--app-surface-soft));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
+}
+
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-edit-field :is(input, textarea, select):focus,
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
     .recipe-edit-store-section-trigger,
