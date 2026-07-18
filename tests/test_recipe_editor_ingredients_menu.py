@@ -823,6 +823,14 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert 'generateButton.textContent = "Generate Image";' in image_contract
     assert 'recipeIngredientModalHasImage(imagePanel) ? "Change Image" : "Add Image"' in image_contract
     assert 'removeButton.textContent = "Remove";' in image_contract
+    assert 'viewButton.dataset.recipeIngredientImageView = "";' in image_contract
+    assert 'viewButton.textContent = "View Image";' in image_contract
+    assert 'viewButton.title = "View full-size ingredient image";' in image_contract
+    assert "viewButton.hidden = !recipeIngredientModalHasImage(imagePanel);" in image_contract
+    assert "imageOptions.insertBefore(viewButton, generateButton || imageOptions.firstChild);" in image_contract
+    assert 'imagePanel.querySelector(".recipe-ingredient-image:not([hidden])")' in image_contract
+    assert "if (image) openRecipeImageLightbox(image);" in image_contract
+    assert 'imageOptions.querySelector("[data-recipe-ingredient-image-view]")?.remove();' in image_contract
     assert 'image.tabIndex = -1;' in image_contract
     assert 'image.title = "Open ingredient image options";' in image_contract
     assert 'image.setAttribute("aria-label", "Enlarge ingredient image");' in image_contract

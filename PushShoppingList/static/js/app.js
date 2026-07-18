@@ -27345,7 +27345,24 @@ function syncRecipeIngredientModalImageActions(imagePanel) {
         : null;
     const imageOptions = imagePanel.querySelector(":scope > .recipe-step-image-actions");
     const usesImageOptionsPopup = recipeIngredientModalUsesImageOptionsPopup();
+    let viewButton = imageOptions
+        ? imageOptions.querySelector("[data-recipe-ingredient-image-view]")
+        : null;
     if (usesImageOptionsPopup && previewMedia && imageOptionsTrigger && imageOptions) {
+        if (!viewButton) {
+            viewButton = document.createElement("button");
+            viewButton.type = "button";
+            viewButton.className = "recipe-step-image-view";
+            viewButton.dataset.recipeIngredientImageView = "";
+            viewButton.textContent = "View Image";
+            viewButton.title = "View full-size ingredient image";
+            viewButton.addEventListener("click", () => {
+                const image = imagePanel.querySelector(".recipe-ingredient-image:not([hidden])");
+                if (image) openRecipeImageLightbox(image);
+            });
+            imageOptions.insertBefore(viewButton, generateButton || imageOptions.firstChild);
+        }
+        viewButton.hidden = !recipeIngredientModalHasImage(imagePanel);
         const imageOptionsOpen = imagePanel.classList.contains("recipe-ingredient-image-options-open");
         const imageOptionsId = `${imagePanel.closest("[data-recipe-ingredient-edit-panel]")?.id || "recipeIngredient"}ImageOptions`;
         imageOptions.id = imageOptionsId;
@@ -27368,6 +27385,7 @@ function syncRecipeIngredientModalImageActions(imagePanel) {
     } else if (imageOptions) {
         imagePanel.classList.remove("recipe-ingredient-image-options-open");
         previewMedia?.classList.remove("is-image-options-open");
+        viewButton?.remove();
         imageOptions.querySelector("[data-recipe-ingredient-image-options-title]")?.remove();
         imageOptions.classList.remove("recipe-edit-ingredient-image-options-popover");
         imageOptions.removeAttribute("id");
@@ -27436,6 +27454,7 @@ function restoreRecipeIngredientModalImage(row) {
     );
     const imageOptions = imagePanel.querySelector(":scope > .recipe-step-image-actions");
     if (imageOptions) {
+        imageOptions.querySelector("[data-recipe-ingredient-image-view]")?.remove();
         imageOptions.querySelector("[data-recipe-ingredient-image-options-title]")?.remove();
         imageOptions.classList.remove("recipe-edit-ingredient-image-options-popover");
         imageOptions.removeAttribute("id");
