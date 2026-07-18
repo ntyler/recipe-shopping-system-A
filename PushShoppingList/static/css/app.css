@@ -48702,6 +48702,18 @@ body.recipe-ingredient-modal-open :is(
     scrollbar-gutter: stable;
 }
 
+/* The locked background cannot scroll; do not leave its native arrow visible. */
+body.recipe-ingredient-modal-open :is(
+    [data-app-content],
+    .app-sidebar,
+    .recipe-edit-ingredient-table-scroll
+).recipe-ingredient-modal-scroll-locked::-webkit-scrollbar-button {
+    -webkit-appearance: none;
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-read-first-row:not(.is-editing) :is(
     .recipe-edit-ingredient-read-cell,
     .recipe-edit-ingredient-quantity-summary,

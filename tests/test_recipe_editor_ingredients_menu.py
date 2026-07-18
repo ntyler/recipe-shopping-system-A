@@ -1111,6 +1111,24 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     scrollbar_button_rule = scrollbar_button_rule[:scrollbar_button_rule.index("}")]
     for declaration in ("display: none;", "width: 0;", "height: 0;"):
         assert declaration in scrollbar_button_rule
+    locked_scrollbar_button_selector = (
+        "body.recipe-ingredient-modal-open :is(\n"
+        "    [data-app-content],\n"
+        "    .app-sidebar,\n"
+        "    .recipe-edit-ingredient-table-scroll\n"
+        ").recipe-ingredient-modal-scroll-locked::-webkit-scrollbar-button {"
+    )
+    locked_scrollbar_button_rule = css[css.index(locked_scrollbar_button_selector):]
+    locked_scrollbar_button_rule = locked_scrollbar_button_rule[
+        :locked_scrollbar_button_rule.index("}")
+    ]
+    for declaration in (
+        "-webkit-appearance: none;",
+        "display: none !important;",
+        "width: 0 !important;",
+        "height: 0 !important;",
+    ):
+        assert declaration in locked_scrollbar_button_rule
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in workspace
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);" in workspace
     bottom_grid_rule = workspace[workspace.index(".recipe-edit-ingredient-modal-bottom-grid {"):]
