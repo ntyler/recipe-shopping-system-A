@@ -2718,6 +2718,20 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert ".recipe-edit-store-section-icon.is-fish" in css
     assert ".recipe-edit-store-section-icon.is-paw" in css
 
+    chevron_start = css.index(
+        ".recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-chevron {"
+    )
+    chevron_rule = css[chevron_start:css.index("}", chevron_start)]
+    assert "opacity: 0;" in chevron_rule
+    assert "transition: opacity 120ms ease;" in chevron_rule
+    assert '.recipe-edit-store-section-trigger:is(:hover, :focus-visible, [aria-expanded="true"])' in css
+    active_chevron_start = css.index(
+        '.recipe-edit-store-section-trigger:is(:hover, :focus-visible, [aria-expanded="true"])'
+    )
+    active_chevron_rule = css[active_chevron_start:css.index("}", active_chevron_start)]
+    assert "> .recipe-edit-store-section-chevron" in active_chevron_rule
+    assert "opacity: 1;" in active_chevron_rule
+
 
 def test_store_section_summary_icon_stays_inside_its_table_cell():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

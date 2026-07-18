@@ -38458,11 +38458,19 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     width: 14px;
     height: 14px;
     color: var(--app-muted);
+    opacity: 0;
+    transition: opacity 120ms ease;
 }
 
 .recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-chevron :is(.recipe-edit-inline-icon, svg) {
     width: 14px;
     height: 14px;
+}
+
+.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-store-section-trigger:is(:hover, :focus-visible, [aria-expanded="true"])
+    > .recipe-edit-store-section-chevron {
+    opacity: 1;
 }
 
 .recipe-edit-row-menu.recipe-edit-store-section-menu {
