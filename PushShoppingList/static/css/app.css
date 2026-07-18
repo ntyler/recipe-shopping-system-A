@@ -50953,6 +50953,38 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         align-self: stretch !important;
     }
 
+    /* Keep mobile fields visually quiet until the user interacts with them. */
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-edit-field :is(input, textarea, select):not([aria-invalid="true"]),
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
+        .recipe-edit-store-section-trigger,
+        .recipe-edit-type-trigger
+    ):not([aria-invalid="true"]):not([aria-expanded="true"]) {
+        border-color: transparent;
+        background: color-mix(in srgb, var(--app-bg) 68%, var(--app-surface-soft));
+        box-shadow: none;
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-edit-field :is(input, textarea, select):focus,
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
+        .recipe-edit-store-section-trigger,
+        .recipe-edit-type-trigger
+    ):is(:focus-visible, [aria-expanded="true"]) {
+        border-color: var(--app-primary-hover);
+        outline: 0;
+        background: color-mix(in srgb, var(--app-bg) 82%, var(--app-surface-soft));
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 24%, transparent);
+    }
+
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-edit-field :is(input, textarea, select)[aria-invalid="true"],
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
+        .recipe-edit-store-section-trigger,
+        .recipe-edit-type-trigger
+    )[aria-invalid="true"] {
+        border-color: var(--app-danger, #ef4444);
+        background: color-mix(in srgb, var(--app-danger, #ef4444) 9%, var(--app-bg));
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-danger, #ef4444) 20%, transparent);
+    }
+
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer {
         grid-template-columns: repeat(6, minmax(0, 1fr));
         min-height: 0;

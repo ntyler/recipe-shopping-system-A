@@ -1268,6 +1268,38 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     ):
         assert declaration in mobile_name_control
 
+    mobile_quiet_field_selector = (
+        "dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-edit-field :is(input, textarea, select):not([aria-invalid=\"true\"]),"
+    )
+    mobile_quiet_field = mobile[mobile.index(mobile_quiet_field_selector):]
+    mobile_quiet_field = mobile_quiet_field[:mobile_quiet_field.index("}")]
+    assert ".recipe-edit-store-section-trigger" in mobile_quiet_field
+    assert ".recipe-edit-type-trigger" in mobile_quiet_field
+    assert "border-color: transparent;" in mobile_quiet_field
+    assert "background: color-mix(in srgb, var(--app-bg) 68%, var(--app-surface-soft));" in mobile_quiet_field
+    assert "box-shadow: none;" in mobile_quiet_field
+
+    mobile_active_field_selector = (
+        "dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-edit-field :is(input, textarea, select):focus,"
+    )
+    mobile_active_field = mobile[mobile.index(mobile_active_field_selector):]
+    mobile_active_field = mobile_active_field[:mobile_active_field.index("}")]
+    assert ':is(:focus-visible, [aria-expanded="true"])' in mobile_active_field
+    assert "border-color: var(--app-primary-hover);" in mobile_active_field
+    assert "box-shadow: 0 0 0 2px" in mobile_active_field
+
+    mobile_invalid_field_selector = (
+        "dialog.recipe-edit-ingredient-edit-panel "
+        ".recipe-edit-ingredient-edit-field :is(input, textarea, select)[aria-invalid=\"true\"],"
+    )
+    mobile_invalid_field = mobile[mobile.index(mobile_invalid_field_selector):]
+    mobile_invalid_field = mobile_invalid_field[:mobile_invalid_field.index("}")]
+    assert ".recipe-edit-store-section-trigger" in mobile_invalid_field
+    assert "border-color: var(--app-danger, #ef4444);" in mobile_invalid_field
+    assert "box-shadow: 0 0 0 2px" in mobile_invalid_field
+
     mobile_image_actions_selector = (
         ".recipe-edit-ingredient-modal-preview-media "
         ".recipe-edit-ingredient-modal-image-panel > .recipe-step-image-actions {"
