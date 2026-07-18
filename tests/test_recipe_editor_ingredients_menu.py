@@ -3318,6 +3318,28 @@ def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():
     assert "applyRecipeEditIngredientColumnLayout();" not in show_all
 
 
+def test_mobile_store_and_type_fields_stack_beneath_their_labels():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    mobile_fields = css[
+        css.index(
+            "/* Ingredient editor v32: stack mobile Store and Type fields beneath their labels. */"
+        ):
+    ]
+    assert "@media (max-width: 767px)" in mobile_fields
+    assert ".recipe-edit-ingredient-store-summary," in mobile_fields
+    assert ".recipe-edit-ingredient-type-summary" in mobile_fields
+    assert "grid-template-columns: minmax(0, 1fr);" in mobile_fields
+    assert "align-items: stretch;" in mobile_fields
+    assert "grid-row: 1;" in mobile_fields
+    assert ".recipe-edit-store-section-trigger," in mobile_fields
+    assert ".recipe-edit-type-trigger" in mobile_fields
+    assert "grid-row: 2;" in mobile_fields
+    assert "justify-self: stretch;" in mobile_fields
+    assert "width: 100%;" in mobile_fields
+    assert "min-width: 0;" in mobile_fields
+
+
 def test_ingredient_rows_label_optional_items_beneath_buy_as_on_desktop_and_mobile():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

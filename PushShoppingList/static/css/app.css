@@ -56284,6 +56284,38 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-inline-pick
     right: 9px;
 }
 
+/* Ingredient editor v32: stack mobile Store and Type fields beneath their labels. */
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > :is(
+        .recipe-edit-ingredient-store-summary,
+        .recipe-edit-ingredient-type-summary
+    ) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-content: start;
+        align-items: stretch;
+        gap: 2px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > :is(
+        .recipe-edit-ingredient-store-summary,
+        .recipe-edit-ingredient-type-summary
+    )::before {
+        display: block;
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger,
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
+        grid-column: 1;
+        grid-row: 2;
+        justify-self: stretch;
+        width: 100%;
+        min-width: 0;
+    }
+}
+
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row
