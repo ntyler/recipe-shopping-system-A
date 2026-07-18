@@ -1094,6 +1094,15 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     scroll_rule = scroll_rule[:scroll_rule.index("}")]
     assert "overflow-y: auto;" in scroll_rule
     assert "overflow-x: hidden;" in scroll_rule
+    scrollbar_button_rule = workspace[
+        workspace.index(
+            ":is(\n    .recipe-edit-ingredient-modal-body,\n"
+            "    .recipe-edit-ingredient-modal-scroll\n)::-webkit-scrollbar-button {"
+        ):
+    ]
+    scrollbar_button_rule = scrollbar_button_rule[:scrollbar_button_rule.index("}")]
+    for declaration in ("display: none;", "width: 0;", "height: 0;"):
+        assert declaration in scrollbar_button_rule
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in workspace
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);" in workspace
     bottom_grid_rule = workspace[workspace.index(".recipe-edit-ingredient-modal-bottom-grid {"):]
