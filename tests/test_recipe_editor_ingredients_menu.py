@@ -495,7 +495,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert 'imageSlot.dataset.recipeIngredientModalImageSlot = "";' in organize
     assert 'nameInput.setAttribute("aria-required", "true");' in organize
     assert 'nameLabel.textContent = "Ingredient Name";' in organize
-    assert "The grocery item that should be added to the shopping list." in organize
+    assert "addRecipeIngredientBuyAsTooltip(buyAs, modalId);" in organize
     assert 'typeLabel.textContent = "Type";' in organize
     assert ">Previous</button>" in organize
     assert ">Next</button>" in organize
@@ -1061,6 +1061,10 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
         script.index("function organizeRecipeEditIngredientRow(row)"):
         script.index("function organizeRecipeEditCompactRowActions", script.index("function organizeRecipeEditIngredientRow(row)"))
     ]
+    buy_as_tooltip = script[
+        script.index("function addRecipeIngredientBuyAsTooltip"):
+        script.index("function organizeRecipeEditIngredientRow(row)")
+    ]
 
     for label in ("Overview", "Quantity &amp; Details", "Usage", "Notes", "AI Analysis"):
         assert f"<span>{label}</span>" in organize
@@ -1090,6 +1094,14 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert 'typeLabel.textContent = "Type";' in organize
     assert "identityFields.appendChild(type);" in organize
     assert "identityFields.appendChild(requirementField);" not in organize
+    assert "addRecipeIngredientBuyAsTooltip(buyAs, modalId);" in organize
+    assert 'helper.textContent = "The grocery item that should be added to the shopping list.";' not in organize
+    assert 'field.querySelector(\':scope > input[data-field="purchasable_item"]\')' in buy_as_tooltip
+    assert 'heading.className = "recipe-edit-ingredient-field-heading recipe-edit-metadata-heading";' in buy_as_tooltip
+    assert 'if (!control.id) control.id = `${modalId}BuyAs`;' in buy_as_tooltip
+    assert "addRecipeEditMetadataTooltip(" in buy_as_tooltip
+    assert '"The grocery item that should be added to the shopping list."' in buy_as_tooltip
+    assert 'if (trigger) trigger.textContent = "i";' in buy_as_tooltip
     assert "previewMedia?.appendChild(imageSlot);" in organize
     assert "analysisSummary?.appendChild(matchDetails);" in organize
     assert "[originalText, choiceReview, warning].filter(Boolean).forEach(field => support.appendChild(field));" in organize
@@ -1310,8 +1322,10 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
     assert "font-size: 16px !important;" in mobile_name_type
     assert ".recipe-edit-ingredient-modal-section-surface > h3" in mobile
     assert "font-weight: 700;" in mobile
-    assert ".recipe-edit-ingredient-field-helper" in mobile
-    assert "font-weight: 400;" in mobile
+    assert ".recipe-edit-ingredient-field-heading" in workspace
+    assert "display: flex;" in workspace
+    assert ".recipe-edit-ingredient-field-heading" in mobile
+    assert ".recipe-edit-ingredient-field-helper" not in workspace
 
     shared_quiet_field_selector = (
         "dialog.recipe-edit-ingredient-edit-panel "

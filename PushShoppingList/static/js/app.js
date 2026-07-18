@@ -28476,6 +28476,31 @@ function bindRecipeIngredientInlineEditor(row) {
     syncRecipeIngredientInlineEditor(row);
 }
 
+function addRecipeIngredientBuyAsTooltip(field, modalId) {
+    if (!field) return;
+    field.querySelectorAll(":scope > .recipe-edit-ingredient-field-helper").forEach(helper => helper.remove());
+    const control = field.querySelector(':scope > input[data-field="purchasable_item"]');
+    if (!control) return;
+
+    let heading = field.querySelector(":scope > .recipe-edit-ingredient-field-heading");
+    if (!heading) {
+        const labelText = field.querySelector(":scope > span:first-child");
+        heading = document.createElement("span");
+        heading.className = "recipe-edit-ingredient-field-heading recipe-edit-metadata-heading";
+        field.insertBefore(heading, field.firstChild);
+        if (labelText) heading.appendChild(labelText);
+    }
+
+    if (!control.id) control.id = `${modalId}BuyAs`;
+    addRecipeEditMetadataTooltip(
+        field,
+        "Buy As",
+        "The grocery item that should be added to the shopping list."
+    );
+    const trigger = heading.querySelector("[data-recipe-edit-metadata-tooltip-trigger]");
+    if (trigger) trigger.textContent = "i";
+}
+
 function organizeRecipeEditIngredientRow(row) {
     if (!recipeEditorStandalonePageIsActive() || !row || row.dataset.recipeEditCompactRow === "1") {
         return;
@@ -28825,10 +28850,7 @@ function organizeRecipeEditIngredientRow(row) {
     }
     if (buyAs) {
         buyAs.classList.add("recipe-edit-ingredient-edit-field", "recipe-edit-ingredient-modal-buy-as-field");
-        const helper = document.createElement("small");
-        helper.className = "recipe-edit-ingredient-field-helper";
-        helper.textContent = "The grocery item that should be added to the shopping list.";
-        buyAs.appendChild(helper);
+        addRecipeIngredientBuyAsTooltip(buyAs, modalId);
         identityFields.appendChild(buyAs);
     }
     ensureRecipeIngredientModalIdentityStack(editPanel);

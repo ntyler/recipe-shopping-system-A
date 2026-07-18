@@ -48973,13 +48973,6 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recip
     resize: vertical;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-field-helper {
-    color: var(--app-muted);
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1.45;
-}
-
 body.recipe-edit-standalone-page .recipe-edit-ingredient-field-error,
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-error {
     color: var(--app-danger, #fb7185);
@@ -49559,11 +49552,6 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recip
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-unit-label input {
     padding-right: 40px;
     text-overflow: clip;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-ingredient-field-helper {
-    font-size: 11.5px;
-    line-height: 1.45;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-image-slot {
@@ -50231,11 +50219,19 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recip
 
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
     .recipe-edit-ingredient-modal-field-label,
-    .recipe-edit-ingredient-edit-field > span:first-child
+    .recipe-edit-ingredient-edit-field > span:first-child,
+    .recipe-edit-ingredient-field-heading
 ) {
     color: color-mix(in srgb, var(--app-text-soft) 88%, var(--app-muted));
     font-size: 12.5px;
     font-weight: 620;
+}
+
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-field-heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
 }
 
 body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-edit-field :is(input, textarea, select),
@@ -51012,7 +51008,8 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
 
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
         .recipe-edit-ingredient-modal-field-label,
-        .recipe-edit-ingredient-edit-field > span:first-child
+        .recipe-edit-ingredient-edit-field > span:first-child,
+        .recipe-edit-ingredient-field-heading
     ) {
         font-size: 12px;
         font-weight: 600;
@@ -51035,12 +51032,6 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel :is(
     ) {
         font-size: 14px;
         font-weight: 600;
-    }
-
-    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-field-helper {
-        font-size: 12px;
-        font-weight: 400;
-        line-height: 1.45;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer {
