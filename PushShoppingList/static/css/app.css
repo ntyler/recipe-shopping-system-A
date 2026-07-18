@@ -56227,6 +56227,19 @@ body.recipe-edit-standalone-page #recipeEditIngredients :is(
     letter-spacing: inherit;
 }
 
+/* Ingredient editor v31: keep inline Unit and Type chevrons outside the input outline. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
+    width: calc(100% - 16px);
+    padding-right: 7px;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-inline-picker-chevron {
+    right: 0;
+}
+
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row
