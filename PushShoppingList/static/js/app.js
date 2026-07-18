@@ -27187,79 +27187,10 @@ function recipeIngredientSentenceCase(value) {
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
 
-const RECIPE_INGREDIENT_EDITABLE_MATCH_STATUSES = [
-    ["matched", "Good match"],
-    ["review_match", "Review match"],
-    ["low_confidence", "Low confidence"],
-    ["multiple_matches", "Multiple matches"],
-    ["unmatched", "Unmatched"],
-    ["pantry_staple", "Pantry staple"],
-];
-
-function recipeIngredientEditableMatchStatusValue(item = {}) {
-    const rawStatus = String(item.match_status || item.matching_status || "").trim();
-    const statusKey = rawStatus.toLowerCase().replace(/[_-]+/g, " ");
-    const aliases = {
-        "good match": "matched",
-        matched: "matched",
-        best: "matched",
-        "best match": "matched",
-        exact: "matched",
-        review: "review_match",
-        "review match": "review_match",
-        "needs review": "review_match",
-        "pending review": "review_match",
-        low: "low_confidence",
-        "low confidence": "low_confidence",
-        weak: "low_confidence",
-        multiple: "multiple_matches",
-        "multiple matches": "multiple_matches",
-        ambiguous: "multiple_matches",
-        conflict: "multiple_matches",
-        unmatched: "unmatched",
-        "not matched": "unmatched",
-        "no match": "unmatched",
-        missing: "unmatched",
-        "pantry staple": "pantry_staple",
-    };
-    if (Object.prototype.hasOwnProperty.call(aliases, statusKey)) {
-        return aliases[statusKey];
-    }
-
-    const match = recipeIngredientMatchDetails(item);
-    const attentionKey = String(match.attentionStatus || "").toLowerCase();
-    if (attentionKey) {
-        return aliases[attentionKey] || "review_match";
-    }
-    const pantryText = `${item.ingredient || ""} ${item.purchasable_item || item.buy_as || ""} ${item.store_section || ""}`.toUpperCase();
-    if (
-        recipeIngredientMatchFlag(item.pantry_staple)
-        || recipeIngredientMatchFlag(item.is_pantry_staple)
-        || pantryText.includes("BEAN")
-        || pantryText.includes("LEGUME")
-        || pantryText.includes("SPICE")
-    ) {
-        return "pantry_staple";
-    }
-    return rawStatus ? "review_match" : "matched";
-}
-
-function recipeIngredientEditableMatchStatusOptions(item = {}) {
-    const selectedValue = recipeIngredientEditableMatchStatusValue(item);
-    return RECIPE_INGREDIENT_EDITABLE_MATCH_STATUSES.map(([value, label]) => (
-        `<option value="${escapeAttribute(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(label)}</option>`
-    )).join("");
-}
-
 function recipeIngredientReadStatusHtml(item = {}) {
     const match = recipeIngredientMatchDetails(item);
-    const matchStatus = String(item.match_status || item.matching_status || "")
-        .trim()
-        .toLowerCase()
-        .replace(/[_-]+/g, " ");
     const pantryText = `${item.ingredient || ""} ${item.purchasable_item || item.buy_as || ""} ${item.store_section || ""}`.toUpperCase();
-    const pantryStaple = matchStatus === "pantry staple"
-        || recipeIngredientMatchFlag(item.pantry_staple)
+    const pantryStaple = recipeIngredientMatchFlag(item.pantry_staple)
         || recipeIngredientMatchFlag(item.is_pantry_staple)
         || pantryText.includes("BEAN")
         || pantryText.includes("LEGUME")
@@ -28596,15 +28527,7 @@ function syncRecipeIngredientInlineEditor(row) {
             }
         }
 
-        control.value = fieldName === "match_status"
-            ? recipeIngredientEditableMatchStatusValue(recipeIngredientMatchItemFromRow(row))
-            : source.value;
-        if (fieldName === "match_status") {
-            const statusControl = control.closest("[data-ingredient-status-control]");
-            if (statusControl) {
-                statusControl.dataset.matchStatus = control.value || "not_evaluated";
-            }
-        }
+        control.value = source.value;
         if (fieldName === "store_section") {
             const trigger = control.closest("[data-ingredient-store-summary]")
                 ?.querySelector("[data-recipe-ingredient-inline-store-section-trigger]");
@@ -28647,8 +28570,7 @@ function bindRecipeIngredientInlineEditor(row) {
             syncRecipeIngredientInlineEditor(row);
         };
         const primaryEvent = control.tagName === "SELECT" ? "change" : "input";
-        const sourceEvent = source.type === "checkbox" || source.tagName === "SELECT" ? "change" : "input";
-        control.addEventListener(primaryEvent, () => applyValue(sourceEvent));
+        control.addEventListener(primaryEvent, () => applyValue(primaryEvent));
         if (control.tagName !== "SELECT") {
             control.addEventListener("change", () => applyValue("change"));
             control.addEventListener("blur", () => {
@@ -28765,19 +28687,7 @@ function organizeRecipeEditIngredientRow(row) {
     statusSummary.className = "recipe-edit-ingredient-status-summary";
     statusSummary.dataset.ingredientStatusSummary = "";
     statusSummary.setAttribute("role", "cell");
-    statusSummary.innerHTML = `
-        <span class="recipe-edit-ingredient-read-status" data-ingredient-read-status></span>
-        <span class="recipe-edit-ingredient-status-control" data-ingredient-status-control>
-            <span class="recipe-edit-ingredient-status-dot" aria-hidden="true"></span>
-            <select class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-status"
-                    data-recipe-ingredient-inline-field="match_status"
-                    aria-label="Status">
-                ${recipeIngredientEditableMatchStatusOptions(recipeIngredientMatchItemFromRow(row))}
-            </select>
-            <span class="recipe-edit-unit-chevron recipe-edit-status-chevron recipe-edit-inline-picker-chevron"
-                  aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
-        </span>
-    `;
+    statusSummary.innerHTML = '<span class="recipe-edit-ingredient-read-status" data-ingredient-read-status></span>';
     row.appendChild(statusSummary);
 
     const summaryDefinitions = [
@@ -36407,7 +36317,7 @@ function recipeIngredientMatchDetails(item = {}) {
         || item.master_ingredient_id
         || item.matched_master_ingredient
         || item.master_ingredient_name
-        || ["matched", "best", "best match", "exact", "pantry staple"].includes(statusKey)
+        || ["matched", "best", "best match", "exact"].includes(statusKey)
     );
     const hasMatchSignal = Boolean(
         status

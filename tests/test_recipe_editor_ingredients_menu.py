@@ -857,53 +857,25 @@ def test_mobile_ingredient_status_value_stacks_beneath_its_label():
     assert "width: 100%;" in value_rule
 
 
-def test_mobile_ingredient_metadata_stays_compact_and_editable():
+def test_mobile_ingredient_metadata_stays_compact_with_read_only_status():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-
-    status_options = script[
-        script.index("const RECIPE_INGREDIENT_EDITABLE_MATCH_STATUSES"):
-        script.index("function recipeIngredientReadStatusHtml")
-    ]
-    for value, label in (
-        ('"matched"', '"Good match"'),
-        ('"review_match"', '"Review match"'),
-        ('"low_confidence"', '"Low confidence"'),
-        ('"multiple_matches"', '"Multiple matches"'),
-        ('"unmatched"', '"Unmatched"'),
-        ('"pantry_staple"', '"Pantry staple"'),
-    ):
-        assert f"[{value}, {label}]" in status_options
 
     organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
     organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
     organize = script[organize_start:organize_end]
-    assert 'data-ingredient-status-control' in organize
-    assert 'data-recipe-ingredient-inline-field="match_status"' in organize
-    assert 'aria-label="Status"' in organize
+    assert 'class="recipe-edit-ingredient-read-status" data-ingredient-read-status' in organize
+    assert 'data-recipe-ingredient-inline-field="match_status"' not in organize
+    assert "RECIPE_INGREDIENT_EDITABLE_MATCH_STATUSES" not in script
     for field_name in ("quantity", "unit", "size", "store_section", "section"):
         assert f'"{field_name}"' in organize
-    assert "data.ingredientSubstitutionsToggle" not in organize
     assert "optionsButton.dataset.ingredientSubstitutionsToggle" in organize
-
-    binding = script[
-        script.index("function syncRecipeIngredientInlineEditor"):
-        script.index("function addRecipeIngredientBuyAsTooltip")
-    ]
-    assert 'fieldName === "match_status"' in binding
-    assert 'statusControl.dataset.matchStatus = control.value || "not_evaluated";' in binding
-    assert 'const sourceEvent = source.type === "checkbox" || source.tagName === "SELECT" ? "change" : "input";' in binding
-    assert "applyValue(sourceEvent)" in binding
 
     v34_start = css.index("/* Ingredient editor v34:")
     v34 = css[v34_start:css.index("/* Keep expanded modal analysis", v34_start)]
     assert "@media (max-width: 767px)" in v34
-    assert ".recipe-edit-ingredient-status-control" in v34
-    assert "width: min(180px, 100%);" in v34
-    assert ".recipe-edit-ingredient-inline-status" in v34
-    assert "appearance: none;" in v34
-    assert ".recipe-edit-ingredient-status-dot" in v34
-    assert ".recipe-edit-status-chevron" in v34
+    assert ".recipe-edit-ingredient-status-control" not in v34
+    assert ".recipe-edit-ingredient-inline-status" not in v34
     assert ".recipe-edit-ingredient-options-button::after" in v34
     assert '.recipe-edit-ingredient-options-button[aria-expanded="true"]::after' in v34
 
