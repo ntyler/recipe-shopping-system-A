@@ -26236,7 +26236,7 @@ function setRecipeEditIngredientColumnVisibility(key, visible) {
         return false;
     }
     layout.hidden = layout.order.filter(columnKey => hidden.has(columnKey));
-    applyRecipeEditIngredientColumnLayout();
+    refreshRecipeEditIngredientColumnLayout();
     saveRecipeEditIngredientColumnLayout();
     syncRecipeEditIngredientColumnVisibilityMenu();
     setRecipeEditIngredientColumnStatus(
@@ -26248,7 +26248,7 @@ function setRecipeEditIngredientColumnVisibility(key, visible) {
 function showAllRecipeEditIngredientColumns() {
     const layout = ensureRecipeEditIngredientColumnLayout();
     layout.hidden = [];
-    applyRecipeEditIngredientColumnLayout();
+    refreshRecipeEditIngredientColumnLayout();
     saveRecipeEditIngredientColumnLayout();
     syncRecipeEditIngredientColumnVisibilityMenu();
     setRecipeEditIngredientColumnStatus("All ingredient columns shown.");

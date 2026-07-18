@@ -1779,7 +1779,7 @@
                                     aria-expanded="false"
                                     onclick="return toggleRecipeEditSectionMenu(this, event)">
                                 <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("settings") }}</span>
-                                <span>Columns</span>
+                                <span class="recipe-edit-ingredient-columns-label">Columns</span>
                                 <span class="recipe-edit-columns-chevron" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
                             </button>
                             <div class="recipe-edit-row-menu recipe-edit-section-menu recipe-edit-ingredient-column-menu" hidden>
@@ -1795,7 +1795,9 @@
                                     <button type="button" onclick="return showAllRecipeEditIngredientColumns()">
                                         Show all columns
                                     </button>
-                                    <button type="button" onclick="return autoFitRecipeEditIngredientColumns()">
+                                    <button type="button"
+                                            class="recipe-edit-ingredient-columns-desktop-action"
+                                            onclick="return autoFitRecipeEditIngredientColumns()">
                                         Auto-fit column widths
                                     </button>
                                     <button type="button" onclick="return resetRecipeEditIngredientColumnLayout()">

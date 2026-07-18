@@ -55862,13 +55862,51 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
 }
 
 /* Ingredient editor v24: real mobile folding for the current card-based layout. */
-.recipe-edit-mobile-ingredients-collapse-toggle,
+body.recipe-edit-standalone-page .ingredients-toolbar .recipe-edit-mobile-ingredients-collapse-toggle {
+    display: none;
+}
+
 body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-compact-row-collapse,
 body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-mobile-quantity-summary {
     display: none;
 }
 
 @media (max-width: 767px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-column-menu-wrap {
+        display: block;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-columns-button {
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
+        min-height: 34px;
+        padding: 0;
+        gap: 0;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-columns-button > :is(
+        .recipe-edit-ingredient-columns-label,
+        .recipe-edit-columns-chevron
+    ) {
+        display: none;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-columns-button .recipe-edit-button-icon,
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-columns-button .recipe-edit-button-icon .app-icon-svg {
+        display: inline-flex;
+        width: 16px;
+        min-width: 16px;
+        height: 16px;
+        opacity: 1;
+        visibility: visible;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-column-help,
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-columns-desktop-action {
+        display: none;
+    }
+
     body.recipe-edit-standalone-page .ingredients-toolbar .recipe-edit-mobile-ingredients-collapse-toggle {
         display: inline-flex;
         width: 34px;

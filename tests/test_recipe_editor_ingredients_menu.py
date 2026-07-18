@@ -3217,7 +3217,15 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
 
     mobile_start = css.index("/* Ingredient editor v24: real mobile folding for the current card-based layout. */")
     mobile_css = css[mobile_start:]
-    assert "@media (max-width: 767px)" in mobile_css
+    mobile_media_start = mobile_css.index("@media (max-width: 767px)")
+    desktop_only_rule = mobile_css[:mobile_media_start]
+    assert (
+        "body.recipe-edit-standalone-page .ingredients-toolbar "
+        ".recipe-edit-mobile-ingredients-collapse-toggle {"
+    ) in desktop_only_rule
+    assert "display: none;" in desktop_only_rule
+    mobile_media = mobile_css[mobile_media_start:]
+    assert "display: inline-flex;" in mobile_media
     assert "grid-template-columns: 40px minmax(0, 1fr) max-content 106px !important;" in mobile_css
     assert "grid-template-rows: 44px !important;" in mobile_css
     assert "min-height: 62px !important;" in mobile_css
@@ -3272,6 +3280,42 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     collapsed_edit = collapsed_edit[:collapsed_edit.index("}")]
     assert "display: inline-flex !important;" in collapsed_edit
     assert "display: none !important;" not in collapsed_edit
+
+
+def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8",
+    )
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert 'class="recipe-edit-ingredient-columns-label">Columns</span>' in template
+    assert 'class="recipe-edit-ingredient-columns-desktop-action"' in template
+    assert '{{ shell.svg_icon("settings") }}' in template
+
+    mobile_start = css.index("/* Ingredient editor v24: real mobile folding for the current card-based layout. */")
+    mobile_css = css[mobile_start:]
+    mobile_css = mobile_css[mobile_css.index("@media (max-width: 767px)"):]
+    assert ".recipe-edit-ingredient-column-menu-wrap {" in mobile_css
+    assert "display: block;" in mobile_css
+    assert ".recipe-edit-ingredient-columns-button .recipe-edit-button-icon .app-icon-svg" in mobile_css
+    assert "width: 16px;" in mobile_css
+    assert "visibility: visible;" in mobile_css
+    assert ".recipe-edit-ingredient-columns-label," in mobile_css
+    assert ".recipe-edit-columns-chevron" in mobile_css
+    assert ".recipe-edit-ingredient-columns-desktop-action" in mobile_css
+
+    visibility_start = script.index("function setRecipeEditIngredientColumnVisibility")
+    visibility_end = script.index("function showAllRecipeEditIngredientColumns", visibility_start)
+    visibility = script[visibility_start:visibility_end]
+    assert "refreshRecipeEditIngredientColumnLayout();" in visibility
+    assert "applyRecipeEditIngredientColumnLayout();" not in visibility
+
+    show_all_start = visibility_end
+    show_all_end = script.index("function recipeEditIngredientColumnCellText", show_all_start)
+    show_all = script[show_all_start:show_all_end]
+    assert "refreshRecipeEditIngredientColumnLayout();" in show_all
+    assert "applyRecipeEditIngredientColumnLayout();" not in show_all
 
 
 def test_ingredient_rows_label_optional_items_beneath_buy_as_on_desktop_and_mobile():
