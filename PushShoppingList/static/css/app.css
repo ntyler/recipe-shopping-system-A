@@ -54973,6 +54973,22 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-
         height: 32px;
         min-height: 32px;
         margin: 0;
+        overflow: hidden;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-copy {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-copy > :is(
+        [data-ingredient-options-label],
+        [data-ingredient-options-summary]
+    ) {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button > .recipe-edit-inline-icon {

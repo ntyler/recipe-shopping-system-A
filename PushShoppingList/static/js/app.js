@@ -22660,58 +22660,58 @@ const RECIPE_EDIT_INGREDIENT_COLUMNS = {
     },
     ingredient: {
         label: "Ingredient",
-        minWidth: 150,
+        minWidth: 130,
         maxWidth: 720,
         fallbackWidth: 240,
         selectors: [":scope > .recipe-edit-ingredient-read-cell"],
     },
     status: {
         label: "Status",
-        minWidth: 78,
+        minWidth: 62,
         maxWidth: 320,
         fallbackWidth: 96,
         selectors: [":scope > .recipe-edit-ingredient-status-summary"],
     },
     quantity: {
         label: "Quantity",
-        minWidth: 58,
+        minWidth: 52,
         maxWidth: 240,
         fallbackWidth: 72,
         selectors: [":scope > .recipe-edit-ingredient-quantity-summary"],
     },
     unit: {
         label: "Unit",
-        minWidth: 64,
+        minWidth: 56,
         maxWidth: 260,
         fallbackWidth: 82,
         selectors: [":scope > .recipe-edit-ingredient-unit-summary"],
     },
     size: {
         label: "Size",
-        minWidth: 58,
+        minWidth: 52,
         maxWidth: 240,
         fallbackWidth: 72,
         selectors: [":scope > .recipe-edit-ingredient-size-summary"],
     },
     store: {
         label: "Store Section",
-        minWidth: 96,
+        minWidth: 78,
         maxWidth: 420,
         fallbackWidth: 128,
         selectors: [":scope > .recipe-edit-ingredient-store-summary"],
     },
     type: {
         label: "Type",
-        minWidth: 72,
+        minWidth: 58,
         maxWidth: 320,
         fallbackWidth: 96,
         selectors: [":scope > .recipe-edit-ingredient-type-summary"],
     },
     alternatives: {
         label: "Alternatives",
-        minWidth: 96,
-        maxWidth: 480,
-        fallbackWidth: 128,
+        minWidth: 84,
+        maxWidth: 180,
+        fallbackWidth: 132,
         selectors: [":scope > .recipe-edit-ingredient-substitution-cell"],
     },
     actions: {
@@ -26299,23 +26299,116 @@ function autoFitRecipeEditIngredientColumnWidth(key, context = null) {
     return clampRecipeEditIngredientColumnWidth(key, measuredWidth);
 }
 
+function fitRecipeEditIngredientColumnWidthsToBudget(keys, requestedWidths, budget) {
+    const widths = {};
+    keys.forEach(key => {
+        widths[key] = clampRecipeEditIngredientColumnWidth(key, requestedWidths[key]);
+    });
+
+    const minimumTotal = keys.reduce((sum, key) => (
+        sum + (RECIPE_EDIT_INGREDIENT_COLUMNS[key]?.minWidth || 0)
+    ), 0);
+    const target = Math.max(minimumTotal, Math.floor(Number(budget) || 0));
+    let total = keys.reduce((sum, key) => sum + widths[key], 0);
+
+    if (total > target) {
+        const capacities = keys.map(key => Math.max(
+            0,
+            widths[key] - RECIPE_EDIT_INGREDIENT_COLUMNS[key].minWidth,
+        ));
+        const totalCapacity = capacities.reduce((sum, capacity) => sum + capacity, 0);
+        let remaining = Math.min(total - target, totalCapacity);
+        capacities.forEach((capacity, index) => {
+            if (!capacity || !remaining) return;
+            const proportional = Math.floor(((total - target) * capacity) / totalCapacity);
+            const reduction = Math.min(capacity, proportional, remaining);
+            widths[keys[index]] -= reduction;
+            remaining -= reduction;
+        });
+        keys.forEach(key => {
+            if (!remaining) return;
+            const definition = RECIPE_EDIT_INGREDIENT_COLUMNS[key];
+            const reduction = Math.min(remaining, widths[key] - definition.minWidth);
+            widths[key] -= reduction;
+            remaining -= reduction;
+        });
+        total = keys.reduce((sum, key) => sum + widths[key], 0);
+    }
+
+    if (total < target) {
+        const growthOrder = [
+            "ingredient",
+            "alternatives",
+            "store",
+            "status",
+            "type",
+            "unit",
+            "size",
+            "quantity",
+            "media",
+            "actions",
+        ].filter(key => keys.includes(key));
+        let remaining = target - total;
+        growthOrder.forEach(key => {
+            if (!remaining) return;
+            const definition = RECIPE_EDIT_INGREDIENT_COLUMNS[key];
+            const growth = Math.min(remaining, definition.maxWidth - widths[key]);
+            widths[key] += growth;
+            remaining -= growth;
+        });
+    }
+
+    return widths;
+}
+
+function recipeEditIngredientColumnWidthBudget(tableScroll, visibleCount, gap) {
+    if (!tableScroll) return 0;
+    const horizontalPadding = 24;
+    const overflowSafety = 2;
+    return Math.max(
+        0,
+        Math.floor(
+            tableScroll.clientWidth
+            - horizontalPadding
+            - overflowSafety
+            - (gap * Math.max(0, visibleCount - 1))
+        ),
+    );
+}
+
 function autoFitRecipeEditIngredientColumns(columnKey = "") {
     const layout = ensureRecipeEditIngredientColumnLayout();
     const canvas = document.createElement("canvas");
     const context = typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
-    const keys = RECIPE_EDIT_INGREDIENT_COLUMNS[columnKey]
-        ? [columnKey]
-        : RECIPE_EDIT_INGREDIENT_COLUMN_ORDER;
-    keys.forEach(key => {
-        layout.widths[key] = autoFitRecipeEditIngredientColumnWidth(key, context);
-    });
+    if (RECIPE_EDIT_INGREDIENT_COLUMNS[columnKey]) {
+        layout.widths[columnKey] = autoFitRecipeEditIngredientColumnWidth(columnKey, context);
+    } else {
+        const tableScroll = document.querySelector("[data-recipe-edit-ingredient-table-scroll]");
+        const visibleKeys = recipeEditIngredientVisibleColumnOrder(layout);
+        const computedGap = tableScroll
+            ? Number.parseFloat(
+                window.getComputedStyle(tableScroll).getPropertyValue("--recipe-edit-ingredient-column-gap"),
+            )
+            : Number.NaN;
+        const gap = Number.isFinite(computedGap) ? computedGap : 10;
+        const measuredWidths = {};
+        visibleKeys.forEach(key => {
+            measuredWidths[key] = autoFitRecipeEditIngredientColumnWidth(key, context);
+        });
+        const fittedWidths = fitRecipeEditIngredientColumnWidthsToBudget(
+            visibleKeys,
+            measuredWidths,
+            recipeEditIngredientColumnWidthBudget(tableScroll, visibleKeys.length, gap),
+        );
+        Object.assign(layout.widths, fittedWidths);
+    }
     applyRecipeEditIngredientColumnLayout();
     saveRecipeEditIngredientColumnLayout();
     closeRecipeEditRowMenus();
     setRecipeEditIngredientColumnStatus(
         columnKey
             ? `${RECIPE_EDIT_INGREDIENT_COLUMNS[columnKey].label} column fitted to its content.`
-            : "Ingredient columns fitted to their content.",
+            : "Visible ingredient columns fitted to the table width.",
     );
     return false;
 }

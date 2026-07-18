@@ -1678,6 +1678,54 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
     assert "display: none !important;" in mobile
 
 
+def test_recipe_editor_auto_fit_keeps_visible_columns_inside_the_table_width():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    definitions = script[
+        script.index("const RECIPE_EDIT_INGREDIENT_COLUMNS = {"):
+        script.index("const RECIPE_EDIT_PDF_FIELD_ALIASES")
+    ]
+    keys = (
+        "media", "ingredient", "status", "quantity", "unit",
+        "size", "store", "type", "alternatives", "actions",
+    )
+    minimum_widths = []
+    for index, key in enumerate(keys):
+        next_key = keys[index + 1] if index + 1 < len(keys) else None
+        start = definitions.index(f"    {key}: {{")
+        end = definitions.index(f"    {next_key}: {{", start) if next_key else len(definitions)
+        block = definitions[start:end]
+        minimum_line = next(line for line in block.splitlines() if "minWidth:" in line)
+        minimum_widths.append(int(minimum_line.split(":", 1)[1].strip(" ,")))
+    assert sum(minimum_widths) + (10 * (len(keys) - 1)) + 24 + 2 <= 860
+
+    alternatives = definitions[
+        definitions.index("    alternatives: {"):
+        definitions.index("    actions: {")
+    ]
+    assert "minWidth: 84" in alternatives
+    assert "maxWidth: 180" in alternatives
+    assert "fallbackWidth: 132" in alternatives
+
+    auto_fit = script[
+        script.index("function fitRecipeEditIngredientColumnWidthsToBudget"):
+        script.index("function recipeEditIngredientColumnLayoutIsAvailable")
+    ]
+    assert "const target = Math.max(minimumTotal" in auto_fit
+    assert 'const visibleKeys = recipeEditIngredientVisibleColumnOrder(layout);' in auto_fit
+    assert "recipeEditIngredientColumnWidthBudget(tableScroll, visibleKeys.length, gap)" in auto_fit
+    assert "Object.assign(layout.widths, fittedWidths);" in auto_fit
+    assert 'tableScroll.clientWidth' in auto_fit
+    assert 'Visible ingredient columns fitted to the table width.' in auto_fit
+
+    alternatives_css = css[css.index("@media (min-width: 768px) {", css.index("/* Ingredient editor v20:")):]
+    assert ".recipe-edit-ingredient-options-button" in alternatives_css
+    assert ".recipe-edit-ingredient-options-copy" in alternatives_css
+    assert "overflow: hidden;" in alternatives_css
+    assert "text-overflow: ellipsis;" in alternatives_css
+
+
 def test_recipe_editor_size_column_follows_unit_and_matches_quantity_formatting():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -1696,7 +1744,7 @@ def test_recipe_editor_size_column_follows_unit_and_matches_quantity_formatting(
         script.index("    size: {"):
         script.index("    store: {")
     ]
-    for formatting in ("minWidth: 58", "maxWidth: 240", "fallbackWidth: 72"):
+    for formatting in ("minWidth: 52", "maxWidth: 240", "fallbackWidth: 72"):
         assert formatting in quantity_definition
         assert formatting in size_definition
 
