@@ -506,8 +506,18 @@ def test_recipe_editor_standard_fields_are_quiet_until_active():
     assert "background-color: color-mix(in srgb, var(--app-bg) 68%, var(--app-surface-soft));" in resting_rule
     assert "box-shadow: none;" in resting_rule
 
+    hover_rule_start = quiet_fields.index(
+        '):not([disabled]):not([readonly]):not([aria-invalid="true"]):not('
+        '[data-recipe-edit-validation-invalid="true"]):hover'
+    )
+    hover_rule = quiet_fields[hover_rule_start:quiet_fields.index("}", hover_rule_start)]
+    assert "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));" in hover_rule
+    assert "background-color: color-mix(in srgb, var(--app-bg) 76%, var(--app-surface-soft));" in hover_rule
+    assert "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);" in hover_rule
+
     active_rule_start = quiet_fields.index(":is(:focus, :focus-visible)")
     active_rule = quiet_fields[active_rule_start:quiet_fields.index("}", active_rule_start)]
+    assert hover_rule_start < active_rule_start
     assert "border-color: var(--app-primary-hover);" in active_rule
     assert "outline: 0;" in active_rule
     assert "background-color: color-mix(in srgb, var(--app-bg) 82%, var(--app-surface-soft));" in active_rule
@@ -523,6 +533,10 @@ def test_recipe_editor_standard_fields_are_quiet_until_active():
     assert "box-shadow: 0 0 0 2px" in invalid_rule
     assert ".recipe-edit-cookbook-select" not in quiet_fields
     assert ".recipe-edit-price-control:not(:focus-within):not(:has(" in quiet_fields
+    price_hover_start = quiet_fields.index(".recipe-edit-price-control:hover:not(:focus-within):not(:has(")
+    price_hover_rule = quiet_fields[price_hover_start:quiet_fields.index("}", price_hover_start)]
+    assert "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));" in price_hover_rule
+    assert "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);" in price_hover_rule
     assert ".recipe-edit-price-control:focus-within" in quiet_fields
     assert ".recipe-edit-price-control:has(" in quiet_fields
     assert "#recipeEditMenuPrice:is([aria-invalid=\"true\"], [data-recipe-edit-validation-invalid=\"true\"])" in quiet_fields

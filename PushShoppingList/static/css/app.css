@@ -56304,12 +56304,45 @@ body.recipe-edit-standalone-page #recipeEditForm :is(
     box-shadow: none;
 }
 
+body.recipe-edit-standalone-page #recipeEditForm :is(
+    .recipe-edit-info-panel:not(.recipe-edit-categories-panel),
+    .recipe-edit-categories-panel
+) :is(
+    input:where(:not(
+        [type="hidden"],
+        [type="checkbox"],
+        [type="radio"],
+        [type="file"],
+        [type="color"],
+        [type="range"],
+        [type="button"],
+        [type="submit"],
+        [type="reset"],
+        [type="image"],
+        #recipeEditDisplayName
+    )),
+    textarea,
+    select
+):not([disabled]):not([readonly]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]):hover {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
+    background-color: color-mix(in srgb, var(--app-bg) 76%, var(--app-surface-soft));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
+}
+
 body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-price-control:not(:focus-within):not(:has(
     #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
 )) {
     border-color: transparent;
     background-color: color-mix(in srgb, var(--app-bg) 68%, var(--app-surface-soft));
     box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-price-control:hover:not(:focus-within):not(:has(
+    #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
+)) {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
+    background-color: color-mix(in srgb, var(--app-bg) 76%, var(--app-surface-soft));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
 }
 
 body.recipe-edit-standalone-page #recipeEditForm :is(
