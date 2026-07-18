@@ -26292,7 +26292,7 @@ function autoFitRecipeEditIngredientColumnWidth(key, context = null) {
     if (key === "media" || key === "actions") return definition.fallbackWidth;
     const header = document.querySelector(`[data-ingredient-column="${key}"]`);
     let measuredWidth = measureRecipeEditIngredientColumnText(context, header || document.body, definition.label) + 34;
-    const contentAllowance = key === "type" ? 58 : 30;
+    const contentAllowance = key === "type" ? 46 : 30;
     recipeEditIngredientRows().forEach(row => {
         definition.selectors.forEach(selector => {
             const cell = row.querySelector(selector);
@@ -37162,16 +37162,12 @@ function recipeIngredientTypeDotClassModifier(value) {
 function syncRecipeIngredientTypeTrigger(trigger, select, selectedValue) {
     if (!trigger) return;
     const triggerLabel = trigger.querySelector("[data-type-trigger-label]");
-    const dot = trigger.querySelector("[data-type-trigger-dot]");
     const resolvedValue = String(selectedValue || "").trim() || "main";
     const inline = trigger.dataset.recipeIngredientInlineTypeTrigger === "true";
     if (triggerLabel) {
         triggerLabel.textContent = inline
             ? recipeIngredientTypeLabel({ section: resolvedValue })
             : recipeIngredientTypeControlLabel(select, resolvedValue);
-    }
-    if (dot) {
-        dot.className = `recipe-edit-type-dot${recipeIngredientTypeDotClassModifier(resolvedValue)}`;
     }
 }
 
@@ -37187,7 +37183,6 @@ function createRecipeIngredientTypeTrigger(select, options = {}) {
     trigger.setAttribute("aria-expanded", "false");
     trigger.recipeEditTypeSelect = select;
     trigger.innerHTML = `
-        <span class="recipe-edit-type-dot" data-type-trigger-dot aria-hidden="true"></span>
         <span data-type-trigger-label></span>
         <span class="recipe-edit-store-section-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
     `;

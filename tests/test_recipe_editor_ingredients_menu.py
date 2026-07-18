@@ -1738,7 +1738,7 @@ def test_recipe_editor_auto_fit_keeps_visible_columns_inside_the_table_width():
     assert "Preserve content-fitted widths when the visible columns already fit." in auto_fit
     assert 'function recipeEditIngredientColumnCellText(cell, key = "")' in script
     assert 'cell.querySelectorAll("[data-type-trigger-label]")' in script
-    assert 'const contentAllowance = key === "type" ? 58 : 30;' in script
+    assert 'const contentAllowance = key === "type" ? 46 : 30;' in script
     assert "recipeEditIngredientColumnCellText(cell, key)" in script
     assert "text) + contentAllowance" in script
 
@@ -2759,7 +2759,8 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert 'return " is-custom";' in script
     assert 'return builtIn.value === "optional" ? " is-optional" : "";' in script
     assert 'class="recipe-edit-type-option-dot${recipeIngredientTypeDotClassModifier(value)}"' in script
-    assert "`recipe-edit-type-dot${recipeIngredientTypeDotClassModifier(resolvedValue)}`" in script
+    assert 'data-type-trigger-dot' not in script
+    assert 'trigger.querySelector("[data-type-trigger-dot]")' not in script
     assert "if (!custom)" in script
     assert 'data-type-action="add-custom"' in script
     assert 'data-type-action="edit-custom"' in script
@@ -2808,6 +2809,13 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert ".recipe-edit-ingredient-type-summary" in css
     assert ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger" in css
     assert 'border: 1px solid transparent;' in css
+
+    trigger_rule_start = css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {"
+    )
+    trigger_rule = css[trigger_rule_start:css.index("}", trigger_rule_start)]
+    assert "grid-template-columns: minmax(0, 1fr) 14px;" in trigger_rule
+    assert "grid-template-columns: 7px minmax(0, 1fr) 14px;" not in trigger_rule
 
 
 def test_recipe_editor_type_is_authoritative_for_saved_optional_state():
@@ -3103,6 +3111,30 @@ def test_ingredient_rows_label_optional_items_beneath_buy_as_on_desktop_and_mobi
     ]
     assert "display: inline-flex;" in desktop_badge
     assert "text-transform: uppercase;" in desktop_badge
+
+
+def test_wide_desktop_ingredient_overview_uses_one_page_compact_grid():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    compact = css[css.index("/* Ingredient editor v27:"):]
+    assert "@media (min-width: 1440px) and (min-height: 800px)" in compact
+    content = compact[compact.index(".recipe-edit-ingredient-modal-content {"):]
+    content = content[:content.index("}")]
+    assert "grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);" in content
+    assert "align-content: start;" in content
+    assert "gap: 16px;" in content
+
+    placements = {
+        ".recipe-edit-ingredient-modal-section.is-identity {": ("grid-column: 1;", "grid-row: 1;"),
+        ".recipe-edit-ingredient-modal-section.is-quantity {": ("grid-column: 2;", "grid-row: 1;"),
+        ".recipe-edit-ingredient-modal-section.is-usage {": ("grid-column: 1 / -1;", "grid-row: 2;"),
+        ".recipe-edit-ingredient-modal-bottom-grid {": ("grid-column: 1 / -1;", "grid-row: 3;"),
+    }
+    for selector, declarations in placements.items():
+        rule = compact[compact.index(selector):]
+        rule = rule[:rule.index("}")]
+        for declaration in declarations:
+            assert declaration in rule
 
 
 def test_recipe_menu_edit_links_to_standalone_editor_page():
