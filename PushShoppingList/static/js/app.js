@@ -22644,6 +22644,7 @@ const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [
     "status",
     "quantity",
     "unit",
+    "size",
     "store",
     "type",
     "alternatives",
@@ -22684,6 +22685,13 @@ const RECIPE_EDIT_INGREDIENT_COLUMNS = {
         maxWidth: 260,
         fallbackWidth: 82,
         selectors: [":scope > .recipe-edit-ingredient-unit-summary"],
+    },
+    size: {
+        label: "Size",
+        minWidth: 58,
+        maxWidth: 240,
+        fallbackWidth: 72,
+        selectors: [":scope > .recipe-edit-ingredient-size-summary"],
     },
     store: {
         label: "Store Section",
@@ -26086,6 +26094,10 @@ function normalizeRecipeEditIngredientColumnLayout(value, fallbackWidths = {}) {
     RECIPE_EDIT_INGREDIENT_COLUMN_ORDER.forEach(key => {
         if (!order.includes(key)) order.push(key);
     });
+    if (!rawOrder.includes("size")) {
+        order.splice(order.indexOf("size"), 1);
+        order.splice(order.indexOf("unit") + 1, 0, "size");
+    }
     const widths = {};
     order.forEach(key => {
         const requestedWidth = value?.widths?.[key] ?? fallbackWidths[key];
@@ -26843,6 +26855,7 @@ function organizeRecipeEditIngredientTools() {
             <span role="columnheader" data-ingredient-column="status">Status</span>
             <span role="columnheader" data-ingredient-column="quantity">Quantity</span>
             <span role="columnheader" data-ingredient-column="unit">Unit</span>
+            <span role="columnheader" data-ingredient-column="size">Size</span>
             <span role="columnheader" data-ingredient-column="store">Store Section</span>
             <span role="columnheader" data-ingredient-column="type">Type</span>
             <span role="columnheader" data-ingredient-column="alternatives">Alternatives</span>
@@ -28581,6 +28594,7 @@ function organizeRecipeEditIngredientRow(row) {
     const summaryDefinitions = [
         ["recipe-edit-ingredient-quantity-summary", "ingredientQuantitySummary", "quantity", "input"],
         ["recipe-edit-ingredient-unit-summary", "ingredientUnitSummary", "unit", "input"],
+        ["recipe-edit-ingredient-size-summary", "ingredientSizeSummary", "size", "input"],
         ["recipe-edit-ingredient-store-summary", "ingredientStoreSummary", "store_section", "select"],
         ["recipe-edit-ingredient-type-summary", "ingredientTypeSummary", "section", "select"],
     ];
@@ -28596,6 +28610,7 @@ function organizeRecipeEditIngredientRow(row) {
         control.setAttribute("aria-label", {
             quantity: "Quantity",
             unit: "Unit",
+            size: "Size",
             store_section: "Store Section",
             section: "Type",
         }[fieldName]);
@@ -28614,7 +28629,7 @@ function organizeRecipeEditIngredientRow(row) {
     if (substitutions) {
         substitutions.classList.add("recipe-edit-ingredient-options-panel");
         substitutions.setAttribute("role", "cell");
-        substitutions.setAttribute("aria-colspan", "9");
+        substitutions.setAttribute("aria-colspan", "10");
         substitutions.hidden = true;
         substitutions.querySelectorAll("[data-substitution-option-row]")
             .forEach(organizeRecipeEditSubstitutionOptionRow);

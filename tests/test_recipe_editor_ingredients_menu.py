@@ -419,6 +419,7 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         "Status",
         "Quantity",
         "Unit",
+        "Size",
         "Store Section",
         "Type",
         "Alternatives",
@@ -445,11 +446,12 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     for summary_class in (
         "recipe-edit-ingredient-quantity-summary",
         "recipe-edit-ingredient-unit-summary",
+        "recipe-edit-ingredient-size-summary",
         "recipe-edit-ingredient-store-summary",
         "recipe-edit-ingredient-type-summary",
     ):
         assert summary_class in organize
-    assert 'substitutions.setAttribute("aria-colspan", "9");' in organize
+    assert 'substitutions.setAttribute("aria-colspan", "10");' in organize
 
     workspace = css[css.index("/* Ingredient editor v14:"):]
     grid_rule = workspace[workspace.index(".recipe-edit-ingredient-table-scroll {"):]
@@ -727,7 +729,7 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert ".recipe-edit-tabs-card," in mobile
     assert ".recipe-edit-ingredient-table-scroll," in mobile
     assert "grid-template-columns: 46px minmax(0, 1fr) minmax(100px, .65fr) 72px !important;" in mobile
-    assert "grid-template-rows: minmax(48px, auto) repeat(4, auto) !important;" in mobile
+    assert "grid-template-rows: minmax(48px, auto) repeat(5, auto) !important;" in mobile
     assert ".recipe-edit-row-handle {\n        display: none !important;" in mobile
     assert "padding-right: 0;" in mobile
     assert ".recipe-edit-ingredient-read-cell {\n        grid-column: 2 / 4 !important;" in mobile
@@ -735,12 +737,14 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 3 !important;" in mobile
     assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 3 / 5 !important;" in mobile
     assert ".recipe-edit-ingredient-unit-summary {\n        grid-column: 2 / 3 !important;\n        grid-row: 3 !important;" in mobile
-    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 3 / 5 !important;\n        grid-row: 3 !important;" in mobile
-    assert ".recipe-edit-ingredient-options-panel {\n        grid-column: 1 / -1 !important;\n        grid-row: 5 !important;" in mobile
+    assert ".recipe-edit-ingredient-size-summary {\n        grid-column: 3 / 5 !important;\n        grid-row: 3 !important;" in mobile
+    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 5 !important;\n        grid-row: 5 !important;" in mobile
+    assert ".recipe-edit-ingredient-options-panel {\n        grid-column: 1 / -1 !important;\n        grid-row: 6 !important;" in mobile
     assert ".recipe-edit-ingredient-substitution-cell {\n        display: block;" in mobile
     assert "grid-template-columns: 72px minmax(0, 1fr);" in mobile
     assert '.recipe-edit-ingredient-quantity-summary::before {\n        content: "Amount";' in mobile
     assert '.recipe-edit-ingredient-unit-summary::before {\n        content: "Unit";' in mobile
+    assert '.recipe-edit-ingredient-size-summary::before {\n        content: "Size";' in mobile
     assert '.recipe-edit-ingredient-substitution-cell::before {\n        content: "Alternatives";' in mobile
     assert '.recipe-edit-ingredient-store-summary::before {\n        content: "Store";' in mobile
     assert ".recipe-edit-ingredient-type-summary::before {" in mobile
@@ -761,7 +765,7 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert "grid-column: 1 / -1;" in narrow
     assert "grid-row: 2;" in narrow
     assert "grid-template-columns: 44px minmax(0, 1fr) 72px !important;" in narrow
-    assert "grid-template-rows: minmax(46px, auto) repeat(5, auto) !important;" in narrow
+    assert "grid-template-rows: minmax(46px, auto) repeat(6, auto) !important;" in narrow
     assert ".recipe-edit-ingredient-read-cell {\n        grid-column: 2 !important;" in narrow
     assert ".recipe-edit-ingredient-status-summary {\n        grid-column: 1 / 4 !important;" in narrow
     assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 4 !important;" in narrow
@@ -1550,7 +1554,7 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
     assert 'const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [' in script
     for column in (
         "media", "ingredient", "status", "quantity", "unit",
-        "store", "type", "alternatives", "actions",
+        "size", "store", "type", "alternatives", "actions",
     ):
         assert f'data-ingredient-column="{column}"' in script
 
@@ -1653,6 +1657,59 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
     assert '[data-recipe-edit-ingredient-column-layout-enabled="true"]' in column_css
     mobile = column_css[column_css.index("@media (max-width: 767px)"):]
     assert "display: none !important;" in mobile
+
+
+def test_recipe_editor_size_column_follows_unit_and_matches_quantity_formatting():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    order = script[
+        script.index("const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = ["):
+        script.index("const RECIPE_EDIT_INGREDIENT_COLUMNS = {")
+    ]
+    assert order.index('"unit"') < order.index('"size"') < order.index('"store"')
+
+    quantity_definition = script[
+        script.index("    quantity: {"):
+        script.index("    unit: {")
+    ]
+    size_definition = script[
+        script.index("    size: {"):
+        script.index("    store: {")
+    ]
+    for formatting in ("minWidth: 58", "maxWidth: 240", "fallbackWidth: 72"):
+        assert formatting in quantity_definition
+        assert formatting in size_definition
+
+    headers = script[
+        script.index('data-ingredient-column="quantity"'):
+        script.index('data-ingredient-column="actions"')
+    ]
+    assert headers.index('data-ingredient-column="unit"') < headers.index(
+        'data-ingredient-column="size"'
+    ) < headers.index('data-ingredient-column="store"')
+
+    row = script[
+        script.index("function organizeRecipeEditIngredientRow(row)"):
+        script.index("function organizeRecipeEditCompactRowActions")
+    ]
+    assert row.index('"ingredientUnitSummary", "unit", "input"') < row.index(
+        '"ingredientSizeSummary", "size", "input"'
+    ) < row.index('"ingredientStoreSummary", "store_section", "select"')
+    assert 'size: "Size"' in row
+    assert 'substitutions.setAttribute("aria-colspan", "10");' in row
+
+    normalize = script[
+        script.index("function normalizeRecipeEditIngredientColumnLayout"):
+        script.index("function loadRecipeEditIngredientColumnLayout")
+    ]
+    assert 'if (!rawOrder.includes("size")) {' in normalize
+    assert 'order.splice(order.indexOf("unit") + 1, 0, "size");' in normalize
+
+    assert '[data-ingredient-column="unit"] { grid-column: 6; }' in css
+    assert '[data-ingredient-column="size"] { grid-column: 7; }' in css
+    assert '.recipe-edit-ingredient-size-summary::before {' in css
+    assert 'content: "Size";' in css
 
 
 def test_recipe_editor_ingredient_modal_ignores_table_column_visibility_filters():
@@ -1971,7 +2028,7 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organizer
     assert 'optionsButton.addEventListener("click"' in organizer
     assert 'substitutions.setAttribute("role", "cell");' in organizer
-    assert 'substitutions.setAttribute("aria-colspan", "9");' in organizer
+    assert 'substitutions.setAttribute("aria-colspan", "10");' in organizer
     assert "<span data-ingredient-options-label>None</span>" in organizer
     options_button_markup = organizer[
         organizer.index("optionsButton.innerHTML"):
@@ -2297,6 +2354,7 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     for summary_class in (
         "recipe-edit-ingredient-quantity-summary",
         "recipe-edit-ingredient-unit-summary",
+        "recipe-edit-ingredient-size-summary",
     ):
         idle_selector = f"#recipeEditIngredients > .recipe-edit-ingredient-row .{summary_class} > .recipe-edit-ingredient-inline-control:not(:hover):not(:focus)"
         idle_rule = v20[v20.index(idle_selector):]
@@ -2867,6 +2925,7 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert ".recipe-edit-ingredient-status-summary," in mobile_css
     assert ".recipe-edit-ingredient-quantity-summary," in mobile_css
     assert ".recipe-edit-ingredient-unit-summary," in mobile_css
+    assert ".recipe-edit-ingredient-size-summary," in mobile_css
     assert ".recipe-edit-ingredient-substitution-cell," in mobile_css
     assert ".recipe-edit-ingredient-mobile-quantity-summary" in mobile_css
     assert "display: none !important;" in mobile_css
