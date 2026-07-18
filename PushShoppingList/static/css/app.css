@@ -56227,13 +56227,9 @@ body.recipe-edit-standalone-page #recipeEditIngredients :is(
     letter-spacing: inherit;
 }
 
-/* Ingredient editor v31: keep Unit separate and align Type like Store Section. */
+/* Ingredient editor v31: align Unit and Type like Store Section. */
 body.recipe-edit-standalone-page #recipeEditIngredients
-    .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control {
-    width: calc(100% - 16px);
-    padding-right: 7px;
-}
-
+    .recipe-edit-ingredient-unit-summary > .recipe-edit-ingredient-inline-control,
 body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger {
     width: 100%;
@@ -56241,10 +56237,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-inline-picker-chevron {
-    right: 0;
-}
-
-body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-type-chevron {
     right: 9px;
 }
 
