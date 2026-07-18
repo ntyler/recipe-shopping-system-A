@@ -3244,6 +3244,8 @@ def test_ingredient_rows_label_optional_items_beneath_buy_as_on_desktop_and_mobi
     ]
     assert "display: inline-flex;" in desktop_badge
     assert "text-transform: uppercase;" in desktop_badge
+    assert "@media (min-width: 768px)" in desktop_badge
+    assert "margin-left: 7px;" in desktop_badge
 
 
 def test_wide_desktop_ingredient_overview_uses_one_page_compact_grid():

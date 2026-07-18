@@ -56113,6 +56113,12 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional:not([hidd
     text-transform: uppercase;
 }
 
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional:not([hidden]) {
+        margin-left: 7px;
+    }
+}
+
 @media (max-width: 767px) {
     body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed
         > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded):has(.recipe-edit-ingredient-read-optional:not([hidden])),
