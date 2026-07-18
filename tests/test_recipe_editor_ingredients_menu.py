@@ -2822,6 +2822,18 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert "grid-template-columns: minmax(0, 1fr) 14px;" in trigger_rule
     assert "grid-template-columns: 7px minmax(0, 1fr) 14px;" not in trigger_rule
 
+    quiet_type = css[css.index("/* Ingredient editor v28:"):]
+    assert "@media (min-width: 768px)" in quiet_type
+    assert ".recipe-edit-ingredient-type-summary:has(> [data-recipe-ingredient-inline-type-trigger])" in quiet_type
+    assert "display: block;" in quiet_type
+    assert "width: 100%;" in quiet_type
+    assert "max-width: none;" in quiet_type
+    assert "padding: 0 22px 0 7px;" in quiet_type
+    assert "text-align: left;" in quiet_type
+    assert "opacity: 0;" in quiet_type
+    assert ':is(:hover, :focus-visible, [aria-expanded="true"])' in quiet_type
+    assert "opacity: .82;" in quiet_type
+
 
 def test_recipe_editor_type_is_authoritative_for_saved_optional_state():
     rows = recipe_edit_service.sanitize_ingredients([
