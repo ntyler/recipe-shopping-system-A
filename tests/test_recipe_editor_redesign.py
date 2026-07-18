@@ -421,6 +421,60 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
     assert "max-width: calc(100vw - 24px);" in css
 
 
+def test_recipe_editor_standard_fields_are_quiet_until_active():
+    css = read_text("PushShoppingList/static/css/app.css")
+    marker = "/* Recipe workspace: keep standard fields quiet until they are active or invalid. */"
+    quiet_fields = css[css.index(marker):]
+
+    assert css.rindex(marker) > css.rindex("/* Ingredient editor v25:")
+    assert ".recipe-edit-info-panel:not(.recipe-edit-categories-panel)" in quiet_fields
+    assert ".recipe-edit-categories-panel" in quiet_fields
+    for control in ("input:where(:not(", "textarea,", "select"):
+        assert control in quiet_fields
+    for excluded_type in (
+        "hidden",
+        "checkbox",
+        "radio",
+        "file",
+        "color",
+        "range",
+        "button",
+        "submit",
+        "reset",
+        "image",
+    ):
+        assert f'[type="{excluded_type}"]' in quiet_fields
+    assert "#recipeEditDisplayName" in quiet_fields
+    assert ":not([disabled]):not([readonly])" in quiet_fields
+    assert ":not([aria-invalid=\"true\"]):not([data-recipe-edit-validation-invalid=\"true\"])" in quiet_fields
+
+    resting_rule = quiet_fields[:quiet_fields.index("}")]
+    assert "border-color: transparent;" in resting_rule
+    assert "background-color: color-mix(in srgb, var(--app-bg) 68%, var(--app-surface-soft));" in resting_rule
+    assert "box-shadow: none;" in resting_rule
+
+    active_rule_start = quiet_fields.index(":is(:focus, :focus-visible)")
+    active_rule = quiet_fields[active_rule_start:quiet_fields.index("}", active_rule_start)]
+    assert "border-color: var(--app-primary-hover);" in active_rule
+    assert "outline: 0;" in active_rule
+    assert "background-color: color-mix(in srgb, var(--app-bg) 82%, var(--app-surface-soft));" in active_rule
+    assert "box-shadow: 0 0 0 2px" in active_rule
+
+    invalid_rule_start = quiet_fields.index(
+        '):not([disabled]):not([readonly]):is([aria-invalid="true"], '
+        '[data-recipe-edit-validation-invalid="true"])'
+    )
+    invalid_rule = quiet_fields[invalid_rule_start:quiet_fields.index("}", invalid_rule_start)]
+    assert "border-color: var(--app-danger, #ef4444) !important;" in invalid_rule
+    assert "background-color: color-mix(in srgb, var(--app-danger, #ef4444) 9%, var(--app-bg));" in invalid_rule
+    assert "box-shadow: 0 0 0 2px" in invalid_rule
+    assert ".recipe-edit-cookbook-select" not in quiet_fields
+    assert ".recipe-edit-price-control:not(:focus-within):not(:has(" in quiet_fields
+    assert ".recipe-edit-price-control:focus-within" in quiet_fields
+    assert ".recipe-edit-price-control:has(" in quiet_fields
+    assert "#recipeEditMenuPrice:is([aria-invalid=\"true\"], [data-recipe-edit-validation-invalid=\"true\"])" in quiet_fields
+
+
 def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")

@@ -56011,3 +56011,102 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-extraction-warning:not([hidden]) {
     display: inline-flex;
 }
+
+/* Recipe workspace: keep standard fields quiet until they are active or invalid. */
+body.recipe-edit-standalone-page #recipeEditForm :is(
+    .recipe-edit-info-panel:not(.recipe-edit-categories-panel),
+    .recipe-edit-categories-panel
+) :is(
+    input:where(:not(
+        [type="hidden"],
+        [type="checkbox"],
+        [type="radio"],
+        [type="file"],
+        [type="color"],
+        [type="range"],
+        [type="button"],
+        [type="submit"],
+        [type="reset"],
+        [type="image"],
+        #recipeEditDisplayName
+    )),
+    textarea,
+    select
+):not([disabled]):not([readonly]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]) {
+    border-color: transparent;
+    background-color: color-mix(in srgb, var(--app-bg) 68%, var(--app-surface-soft));
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-price-control:not(:focus-within):not(:has(
+    #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
+)) {
+    border-color: transparent;
+    background-color: color-mix(in srgb, var(--app-bg) 68%, var(--app-surface-soft));
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm :is(
+    .recipe-edit-info-panel:not(.recipe-edit-categories-panel),
+    .recipe-edit-categories-panel
+) :is(
+    input:where(:not(
+        [type="hidden"],
+        [type="checkbox"],
+        [type="radio"],
+        [type="file"],
+        [type="color"],
+        [type="range"],
+        [type="button"],
+        [type="submit"],
+        [type="reset"],
+        [type="image"],
+        #recipeEditDisplayName
+    )),
+    textarea,
+    select
+):not([disabled]):not([readonly]):is(:focus, :focus-visible) {
+    border-color: var(--app-primary-hover);
+    outline: 0;
+    background-color: color-mix(in srgb, var(--app-bg) 82%, var(--app-surface-soft));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 24%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-price-control:focus-within {
+    border-color: var(--app-primary-hover);
+    background-color: color-mix(in srgb, var(--app-bg) 82%, var(--app-surface-soft));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 24%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditForm :is(
+    .recipe-edit-info-panel:not(.recipe-edit-categories-panel),
+    .recipe-edit-categories-panel
+) :is(
+    input:where(:not(
+        [type="hidden"],
+        [type="checkbox"],
+        [type="radio"],
+        [type="file"],
+        [type="color"],
+        [type="range"],
+        [type="button"],
+        [type="submit"],
+        [type="reset"],
+        [type="image"],
+        #recipeEditDisplayName
+    )),
+    textarea,
+    select
+):not([disabled]):not([readonly]):is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"]) {
+    border-color: var(--app-danger, #ef4444) !important;
+    background-color: color-mix(in srgb, var(--app-danger, #ef4444) 9%, var(--app-bg));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-danger, #ef4444) 20%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-price-control:has(
+    #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
+) {
+    border-color: var(--app-danger, #ef4444) !important;
+    background-color: color-mix(in srgb, var(--app-danger, #ef4444) 9%, var(--app-bg));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-danger, #ef4444) 20%, transparent);
+}
