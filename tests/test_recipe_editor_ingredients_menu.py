@@ -3045,7 +3045,7 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert "display: none !important;" not in collapsed_edit
 
 
-def test_collapsed_mobile_ingredient_cards_label_optional_rows_beneath_buy_as():
+def test_ingredient_rows_label_optional_items_beneath_buy_as_on_desktop_and_mobile():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -3073,6 +3073,14 @@ def test_collapsed_mobile_ingredient_cards_label_optional_rows_beneath_buy_as():
     assert "min-height: 74px !important;" in optional_css
     assert "display: inline-flex;" in optional_css
     assert "text-transform: uppercase;" in optional_css
+    desktop_badge = optional_css[
+        optional_css.index(
+            "body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional:not([hidden]) {"
+        ):
+        optional_css.index("@media (max-width: 767px)")
+    ]
+    assert "display: inline-flex;" in desktop_badge
+    assert "text-transform: uppercase;" in desktop_badge
 
 
 def test_recipe_menu_edit_links_to_standalone_editor_page():
