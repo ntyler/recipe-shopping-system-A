@@ -1580,6 +1580,9 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert "const availableWidth = Math.max(0, horizontalRightLimit - horizontalLeftLimit);" in position
     assert "const popupWidth = Math.min(1080, availableWidth);" in position
     assert "buttonRect.left + menuWidth <= rightLimit" in position
+    assert 'menu.matches(".recipe-edit-unit-menu, .recipe-edit-type-menu")' in position
+    assert "let left = alignMenuToAnchorStart ? buttonRect.left : buttonRect.right - menuWidth;" in position
+    assert "left = Math.max(horizontalLeftLimit, Math.min(left, rightLimit - menuWidth));" in position
 
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in script
     assert '`${alternativeCount} Alternative${alternativeCount === 1 ? "" : "s"}`' in script

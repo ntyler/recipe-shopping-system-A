@@ -40163,6 +40163,7 @@ function positionRecipeEditPopupMenu(menu, button) {
     }
 
     const isIngredientOptionsMenu = menu.classList.contains("recipe-edit-ingredient-row-menu");
+    const alignMenuToAnchorStart = menu.matches(".recipe-edit-unit-menu, .recipe-edit-type-menu");
     const margin = isIngredientOptionsMenu ? 16 : 8;
     const gap = isIngredientOptionsMenu ? 10 : 6;
     const dialog = button.closest(".recipe-edit-dialog, [data-recipe-ingredient-edit-panel][open]");
@@ -40212,7 +40213,7 @@ function positionRecipeEditPopupMenu(menu, button) {
     const bottomLimit = Math.min(window.innerHeight - margin, dialogRect.bottom - margin);
     const rightLimit = horizontalRightLimit;
 
-    let left = buttonRect.right - menuWidth;
+    let left = alignMenuToAnchorStart ? buttonRect.left : buttonRect.right - menuWidth;
     if (isIngredientOptionsMenu && left < horizontalLeftLimit && buttonRect.left + menuWidth <= rightLimit) {
         left = buttonRect.left;
     }
