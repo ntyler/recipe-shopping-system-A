@@ -2824,8 +2824,10 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
 
     quiet_type = css[css.index("/* Ingredient editor v28:"):]
     assert "@media (min-width: 768px)" in quiet_type
-    assert ".recipe-edit-ingredient-type-summary:has(> [data-recipe-ingredient-inline-type-trigger])" in quiet_type
+    assert "#recipeEditIngredients .recipe-edit-ingredient-type-summary:has(> [data-recipe-ingredient-inline-type-trigger])" in quiet_type
+    assert ".recipe-edit-ingredient-modal-type-field" in quiet_type
     assert "display: block;" in quiet_type
+    assert "grid-template-columns: minmax(0, 1fr);" in quiet_type
     assert "width: 100%;" in quiet_type
     assert "max-width: none;" in quiet_type
     assert "padding: 0 22px 0 7px;" in quiet_type
