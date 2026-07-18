@@ -37796,23 +37796,34 @@ function recipeEditListboxOptionTypeaheadText(option) {
     return recipeEditListboxTypeaheadText(value);
 }
 
+function recipeEditListboxMatch(menu, value, startIndex = 0) {
+    const searchQuery = recipeEditListboxTypeaheadText(value);
+    if (!menu || !searchQuery) {
+        return null;
+    }
+    const candidates = recipeEditListboxOptions(menu)
+        .map((option, index) => ({ option, index, text: recipeEditListboxOptionTypeaheadText(option) }))
+        .filter(({ option, text }) => (
+            text
+            && !option.matches("[data-unit-action], [data-type-action], [data-store-section-action]")
+        ));
+    const ordered = [
+        ...candidates.filter(candidate => candidate.index >= startIndex),
+        ...candidates.filter(candidate => candidate.index < startIndex),
+    ];
+    const prefixMatch = ordered.find(candidate => (
+        candidate.text.startsWith(searchQuery)
+        || candidate.text.split(/\s+/).some(word => word.startsWith(searchQuery))
+    ));
+    return prefixMatch || ordered.find(candidate => candidate.text.includes(searchQuery)) || null;
+}
+
 function moveRecipeEditListboxToTypeaheadMatch(event, menu) {
     if (!recipeEditListboxTypeaheadKey(event) || !menu) {
         return false;
     }
 
     event.preventDefault();
-    const options = recipeEditListboxOptions(menu);
-    const candidates = options
-        .map((option, index) => ({ option, index, text: recipeEditListboxOptionTypeaheadText(option) }))
-        .filter(({ option, text }) => (
-            text
-            && !option.matches("[data-unit-action], [data-type-action], [data-store-section-action]")
-        ));
-    if (!candidates.length) {
-        return true;
-    }
-
     const now = Date.now();
     const key = recipeEditListboxTypeaheadText(event.key);
     const previousAt = Number(menu.recipeEditTypeaheadAt || 0);
@@ -37825,23 +37836,10 @@ function moveRecipeEditListboxToTypeaheadMatch(event, menu) {
     );
     let query = repeatedKey ? key : `${previousBuffer}${key}`;
     const currentIndex = Number(menu.dataset.activeIndex || 0);
-
-    const findMatch = (searchQuery, startIndex) => {
-        const ordered = [
-            ...candidates.filter(candidate => candidate.index >= startIndex),
-            ...candidates.filter(candidate => candidate.index < startIndex),
-        ];
-        const prefixMatch = ordered.find(candidate => (
-            candidate.text.startsWith(searchQuery)
-            || candidate.text.split(/\s+/).some(word => word.startsWith(searchQuery))
-        ));
-        return prefixMatch || ordered.find(candidate => candidate.text.includes(searchQuery)) || null;
-    };
-
-    let match = findMatch(query, query.length === 1 ? currentIndex + 1 : 0);
+    let match = recipeEditListboxMatch(menu, query, query.length === 1 ? currentIndex + 1 : 0);
     if (!match && query !== key) {
         query = key;
-        match = findMatch(query, currentIndex + 1);
+        match = recipeEditListboxMatch(menu, query, currentIndex + 1);
     }
 
     menu.dataset.typeaheadBuffer = query;
@@ -38066,7 +38064,7 @@ function handleRecipeIngredientUnitKeydown(event, input) {
         return;
     }
 
-    let menu = document.getElementById("recipeIngredientUnitMenu");
+    const menu = document.getElementById("recipeIngredientUnitMenu");
     const isOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === input);
     if (["ArrowDown", "ArrowUp"].includes(event.key)) {
         event.preventDefault();
@@ -38076,14 +38074,6 @@ function handleRecipeIngredientUnitKeydown(event, input) {
         }
         const currentIndex = Number(menu.dataset.activeIndex || 0);
         setRecipeEditListboxActiveOption(menu, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
-        return;
-    }
-    if (recipeEditListboxTypeaheadKey(event)) {
-        if (!isOpen) {
-            openRecipeIngredientUnitPicker(input, { showAll: true });
-            menu = document.getElementById("recipeIngredientUnitMenu");
-        }
-        moveRecipeEditListboxToTypeaheadMatch(event, menu);
         return;
     }
     if (!isOpen) {
@@ -38119,15 +38109,33 @@ function bindRecipeIngredientUnitPickerTrigger(input) {
     input.setAttribute("aria-expanded", "false");
     input.removeAttribute("list");
     input.dataset.recipeEditUnitTrigger = "true";
-    input.addEventListener("click", () => openRecipeIngredientUnitPicker(input, { showAll: true }));
+    input.addEventListener("click", () => {
+        const menu = document.getElementById("recipeIngredientUnitMenu");
+        const wasOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === input);
+        openRecipeIngredientUnitPicker(input, { showAll: true });
+        if (!wasOpen && typeof input.select === "function") {
+            input.select();
+        }
+    });
     input.addEventListener("keydown", event => handleRecipeIngredientUnitKeydown(event, input));
-    input.addEventListener("input", () => {
+    input.addEventListener("input", event => {
         input.setCustomValidity("");
         input.removeAttribute("aria-invalid");
-        const menu = document.getElementById("recipeIngredientUnitMenu");
-        if (menu && !menu.hidden && menu.recipeEditAnchorButton === input) {
-            renderRecipeIngredientUnitMenu(menu, input);
+        let menu = document.getElementById("recipeIngredientUnitMenu");
+        const isOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === input);
+        if (!isOpen && event.isTrusted) {
+            openRecipeIngredientUnitPicker(input, { showAll: true });
+            menu = document.getElementById("recipeIngredientUnitMenu");
+        } else if (isOpen) {
+            renderRecipeIngredientUnitMenu(menu, input, { showAll: true });
             positionRecipeEditPopupMenu(menu, input);
+        }
+        if (!menu || menu.hidden || menu.recipeEditAnchorButton !== input) {
+            return;
+        }
+        const match = recipeEditListboxMatch(menu, input.value);
+        if (match) {
+            setRecipeEditListboxActiveOption(menu, match.index);
         }
     });
 }

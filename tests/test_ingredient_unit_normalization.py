@@ -302,7 +302,11 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert 'input.setAttribute("aria-controls", "recipeIngredientUnitMenu")' in app_js
     assert 'input.setAttribute("aria-expanded", "false")' in app_js
     assert 'input.removeAttribute("list")' in app_js
-    assert 'input.addEventListener("click", () => openRecipeIngredientUnitPicker(input, { showAll: true }))' in app_js
+    assert 'input.addEventListener("click", () => {' in app_js
+    assert 'const wasOpen = Boolean(menu && !menu.hidden && menu.recipeEditAnchorButton === input);' in app_js
+    assert 'openRecipeIngredientUnitPicker(input, { showAll: true });' in app_js
+    assert 'if (!wasOpen && typeof input.select === "function") {' in app_js
+    assert 'input.select();' in app_js
     assert 'input.addEventListener("keydown", event => handleRecipeIngredientUnitKeydown(event, input))' in app_js
     assert 'typeof input.showPicker !== "function"' not in app_js
     assert ".recipe-edit-row-menu.recipe-edit-unit-menu" in app_css

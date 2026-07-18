@@ -2983,23 +2983,25 @@ def test_recipe_editor_dropdowns_support_shared_keyboard_typeahead_search():
     assert "option.dataset.typeValue" in script
     assert "option.dataset.storeSectionValue" in script
 
+    matcher_start = script.index("function recipeEditListboxMatch(menu, value, startIndex = 0)")
     helper_start = script.index("function moveRecipeEditListboxToTypeaheadMatch(event, menu)")
     helper_end = script.index("function renderRecipeIngredientUnitMenu", helper_start)
+    matcher = script[matcher_start:helper_start]
     helper = script[helper_start:helper_end]
+    assert "candidate.text.startsWith(searchQuery)" in matcher
+    assert "word.startsWith(searchQuery)" in matcher
+    assert "candidate.text.includes(searchQuery)" in matcher
+    assert 'option.matches("[data-unit-action], [data-type-action], [data-store-section-action]")' in matcher
     assert "event.preventDefault();" in helper
     assert 'menu.dataset.typeaheadBuffer || ""' in helper
     assert "previousBuffer" in helper
     assert "repeatedKey" in helper
-    assert "candidate.text.startsWith(searchQuery)" in helper
-    assert "word.startsWith(searchQuery)" in helper
-    assert "candidate.text.includes(searchQuery)" in helper
-    assert 'option.matches("[data-unit-action], [data-type-action], [data-store-section-action]")' in helper
+    assert "recipeEditListboxMatch(menu, query" in helper
     assert "setRecipeEditListboxActiveOption(menu, match.index);" in helper
 
     handlers = (
         ("function handleRecipeIngredientStoreSectionKeydown", "function bindRecipeIngredientStoreSectionControls", "openRecipeIngredientStoreSectionMenu(trigger);"),
         ("function handleRecipeIngredientTypeKeydown", "function bindRecipeIngredientTypeControls", "openRecipeIngredientTypeMenu(trigger);"),
-        ("function handleRecipeIngredientUnitKeydown", "function bindRecipeIngredientUnitPickerTrigger", "openRecipeIngredientUnitPicker(input, { showAll: true });"),
     )
     for start_marker, end_marker, open_call in handlers:
         start = script.index(start_marker)
@@ -3007,6 +3009,22 @@ def test_recipe_editor_dropdowns_support_shared_keyboard_typeahead_search():
         assert "recipeEditListboxTypeaheadKey(event)" in handler
         assert open_call in handler
         assert "moveRecipeEditListboxToTypeaheadMatch(event, menu);" in handler
+
+    unit_handler_start = script.index("function handleRecipeIngredientUnitKeydown")
+    unit_handler = script[unit_handler_start:script.index("function bindRecipeIngredientUnitPickerTrigger", unit_handler_start)]
+    assert "recipeEditListboxTypeaheadKey(event)" not in unit_handler
+    assert "moveRecipeEditListboxToTypeaheadMatch(event, menu);" not in unit_handler
+
+    unit_bind_start = script.index("function bindRecipeIngredientUnitPickerTrigger(input)")
+    unit_bind = script[unit_bind_start:script.index("function bindRecipeIngredientUnitControls", unit_bind_start)]
+    assert "input.select();" in unit_bind
+    assert 'input.addEventListener("input", event =>' in unit_bind
+    assert "if (!isOpen && event.isTrusted)" in unit_bind
+    assert "openRecipeIngredientUnitPicker(input, { showAll: true });" in unit_bind
+    assert "renderRecipeIngredientUnitMenu(menu, input, { showAll: true });" in unit_bind
+    assert "if (!menu || menu.hidden || menu.recipeEditAnchorButton !== input)" in unit_bind
+    assert "const match = recipeEditListboxMatch(menu, input.value);" in unit_bind
+    assert "setRecipeEditListboxActiveOption(menu, match.index);" in unit_bind
 
     close_start = script.index("function closeRecipeEditRowMenus()")
     close_end = script.index("function closeRecipeViewGenerateSubmenus", close_start)
