@@ -26255,8 +26255,14 @@ function showAllRecipeEditIngredientColumns() {
     return false;
 }
 
-function recipeEditIngredientColumnCellText(cell) {
+function recipeEditIngredientColumnCellText(cell, key = "") {
     if (!cell) return "";
+    if (key === "type") {
+        const typeLabels = Array.from(cell.querySelectorAll("[data-type-trigger-label]"))
+            .map(label => String(label.textContent || "").replace(/\s+/g, " ").trim())
+            .filter(Boolean);
+        if (typeLabels.length) return [...new Set(typeLabels)].join(" ");
+    }
     const controlText = Array.from(cell.querySelectorAll("input, select, button"))
         .filter(control => control.type !== "hidden" && !control.hidden)
         .map(control => {
@@ -26286,13 +26292,14 @@ function autoFitRecipeEditIngredientColumnWidth(key, context = null) {
     if (key === "media" || key === "actions") return definition.fallbackWidth;
     const header = document.querySelector(`[data-ingredient-column="${key}"]`);
     let measuredWidth = measureRecipeEditIngredientColumnText(context, header || document.body, definition.label) + 34;
+    const contentAllowance = key === "type" ? 58 : 30;
     recipeEditIngredientRows().forEach(row => {
         definition.selectors.forEach(selector => {
             const cell = row.querySelector(selector);
-            const text = recipeEditIngredientColumnCellText(cell);
+            const text = recipeEditIngredientColumnCellText(cell, key);
             measuredWidth = Math.max(
                 measuredWidth,
-                measureRecipeEditIngredientColumnText(context, cell || document.body, text) + 30,
+                measureRecipeEditIngredientColumnText(context, cell || document.body, text) + contentAllowance,
             );
         });
     });

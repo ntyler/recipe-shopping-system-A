@@ -1736,6 +1736,11 @@ def test_recipe_editor_auto_fit_keeps_visible_columns_inside_the_table_width():
     assert "if (total < target)" not in auto_fit
     assert "const growthOrder" not in auto_fit
     assert "Preserve content-fitted widths when the visible columns already fit." in auto_fit
+    assert 'function recipeEditIngredientColumnCellText(cell, key = "")' in script
+    assert 'cell.querySelectorAll("[data-type-trigger-label]")' in script
+    assert 'const contentAllowance = key === "type" ? 58 : 30;' in script
+    assert "recipeEditIngredientColumnCellText(cell, key)" in script
+    assert "text) + contentAllowance" in script
 
     alternatives_css = css[css.index("@media (min-width: 768px) {", css.index("/* Ingredient editor v20:")):]
     assert ".recipe-edit-ingredient-options-button" in alternatives_css
