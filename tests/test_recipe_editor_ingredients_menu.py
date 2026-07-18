@@ -3124,6 +3124,18 @@ def test_wide_desktop_ingredient_overview_uses_one_page_compact_grid():
     assert "align-content: start;" in content
     assert "gap: 16px;" in content
 
+    identity_fields = compact[
+        compact.index(
+            "dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields {"
+        ):
+    ]
+    identity_fields = identity_fields[:identity_fields.index("}")]
+    assert (
+        "grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(120px, .72fr);"
+        in identity_fields
+    )
+    assert "gap: 16px;" in identity_fields
+
     placements = {
         ".recipe-edit-ingredient-modal-section.is-identity {": ("grid-column: 1;", "grid-row: 1;"),
         ".recipe-edit-ingredient-modal-section.is-quantity {": ("grid-column: 2;", "grid-row: 1;"),

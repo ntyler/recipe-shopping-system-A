@@ -56117,6 +56117,11 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-optional:not([hidd
         gap: 16px;
     }
 
+    body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-identity-fields {
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(120px, .72fr);
+        gap: 16px;
+    }
+
     body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel .recipe-edit-ingredient-modal-section.is-identity {
         grid-column: 1;
         grid-row: 1;
