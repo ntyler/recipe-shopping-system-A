@@ -961,6 +961,42 @@ def test_mobile_optional_type_label_does_not_keep_the_desktop_dot_background():
     assert "background: transparent;" in rule
 
 
+def test_mobile_ingredient_header_surfaces_and_opens_saved_alternatives():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
+    organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
+    organize = script[organize_start:organize_end]
+    assert 'mobileAlternativesBadge.className = "recipe-edit-ingredient-mobile-alternatives-badge";' in organize
+    assert "mobileAlternativesBadge.dataset.ingredientMobileAlternativesBadge" in organize
+    assert 'mobileAlternativesBadge.setAttribute("aria-controls", substitutions.id);' in organize
+    assert "openRecipeIngredientAlternativesFromHeader(mobileAlternativesBadge, event)" in organize
+
+    state_start = script.index("function updateRecipeIngredientSubstitutionState")
+    state_end = script.index("function addRecipeIngredientSubstitutionRow", state_start)
+    state = script[state_start:state_end]
+    assert 'const badgeLabel = `${alternativeCount} alt${alternativeCount === 1 ? "" : "s"}`;' in state
+    assert "mobileAlternativesBadge.hidden = alternativeCount === 0;" in state
+    assert 'mobileAlternativesBadge.setAttribute("aria-expanded", String(isExpanded));' in state
+
+    open_start = script.index("function openRecipeIngredientAlternativesFromHeader")
+    open_end = script.index("function recipeIngredientSubstitutionDomGroups", open_start)
+    open_helper = script[open_start:open_end]
+    assert "setRecipeIngredientRowCollapsed(row, false);" in open_helper
+    assert "setRecipeIngredientSubstitutionsExpanded(row, optionsButton, true);" in open_helper
+    assert 'container.scrollIntoView({ behavior: "smooth", block: "nearest" })' in open_helper
+
+    v41_start = css.index("/* Ingredient editor v41:")
+    v41 = css[v41_start:css.index("/* Keep expanded modal analysis", v41_start)]
+    assert ".recipe-edit-ingredient-mobile-alternatives-badge" in v41
+    assert "display: none;" in v41
+    assert "@media (max-width: 767px)" in v41
+    assert ".recipe-edit-ingredient-mobile-alternatives-badge:not([hidden])" in v41
+    assert "display: inline-flex;" in v41
+    assert "border-radius: 999px;" in v41
+
+
 def test_mobile_expanded_editable_values_share_one_typography_treatment():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -3539,7 +3575,7 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert 'mobileQuantitySummary.className = "recipe-edit-ingredient-mobile-quantity-summary";' in script
     assert 'mobileQuantitySummary.setAttribute("aria-label", "Quantity Unit");' in script
     assert "const quantitySummaryText = formatRecipeIngredientQuantityUnit(values);" in script
-    assert 'mobileQuantitySummary.textContent = quantitySummaryText;' in script
+    assert 'mobileQuantityValue.textContent = quantitySummaryText;' in script
     quantity_unit_formatter = script[
         script.index("function formatRecipeIngredientQuantityUnit"):
         script.index("function formatRecipeIngredientQuantityColumn")

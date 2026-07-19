@@ -56880,6 +56880,54 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     }
 }
 
+/* Ingredient editor v41: surface saved alternatives in the compact mobile header. */
+body.recipe-edit-standalone-page .recipe-edit-ingredient-mobile-alternatives-badge {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row
+        > .recipe-edit-ingredient-mobile-header
+        > .recipe-edit-ingredient-mobile-quantity-summary {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 2px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-mobile-alternatives-badge:not([hidden]) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        width: max-content;
+        min-width: 0;
+        min-height: 16px;
+        margin: 0;
+        padding: 1px 5px;
+        border: 1px solid color-mix(in srgb, var(--app-primary) 58%, transparent);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--app-primary-soft) 48%, transparent);
+        color: var(--app-primary-hover);
+        font-size: 9px;
+        font-weight: 800;
+        line-height: 1;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-mobile-alternatives-badge:not([hidden]):is(:hover, :focus-visible) {
+        border-color: var(--app-primary-hover);
+        outline: none;
+        background: color-mix(in srgb, var(--app-primary-soft) 74%, transparent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 20%, transparent);
+    }
+}
+
 /* Keep expanded modal analysis fields visible even when their table row is collapsed. */
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row

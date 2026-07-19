@@ -28752,6 +28752,24 @@ function organizeRecipeEditIngredientRow(row) {
     mobileQuantitySummary.dataset.ingredientMobileQuantitySummary = "";
     mobileQuantitySummary.setAttribute("role", "cell");
     mobileQuantitySummary.setAttribute("aria-label", "Quantity Unit");
+    const mobileQuantityValue = document.createElement("span");
+    mobileQuantityValue.className = "recipe-edit-ingredient-mobile-quantity-value";
+    mobileQuantityValue.dataset.ingredientMobileQuantityValue = "";
+    mobileQuantitySummary.appendChild(mobileQuantityValue);
+    const mobileAlternativesBadge = document.createElement("button");
+    mobileAlternativesBadge.type = "button";
+    mobileAlternativesBadge.className = "recipe-edit-ingredient-mobile-alternatives-badge";
+    mobileAlternativesBadge.dataset.ingredientMobileAlternativesBadge = "";
+    mobileAlternativesBadge.hidden = true;
+    mobileAlternativesBadge.setAttribute("aria-expanded", "false");
+    mobileAlternativesBadge.innerHTML = `
+        <span aria-hidden="true">\u21c4</span>
+        <span data-ingredient-mobile-alternatives-label></span>
+    `;
+    mobileAlternativesBadge.addEventListener("click", event => (
+        openRecipeIngredientAlternativesFromHeader(mobileAlternativesBadge, event)
+    ));
+    mobileQuantitySummary.appendChild(mobileAlternativesBadge);
     row.appendChild(mobileQuantitySummary);
 
     if (substitutions) {
@@ -28763,6 +28781,7 @@ function organizeRecipeEditIngredientRow(row) {
             .forEach(organizeRecipeEditSubstitutionOptionRow);
         recipeEditIngredientSubstitutionsId += 1;
         substitutions.id = `recipeEditIngredientAlternatives${recipeEditIngredientSubstitutionsId}`;
+        mobileAlternativesBadge.setAttribute("aria-controls", substitutions.id);
 
         const optionsCell = document.createElement("div");
         optionsCell.className = "recipe-edit-ingredient-substitution-cell";
@@ -39126,6 +39145,24 @@ function toggleRecipeIngredientSubstitutions(button, event = null) {
     return false;
 }
 
+function openRecipeIngredientAlternativesFromHeader(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const row = recipeIngredientParentRowFromControl(button);
+    const optionsButton = row ? row.querySelector("[data-ingredient-substitutions-toggle]") : null;
+    const container = recipeIngredientSubstitutionContainer(row, button);
+    if (!row || !optionsButton || !container) {
+        return false;
+    }
+
+    setRecipeIngredientRowCollapsed(row, false);
+    setRecipeIngredientSubstitutionsExpanded(row, optionsButton, true);
+    window.requestAnimationFrame(() => container.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+    return false;
+}
+
 function recipeIngredientSubstitutionDomGroups(optionRows = []) {
     const groups = [];
     const groupsById = new Map();
@@ -39838,6 +39875,9 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     const optionRows = list ? [...list.querySelectorAll("[data-substitution-option-row]")] : [];
     const alternativeGroups = recipeIngredientSubstitutionDomGroups(optionRows);
     const alternativeCount = alternativeGroups.length;
+    const mobileAlternativesBadge = row
+        ? row.querySelector("[data-ingredient-mobile-alternatives-badge]")
+        : null;
 
     alternativeGroups.forEach((group, groupIndex) => {
         group.rows.forEach((optionRow, componentIndex) => {
@@ -39896,6 +39936,21 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
 
     const ingredientField = row ? row.querySelector('[data-field="ingredient"]') : null;
     const ingredientName = String(ingredientField ? ingredientField.value : "").trim() || "ingredient";
+    if (mobileAlternativesBadge) {
+        const mobileAlternativesLabel = mobileAlternativesBadge.querySelector(
+            "[data-ingredient-mobile-alternatives-label]"
+        );
+        const badgeLabel = `${alternativeCount} alt${alternativeCount === 1 ? "" : "s"}`;
+        const isExpanded = Boolean(container && !container.hidden);
+        if (mobileAlternativesLabel) mobileAlternativesLabel.textContent = badgeLabel;
+        mobileAlternativesBadge.hidden = alternativeCount === 0;
+        mobileAlternativesBadge.setAttribute("aria-expanded", String(isExpanded));
+        mobileAlternativesBadge.setAttribute(
+            "aria-label",
+            `${alternativeCount} alternative${alternativeCount === 1 ? "" : "s"} available for ${ingredientName}. Show alternatives.`
+        );
+        mobileAlternativesBadge.title = `Show ${alternativeCount} alternative${alternativeCount === 1 ? "" : "s"} for ${ingredientName}`;
+    }
     if (title) {
         title.replaceChildren(document.createTextNode("Alternatives for "));
         const name = document.createElement("strong");
@@ -40131,6 +40186,7 @@ function updateRecipeIngredientSummary(row) {
     const previewStore = row ? row.querySelector("[data-recipe-ingredient-modal-preview-store]") : null;
     const typeSummary = row ? row.querySelector("[data-ingredient-type-summary]") : null;
     const mobileQuantitySummary = row ? row.querySelector("[data-ingredient-mobile-quantity-summary]") : null;
+    const mobileQuantityValue = row ? row.querySelector("[data-ingredient-mobile-quantity-value]") : null;
     const container = recipeIngredientSubstitutionContainer(row);
     const substitutionCount = container ? container.querySelector("[data-ingredient-substitution-count]") : null;
     const values = row ? fieldValuesFromRow(row) : {};
@@ -40163,8 +40219,10 @@ function updateRecipeIngredientSummary(row) {
         readBuyAs.value = buyAsValue;
         readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Buy As matches Ingredient Name";
     }
+    if (mobileQuantityValue) {
+        mobileQuantityValue.textContent = quantitySummaryText;
+    }
     if (mobileQuantitySummary) {
-        mobileQuantitySummary.textContent = quantitySummaryText;
         mobileQuantitySummary.title = quantitySummaryText === "\u2014" ? "Amount not specified" : quantitySummaryText;
         mobileQuantitySummary.setAttribute(
             "aria-label",
