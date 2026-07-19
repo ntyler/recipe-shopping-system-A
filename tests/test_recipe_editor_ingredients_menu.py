@@ -766,9 +766,9 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert ".recipe-edit-ingredient-status-summary {\n        grid-column: 1 / 5 !important;" in mobile
     assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 3 !important;" in mobile
     assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 3 / 5 !important;" in mobile
-    assert ".recipe-edit-ingredient-unit-summary {\n        grid-column: 2 / 3 !important;\n        grid-row: 4 !important;" in mobile
-    assert ".recipe-edit-ingredient-size-summary {\n        grid-column: 3 / 5 !important;\n        grid-row: 4 !important;" in mobile
-    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 5 !important;\n        grid-row: 3 !important;" in mobile
+    assert ".recipe-edit-ingredient-unit-summary {\n        grid-column: 2 / 3 !important;\n        grid-row: 3 !important;" in mobile
+    assert ".recipe-edit-ingredient-size-summary {\n        grid-column: 3 / 5 !important;\n        grid-row: 3 !important;" in mobile
+    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 5 !important;\n        grid-row: 5 !important;" in mobile
     assert ".recipe-edit-ingredient-options-panel {\n        grid-column: 1 / -1 !important;\n        grid-row: 6 !important;" in mobile
     assert ".recipe-edit-ingredient-substitution-cell {\n        display: block;" in mobile
     assert "grid-template-columns: 72px minmax(0, 1fr);" in mobile
@@ -798,9 +798,9 @@ def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readabl
     assert "grid-template-rows: minmax(46px, auto) repeat(6, auto) !important;" in narrow
     assert ".recipe-edit-ingredient-read-cell {\n        grid-column: 2 !important;" in narrow
     assert ".recipe-edit-ingredient-status-summary {\n        grid-column: 1 / 4 !important;" in narrow
-    assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 4 !important;\n        grid-row: 5 !important;" in narrow
-    assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 1 / 4 !important;\n        grid-row: 6 !important;" in narrow
-    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 4 !important;\n        grid-row: 3 !important;" in narrow
+    assert ".recipe-edit-ingredient-store-summary {\n        grid-column: 1 / 4 !important;\n        grid-row: 4 !important;" in narrow
+    assert ".recipe-edit-ingredient-type-summary {\n        grid-column: 1 / 4 !important;\n        grid-row: 5 !important;" in narrow
+    assert ".recipe-edit-ingredient-substitution-cell {\n        grid-column: 1 / 4 !important;\n        grid-row: 6 !important;" in narrow
     assert ".recipe-edit-ingredient-options-panel {\n        grid-column: 1 / -1 !important;\n        grid-row: 7 !important;" in narrow
     assert 'onclick="moveRecipeEditRow(this, -1)">Move ingredient up</button>' in script
     assert 'onclick="moveRecipeEditRow(this, 1)">Move ingredient down</button>' in script
@@ -880,7 +880,7 @@ def test_mobile_ingredient_metadata_stays_compact_with_read_only_status():
     assert '.recipe-edit-ingredient-options-button[aria-expanded="true"]::after' in v34
 
 
-def test_mobile_expanded_ingredient_cards_put_alternatives_after_status():
+def test_mobile_expanded_ingredient_cards_align_status_and_alternatives_beside_one_divider():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -895,33 +895,45 @@ def test_mobile_expanded_ingredient_cards_put_alternatives_after_status():
     assert "recipeIngredientMobileAccordionIsActive()\n            ||" in collapse
     assert 'row.classList.add("recipe-edit-row-expanded");' in collapse
 
-    v23_start = css.index("/* Ingredient editor v23:")
-    v23 = css[v23_start:css.index("/* Ingredient editor v24:", v23_start)]
-    assert "@media (max-width: 767px)" in v23
-    assert "grid-template-rows: minmax(48px, auto) repeat(5, auto) !important;" in v23
+    v35_start = css.index("/* Ingredient editor v35:")
+    assert v35_start > css.index("/* Ingredient editor v34:")
+    v35 = css[v35_start:css.index("/* Keep expanded modal analysis", v35_start)]
+    assert "@media (max-width: 767px)" in v35
+    assert "> .recipe-edit-ingredient-row.recipe-edit-row-expanded::before" in v35
+    assert "grid-column: 1 / -1;" in v35
+    assert "grid-row: 2;" in v35
+    assert "border-top: 1px solid" in v35
 
-    status_start = v23.index("> .recipe-edit-ingredient-status-summary {")
-    status_end = v23.index("> .recipe-edit-ingredient-quantity-summary {", status_start)
-    status = v23[status_start:status_end]
-    assert "grid-column: 1 / 5 !important;" in status
+    status_start = v35.index("> .recipe-edit-ingredient-status-summary {")
+    status_end = v35.index("> .recipe-edit-ingredient-substitution-cell {", status_start)
+    status = v35[status_start:status_end]
+    assert "grid-column: 1 / 3 !important;" in status
     assert "grid-row: 2 !important;" in status
-    assert "border-top:" in status
+    assert "align-self: stretch;" in status
+    assert "border-top: 0;" in status
 
-    alternatives_start = v23.index("> .recipe-edit-ingredient-substitution-cell {")
-    alternatives_end = v23.index("> .recipe-edit-ingredient-options-panel {", alternatives_start)
-    alternatives = v23[alternatives_start:alternatives_end]
-    assert "grid-column: 1 / 5 !important;" in alternatives
-    assert "grid-row: 3 !important;" in alternatives
-    assert "border-top:" not in alternatives
+    alternatives_start = status_end
+    alternatives_end = v35.index("> .recipe-edit-ingredient-substitution-cell::before", alternatives_start)
+    alternatives = v35[alternatives_start:alternatives_end]
+    assert "grid-column: 3 / 5 !important;" in alternatives
+    assert "grid-row: 2 !important;" in alternatives
+    assert "align-self: stretch;" in alternatives
+    assert "gap: 0;" in alternatives
+    assert "border-top: 0;" in alternatives
 
-    assert "grid-row: 4 !important;" in v23[v23.index("> .recipe-edit-ingredient-quantity-summary {"):alternatives_start]
-    assert "grid-row: 5 !important;" in v23[v23.index("> .recipe-edit-ingredient-store-summary {"):alternatives_start]
+    button_start = v35.index("> .recipe-edit-ingredient-options-button {")
+    button_end = v35.index("}", button_start)
+    button = v35[button_start:button_end]
+    assert "height: auto;" in button
+    assert "min-height: 18px;" in button
+    assert "align-items: flex-start;" in button
+    assert "margin-top: -1px;" in button
+    assert "padding-block: 0;" in button
 
-    options_start = alternatives_end
-    options_end = v23.index("> :is(", options_start)
-    options = v23[options_start:options_end]
-    assert "grid-row: 6 !important;" in options
-    assert "/* Ingredient editor v35:" not in css
+    assert "@media (max-width: 420px)" in v35
+    assert "grid-template-columns: repeat(12, minmax(0, 1fr)) !important;" in v35
+    assert "grid-column: 1 / 7 !important;" in v35
+    assert "grid-column: 7 / 13 !important;" in v35
 
 
 def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
