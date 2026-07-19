@@ -55715,6 +55715,10 @@ body.recipe-edit-standalone-page.recipe-edit-ingredient-column-moving * {
         content: "Type";
     }
 
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary.is-optional::before {
+        background: transparent;
+    }
+
     body.recipe-edit-standalone-page .recipe-edit-ingredient-read-cell > .recipe-edit-ingredient-inline-name {
         height: 28px;
         min-height: 28px;

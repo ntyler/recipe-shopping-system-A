@@ -948,6 +948,19 @@ def test_mobile_expanded_ingredient_cards_align_status_and_alternatives_beside_o
     assert "grid-column: 7 / 13 !important;" in v35
 
 
+def test_mobile_optional_type_label_does_not_keep_the_desktop_dot_background():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    mobile_start = css.index("/* Ingredient editor v23: compact, readable mobile ingredient cards. */")
+    selector = (
+        "body.recipe-edit-standalone-page "
+        ".recipe-edit-ingredient-type-summary.is-optional::before {"
+    )
+    rule_start = css.index(selector, mobile_start)
+    rule = css[rule_start:css.index("}", rule_start)]
+    assert "background: transparent;" in rule
+
+
 def test_mobile_expanded_editable_values_share_one_typography_treatment():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
