@@ -880,6 +880,39 @@ def test_mobile_ingredient_metadata_stays_compact_with_read_only_status():
     assert '.recipe-edit-ingredient-options-button[aria-expanded="true"]::after' in v34
 
 
+def test_mobile_expanded_ingredient_cards_use_single_open_compact_layout():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    collapse_start = script.index("function recipeIngredientMobileAccordionIsActive")
+    collapse_end = script.index("function expandRecipeIngredientRow", collapse_start)
+    collapse = script[collapse_start:collapse_end]
+    assert 'window.matchMedia("(max-width: 767px)").matches' in collapse
+    assert "function collapseOtherRecipeIngredientRows(activeRow)" in collapse
+    assert "if (row !== activeRow)" in collapse
+    assert "setRecipeIngredientRowCollapsed(row, true);" in collapse
+    assert "collapseOtherRecipeIngredientRows(row);" in collapse
+    assert "recipeIngredientMobileAccordionIsActive()\n            ||" in collapse
+    assert 'row.classList.add("recipe-edit-row-expanded");' in collapse
+
+    v35_start = css.index("/* Ingredient editor v35:")
+    assert v35_start > css.index("/* Ingredient editor v34:")
+    v35 = css[v35_start:css.index("/* Keep expanded modal analysis", v35_start)]
+    assert "@media (max-width: 767px)" in v35
+    assert "> .recipe-edit-ingredient-row.recipe-edit-row-expanded" in v35
+    assert "grid-template-rows: minmax(48px, auto) repeat(4, auto) !important;" in v35
+    assert "> .recipe-edit-ingredient-status-summary" in v35
+    assert "grid-column: 1 / 3 !important;" in v35
+    assert "> .recipe-edit-ingredient-substitution-cell" in v35
+    assert "grid-column: 3 / 5 !important;" in v35
+    assert "grid-row: 2 !important;" in v35
+    assert "grid-row: 3 !important;" in v35
+    assert "grid-row: 4 !important;" in v35
+    assert "grid-row: 5 !important;" in v35
+    assert "@media (max-width: 420px)" in v35
+    assert "grid-template-columns: repeat(12, minmax(0, 1fr)) !important;" in v35
+
+
 def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 

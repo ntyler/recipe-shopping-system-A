@@ -41035,6 +41035,26 @@ function isRecipeIngredientRowCollapsed(row) {
     );
 }
 
+function recipeIngredientMobileAccordionIsActive() {
+    return Boolean(
+        typeof window !== "undefined"
+        && typeof window.matchMedia === "function"
+        && window.matchMedia("(max-width: 767px)").matches
+    );
+}
+
+function collapseOtherRecipeIngredientRows(activeRow) {
+    if (!recipeIngredientMobileAccordionIsActive()) {
+        return;
+    }
+
+    recipeEditIngredientRows().forEach(row => {
+        if (row !== activeRow) {
+            setRecipeIngredientRowCollapsed(row, true);
+        }
+    });
+}
+
 function setRecipeIngredientRowCollapsed(row, collapsed) {
     const list = row ? row.closest("#recipeEditIngredients") : null;
 
@@ -41056,9 +41076,13 @@ function setRecipeIngredientRowCollapsed(row, collapsed) {
         }
         updateRecipeIngredientSubstitutionState(row, substitutionsToggle);
     } else {
+        collapseOtherRecipeIngredientRows(row);
         row.classList.remove("recipe-edit-row-collapsed");
 
-        if (list && list.classList.contains("recipe-edit-ingredients-collapsed")) {
+        if (
+            recipeIngredientMobileAccordionIsActive()
+            || (list && list.classList.contains("recipe-edit-ingredients-collapsed"))
+        ) {
             row.classList.add("recipe-edit-row-expanded");
         } else {
             row.classList.remove("recipe-edit-row-expanded");
