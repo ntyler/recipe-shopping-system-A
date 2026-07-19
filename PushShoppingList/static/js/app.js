@@ -28635,6 +28635,7 @@ function organizeRecipeEditIngredientRow(row) {
     const type = row.querySelector(":scope > .recipe-edit-section-label");
     const optional = row.querySelector(":scope > .recipe-edit-optional-label");
     const substitutions = name ? name.querySelector("[data-ingredient-substitutions]") : row.querySelector("[data-ingredient-substitutions]");
+    let alternativesDialog = null;
     const menuWrap = Array.from(row.children)
         .find(child => child.classList && child.classList.contains("recipe-edit-row-menu-wrap"));
     const actionMenuButton = menuWrap ? menuWrap.querySelector(".recipe-edit-row-menu-btn") : null;
@@ -28762,26 +28763,65 @@ function organizeRecipeEditIngredientRow(row) {
     mobileAlternativesBadge.dataset.ingredientMobileAlternativesBadge = "";
     mobileAlternativesBadge.hidden = true;
     mobileAlternativesBadge.setAttribute("aria-expanded", "false");
-    mobileAlternativesBadge.innerHTML = `
-        <span aria-hidden="true">\u21c4</span>
-        <span data-ingredient-mobile-alternatives-label></span>
-    `;
+    mobileAlternativesBadge.setAttribute("aria-haspopup", "dialog");
+    mobileAlternativesBadge.innerHTML = '<span data-ingredient-mobile-alternatives-label></span>';
     mobileAlternativesBadge.addEventListener("click", event => (
-        openRecipeIngredientAlternativesFromHeader(mobileAlternativesBadge, event)
+        openRecipeIngredientAlternativesDialog(mobileAlternativesBadge, event)
     ));
     mobileQuantitySummary.appendChild(mobileAlternativesBadge);
     row.appendChild(mobileQuantitySummary);
 
     if (substitutions) {
         substitutions.classList.add("recipe-edit-ingredient-options-panel");
-        substitutions.setAttribute("role", "cell");
-        substitutions.setAttribute("aria-colspan", "10");
+        substitutions.setAttribute("role", "region");
+        substitutions.removeAttribute("aria-colspan");
         substitutions.hidden = true;
         substitutions.querySelectorAll("[data-substitution-option-row]")
             .forEach(organizeRecipeEditSubstitutionOptionRow);
         recipeEditIngredientSubstitutionsId += 1;
         substitutions.id = `recipeEditIngredientAlternatives${recipeEditIngredientSubstitutionsId}`;
-        mobileAlternativesBadge.setAttribute("aria-controls", substitutions.id);
+        const alternativesDialogId = `recipeEditIngredientAlternativesDialog${recipeEditIngredientSubstitutionsId}`;
+        const alternativesDialogTitleId = `${alternativesDialogId}Title`;
+        alternativesDialog = document.createElement("dialog");
+        alternativesDialog.className = "recipe-edit-ingredient-alternatives-dialog";
+        alternativesDialog.dataset.recipeIngredientAlternativesDialog = "";
+        alternativesDialog.id = alternativesDialogId;
+        alternativesDialog.setAttribute("aria-labelledby", alternativesDialogTitleId);
+        alternativesDialog.hidden = true;
+        alternativesDialog.innerHTML = `
+            <div class="recipe-edit-ingredient-alternatives-dialog-shell">
+                <header class="recipe-edit-ingredient-alternatives-dialog-header">
+                    <div class="recipe-edit-ingredient-alternatives-dialog-heading">
+                        <span class="recipe-edit-ingredient-alternatives-dialog-eyebrow">Ingredient alternatives</span>
+                        <h2 id="${alternativesDialogTitleId}">Alternatives</h2>
+                        <p data-recipe-ingredient-alternatives-dialog-name></p>
+                    </div>
+                    <button type="button"
+                            class="recipe-edit-ingredient-alternatives-dialog-close"
+                            data-recipe-ingredient-alternatives-dialog-close
+                            aria-label="Close alternatives"
+                            title="Close">
+                        ${recipeEditSvgIcon("x")}
+                    </button>
+                </header>
+                <div class="recipe-edit-ingredient-alternatives-dialog-body"
+                     data-recipe-ingredient-alternatives-dialog-body></div>
+            </div>
+        `;
+        alternativesDialog.querySelector("[data-recipe-ingredient-alternatives-dialog-body]")
+            ?.appendChild(substitutions);
+        alternativesDialog.querySelector("[data-recipe-ingredient-alternatives-dialog-close]")
+            ?.addEventListener("click", event => closeRecipeIngredientAlternativesDialog(event.currentTarget, event));
+        alternativesDialog.addEventListener("cancel", event => {
+            event.preventDefault();
+            closeRecipeIngredientAlternativesDialog(alternativesDialog, event);
+        });
+        alternativesDialog.addEventListener("click", event => {
+            if (event.target === alternativesDialog) {
+                closeRecipeIngredientAlternativesDialog(alternativesDialog, event);
+            }
+        });
+        mobileAlternativesBadge.setAttribute("aria-controls", alternativesDialog.id);
 
         const optionsCell = document.createElement("div");
         optionsCell.className = "recipe-edit-ingredient-substitution-cell";
@@ -28791,14 +28831,15 @@ function organizeRecipeEditIngredientRow(row) {
         optionsButton.className = "recipe-edit-ingredient-options-button";
         optionsButton.dataset.ingredientSubstitutionsToggle = "";
         optionsButton.setAttribute("aria-expanded", "false");
-        optionsButton.setAttribute("aria-controls", substitutions.id);
+        optionsButton.setAttribute("aria-haspopup", "dialog");
+        optionsButton.setAttribute("aria-controls", alternativesDialog.id);
         optionsButton.innerHTML = `
             <span class="recipe-edit-ingredient-options-copy">
                 <span data-ingredient-options-label>None</span>
                 <span data-ingredient-options-summary hidden></span>
             </span>
         `;
-        optionsButton.addEventListener("click", event => toggleRecipeIngredientSubstitutions(optionsButton, event));
+        optionsButton.addEventListener("click", event => openRecipeIngredientAlternativesDialog(optionsButton, event));
         optionsCell.appendChild(optionsButton);
         row.appendChild(optionsCell);
     }
@@ -29104,7 +29145,11 @@ function organizeRecipeEditIngredientRow(row) {
         actionMenuButton.setAttribute("aria-label", "Ingredient actions");
         actionMenuButton.title = "Ingredient actions";
     }
-    if (substitutions) row.appendChild(substitutions);
+    if (alternativesDialog) {
+        row.appendChild(alternativesDialog);
+    } else if (substitutions) {
+        row.appendChild(substitutions);
+    }
     if (metadata && !metadata.children.length) metadata.remove();
     initializeRecipeIngredientMobileHeaderLayout();
     syncRecipeIngredientMobileHeader(row);
@@ -34258,7 +34303,12 @@ function showRecipeEditorValidationErrors(errors, options = {}) {
         : null;
     if (optionRow) {
         const ingredientRow = recipeIngredientParentRowFromControl(optionRow);
-        setRecipeIngredientSubstitutionsExpanded(ingredientRow, null, true, { restoreOtherEdits: false });
+        const alternativesButton = ingredientRow
+            ? ingredientRow.querySelector("[data-ingredient-substitutions-toggle]")
+            : null;
+        if (alternativesButton) {
+            openRecipeIngredientAlternativesDialog(alternativesButton, null, { restoreOtherEdits: false });
+        }
         const card = optionRow.closest(".recipe-edit-alternative-card");
         if (card) setRecipeIngredientAlternativeEditMode(card, true, { restoreOtherEdits: false });
     } else if (firstErrorControl && firstErrorControl.closest) {
@@ -39079,8 +39129,20 @@ function recipeIngredientSubstitutionContainer(row, control = null) {
     if (directContainer) {
         return directContainer;
     }
+    const dialogContainer = row
+        ? row.querySelector(":scope > [data-recipe-ingredient-alternatives-dialog] [data-ingredient-substitutions]")
+        : null;
+    if (dialogContainer) {
+        return dialogContainer;
+    }
     const optionsMenu = recipeIngredientOptionsMenuForRow(row, control);
     return optionsMenu ? optionsMenu.querySelector("[data-ingredient-substitutions]") : null;
+}
+
+function recipeIngredientAlternativesDialogForRow(row) {
+    return row
+        ? row.querySelector(":scope > [data-recipe-ingredient-alternatives-dialog]")
+        : null;
 }
 
 function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, options = {}) {
@@ -39105,6 +39167,16 @@ function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, opti
             });
             otherContainer.hidden = true;
             otherRow.classList.remove("recipe-edit-substitutions-open");
+            const otherDialog = recipeIngredientAlternativesDialogForRow(otherRow);
+            if (otherDialog && otherDialog.open) {
+                otherDialog.recipeIngredientAlternativesReturnFocus = null;
+                if (typeof otherDialog.close === "function") {
+                    otherDialog.close();
+                } else {
+                    otherDialog.removeAttribute("open");
+                }
+                otherDialog.hidden = true;
+            }
         }
         if (otherRow !== row && otherButton) {
             otherButton.setAttribute("aria-expanded", "false");
@@ -39135,17 +39207,17 @@ function toggleRecipeIngredientSubstitutions(button, event = null) {
         event.stopPropagation();
     }
     const row = recipeIngredientParentRowFromControl(button);
-    const container = recipeIngredientSubstitutionContainer(row, button);
-    if (!row || !container) {
+    const dialog = recipeIngredientAlternativesDialogForRow(row);
+    if (!row || !dialog) {
         return false;
     }
 
-    const shouldOpen = container.hidden;
-    setRecipeIngredientSubstitutionsExpanded(row, button, shouldOpen);
-    return false;
+    return dialog.open
+        ? closeRecipeIngredientAlternativesDialog(dialog, event)
+        : openRecipeIngredientAlternativesDialog(button, event);
 }
 
-function openRecipeIngredientAlternativesFromHeader(button, event = null) {
+function openRecipeIngredientAlternativesDialog(button, event = null, options = {}) {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -39153,13 +39225,67 @@ function openRecipeIngredientAlternativesFromHeader(button, event = null) {
     const row = recipeIngredientParentRowFromControl(button);
     const optionsButton = row ? row.querySelector("[data-ingredient-substitutions-toggle]") : null;
     const container = recipeIngredientSubstitutionContainer(row, button);
-    if (!row || !optionsButton || !container) {
+    const dialog = recipeIngredientAlternativesDialogForRow(row);
+    if (!row || !optionsButton || !container || !dialog) {
         return false;
     }
 
-    setRecipeIngredientRowCollapsed(row, false);
-    setRecipeIngredientSubstitutionsExpanded(row, optionsButton, true);
-    window.requestAnimationFrame(() => container.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+    document.querySelectorAll("[data-recipe-ingredient-alternatives-dialog][open]").forEach(otherDialog => {
+        if (otherDialog !== dialog) {
+            closeRecipeIngredientAlternativesDialog(otherDialog, null, { restoreFocus: false });
+        }
+    });
+
+    dialog.recipeIngredientAlternativesReturnFocus = button;
+    dialog.hidden = false;
+    setRecipeIngredientSubstitutionsExpanded(row, optionsButton, true, options);
+    document.body.classList.add("recipe-ingredient-alternatives-modal-open");
+    if (!dialog.open) {
+        if (typeof dialog.showModal === "function") {
+            dialog.showModal();
+        } else {
+            dialog.setAttribute("open", "");
+        }
+    }
+    const closeButton = dialog.querySelector("[data-recipe-ingredient-alternatives-dialog-close]");
+    window.requestAnimationFrame(() => {
+        if (dialog.open && closeButton) closeButton.focus({ preventScroll: true });
+    });
+    return false;
+}
+
+function closeRecipeIngredientAlternativesDialog(control, event = null, options = {}) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const dialog = control && control.matches && control.matches("[data-recipe-ingredient-alternatives-dialog]")
+        ? control
+        : control && control.closest
+            ? control.closest("[data-recipe-ingredient-alternatives-dialog]")
+            : null;
+    const row = dialog ? dialog.closest(".recipe-edit-ingredient-row") : null;
+    if (!dialog || !row) {
+        return false;
+    }
+
+    const returnFocus = dialog.recipeIngredientAlternativesReturnFocus;
+    dialog.recipeIngredientAlternativesReturnFocus = null;
+    if (dialog.open && typeof dialog.close === "function") {
+        dialog.close();
+    } else {
+        dialog.removeAttribute("open");
+    }
+    dialog.hidden = true;
+    const optionsButton = row.querySelector("[data-ingredient-substitutions-toggle]");
+    setRecipeIngredientSubstitutionsExpanded(row, optionsButton, false, options);
+    document.body.classList.toggle(
+        "recipe-ingredient-alternatives-modal-open",
+        Boolean(document.querySelector("[data-recipe-ingredient-alternatives-dialog][open]"))
+    );
+    if (options.restoreFocus !== false && returnFocus && returnFocus.isConnected) {
+        returnFocus.focus({ preventScroll: true });
+    }
     return false;
 }
 
@@ -39936,6 +40062,12 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
 
     const ingredientField = row ? row.querySelector('[data-field="ingredient"]') : null;
     const ingredientName = String(ingredientField ? ingredientField.value : "").trim() || "ingredient";
+    const alternativesDialogName = row
+        ? row.querySelector("[data-recipe-ingredient-alternatives-dialog-name]")
+        : null;
+    if (alternativesDialogName) {
+        alternativesDialogName.textContent = ingredientName;
+    }
     if (mobileAlternativesBadge) {
         const mobileAlternativesLabel = mobileAlternativesBadge.querySelector(
             "[data-ingredient-mobile-alternatives-label]"

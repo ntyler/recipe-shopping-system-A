@@ -471,7 +471,8 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         "recipe-edit-ingredient-type-summary",
     ):
         assert summary_class in organize
-    assert 'substitutions.setAttribute("aria-colspan", "10");' in organize
+    assert 'substitutions.setAttribute("role", "region");' in organize
+    assert 'substitutions.removeAttribute("aria-colspan");' in organize
 
     workspace = css[css.index("/* Ingredient editor v14:"):]
     grid_rule = workspace[workspace.index(".recipe-edit-ingredient-table-scroll {"):]
@@ -961,7 +962,7 @@ def test_mobile_optional_type_label_does_not_keep_the_desktop_dot_background():
     assert "background: transparent;" in rule
 
 
-def test_mobile_ingredient_header_surfaces_and_opens_saved_alternatives():
+def test_mobile_ingredient_header_surfaces_saved_alternatives_in_a_dialog():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -970,8 +971,9 @@ def test_mobile_ingredient_header_surfaces_and_opens_saved_alternatives():
     organize = script[organize_start:organize_end]
     assert 'mobileAlternativesBadge.className = "recipe-edit-ingredient-mobile-alternatives-badge";' in organize
     assert "mobileAlternativesBadge.dataset.ingredientMobileAlternativesBadge" in organize
-    assert 'mobileAlternativesBadge.setAttribute("aria-controls", substitutions.id);' in organize
-    assert "openRecipeIngredientAlternativesFromHeader(mobileAlternativesBadge, event)" in organize
+    assert 'mobileAlternativesBadge.setAttribute("aria-haspopup", "dialog");' in organize
+    assert 'mobileAlternativesBadge.setAttribute("aria-controls", alternativesDialog.id);' in organize
+    assert "openRecipeIngredientAlternativesDialog(mobileAlternativesBadge, event)" in organize
 
     state_start = script.index("function updateRecipeIngredientSubstitutionState")
     state_end = script.index("function addRecipeIngredientSubstitutionRow", state_start)
@@ -979,22 +981,37 @@ def test_mobile_ingredient_header_surfaces_and_opens_saved_alternatives():
     assert 'const badgeLabel = `${alternativeCount} alt${alternativeCount === 1 ? "" : "s"}`;' in state
     assert "mobileAlternativesBadge.hidden = alternativeCount === 0;" in state
     assert 'mobileAlternativesBadge.setAttribute("aria-expanded", String(isExpanded));' in state
+    assert "alternativesDialogName.textContent = ingredientName;" in state
 
-    open_start = script.index("function openRecipeIngredientAlternativesFromHeader")
+    open_start = script.index("function openRecipeIngredientAlternativesDialog")
     open_end = script.index("function recipeIngredientSubstitutionDomGroups", open_start)
     open_helper = script[open_start:open_end]
-    assert "setRecipeIngredientRowCollapsed(row, false);" in open_helper
-    assert "setRecipeIngredientSubstitutionsExpanded(row, optionsButton, true);" in open_helper
-    assert 'container.scrollIntoView({ behavior: "smooth", block: "nearest" })' in open_helper
+    assert "setRecipeIngredientSubstitutionsExpanded(row, optionsButton, true, options);" in open_helper
+    assert 'document.body.classList.add("recipe-ingredient-alternatives-modal-open");' in open_helper
+    assert 'typeof dialog.showModal === "function"' in open_helper
+    assert "dialog.showModal();" in open_helper
+    assert "function closeRecipeIngredientAlternativesDialog" in open_helper
+    assert "dialog.close();" in open_helper
+    assert "setRecipeIngredientSubstitutionsExpanded(row, optionsButton, false, options);" in open_helper
 
     v41_start = css.index("/* Ingredient editor v41:")
-    v41 = css[v41_start:css.index("/* Keep expanded modal analysis", v41_start)]
+    v41 = css[v41_start:css.index("/* Ingredient editor v42:", v41_start)]
     assert ".recipe-edit-ingredient-mobile-alternatives-badge" in v41
     assert "display: none;" in v41
     assert "@media (max-width: 767px)" in v41
     assert ".recipe-edit-ingredient-mobile-alternatives-badge:not([hidden])" in v41
     assert "display: inline-flex;" in v41
-    assert "border-radius: 999px;" in v41
+    assert "border: 0;" in v41
+    assert "background: transparent;" in v41
+    assert "font-size: 8px;" in v41
+    assert "font-weight: 650;" in v41
+
+    v42_start = css.index("/* Ingredient editor v42:")
+    v42 = css[v42_start:css.index("/* Keep expanded modal analysis", v42_start)]
+    assert "dialog.recipe-edit-ingredient-alternatives-dialog" in v42
+    assert ".recipe-edit-ingredient-alternatives-dialog::backdrop" in v42
+    assert ".recipe-edit-ingredient-alternatives-dialog-close" in v42
+    assert "@media (max-width: 767px)" in v42
 
 
 def test_mobile_expanded_editable_values_share_one_typography_treatment():
@@ -2180,7 +2197,8 @@ def test_recipe_editor_size_column_follows_unit_and_matches_quantity_formatting(
         '"ingredientSizeSummary", "size", "input"'
     ) < row.index('"ingredientStoreSummary", "store_section", "select"')
     assert 'size: "Size"' in row
-    assert 'substitutions.setAttribute("aria-colspan", "10");' in row
+    assert 'substitutions.setAttribute("role", "region");' in row
+    assert 'substitutions.removeAttribute("aria-colspan");' in row
 
     normalize = script[
         script.index("function normalizeRecipeEditIngredientColumnLayout"):
@@ -2491,7 +2509,7 @@ def test_recipe_editor_replacement_rows_edit_and_duplicate_without_new_save_plum
     assert "/api/" not in duplicate
 
 
-def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inline():
+def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_in_dialog():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -2510,17 +2528,22 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
 
     assert 'optionsButton.type = "button";' in organizer
     assert 'optionsButton.setAttribute("aria-expanded", "false");' in organizer
-    assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organizer
+    assert 'optionsButton.setAttribute("aria-haspopup", "dialog");' in organizer
+    assert 'optionsButton.setAttribute("aria-controls", alternativesDialog.id);' in organizer
     assert 'optionsButton.addEventListener("click"' in organizer
-    assert 'substitutions.setAttribute("role", "cell");' in organizer
-    assert 'substitutions.setAttribute("aria-colspan", "10");' in organizer
+    assert 'substitutions.setAttribute("role", "region");' in organizer
+    assert 'alternativesDialog = document.createElement("dialog");' in organizer
+    assert 'alternativesDialog.dataset.recipeIngredientAlternativesDialog = "";' in organizer
+    assert '?.appendChild(substitutions);' in organizer
+    assert 'alternativesDialog.addEventListener("cancel"' in organizer
     assert "<span data-ingredient-options-label>None</span>" in organizer
     options_button_markup = organizer[
         organizer.index("optionsButton.innerHTML"):
         organizer.index('optionsButton.addEventListener("click"')
     ]
     assert 'recipeEditSvgIcon("chevron-down")' not in options_button_markup
-    assert organizer.index("organizeRecipeEditCompactRowActions") < organizer.index("if (substitutions) row.appendChild(substitutions)")
+    assert organizer.index("organizeRecipeEditCompactRowActions") < organizer.index("if (alternativesDialog)")
+    assert "row.appendChild(alternativesDialog);" in organizer
 
     assert "!optionCount" not in toggle
     assert 'otherContainer.hidden = true;' in toggle
@@ -2528,6 +2551,11 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert 'row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);' in toggle
     assert "event.preventDefault();" in toggle
     assert "event.stopPropagation();" in toggle
+    assert "function openRecipeIngredientAlternativesDialog" in toggle
+    assert 'document.body.classList.add("recipe-ingredient-alternatives-modal-open");' in toggle
+    assert "dialog.showModal();" in toggle
+    assert "function closeRecipeIngredientAlternativesDialog" in toggle
+    assert "dialog.close();" in toggle
 
     assert "optionsButton.disabled = false;" in state
     assert '`${action} alternative groups for ${ingredientName}${tooltip}`' in state
@@ -2544,11 +2572,13 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert "ensureRecipeIngredientAlternativeCards(container)" in state
     assert "viewAll.hidden = true;" in state
 
-    v10 = css[css.index("/* Ingredient editor v10:"):]
-    assert ".recipe-edit-ingredient-options-panel:not([hidden])" in v10
-    open_rule = v10[v10.index(".recipe-edit-ingredient-options-panel:not([hidden])"):]
+    v42 = css[css.index("/* Ingredient editor v42:"):]
+    assert ".recipe-edit-ingredient-options-panel:not([hidden])" in v42
+    open_rule = v42[v42.index(".recipe-edit-ingredient-options-panel:not([hidden])"):]
     open_rule = open_rule[:open_rule.index("}")]
     assert "display: grid !important;" in open_rule
+    assert "dialog.recipe-edit-ingredient-alternatives-dialog[open]" in v42
+    assert ".recipe-edit-ingredient-alternatives-dialog::backdrop" in v42
     assert ".recipe-edit-substitution-empty[hidden]" in css
     assert ".recipe-edit-ingredient-options-button:focus-visible" in css
 

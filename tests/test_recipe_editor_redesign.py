@@ -1082,7 +1082,7 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     assert "tableScroll.appendChild(ingredientList);" in tools_block
 
 
-def test_recipe_editor_ingredient_options_use_inline_accessible_disclosure():
+def test_recipe_editor_ingredient_options_use_accessible_dialog_disclosure():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
 
@@ -1090,13 +1090,16 @@ def test_recipe_editor_ingredient_options_use_inline_accessible_disclosure():
     organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
     organize = script[organize_start:organize_end]
     assert 'substitutions.classList.add("recipe-edit-ingredient-options-panel")' in organize
-    assert "row.appendChild(substitutions);" in organize
+    assert "row.appendChild(alternativesDialog);" in organize
+    assert 'alternativesDialog = document.createElement("dialog");' in organize
+    assert '?.appendChild(substitutions);' in organize
     assert "substitutions.hidden = true;" in organize
     assert 'optionsCell.className = "recipe-edit-ingredient-substitution-cell";' in organize
     assert 'optionsCell.setAttribute("role", "cell");' in organize
     assert 'optionsButton.className = "recipe-edit-ingredient-options-button";' in organize
-    assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organize
-    assert "toggleRecipeIngredientSubstitutions(optionsButton, event)" in organize
+    assert 'optionsButton.setAttribute("aria-haspopup", "dialog");' in organize
+    assert 'optionsButton.setAttribute("aria-controls", alternativesDialog.id);' in organize
+    assert "openRecipeIngredientAlternativesDialog(optionsButton, event)" in organize
     assert "organizeRecipeEditSubstitutionOptionRow" in script
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in script
 
@@ -1107,6 +1110,8 @@ def test_recipe_editor_ingredient_options_use_inline_accessible_disclosure():
     assert "grid-column: 1 / -1 !important;" in v10_css
     assert "grid-row: 2 !important;" in v10_css
     assert ".recipe-edit-ingredient-options-panel[hidden]" in v10_css
+    assert "dialog.recipe-edit-ingredient-alternatives-dialog[open]" in css
+    assert ".recipe-edit-ingredient-alternatives-dialog::backdrop" in css
 
 
 def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls():
