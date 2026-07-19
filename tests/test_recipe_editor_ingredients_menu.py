@@ -895,6 +895,12 @@ def test_mobile_expanded_ingredient_cards_align_status_and_alternatives_beside_o
     assert "recipeIngredientMobileAccordionIsActive()\n            ||" in collapse
     assert 'row.classList.add("recipe-edit-row-expanded");' in collapse
 
+    expand_all_start = script.index("function setRecipeIngredientsCollapsed")
+    expand_all_end = script.index("function toggleRecipeIngredientsCollapsed", expand_all_start)
+    expand_all = script[expand_all_start:expand_all_end]
+    assert "const expandRows = !collapsed && recipeIngredientMobileAccordionIsActive();" in expand_all
+    assert 'row.classList.toggle("recipe-edit-row-expanded", expandRows);' in expand_all
+
     v35_start = css.index("/* Ingredient editor v35:")
     assert v35_start > css.index("/* Ingredient editor v34:")
     v35 = css[v35_start:css.index("/* Keep expanded modal analysis", v35_start)]

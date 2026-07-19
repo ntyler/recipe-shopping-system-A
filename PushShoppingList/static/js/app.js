@@ -41267,10 +41267,11 @@ function setRecipeIngredientsCollapsed(collapsed) {
     }
 
     list.classList.toggle("recipe-edit-ingredients-collapsed", Boolean(collapsed));
+    const expandRows = !collapsed && recipeIngredientMobileAccordionIsActive();
 
     recipeEditIngredientRows().forEach(row => {
         row.classList.remove("recipe-edit-row-collapsed");
-        row.classList.remove("recipe-edit-row-expanded");
+        row.classList.toggle("recipe-edit-row-expanded", expandRows);
         updateRecipeIngredientRowCollapseToggle(row);
     });
 
