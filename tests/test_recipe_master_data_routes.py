@@ -751,6 +751,10 @@ def test_master_data_store_section_batch_save_is_wired():
     assert ".master-data-record-row-dirty td" in css
     assert ".master-data-store-section-form {\n            display: block;" in css
     assert ".master-data-record-field input" in css
+    assert "border: 1px solid transparent;" in css
+    assert "background: transparent;" in css
+    assert ".master-data-record-field input:is(:hover, :focus-visible)" in css
+    assert ".master-data-record-field input:focus-visible" in css
     assert '.master-data-ingredients-table select[name="store_section"]' in css
 
 

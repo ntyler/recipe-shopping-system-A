@@ -26133,13 +26133,14 @@ img[data-deferred-src] {
             min-width: 0;
             min-height: 34px;
             padding: 6px 8px;
-            border: 1px solid #4c5964;
+            border: 1px solid transparent;
             border-radius: 6px;
-            background: #11191d;
+            background: transparent;
             color: #f8fafc;
             font-size: 13px;
             font-weight: 850;
             line-height: 1.2;
+            transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
         }
 
         .master-data-record-field.is-normalized input {
@@ -26149,7 +26150,12 @@ img[data-deferred-src] {
             font-weight: 700;
         }
 
-        .master-data-record-field input:is(:hover, :focus-visible),
+        .master-data-record-field input:is(:hover, :focus-visible) {
+            background: #11191d;
+            border-color: #4c5964;
+        }
+
+        .master-data-record-field input:focus-visible,
         .master-data-ingredients-table select[name="store_section"]:is(:hover, :focus-visible) {
             outline: none;
             border-color: #2d8f70;
