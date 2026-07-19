@@ -28727,6 +28727,26 @@ function organizeRecipeEditIngredientRow(row) {
         row.appendChild(summary);
     });
 
+    const mobileDetailDefinitions = [
+        ["recipe-edit-ingredient-preparation-summary", "ingredientPreparationSummary", "preparation", "Preparation", "Add preparation"],
+        ["recipe-edit-ingredient-buy-as-summary", "ingredientBuyAsSummary", "purchasable_item", "Buy As", "Add buy as"],
+    ];
+    mobileDetailDefinitions.forEach(([className, dataName, fieldName, label, placeholder]) => {
+        const summary = document.createElement("div");
+        summary.className = `recipe-edit-ingredient-mobile-detail-summary ${className}`;
+        summary.dataset[dataName] = "";
+        summary.setAttribute("role", "cell");
+        const control = document.createElement("input");
+        control.type = "text";
+        control.className = "recipe-edit-ingredient-inline-control";
+        control.dataset.recipeIngredientInlineField = fieldName;
+        control.setAttribute("aria-label", label);
+        control.setAttribute("placeholder", placeholder);
+        control.setAttribute("autocomplete", "off");
+        summary.appendChild(control);
+        row.appendChild(summary);
+    });
+
     const mobileQuantitySummary = document.createElement("span");
     mobileQuantitySummary.className = "recipe-edit-ingredient-mobile-quantity-summary";
     mobileQuantitySummary.dataset.ingredientMobileQuantitySummary = "";
@@ -29067,6 +29087,8 @@ function organizeRecipeEditIngredientRow(row) {
     }
     if (substitutions) row.appendChild(substitutions);
     if (metadata && !metadata.children.length) metadata.remove();
+    initializeRecipeIngredientMobileHeaderLayout();
+    syncRecipeIngredientMobileHeader(row);
     updateRecipeIngredientSubstitutionState(row);
 }
 
@@ -41041,6 +41063,58 @@ function recipeIngredientMobileAccordionIsActive() {
         && typeof window.matchMedia === "function"
         && window.matchMedia("(max-width: 767px)").matches
     );
+}
+
+let recipeIngredientMobileHeaderMediaQuery = null;
+
+function syncRecipeIngredientMobileHeader(row) {
+    if (!row || !row.classList.contains("recipe-edit-ingredient-row")) {
+        return;
+    }
+
+    let header = row.querySelector(":scope > .recipe-edit-ingredient-mobile-header");
+    if (!recipeIngredientMobileAccordionIsActive()) {
+        if (!header) return;
+        [...header.children].forEach(child => row.insertBefore(child, header));
+        header.remove();
+        return;
+    }
+
+    if (!header) {
+        header = document.createElement("div");
+        header.className = "recipe-edit-ingredient-mobile-header";
+        header.setAttribute("role", "presentation");
+        row.insertBefore(header, row.firstChild);
+    }
+
+    [
+        ".recipe-edit-row-number",
+        ".recipe-ingredient-image-panel",
+        ".recipe-edit-ingredient-read-cell",
+        ".recipe-edit-ingredient-mobile-quantity-summary",
+        ".recipe-edit-compact-row-actions",
+    ].forEach(selector => {
+        const element = row.querySelector(`:scope > ${selector}`);
+        if (element) header.appendChild(element);
+    });
+}
+
+function initializeRecipeIngredientMobileHeaderLayout() {
+    if (
+        recipeIngredientMobileHeaderMediaQuery
+        || typeof window === "undefined"
+        || typeof window.matchMedia !== "function"
+    ) {
+        return;
+    }
+
+    recipeIngredientMobileHeaderMediaQuery = window.matchMedia("(max-width: 767px)");
+    const syncHeaders = () => recipeEditIngredientRows().forEach(syncRecipeIngredientMobileHeader);
+    if (typeof recipeIngredientMobileHeaderMediaQuery.addEventListener === "function") {
+        recipeIngredientMobileHeaderMediaQuery.addEventListener("change", syncHeaders);
+    } else if (typeof recipeIngredientMobileHeaderMediaQuery.addListener === "function") {
+        recipeIngredientMobileHeaderMediaQuery.addListener(syncHeaders);
+    }
 }
 
 function collapseOtherRecipeIngredientRows(activeRow) {

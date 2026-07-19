@@ -921,19 +921,186 @@ def test_mobile_expanded_ingredient_cards_align_status_and_alternatives_beside_o
     assert "gap: 0;" in alternatives
     assert "border-top: 0;" in alternatives
 
-    button_start = v35.index("> .recipe-edit-ingredient-options-button {")
+    value_row_start = v35.index("> [data-ingredient-read-status],")
+    value_row_end = v35.index("}", value_row_start)
+    value_row = v35[value_row_start:value_row_end]
+    assert "display: flex;" in value_row
+    assert "align-items: center;" in value_row
+    assert "height: 30px;" in value_row
+    assert "min-height: 30px;" in value_row
+
+    button_start = v35.index("> .recipe-edit-ingredient-options-button {", value_row_end)
     button_end = v35.index("}", button_start)
     button = v35[button_start:button_end]
-    assert "height: auto;" in button
-    assert "min-height: 18px;" in button
-    assert "align-items: flex-start;" in button
-    assert "margin-top: -1px;" in button
+    assert "margin-top: 0;" in button
     assert "padding-block: 0;" in button
+    assert "line-height: 1.4;" in button
 
     assert "@media (max-width: 420px)" in v35
     assert "grid-template-columns: repeat(12, minmax(0, 1fr)) !important;" in v35
     assert "grid-column: 1 / 7 !important;" in v35
     assert "grid-column: 7 / 13 !important;" in v35
+
+
+def test_mobile_expanded_editable_values_share_one_typography_treatment():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    v36_start = css.index("/* Ingredient editor v36:")
+    v36 = css[v36_start:css.index("/* Ingredient editor v37:", v36_start)]
+    assert "@media (max-width: 767px)" in v36
+    for class_name in (
+        ".recipe-edit-ingredient-quantity-summary",
+        ".recipe-edit-ingredient-unit-summary",
+        ".recipe-edit-ingredient-size-summary",
+        ".recipe-edit-ingredient-store-summary",
+        ".recipe-edit-ingredient-type-summary",
+        ".recipe-edit-ingredient-preparation-summary",
+        ".recipe-edit-ingredient-buy-as-summary",
+        ".recipe-edit-ingredient-inline-control",
+        ".recipe-edit-store-section-trigger",
+        ".recipe-edit-type-trigger",
+    ):
+        assert class_name in v36
+    assert "font-family: inherit;" in v36
+    assert "font-size: 16px !important;" in v36
+    assert "font-weight: 400;" in v36
+    assert "line-height: 1.2;" in v36
+    assert ".recipe-edit-ingredient-status-summary" not in v36
+    assert ".recipe-edit-ingredient-substitution-cell" not in v36
+
+
+def test_mobile_expanded_cards_show_editable_preparation_and_buy_as_fields():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
+    organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
+    organize = script[organize_start:organize_end]
+    assert '"recipe-edit-ingredient-preparation-summary"' in organize
+    assert '"recipe-edit-ingredient-buy-as-summary"' in organize
+    assert '"preparation", "Preparation", "Add preparation"' in organize
+    assert '"purchasable_item", "Buy As", "Add buy as"' in organize
+    assert 'control.dataset.recipeIngredientInlineField = fieldName;' in organize
+
+    v37_start = css.index("/* Ingredient editor v37:")
+    v37 = css[v37_start:css.index("/* Ingredient editor v38:", v37_start)]
+    assert "grid-template-rows: minmax(48px, auto) repeat(5, auto) !important;" in v37
+    hidden_header_start = v37.index("> .recipe-edit-ingredient-read-details {")
+    hidden_header_end = v37.index("}", hidden_header_start)
+    hidden_header = v37[hidden_header_start:hidden_header_end]
+    assert "display: none !important;" in hidden_header
+    assert ".recipe-edit-ingredient-read-buy-as" not in hidden_header
+    assert "> .recipe-edit-ingredient-mobile-detail-summary {" in v37
+    assert "display: grid;" in v37
+    assert "grid-row: 5 !important;" in v37
+    assert 'content: "Preparation";' in v37
+    assert 'content: "Buy As";' in v37
+    assert "height: 30px;" in v37
+    assert "grid-row: 6 !important;" in v37
+
+
+def test_mobile_ingredient_header_uses_one_layout_in_every_fold_state():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    sync_start = script.index("function syncRecipeIngredientMobileHeader(row)")
+    sync_end = script.index("function initializeRecipeIngredientMobileHeaderLayout", sync_start)
+    sync = script[sync_start:sync_end]
+    assert 'row.querySelector(":scope > .recipe-edit-ingredient-mobile-header")' in sync
+    assert 'header.className = "recipe-edit-ingredient-mobile-header";' in sync
+    assert 'row.insertBefore(header, row.firstChild);' in sync
+    assert '[...header.children].forEach(child => row.insertBefore(child, header));' in sync
+    for selector in (
+        ".recipe-edit-row-number",
+        ".recipe-ingredient-image-panel",
+        ".recipe-edit-ingredient-read-cell",
+        ".recipe-edit-ingredient-mobile-quantity-summary",
+        ".recipe-edit-compact-row-actions",
+    ):
+        assert f'"{selector}"' in sync
+
+    init_start = script.index("function initializeRecipeIngredientMobileHeaderLayout()")
+    init_end = script.index("function collapseOtherRecipeIngredientRows", init_start)
+    initialization = script[init_start:init_end]
+    assert 'window.matchMedia("(max-width: 767px)")' in initialization
+    assert 'addEventListener("change", syncHeaders)' in initialization
+
+    v39_start = css.index("/* Ingredient editor v39:")
+    v39 = css[v39_start:css.index("/* Keep expanded modal analysis", v39_start)]
+    header_start = v39.index("> .recipe-edit-ingredient-mobile-header {")
+    header_end = v39.index("}", header_start)
+    header = v39[header_start:header_end]
+    assert ".recipe-edit-row-expanded" not in header
+    assert "grid-template-columns: 40px minmax(0, 1fr) max-content 106px;" in header
+    assert "grid-column: 1 / -1 !important;" in header
+    assert "grid-row: 1 !important;" in header
+    assert "height: 44px;" in header
+    assert "column-gap: 6px;" in header
+
+    for selector, column in (
+        ("> .recipe-edit-row-number,", "grid-column: 1 !important;"),
+        ("> .recipe-ingredient-image-panel {", "grid-column: 1 !important;"),
+        ("> .recipe-edit-ingredient-read-cell {", "grid-column: 2 !important;"),
+        ("> .recipe-edit-ingredient-mobile-quantity-summary {", "grid-column: 3 !important;"),
+        ("> .recipe-edit-compact-row-actions {", "grid-column: 4 !important;"),
+    ):
+        start = v39.index(selector)
+        end = v39.index("}", start)
+        rule = v39[start:end]
+        assert ".recipe-edit-row-expanded" not in rule
+        assert column in rule
+        assert "grid-row: 1 !important;" in rule
+
+    actions_start = v39.index("> .recipe-edit-compact-row-actions {")
+    actions_end = v39.index("}", actions_start)
+    actions = v39[actions_start:actions_end]
+    assert "display: flex !important;" in actions
+    assert "align-items: center;" in actions
+    assert "justify-content: flex-end;" in actions
+    assert "gap: 4px;" in actions
+
+    number_start = v39.index("> .recipe-edit-row-number {")
+    number_end = v39.index("}", number_start)
+    number = v39[number_start:number_end]
+    assert "display: grid;" in number
+    assert "place-items: center;" in number
+    assert "z-index: 1;" in number
+    assert "> .recipe-edit-ingredient-mobile-header:has(" in v39
+    assert ".recipe-ingredient-image:not([hidden])" in v39
+
+    image_start = v39.index("> .recipe-ingredient-image-panel {")
+    image_end = v39.index("}", image_start)
+    image = v39[image_start:image_end]
+    assert "width: 40px !important;" in image
+    assert "height: 40px !important;" in image
+    assert "overflow: hidden;" in image
+    assert "border: 1px solid var(--app-border-strong);" in image
+    assert "border-radius: 8px;" in image
+    assert ".recipe-edit-ingredient-status-summary" not in v39
+    assert ".recipe-edit-ingredient-type-summary" not in v39
+
+
+def test_mobile_preparation_and_buy_as_fields_use_full_width_rows():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    v40_start = css.index("/* Ingredient editor v40:")
+    v40 = css[v40_start:css.index("/* Keep expanded modal analysis", v40_start)]
+    assert "grid-template-rows: 44px repeat(6, auto) !important;" in v40
+
+    for selector, row in (
+        ("> .recipe-edit-ingredient-preparation-summary {", "grid-row: 5 !important;"),
+        ("> .recipe-edit-ingredient-buy-as-summary {", "grid-row: 6 !important;"),
+    ):
+        start = v40.index(selector)
+        end = v40.index("}", start)
+        rule = v40[start:end]
+        assert "grid-column: 1 / 5 !important;" in rule
+        assert row in rule
+
+    options_start = v40.index("> .recipe-edit-ingredient-options-panel {")
+    options_end = v40.index("}", options_start)
+    options = v40[options_start:options_end]
+    assert "grid-row: 7 !important;" in options
 
 
 def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
