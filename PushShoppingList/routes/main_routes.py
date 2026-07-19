@@ -1146,6 +1146,40 @@ def master_data_equipment_route():
     return render_master_data_page("equipment")
 
 
+@main_bp.route("/api/master-data/ingredients/options")
+def ingredient_master_options_route():
+    search = recipe_master_data.clean_text(
+        request.args.get("search") or request.args.get("q")
+    )
+    limit = int_query_arg("limit", 20, minimum=1, maximum=50)
+    rows = recipe_master_data.list_ingredients(
+        search=search,
+        limit=limit,
+        sort="usage_count_desc",
+    )
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "search": search,
+        "ingredients": [
+            {
+                "ingredient_id": int(row.get("id") or 0),
+                "name": recipe_master_data.clean_text(row.get("name")),
+                "normalized_name": recipe_master_data.normalized_master_name(
+                    row.get("normalized_name") or row.get("name")
+                ),
+                "store_section": recipe_master_data.clean_ingredient_store_section(
+                    row.get("store_section")
+                ),
+                "image_url": recipe_master_data.clean_text(row.get("image_url")),
+                "usage_count": int(row.get("usage_count") or 0),
+            }
+            for row in rows
+        ],
+        "manage_url": url_for("main_bp.master_data_ingredients_route"),
+    })
+
+
 @main_bp.route("/api/master-data/<record_type>/<int:record_id>/references")
 def master_data_record_references_route(record_type, record_id):
     if record_type not in MASTER_DATA_PAGE_CONFIG:
@@ -1215,6 +1249,56 @@ def master_data_record_references_route(record_type, record_id):
         "total": int(references.get("total") or 0),
         "limit": int(references.get("limit") or 0),
     })
+
+
+@main_bp.route("/admin/master-data/ingredients/<int:ingredient_id>", methods=["POST"])
+def update_ingredient_master_record_route(ingredient_id):
+    active_public_user = current_public_user()
+    allow_other_users = is_admin_user(active_public_user)
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    result = recipe_master_data.update_ingredient_master_record(
+        ingredient_id,
+        payload.get("name"),
+        payload.get("normalized_name"),
+        payload.get("store_section"),
+        allow_other_users=allow_other_users,
+    )
+    redirect_url = recipe_master_data.clean_text(payload.get("redirect_url"))
+    if not redirect_url.startswith("/") or redirect_url.startswith("//"):
+        redirect_url = url_for("main_bp.master_data_ingredients_route")
+
+    if result.get("ok"):
+        if result.get("changed"):
+            message = f"Ingredient master record updated: {result.get('name')}."
+        else:
+            message = f"Ingredient master record was already up to date: {result.get('name')}."
+        category = "success"
+    else:
+        message = result.get("error") or "Ingredient master record could not be updated."
+        category = "error"
+
+    session["recipe_master_data_messages"] = [{
+        "category": category,
+        "text": message,
+    }]
+    wants_json = (
+        request.is_json
+        or request.headers.get("X-Requested-With") == "fetch"
+        or request.accept_mimetypes.best == "application/json"
+    )
+    if wants_json:
+        status = 200 if result.get("ok") else int(result.get("status") or 400)
+        return jsonify({
+            "ok": result.get("ok", False),
+            "success": result.get("ok", False),
+            "category": category,
+            "message": message,
+            "result": result,
+            "redirect_url": redirect_url,
+        }), status
+
+    return redirect(redirect_url)
 
 
 @main_bp.route("/admin/master-data/ingredients/<int:ingredient_id>/store-section", methods=["POST"])

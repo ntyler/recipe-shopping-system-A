@@ -1014,6 +1014,44 @@ def test_mobile_ingredient_header_surfaces_saved_alternatives_in_a_dialog():
     assert "@media (max-width: 767px)" in v42
 
 
+def test_ingredient_name_fields_use_the_normalized_master_data_picker():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    bind_start = script.index("function bindRecipeIngredientNameField(row)")
+    bind_end = script.index("function addRecipeIngredientRow", bind_start)
+    binding = script[bind_start:bind_end]
+    assert 'recipeIngredientDirectField(row, "ingredient")' in binding
+    assert 'data-recipe-ingredient-inline-field="ingredient"' in binding
+    assert "bindRecipeIngredientMasterPicker(field);" in binding
+
+    picker_start = script.index("function ensureRecipeIngredientMasterMenu")
+    picker_end = script.index("function bindRecipeIngredientNameField", picker_start)
+    picker = script[picker_start:picker_end]
+    assert 'menu.setAttribute("role", "listbox");' in picker
+    assert 'input.setAttribute("role", "combobox");' in picker
+    assert 'input.setAttribute("aria-autocomplete", "list");' in picker
+    assert 'fetch(`/api/master-data/ingredients/options?${params.toString()}`' in picker
+    assert "function chooseRecipeIngredientMasterOption" in picker
+    for field_name in (
+        "ingredient_id",
+        "normalized_name",
+        "master_normalized_name",
+        "store_section",
+        "ingredient_image_url",
+        "match_status",
+    ):
+        assert f'setRowFieldValue(row, "{field_name}"' in picker
+    assert 'match_source: "ingredient master data"' in picker
+    assert "Manage master ingredients" in picker
+
+    v43 = css[css.index("/* Ingredient editor v43:"):css.index("/* Keep expanded modal analysis")]
+    assert ".recipe-edit-row-menu.recipe-edit-ingredient-master-menu" in v43
+    assert ".recipe-edit-ingredient-master-option" in v43
+    assert ".recipe-edit-ingredient-master-manage" in v43
+    assert "@media (max-width: 520px)" in v43
+
+
 def test_mobile_expanded_editable_values_share_one_typography_treatment():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 

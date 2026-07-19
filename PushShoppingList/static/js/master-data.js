@@ -751,7 +751,21 @@
     }
 
     function storeSectionSelectFor(form) {
-        return form ? form.querySelector('select[name="store_section"]') : null;
+        return form && form.elements ? form.elements.namedItem("store_section") : null;
+    }
+
+    function masterDataRecordFields(form) {
+        return form && form.elements
+            ? Array.from(form.elements).filter((field) => field.matches && field.matches("[data-master-record-field]"))
+            : [];
+    }
+
+    function originalMasterRecordFieldValue(field) {
+        return text(field && field.dataset ? field.dataset.originalValue : "").trim();
+    }
+
+    function currentMasterRecordFieldValue(field) {
+        return text(field ? field.value : "").trim();
     }
 
     function originalStoreSectionValue(select) {
@@ -763,8 +777,9 @@
     }
 
     function storeSectionFormIsDirty(form) {
-        const select = storeSectionSelectFor(form);
-        return !!select && currentStoreSectionValue(select) !== originalStoreSectionValue(select);
+        return masterDataRecordFields(form).some((field) => (
+            currentMasterRecordFieldValue(field) !== originalMasterRecordFieldValue(field)
+        ));
     }
 
     function updateStoreSectionFormState(form) {
@@ -825,13 +840,13 @@
 
         if (count > 0) {
             setStoreSectionPanelMessage(
-                `${count} unsaved store section change${count === 1 ? "" : "s"}`,
-                "Save once after making all section edits on this page."
+                `${count} unsaved ingredient change${count === 1 ? "" : "s"}`,
+                "Save once after editing names, normalized names, or store sections on this page."
             );
         } else {
             setStoreSectionPanelMessage(
-                "No store section changes",
-                "Change store sections in the table, then save all pending changes here."
+                "No ingredient changes",
+                "Edit ingredient names, normalized names, or store sections, then save all pending changes here."
             );
         }
     }
@@ -852,14 +867,16 @@
                     : "Save Changes";
         }
         masterDataStoreSectionForms().forEach((form) => {
-            const select = storeSectionSelectFor(form);
-            if (select) {
-                select.disabled = busy;
-            }
+            masterDataRecordFields(form).forEach((field) => {
+                field.disabled = busy;
+            });
         });
     }
 
     async function submitStoreSectionForm(form) {
+        if (typeof form.reportValidity === "function" && !form.reportValidity()) {
+            throw new Error("Complete the ingredient name and normalized name before saving.");
+        }
         const response = await fetch(form.action, {
             method: form.method || "POST",
             body: new FormData(form),
@@ -891,9 +908,21 @@
             return;
         }
 
+        const invalidForm = forms.find((form) => (
+            typeof form.checkValidity === "function" && !form.checkValidity()
+        ));
+        if (invalidForm) {
+            if (typeof invalidForm.reportValidity === "function") invalidForm.reportValidity();
+            setStoreSectionPanelMessage(
+                "Complete required ingredient fields",
+                "Every changed record needs an ingredient name and normalized name."
+            );
+            return;
+        }
+
         setStoreSectionSaveBusy(true);
         setStoreSectionPanelMessage(
-            `Saving ${forms.length} store section change${forms.length === 1 ? "" : "s"}...`,
+            `Saving ${forms.length} ingredient change${forms.length === 1 ? "" : "s"}...`,
             "Please keep this page open while the updates finish."
         );
 
@@ -904,9 +933,10 @@
             const row = form.closest(".master-data-record-row");
             try {
                 await submitStoreSectionForm(form);
-                if (select) {
-                    select.dataset.originalStoreSection = currentStoreSectionValue(select);
-                }
+                masterDataRecordFields(form).forEach((field) => {
+                    field.dataset.originalValue = currentMasterRecordFieldValue(field);
+                });
+                if (select) select.dataset.originalStoreSection = currentStoreSectionValue(select);
                 form.classList.remove("master-data-store-section-form-dirty");
                 if (row) {
                     row.classList.remove("master-data-record-row-dirty", "master-data-record-row-error");
@@ -936,7 +966,7 @@
         }
 
         setStoreSectionPanelMessage(
-            `${savedCount} store section change${savedCount === 1 ? "" : "s"} saved`,
+            `${savedCount} ingredient change${savedCount === 1 ? "" : "s"} saved`,
             "Refreshing the table so groups and filters stay up to date."
         );
 
@@ -956,6 +986,11 @@
             if (select && !select.dataset.originalStoreSection) {
                 select.dataset.originalStoreSection = currentStoreSectionValue(select);
             }
+            masterDataRecordFields(form).forEach((field) => {
+                if (!Object.prototype.hasOwnProperty.call(field.dataset, "originalValue")) {
+                    field.dataset.originalValue = currentMasterRecordFieldValue(field);
+                }
+            });
             form.addEventListener("submit", saveChangedStoreSections);
             form.addEventListener("change", updateStoreSectionSavePanel);
             form.addEventListener("input", updateStoreSectionSavePanel);

@@ -143,7 +143,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'class="master-data-item-cell"' in all_html
     assert 'class="master-data-item-copy"' in all_html
     assert 'data-full-src="/static/generated/tomato.png"' in all_html
-    assert all_html.index('class="master-data-thumbnail"') < all_html.index("<strong>Tomato</strong>")
+    assert all_html.index('class="master-data-thumbnail"') < all_html.index('value="Tomato"')
     assert '<th scope="rowgroup" colspan="6">PRODUCE</th>' in all_html
     assert "Backfill progress" in all_html
     assert "data-master-backfill-form" in all_html
@@ -331,6 +331,77 @@ def test_ingredient_master_store_section_update_is_user_scoped(monkeypatch, tmp_
     assert own_response.status_code == 302
     assert user_a_tomato["store_section"] == "BAKING"
     assert user_b_tomato["store_section"] == "DAIRY & EGGS"
+
+
+def test_ingredient_master_options_are_scoped_for_recipe_editor(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.get(
+            "/api/master-data/ingredients/options?search=tom&limit=10",
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["manage_url"] == "/admin/master-data/ingredients"
+    assert payload["ingredients"] == [{
+        "ingredient_id": payload["ingredients"][0]["ingredient_id"],
+        "name": "Tomato",
+        "normalized_name": "tomato",
+        "store_section": "PRODUCE",
+        "image_url": "/static/generated/tomato.png",
+        "usage_count": 1,
+    }]
+
+
+def test_ingredient_master_record_edit_is_scoped_and_admin_can_edit_other_users(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+    user_a_tomato = master_data.master_record_for_name("ingredients", "user-a", "tomato")
+    user_b_garlic = master_data.master_record_for_name("ingredients", "user-b", "garlic")
+    headers = {"X-Requested-With": "fetch", "Accept": "application/json"}
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        own_response = client.post(
+            f"/admin/master-data/ingredients/{user_a_tomato['id']}",
+            data={
+                "name": "Roma Tomato",
+                "normalized_name": "roma tomato",
+                "store_section": "PRODUCE",
+            },
+            headers=headers,
+        )
+        blocked_response = client.post(
+            f"/admin/master-data/ingredients/{user_b_garlic['id']}",
+            data={
+                "name": "Fresh Garlic",
+                "normalized_name": "fresh garlic",
+                "store_section": "PRODUCE",
+            },
+            headers=headers,
+        )
+        sign_in(client, "admin-user")
+        admin_response = client.post(
+            f"/admin/master-data/ingredients/{user_b_garlic['id']}",
+            data={
+                "name": "Fresh Garlic",
+                "normalized_name": "fresh garlic",
+                "store_section": "PRODUCE",
+            },
+            headers=headers,
+        )
+
+    assert own_response.status_code == 200
+    assert own_response.get_json()["result"]["normalized_name"] == "roma tomato"
+    assert blocked_response.status_code == 404
+    assert admin_response.status_code == 200
+    assert master_data.master_record_for_name("ingredients", "user-a", "roma tomato")["name"] == "Roma Tomato"
+    assert master_data.master_record_for_name("ingredients", "user-b", "fresh garlic")["name"] == "Fresh Garlic"
 
 
 def test_admin_backfill_route_uses_existing_service(monkeypatch, tmp_path):
@@ -658,12 +729,19 @@ def test_master_data_store_section_batch_save_is_wired():
     assert "data-master-store-section-save" in template
     assert "data-master-store-section-form" in template
     assert "data-original-store-section" in template
+    assert "data-master-record-form" in template
+    assert "data-master-record-field" in template
+    assert 'name="name"' in template
+    assert 'name="normalized_name"' in template
+    assert "update_ingredient_master_record_route" in template
     assert '<button type="submit">Save</button>' not in template
 
     assert "function initMasterDataStoreSectionBatchSave" in script
     assert "function changedStoreSectionForms" in script
     assert "function saveChangedStoreSections" in script
     assert "function submitStoreSectionForm" in script
+    assert "function masterDataRecordFields" in script
+    assert "currentMasterRecordFieldValue(field) !== originalMasterRecordFieldValue(field)" in script
     assert "initMasterDataStoreSectionBatchSave();" in script
     assert '"X-Requested-With": "fetch"' in script
     assert "window.location.assign(window.location.href)" in script
@@ -672,6 +750,8 @@ def test_master_data_store_section_batch_save_is_wired():
     assert ".master-data-store-section-save-panel.has-changes" in css
     assert ".master-data-record-row-dirty td" in css
     assert ".master-data-store-section-form {\n            display: block;" in css
+    assert ".master-data-record-field input" in css
+    assert '.master-data-ingredients-table select[name="store_section"]' in css
 
 
 def test_master_data_reference_expander_is_wired():

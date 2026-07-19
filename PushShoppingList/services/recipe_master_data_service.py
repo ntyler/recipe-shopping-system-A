@@ -1538,6 +1538,105 @@ def update_ingredient_store_section(ingredient_id, store_section, user_id=None, 
         }
 
 
+def update_ingredient_master_record(
+    ingredient_id,
+    name,
+    normalized_name,
+    store_section,
+    user_id=None,
+    allow_other_users=False,
+):
+    try:
+        ingredient_id = int(ingredient_id or 0)
+    except (TypeError, ValueError):
+        ingredient_id = 0
+    if ingredient_id <= 0:
+        return {"ok": False, "status": 400, "error": "Ingredient record is required."}
+
+    name = clean_text(name)[:160]
+    normalized_name = normalized_master_name(normalized_name or name)[:160]
+    section = clean_ingredient_store_section(store_section)
+    if not name:
+        return {"ok": False, "status": 400, "error": "Ingredient name is required."}
+    if not normalized_name:
+        return {"ok": False, "status": 400, "error": "Normalized name is required."}
+
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {"ok": False, "status": 404, "error": "Recipe master database was not found."}
+
+        params = [ingredient_id]
+        user_clause = ""
+        if not allow_other_users:
+            user_clause = "AND user_id = ?"
+            params.append(scoped_user_id)
+
+        row = connection.execute(
+            f"""
+            SELECT id, user_id, name, normalized_name, store_section
+              FROM ingredients
+             WHERE id = ?
+               {user_clause}
+            """,
+            params,
+        ).fetchone()
+        if not row:
+            return {"ok": False, "status": 404, "error": "Ingredient record was not found."}
+
+        duplicate = connection.execute(
+            """
+            SELECT id
+              FROM ingredients
+             WHERE user_id = ?
+               AND normalized_name = ?
+               AND id != ?
+            """,
+            (row["user_id"], normalized_name, int(row["id"])),
+        ).fetchone()
+        if duplicate:
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "That normalized ingredient already exists in this workspace.",
+            }
+
+        previous = {
+            "name": clean_text(row["name"]),
+            "normalized_name": normalized_master_name(row["normalized_name"]),
+            "store_section": clean_ingredient_store_section(row["store_section"]),
+        }
+        changed = (
+            previous["name"] != name
+            or previous["normalized_name"] != normalized_name
+            or previous["store_section"] != section
+        )
+        if changed:
+            connection.execute(
+                """
+                UPDATE ingredients
+                   SET name = ?,
+                       normalized_name = ?,
+                       store_section = ?,
+                       updated_at = ?
+                 WHERE id = ?
+                   AND user_id = ?
+                """,
+                (name, normalized_name, section, utc_now_iso(), int(row["id"]), row["user_id"]),
+            )
+
+        return {
+            "ok": True,
+            "changed": changed,
+            "ingredient_id": int(row["id"]),
+            "user_id": row["user_id"],
+            "name": name,
+            "normalized_name": normalized_name,
+            "store_section": section,
+            "previous": previous,
+        }
+
+
 def ingredient_master_records_for_items(items, user_id=None):
     scoped_user_id = scoped_recipe_user_id(user_id)
     ingredient_ids = set()

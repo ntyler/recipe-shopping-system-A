@@ -386,6 +386,49 @@ def test_list_master_records_searches_sorts_and_counts_usage(monkeypatch, tmp_pa
     assert master_data.count_equipment(user_id="user-a", equipment_section="BAKEWARE") == 1
 
 
+def test_update_ingredient_master_record_changes_identity_without_breaking_recipe_links(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    recipe_url = "https://example.com/master-edit"
+    master_data.sync_recipe_master_records(
+        recipe_url,
+        recipe_data={"ingredients": [
+            {"ingredient": "Onion", "store_section": "Produce"},
+            {"ingredient": "Garlic", "store_section": "Produce"},
+        ]},
+        user_id="user-a",
+    )
+    onion = master_data.master_record_for_name("ingredients", "user-a", "onion")
+    garlic = master_data.master_record_for_name("ingredients", "user-a", "garlic")
+
+    result = master_data.update_ingredient_master_record(
+        onion["id"],
+        "Yellow Onion",
+        "yellow onion",
+        "PRODUCE",
+        user_id="user-a",
+    )
+
+    renamed = master_data.master_record_for_name("ingredients", "user-a", "yellow onion")
+    recipe_rows = master_data.recipe_master_rows("recipe_ingredients", recipe_url, user_id="user-a")
+    assert result["ok"] is True
+    assert result["changed"] is True
+    assert renamed["id"] == onion["id"]
+    assert renamed["name"] == "Yellow Onion"
+    assert master_data.master_record_for_name("ingredients", "user-a", "onion") is None
+    assert any(row["ingredient_id"] == onion["id"] and row["name"] == "Yellow Onion" for row in recipe_rows)
+
+    duplicate = master_data.update_ingredient_master_record(
+        garlic["id"],
+        "Another Onion",
+        "yellow onion",
+        "PRODUCE",
+        user_id="user-a",
+    )
+    assert duplicate["ok"] is False
+    assert duplicate["status"] == 409
+    assert master_data.master_record_for_name("ingredients", "user-a", "garlic")["id"] == garlic["id"]
+
+
 def test_list_master_record_recipe_references_returns_usage_details(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     monkeypatch.setattr(master_data.storage_service, "USER_DATA_DIR", tmp_path / "users")
