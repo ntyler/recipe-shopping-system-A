@@ -41420,7 +41420,7 @@ function handleRecipeEditRowMenuOutsideClick(event) {
         && target.closest(
             ".recipe-edit-row-menu, .recipe-edit-row-menu-btn, "
             + "[data-recipe-edit-unit-trigger], [data-recipe-edit-store-section-trigger], "
-            + "[data-recipe-edit-type-trigger]"
+            + "[data-recipe-edit-type-trigger], [data-recipe-edit-ingredient-master-trigger]"
         )
     ) {
         return;
@@ -41439,7 +41439,8 @@ function handleRecipeEditRowMenuEscape(event) {
         + ".recipe-edit-section-menu-wrap button[aria-expanded=\"true\"], "
         + "[data-recipe-edit-unit-trigger][aria-expanded=\"true\"], "
         + "[data-recipe-edit-store-section-trigger][aria-expanded=\"true\"], "
-        + "[data-recipe-edit-type-trigger][aria-expanded=\"true\"]"
+        + "[data-recipe-edit-type-trigger][aria-expanded=\"true\"], "
+        + "[data-recipe-edit-ingredient-master-trigger][aria-expanded=\"true\"]"
     );
     event.preventDefault();
     closeRecipeEditRowMenus();

@@ -1045,6 +1045,12 @@ def test_ingredient_name_fields_use_the_normalized_master_data_picker():
     assert 'match_source: "ingredient master data"' in picker
     assert "Manage master ingredients" in picker
 
+    outside_click_start = script.index("function handleRecipeEditRowMenuOutsideClick")
+    outside_click_end = script.index("function handleRecipeEditRowMenuScrollOrResize", outside_click_start)
+    outside_click = script[outside_click_start:outside_click_end]
+    assert "[data-recipe-edit-ingredient-master-trigger]" in outside_click
+    assert '[data-recipe-edit-ingredient-master-trigger][aria-expanded=\\"true\\"]' in outside_click
+
     v43 = css[css.index("/* Ingredient editor v43:"):css.index("/* Keep expanded modal analysis")]
     assert ".recipe-edit-row-menu.recipe-edit-ingredient-master-menu" in v43
     assert ".recipe-edit-ingredient-master-option" in v43
