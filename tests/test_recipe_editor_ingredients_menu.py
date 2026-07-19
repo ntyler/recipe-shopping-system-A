@@ -1085,7 +1085,9 @@ def test_mobile_preparation_and_buy_as_fields_use_full_width_rows():
 
     v40_start = css.index("/* Ingredient editor v40:")
     v40 = css[v40_start:css.index("/* Keep expanded modal analysis", v40_start)]
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr)) !important;" in v40
     assert "grid-template-rows: 44px repeat(6, auto) !important;" in v40
+    assert "column-gap: 8px !important;" in v40
 
     for selector, row in (
         ("> .recipe-edit-ingredient-preparation-summary {", "grid-row: 5 !important;"),
@@ -1101,6 +1103,26 @@ def test_mobile_preparation_and_buy_as_fields_use_full_width_rows():
     options_end = v40.index("}", options_start)
     options = v40[options_start:options_end]
     assert "grid-row: 7 !important;" in options
+
+
+def test_mobile_detail_inputs_share_quantity_quiet_and_hover_colors():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    quiet_start = css.index(
+        "#recipeEditIngredients > .recipe-edit-ingredient-row .recipe-edit-ingredient-read-cell"
+    )
+    quiet_end = css.index(".recipe-edit-standalone-page .recipe-edit-ingredient-inline-control[aria-invalid", quiet_start)
+    quiet_styles = css[quiet_start:quiet_end]
+    for class_name in (
+        ".recipe-edit-ingredient-quantity-summary",
+        ".recipe-edit-ingredient-preparation-summary",
+        ".recipe-edit-ingredient-buy-as-summary",
+    ):
+        assert class_name in quiet_styles
+    assert "border-color: transparent;" in quiet_styles
+    assert "background: transparent;" in quiet_styles
+    assert "border-color: var(--app-border-strong);" in quiet_styles
+    assert "background: var(--app-bg-soft);" in quiet_styles
 
 
 def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
