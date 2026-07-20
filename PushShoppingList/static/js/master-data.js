@@ -1555,8 +1555,9 @@
                 throw new Error(data.error || data.message || "The last ingredient merge could not be undone.");
             }
             setMasterDataUndoMergeState(data.next_merge || null);
-            broadcastIngredientMasterDataMerge();
-            window.location.reload();
+            await refreshAfterMasterDataDuplicateMerge(
+                data.message || "Ingredient merge undone."
+            );
         } catch (error) {
             setMasterDataDuplicateStatus(
                 error.message || "The last ingredient merge could not be undone.",

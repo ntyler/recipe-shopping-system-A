@@ -1359,10 +1359,6 @@ def undo_ingredient_master_merge_route():
         f"{result.get('target_name')}; restored {restored_count} recipe "
         f"reference{'s' if restored_count != 1 else ''}."
     )
-    session["recipe_master_data_messages"] = [{
-        "category": "success",
-        "text": message,
-    }]
     return jsonify({
         **result,
         "success": True,
