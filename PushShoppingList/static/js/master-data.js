@@ -19,6 +19,8 @@
     let masterDataMergeReturnFocus = null;
     let masterDataDuplicateReferenceRequestId = 0;
     let masterDataDuplicateReferenceReturnFocus = null;
+    let masterDataDuplicateConfirmationResolve = null;
+    let masterDataDuplicateConfirmationReturnFocus = null;
 
     function text(value) {
         return String(value == null ? "" : value);
@@ -1395,6 +1397,156 @@
         els.status.classList.toggle("is-warning", kind === "warning");
     }
 
+    function masterDataDuplicateConfirmationElements() {
+        const dialog = document.querySelector("[data-master-duplicate-confirm-dialog]");
+        return {
+            dialog,
+            title: dialog && dialog.querySelector("[data-master-duplicate-confirm-title]"),
+            summary: dialog && dialog.querySelector("[data-master-duplicate-confirm-summary]"),
+            list: dialog && dialog.querySelector("[data-master-duplicate-confirm-list]"),
+            confirm: dialog && dialog.querySelector("[data-master-duplicate-confirm-accept]"),
+            cancelButtons: dialog ? dialog.querySelectorAll("[data-master-duplicate-confirm-cancel]") : [],
+        };
+    }
+
+    function finishMasterDataDuplicateConfirmation(confirmed) {
+        const els = masterDataDuplicateConfirmationElements();
+        const resolve = masterDataDuplicateConfirmationResolve;
+        const returnFocus = masterDataDuplicateConfirmationReturnFocus;
+        masterDataDuplicateConfirmationResolve = null;
+        masterDataDuplicateConfirmationReturnFocus = null;
+        if (els.dialog) {
+            if (els.dialog.open && typeof els.dialog.close === "function") {
+                els.dialog.close();
+            } else {
+                els.dialog.removeAttribute("open");
+            }
+        }
+        if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === "function") {
+            returnFocus.focus({ preventScroll: true });
+        }
+        if (resolve) resolve(Boolean(confirmed));
+    }
+
+    function confirmMasterDataDuplicateMerge(options = {}) {
+        const els = masterDataDuplicateConfirmationElements();
+        if (!els.dialog || !els.confirm) {
+            setMasterDataDuplicateStatus("The merge confirmation could not be opened. Reload and try again.", "error");
+            return Promise.resolve(false);
+        }
+        if (masterDataDuplicateConfirmationResolve) {
+            finishMasterDataDuplicateConfirmation(false);
+        }
+        if (els.title) els.title.textContent = text(options.title) || "Confirm ingredient merge";
+        if (els.summary) els.summary.textContent = text(options.summary);
+        if (els.list) {
+            els.list.replaceChildren();
+            (Array.isArray(options.items) ? options.items : []).forEach((item) => {
+                const row = document.createElement("li");
+                row.textContent = text(item);
+                els.list.appendChild(row);
+            });
+            els.list.hidden = !els.list.children.length;
+        }
+        els.confirm.textContent = text(options.confirmLabel) || "Merge ingredients";
+        masterDataDuplicateConfirmationReturnFocus = options.returnFocus || document.activeElement;
+        return new Promise((resolve) => {
+            masterDataDuplicateConfirmationResolve = resolve;
+            if (typeof els.dialog.showModal === "function") {
+                els.dialog.showModal();
+            } else {
+                els.dialog.setAttribute("open", "");
+            }
+            els.confirm.focus({ preventScroll: true });
+        });
+    }
+
+    function initMasterDataDuplicateConfirmation() {
+        const els = masterDataDuplicateConfirmationElements();
+        if (!els.dialog || els.dialog.dataset.confirmationBound === "true") return;
+        els.dialog.dataset.confirmationBound = "true";
+        Array.from(els.cancelButtons || []).forEach((button) => {
+            button.addEventListener("click", () => finishMasterDataDuplicateConfirmation(false));
+        });
+        els.confirm.addEventListener("click", () => finishMasterDataDuplicateConfirmation(true));
+        els.dialog.addEventListener("cancel", (event) => {
+            event.preventDefault();
+            finishMasterDataDuplicateConfirmation(false);
+        });
+        els.dialog.addEventListener("click", (event) => {
+            if (event.target === els.dialog) finishMasterDataDuplicateConfirmation(false);
+        });
+    }
+
+    async function refreshMasterDataRecordResults() {
+        const response = await fetch(window.location.href, {
+            headers: { Accept: "text/html", "X-Requested-With": "fetch" },
+        });
+        if (!response.ok) {
+            throw new Error("The ingredient table could not be refreshed.");
+        }
+        const html = await response.text();
+        const nextDocument = new DOMParser().parseFromString(html, "text/html");
+        const requiredSelectors = [
+            "[data-master-results-header]",
+            "[data-master-record-results]",
+            "[data-master-pagination]",
+        ];
+        requiredSelectors.forEach((selector) => {
+            const current = document.querySelector(selector);
+            const incoming = nextDocument.querySelector(selector);
+            if (!current || !incoming) {
+                throw new Error("The updated ingredient table was incomplete.");
+            }
+            current.replaceWith(incoming);
+        });
+
+        const currentSavePanel = document.querySelector("[data-master-store-section-panel]");
+        const incomingSavePanel = nextDocument.querySelector("[data-master-store-section-panel]");
+        if (currentSavePanel && incomingSavePanel) {
+            currentSavePanel.replaceWith(incomingSavePanel);
+        } else if (currentSavePanel) {
+            currentSavePanel.remove();
+        } else if (incomingSavePanel) {
+            const records = document.querySelector("[data-master-record-results]");
+            if (records) records.before(incomingSavePanel);
+        }
+
+        decorateMasterDataLightboxImages();
+        applyMasterDataThumbnailSize(masterDataThumbnailSize);
+        initMasterDataStoreSectionBatchSave();
+    }
+
+    function broadcastIngredientMasterDataMerge(plural = false) {
+        try {
+            if (window.localStorage) {
+                window.localStorage.setItem(INGREDIENT_MASTER_DATA_VERSION_STORAGE_KEY, String(Date.now()));
+            }
+        } catch (storageError) {
+            console.debug(`Unable to notify other tabs about the ingredient merge${plural ? "s" : ""}.`, storageError);
+        }
+    }
+
+    async function refreshAfterMasterDataDuplicateMerge(message, kind = "") {
+        broadcastIngredientMasterDataMerge();
+        let recordsError = null;
+        const [reviewsRefreshed] = await Promise.all([
+            loadMasterDataDuplicateReviews(),
+            refreshMasterDataRecordResults().catch((error) => {
+                recordsError = error;
+                console.warn("Unable to refresh ingredient master data in place.", error);
+            }),
+        ]);
+        if (recordsError || !reviewsRefreshed) {
+            setMasterDataDuplicateStatus(
+                `${message} Some on-page data could not update; refresh whenever convenient.`,
+                "warning"
+            );
+            return;
+        }
+        setMasterDataDuplicateStatus(message, kind);
+    }
+
     function masterDataDuplicateRequestContext() {
         const els = masterDataDuplicateElements();
         return {
@@ -1896,18 +2048,18 @@
                 `${card.dataset.suggestedSourceName} → ${card.dataset.suggestedTargetName}`
             ));
             if (selected.length > preview.length) preview.push(`...and ${selected.length - preview.length} more`);
-            const confirmed = window.confirm(
-                `Merge ${selected.length} selected duplicate pair${selected.length === 1 ? "" : "s"} `
-                + "into the suggested survivors?\n\n"
-                + preview.join("\n")
-                + "\n\nRecipe references will move and removed names will be kept as aliases."
-            );
+            const confirmed = await confirmMasterDataDuplicateMerge({
+                title: `Merge ${selected.length} selected duplicate pair${selected.length === 1 ? "" : "s"}?`,
+                summary: "Recipe references will move to each surviving ingredient. Removed names will remain as aliases.",
+                items: preview,
+                confirmLabel: selected.length === 1 ? "Merge ingredient" : `Merge ${selected.length} pairs`,
+                returnFocus: button,
+            });
             if (!confirmed) return;
         }
 
         setMasterDataDuplicateBulkBusy(true, action);
         setMasterDataDuplicateStatus(`Applying ${selected.length} selected review decisions...`);
-        let reloadScheduled = false;
         try {
             const response = await fetch(text(els.panel.dataset.bulkDecisionUrl), {
                 method: "POST",
@@ -1925,16 +2077,10 @@
                 throw new Error(data.error || data.message || "Bulk review decisions could not be applied.");
             }
             if (Number(data.merged_count) > 0) {
-                try {
-                    if (window.localStorage) {
-                        window.localStorage.setItem(INGREDIENT_MASTER_DATA_VERSION_STORAGE_KEY, String(Date.now()));
-                    }
-                } catch (storageError) {
-                    console.debug("Unable to notify other tabs about the ingredient merges.", storageError);
-                }
-                setMasterDataDuplicateStatus(data.message || "Bulk merge complete.");
-                reloadScheduled = true;
-                window.setTimeout(() => window.location.assign(window.location.href), 750);
+                await refreshAfterMasterDataDuplicateMerge(
+                    data.message || "Bulk merge complete.",
+                    Number(data.failed_count) > 0 ? "warning" : ""
+                );
                 return;
             }
             await loadMasterDataDuplicateReviews();
@@ -1945,7 +2091,7 @@
         } catch (error) {
             setMasterDataDuplicateStatus(error.message || "Bulk review decisions could not be applied.", "error");
         } finally {
-            if (!reloadScheduled) setMasterDataDuplicateBulkBusy(false);
+            setMasterDataDuplicateBulkBusy(false);
         }
     }
 
@@ -1960,7 +2106,7 @@
 
     async function loadMasterDataDuplicateReviews() {
         const els = masterDataDuplicateElements();
-        if (!els.panel || !els.list || els.panel.dataset.scope === "all") return;
+        if (!els.panel || !els.list || els.panel.dataset.scope === "all") return false;
         try {
             const response = await fetch(duplicateReviewsUrl(), {
                 headers: { Accept: "application/json", "X-Requested-With": "fetch" },
@@ -1975,9 +2121,11 @@
                     ? `${data.review_count} ingredient pair${data.review_count === 1 ? "" : "s"} waiting for your decision.`
                     : "No unresolved suggestions. Run a scan whenever your ingredient master data changes."
             );
+            return true;
         } catch (error) {
             renderMasterDataDuplicateReviews([]);
             setMasterDataDuplicateStatus(error.message || "Saved duplicate reviews could not be loaded.", "error");
+            return false;
         }
     }
 
@@ -2028,10 +2176,13 @@
                 setMasterDataDuplicateStatus("Save your pending ingredient edits before merging records.", "warning");
                 return;
             }
-            const confirmed = window.confirm(
-                `Merge “${text(button.dataset.sourceName)}” into “${text(button.dataset.targetName)}”? `
-                + "Recipe references will move to the surviving item and the removed name will be kept as an alias."
-            );
+            const confirmed = await confirmMasterDataDuplicateMerge({
+                title: `Merge “${text(button.dataset.sourceName)}” into “${text(button.dataset.targetName)}”?`,
+                summary: "Recipe references will move to the surviving ingredient. The removed name will remain as an alias.",
+                items: [`${text(button.dataset.sourceName)} → ${text(button.dataset.targetName)}`],
+                confirmLabel: `Merge into ${text(button.dataset.targetName)}`,
+                returnFocus: button,
+            });
             if (!confirmed) return;
         }
 
@@ -2058,14 +2209,7 @@
             }
             setMasterDataDuplicateStatus(data.message || "Review decision saved.");
             if (action === "merge") {
-                try {
-                    if (window.localStorage) {
-                        window.localStorage.setItem(INGREDIENT_MASTER_DATA_VERSION_STORAGE_KEY, String(Date.now()));
-                    }
-                } catch (storageError) {
-                    console.debug("Unable to notify other tabs about the ingredient merge.", storageError);
-                }
-                window.setTimeout(() => window.location.assign(window.location.href), 650);
+                await refreshAfterMasterDataDuplicateMerge(data.message || "Ingredient merge complete.");
                 return;
             }
             if (card) card.remove();
@@ -2082,6 +2226,7 @@
     function initMasterDataDuplicateReview() {
         const els = masterDataDuplicateElements();
         if (!els.panel) return;
+        initMasterDataDuplicateConfirmation();
         if (els.scan) els.scan.addEventListener("click", scanMasterDataDuplicates);
         if (els.selectHighConfidence) {
             els.selectHighConfidence.addEventListener("click", () => selectMasterDataDuplicateCards("high-confidence"));

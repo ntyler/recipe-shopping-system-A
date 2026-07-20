@@ -992,6 +992,11 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-duplicate-reference-column",
         "data-master-duplicate-reference-pair-name",
         "ingredient_reference_url",
+        "data-master-duplicate-confirm-dialog",
+        "data-master-duplicate-confirm-accept",
+        "data-master-record-results",
+        "data-master-results-header",
+        "data-master-pagination",
     ):
         assert marker in template
     assert "Find Potential Duplicates" in template
@@ -1007,11 +1012,19 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "async function loadMasterDataDuplicateReferenceColumn(column, record, requestId)" in script
     assert "async function openMasterDataDuplicateReferences(button)" in script
     assert "function closeMasterDataDuplicateReferences()" in script
+    assert "function confirmMasterDataDuplicateMerge(options = {})" in script
+    assert "function refreshMasterDataRecordResults()" in script
+    assert "async function refreshAfterMasterDataDuplicateMerge(message, kind = \"\")" in script
     assert "data-master-duplicate-references-open" in script
     assert 'url.searchParams.set("limit", "500")' in script
     assert 'card.dataset.highConfidenceDuplicate' in script
     assert 'button.closest(".master-data-duplicate-card")' in script
-    assert "window.confirm(" in script
+    duplicate_review_block = script[
+        script.index("function masterDataDuplicateElements()"):
+        script.index("function renderProgress(")
+    ]
+    assert "window.confirm(" not in duplicate_review_block
+    assert "window.location.assign(window.location.href)" not in duplicate_review_block
     assert "initMasterDataDuplicateReview();" in script
     assert ".master-data-duplicate-review" in css
     assert ".master-data-duplicate-comparison" in css
@@ -1023,6 +1036,8 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-reference-dialog" in css
     assert ".master-data-reference-dialog-comparison" in css
     assert ".master-data-reference-column.is-suggested" in css
+    assert ".master-data-duplicate-confirm-dialog" in css
+    assert ".master-data-duplicate-confirm-footer button.primary" in css
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);" in css
     assert ".master-data-duplicate-scan-actions button" in css

@@ -27016,6 +27016,58 @@ img[data-deferred-src] {
             font-weight: 850;
         }
 
+        .master-data-duplicate-confirm-dialog {
+            width: min(560px, calc(100vw - 24px));
+            max-width: 560px;
+        }
+
+        .master-data-duplicate-confirm-shell {
+            grid-template-rows: auto minmax(0, 1fr) auto;
+        }
+
+        .master-data-duplicate-confirm-body {
+            display: grid;
+            gap: 12px;
+        }
+
+        .master-data-duplicate-confirm-body ul {
+            display: grid;
+            gap: 7px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .master-data-duplicate-confirm-body li {
+            padding: 9px 11px;
+            border: 1px solid #2d8f70;
+            border-radius: 7px;
+            background: #0d2922;
+            color: #d1fae5;
+            font-size: 12px;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-duplicate-confirm-body p {
+            margin: 0;
+            color: #aebdca;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .master-data-duplicate-confirm-footer > div {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .master-data-duplicate-confirm-footer button.primary {
+            border-color: #20a873;
+            background: #0b6542;
+            color: #fff;
+        }
+
         .master-data-merge-dialog {
             width: min(620px, calc(100vw - 24px));
             max-width: 620px;

@@ -503,9 +503,46 @@
                     </footer>
                 </div>
             </dialog>
+
+            <dialog id="masterDataDuplicateConfirmDialog"
+                    class="master-data-reference-dialog master-data-duplicate-confirm-dialog"
+                    data-master-duplicate-confirm-dialog
+                    aria-labelledby="masterDataDuplicateConfirmTitle"
+                    aria-describedby="masterDataDuplicateConfirmSummary">
+                <div class="master-data-reference-dialog-shell master-data-duplicate-confirm-shell">
+                    <header class="master-data-reference-dialog-header">
+                        <div>
+                            <span>Confirm merge</span>
+                            <h2 id="masterDataDuplicateConfirmTitle"
+                                data-master-duplicate-confirm-title>Confirm ingredient merge</h2>
+                            <p id="masterDataDuplicateConfirmSummary"
+                               data-master-duplicate-confirm-summary></p>
+                        </div>
+                        <button type="button"
+                                class="master-data-reference-dialog-close"
+                                data-master-duplicate-confirm-cancel
+                                aria-label="Cancel ingredient merge">&times;</button>
+                    </header>
+                    <div class="master-data-reference-dialog-body master-data-duplicate-confirm-body">
+                        <ul data-master-duplicate-confirm-list></ul>
+                        <p>
+                            This combines the ingredient records. Recipe references will be reassigned and the removed names will be kept as aliases.
+                        </p>
+                    </div>
+                    <footer class="master-data-reference-dialog-footer master-data-duplicate-confirm-footer">
+                        <span>You stay on this page after the merge.</span>
+                        <div>
+                            <button type="button" data-master-duplicate-confirm-cancel>Cancel</button>
+                            <button type="button"
+                                    class="primary"
+                                    data-master-duplicate-confirm-accept>Merge ingredients</button>
+                        </div>
+                    </footer>
+                </div>
+            </dialog>
         {% endif %}
 
-        <div class="master-data-results-header">
+        <div class="master-data-results-header" data-master-results-header>
             <div class="master-data-results-summary" aria-live="polite">
                 {% if master_data.total_count %}
                     Showing {{ master_data.offset + 1 }}-{{ master_data.offset + (master_data.rows|length) }} of {{ master_data.total_count }} {{ master_data.empty_label }}.
@@ -540,26 +577,27 @@
             </div>
         </div>
 
-        {% if master_data.rows %}
-            {% if master_data.record_type == 'ingredients' %}
-                <section class="master-data-store-section-save-panel"
-                         data-master-store-section-panel
-                         data-master-record-save-panel
-                         aria-live="polite">
-                    <div>
-                        <strong data-master-store-section-summary data-master-record-save-summary>No ingredient changes</strong>
-                        <span data-master-store-section-detail data-master-record-save-detail>Edit ingredient names, normalized names, or store sections, then save all pending changes here.</span>
-                    </div>
-                    <button type="button"
-                            data-master-store-section-save
-                            data-master-record-save
-                            disabled>
-                        Save Changes
-                    </button>
-                </section>
-            {% endif %}
-            <div class="master-data-table-wrap">
-                <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}">
+        {% if master_data.rows and master_data.record_type == 'ingredients' %}
+            <section class="master-data-store-section-save-panel"
+                     data-master-store-section-panel
+                     data-master-record-save-panel
+                     aria-live="polite">
+                <div>
+                    <strong data-master-store-section-summary data-master-record-save-summary>No ingredient changes</strong>
+                    <span data-master-store-section-detail data-master-record-save-detail>Edit ingredient names, normalized names, or store sections, then save all pending changes here.</span>
+                </div>
+                <button type="button"
+                        data-master-store-section-save
+                        data-master-record-save
+                        disabled>
+                    Save Changes
+                </button>
+            </section>
+        {% endif %}
+        <div data-master-record-results>
+            {% if master_data.rows %}
+                <div class="master-data-table-wrap">
+                    <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}">
                     <thead>
                         <tr>
                             <th scope="col">Item</th>
@@ -590,13 +628,14 @@
                             {% endfor %}
                         {% endif %}
                     </tbody>
-                </table>
-            </div>
-        {% elif master_data.db_status.exists %}
-            <div class="master-data-empty-state">
-                No matching {{ master_data.empty_label }} records were found for this scope.
-            </div>
-        {% endif %}
+                    </table>
+                </div>
+            {% elif master_data.db_status.exists %}
+                <div class="master-data-empty-state">
+                    No matching {{ master_data.empty_label }} records were found for this scope.
+                </div>
+            {% endif %}
+        </div>
 
         {% if master_data.record_type == 'ingredients' and master_data.rows %}
             <dialog id="masterDataIngredientMergeDialog"
@@ -663,7 +702,7 @@
             </dialog>
         {% endif %}
 
-        <div class="master-data-pagination">
+        <div class="master-data-pagination" data-master-pagination>
             {% if master_data.prev_url %}
                 <a href="{{ master_data.prev_url }}">Previous</a>
             {% else %}
