@@ -989,6 +989,8 @@ def test_master_data_duplicate_review_ui_is_wired():
         "master-data-duplicate-scan-actions",
         "data-master-duplicate-reference-dialog",
         "data-master-duplicate-reference-body",
+        "data-master-duplicate-reference-column",
+        "data-master-duplicate-reference-pair-name",
         "ingredient_reference_url",
     ):
         assert marker in template
@@ -1000,6 +1002,9 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "async function applyMasterDataDuplicateBulkAction(button)" in script
     assert "function updateMasterDataDuplicateSelectionState()" in script
     assert "function masterDataDuplicateReferenceUrl(ingredientId)" in script
+    assert "function masterDataDuplicateReferenceRecord(button, side)" in script
+    assert "function renderMasterDataDuplicateReferenceColumn(column, data)" in script
+    assert "async function loadMasterDataDuplicateReferenceColumn(column, record, requestId)" in script
     assert "async function openMasterDataDuplicateReferences(button)" in script
     assert "function closeMasterDataDuplicateReferences()" in script
     assert "data-master-duplicate-references-open" in script
@@ -1016,6 +1021,9 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-duplicate-ingredient-open" in css
     assert ".master-data-duplicate-view-references" in css
     assert ".master-data-reference-dialog" in css
+    assert ".master-data-reference-dialog-comparison" in css
+    assert ".master-data-reference-column.is-suggested" in css
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);" in css
     assert ".master-data-duplicate-scan-actions button" in css
     assert "Nothing is merged automatically." in template

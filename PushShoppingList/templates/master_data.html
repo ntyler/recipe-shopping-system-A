@@ -459,23 +459,46 @@
                 <div class="master-data-reference-dialog-shell">
                     <header class="master-data-reference-dialog-header">
                         <div>
-                            <span>Ingredient usage</span>
-                            <h2 id="masterDataIngredientReferencesTitle">
-                                Recipes using <span data-master-duplicate-reference-name>this ingredient</span>
+                            <span>Recipe impact comparison</span>
+                            <h2 id="masterDataIngredientReferencesTitle" class="master-data-reference-dialog-pair">
+                                <span data-master-duplicate-reference-pair-name="left">Ingredient A</span>
+                                <small>vs</small>
+                                <span data-master-duplicate-reference-pair-name="right">Ingredient B</span>
                             </h2>
                             <p id="masterDataIngredientReferencesContext"
-                               data-master-duplicate-reference-context></p>
+                               data-master-duplicate-reference-summary>
+                                Compare every recipe using either ingredient before making a decision.
+                            </p>
                         </div>
                         <button type="button"
                                 class="master-data-reference-dialog-close"
                                 data-master-duplicate-reference-close
                                 aria-label="Close recipe usage dialog">&times;</button>
                     </header>
-                    <div class="master-data-reference-dialog-body"
-                         data-master-duplicate-reference-body
-                         aria-live="polite"></div>
+                    <div class="master-data-reference-dialog-body">
+                        <div class="master-data-reference-dialog-comparison">
+                            {% for side, label in [('left', 'Ingredient A'), ('right', 'Ingredient B')] %}
+                                <section class="master-data-reference-column"
+                                         data-master-duplicate-reference-column="{{ side }}">
+                                    <header class="master-data-reference-column-header">
+                                        <div>
+                                            <span>{{ label }}</span>
+                                            <h3 data-master-duplicate-reference-name="{{ side }}">{{ label }}</h3>
+                                            <p data-master-duplicate-reference-context="{{ side }}"></p>
+                                        </div>
+                                        <span class="master-data-reference-survivor"
+                                              data-master-duplicate-reference-survivor
+                                              hidden>Suggested survivor</span>
+                                    </header>
+                                    <div class="master-data-reference-column-body"
+                                         data-master-duplicate-reference-body="{{ side }}"
+                                         aria-live="polite"></div>
+                                </section>
+                            {% endfor %}
+                        </div>
+                    </div>
                     <footer class="master-data-reference-dialog-footer">
-                        <span>Read-only recipe references for this workspace.</span>
+                        <span>Review-only preview. Merge actions remain on the duplicate card.</span>
                         <button type="button" data-master-duplicate-reference-close>Close</button>
                     </footer>
                 </div>

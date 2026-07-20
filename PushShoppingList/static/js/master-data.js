@@ -1418,12 +1418,34 @@
 
     function masterDataDuplicateReferenceElements() {
         const dialog = document.querySelector("[data-master-duplicate-reference-dialog]");
+        const column = (side) => {
+            const element = dialog && dialog.querySelector(`[data-master-duplicate-reference-column="${side}"]`);
+            return {
+                element,
+                pairName: dialog && dialog.querySelector(`[data-master-duplicate-reference-pair-name="${side}"]`),
+                name: element && element.querySelector(`[data-master-duplicate-reference-name="${side}"]`),
+                context: element && element.querySelector(`[data-master-duplicate-reference-context="${side}"]`),
+                body: element && element.querySelector(`[data-master-duplicate-reference-body="${side}"]`),
+                survivor: element && element.querySelector("[data-master-duplicate-reference-survivor]"),
+            };
+        };
         return {
             dialog,
-            name: dialog && dialog.querySelector("[data-master-duplicate-reference-name]"),
-            context: dialog && dialog.querySelector("[data-master-duplicate-reference-context]"),
-            body: dialog && dialog.querySelector("[data-master-duplicate-reference-body]"),
+            summary: dialog && dialog.querySelector("[data-master-duplicate-reference-summary]"),
+            left: column("left"),
+            right: column("right"),
             closeButtons: dialog ? dialog.querySelectorAll("[data-master-duplicate-reference-close]") : [],
+        };
+    }
+
+    function masterDataDuplicateReferenceRecord(button, side) {
+        const prefix = side === "right" ? "right" : "left";
+        return {
+            ingredientId: Number(button && button.dataset[`${prefix}IngredientId`]) || 0,
+            name: text(button && button.dataset[`${prefix}IngredientName`]).trim() || "Ingredient",
+            normalizedName: text(button && button.dataset[`${prefix}NormalizedName`]).trim(),
+            storeSection: text(button && button.dataset[`${prefix}StoreSection`]).trim(),
+            usageCount: Math.max(0, Number(button && button.dataset[`${prefix}UsageCount`]) || 0),
         };
     }
 
@@ -1438,13 +1460,64 @@
         return url.toString();
     }
 
+    function renderMasterDataDuplicateReferenceColumn(column, data) {
+        if (!column || !column.body) return;
+        column.body.replaceChildren();
+        const references = Array.isArray(data && data.references) ? data.references : [];
+        const total = Number(data && data.total) || references.length;
+        if (column.context) {
+            const storeSection = text(data && data.record && data.record.store_section).trim();
+            column.context.textContent = [storeSection, duplicateUsageLabel(total)].filter(Boolean).join(" · ");
+        }
+        if (!references.length) {
+            const empty = document.createElement("div");
+            empty.className = "master-data-reference-placeholder";
+            empty.textContent = "No recipe references were found for this ingredient.";
+            column.body.appendChild(empty);
+            return;
+        }
+        if (total > references.length) {
+            const note = document.createElement("div");
+            note.className = "master-data-reference-placeholder";
+            note.textContent = `Showing the first ${references.length} of ${total} recipes.`;
+            column.body.appendChild(note);
+        }
+        const list = document.createElement("div");
+        list.className = "master-data-reference-list";
+        references.forEach((reference) => list.appendChild(renderReferenceItem(reference || {})));
+        column.body.appendChild(list);
+        decorateMasterDataLightboxImages(column.body);
+    }
+
+    async function loadMasterDataDuplicateReferenceColumn(column, record, requestId) {
+        try {
+            const response = await fetch(masterDataDuplicateReferenceUrl(record.ingredientId), {
+                headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (requestId !== masterDataDuplicateReferenceRequestId) return;
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "Recipe references could not be loaded.");
+            }
+            renderMasterDataDuplicateReferenceColumn(column, data);
+        } catch (error) {
+            if (requestId !== masterDataDuplicateReferenceRequestId) return;
+            setReferenceError(
+                column.body,
+                error && error.message ? error.message : "Recipe references could not be loaded."
+            );
+        }
+    }
+
     function closeMasterDataDuplicateReferences() {
         const els = masterDataDuplicateReferenceElements();
         masterDataDuplicateReferenceRequestId += 1;
         if (els.dialog && els.dialog.open) {
             els.dialog.close();
         }
-        if (els.body) els.body.replaceChildren();
+        [els.left, els.right].forEach((column) => {
+            if (column && column.body) column.body.replaceChildren();
+        });
         const returnFocus = masterDataDuplicateReferenceReturnFocus;
         masterDataDuplicateReferenceReturnFocus = null;
         if (returnFocus && returnFocus.isConnected) returnFocus.focus();
@@ -1452,19 +1525,31 @@
 
     async function openMasterDataDuplicateReferences(button) {
         const els = masterDataDuplicateReferenceElements();
-        const ingredientId = Number(button && button.dataset.ingredientId) || 0;
-        if (!els.dialog || !els.body || !ingredientId) return;
+        const leftRecord = masterDataDuplicateReferenceRecord(button, "left");
+        const rightRecord = masterDataDuplicateReferenceRecord(button, "right");
+        if (!els.dialog || !leftRecord.ingredientId || !rightRecord.ingredientId) return;
 
-        const ingredientName = text(button.dataset.ingredientName).trim() || "this ingredient";
-        const storeSection = text(button.dataset.storeSection).trim();
-        const usageCount = Math.max(0, Number(button.dataset.usageCount) || 0);
-        if (els.name) els.name.textContent = ingredientName;
-        if (els.context) {
-            els.context.textContent = [storeSection, duplicateUsageLabel(usageCount)]
-                .filter(Boolean)
-                .join(" · ");
+        const suggestedTargetId = Number(button.dataset.suggestedTargetId) || 0;
+        [[els.left, leftRecord], [els.right, rightRecord]].forEach(([column, record]) => {
+            if (column.pairName) column.pairName.textContent = record.name;
+            if (column.name) column.name.textContent = record.name;
+            if (column.context) {
+                column.context.textContent = [record.storeSection, duplicateUsageLabel(record.usageCount)]
+                    .filter(Boolean)
+                    .join(" · ");
+            }
+            if (column.element) {
+                column.element.classList.toggle("is-suggested", record.ingredientId === suggestedTargetId);
+            }
+            if (column.survivor) column.survivor.hidden = record.ingredientId !== suggestedTargetId;
+            setReferenceLoading(column.body);
+        });
+        if (els.summary) {
+            const confidence = Math.round((Number(button.dataset.reviewConfidence) || 0) * 100);
+            const classification = duplicateClassificationLabel(button.dataset.reviewClassification);
+            const combinedUsage = leftRecord.usageCount + rightRecord.usageCount;
+            els.summary.textContent = `${classification} · ${confidence}% confidence · ${duplicateUsageLabel(combinedUsage)} total`;
         }
-        setReferenceLoading(els.body);
         masterDataDuplicateReferenceReturnFocus = button;
         if (!els.dialog.open) {
             if (typeof els.dialog.showModal === "function") {
@@ -1475,26 +1560,13 @@
         }
 
         const requestId = ++masterDataDuplicateReferenceRequestId;
-        try {
-            const response = await fetch(masterDataDuplicateReferenceUrl(ingredientId), {
-                headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-            });
-            const data = await response.json().catch(() => ({}));
-            if (requestId !== masterDataDuplicateReferenceRequestId) return;
-            if (!response.ok || data.ok === false) {
-                throw new Error(data.error || data.message || "Recipe references could not be loaded.");
-            }
-            renderReferences(els.body, data);
-        } catch (error) {
-            if (requestId !== masterDataDuplicateReferenceRequestId) return;
-            setReferenceError(
-                els.body,
-                error && error.message ? error.message : "Recipe references could not be loaded."
-            );
-        }
+        await Promise.all([
+            loadMasterDataDuplicateReferenceColumn(els.left, leftRecord, requestId),
+            loadMasterDataDuplicateReferenceColumn(els.right, rightRecord, requestId),
+        ]);
     }
 
-    function masterDataDuplicateIngredient(record, suggestedTargetId) {
+    function masterDataDuplicateIngredient(record, suggestedTargetId, review) {
         const item = document.createElement("article");
         item.className = "master-data-duplicate-ingredient";
         if (Number(record.ingredient_id) === Number(suggestedTargetId)) {
@@ -1505,13 +1577,23 @@
         openButton.type = "button";
         openButton.className = "master-data-duplicate-ingredient-open";
         openButton.dataset.masterDuplicateReferencesOpen = "1";
-        openButton.dataset.ingredientId = text(record.ingredient_id);
-        openButton.dataset.ingredientName = text(record.name);
-        openButton.dataset.storeSection = text(record.store_section);
-        openButton.dataset.usageCount = text(record.usage_count);
+        ["left", "right"].forEach((side) => {
+            const pairRecord = review && review[side] ? review[side] : {};
+            openButton.dataset[`${side}IngredientId`] = text(pairRecord.ingredient_id);
+            openButton.dataset[`${side}IngredientName`] = text(pairRecord.name);
+            openButton.dataset[`${side}NormalizedName`] = text(pairRecord.normalized_name);
+            openButton.dataset[`${side}StoreSection`] = text(pairRecord.store_section);
+            openButton.dataset[`${side}UsageCount`] = text(pairRecord.usage_count);
+        });
+        openButton.dataset.suggestedTargetId = text(suggestedTargetId);
+        openButton.dataset.reviewClassification = text(review && review.classification);
+        openButton.dataset.reviewConfidence = text(review && review.confidence);
         openButton.setAttribute("aria-haspopup", "dialog");
         openButton.setAttribute("aria-controls", "masterDataIngredientReferencesDialog");
-        openButton.setAttribute("aria-label", `View recipes using ${text(record.name)}`);
+        openButton.setAttribute(
+            "aria-label",
+            `Compare recipes using ${text(review && review.left && review.left.name)} and ${text(review && review.right && review.right.name)}`
+        );
 
         const media = document.createElement("span");
         media.className = "master-data-duplicate-media";
@@ -1542,7 +1624,7 @@
         detail.textContent = `${text(record.store_section)} · ${duplicateUsageLabel(record.usage_count)}`;
         const viewRecipes = document.createElement("span");
         viewRecipes.className = "master-data-duplicate-view-references";
-        viewRecipes.textContent = "View recipes";
+        viewRecipes.textContent = "Compare recipes";
         copy.append(heading, normalized, detail, viewRecipes);
         const aliases = Array.isArray(record.aliases) ? record.aliases.filter(Boolean) : [];
         if (aliases.length) {
@@ -1609,8 +1691,8 @@
         const comparison = document.createElement("div");
         comparison.className = "master-data-duplicate-comparison";
         comparison.append(
-            masterDataDuplicateIngredient(review.left, review.suggested_target_id),
-            masterDataDuplicateIngredient(review.right, review.suggested_target_id)
+            masterDataDuplicateIngredient(review.left, review.suggested_target_id, review),
+            masterDataDuplicateIngredient(review.right, review.suggested_target_id, review)
         );
 
         const reason = document.createElement("p");

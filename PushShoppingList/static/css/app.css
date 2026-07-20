@@ -26795,8 +26795,8 @@ img[data-deferred-src] {
         }
 
         .master-data-reference-dialog {
-            width: min(760px, calc(100vw - 24px));
-            max-width: 760px;
+            width: min(1120px, calc(100vw - 24px));
+            max-width: 1120px;
             max-height: min(820px, calc(100dvh - 24px));
             padding: 0;
             overflow: hidden;
@@ -26853,8 +26853,22 @@ img[data-deferred-src] {
             overflow-wrap: anywhere;
         }
 
-        .master-data-reference-dialog-header h2 span {
+        .master-data-reference-dialog-pair {
+            display: flex;
+            align-items: baseline;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .master-data-reference-dialog-pair span {
             color: #a7f3d0;
+        }
+
+        .master-data-reference-dialog-pair small {
+            color: #7f93a3;
+            font-size: 12px;
+            font-weight: 850;
+            text-transform: uppercase;
         }
 
         .master-data-reference-dialog-header p {
@@ -26881,13 +26895,100 @@ img[data-deferred-src] {
         }
 
         .master-data-reference-dialog-body {
-            display: grid;
-            align-content: start;
             min-height: 120px;
-            gap: 10px;
             padding: 14px 16px;
             overflow-y: auto;
             background: #081320;
+        }
+
+        .master-data-reference-dialog-comparison {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            align-items: start;
+            gap: 12px;
+        }
+
+        .master-data-reference-column {
+            display: grid;
+            min-width: 0;
+            align-content: start;
+            overflow: hidden;
+            border: 1px solid #334a5b;
+            border-radius: 9px;
+            background: #07111c;
+        }
+
+        .master-data-reference-column.is-suggested {
+            border-color: #2d8f70;
+            box-shadow: 0 0 0 1px rgba(45, 143, 112, .18);
+        }
+
+        .master-data-reference-column-header {
+            display: flex;
+            min-width: 0;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 11px 12px;
+            border-bottom: 1px solid #243a50;
+            background: #0d1b24;
+        }
+
+        .master-data-reference-column.is-suggested .master-data-reference-column-header {
+            background: #0d2922;
+        }
+
+        .master-data-reference-column-header > div {
+            display: grid;
+            min-width: 0;
+            gap: 3px;
+        }
+
+        .master-data-reference-column-header > div > span {
+            color: #9fb3c8;
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+        }
+
+        .master-data-reference-column-header h3 {
+            margin: 0;
+            color: #f8fafc;
+            font-size: 15px;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-reference-column-header p {
+            margin: 0;
+            color: #aebdca;
+            font-size: 10px;
+            font-weight: 750;
+        }
+
+        .master-data-reference-survivor {
+            flex: 0 0 auto;
+            padding: 4px 7px;
+            border: 1px solid #2d8f70;
+            border-radius: 999px;
+            background: #0f3328;
+            color: #a7f3d0;
+            font-size: 8px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .master-data-reference-column-body {
+            display: grid;
+            min-height: 90px;
+            align-content: start;
+            gap: 8px;
+            padding: 10px;
+        }
+
+        .master-data-reference-column-body .master-data-reference-item {
+            padding: 8px;
         }
 
         .master-data-reference-dialog-footer {
@@ -26901,6 +27002,9 @@ img[data-deferred-src] {
         }
 
         .master-data-reference-dialog-footer button {
+            width: auto;
+            min-width: 96px;
+            flex: 0 0 auto;
             min-height: 34px;
             margin: 0;
             padding: 6px 14px;
@@ -27230,6 +27334,10 @@ img[data-deferred-src] {
 
             .master-data-duplicate-actions {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .master-data-reference-dialog-comparison {
+                grid-template-columns: 1fr;
             }
 
             .master-data-backfill-form,
