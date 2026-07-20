@@ -26569,6 +26569,10 @@ img[data-deferred-src] {
             box-shadow: 0 0 0 2px rgba(52, 211, 153, .14);
         }
 
+        .master-data-duplicate-card.has-data-quality-warning {
+            border-color: #b7791f;
+        }
+
         .master-data-duplicate-card[aria-busy="true"] {
             opacity: .62;
         }
@@ -26743,6 +26747,24 @@ img[data-deferred-src] {
             line-height: 1.45;
         }
 
+        .master-data-duplicate-quality-warning {
+            display: grid;
+            gap: 3px;
+            padding: 9px 10px;
+            border: 1px solid #a86f18;
+            border-radius: 7px;
+            background: rgba(120, 74, 10, .22);
+            color: #fde68a;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .master-data-duplicate-quality-warning strong {
+            color: #fcd34d;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
         .master-data-duplicate-signals,
         .master-data-duplicate-actions {
             display: flex;
@@ -26792,6 +26814,11 @@ img[data-deferred-src] {
         .master-data-duplicate-actions button:disabled {
             cursor: wait;
             opacity: .55;
+        }
+
+        .master-data-duplicate-card.has-data-quality-warning
+        .master-data-duplicate-actions button[data-master-duplicate-decision="merge"]:disabled {
+            cursor: not-allowed;
         }
 
         .master-data-reference-dialog {

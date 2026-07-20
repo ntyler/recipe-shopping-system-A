@@ -1369,16 +1369,48 @@
         };
     }
 
+    function formatMasterDataDuplicateScanTime(value) {
+        const date = new Date(text(value));
+        if (Number.isNaN(date.getTime())) return "";
+        return date.toLocaleString([], {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+        });
+    }
+
+    function masterDataDuplicateScanSuffix(scan) {
+        const label = formatMasterDataDuplicateScanTime(scan && scan.scanned_at);
+        return label ? ` Last scanned ${label}.` : "";
+    }
+
+    function updateMasterDataDuplicateScanState(scan) {
+        const els = masterDataDuplicateElements();
+        if (!els.panel || !scan || !scan.scanned_at) return;
+        els.panel.dataset.lastScanAt = text(scan.scanned_at);
+        if (els.scan && els.panel.getAttribute("aria-busy") !== "true") {
+            els.scan.textContent = "Rescan Potential Duplicates";
+        }
+    }
+
     function setMasterDataDuplicateBusy(busy, message = "") {
         const els = masterDataDuplicateElements();
         if (!els.panel) return;
         els.panel.setAttribute("aria-busy", busy ? "true" : "false");
         if (els.scan) {
             els.scan.disabled = busy || els.panel.dataset.scope === "all";
-            els.scan.textContent = busy ? "Reviewing ingredient pairs..." : "Find Potential Duplicates";
+            els.scan.textContent = busy
+                ? "Reviewing ingredient pairs..."
+                : (els.panel.dataset.lastScanAt ? "Rescan Potential Duplicates" : "Find Potential Duplicates");
         }
         masterDataDuplicateCards().forEach((card) => {
-            card.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
+            card.querySelectorAll("button").forEach((button) => {
+                const blockedMerge = card.dataset.mergeBlocked === "true"
+                    && button.dataset.masterDuplicateDecision === "merge";
+                button.disabled = busy || blockedMerge;
+            });
         });
         if (message && els.status) {
             els.status.textContent = message;
@@ -1758,8 +1790,11 @@
         card.dataset.classification = text(review.classification).toLowerCase();
         card.dataset.confidence = text(review.confidence || 0);
         card.dataset.suggestedTargetId = text(review.suggested_target_id || "");
+        card.dataset.mergeBlocked = text(Boolean(review.merge_blocked));
+        if (review.merge_blocked) card.classList.add("has-data-quality-warning");
         card.dataset.highConfidenceDuplicate = text(Boolean(
-            review.classification === "duplicate"
+            !review.merge_blocked
+            && review.classification === "duplicate"
             && Number(review.confidence) >= 0.98
             && review.signals
             && (review.signals.singular_exact || review.signals.alias_match)
@@ -1795,6 +1830,25 @@
         reason.className = "master-data-duplicate-reason";
         reason.textContent = text(review.reason) || "These names have overlapping ingredient signals.";
 
+        let dataQualityWarning = null;
+        if (review.merge_blocked) {
+            const issues = Array.isArray(review.data_quality_issues) ? review.data_quality_issues : [];
+            const examples = issues
+                .map((issue) => text(issue && issue.message).trim())
+                .filter(Boolean)
+                .slice(0, 3);
+            dataQualityWarning = document.createElement("div");
+            dataQualityWarning.className = "master-data-duplicate-quality-warning";
+            dataQualityWarning.setAttribute("role", "status");
+            const warningTitle = document.createElement("strong");
+            warningTitle.textContent = "Needs data repair";
+            const warningCopy = document.createElement("span");
+            warningCopy.textContent = examples.length
+                ? `${examples.join(" ")} Merge actions are disabled until these recipe references are repaired.`
+                : "Suspicious recipe references must be repaired before this pair can be merged.";
+            dataQualityWarning.append(warningTitle, warningCopy);
+        }
+
         const signals = document.createElement("div");
         signals.className = "master-data-duplicate-signals";
         const signalLabels = [];
@@ -1826,6 +1880,12 @@
         const mergeAlternate = masterDataDuplicateAction(`Merge into ${alternate.name}`, "merge", review, alternate);
         mergeSuggested.setAttribute("aria-pressed", "true");
         mergeAlternate.setAttribute("aria-pressed", "false");
+        if (review.merge_blocked) {
+            [mergeSuggested, mergeAlternate].forEach((mergeButton) => {
+                mergeButton.disabled = true;
+                mergeButton.title = "Repair the suspicious recipe references before merging this pair.";
+            });
+        }
         const related = masterDataDuplicateAction(
             "Related variant",
             "related",
@@ -1848,6 +1908,7 @@
             actions.append(mergeSuggested, mergeAlternate, related, notDuplicate);
         }
         card.append(header, comparison, reason);
+        if (dataQualityWarning) card.appendChild(dataQualityWarning);
         if (signalLabels.length) card.appendChild(signals);
         card.appendChild(actions);
         return card;
@@ -1913,10 +1974,13 @@
         });
         Array.from(els.bulkActions || []).forEach((button) => {
             const action = text(button.dataset.masterDuplicateBulkAction).trim();
+            const includesBlockedMerge = selected.some((card) => card.dataset.mergeBlocked === "true");
             const includesUnsafeMerge = selected.some((card) => card.dataset.highConfidenceDuplicate !== "true");
             button.disabled = busy || !selected.length || (action === "merge" && includesUnsafeMerge);
             if (action === "merge") {
-                button.title = includesUnsafeMerge
+                button.title = includesBlockedMerge
+                    ? "Repair suspicious recipe references before bulk merging these pairs."
+                    : includesUnsafeMerge
                     ? "Bulk merge is available only for ≥98% singular/plural or alias matches."
                     : "Merge each selected pair into its suggested survivor.";
             }
@@ -1961,7 +2025,11 @@
         els.panel.setAttribute("aria-busy", busy ? "true" : "false");
         if (els.scan) els.scan.disabled = busy || els.panel.dataset.scope === "all";
         masterDataDuplicateCards().forEach((card) => {
-            card.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
+            card.querySelectorAll("button").forEach((button) => {
+                const blockedMerge = card.dataset.mergeBlocked === "true"
+                    && button.dataset.masterDuplicateDecision === "merge";
+                button.disabled = busy || blockedMerge;
+            });
         });
         Array.from(els.bulkActions || []).forEach((button) => {
             if (!button.dataset.defaultLabel) button.dataset.defaultLabel = button.textContent;
@@ -1979,6 +2047,13 @@
         const selected = selectedMasterDataDuplicateCards();
         if (!els.panel || !selected.length || !action) return;
         if (action === "merge") {
+            if (selected.some((card) => card.dataset.mergeBlocked === "true")) {
+                setMasterDataDuplicateStatus(
+                    "Repair suspicious recipe references before bulk merging these pairs.",
+                    "warning"
+                );
+                return;
+            }
             if (selected.some((card) => card.dataset.highConfidenceDuplicate !== "true")) {
                 setMasterDataDuplicateStatus(
                     "Bulk merge is limited to ≥98% singular/plural or alias matches. Adjust the selection and try again.",
@@ -2050,10 +2125,11 @@
                 throw new Error(data.error || "Saved duplicate reviews could not be loaded.");
             }
             renderMasterDataDuplicateReviews(data.reviews);
+            updateMasterDataDuplicateScanState(data.scan);
             setMasterDataDuplicateStatus(
                 data.review_count
-                    ? `${data.review_count} ingredient pair${data.review_count === 1 ? "" : "s"} waiting for your decision.`
-                    : "No unresolved suggestions. Run a scan whenever your ingredient master data changes."
+                    ? `${data.review_count} ingredient pair${data.review_count === 1 ? "" : "s"} waiting for your decision.${masterDataDuplicateScanSuffix(data.scan)}`
+                    : `No unresolved suggestions. Run a scan whenever your ingredient master data changes.${masterDataDuplicateScanSuffix(data.scan)}`
             );
             return true;
         } catch (error) {
@@ -2086,11 +2162,12 @@
                 throw new Error(data.error || "Potential duplicates could not be reviewed.");
             }
             renderMasterDataDuplicateReviews(data.reviews);
+            updateMasterDataDuplicateScanState(data.scan);
             const baseMessage = data.review_count
                 ? `Found ${data.review_count} pair${data.review_count === 1 ? "" : "s"} for your review.`
                 : `Scanned ${data.scanned_count || 0} ingredients and found no unresolved pairs.`;
             setMasterDataDuplicateStatus(
-                data.warning ? `${baseMessage} ${data.warning}` : baseMessage,
+                `${baseMessage}${masterDataDuplicateScanSuffix(data.scan)}${data.warning ? ` ${data.warning}` : ""}`,
                 data.warning ? "warning" : ""
             );
         } catch (error) {
@@ -2145,7 +2222,13 @@
             updateMasterDataDuplicateSelectionState();
         } catch (error) {
             if (card) card.removeAttribute("aria-busy");
-            if (card) card.querySelectorAll("button").forEach((actionButton) => { actionButton.disabled = false; });
+            if (card) {
+                card.querySelectorAll("button").forEach((actionButton) => {
+                    const blockedMerge = card.dataset.mergeBlocked === "true"
+                        && actionButton.dataset.masterDuplicateDecision === "merge";
+                    actionButton.disabled = blockedMerge;
+                });
+            }
             setMasterDataDuplicateStatus(error.message || "That review decision could not be saved.", "error");
         }
     }

@@ -1247,6 +1247,7 @@ def ingredient_duplicate_reviews_route():
         "user_id": workspace_user_id,
         "review_count": len(reviews),
         "reviews": reviews,
+        "scan": ingredient_duplicate_reviews.duplicate_scan_summary(workspace_user_id),
     })
 
 

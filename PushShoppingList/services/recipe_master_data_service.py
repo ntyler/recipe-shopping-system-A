@@ -12,6 +12,7 @@ from PushShoppingList.services import storage_service
 from PushShoppingList.services.ingredient_unit_service import canonical_unit_aliases
 from PushShoppingList.services.ingredient_unit_service import canonical_unit_options
 from PushShoppingList.services.ingredient_unit_service import canonical_unit
+from PushShoppingList.services.ingredient_unit_service import misplaced_unit_ingredient_details
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import recipe_url_name
@@ -631,6 +632,17 @@ def ensure_recipe_master_schema(connection=None):
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(user_id, left_ingredient_id, right_ingredient_id)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ingredient_duplicate_scans (
+            user_id TEXT PRIMARY KEY,
+            scanned_at TEXT NOT NULL,
+            scanned_count INTEGER NOT NULL DEFAULT 0,
+            candidate_count INTEGER NOT NULL DEFAULT 0,
+            review_count INTEGER NOT NULL DEFAULT 0
         )
         """
     )
@@ -2813,6 +2825,98 @@ def normalize_saved_recipe_units(extractor_data_root):
             changed = _normalize_unit_rows_for_migration(record.get("ingredient_details"), summary) or changed
             raw = record.get("raw") if isinstance(record.get("raw"), dict) else {}
             changed = _normalize_unit_rows_for_migration(raw.get("ingredients"), summary) or changed
+        if changed:
+            path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+            summary["files_updated"] += 1
+    return summary
+
+
+def repair_saved_misplaced_unit_ingredients(extractor_data_root):
+    """Repair only high-confidence unit/ingredient swaps in saved recipe JSON."""
+    extractor_data_root = Path(extractor_data_root)
+    summary = {
+        "files_updated": 0,
+        "records_updated": 0,
+        "rows_repaired": 0,
+    }
+    paths = [extractor_data_root / "recipe_ingredients.json"]
+    output_folder = extractor_data_root / "output"
+    if output_folder.exists():
+        paths.extend(path for path in output_folder.glob("*.json") if path.name != "sorted_ingredients.json")
+
+    for path in paths:
+        if not path.is_file():
+            continue
+        payload = load_json_file(path)
+        if not isinstance(payload, dict):
+            continue
+        changed = False
+        records = payload.values() if path.name == "recipe_ingredients.json" else (payload,)
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            record_changed = False
+            collections = [record.get("ingredients"), record.get("ingredient_details")]
+            raw = record.get("raw") if isinstance(record.get("raw"), dict) else {}
+            inference = record.get("recipe_inference") if isinstance(record.get("recipe_inference"), dict) else {}
+            collections.extend((raw.get("ingredients"), inference.get("ingredients")))
+            for rows in collections:
+                if not isinstance(rows, list):
+                    continue
+                for item in rows:
+                    if not isinstance(item, dict):
+                        continue
+                    ingredient = clean_text(
+                        item.get("ingredient")
+                        or item.get("name")
+                        or item.get("parsed_name")
+                        or item.get("normalized_name")
+                    )
+                    original_text = clean_text(
+                        item.get("original_text") or item.get("original_recipe_text")
+                    )
+                    if not misplaced_unit_ingredient_details(
+                        ingredient,
+                        original_text,
+                        item.get("unit"),
+                    ):
+                        continue
+                    normalize_ingredient_unit_fields(item, log_unrecognized=False)
+                    summary["rows_repaired"] += 1
+                    record_changed = True
+
+            if record_changed and path.name == "recipe_ingredients.json":
+                details = record.get("ingredient_details")
+                if isinstance(details, list):
+                    ingredient_names = []
+                    scaled_ingredients = {}
+                    for item in details:
+                        if not isinstance(item, dict):
+                            continue
+                        name = clean_text(
+                            item.get("normalized_name")
+                            or item.get("ingredient")
+                            or item.get("parsed_name")
+                            or item.get("original_text")
+                        )
+                        if not name:
+                            continue
+                        if name not in ingredient_names:
+                            ingredient_names.append(name)
+                        quantity = clean_text(item.get("quantity"))
+                        unit = clean_text(item.get("unit"))
+                        display = " ".join(value for value in (quantity, unit) if value)
+                        scaled_ingredients[name] = {
+                            "quantity": quantity,
+                            "unit": unit or None,
+                            "display": display,
+                        }
+                    record["ingredients"] = ingredient_names
+                    record["scaled_ingredients"] = scaled_ingredients
+
+            if record_changed:
+                changed = True
+                summary["records_updated"] += 1
         if changed:
             path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
             summary["files_updated"] += 1

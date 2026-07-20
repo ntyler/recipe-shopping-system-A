@@ -6,6 +6,7 @@ from difflib import SequenceMatcher
 from openai import OpenAI
 
 from PushShoppingList.services import recipe_master_data_service as master_data
+from PushShoppingList.services.ingredient_unit_service import misplaced_unit_ingredient_details
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
@@ -350,6 +351,93 @@ def _manual_decision_pairs(connection, user_id):
     return {(int(row["left_ingredient_id"]), int(row["right_ingredient_id"])) for row in rows}
 
 
+def _ingredient_reference_quality_issues(connection, user_id, ingredient_names):
+    ingredient_names = {
+        int(ingredient_id): master_data.clean_text(name)
+        for ingredient_id, name in (ingredient_names or {}).items()
+        if int(ingredient_id or 0) > 0
+    }
+    if not ingredient_names:
+        return {}
+
+    placeholders = ", ".join("?" for _ingredient_id in ingredient_names)
+    rows = connection.execute(
+        f"""
+        SELECT ingredient_id, recipe_id, unit, original_recipe_text
+          FROM recipe_ingredients
+         WHERE user_id = ?
+           AND ingredient_id IN ({placeholders})
+         ORDER BY ingredient_id ASC, LOWER(recipe_id) ASC, sort_order ASC, id ASC
+        """,
+        (user_id, *ingredient_names),
+    ).fetchall()
+    issues = {}
+    for row in rows:
+        ingredient_id = int(row["ingredient_id"])
+        ingredient_name = ingredient_names.get(ingredient_id, "")
+        mismatch = misplaced_unit_ingredient_details(
+            ingredient_name,
+            row["original_recipe_text"],
+            row["unit"],
+        )
+        if not mismatch:
+            continue
+        issues.setdefault(ingredient_id, []).append({
+            "ingredient_id": ingredient_id,
+            "ingredient_name": ingredient_name,
+            "recipe_id": master_data.clean_text(row["recipe_id"]),
+            "source_text": master_data.clean_text(row["original_recipe_text"]),
+            "misplaced_unit": mismatch["unit"],
+            "message": (
+                f"{ingredient_name} appears to be a misplaced unit for "
+                f"{master_data.clean_text(row['original_recipe_text'])}."
+            ),
+        })
+    return issues
+
+
+def duplicate_scan_summary(user_id=None):
+    scoped_user_id = master_data.scoped_recipe_user_id(user_id)
+    with master_data.existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {}
+        row = connection.execute(
+            """
+            SELECT scanned_at, scanned_count, candidate_count, review_count
+              FROM ingredient_duplicate_scans
+             WHERE user_id = ?
+            """,
+            (scoped_user_id,),
+        ).fetchone()
+        if not row:
+            row = connection.execute(
+                """
+                SELECT MAX(updated_at) AS scanned_at,
+                       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS review_count,
+                       (SELECT COUNT(*) FROM ingredients WHERE user_id = ?) AS scanned_count
+                  FROM ingredient_duplicate_reviews
+                 WHERE user_id = ?
+                """,
+                (scoped_user_id, scoped_user_id),
+            ).fetchone()
+            if not row or not master_data.clean_text(row["scanned_at"]):
+                return {}
+            review_count = int(row["review_count"] or 0)
+            return {
+                "scanned_at": master_data.clean_text(row["scanned_at"]),
+                "scanned_count": int(row["scanned_count"] or 0),
+                "candidate_count": review_count,
+                "review_count": review_count,
+                "inferred_from_reviews": True,
+            }
+    return {
+        "scanned_at": master_data.clean_text(row["scanned_at"]),
+        "scanned_count": int(row["scanned_count"] or 0),
+        "candidate_count": int(row["candidate_count"] or 0),
+        "review_count": int(row["review_count"] or 0),
+    }
+
+
 def scan_potential_duplicates(user_id=None):
     scoped_user_id = master_data.scoped_recipe_user_id(user_id)
     rows = master_data.list_ingredients(
@@ -424,6 +512,32 @@ def scan_potential_duplicates(user_id=None):
             )
 
     reviews = list_duplicate_reviews(scoped_user_id)
+    scan = {
+        "scanned_at": now,
+        "scanned_count": len(rows),
+        "candidate_count": len(candidates),
+        "review_count": len(reviews),
+    }
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO ingredient_duplicate_scans (
+                user_id, scanned_at, scanned_count, candidate_count, review_count
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                scanned_at = excluded.scanned_at,
+                scanned_count = excluded.scanned_count,
+                candidate_count = excluded.candidate_count,
+                review_count = excluded.review_count
+            """,
+            (
+                scoped_user_id,
+                scan["scanned_at"],
+                scan["scanned_count"],
+                scan["candidate_count"],
+                scan["review_count"],
+            ),
+        )
     return {
         "ok": True,
         "user_id": scoped_user_id,
@@ -435,6 +549,7 @@ def scan_potential_duplicates(user_id=None):
         "candidate_count": len(candidates),
         "scanned_count": len(rows),
         "scan_limited": len(rows) >= MAX_SCAN_RECORDS,
+        "scan": scan,
     }
 
 
@@ -482,10 +597,26 @@ def list_duplicate_reviews(user_id=None, status="pending"):
             """,
             (scoped_user_id, status),
         ).fetchall()
+        ingredient_names = {}
+        for row in rows:
+            ingredient_names[int(row["left_ingredient_id"])] = master_data.clean_text(
+                row["current_left_name"] or row["left_name"]
+            )
+            ingredient_names[int(row["right_ingredient_id"])] = master_data.clean_text(
+                row["current_right_name"] or row["right_name"]
+            )
+        quality_issues = _ingredient_reference_quality_issues(
+            connection,
+            scoped_user_id,
+            ingredient_names,
+        )
 
     reviews = []
     for row in rows:
         item = dict(row)
+        left_quality_issues = quality_issues.get(int(item["left_ingredient_id"]), [])
+        right_quality_issues = quality_issues.get(int(item["right_ingredient_id"]), [])
+        data_quality_issues = [*left_quality_issues, *right_quality_issues]
         review = {
             "review_id": int(item["id"]),
             "classification": item["classification"],
@@ -496,6 +627,8 @@ def list_duplicate_reviews(user_id=None, status="pending"):
             "signals": _decode_signals(item["signals_json"]),
             "analysis_source": item["analysis_source"],
             "model": item["model"],
+            "merge_blocked": bool(data_quality_issues),
+            "data_quality_issues": data_quality_issues,
             "left": {
                 "ingredient_id": int(item["left_ingredient_id"]),
                 "name": master_data.clean_text(item["current_left_name"] or item["left_name"]),
@@ -506,6 +639,7 @@ def list_duplicate_reviews(user_id=None, status="pending"):
                 "image_url": master_data.clean_text(item["left_image_url"]),
                 "usage_count": int(item["left_usage_count"] or 0),
                 "aliases": [value for value in master_data.clean_text(item["left_aliases"]).split(chr(31)) if value],
+                "data_quality_issue_count": len(left_quality_issues),
             },
             "right": {
                 "ingredient_id": int(item["right_ingredient_id"]),
@@ -517,6 +651,7 @@ def list_duplicate_reviews(user_id=None, status="pending"):
                 "image_url": master_data.clean_text(item["right_image_url"]),
                 "usage_count": int(item["right_usage_count"] or 0),
                 "aliases": [value for value in master_data.clean_text(item["right_aliases"]).split(chr(31)) if value],
+                "data_quality_issue_count": len(right_quality_issues),
             },
         }
         reviews.append(review)
@@ -547,6 +682,25 @@ def decide_duplicate_review(review_id, action, target_ingredient_id=None, user_i
         review_user_id = review["user_id"]
         left_id = int(review["left_ingredient_id"])
         right_id = int(review["right_ingredient_id"])
+
+        if action == "merge":
+            quality_issues = _ingredient_reference_quality_issues(
+                connection,
+                review_user_id,
+                {
+                    left_id: review["left_name"],
+                    right_id: review["right_name"],
+                },
+            )
+            if quality_issues:
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": (
+                        "Repair the suspicious recipe references before merging this ingredient pair."
+                    ),
+                    "merge_blocked": True,
+                }
 
     now = master_data.utc_now_iso()
     if action == "merge":

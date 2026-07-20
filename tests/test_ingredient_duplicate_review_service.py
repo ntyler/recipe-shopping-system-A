@@ -63,6 +63,9 @@ def test_scan_persists_reviews_and_rejected_pairs_do_not_return(monkeypatch, tmp
     assert first_scan["ok"] is True
     assert first_scan["analysis_source"] == "local"
     assert first_scan["review_count"] == 1
+    assert first_scan["scan"]["review_count"] == 1
+    assert first_scan["scan"]["scanned_at"]
+    assert duplicate_reviews.duplicate_scan_summary("user-a") == first_scan["scan"]
     assert first_scan["reviews"][0]["classification"] == "duplicate"
     review_id = first_scan["reviews"][0]["review_id"]
 
@@ -88,6 +91,45 @@ def test_scan_persists_reviews_and_rejected_pairs_do_not_return(monkeypatch, tmp
         ).fetchone()
     assert row["status"] == "dismissed"
     assert row["classification"] == "different"
+
+
+def test_suspicious_unit_as_ingredient_reference_blocks_merge(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/teaspoon",
+        recipe_data={"ingredients": [{"ingredient": "Teaspoon", "original_text": "teaspoon"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/teaspoons",
+        recipe_data={"ingredients": [{"ingredient": "Teaspoons", "original_text": "teaspoons"}]},
+        user_id="user-a",
+    )
+    teaspoon = master_data.master_record_for_name("ingredients", "user-a", "teaspoon")
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            """
+            UPDATE recipe_ingredients
+               SET original_recipe_text = 'soy sauce', unit = '', unit_id = NULL
+             WHERE user_id = ? AND ingredient_id = ?
+            """,
+            ("user-a", teaspoon["id"]),
+        )
+
+    review = duplicate_reviews.scan_potential_duplicates("user-a")["reviews"][0]
+
+    assert review["merge_blocked"] is True
+    assert review["left"]["data_quality_issue_count"] + review["right"]["data_quality_issue_count"] == 1
+    assert review["data_quality_issues"][0]["source_text"] == "soy sauce"
+    result = duplicate_reviews.decide_duplicate_review(
+        review["review_id"],
+        "merge",
+        target_ingredient_id=review["suggested_target_id"],
+        user_id="user-a",
+    )
+    assert result["ok"] is False
+    assert result["status"] == 409
+    assert result["merge_blocked"] is True
 
 
 def test_related_decision_is_durable(monkeypatch, tmp_path):

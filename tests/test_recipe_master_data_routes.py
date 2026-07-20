@@ -479,11 +479,14 @@ def test_duplicate_review_routes_scan_scope_and_save_decisions(monkeypatch, tmp_
     assert scan_response.status_code == 200
     assert scan_payload["user_id"] == "user-a"
     assert scan_payload["review_count"] == 1
+    assert scan_payload["scan"]["review_count"] == 1
+    assert scan_payload["scan"]["scanned_at"]
     assert decision_response.status_code == 200
     assert decision_response.get_json()["status"] == "related"
     assert list_response.status_code == 200
     assert list_response.get_json()["user_id"] == "user-a"
     assert list_response.get_json()["review_count"] == 0
+    assert list_response.get_json()["scan"]["scanned_at"] == scan_payload["scan"]["scanned_at"]
     assert all_scope_response.status_code == 400
     assert user_b_response.status_code == 200
     assert user_b_response.get_json()["user_id"] == "user-b"
@@ -1002,6 +1005,9 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "function masterDataDuplicateCard(review)" in script
     assert "function setMasterDataDuplicateSuggestedSurvivor(button)" in script
     assert "async function scanMasterDataDuplicates()" in script
+    assert "function updateMasterDataDuplicateScanState(scan)" in script
+    assert "Rescan Potential Duplicates" in script
+    assert "Last scanned" in script
     assert "async function decideMasterDataDuplicate(button)" in script
     assert "async function applyMasterDataDuplicateBulkAction(button)" in script
     assert "function updateMasterDataDuplicateSelectionState()" in script
@@ -1016,6 +1022,8 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "data-master-duplicate-references-open" in script
     assert 'url.searchParams.set("limit", "500")' in script
     assert 'card.dataset.highConfidenceDuplicate' in script
+    assert 'card.dataset.mergeBlocked' in script
+    assert "Needs data repair" in script
     assert 'button.closest(".master-data-duplicate-card")' in script
     assert 'ingredient.classList.toggle("is-suggested", isSuggested)' in script
     assert 'if (label) label.hidden = !isSuggested' in script
@@ -1041,6 +1049,7 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-duplicate-actions" in css
     assert ".master-data-duplicate-toolbar" in css
     assert ".master-data-duplicate-card.is-selected" in css
+    assert ".master-data-duplicate-quality-warning" in css
     assert ".master-data-duplicate-ingredient-open" in css
     assert ".master-data-duplicate-view-references" in css
     assert ".master-data-reference-dialog" in css

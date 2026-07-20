@@ -149,6 +149,79 @@ def _clean_phrase(value):
     return re.sub(r"\s+", " ", str(value or "").strip())
 
 
+def misplaced_unit_ingredient_details(ingredient, original_text, unit=""):
+    """Describe an obvious unit/ingredient field swap, or return ``None``.
+
+    Some inferred recipes placed values such as ``teaspoon`` in the ingredient
+    field while retaining the actual grocery item in ``original_text``.  Keep
+    the check deliberately narrow: the ingredient must be a known unit and the
+    source text must not contain that unit at all.
+    """
+    ingredient_text = _clean_phrase(ingredient)
+    original = _clean_phrase(original_text)
+    misplaced_unit = canonical_unit(ingredient_text)
+    if not misplaced_unit or not original or not re.search(r"[A-Za-z]", original):
+        return None
+
+    current_unit = canonical_unit(unit)
+    if current_unit and current_unit["id"] != misplaced_unit["id"]:
+        return None
+
+    original_key = re.sub(r"[^a-z0-9]+", " ", _unit_key(original)).strip()
+    matching_aliases = (
+        alias
+        for alias, canonical_name in UNIT_ALIAS_TO_NAME.items()
+        if canonical_name == misplaced_unit["name"]
+    )
+    if any(re.search(rf"(?:^|\s){re.escape(alias)}(?:$|\s)", original_key) for alias in matching_aliases):
+        return None
+
+    return {
+        "ingredient": ingredient_text,
+        "original_text": original,
+        "unit": misplaced_unit["name"],
+        "unit_id": misplaced_unit["id"],
+    }
+
+
+def repair_misplaced_unit_ingredient(item):
+    """Repair a narrowly detected unit/ingredient field swap in place."""
+    if not isinstance(item, dict):
+        return False
+
+    ingredient_text = _clean_phrase(
+        item.get("ingredient")
+        or item.get("name")
+        or item.get("parsed_name")
+        or item.get("normalized_name")
+    )
+    original = _clean_phrase(item.get("original_text") or item.get("original_recipe_text"))
+    details = misplaced_unit_ingredient_details(ingredient_text, original, item.get("unit"))
+    if not details:
+        return False
+
+    misplaced_unit_id = details["unit_id"]
+    item["ingredient"] = original
+    for field in ("name", "parsed_name", "normalized_name"):
+        value = _clean_phrase(item.get(field))
+        value_unit = canonical_unit(value)
+        if value and value_unit and value_unit["id"] == misplaced_unit_id:
+            item[field] = original
+    for field in ("purchasable_item", "buy_as", "purchase_group"):
+        value = _clean_phrase(item.get(field))
+        value_unit = canonical_unit(value)
+        if value and value_unit and value_unit["id"] == misplaced_unit_id:
+            item[field] = original
+
+    item["unit"] = details["unit"]
+    item["unit_id"] = details["unit_id"]
+    item["unit_raw"] = item.get("unit_raw") or ingredient_text
+    item["unit_review_required"] = False
+    item["unit_review_value"] = ""
+    item["unit_custom"] = False
+    return True
+
+
 def _append_preparation(existing, value):
     parts = [_clean_phrase(existing), _clean_phrase(value)]
     return ", ".join(dict.fromkeys(part for part in parts if part))
@@ -208,6 +281,7 @@ def normalize_ingredient_unit_fields(item, *, log_unrecognized=True):
     if not isinstance(item, dict):
         return item
 
+    repair_misplaced_unit_ingredient(item)
     raw_current = _clean_phrase(item.get("unit"))
     saved_raw = _clean_phrase(item.get("unit_raw") or item.get("raw_unit"))
     review_flag = item.get("unit_review_required")

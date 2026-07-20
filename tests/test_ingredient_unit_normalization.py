@@ -8,6 +8,7 @@ from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services.ingredient_unit_service import CANONICAL_UNITS
 from PushShoppingList.services.ingredient_unit_service import canonical_unit
 from PushShoppingList.services.ingredient_unit_service import display_unit
+from PushShoppingList.services.ingredient_unit_service import misplaced_unit_ingredient_details
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
 from PushShoppingList.services.recipe_extract_service import parse_structured_ingredient_line
@@ -99,6 +100,38 @@ def test_forbidden_and_unknown_unit_values_never_become_canonical_units(caplog):
         "ingredient": "sugar",
     })
     assert cleared["unit"] == ""
+
+
+def test_unit_name_misplaced_as_ingredient_is_repaired_from_source_text():
+    row = normalize_ingredient_unit_fields({
+        "quantity": "1/2",
+        "unit": "",
+        "ingredient": "teaspoon",
+        "normalized_name": "teaspoon",
+        "original_text": "salt",
+        "purchasable_item": "teaspoon",
+        "purchase_group": "teaspoon",
+    })
+
+    assert row["ingredient"] == "salt"
+    assert row["normalized_name"] == "salt"
+    assert row["unit"] == "teaspoon"
+    assert row["unit_id"] == "volume_teaspoon"
+    assert row["unit_raw"] == "teaspoon"
+    assert row["purchasable_item"] == "salt"
+    assert row["purchase_group"] == "salt"
+
+
+def test_legitimate_unit_ingredient_source_is_not_rewritten():
+    assert misplaced_unit_ingredient_details("teaspoon", "1 teaspoon") is None
+    assert misplaced_unit_ingredient_details("teaspoon", "1 teaspoon, salt") is None
+    row = normalize_ingredient_unit_fields({
+        "quantity": "1",
+        "ingredient": "teaspoon",
+        "original_text": "teaspoon",
+    })
+    assert row["ingredient"] == "teaspoon"
+    assert row["unit"] == ""
 
 
 def test_explicit_custom_unit_is_preserved_without_weakening_unknown_unit_review():
@@ -259,6 +292,55 @@ def test_saved_json_backfill_preserves_quantities_and_records_review(tmp_path):
     assert updated[1]["unit"] == ""
     assert updated[1]["unit_raw"] == "scoop"
     assert updated[1]["unit_review_required"] is True
+
+
+def test_saved_json_targeted_repair_fixes_only_misplaced_unit_ingredients(tmp_path):
+    data_root = tmp_path / "data"
+    output_root = data_root / "output"
+    output_root.mkdir(parents=True)
+    recipe_url = "https://example.com/fried-rice"
+    details = [
+        {
+            "original_text": "soy sauce",
+            "normalized_name": "teaspoon",
+            "quantity": "1",
+            "unit": "",
+        },
+        {
+            "original_text": "rice",
+            "normalized_name": "rice",
+            "quantity": "2",
+            "unit": "cup",
+        },
+    ]
+    (data_root / "recipe_ingredients.json").write_text(json.dumps({
+        recipe_url: {
+            "url": recipe_url,
+            "ingredients": ["teaspoon", "rice"],
+            "ingredient_details": details,
+        }
+    }), encoding="utf-8")
+    (output_root / "fried-rice.json").write_text(json.dumps({
+        "source_url": recipe_url,
+        "ingredients": [{
+            "original_text": "soy sauce",
+            "ingredient": "teaspoon",
+            "quantity": "1",
+            "unit": "",
+        }],
+    }), encoding="utf-8")
+
+    summary = master_data.repair_saved_misplaced_unit_ingredients(data_root)
+
+    assert summary == {"files_updated": 2, "records_updated": 2, "rows_repaired": 2}
+    saved = json.loads((data_root / "recipe_ingredients.json").read_text(encoding="utf-8"))[recipe_url]
+    assert saved["ingredients"] == ["soy sauce", "rice"]
+    assert saved["ingredient_details"][0]["normalized_name"] == "soy sauce"
+    assert saved["ingredient_details"][0]["unit"] == "teaspoon"
+    assert saved["scaled_ingredients"]["soy sauce"]["display"] == "1 teaspoon"
+    output = json.loads((output_root / "fried-rice.json").read_text(encoding="utf-8"))
+    assert output["ingredients"][0]["ingredient"] == "soy sauce"
+    assert output["ingredients"][0]["unit"] == "teaspoon"
 
 
 def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
