@@ -442,6 +442,22 @@
                         <button type="button" data-master-duplicate-select-all>Select all</button>
                         <button type="button" data-master-duplicate-select-none>Clear</button>
                     </div>
+                    <div class="master-data-duplicate-toolbar-actions">
+                        <button type="button"
+                                class="primary"
+                                data-master-duplicate-toolbar-scan
+                                {% if master_data.scope == 'all' %}disabled{% endif %}>
+                            Find Potential Duplicates
+                        </button>
+                        <button type="button"
+                                data-master-duplicate-toolbar-undo-merge
+                                data-undo-available="{{ 'true' if master_data.latest_ingredient_merge else 'false' }}"
+                                data-source-name="{{ master_data.latest_ingredient_merge.source_name if master_data.latest_ingredient_merge else '' }}"
+                                data-target-name="{{ master_data.latest_ingredient_merge.target_name if master_data.latest_ingredient_merge else '' }}"
+                                {% if not master_data.latest_ingredient_merge or master_data.scope == 'all' %}disabled{% endif %}>
+                            Undo last merge
+                        </button>
+                    </div>
                     <div class="master-data-duplicate-bulk-actions">
                         <button type="button"
                                 class="primary"

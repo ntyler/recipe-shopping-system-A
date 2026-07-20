@@ -1358,6 +1358,9 @@
         return {
             panel,
             scan: panel && panel.querySelector("[data-master-duplicate-scan]"),
+            scanButtons: panel ? panel.querySelectorAll(
+                "[data-master-duplicate-scan], [data-master-duplicate-toolbar-scan]"
+            ) : [],
             status: panel && panel.querySelector("[data-master-duplicate-status]"),
             list: panel && panel.querySelector("[data-master-duplicate-list]"),
             toolbar: panel && panel.querySelector("[data-master-duplicate-toolbar]"),
@@ -1367,6 +1370,9 @@
             selectNone: panel && panel.querySelector("[data-master-duplicate-select-none]"),
             bulkActions: panel ? panel.querySelectorAll("[data-master-duplicate-bulk-action]") : [],
             undoMerge: panel && panel.querySelector("[data-master-duplicate-undo-merge]"),
+            undoMergeButtons: panel ? panel.querySelectorAll(
+                "[data-master-duplicate-undo-merge], [data-master-duplicate-toolbar-undo-merge]"
+            ) : [],
             undoSummary: panel && panel.querySelector("[data-master-duplicate-undo-summary]"),
         };
     }
@@ -1392,8 +1398,10 @@
         const els = masterDataDuplicateElements();
         if (!els.panel || !scan || !scan.scanned_at) return;
         els.panel.dataset.lastScanAt = text(scan.scanned_at);
-        if (els.scan && els.panel.getAttribute("aria-busy") !== "true") {
-            els.scan.textContent = "Rescan Potential Duplicates";
+        if (els.panel.getAttribute("aria-busy") !== "true") {
+            Array.from(els.scanButtons || []).forEach((button) => {
+                button.textContent = "Rescan Potential Duplicates";
+            });
         }
     }
 
@@ -1401,17 +1409,17 @@
         const els = masterDataDuplicateElements();
         if (!els.panel) return;
         els.panel.setAttribute("aria-busy", busy ? "true" : "false");
-        if (els.scan) {
-            els.scan.disabled = busy || els.panel.dataset.scope === "all";
-            els.scan.textContent = busy
+        Array.from(els.scanButtons || []).forEach((button) => {
+            button.disabled = busy || els.panel.dataset.scope === "all";
+            button.textContent = busy
                 ? "Reviewing ingredient pairs..."
                 : (els.panel.dataset.lastScanAt ? "Rescan Potential Duplicates" : "Find Potential Duplicates");
-        }
-        if (els.undoMerge) {
-            els.undoMerge.disabled = busy
+        });
+        Array.from(els.undoMergeButtons || []).forEach((button) => {
+            button.disabled = busy
                 || els.panel.dataset.scope === "all"
-                || els.undoMerge.dataset.undoAvailable !== "true";
-        }
+                || button.dataset.undoAvailable !== "true";
+        });
         masterDataDuplicateCards().forEach((card) => {
             card.querySelectorAll("button").forEach((button) => {
                 const blockedMerge = card.dataset.mergeBlocked === "true"
@@ -1440,12 +1448,14 @@
         const available = Boolean(merge);
         const sourceName = available ? text(merge.source_name).trim() : "";
         const targetName = available ? text(merge.target_name).trim() : "";
-        els.undoMerge.dataset.undoAvailable = available ? "true" : "false";
-        els.undoMerge.dataset.sourceName = sourceName;
-        els.undoMerge.dataset.targetName = targetName;
-        els.undoMerge.disabled = !available
-            || els.panel.dataset.scope === "all"
-            || els.panel.getAttribute("aria-busy") === "true";
+        Array.from(els.undoMergeButtons || []).forEach((button) => {
+            button.dataset.undoAvailable = available ? "true" : "false";
+            button.dataset.sourceName = sourceName;
+            button.dataset.targetName = targetName;
+            button.disabled = !available
+                || els.panel.dataset.scope === "all"
+                || els.panel.getAttribute("aria-busy") === "true";
+        });
         if (els.undoSummary) {
             els.undoSummary.textContent = available
                 ? `Last merge: ${sourceName} into ${targetName}.`
@@ -2036,11 +2046,11 @@
         [els.selectHighConfidence, els.selectAll, els.selectNone].forEach((button) => {
             if (button) button.disabled = busy || !cards.length;
         });
-        if (els.undoMerge) {
-            els.undoMerge.disabled = busy
+        Array.from(els.undoMergeButtons || []).forEach((button) => {
+            button.disabled = busy
                 || els.panel.dataset.scope === "all"
-                || els.undoMerge.dataset.undoAvailable !== "true";
-        }
+                || button.dataset.undoAvailable !== "true";
+        });
         Array.from(els.bulkActions || []).forEach((button) => {
             const action = text(button.dataset.masterDuplicateBulkAction).trim();
             const includesBlockedMerge = selected.some((card) => card.dataset.mergeBlocked === "true");
@@ -2092,7 +2102,9 @@
         const els = masterDataDuplicateElements();
         if (!els.panel) return;
         els.panel.setAttribute("aria-busy", busy ? "true" : "false");
-        if (els.scan) els.scan.disabled = busy || els.panel.dataset.scope === "all";
+        Array.from(els.scanButtons || []).forEach((button) => {
+            button.disabled = busy || els.panel.dataset.scope === "all";
+        });
         masterDataDuplicateCards().forEach((card) => {
             card.querySelectorAll("button").forEach((button) => {
                 const blockedMerge = card.dataset.mergeBlocked === "true"
@@ -2316,10 +2328,12 @@
     function initMasterDataDuplicateReview() {
         const els = masterDataDuplicateElements();
         if (!els.panel) return;
-        if (els.scan) els.scan.addEventListener("click", scanMasterDataDuplicates);
-        if (els.undoMerge) {
-            els.undoMerge.addEventListener("click", () => void undoLastMasterDataIngredientMerge());
-        }
+        Array.from(els.scanButtons || []).forEach((button) => {
+            button.addEventListener("click", scanMasterDataDuplicates);
+        });
+        Array.from(els.undoMergeButtons || []).forEach((button) => {
+            button.addEventListener("click", () => void undoLastMasterDataIngredientMerge());
+        });
         if (els.selectHighConfidence) {
             els.selectHighConfidence.addEventListener("click", () => selectMasterDataDuplicateCards("high-confidence"));
         }

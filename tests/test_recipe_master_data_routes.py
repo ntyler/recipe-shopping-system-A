@@ -1053,6 +1053,8 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-results-header",
         "data-master-pagination",
         "data-master-duplicate-undo-merge",
+        "data-master-duplicate-toolbar-scan",
+        "data-master-duplicate-toolbar-undo-merge",
         "data-master-duplicate-undo-summary",
     ):
         assert marker in template
@@ -1113,6 +1115,10 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-duplicate-comparison" in css
     assert ".master-data-duplicate-actions" in css
     assert ".master-data-duplicate-toolbar" in css
+    assert ".master-data-duplicate-toolbar-actions" in css
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in css
+    assert '"[data-master-duplicate-scan], [data-master-duplicate-toolbar-scan]"' in script
+    assert '"[data-master-duplicate-undo-merge], [data-master-duplicate-toolbar-undo-merge]"' in script
     assert ".master-data-duplicate-card.is-selected" in css
     assert ".master-data-duplicate-quality-warning" in css
     assert ".master-data-duplicate-ingredient-open" in css
