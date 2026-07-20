@@ -1448,7 +1448,7 @@ def list_master_record_recipe_references(
             "total": 0,
         }
 
-    limit = bounded_master_limit(limit, default=25, maximum=100)
+    limit = bounded_master_limit(limit, default=25, maximum=500)
     usage_table = config["usage_table"]
     usage_fk = config["usage_fk"]
     if table_name == "ingredients":

@@ -1141,6 +1141,11 @@ def master_data_context(record_type):
         "ingredient_duplicate_bulk_decision_url": url_for(
             "main_bp.ingredient_duplicate_bulk_decision_route"
         ),
+        "ingredient_reference_url": url_for(
+            "main_bp.master_data_record_references_route",
+            record_type="ingredients",
+            record_id=0,
+        ),
         "current_url": current_url,
         "prev_url": prev_url,
         "next_url": next_url,
@@ -1331,7 +1336,7 @@ def master_data_record_references_route(record_type, record_id):
         record_id,
         user_id=scope_info["user_id"],
         include_all_users=scope_info["include_all_users"],
-        limit=int_query_arg("limit", 25, minimum=1, maximum=100),
+        limit=int_query_arg("limit", 25, minimum=1, maximum=500),
     )
     if not references.get("record"):
         return jsonify({

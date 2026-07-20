@@ -17,6 +17,8 @@
     let masterDataMergeSearchTimer = null;
     let masterDataMergeRequestId = 0;
     let masterDataMergeReturnFocus = null;
+    let masterDataDuplicateReferenceRequestId = 0;
+    let masterDataDuplicateReferenceReturnFocus = null;
 
     function text(value) {
         return String(value == null ? "" : value);
@@ -1414,6 +1416,84 @@
         return `${count} recipe use${count === 1 ? "" : "s"}`;
     }
 
+    function masterDataDuplicateReferenceElements() {
+        const dialog = document.querySelector("[data-master-duplicate-reference-dialog]");
+        return {
+            dialog,
+            name: dialog && dialog.querySelector("[data-master-duplicate-reference-name]"),
+            context: dialog && dialog.querySelector("[data-master-duplicate-reference-context]"),
+            body: dialog && dialog.querySelector("[data-master-duplicate-reference-body]"),
+            closeButtons: dialog ? dialog.querySelectorAll("[data-master-duplicate-reference-close]") : [],
+        };
+    }
+
+    function masterDataDuplicateReferenceUrl(ingredientId) {
+        const els = masterDataDuplicateElements();
+        const url = new URL(text(els.panel && els.panel.dataset.referenceUrl), window.location.origin);
+        url.pathname = url.pathname.replace(/\/0\/references$/, `/${Number(ingredientId) || 0}/references`);
+        const context = masterDataDuplicateRequestContext();
+        if (context.scope) url.searchParams.set("scope", context.scope);
+        if (context.user_id) url.searchParams.set("user_id", context.user_id);
+        url.searchParams.set("limit", "500");
+        return url.toString();
+    }
+
+    function closeMasterDataDuplicateReferences() {
+        const els = masterDataDuplicateReferenceElements();
+        masterDataDuplicateReferenceRequestId += 1;
+        if (els.dialog && els.dialog.open) {
+            els.dialog.close();
+        }
+        if (els.body) els.body.replaceChildren();
+        const returnFocus = masterDataDuplicateReferenceReturnFocus;
+        masterDataDuplicateReferenceReturnFocus = null;
+        if (returnFocus && returnFocus.isConnected) returnFocus.focus();
+    }
+
+    async function openMasterDataDuplicateReferences(button) {
+        const els = masterDataDuplicateReferenceElements();
+        const ingredientId = Number(button && button.dataset.ingredientId) || 0;
+        if (!els.dialog || !els.body || !ingredientId) return;
+
+        const ingredientName = text(button.dataset.ingredientName).trim() || "this ingredient";
+        const storeSection = text(button.dataset.storeSection).trim();
+        const usageCount = Math.max(0, Number(button.dataset.usageCount) || 0);
+        if (els.name) els.name.textContent = ingredientName;
+        if (els.context) {
+            els.context.textContent = [storeSection, duplicateUsageLabel(usageCount)]
+                .filter(Boolean)
+                .join(" · ");
+        }
+        setReferenceLoading(els.body);
+        masterDataDuplicateReferenceReturnFocus = button;
+        if (!els.dialog.open) {
+            if (typeof els.dialog.showModal === "function") {
+                els.dialog.showModal();
+            } else {
+                els.dialog.setAttribute("open", "");
+            }
+        }
+
+        const requestId = ++masterDataDuplicateReferenceRequestId;
+        try {
+            const response = await fetch(masterDataDuplicateReferenceUrl(ingredientId), {
+                headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (requestId !== masterDataDuplicateReferenceRequestId) return;
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "Recipe references could not be loaded.");
+            }
+            renderReferences(els.body, data);
+        } catch (error) {
+            if (requestId !== masterDataDuplicateReferenceRequestId) return;
+            setReferenceError(
+                els.body,
+                error && error.message ? error.message : "Recipe references could not be loaded."
+            );
+        }
+    }
+
     function masterDataDuplicateIngredient(record, suggestedTargetId) {
         const item = document.createElement("article");
         item.className = "master-data-duplicate-ingredient";
@@ -1421,7 +1501,19 @@
             item.classList.add("is-suggested");
         }
 
-        const media = document.createElement("div");
+        const openButton = document.createElement("button");
+        openButton.type = "button";
+        openButton.className = "master-data-duplicate-ingredient-open";
+        openButton.dataset.masterDuplicateReferencesOpen = "1";
+        openButton.dataset.ingredientId = text(record.ingredient_id);
+        openButton.dataset.ingredientName = text(record.name);
+        openButton.dataset.storeSection = text(record.store_section);
+        openButton.dataset.usageCount = text(record.usage_count);
+        openButton.setAttribute("aria-haspopup", "dialog");
+        openButton.setAttribute("aria-controls", "masterDataIngredientReferencesDialog");
+        openButton.setAttribute("aria-label", `View recipes using ${text(record.name)}`);
+
+        const media = document.createElement("span");
         media.className = "master-data-duplicate-media";
         if (record.image_url) {
             const image = document.createElement("img");
@@ -1432,9 +1524,9 @@
             media.textContent = "No image";
         }
 
-        const copy = document.createElement("div");
+        const copy = document.createElement("span");
         copy.className = "master-data-duplicate-ingredient-copy";
-        const heading = document.createElement("div");
+        const heading = document.createElement("span");
         heading.className = "master-data-duplicate-ingredient-heading";
         const name = document.createElement("strong");
         name.textContent = text(record.name);
@@ -1448,14 +1540,18 @@
         normalized.textContent = text(record.normalized_name);
         const detail = document.createElement("small");
         detail.textContent = `${text(record.store_section)} · ${duplicateUsageLabel(record.usage_count)}`;
-        copy.append(heading, normalized, detail);
+        const viewRecipes = document.createElement("span");
+        viewRecipes.className = "master-data-duplicate-view-references";
+        viewRecipes.textContent = "View recipes";
+        copy.append(heading, normalized, detail, viewRecipes);
         const aliases = Array.isArray(record.aliases) ? record.aliases.filter(Boolean) : [];
         if (aliases.length) {
             const aliasText = document.createElement("small");
             aliasText.textContent = `Aliases: ${aliases.join(", ")}`;
             copy.appendChild(aliasText);
         }
-        item.append(media, copy);
+        openButton.append(media, copy);
+        item.appendChild(openButton);
         return item;
     }
 
@@ -1919,6 +2015,14 @@
         });
         if (els.list) {
             els.list.addEventListener("click", (event) => {
+                const referenceButton = event.target && event.target.closest
+                    ? event.target.closest("[data-master-duplicate-references-open]")
+                    : null;
+                if (referenceButton) {
+                    event.preventDefault();
+                    void openMasterDataDuplicateReferences(referenceButton);
+                    return;
+                }
                 const button = event.target && event.target.closest
                     ? event.target.closest("[data-master-duplicate-decision]")
                     : null;
@@ -1935,6 +2039,20 @@
             setMasterDataDuplicateStatus("Select one workspace to load or create duplicate suggestions.", "warning");
         } else {
             void loadMasterDataDuplicateReviews();
+        }
+
+        const referenceEls = masterDataDuplicateReferenceElements();
+        Array.from(referenceEls.closeButtons || []).forEach((button) => {
+            button.addEventListener("click", closeMasterDataDuplicateReferences);
+        });
+        if (referenceEls.dialog) {
+            referenceEls.dialog.addEventListener("cancel", (event) => {
+                event.preventDefault();
+                closeMasterDataDuplicateReferences();
+            });
+            referenceEls.dialog.addEventListener("click", (event) => {
+                if (event.target === referenceEls.dialog) closeMasterDataDuplicateReferences();
+            });
         }
     }
 

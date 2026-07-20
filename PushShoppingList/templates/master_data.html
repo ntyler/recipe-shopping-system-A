@@ -385,6 +385,7 @@
                      data-reviews-url="{{ master_data.ingredient_duplicate_reviews_url }}"
                      data-decision-url="{{ master_data.ingredient_duplicate_decision_url }}"
                      data-bulk-decision-url="{{ master_data.ingredient_duplicate_bulk_decision_url }}"
+                     data-reference-url="{{ master_data.ingredient_reference_url }}"
                      data-scope="{{ master_data.scope }}"
                      data-user-id="{{ master_data.scope_user_id }}">
                 <header class="master-data-duplicate-header">
@@ -447,6 +448,38 @@
                      data-master-duplicate-list
                      aria-live="polite"></div>
             </section>
+        {% endif %}
+
+        {% if master_data.record_type == 'ingredients' and master_data.db_status.exists %}
+            <dialog id="masterDataIngredientReferencesDialog"
+                    class="master-data-reference-dialog"
+                    data-master-duplicate-reference-dialog
+                    aria-labelledby="masterDataIngredientReferencesTitle"
+                    aria-describedby="masterDataIngredientReferencesContext">
+                <div class="master-data-reference-dialog-shell">
+                    <header class="master-data-reference-dialog-header">
+                        <div>
+                            <span>Ingredient usage</span>
+                            <h2 id="masterDataIngredientReferencesTitle">
+                                Recipes using <span data-master-duplicate-reference-name>this ingredient</span>
+                            </h2>
+                            <p id="masterDataIngredientReferencesContext"
+                               data-master-duplicate-reference-context></p>
+                        </div>
+                        <button type="button"
+                                class="master-data-reference-dialog-close"
+                                data-master-duplicate-reference-close
+                                aria-label="Close recipe usage dialog">&times;</button>
+                    </header>
+                    <div class="master-data-reference-dialog-body"
+                         data-master-duplicate-reference-body
+                         aria-live="polite"></div>
+                    <footer class="master-data-reference-dialog-footer">
+                        <span>Read-only recipe references for this workspace.</span>
+                        <button type="button" data-master-duplicate-reference-close>Close</button>
+                    </footer>
+                </div>
+            </dialog>
         {% endif %}
 
         <div class="master-data-results-header">
