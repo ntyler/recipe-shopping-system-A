@@ -505,69 +505,85 @@
                                 aria-label="Close undo preview">&times;</button>
                     </header>
                     <div class="master-data-undo-dialog-body">
-                        <p class="master-data-undo-preview-status"
-                           data-master-undo-preview-status
-                           role="status"
-                           aria-live="polite">
-                            Loading undo details&hellip;
-                        </p>
-                        <div class="master-data-undo-preview" data-master-undo-preview hidden>
-                            <div class="master-data-undo-preview-meta">
-                                <strong>Newest undoable merge</strong>
-                                <time data-master-undo-preview-time></time>
-                            </div>
-                            <div class="master-data-undo-preview-comparison">
-                                <article class="master-data-undo-preview-ingredient is-restored">
-                                    <span>Restore as a separate ingredient</span>
-                                    <div class="master-data-undo-preview-identity">
-                                        <div class="master-data-undo-preview-image">
-                                            <img data-master-undo-preview-image="source" alt="" hidden>
-                                            <span data-master-undo-preview-image-fallback="source" aria-hidden="true">&#8630;</span>
-                                        </div>
-                                        <div>
-                                            <h3 data-master-undo-preview-name="source">Ingredient</h3>
-                                            <p data-master-undo-preview-section="source"></p>
-                                        </div>
-                                    </div>
-                                    <div class="master-data-undo-preview-aliases"
-                                         data-master-undo-preview-aliases="source"></div>
-                                </article>
-                                <div class="master-data-undo-preview-direction" aria-hidden="true">
-                                    <span>&larr;</span>
-                                    split from
-                                </div>
-                                <article class="master-data-undo-preview-ingredient">
-                                    <span>Keep as the surviving ingredient</span>
-                                    <div class="master-data-undo-preview-identity">
-                                        <div class="master-data-undo-preview-image">
-                                            <img data-master-undo-preview-image="target" alt="" hidden>
-                                            <span data-master-undo-preview-image-fallback="target" aria-hidden="true">&#10003;</span>
-                                        </div>
-                                        <div>
-                                            <h3 data-master-undo-preview-name="target">Ingredient</h3>
-                                            <p data-master-undo-preview-section="target"></p>
-                                        </div>
-                                    </div>
-                                    <div class="master-data-undo-preview-aliases"
-                                         data-master-undo-preview-aliases="target"></div>
-                                </article>
-                            </div>
-                            <section class="master-data-undo-preview-impact">
-                                <h3>What will be restored</h3>
-                                <ul data-master-undo-preview-impact></ul>
-                            </section>
-                            <section class="master-data-undo-preview-recipes">
+                        <div class="master-data-undo-history-layout">
+                            <aside class="master-data-undo-history">
                                 <header>
-                                    <h3>Recipe references</h3>
-                                    <strong data-master-undo-preview-reference-count>0 affected</strong>
+                                    <div>
+                                        <span>Undo stack</span>
+                                        <h3>Restorable merges</h3>
+                                    </div>
+                                    <strong data-master-undo-history-count>0</strong>
                                 </header>
-                                <div data-master-undo-preview-references></div>
-                            </section>
-                            <p class="master-data-undo-preview-next" data-master-undo-preview-next></p>
+                                <div class="master-data-undo-history-list"
+                                     data-master-undo-history-list
+                                     aria-label="Restorable ingredient merges"></div>
+                            </aside>
+                            <div class="master-data-undo-preview-detail">
+                                <p class="master-data-undo-preview-status"
+                                   data-master-undo-preview-status
+                                   role="status"
+                                   aria-live="polite">
+                                    Loading undo details&hellip;
+                                </p>
+                                <div class="master-data-undo-preview" data-master-undo-preview hidden>
+                                    <div class="master-data-undo-preview-meta">
+                                        <strong data-master-undo-preview-position>Newest undoable merge</strong>
+                                        <time data-master-undo-preview-time></time>
+                                    </div>
+                                    <div class="master-data-undo-preview-comparison">
+                                        <article class="master-data-undo-preview-ingredient is-restored">
+                                            <span>Restore as a separate ingredient</span>
+                                            <div class="master-data-undo-preview-identity">
+                                                <div class="master-data-undo-preview-image">
+                                                    <img data-master-undo-preview-image="source" alt="" hidden>
+                                                    <span data-master-undo-preview-image-fallback="source" aria-hidden="true">&#8630;</span>
+                                                </div>
+                                                <div>
+                                                    <h3 data-master-undo-preview-name="source">Ingredient</h3>
+                                                    <p data-master-undo-preview-section="source"></p>
+                                                </div>
+                                            </div>
+                                            <div class="master-data-undo-preview-aliases"
+                                                 data-master-undo-preview-aliases="source"></div>
+                                        </article>
+                                        <div class="master-data-undo-preview-direction" aria-hidden="true">
+                                            <span>&larr;</span>
+                                            split from
+                                        </div>
+                                        <article class="master-data-undo-preview-ingredient">
+                                            <span>Keep as the surviving ingredient</span>
+                                            <div class="master-data-undo-preview-identity">
+                                                <div class="master-data-undo-preview-image">
+                                                    <img data-master-undo-preview-image="target" alt="" hidden>
+                                                    <span data-master-undo-preview-image-fallback="target" aria-hidden="true">&#10003;</span>
+                                                </div>
+                                                <div>
+                                                    <h3 data-master-undo-preview-name="target">Ingredient</h3>
+                                                    <p data-master-undo-preview-section="target"></p>
+                                                </div>
+                                            </div>
+                                            <div class="master-data-undo-preview-aliases"
+                                                 data-master-undo-preview-aliases="target"></div>
+                                        </article>
+                                    </div>
+                                    <section class="master-data-undo-preview-impact">
+                                        <h3>What will be restored</h3>
+                                        <ul data-master-undo-preview-impact></ul>
+                                    </section>
+                                    <section class="master-data-undo-preview-recipes">
+                                        <header>
+                                            <h3>Recipe references</h3>
+                                            <strong data-master-undo-preview-reference-count>0 affected</strong>
+                                        </header>
+                                        <div data-master-undo-preview-references></div>
+                                    </section>
+                                    <p class="master-data-undo-preview-next" data-master-undo-preview-next></p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <footer class="master-data-undo-dialog-footer">
-                        <span>The most recent merge must be undone first.</span>
+                        <span data-master-undo-preview-footer>The most recent merge must be undone first.</span>
                         <div>
                             <button type="button" data-master-undo-preview-close>Cancel</button>
                             <button type="button"

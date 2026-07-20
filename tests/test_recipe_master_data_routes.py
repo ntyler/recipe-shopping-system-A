@@ -485,6 +485,8 @@ def test_ingredient_master_merge_undo_route_and_button_restore_last_merge(monkey
     assert preview_payload["merge"]["target_restore"]["name"] == "Carrot"
     assert preview_payload["merge"]["restored_reference_count"] == 1
     assert preview_payload["merge"]["older_undo_count"] == 0
+    assert len(preview_payload["merges"]) == 1
+    assert preview_payload["merges"][0]["is_next_undo"] is True
     assert undo_response.status_code == 200
     assert undo_payload["ok"] is True
     assert undo_payload["source_name"] == "Carrots"
@@ -1074,6 +1076,9 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-undo-preview-confirm",
         "data-master-undo-preview-impact",
         "data-master-undo-preview-references",
+        "data-master-undo-history-list",
+        "data-master-undo-history-count",
+        "data-master-undo-preview-position",
         "ingredient_merge_undo_preview_url",
     ):
         assert marker in template
@@ -1099,6 +1104,8 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "function setMasterDataUndoMergeState(merge = null)" in script
     assert "async function undoLastMasterDataIngredientMerge()" in script
     assert "async function openMasterDataUndoPreview()" in script
+    assert "async function loadMasterDataUndoPreview(mergeId = 0)" in script
+    assert "function renderMasterDataUndoHistory(merges, selectedMergeId)" in script
     assert "undoLastMasterDataIngredientMerge()" in script
     undo_start = script.index("async function undoLastMasterDataIngredientMerge()")
     undo_end = script.index("function duplicateClassificationLabel", undo_start)
@@ -1139,6 +1146,8 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-duplicate-toolbar-actions" in css
     assert ".master-data-undo-dialog" in css
     assert ".master-data-undo-preview-comparison" in css
+    assert ".master-data-undo-history-layout" in css
+    assert ".master-data-undo-history-item" in css
     assert "grid-template-columns: minmax(0, 1fr) auto;" in css
     assert '"[data-master-duplicate-scan], [data-master-duplicate-toolbar-scan]"' in script
     assert '"[data-master-duplicate-undo-merge], [data-master-duplicate-toolbar-undo-merge]"' in script

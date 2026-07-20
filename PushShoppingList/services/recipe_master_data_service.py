@@ -1789,25 +1789,72 @@ def ingredient_merge_history_summary(row):
     }
 
 
-def ingredient_merge_undo_preview(user_id=None, reference_limit=8):
+def ingredient_merge_undo_stack_summary(row, index, total):
+    summary = ingredient_merge_history_summary(row)
+    snapshot = {}
+    try:
+        snapshot = json.loads(row["snapshot_json"])
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        snapshot = {}
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    source = snapshot.get("source") if isinstance(snapshot.get("source"), dict) else {}
+    target = snapshot.get("target") if isinstance(snapshot.get("target"), dict) else {}
+    moved_reference_ids = {
+        int(reference_id)
+        for reference_id in snapshot.get("moved_reference_ids", [])
+        if str(reference_id).isdigit() and int(reference_id) > 0
+    }
+    summary.update({
+        "undo_order": index + 1,
+        "is_next_undo": index == 0,
+        "newer_undo_count": index,
+        "older_undo_count": max(0, total - index - 1),
+        "restored_reference_count": len(moved_reference_ids),
+        "source_image_url": clean_text(source.get("image_url")),
+        "target_image_url": clean_text(target.get("image_url")),
+    })
+    return summary
+
+
+def ingredient_merge_undo_preview(user_id=None, reference_limit=8, merge_id=None):
     scoped_user_id = scoped_recipe_user_id(user_id)
     reference_limit = bounded_master_limit(reference_limit, default=8, maximum=25)
+    try:
+        merge_id = int(merge_id or 0)
+    except (TypeError, ValueError):
+        merge_id = 0
     with existing_recipe_master_connection() as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
-        history = connection.execute(
+        history_rows = connection.execute(
             """
             SELECT id, user_id, source_ingredient_id, target_ingredient_id,
                    source_name, target_name, snapshot_json, merged_at
               FROM ingredient_merge_history
              WHERE user_id = ? AND undone_at IS NULL
              ORDER BY id DESC
-             LIMIT 1
             """,
             (scoped_user_id,),
-        ).fetchone()
-        if not history:
+        ).fetchall()
+        if not history_rows:
             return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
+        history = next(
+            (row for row in history_rows if int(row["id"]) == merge_id),
+            history_rows[0] if merge_id <= 0 else None,
+        )
+        if history is None:
+            return {
+                "ok": False,
+                "status": 404,
+                "error": "That merge is no longer available in the undo history.",
+            }
+        selected_index = next(
+            index for index, row in enumerate(history_rows) if int(row["id"]) == int(history["id"])
+        )
+        undoable_merges = [
+            ingredient_merge_undo_stack_summary(row, index, len(history_rows))
+            for index, row in enumerate(history_rows)
+        ]
 
         try:
             snapshot = json.loads(history["snapshot_json"])
@@ -1906,15 +1953,8 @@ def ingredient_merge_undo_preview(user_id=None, reference_limit=8):
                 "restored": restored_value,
             })
 
-        older_row = connection.execute(
-            """
-            SELECT COUNT(*) AS merge_count
-              FROM ingredient_merge_history
-             WHERE user_id = ? AND undone_at IS NULL AND id < ?
-            """,
-            (scoped_user_id, int(history["id"])),
-        ).fetchone()
-        older_undo_count = int(older_row["merge_count"] or 0) if older_row else 0
+        newer_undo_count = selected_index
+        older_undo_count = max(0, len(history_rows) - selected_index - 1)
 
         return {
             "ok": True,
@@ -1934,6 +1974,9 @@ def ingredient_merge_undo_preview(user_id=None, reference_limit=8):
             "reference_preview_truncated": len(moved_reference_ids) > len(references),
             "older_undo_count": older_undo_count,
             "has_older_merge": older_undo_count > 0,
+            "newer_undo_count": newer_undo_count,
+            "is_next_undo": newer_undo_count == 0,
+            "undoable_merges": undoable_merges,
         }
 
 

@@ -1548,8 +1548,11 @@
         return {
             dialog,
             summary: dialog && dialog.querySelector("[data-master-undo-preview-summary]"),
+            historyCount: dialog && dialog.querySelector("[data-master-undo-history-count]"),
+            historyList: dialog && dialog.querySelector("[data-master-undo-history-list]"),
             status: dialog && dialog.querySelector("[data-master-undo-preview-status]"),
             preview: dialog && dialog.querySelector("[data-master-undo-preview]"),
+            position: dialog && dialog.querySelector("[data-master-undo-preview-position]"),
             time: dialog && dialog.querySelector("[data-master-undo-preview-time]"),
             sourceName: dialog && dialog.querySelector('[data-master-undo-preview-name="source"]'),
             targetName: dialog && dialog.querySelector('[data-master-undo-preview-name="target"]'),
@@ -1565,6 +1568,7 @@
             referenceCount: dialog && dialog.querySelector("[data-master-undo-preview-reference-count]"),
             references: dialog && dialog.querySelector("[data-master-undo-preview-references]"),
             next: dialog && dialog.querySelector("[data-master-undo-preview-next]"),
+            footer: dialog && dialog.querySelector("[data-master-undo-preview-footer]"),
             confirm: dialog && dialog.querySelector("[data-master-undo-preview-confirm]"),
             closeButtons: dialog ? dialog.querySelectorAll("[data-master-undo-preview-close]") : [],
         };
@@ -1676,6 +1680,56 @@
         if (els.confirm) els.confirm.disabled = true;
     }
 
+    function renderMasterDataUndoHistory(merges, selectedMergeId) {
+        const els = masterDataUndoPreviewElements();
+        const rows = Array.isArray(merges) ? merges : [];
+        if (els.historyCount) els.historyCount.textContent = String(rows.length);
+        if (!els.historyList) return;
+        els.historyList.replaceChildren();
+        rows.forEach((merge) => {
+            const mergeId = Number(merge && merge.merge_id) || 0;
+            const newerCount = Math.max(0, Number(merge && merge.newer_undo_count) || 0);
+            const referenceCount = Math.max(0, Number(merge && merge.restored_reference_count) || 0);
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "master-data-undo-history-item";
+            button.classList.toggle("is-blocked", newerCount > 0);
+            button.dataset.masterUndoHistoryMergeId = String(mergeId);
+            button.setAttribute("aria-current", mergeId === Number(selectedMergeId) ? "true" : "false");
+
+            const header = document.createElement("span");
+            header.className = "master-data-undo-history-item-header";
+            const source = document.createElement("strong");
+            source.textContent = text(merge && merge.source_name).trim() || "Ingredient";
+            const badge = document.createElement("span");
+            badge.className = "master-data-undo-history-item-badge";
+            badge.textContent = newerCount
+                ? `${newerCount} newer first`
+                : "Undo next";
+            header.append(source, badge);
+
+            const target = document.createElement("span");
+            target.className = "master-data-undo-history-item-target";
+            target.textContent = `Merged into ${text(merge && merge.target_name).trim() || "ingredient"}`;
+
+            const meta = document.createElement("span");
+            meta.className = "master-data-undo-history-item-meta";
+            const mergedAt = document.createElement("span");
+            mergedAt.textContent = formatMasterDataDuplicateScanTime(merge && merge.merged_at) || "Time unavailable";
+            const references = document.createElement("span");
+            references.textContent = `${referenceCount} recipe ref${referenceCount === 1 ? "" : "s"}`;
+            meta.append(mergedAt, references);
+
+            button.append(header, target, meta);
+            button.addEventListener("click", () => {
+                if (mergeId && mergeId !== Number(activeMasterDataUndoPreview && activeMasterDataUndoPreview.merge_id)) {
+                    void loadMasterDataUndoPreview(mergeId);
+                }
+            });
+            els.historyList.appendChild(button);
+        });
+    }
+
     function renderMasterDataUndoPreview(merge) {
         const els = masterDataUndoPreviewElements();
         if (!els.dialog || !merge) return;
@@ -1685,8 +1739,17 @@
         const sourceName = text(source.name || merge.source_name).trim() || "Ingredient";
         const targetName = text(target.name || merge.target_name).trim() || "Ingredient";
         const referenceCount = Math.max(0, Number(merge.restored_reference_count) || 0);
+        const newerCount = Math.max(0, Number(merge.newer_undo_count) || 0);
+        const isNextUndo = merge.is_next_undo !== false && newerCount === 0;
         if (els.summary) {
-            els.summary.textContent = `Restore ${sourceName} from its merge into ${targetName}.`;
+            els.summary.textContent = isNextUndo
+                ? `Restore ${sourceName} from its merge into ${targetName}.`
+                : `Preview ${sourceName}; undo ${newerCount} newer merge${newerCount === 1 ? "" : "s"} first.`;
+        }
+        if (els.position) {
+            els.position.textContent = isNextUndo
+                ? "Undo next • newest merge"
+                : `Undo position ${Math.max(1, Number(merge.undo_order) || newerCount + 1)}`;
         }
         if (els.time) {
             els.time.textContent = formatMasterDataDuplicateScanTime(merge.merged_at) || "Merge time unavailable";
@@ -1741,9 +1804,16 @@
         );
         const olderCount = Math.max(0, Number(merge.older_undo_count) || 0);
         if (els.next) {
-            els.next.textContent = olderCount
+            els.next.textContent = newerCount
+                ? `${newerCount} newer merge${newerCount === 1 ? " must" : "s must"} be undone before this merge can be restored.`
+                : olderCount
                 ? `${olderCount} older merge${olderCount === 1 ? "" : "s"} will remain available after this undo.`
                 : "This is the oldest remaining merge in the undo history.";
+        }
+        if (els.footer) {
+            els.footer.textContent = isNextUndo
+                ? "Undoing this merge will automatically advance the history stack."
+                : `This merge unlocks after ${newerCount} newer undo${newerCount === 1 ? "" : "s"}.`;
         }
         if (els.status) {
             els.status.hidden = true;
@@ -1751,8 +1821,10 @@
         }
         if (els.preview) els.preview.hidden = false;
         if (els.confirm) {
-            els.confirm.disabled = false;
-            els.confirm.textContent = `Undo and restore ${sourceName}`;
+            els.confirm.disabled = !isNextUndo;
+            els.confirm.textContent = isNextUndo
+                ? `Undo and restore ${sourceName}`
+                : "Undo newer merges first";
         }
     }
 
@@ -1760,6 +1832,46 @@
         const els = masterDataUndoPreviewElements();
         activeMasterDataUndoPreview = null;
         if (els.dialog && els.dialog.open) els.dialog.close();
+    }
+
+    async function loadMasterDataUndoPreview(mergeId = 0) {
+        const duplicateEls = masterDataDuplicateElements();
+        const els = masterDataUndoPreviewElements();
+        if (!duplicateEls.panel || !els.dialog) return false;
+        activeMasterDataUndoPreview = null;
+        if (els.preview) els.preview.hidden = true;
+        if (els.summary) els.summary.textContent = "Loading merge restore details...";
+        if (els.status) {
+            els.status.hidden = false;
+            els.status.textContent = "Loading undo details...";
+            els.status.classList.remove("is-error");
+        }
+        if (els.confirm) {
+            els.confirm.disabled = true;
+            els.confirm.textContent = "Undo this merge";
+        }
+        try {
+            const url = new URL(text(duplicateEls.panel.dataset.undoMergePreviewUrl), window.location.origin);
+            const context = masterDataDuplicateRequestContext();
+            if (context.scope) url.searchParams.set("scope", context.scope);
+            if (context.user_id) url.searchParams.set("user_id", context.user_id);
+            if (Number(mergeId) > 0) url.searchParams.set("merge_id", String(Number(mergeId)));
+            const response = await fetch(url.toString(), {
+                headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false || !data.merge) {
+                throw new Error(data.error || "The latest ingredient merge could not be previewed.");
+            }
+            renderMasterDataUndoHistory(data.merges || data.merge.undoable_merges, data.merge.merge_id);
+            renderMasterDataUndoPreview(data.merge);
+            return true;
+        } catch (error) {
+            setMasterDataUndoPreviewError(
+                error.message || "The latest ingredient merge could not be previewed."
+            );
+            return false;
+        }
     }
 
     async function openMasterDataUndoPreview() {
@@ -1770,44 +1882,23 @@
             setMasterDataDuplicateStatus("Save your pending ingredient edits before reviewing an undo.", "warning");
             return;
         }
-        activeMasterDataUndoPreview = null;
-        if (els.preview) els.preview.hidden = true;
-        if (els.summary) els.summary.textContent = "Loading the latest restorable merge...";
-        if (els.status) {
-            els.status.hidden = false;
-            els.status.textContent = "Loading undo details...";
-            els.status.classList.remove("is-error");
-        }
-        if (els.confirm) {
-            els.confirm.disabled = true;
-            els.confirm.textContent = "Undo this merge";
-        }
+        if (els.historyList) els.historyList.replaceChildren();
+        if (els.historyCount) els.historyCount.textContent = "0";
         if (!els.dialog.open) els.dialog.showModal();
-        try {
-            const url = new URL(text(duplicateEls.panel.dataset.undoMergePreviewUrl), window.location.origin);
-            const context = masterDataDuplicateRequestContext();
-            if (context.scope) url.searchParams.set("scope", context.scope);
-            if (context.user_id) url.searchParams.set("user_id", context.user_id);
-            const response = await fetch(url.toString(), {
-                headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || data.ok === false || !data.merge) {
-                throw new Error(data.error || "The latest ingredient merge could not be previewed.");
-            }
-            renderMasterDataUndoPreview(data.merge);
-        } catch (error) {
-            setMasterDataUndoPreviewError(
-                error.message || "The latest ingredient merge could not be previewed."
-            );
-        }
+        await loadMasterDataUndoPreview();
     }
 
     async function undoLastMasterDataIngredientMerge() {
         const els = masterDataDuplicateElements();
         const previewEls = masterDataUndoPreviewElements();
         const preview = activeMasterDataUndoPreview;
-        if (!els.panel || !previewEls.dialog || !preview || !Number(preview.merge_id)) return;
+        if (
+            !els.panel
+            || !previewEls.dialog
+            || !preview
+            || !Number(preview.merge_id)
+            || preview.is_next_undo === false
+        ) return;
         if (changedStoreSectionForms().length) {
             setMasterDataUndoPreviewError("Save your pending ingredient edits before undoing a merge.");
             return;
@@ -1836,10 +1927,21 @@
                 throw new Error(data.error || data.message || "The last ingredient merge could not be undone.");
             }
             setMasterDataUndoMergeState(data.next_merge || null);
-            closeMasterDataUndoPreview();
+            activeMasterDataUndoPreview = null;
+            if (previewEls.preview) previewEls.preview.hidden = true;
+            if (previewEls.status) {
+                previewEls.status.hidden = false;
+                previewEls.status.textContent = "Merge undone. Loading the remaining history...";
+                previewEls.status.classList.remove("is-error");
+            }
             await refreshAfterMasterDataDuplicateMerge(
                 data.message || "Ingredient merge undone."
             );
+            if (data.next_merge) {
+                await loadMasterDataUndoPreview();
+            } else {
+                closeMasterDataUndoPreview();
+            }
         } catch (error) {
             activeMasterDataUndoPreview = null;
             setMasterDataUndoPreviewError(
@@ -1851,13 +1953,6 @@
             );
         } finally {
             setMasterDataDuplicateBusy(false);
-            const latestPreviewEls = masterDataUndoPreviewElements();
-            if (latestPreviewEls.dialog && latestPreviewEls.dialog.open && latestPreviewEls.confirm) {
-                latestPreviewEls.confirm.disabled = !activeMasterDataUndoPreview;
-                latestPreviewEls.confirm.textContent = activeMasterDataUndoPreview
-                    ? `Undo and restore ${text(activeMasterDataUndoPreview.source_name).trim()}`
-                    : "Undo this merge";
-            }
         }
     }
 

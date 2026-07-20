@@ -589,6 +589,9 @@ def test_ingredient_merge_history_can_be_previewed_and_undone_repeatedly(monkeyp
     )
 
     latest_preview = master_data.ingredient_merge_undo_preview("user-a")
+    locked_older_preview = master_data.ingredient_merge_undo_preview(
+        "user-a", merge_id=first_merge["merge_id"]
+    )
     stale_undo = master_data.undo_last_ingredient_master_merge(
         "user-a", expected_merge_id=first_merge["merge_id"]
     )
@@ -603,6 +606,16 @@ def test_ingredient_merge_history_can_be_previewed_and_undone_repeatedly(monkeyp
     assert latest_preview["merge_id"] == second_merge["merge_id"]
     assert latest_preview["source_name"] == "Beans"
     assert latest_preview["older_undo_count"] == 1
+    assert latest_preview["is_next_undo"] is True
+    assert [row["merge_id"] for row in latest_preview["undoable_merges"]] == [
+        second_merge["merge_id"],
+        first_merge["merge_id"],
+    ]
+    assert latest_preview["undoable_merges"][0]["is_next_undo"] is True
+    assert latest_preview["undoable_merges"][1]["newer_undo_count"] == 1
+    assert locked_older_preview["merge_id"] == first_merge["merge_id"]
+    assert locked_older_preview["is_next_undo"] is False
+    assert locked_older_preview["newer_undo_count"] == 1
     assert stale_undo["ok"] is False
     assert stale_undo["status"] == 409
     assert "available merge changed" in stale_undo["error"]

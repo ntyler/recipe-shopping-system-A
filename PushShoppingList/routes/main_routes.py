@@ -1350,13 +1350,17 @@ def preview_ingredient_master_merge_undo_route():
             "error": "Choose one user workspace before previewing an ingredient merge undo.",
         }), 400
 
-    result = recipe_master_data.ingredient_merge_undo_preview(workspace_user_id)
+    result = recipe_master_data.ingredient_merge_undo_preview(
+        workspace_user_id,
+        merge_id=request.args.get("merge_id"),
+    )
     if not result.get("ok"):
         return jsonify({**result, "success": False}), int(result.get("status") or 400)
     return jsonify({
         "ok": True,
         "success": True,
         "merge": result,
+        "merges": result.get("undoable_merges", []),
     })
 
 
