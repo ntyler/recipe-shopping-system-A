@@ -1358,6 +1358,12 @@
             scan: panel && panel.querySelector("[data-master-duplicate-scan]"),
             status: panel && panel.querySelector("[data-master-duplicate-status]"),
             list: panel && panel.querySelector("[data-master-duplicate-list]"),
+            toolbar: panel && panel.querySelector("[data-master-duplicate-toolbar]"),
+            selectionCount: panel && panel.querySelector("[data-master-duplicate-selection-count]"),
+            selectHighConfidence: panel && panel.querySelector("[data-master-duplicate-select-high-confidence]"),
+            selectAll: panel && panel.querySelector("[data-master-duplicate-select-all]"),
+            selectNone: panel && panel.querySelector("[data-master-duplicate-select-none]"),
+            bulkActions: panel ? panel.querySelectorAll("[data-master-duplicate-bulk-action]") : [],
         };
     }
 
@@ -1369,10 +1375,14 @@
             els.scan.disabled = busy || els.panel.dataset.scope === "all";
             els.scan.textContent = busy ? "Reviewing ingredient pairs..." : "Find Potential Duplicates";
         }
+        masterDataDuplicateCards().forEach((card) => {
+            card.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
+        });
         if (message && els.status) {
             els.status.textContent = message;
             els.status.classList.remove("is-error", "is-warning");
         }
+        updateMasterDataDuplicateSelectionState();
     }
 
     function setMasterDataDuplicateStatus(message, kind = "") {
@@ -1471,8 +1481,26 @@
         const card = document.createElement("article");
         card.className = `master-data-duplicate-card is-${text(review.classification).toLowerCase()}`;
         card.dataset.reviewId = text(review.review_id);
+        card.dataset.classification = text(review.classification).toLowerCase();
+        card.dataset.confidence = text(review.confidence || 0);
+        card.dataset.suggestedTargetId = text(review.suggested_target_id || "");
+        card.dataset.highConfidenceDuplicate = text(Boolean(
+            review.classification === "duplicate"
+            && Number(review.confidence) >= 0.98
+            && review.signals
+            && (review.signals.singular_exact || review.signals.alias_match)
+        ));
 
         const header = document.createElement("header");
+        const selection = document.createElement("label");
+        selection.className = "master-data-duplicate-select";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.masterDuplicateSelect = "1";
+        checkbox.setAttribute("aria-label", `Select ${text(review.left.name)} and ${text(review.right.name)}`);
+        const selectionText = document.createElement("span");
+        selectionText.textContent = "Select";
+        selection.append(checkbox, selectionText);
         const classification = document.createElement("span");
         classification.className = "master-data-duplicate-classification";
         classification.textContent = duplicateClassificationLabel(review.classification);
@@ -1480,7 +1508,7 @@
         confidence.textContent = `${Math.round((Number(review.confidence) || 0) * 100)}% confidence`;
         const source = document.createElement("small");
         source.textContent = review.analysis_source === "ai" ? "AI review" : "Local similarity review";
-        header.append(classification, confidence, source);
+        header.append(selection, classification, confidence, source);
 
         const comparison = document.createElement("div");
         comparison.className = "master-data-duplicate-comparison";
@@ -1512,6 +1540,8 @@
             ? review.right
             : review.left;
         const alternate = suggested === review.left ? review.right : review.left;
+        card.dataset.suggestedTargetName = text(suggested.name);
+        card.dataset.suggestedSourceName = text(alternate.name);
         const mergeSuggested = masterDataDuplicateAction(
             `Merge into ${suggested.name}`,
             "merge",
@@ -1552,14 +1582,193 @@
         if (!els.list) return;
         els.list.replaceChildren();
         const rows = Array.isArray(reviews) ? reviews : [];
+        if (els.toolbar) els.toolbar.hidden = !rows.length;
         if (!rows.length) {
             const empty = document.createElement("div");
             empty.className = "master-data-duplicate-empty";
             empty.textContent = "No unresolved duplicate suggestions.";
             els.list.appendChild(empty);
+            updateMasterDataDuplicateSelectionState();
             return;
         }
         rows.forEach((review) => els.list.appendChild(masterDataDuplicateCard(review)));
+        updateMasterDataDuplicateSelectionState();
+    }
+
+    function masterDataDuplicateCards() {
+        const els = masterDataDuplicateElements();
+        return els.list
+            ? Array.from(els.list.querySelectorAll(".master-data-duplicate-card[data-review-id]"))
+            : [];
+    }
+
+    function selectedMasterDataDuplicateCards() {
+        return masterDataDuplicateCards().filter((card) => {
+            const checkbox = card.querySelector("[data-master-duplicate-select]");
+            return checkbox && checkbox.checked;
+        });
+    }
+
+    function updateMasterDataDuplicateSelectionState() {
+        const els = masterDataDuplicateElements();
+        if (!els.panel) return;
+        const cards = masterDataDuplicateCards();
+        const selected = selectedMasterDataDuplicateCards();
+        const busy = els.panel.getAttribute("aria-busy") === "true";
+        cards.forEach((card) => {
+            const checkbox = card.querySelector("[data-master-duplicate-select]");
+            card.classList.toggle("is-selected", Boolean(checkbox && checkbox.checked));
+            if (checkbox) checkbox.disabled = busy;
+        });
+        if (els.toolbar) els.toolbar.hidden = !cards.length;
+        if (els.selectionCount) {
+            els.selectionCount.textContent = `${selected.length} selected`;
+        }
+        if (els.selectHighConfidence) {
+            const highConfidenceCount = cards.filter(
+                (card) => card.dataset.highConfidenceDuplicate === "true"
+            ).length;
+            els.selectHighConfidence.textContent = highConfidenceCount
+                ? `Select ${highConfidenceCount} high-confidence duplicate${highConfidenceCount === 1 ? "" : "s"}`
+                : "No high-confidence duplicates";
+        }
+        [els.selectHighConfidence, els.selectAll, els.selectNone].forEach((button) => {
+            if (button) button.disabled = busy || !cards.length;
+        });
+        Array.from(els.bulkActions || []).forEach((button) => {
+            const action = text(button.dataset.masterDuplicateBulkAction).trim();
+            const includesUnsafeMerge = selected.some((card) => card.dataset.highConfidenceDuplicate !== "true");
+            button.disabled = busy || !selected.length || (action === "merge" && includesUnsafeMerge);
+            if (action === "merge") {
+                button.title = includesUnsafeMerge
+                    ? "Bulk merge is available only for ≥98% singular/plural or alias matches."
+                    : "Merge each selected pair into its suggested survivor.";
+            }
+        });
+    }
+
+    function selectMasterDataDuplicateCards(mode) {
+        const cards = masterDataDuplicateCards();
+        cards.forEach((card) => {
+            const checkbox = card.querySelector("[data-master-duplicate-select]");
+            if (!checkbox) return;
+            if (mode === "high-confidence") {
+                checkbox.checked = card.dataset.highConfidenceDuplicate === "true";
+            } else {
+                checkbox.checked = mode === "all";
+            }
+        });
+        updateMasterDataDuplicateSelectionState();
+        const selectedCount = selectedMasterDataDuplicateCards().length;
+        if (mode === "high-confidence") {
+            setMasterDataDuplicateStatus(
+                selectedCount
+                    ? `Selected ${selectedCount} high-confidence singular/plural or alias match${selectedCount === 1 ? "" : "es"}.`
+                    : "No high-confidence duplicates are currently available."
+            );
+        }
+    }
+
+    function masterDataDuplicateBulkDecisions(cards, action) {
+        return cards.map((card) => ({
+            review_id: Number(card.dataset.reviewId) || 0,
+            action,
+            target_ingredient_id: action === "merge"
+                ? Number(card.dataset.suggestedTargetId) || null
+                : null,
+        }));
+    }
+
+    function setMasterDataDuplicateBulkBusy(busy, action = "") {
+        const els = masterDataDuplicateElements();
+        if (!els.panel) return;
+        els.panel.setAttribute("aria-busy", busy ? "true" : "false");
+        if (els.scan) els.scan.disabled = busy || els.panel.dataset.scope === "all";
+        masterDataDuplicateCards().forEach((card) => {
+            card.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
+        });
+        Array.from(els.bulkActions || []).forEach((button) => {
+            if (!button.dataset.defaultLabel) button.dataset.defaultLabel = button.textContent;
+            const buttonAction = text(button.dataset.masterDuplicateBulkAction).trim();
+            button.textContent = busy && buttonAction === action
+                ? "Applying selected decisions..."
+                : button.dataset.defaultLabel;
+        });
+        updateMasterDataDuplicateSelectionState();
+    }
+
+    async function applyMasterDataDuplicateBulkAction(button) {
+        const els = masterDataDuplicateElements();
+        const action = text(button.dataset.masterDuplicateBulkAction).trim();
+        const selected = selectedMasterDataDuplicateCards();
+        if (!els.panel || !selected.length || !action) return;
+        if (action === "merge") {
+            if (selected.some((card) => card.dataset.highConfidenceDuplicate !== "true")) {
+                setMasterDataDuplicateStatus(
+                    "Bulk merge is limited to ≥98% singular/plural or alias matches. Adjust the selection and try again.",
+                    "warning"
+                );
+                return;
+            }
+            if (changedStoreSectionForms().length) {
+                setMasterDataDuplicateStatus("Save your pending ingredient edits before merging records.", "warning");
+                return;
+            }
+            const preview = selected.slice(0, 5).map((card) => (
+                `${card.dataset.suggestedSourceName} → ${card.dataset.suggestedTargetName}`
+            ));
+            if (selected.length > preview.length) preview.push(`...and ${selected.length - preview.length} more`);
+            const confirmed = window.confirm(
+                `Merge ${selected.length} selected duplicate pair${selected.length === 1 ? "" : "s"} `
+                + "into the suggested survivors?\n\n"
+                + preview.join("\n")
+                + "\n\nRecipe references will move and removed names will be kept as aliases."
+            );
+            if (!confirmed) return;
+        }
+
+        setMasterDataDuplicateBulkBusy(true, action);
+        setMasterDataDuplicateStatus(`Applying ${selected.length} selected review decisions...`);
+        let reloadScheduled = false;
+        try {
+            const response = await fetch(text(els.panel.dataset.bulkDecisionUrl), {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({
+                    decisions: masterDataDuplicateBulkDecisions(selected, action),
+                }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "Bulk review decisions could not be applied.");
+            }
+            if (Number(data.merged_count) > 0) {
+                try {
+                    if (window.localStorage) {
+                        window.localStorage.setItem(INGREDIENT_MASTER_DATA_VERSION_STORAGE_KEY, String(Date.now()));
+                    }
+                } catch (storageError) {
+                    console.debug("Unable to notify other tabs about the ingredient merges.", storageError);
+                }
+                setMasterDataDuplicateStatus(data.message || "Bulk merge complete.");
+                reloadScheduled = true;
+                window.setTimeout(() => window.location.assign(window.location.href), 750);
+                return;
+            }
+            await loadMasterDataDuplicateReviews();
+            setMasterDataDuplicateStatus(
+                data.message || "Bulk review decisions saved.",
+                Number(data.failed_count) > 0 ? "warning" : ""
+            );
+        } catch (error) {
+            setMasterDataDuplicateStatus(error.message || "Bulk review decisions could not be applied.", "error");
+        } finally {
+            if (!reloadScheduled) setMasterDataDuplicateBulkBusy(false);
+        }
     }
 
     function duplicateReviewsUrl() {
@@ -1684,6 +1893,7 @@
             if (card) card.remove();
             const remaining = els.list.querySelectorAll(".master-data-duplicate-card[data-review-id]").length;
             if (!remaining) renderMasterDataDuplicateReviews([]);
+            updateMasterDataDuplicateSelectionState();
         } catch (error) {
             if (card) card.removeAttribute("aria-busy");
             if (card) card.querySelectorAll("button").forEach((actionButton) => { actionButton.disabled = false; });
@@ -1695,12 +1905,30 @@
         const els = masterDataDuplicateElements();
         if (!els.panel) return;
         if (els.scan) els.scan.addEventListener("click", scanMasterDataDuplicates);
+        if (els.selectHighConfidence) {
+            els.selectHighConfidence.addEventListener("click", () => selectMasterDataDuplicateCards("high-confidence"));
+        }
+        if (els.selectAll) {
+            els.selectAll.addEventListener("click", () => selectMasterDataDuplicateCards("all"));
+        }
+        if (els.selectNone) {
+            els.selectNone.addEventListener("click", () => selectMasterDataDuplicateCards("none"));
+        }
+        Array.from(els.bulkActions || []).forEach((button) => {
+            button.addEventListener("click", () => void applyMasterDataDuplicateBulkAction(button));
+        });
         if (els.list) {
             els.list.addEventListener("click", (event) => {
                 const button = event.target && event.target.closest
                     ? event.target.closest("[data-master-duplicate-decision]")
                     : null;
                 if (button) void decideMasterDataDuplicate(button);
+            });
+            els.list.addEventListener("change", (event) => {
+                const checkbox = event.target && event.target.closest
+                    ? event.target.closest("[data-master-duplicate-select]")
+                    : null;
+                if (checkbox) updateMasterDataDuplicateSelectionState();
             });
         }
         if (els.panel.dataset.scope === "all") {

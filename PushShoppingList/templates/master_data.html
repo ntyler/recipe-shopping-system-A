@@ -384,6 +384,7 @@
                      data-scan-url="{{ master_data.ingredient_duplicate_scan_url }}"
                      data-reviews-url="{{ master_data.ingredient_duplicate_reviews_url }}"
                      data-decision-url="{{ master_data.ingredient_duplicate_decision_url }}"
+                     data-bulk-decision-url="{{ master_data.ingredient_duplicate_bulk_decision_url }}"
                      data-scope="{{ master_data.scope }}"
                      data-user-id="{{ master_data.scope_user_id }}">
                 <header class="master-data-duplicate-header">
@@ -408,6 +409,36 @@
                      role="status"
                      aria-live="polite">
                     Loading saved review decisions&hellip;
+                </div>
+                <div class="master-data-duplicate-toolbar"
+                     data-master-duplicate-toolbar
+                     hidden>
+                    <div class="master-data-duplicate-selection-tools">
+                        <strong data-master-duplicate-selection-count>0 selected</strong>
+                        <button type="button" data-master-duplicate-select-high-confidence>
+                            Select high-confidence duplicates
+                        </button>
+                        <button type="button" data-master-duplicate-select-all>Select all</button>
+                        <button type="button" data-master-duplicate-select-none>Clear</button>
+                    </div>
+                    <div class="master-data-duplicate-bulk-actions">
+                        <button type="button"
+                                class="primary"
+                                data-master-duplicate-bulk-action="merge"
+                                disabled>
+                            Merge selected suggestions
+                        </button>
+                        <button type="button"
+                                data-master-duplicate-bulk-action="related"
+                                disabled>
+                            Mark selected related
+                        </button>
+                        <button type="button"
+                                data-master-duplicate-bulk-action="not_duplicate"
+                                disabled>
+                            Mark selected not duplicate
+                        </button>
+                    </div>
                 </div>
                 <div class="master-data-duplicate-list"
                      data-master-duplicate-list

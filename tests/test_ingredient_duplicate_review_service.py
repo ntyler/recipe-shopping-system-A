@@ -197,3 +197,119 @@ def test_decision_cannot_cross_workspaces(monkeypatch, tmp_path):
 
     assert result["ok"] is False
     assert result["status"] == 404
+
+
+def test_bulk_decisions_apply_multiple_review_choices(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    seed_pair()
+    master_data.sync_recipe_master_records(
+        "https://example.com/tomato",
+        recipe_data={"ingredients": [{"ingredient": "Tomato", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/tomatoes",
+        recipe_data={"ingredients": [{"ingredient": "Tomatoes", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    reviews = duplicate_reviews.scan_potential_duplicates("user-a")["reviews"]
+
+    result = duplicate_reviews.decide_duplicate_reviews(
+        [
+            {"review_id": review["review_id"], "action": "related"}
+            for review in reviews
+        ],
+        user_id="user-a",
+    )
+
+    assert result["ok"] is True
+    assert result["complete"] is True
+    assert result["requested_count"] == len(reviews)
+    assert result["succeeded_count"] == len(reviews)
+    assert result["failed_count"] == 0
+    assert result["merged_count"] == 0
+    assert duplicate_reviews.list_duplicate_reviews("user-a") == []
+
+
+def test_bulk_merge_uses_each_suggested_survivor(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    seed_pair()
+    master_data.sync_recipe_master_records(
+        "https://example.com/tomato",
+        recipe_data={"ingredients": [{"ingredient": "Tomato", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/tomatoes",
+        recipe_data={"ingredients": [{"ingredient": "Tomatoes", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    reviews = duplicate_reviews.scan_potential_duplicates("user-a")["reviews"]
+    exact_reviews = [review for review in reviews if review["signals"].get("singular_exact")]
+
+    result = duplicate_reviews.decide_duplicate_reviews(
+        [
+            {
+                "review_id": review["review_id"],
+                "action": "merge",
+                "target_ingredient_id": review["suggested_target_id"],
+            }
+            for review in exact_reviews
+        ],
+        user_id="user-a",
+    )
+
+    assert result["complete"] is True
+    assert result["merged_count"] == 2
+    assert len(master_data.list_ingredients(user_id="user-a", search="potatoes")) == 1
+    assert len(master_data.list_ingredients(user_id="user-a", search="tomatoes")) == 1
+
+
+def test_bulk_merge_rejects_lower_confidence_spelling_candidates(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/potatoes",
+        recipe_data={"ingredients": [{"ingredient": "Potatoes", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/tomatoes",
+        recipe_data={"ingredients": [{"ingredient": "Tomatoes", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    review = duplicate_reviews.scan_potential_duplicates("user-a")["reviews"][0]
+
+    result = duplicate_reviews.decide_duplicate_reviews(
+        [{
+            "review_id": review["review_id"],
+            "action": "merge",
+            "target_ingredient_id": review["suggested_target_id"],
+        }],
+        user_id="user-a",
+    )
+
+    assert result["complete"] is False
+    assert result["succeeded_count"] == 0
+    assert result["failed_count"] == 1
+    assert "high-confidence" in result["results"][0]["error"]
+    assert master_data.count_ingredients(user_id="user-a") == 2
+
+
+def test_bulk_decisions_report_item_failures_without_rolling_back_success(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    seed_pair()
+    review = duplicate_reviews.scan_potential_duplicates("user-a")["reviews"][0]
+
+    result = duplicate_reviews.decide_duplicate_reviews(
+        [
+            {"review_id": review["review_id"], "action": "not_duplicate"},
+            {"review_id": 999999, "action": "not_duplicate"},
+        ],
+        user_id="user-a",
+    )
+
+    assert result["ok"] is True
+    assert result["complete"] is False
+    assert result["succeeded_count"] == 1
+    assert result["failed_count"] == 1
+    assert result["results"][1]["status"] == 404

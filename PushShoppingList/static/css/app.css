@@ -26395,6 +26395,71 @@ img[data-deferred-src] {
             color: #fecaca;
         }
 
+        .master-data-duplicate-toolbar {
+            position: sticky;
+            top: 8px;
+            z-index: 8;
+            display: grid;
+            gap: 9px;
+            padding: 10px;
+            border: 1px solid #345069;
+            border-radius: 8px;
+            background: #0a1821;
+            box-shadow: 0 10px 26px rgba(0, 0, 0, .32);
+        }
+
+        .master-data-duplicate-toolbar[hidden] {
+            display: none;
+        }
+
+        .master-data-duplicate-selection-tools,
+        .master-data-duplicate-bulk-actions {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .master-data-duplicate-selection-tools strong {
+            min-width: 72px;
+            color: #f8fafc;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .master-data-duplicate-toolbar button {
+            width: auto;
+            min-height: 32px;
+            padding: 5px 9px;
+            border: 1px solid #466075;
+            border-radius: 6px;
+            background: #14212a;
+            color: #e5edf5;
+            font-size: 10px;
+            font-weight: 850;
+        }
+
+        .master-data-duplicate-bulk-actions {
+            padding-top: 9px;
+            border-top: 1px solid #263d4e;
+        }
+
+        .master-data-duplicate-toolbar button.primary {
+            border-color: #20a873;
+            background: #0b6542;
+            color: #fff;
+        }
+
+        .master-data-duplicate-toolbar button:is(:hover, :focus-visible) {
+            outline: none;
+            border-color: #6ee7b7;
+        }
+
+        .master-data-duplicate-toolbar button:disabled {
+            cursor: not-allowed;
+            opacity: .48;
+        }
+
         .master-data-duplicate-list {
             display: grid;
             gap: 10px;
@@ -26423,6 +26488,11 @@ img[data-deferred-src] {
             border-color: #2d8f70;
         }
 
+        .master-data-duplicate-card.is-selected {
+            border-color: #6ee7b7;
+            box-shadow: 0 0 0 2px rgba(52, 211, 153, .14);
+        }
+
         .master-data-duplicate-card[aria-busy="true"] {
             opacity: .62;
         }
@@ -26444,6 +26514,26 @@ img[data-deferred-src] {
             color: #91a7b8;
             font-size: 10px;
             font-weight: 750;
+        }
+
+        .master-data-duplicate-select {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 6px;
+            border: 1px solid #3d566a;
+            border-radius: 6px;
+            color: #cbd5e1;
+            font-size: 9px;
+            font-weight: 850;
+            cursor: pointer;
+        }
+
+        .master-data-duplicate-select input {
+            width: 15px;
+            height: 15px;
+            margin: 0;
+            accent-color: #10b981;
         }
 
         .master-data-duplicate-classification {
@@ -26553,6 +26643,11 @@ img[data-deferred-src] {
             flex-wrap: wrap;
         }
 
+        .master-data-duplicate-actions {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
         .master-data-duplicate-signals span {
             padding: 3px 6px;
             border: 1px solid #345069;
@@ -26564,6 +26659,7 @@ img[data-deferred-src] {
         }
 
         .master-data-duplicate-actions button {
+            width: 100%;
             min-height: 34px;
             padding: 6px 9px;
             border: 1px solid #466075;
@@ -26905,6 +27001,10 @@ img[data-deferred-src] {
                 width: 100%;
             }
 
+            .master-data-duplicate-actions {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
             .master-data-backfill-form,
             .master-data-image-form,
             .master-data-filter-form {
@@ -26952,9 +27052,23 @@ img[data-deferred-src] {
                 grid-template-columns: 1fr;
             }
 
+            .master-data-duplicate-toolbar {
+                position: static;
+            }
+
             .master-data-duplicate-actions {
                 display: grid;
                 grid-template-columns: 1fr;
+            }
+
+            .master-data-duplicate-selection-tools,
+            .master-data-duplicate-bulk-actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .master-data-duplicate-toolbar button {
+                width: 100%;
             }
 
             .master-data-merge-dialog,

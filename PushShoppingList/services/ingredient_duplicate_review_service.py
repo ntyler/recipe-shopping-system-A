@@ -598,3 +598,91 @@ def decide_duplicate_review(review_id, action, target_ingredient_id=None, user_i
             (status, classification, now, review_id, review_user_id),
         )
     return {"ok": True, "action": action, "review_id": review_id, "status": status}
+
+
+def decide_duplicate_reviews(decisions, user_id=None, allow_other_users=False, limit=100):
+    if not isinstance(decisions, list) or not decisions:
+        return {
+            "ok": False,
+            "status": 400,
+            "error": "Choose at least one duplicate review.",
+        }
+
+    try:
+        limit = max(1, min(int(limit or 100), 100))
+    except (TypeError, ValueError):
+        limit = 100
+
+    results = []
+    seen_review_ids = set()
+    for raw_decision in decisions[:limit]:
+        if not isinstance(raw_decision, dict):
+            results.append({
+                "ok": False,
+                "review_id": 0,
+                "error": "Invalid duplicate review decision.",
+            })
+            continue
+        try:
+            review_id = int(raw_decision.get("review_id") or 0)
+        except (TypeError, ValueError):
+            review_id = 0
+        if review_id <= 0 or review_id in seen_review_ids:
+            results.append({
+                "ok": False,
+                "review_id": review_id,
+                "error": "Invalid or repeated duplicate review.",
+            })
+            continue
+        seen_review_ids.add(review_id)
+        action = master_data.clean_text(raw_decision.get("action")).lower().replace("-", "_")
+        if action == "merge":
+            scoped_user_id = master_data.scoped_recipe_user_id(user_id)
+            with master_data.existing_recipe_master_connection() as connection:
+                review = connection.execute(
+                    "SELECT user_id, classification, confidence, signals_json "
+                    "FROM ingredient_duplicate_reviews WHERE id = ?",
+                    (review_id,),
+                ).fetchone() if connection is not None else None
+            if review and (allow_other_users or review["user_id"] == scoped_user_id):
+                signals = _decode_signals(review["signals_json"])
+                high_confidence_duplicate = (
+                    review["classification"] == "duplicate"
+                    and float(review["confidence"] or 0) >= 0.98
+                    and bool(signals.get("singular_exact") or signals.get("alias_match"))
+                )
+                if not high_confidence_duplicate:
+                    results.append({
+                        "ok": False,
+                        "status": 400,
+                        "review_id": review_id,
+                        "error": (
+                            "Bulk merge is limited to high-confidence singular/plural or alias matches."
+                        ),
+                    })
+                    continue
+        result = decide_duplicate_review(
+            review_id,
+            action,
+            target_ingredient_id=raw_decision.get("target_ingredient_id"),
+            user_id=user_id,
+            allow_other_users=allow_other_users,
+        )
+        results.append(result)
+
+    succeeded_count = sum(1 for result in results if result.get("ok"))
+    failed_count = len(results) - succeeded_count
+    merged_count = sum(
+        1
+        for result in results
+        if result.get("ok") and result.get("action") == "merge"
+    )
+    return {
+        "ok": True,
+        "complete": failed_count == 0,
+        "requested_count": min(len(decisions), limit),
+        "succeeded_count": succeeded_count,
+        "failed_count": failed_count,
+        "merged_count": merged_count,
+        "results": results,
+    }

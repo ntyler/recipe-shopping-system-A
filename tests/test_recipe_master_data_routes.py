@@ -488,6 +488,54 @@ def test_duplicate_review_routes_scan_scope_and_save_decisions(monkeypatch, tmp_
     assert user_b_response.get_json()["review_count"] == 1
 
 
+def test_duplicate_review_bulk_route_applies_selected_cards(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    for singular, plural in (("Potato", "Potatoes"), ("Tomato", "Tomatoes")):
+        master_data.sync_recipe_master_records(
+            f"https://example.com/{singular.lower()}",
+            recipe_data={"ingredients": [{"ingredient": singular, "store_section": "Produce"}]},
+            user_id="user-a",
+        )
+        master_data.sync_recipe_master_records(
+            f"https://example.com/{plural.lower()}",
+            recipe_data={"ingredients": [{"ingredient": plural, "store_section": "Produce"}]},
+            user_id="user-a",
+        )
+    headers = {"X-Requested-With": "fetch", "Accept": "application/json"}
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        scan = client.post(
+            "/api/master-data/ingredients/duplicate-scan",
+            json={"scope": "mine"},
+            headers=headers,
+        ).get_json()
+        response = client.post(
+            "/api/master-data/ingredients/duplicate-reviews/bulk-decision",
+            json={
+                "decisions": [
+                    {"review_id": review["review_id"], "action": "not_duplicate"}
+                    for review in scan["reviews"]
+                    if review["signals"].get("singular_exact")
+                ]
+            },
+            headers=headers,
+        )
+        remaining = client.get(
+            "/api/master-data/ingredients/duplicate-reviews",
+            headers=headers,
+        ).get_json()
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["complete"] is True
+    assert payload["succeeded_count"] == 2
+    assert payload["failed_count"] == 0
+    assert remaining["review_count"] == len(scan["reviews"]) - 2
+
+
 def test_ingredient_master_record_edit_is_scoped_and_admin_can_edit_other_users(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     seed_master_records()
@@ -930,6 +978,12 @@ def test_master_data_duplicate_review_ui_is_wired():
         "ingredient_duplicate_scan_url",
         "ingredient_duplicate_reviews_url",
         "ingredient_duplicate_decision_url",
+        "ingredient_duplicate_bulk_decision_url",
+        "data-master-duplicate-toolbar",
+        "data-master-duplicate-select-high-confidence",
+        "data-master-duplicate-select-all",
+        "data-master-duplicate-select-none",
+        "data-master-duplicate-bulk-action",
     ):
         assert marker in template
     assert "Find Potential Duplicates" in template
@@ -937,12 +991,17 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "function masterDataDuplicateCard(review)" in script
     assert "async function scanMasterDataDuplicates()" in script
     assert "async function decideMasterDataDuplicate(button)" in script
+    assert "async function applyMasterDataDuplicateBulkAction(button)" in script
+    assert "function updateMasterDataDuplicateSelectionState()" in script
+    assert 'card.dataset.highConfidenceDuplicate' in script
     assert 'button.closest(".master-data-duplicate-card")' in script
     assert "window.confirm(" in script
     assert "initMasterDataDuplicateReview();" in script
     assert ".master-data-duplicate-review" in css
     assert ".master-data-duplicate-comparison" in css
     assert ".master-data-duplicate-actions" in css
+    assert ".master-data-duplicate-toolbar" in css
+    assert ".master-data-duplicate-card.is-selected" in css
 
 
 def test_master_data_reference_expander_is_wired():

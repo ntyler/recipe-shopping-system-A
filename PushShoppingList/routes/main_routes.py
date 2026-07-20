@@ -1138,6 +1138,9 @@ def master_data_context(record_type):
             "main_bp.ingredient_duplicate_decision_route",
             review_id=0,
         ),
+        "ingredient_duplicate_bulk_decision_url": url_for(
+            "main_bp.ingredient_duplicate_bulk_decision_route"
+        ),
         "current_url": current_url,
         "prev_url": prev_url,
         "next_url": next_url,
@@ -1276,6 +1279,40 @@ def ingredient_duplicate_decision_route(review_id):
         **result,
         "success": False,
     }), int(result.get("status") or 400)
+
+
+@main_bp.route(
+    "/api/master-data/ingredients/duplicate-reviews/bulk-decision",
+    methods=["POST"],
+)
+def ingredient_duplicate_bulk_decision_route():
+    active_public_user = current_public_user()
+    payload = request.get_json(silent=True) if request.is_json else {}
+    payload = payload if isinstance(payload, dict) else {}
+    result = ingredient_duplicate_reviews.decide_duplicate_reviews(
+        payload.get("decisions"),
+        allow_other_users=is_admin_user(active_public_user),
+    )
+    if not result.get("ok"):
+        return jsonify({**result, "success": False}), int(result.get("status") or 400)
+
+    succeeded_count = int(result.get("succeeded_count") or 0)
+    failed_count = int(result.get("failed_count") or 0)
+    merged_count = int(result.get("merged_count") or 0)
+    message = f"Applied {succeeded_count} bulk review decision{'s' if succeeded_count != 1 else ''}."
+    if failed_count:
+        message += f" {failed_count} item{'s' if failed_count != 1 else ''} could not be applied."
+    if merged_count:
+        message += f" {merged_count} duplicate pair{'s' if merged_count != 1 else ''} merged."
+        session["recipe_master_data_messages"] = [{
+            "category": "success" if not failed_count else "warning",
+            "text": message,
+        }]
+    return jsonify({
+        **result,
+        "success": True,
+        "message": message,
+    })
 
 
 @main_bp.route("/api/master-data/<record_type>/<int:record_id>/references")
