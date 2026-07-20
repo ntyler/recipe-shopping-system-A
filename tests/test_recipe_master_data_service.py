@@ -589,18 +589,15 @@ def test_ingredient_merge_history_can_be_previewed_and_undone_repeatedly(monkeyp
     )
 
     latest_preview = master_data.ingredient_merge_undo_preview("user-a")
-    locked_older_preview = master_data.ingredient_merge_undo_preview(
+    independent_older_preview = master_data.ingredient_merge_undo_preview(
         "user-a", merge_id=first_merge["merge_id"]
     )
-    stale_undo = master_data.undo_last_ingredient_master_merge(
+    out_of_order_undo = master_data.undo_last_ingredient_master_merge(
         "user-a", expected_merge_id=first_merge["merge_id"]
     )
+    remaining_preview = master_data.ingredient_merge_undo_preview("user-a")
     latest_undo = master_data.undo_last_ingredient_master_merge(
         "user-a", expected_merge_id=second_merge["merge_id"]
-    )
-    older_preview = master_data.ingredient_merge_undo_preview("user-a")
-    older_undo = master_data.undo_last_ingredient_master_merge(
-        "user-a", expected_merge_id=first_merge["merge_id"]
     )
 
     assert latest_preview["merge_id"] == second_merge["merge_id"]
@@ -613,19 +610,60 @@ def test_ingredient_merge_history_can_be_previewed_and_undone_repeatedly(monkeyp
     ]
     assert latest_preview["undoable_merges"][0]["is_next_undo"] is True
     assert latest_preview["undoable_merges"][1]["newer_undo_count"] == 1
-    assert locked_older_preview["merge_id"] == first_merge["merge_id"]
-    assert locked_older_preview["is_next_undo"] is False
-    assert locked_older_preview["newer_undo_count"] == 1
-    assert stale_undo["ok"] is False
-    assert stale_undo["status"] == 409
-    assert "available merge changed" in stale_undo["error"]
+    assert latest_preview["undoable_merges"][1]["can_undo_now"] is True
+    assert independent_older_preview["merge_id"] == first_merge["merge_id"]
+    assert independent_older_preview["is_next_undo"] is False
+    assert independent_older_preview["can_undo_now"] is True
+    assert independent_older_preview["newer_undo_count"] == 1
+    assert out_of_order_undo["ok"] is True
+    assert out_of_order_undo["merge_id"] == first_merge["merge_id"]
+    assert out_of_order_undo["next_merge"]["merge_id"] == second_merge["merge_id"]
+    assert remaining_preview["merge_id"] == second_merge["merge_id"]
+    assert remaining_preview["older_undo_count"] == 0
     assert latest_undo["ok"] is True
-    assert latest_undo["next_merge"]["merge_id"] == first_merge["merge_id"]
-    assert older_preview["merge_id"] == first_merge["merge_id"]
-    assert older_preview["older_undo_count"] == 0
-    assert older_undo["ok"] is True
-    assert older_undo["next_merge"] is None
+    assert latest_undo["next_merge"] is None
     assert master_data.latest_undoable_ingredient_merge("user-a") is None
+
+
+def test_out_of_order_undo_blocks_dependent_merge_until_newer_merge_is_undone(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    for name in ("Scallions", "Green Onion", "Onion"):
+        master_data.sync_recipe_master_records(
+            f"https://example.com/{name.lower().replace(' ', '-')}",
+            recipe_data={"ingredients": [{"ingredient": name, "store_section": "Produce"}]},
+            user_id="user-a",
+        )
+
+    scallions = master_data.master_record_for_name("ingredients", "user-a", "scallions")
+    green_onion = master_data.master_record_for_name("ingredients", "user-a", "green onion")
+    onion = master_data.master_record_for_name("ingredients", "user-a", "onion")
+    older_merge = master_data.merge_ingredient_master_records(
+        scallions["id"], green_onion["id"], user_id="user-a"
+    )
+    newer_merge = master_data.merge_ingredient_master_records(
+        green_onion["id"], onion["id"], user_id="user-a"
+    )
+
+    blocked_preview = master_data.ingredient_merge_undo_preview(
+        "user-a", merge_id=older_merge["merge_id"]
+    )
+    blocked_undo = master_data.undo_last_ingredient_master_merge(
+        "user-a", expected_merge_id=older_merge["merge_id"]
+    )
+    newer_undo = master_data.undo_last_ingredient_master_merge(
+        "user-a", expected_merge_id=newer_merge["merge_id"]
+    )
+    unlocked_preview = master_data.ingredient_merge_undo_preview(
+        "user-a", merge_id=older_merge["merge_id"]
+    )
+
+    assert blocked_preview["can_undo_now"] is False
+    assert "surviving ingredient changed" in blocked_preview["blocked_reason"]
+    assert blocked_preview["undoable_merges"][1]["can_undo_now"] is False
+    assert blocked_undo["ok"] is False
+    assert blocked_undo["status"] == 409
+    assert newer_undo["ok"] is True
+    assert unlocked_preview["can_undo_now"] is True
 
 
 def test_undo_ingredient_merge_refuses_to_overwrite_later_target_edits(monkeypatch, tmp_path):

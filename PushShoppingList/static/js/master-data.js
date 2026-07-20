@@ -1690,12 +1690,16 @@
             const mergeId = Number(merge && merge.merge_id) || 0;
             const newerCount = Math.max(0, Number(merge && merge.newer_undo_count) || 0);
             const referenceCount = Math.max(0, Number(merge && merge.restored_reference_count) || 0);
+            const canUndoNow = Boolean(merge && merge.can_undo_now);
             const button = document.createElement("button");
             button.type = "button";
             button.className = "master-data-undo-history-item";
-            button.classList.toggle("is-blocked", newerCount > 0);
+            button.classList.toggle("is-blocked", !canUndoNow);
             button.dataset.masterUndoHistoryMergeId = String(mergeId);
             button.setAttribute("aria-current", mergeId === Number(selectedMergeId) ? "true" : "false");
+            button.title = canUndoNow
+                ? (newerCount ? "This merge is independent and can be undone out of order." : "This merge can be undone now.")
+                : text(merge && merge.blocked_reason).trim();
 
             const header = document.createElement("span");
             header.className = "master-data-undo-history-item-header";
@@ -1703,9 +1707,9 @@
             source.textContent = text(merge && merge.source_name).trim() || "Ingredient";
             const badge = document.createElement("span");
             badge.className = "master-data-undo-history-item-badge";
-            badge.textContent = newerCount
-                ? `${newerCount} newer first`
-                : "Undo next";
+            badge.textContent = canUndoNow
+                ? (newerCount ? "Safe now" : "Undo next")
+                : "Blocked";
             header.append(source, badge);
 
             const target = document.createElement("span");
@@ -1741,15 +1745,20 @@
         const referenceCount = Math.max(0, Number(merge.restored_reference_count) || 0);
         const newerCount = Math.max(0, Number(merge.newer_undo_count) || 0);
         const isNextUndo = merge.is_next_undo !== false && newerCount === 0;
+        const canUndoNow = Boolean(merge.can_undo_now);
+        const blockedReason = text(merge.blocked_reason).trim()
+            || "This merge depends on newer changes and cannot be safely undone yet.";
         if (els.summary) {
-            els.summary.textContent = isNextUndo
+            els.summary.textContent = canUndoNow
                 ? `Restore ${sourceName} from its merge into ${targetName}.`
-                : `Preview ${sourceName}; undo ${newerCount} newer merge${newerCount === 1 ? "" : "s"} first.`;
+                : `Preview ${sourceName}; this restore is currently blocked.`;
         }
         if (els.position) {
             els.position.textContent = isNextUndo
                 ? "Undo next • newest merge"
-                : `Undo position ${Math.max(1, Number(merge.undo_order) || newerCount + 1)}`;
+                : canUndoNow
+                ? "Safe out-of-order undo"
+                : "Blocked by newer changes";
         }
         if (els.time) {
             els.time.textContent = formatMasterDataDuplicateScanTime(merge.merged_at) || "Merge time unavailable";
@@ -1804,16 +1813,21 @@
         );
         const olderCount = Math.max(0, Number(merge.older_undo_count) || 0);
         if (els.next) {
-            els.next.textContent = newerCount
-                ? `${newerCount} newer merge${newerCount === 1 ? " must" : "s must"} be undone before this merge can be restored.`
+            els.next.classList.toggle("is-blocked", !canUndoNow);
+            els.next.textContent = !canUndoNow
+                ? blockedReason
+                : newerCount
+                ? `This merge is independent. ${newerCount} newer merge${newerCount === 1 ? " will" : "s will"} remain after this undo.`
                 : olderCount
                 ? `${olderCount} older merge${olderCount === 1 ? "" : "s"} will remain available after this undo.`
                 : "This is the oldest remaining merge in the undo history.";
         }
         if (els.footer) {
-            els.footer.textContent = isNextUndo
+            els.footer.textContent = !canUndoNow
+                ? "This merge is read-only until its restore checks pass."
+                : isNextUndo
                 ? "Undoing this merge will automatically advance the history stack."
-                : `This merge unlocks after ${newerCount} newer undo${newerCount === 1 ? "" : "s"}.`;
+                : "Safe out-of-order undo leaves unrelated newer merges available.";
         }
         if (els.status) {
             els.status.hidden = true;
@@ -1821,10 +1835,10 @@
         }
         if (els.preview) els.preview.hidden = false;
         if (els.confirm) {
-            els.confirm.disabled = !isNextUndo;
-            els.confirm.textContent = isNextUndo
+            els.confirm.disabled = !canUndoNow;
+            els.confirm.textContent = canUndoNow
                 ? `Undo and restore ${sourceName}`
-                : "Undo newer merges first";
+                : "Cannot safely undo yet";
         }
     }
 
@@ -1897,7 +1911,7 @@
             || !previewEls.dialog
             || !preview
             || !Number(preview.merge_id)
-            || preview.is_next_undo === false
+            || preview.can_undo_now === false
         ) return;
         if (changedStoreSectionForms().length) {
             setMasterDataUndoPreviewError("Save your pending ingredient edits before undoing a merge.");

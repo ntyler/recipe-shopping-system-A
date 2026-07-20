@@ -485,8 +485,10 @@ def test_ingredient_master_merge_undo_route_and_button_restore_last_merge(monkey
     assert preview_payload["merge"]["target_restore"]["name"] == "Carrot"
     assert preview_payload["merge"]["restored_reference_count"] == 1
     assert preview_payload["merge"]["older_undo_count"] == 0
+    assert preview_payload["merge"]["can_undo_now"] is True
     assert len(preview_payload["merges"]) == 1
     assert preview_payload["merges"][0]["is_next_undo"] is True
+    assert preview_payload["merges"][0]["can_undo_now"] is True
     assert undo_response.status_code == 200
     assert undo_payload["ok"] is True
     assert undo_payload["source_name"] == "Carrots"
@@ -1113,6 +1115,7 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert 'await refreshAfterMasterDataDuplicateMerge(' in undo_block
     assert 'data.message || "Ingredient merge undone."' in undo_block
     assert "merge_id: Number(preview.merge_id)" in undo_block
+    assert "preview.can_undo_now === false" in undo_block
     assert "window.location.reload();" not in undo_block
     assert "data-master-duplicate-references-open" in script
     assert 'url.searchParams.set("limit", "500")' in script
@@ -1148,6 +1151,9 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-undo-preview-comparison" in css
     assert ".master-data-undo-history-layout" in css
     assert ".master-data-undo-history-item" in css
+    assert "Safe out-of-order undo" in script
+    assert "Cannot safely undo yet" in script
+    assert "Undo newer merges first" not in script
     assert "grid-template-columns: minmax(0, 1fr) auto;" in css
     assert '"[data-master-duplicate-scan], [data-master-duplicate-toolbar-scan]"' in script
     assert '"[data-master-duplicate-undo-merge], [data-master-duplicate-toolbar-undo-merge]"' in script

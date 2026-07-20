@@ -27033,6 +27033,11 @@ img[data-deferred-src] {
             color: #a9bac6;
         }
 
+        .master-data-undo-history-item.is-blocked[aria-current="true"] {
+            border-color: #a86f18;
+            background: #2a1d0b;
+        }
+
         .master-data-undo-history-item-header,
         .master-data-undo-history-item-meta {
             display: flex;
@@ -27317,6 +27322,12 @@ img[data-deferred-src] {
             border-left: 3px solid #2d8f70;
             background: rgba(15, 51, 40, .52);
             color: #c7f9e8;
+        }
+
+        .master-data-undo-preview-next.is-blocked {
+            border-left-color: #d59a32;
+            background: rgba(85, 54, 10, .48);
+            color: #fde68a;
         }
 
         .master-data-undo-dialog-footer {

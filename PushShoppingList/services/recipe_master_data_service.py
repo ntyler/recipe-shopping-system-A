@@ -1789,7 +1789,165 @@ def ingredient_merge_history_summary(row):
     }
 
 
-def ingredient_merge_undo_stack_summary(row, index, total):
+INGREDIENT_MERGE_RESTORE_FIELDS = (
+    "id",
+    "user_id",
+    "name",
+    "normalized_name",
+    "store_section",
+    "image_url",
+    "image_path",
+    "created_at",
+    "updated_at",
+)
+INGREDIENT_MERGE_ALIAS_FIELDS = (
+    "id",
+    "user_id",
+    "ingredient_id",
+    "alias_name",
+    "normalized_alias",
+    "created_at",
+    "updated_at",
+)
+
+
+def validate_ingredient_merge_undo_candidate(connection, history, scoped_user_id):
+    def failure(message):
+        return {"ok": False, "status": 409, "error": message}
+
+    if not history:
+        return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
+    try:
+        snapshot = json.loads(history["snapshot_json"])
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return failure("This merge cannot be undone because its restore data is unavailable.")
+
+    source = snapshot.get("source") if isinstance(snapshot, dict) else None
+    target = snapshot.get("target") if isinstance(snapshot, dict) else None
+    merged_target = snapshot.get("merged_target") if isinstance(snapshot, dict) else None
+    aliases_before = snapshot.get("aliases_before") if isinstance(snapshot, dict) else None
+    merged_aliases = snapshot.get("merged_aliases") if isinstance(snapshot, dict) else None
+    if not all(isinstance(value, dict) for value in (source, target, merged_target)):
+        return failure("This merge cannot be undone because its restore data is incomplete.")
+    aliases_before = aliases_before if isinstance(aliases_before, list) else []
+    merged_aliases = merged_aliases if isinstance(merged_aliases, list) else []
+    source_id = int(history["source_ingredient_id"])
+    target_id = int(history["target_ingredient_id"])
+    if (
+        int(source.get("id") or 0) != source_id
+        or int(target.get("id") or 0) != target_id
+        or clean_text(source.get("user_id")) != scoped_user_id
+        or clean_text(target.get("user_id")) != scoped_user_id
+    ):
+        return failure("This merge cannot be undone because its restore data does not match the workspace.")
+
+    current_target = connection.execute(
+        """
+        SELECT id, user_id, name, normalized_name, store_section,
+               image_url, image_path, created_at, updated_at
+          FROM ingredients
+         WHERE id = ? AND user_id = ?
+        """,
+        (target_id, scoped_user_id),
+    ).fetchone()
+    current_target_data = dict(current_target) if current_target else {}
+    if not current_target or any(
+        current_target_data.get(field) != merged_target.get(field)
+        for field in INGREDIENT_MERGE_RESTORE_FIELDS
+    ):
+        return failure("The surviving ingredient changed after this merge, so it cannot be safely restored.")
+
+    current_aliases = connection.execute(
+        """
+        SELECT id, user_id, ingredient_id, alias_name, normalized_alias,
+               created_at, updated_at
+          FROM ingredient_aliases
+         WHERE user_id = ? AND ingredient_id = ?
+         ORDER BY normalized_alias ASC
+        """,
+        (scoped_user_id, target_id),
+    ).fetchall()
+
+    def alias_signatures(rows):
+        return sorted(
+            tuple(dict(row).get(field) for field in INGREDIENT_MERGE_ALIAS_FIELDS)
+            for row in rows or []
+        )
+
+    if alias_signatures(current_aliases) != alias_signatures(merged_aliases):
+        return failure("The surviving ingredient aliases changed after this merge, so it cannot be safely restored.")
+
+    source_conflict = connection.execute(
+        """
+        SELECT id
+          FROM ingredients
+         WHERE id = ?
+            OR (user_id = ? AND normalized_name = ?)
+         LIMIT 1
+        """,
+        (source_id, scoped_user_id, normalized_master_name(source.get("normalized_name"))),
+    ).fetchone()
+    if source_conflict:
+        return failure("The removed ingredient name is in use again, so this merge cannot be undone safely.")
+
+    restored_alias_names = sorted({
+        normalized_master_name(alias.get("normalized_alias"))
+        for alias in aliases_before
+        if isinstance(alias, dict) and normalized_master_name(alias.get("normalized_alias"))
+    })
+    if restored_alias_names:
+        placeholders = ", ".join("?" for _value in restored_alias_names)
+        alias_conflict = connection.execute(
+            f"""
+            SELECT normalized_alias
+              FROM ingredient_aliases
+             WHERE user_id = ?
+               AND normalized_alias IN ({placeholders})
+               AND ingredient_id != ?
+             LIMIT 1
+            """,
+            (scoped_user_id, *restored_alias_names, target_id),
+        ).fetchone()
+        if alias_conflict:
+            return failure(
+                f"The alias {alias_conflict['normalized_alias']} is in use, so this merge cannot be undone safely."
+            )
+
+    moved_reference_ids = sorted({
+        int(reference_id)
+        for reference_id in snapshot.get("moved_reference_ids", [])
+        if str(reference_id).isdigit() and int(reference_id) > 0
+    })
+    if moved_reference_ids:
+        placeholders = ", ".join("?" for _value in moved_reference_ids)
+        moved_reference_rows = connection.execute(
+            f"""
+            SELECT id, ingredient_id
+              FROM recipe_ingredients
+             WHERE user_id = ? AND id IN ({placeholders})
+            """,
+            (scoped_user_id, *moved_reference_ids),
+        ).fetchall()
+        if len(moved_reference_rows) != len(moved_reference_ids) or any(
+            int(row["ingredient_id"]) != target_id for row in moved_reference_rows
+        ):
+            return failure("A moved recipe reference changed after this merge, so it cannot be safely restored.")
+
+    return {
+        "ok": True,
+        "snapshot": snapshot,
+        "source": source,
+        "target": target,
+        "merged_target": merged_target,
+        "aliases_before": aliases_before,
+        "merged_aliases": merged_aliases,
+        "source_id": source_id,
+        "target_id": target_id,
+        "moved_reference_ids": moved_reference_ids,
+    }
+
+
+def ingredient_merge_undo_stack_summary(row, index, total, validation=None):
     summary = ingredient_merge_history_summary(row)
     snapshot = {}
     try:
@@ -1812,6 +1970,10 @@ def ingredient_merge_undo_stack_summary(row, index, total):
         "restored_reference_count": len(moved_reference_ids),
         "source_image_url": clean_text(source.get("image_url")),
         "target_image_url": clean_text(target.get("image_url")),
+        "can_undo_now": bool(validation and validation.get("ok")),
+        "blocked_reason": "" if validation and validation.get("ok") else clean_text(
+            validation.get("error") if isinstance(validation, dict) else ""
+        ),
     })
     return summary
 
@@ -1851,10 +2013,24 @@ def ingredient_merge_undo_preview(user_id=None, reference_limit=8, merge_id=None
         selected_index = next(
             index for index, row in enumerate(history_rows) if int(row["id"]) == int(history["id"])
         )
+        validations = {
+            int(row["id"]): validate_ingredient_merge_undo_candidate(
+                connection,
+                row,
+                scoped_user_id,
+            )
+            for row in history_rows
+        }
         undoable_merges = [
-            ingredient_merge_undo_stack_summary(row, index, len(history_rows))
+            ingredient_merge_undo_stack_summary(
+                row,
+                index,
+                len(history_rows),
+                validations.get(int(row["id"])),
+            )
             for index, row in enumerate(history_rows)
         ]
+        selected_validation = validations.get(int(history["id"]), {})
 
         try:
             snapshot = json.loads(history["snapshot_json"])
@@ -1976,6 +2152,10 @@ def ingredient_merge_undo_preview(user_id=None, reference_limit=8, merge_id=None
             "has_older_merge": older_undo_count > 0,
             "newer_undo_count": newer_undo_count,
             "is_next_undo": newer_undo_count == 0,
+            "can_undo_now": bool(selected_validation.get("ok")),
+            "blocked_reason": "" if selected_validation.get("ok") else clean_text(
+                selected_validation.get("error")
+            ),
             "undoable_merges": undoable_merges,
         }
 
@@ -2302,198 +2482,50 @@ def undo_last_ingredient_master_merge(user_id=None, expected_merge_id=None):
         expected_merge_id = int(expected_merge_id or 0)
     except (TypeError, ValueError):
         expected_merge_id = 0
-    ingredient_fields = (
-        "id",
-        "user_id",
-        "name",
-        "normalized_name",
-        "store_section",
-        "image_url",
-        "image_path",
-        "created_at",
-        "updated_at",
-    )
-    alias_fields = (
-        "id",
-        "user_id",
-        "ingredient_id",
-        "alias_name",
-        "normalized_alias",
-        "created_at",
-        "updated_at",
-    )
-
-    def snapshot_matches(row, expected, fields):
-        if not row or not isinstance(expected, dict):
-            return False
-        current = dict(row)
-        return all(current.get(field) == expected.get(field) for field in fields)
-
-    def alias_signatures(rows):
-        return sorted(
-            tuple(dict(row).get(field) for field in alias_fields)
-            for row in rows or []
-        )
-
     with existing_recipe_master_connection() as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
 
-        history = connection.execute(
-            """
-            SELECT id, user_id, source_ingredient_id, target_ingredient_id,
-                   source_name, target_name, snapshot_json, merged_at
-              FROM ingredient_merge_history
-             WHERE user_id = ? AND undone_at IS NULL
-             ORDER BY id DESC
-             LIMIT 1
-            """,
-            (scoped_user_id,),
-        ).fetchone()
-        if not history:
-            return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
-        if expected_merge_id > 0 and int(history["id"]) != expected_merge_id:
-            return {
-                "ok": False,
-                "status": 409,
-                "error": "The available merge changed. Review the latest undo before confirming again.",
-            }
-
-        try:
-            snapshot = json.loads(history["snapshot_json"])
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return {
-                "ok": False,
-                "status": 409,
-                "error": "This merge cannot be undone because its restore data is unavailable.",
-            }
-
-        source = snapshot.get("source") if isinstance(snapshot, dict) else None
-        target = snapshot.get("target") if isinstance(snapshot, dict) else None
-        merged_target = snapshot.get("merged_target") if isinstance(snapshot, dict) else None
-        aliases_before = snapshot.get("aliases_before") if isinstance(snapshot, dict) else None
-        merged_aliases = snapshot.get("merged_aliases") if isinstance(snapshot, dict) else None
-        if not all(isinstance(value, dict) for value in (source, target, merged_target)):
-            return {
-                "ok": False,
-                "status": 409,
-                "error": "This merge cannot be undone because its restore data is incomplete.",
-            }
-        aliases_before = aliases_before if isinstance(aliases_before, list) else []
-        merged_aliases = merged_aliases if isinstance(merged_aliases, list) else []
-        source_id = int(history["source_ingredient_id"])
-        target_id = int(history["target_ingredient_id"])
-        if (
-            int(source.get("id") or 0) != source_id
-            or int(target.get("id") or 0) != target_id
-            or clean_text(source.get("user_id")) != scoped_user_id
-            or clean_text(target.get("user_id")) != scoped_user_id
-        ):
-            return {
-                "ok": False,
-                "status": 409,
-                "error": "This merge cannot be undone because its restore data does not match the workspace.",
-            }
-
-        current_target = connection.execute(
-            """
-            SELECT id, user_id, name, normalized_name, store_section,
-                   image_url, image_path, created_at, updated_at
-              FROM ingredients
-             WHERE id = ? AND user_id = ?
-            """,
-            (target_id, scoped_user_id),
-        ).fetchone()
-        if not snapshot_matches(current_target, merged_target, ingredient_fields):
-            return {
-                "ok": False,
-                "status": 409,
-                "error": "The surviving ingredient changed after this merge, so it was not overwritten.",
-            }
-
-        current_aliases = connection.execute(
-            """
-            SELECT id, user_id, ingredient_id, alias_name, normalized_alias,
-                   created_at, updated_at
-              FROM ingredient_aliases
-             WHERE user_id = ? AND ingredient_id = ?
-             ORDER BY normalized_alias ASC
-            """,
-            (scoped_user_id, target_id),
-        ).fetchall()
-        if alias_signatures(current_aliases) != alias_signatures(merged_aliases):
-            return {
-                "ok": False,
-                "status": 409,
-                "error": "The surviving ingredient aliases changed after this merge, so they were not overwritten.",
-            }
-
-        source_conflict = connection.execute(
-            """
-            SELECT id
-              FROM ingredients
-             WHERE id = ?
-                OR (user_id = ? AND normalized_name = ?)
-             LIMIT 1
-            """,
-            (source_id, scoped_user_id, normalized_master_name(source.get("normalized_name"))),
-        ).fetchone()
-        if source_conflict:
-            return {
-                "ok": False,
-                "status": 409,
-                "error": "The removed ingredient name is in use again, so this merge cannot be undone safely.",
-            }
-
-        restored_alias_names = sorted({
-            normalized_master_name(alias.get("normalized_alias"))
-            for alias in aliases_before
-            if isinstance(alias, dict) and normalized_master_name(alias.get("normalized_alias"))
-        })
-        if restored_alias_names:
-            placeholders = ", ".join("?" for _value in restored_alias_names)
-            alias_conflict = connection.execute(
-                f"""
-                SELECT normalized_alias
-                  FROM ingredient_aliases
-                 WHERE user_id = ?
-                   AND normalized_alias IN ({placeholders})
-                   AND ingredient_id != ?
+        if expected_merge_id > 0:
+            history = connection.execute(
+                """
+                SELECT id, user_id, source_ingredient_id, target_ingredient_id,
+                       source_name, target_name, snapshot_json, merged_at
+                  FROM ingredient_merge_history
+                 WHERE user_id = ? AND id = ? AND undone_at IS NULL
                  LIMIT 1
                 """,
-                (scoped_user_id, *restored_alias_names, target_id),
+                (scoped_user_id, expected_merge_id),
             ).fetchone()
-            if alias_conflict:
-                return {
-                    "ok": False,
-                    "status": 409,
-                    "error": (
-                        f"The alias {alias_conflict['normalized_alias']} is in use, "
-                        "so this merge cannot be undone safely."
-                    ),
-                }
-
-        moved_reference_ids = sorted({
-            int(reference_id)
-            for reference_id in snapshot.get("moved_reference_ids", [])
-            if str(reference_id).isdigit() and int(reference_id) > 0
-        })
-        if moved_reference_ids:
-            placeholders = ", ".join("?" for _value in moved_reference_ids)
-            moved_reference_rows = connection.execute(
-                f"""
-                SELECT id, ingredient_id
-                  FROM recipe_ingredients
-                 WHERE user_id = ? AND id IN ({placeholders})
+        else:
+            history = connection.execute(
+                """
+                SELECT id, user_id, source_ingredient_id, target_ingredient_id,
+                       source_name, target_name, snapshot_json, merged_at
+                  FROM ingredient_merge_history
+                 WHERE user_id = ? AND undone_at IS NULL
+                 ORDER BY id DESC
+                 LIMIT 1
                 """,
-                (scoped_user_id, *moved_reference_ids),
-            ).fetchall()
-            if any(int(row["ingredient_id"]) != target_id for row in moved_reference_rows):
-                return {
-                    "ok": False,
-                    "status": 409,
-                    "error": "A moved recipe reference changed after this merge, so it was not overwritten.",
-                }
+                (scoped_user_id,),
+            ).fetchone()
+        if not history:
+            return {
+                "ok": False,
+                "status": 404,
+                "error": "That ingredient merge is no longer available to undo.",
+            }
+
+        validation = validate_ingredient_merge_undo_candidate(connection, history, scoped_user_id)
+        if not validation.get("ok"):
+            return validation
+        snapshot = validation["snapshot"]
+        source = validation["source"]
+        target = validation["target"]
+        aliases_before = validation["aliases_before"]
+        source_id = validation["source_id"]
+        target_id = validation["target_id"]
+        moved_reference_ids = validation["moved_reference_ids"]
 
         connection.execute(
             """
@@ -2503,7 +2535,7 @@ def undo_last_ingredient_master_merge(user_id=None, expected_merge_id=None):
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            tuple(source.get(field) for field in ingredient_fields),
+            tuple(source.get(field) for field in INGREDIENT_MERGE_RESTORE_FIELDS),
         )
         connection.execute(
             """
@@ -2539,7 +2571,7 @@ def undo_last_ingredient_master_merge(user_id=None, expected_merge_id=None):
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                tuple(alias.get(field) for field in alias_fields),
+                tuple(alias.get(field) for field in INGREDIENT_MERGE_ALIAS_FIELDS),
             )
 
         restored_reference_count = 0
