@@ -454,9 +454,18 @@ def test_ingredient_master_merge_undo_route_and_button_restore_last_merge(monkey
             headers=headers,
         )
         merged_page = client.get("/admin/master-data/ingredients")
+        preview_response = client.get(
+            "/api/master-data/ingredients/merges/undo-preview?scope=mine",
+            headers=headers,
+        )
+        preview_payload = preview_response.get_json()
         undo_response = client.post(
             "/api/master-data/ingredients/merges/undo",
-            json={"scope": "user", "user_id": "user-b"},
+            json={
+                "scope": "user",
+                "user_id": "user-b",
+                "merge_id": preview_payload["merge"]["merge_id"],
+            },
             headers=headers,
         )
         restored_page = client.get("/admin/master-data/ingredients")
@@ -471,6 +480,11 @@ def test_ingredient_master_merge_undo_route_and_button_restore_last_merge(monkey
     assert 'data-source-name="Carrots"' in merged_html
     assert 'data-target-name="Carrot"' in merged_html
     assert "Last merge: Carrots into Carrot." in merged_html
+    assert preview_response.status_code == 200
+    assert preview_payload["merge"]["source_restore"]["name"] == "Carrots"
+    assert preview_payload["merge"]["target_restore"]["name"] == "Carrot"
+    assert preview_payload["merge"]["restored_reference_count"] == 1
+    assert preview_payload["merge"]["older_undo_count"] == 0
     assert undo_response.status_code == 200
     assert undo_payload["ok"] is True
     assert undo_payload["source_name"] == "Carrots"
@@ -1056,6 +1070,11 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-duplicate-toolbar-scan",
         "data-master-duplicate-toolbar-undo-merge",
         "data-master-duplicate-undo-summary",
+        "data-master-undo-dialog",
+        "data-master-undo-preview-confirm",
+        "data-master-undo-preview-impact",
+        "data-master-undo-preview-references",
+        "ingredient_merge_undo_preview_url",
     ):
         assert marker in template
     assert "Find Potential Duplicates" in template
@@ -1079,12 +1098,14 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "async function refreshAfterMasterDataDuplicateMerge(message, kind = \"\", merge = null)" in script
     assert "function setMasterDataUndoMergeState(merge = null)" in script
     assert "async function undoLastMasterDataIngredientMerge()" in script
+    assert "async function openMasterDataUndoPreview()" in script
     assert "undoLastMasterDataIngredientMerge()" in script
     undo_start = script.index("async function undoLastMasterDataIngredientMerge()")
     undo_end = script.index("function duplicateClassificationLabel", undo_start)
     undo_block = script[undo_start:undo_end]
     assert 'await refreshAfterMasterDataDuplicateMerge(' in undo_block
     assert 'data.message || "Ingredient merge undone."' in undo_block
+    assert "merge_id: Number(preview.merge_id)" in undo_block
     assert "window.location.reload();" not in undo_block
     assert "data-master-duplicate-references-open" in script
     assert 'url.searchParams.set("limit", "500")' in script
@@ -1116,6 +1137,8 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-duplicate-actions" in css
     assert ".master-data-duplicate-toolbar" in css
     assert ".master-data-duplicate-toolbar-actions" in css
+    assert ".master-data-undo-dialog" in css
+    assert ".master-data-undo-preview-comparison" in css
     assert "grid-template-columns: minmax(0, 1fr) auto;" in css
     assert '"[data-master-duplicate-scan], [data-master-duplicate-toolbar-scan]"' in script
     assert '"[data-master-duplicate-undo-merge], [data-master-duplicate-toolbar-undo-merge]"' in script

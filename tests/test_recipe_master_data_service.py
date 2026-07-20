@@ -537,6 +537,17 @@ def test_undo_last_ingredient_merge_restores_records_aliases_metadata_and_refere
     assert merged_target["image_url"] == "/static/generated/beans.png"
     assert master_data.latest_undoable_ingredient_merge("user-a")["merge_id"] == merge_result["merge_id"]
 
+    undo_preview = master_data.ingredient_merge_undo_preview("user-a")
+
+    assert undo_preview["ok"] is True
+    assert undo_preview["merge_id"] == merge_result["merge_id"]
+    assert undo_preview["source_restore"]["name"] == "Beans"
+    assert undo_preview["source_restore"]["image_url"] == "/static/generated/beans.png"
+    assert undo_preview["target_restore"]["name"] == "Bean"
+    assert undo_preview["restored_reference_count"] == 1
+    assert undo_preview["reference_previews"][0]["recipe_title"] == "Roasted Beans"
+    assert undo_preview["older_undo_count"] == 0
+
     undo_result = master_data.undo_last_ingredient_master_merge("user-a")
     restored_source = master_data.master_record_for_name("ingredients", "user-a", "beans")
     restored_target = master_data.master_record_for_name("ingredients", "user-a", "bean")
@@ -554,6 +565,53 @@ def test_undo_last_ingredient_merge_restores_records_aliases_metadata_and_refere
     assert master_data.count_ingredient_usage(target["id"], user_id="user-a") == 1
     assert master_data.list_ingredients(user_id="user-a", search="garden beans")[0]["id"] == source["id"]
     assert master_data.list_ingredients(user_id="user-a", search="bean pod")[0]["id"] == target["id"]
+    assert master_data.latest_undoable_ingredient_merge("user-a") is None
+
+
+def test_ingredient_merge_history_can_be_previewed_and_undone_repeatedly(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    for name in ("Carrot", "Carrots", "Bean", "Beans"):
+        master_data.sync_recipe_master_records(
+            f"https://example.com/{name.lower()}",
+            recipe_data={"ingredients": [{"ingredient": name, "store_section": "Produce"}]},
+            user_id="user-a",
+        )
+
+    carrot = master_data.master_record_for_name("ingredients", "user-a", "carrot")
+    carrots = master_data.master_record_for_name("ingredients", "user-a", "carrots")
+    bean = master_data.master_record_for_name("ingredients", "user-a", "bean")
+    beans = master_data.master_record_for_name("ingredients", "user-a", "beans")
+    first_merge = master_data.merge_ingredient_master_records(
+        carrots["id"], carrot["id"], user_id="user-a"
+    )
+    second_merge = master_data.merge_ingredient_master_records(
+        beans["id"], bean["id"], user_id="user-a"
+    )
+
+    latest_preview = master_data.ingredient_merge_undo_preview("user-a")
+    stale_undo = master_data.undo_last_ingredient_master_merge(
+        "user-a", expected_merge_id=first_merge["merge_id"]
+    )
+    latest_undo = master_data.undo_last_ingredient_master_merge(
+        "user-a", expected_merge_id=second_merge["merge_id"]
+    )
+    older_preview = master_data.ingredient_merge_undo_preview("user-a")
+    older_undo = master_data.undo_last_ingredient_master_merge(
+        "user-a", expected_merge_id=first_merge["merge_id"]
+    )
+
+    assert latest_preview["merge_id"] == second_merge["merge_id"]
+    assert latest_preview["source_name"] == "Beans"
+    assert latest_preview["older_undo_count"] == 1
+    assert stale_undo["ok"] is False
+    assert stale_undo["status"] == 409
+    assert "available merge changed" in stale_undo["error"]
+    assert latest_undo["ok"] is True
+    assert latest_undo["next_merge"]["merge_id"] == first_merge["merge_id"]
+    assert older_preview["merge_id"] == first_merge["merge_id"]
+    assert older_preview["older_undo_count"] == 0
+    assert older_undo["ok"] is True
+    assert older_undo["next_merge"] is None
     assert master_data.latest_undoable_ingredient_merge("user-a") is None
 
 

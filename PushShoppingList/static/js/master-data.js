@@ -1541,15 +1541,283 @@
         };
     }
 
+    let activeMasterDataUndoPreview = null;
+
+    function masterDataUndoPreviewElements() {
+        const dialog = document.querySelector("[data-master-undo-dialog]");
+        return {
+            dialog,
+            summary: dialog && dialog.querySelector("[data-master-undo-preview-summary]"),
+            status: dialog && dialog.querySelector("[data-master-undo-preview-status]"),
+            preview: dialog && dialog.querySelector("[data-master-undo-preview]"),
+            time: dialog && dialog.querySelector("[data-master-undo-preview-time]"),
+            sourceName: dialog && dialog.querySelector('[data-master-undo-preview-name="source"]'),
+            targetName: dialog && dialog.querySelector('[data-master-undo-preview-name="target"]'),
+            sourceSection: dialog && dialog.querySelector('[data-master-undo-preview-section="source"]'),
+            targetSection: dialog && dialog.querySelector('[data-master-undo-preview-section="target"]'),
+            sourceAliases: dialog && dialog.querySelector('[data-master-undo-preview-aliases="source"]'),
+            targetAliases: dialog && dialog.querySelector('[data-master-undo-preview-aliases="target"]'),
+            sourceImage: dialog && dialog.querySelector('[data-master-undo-preview-image="source"]'),
+            targetImage: dialog && dialog.querySelector('[data-master-undo-preview-image="target"]'),
+            sourceImageFallback: dialog && dialog.querySelector('[data-master-undo-preview-image-fallback="source"]'),
+            targetImageFallback: dialog && dialog.querySelector('[data-master-undo-preview-image-fallback="target"]'),
+            impact: dialog && dialog.querySelector("[data-master-undo-preview-impact]"),
+            referenceCount: dialog && dialog.querySelector("[data-master-undo-preview-reference-count]"),
+            references: dialog && dialog.querySelector("[data-master-undo-preview-references]"),
+            next: dialog && dialog.querySelector("[data-master-undo-preview-next]"),
+            confirm: dialog && dialog.querySelector("[data-master-undo-preview-confirm]"),
+            closeButtons: dialog ? dialog.querySelectorAll("[data-master-undo-preview-close]") : [],
+        };
+    }
+
+    function setMasterDataUndoPreviewImage(image, fallback, record) {
+        if (!image || !fallback) return;
+        const imageUrl = text(record && record.image_url).trim();
+        const name = text(record && record.name).trim() || "Ingredient";
+        image.onerror = null;
+        if (!imageUrl) {
+            image.hidden = true;
+            image.removeAttribute("src");
+            image.alt = "";
+            fallback.hidden = false;
+            return;
+        }
+        image.src = imageUrl;
+        image.alt = name;
+        image.hidden = false;
+        fallback.hidden = true;
+        image.onerror = () => {
+            image.hidden = true;
+            fallback.hidden = false;
+        };
+    }
+
+    function renderMasterDataUndoPreviewAliases(container, aliases) {
+        if (!container) return;
+        container.replaceChildren();
+        const values = Array.isArray(aliases) ? aliases.filter(Boolean) : [];
+        if (!values.length) {
+            const empty = document.createElement("em");
+            empty.textContent = "No saved aliases";
+            container.appendChild(empty);
+            return;
+        }
+        values.forEach((alias) => {
+            const chip = document.createElement("span");
+            chip.textContent = alias;
+            container.appendChild(chip);
+        });
+    }
+
+    function masterDataUndoPreviewFieldValue(change, value) {
+        if (text(change && change.field) === "image_url") {
+            return text(value).trim() ? "saved image" : "no image";
+        }
+        return text(value).trim() || "blank";
+    }
+
+    function appendMasterDataUndoPreviewImpact(list, message) {
+        if (!list || !message) return;
+        const item = document.createElement("li");
+        item.textContent = message;
+        list.appendChild(item);
+    }
+
+    function renderMasterDataUndoPreviewReferences(container, references, truncated) {
+        if (!container) return;
+        container.replaceChildren();
+        const rows = Array.isArray(references) ? references : [];
+        if (!rows.length) {
+            const empty = document.createElement("div");
+            empty.className = "master-data-undo-preview-reference";
+            const label = document.createElement("strong");
+            label.textContent = "No recipe references will move.";
+            empty.appendChild(label);
+            container.appendChild(empty);
+            return;
+        }
+        rows.forEach((reference) => {
+            const row = document.createElement("div");
+            row.className = "master-data-undo-preview-reference";
+            const title = document.createElement("strong");
+            title.textContent = text(reference.recipe_title).trim() || "Recipe";
+            const amount = document.createElement("span");
+            amount.textContent = [reference.quantity, reference.unit, reference.size]
+                .map((value) => text(value).trim())
+                .filter(Boolean)
+                .join(" ") || "Linked ingredient";
+            row.append(title, amount);
+            const detail = text(reference.original_recipe_text).trim()
+                || text(reference.preparation).trim();
+            if (detail) {
+                const copy = document.createElement("small");
+                copy.textContent = detail;
+                row.appendChild(copy);
+            }
+            container.appendChild(row);
+        });
+        if (truncated) {
+            const more = document.createElement("div");
+            more.className = "master-data-undo-preview-reference";
+            const label = document.createElement("strong");
+            label.textContent = "Additional recipe references will also be restored.";
+            more.appendChild(label);
+            container.appendChild(more);
+        }
+    }
+
+    function setMasterDataUndoPreviewError(message) {
+        const els = masterDataUndoPreviewElements();
+        if (els.status) {
+            els.status.hidden = false;
+            els.status.textContent = message;
+            els.status.classList.add("is-error");
+        }
+        if (els.confirm) els.confirm.disabled = true;
+    }
+
+    function renderMasterDataUndoPreview(merge) {
+        const els = masterDataUndoPreviewElements();
+        if (!els.dialog || !merge) return;
+        activeMasterDataUndoPreview = merge;
+        const source = merge.source_restore || {};
+        const target = merge.target_restore || {};
+        const sourceName = text(source.name || merge.source_name).trim() || "Ingredient";
+        const targetName = text(target.name || merge.target_name).trim() || "Ingredient";
+        const referenceCount = Math.max(0, Number(merge.restored_reference_count) || 0);
+        if (els.summary) {
+            els.summary.textContent = `Restore ${sourceName} from its merge into ${targetName}.`;
+        }
+        if (els.time) {
+            els.time.textContent = formatMasterDataDuplicateScanTime(merge.merged_at) || "Merge time unavailable";
+        }
+        if (els.sourceName) els.sourceName.textContent = sourceName;
+        if (els.targetName) els.targetName.textContent = targetName;
+        if (els.sourceSection) {
+            els.sourceSection.textContent = `${text(source.store_section).trim() || "MISC"} store section`;
+        }
+        if (els.targetSection) {
+            els.targetSection.textContent = `${text(target.store_section).trim() || "MISC"} store section after undo`;
+        }
+        setMasterDataUndoPreviewImage(els.sourceImage, els.sourceImageFallback, source);
+        setMasterDataUndoPreviewImage(els.targetImage, els.targetImageFallback, target);
+        renderMasterDataUndoPreviewAliases(els.sourceAliases, source.aliases);
+        renderMasterDataUndoPreviewAliases(els.targetAliases, target.aliases);
+
+        if (els.impact) {
+            els.impact.replaceChildren();
+            appendMasterDataUndoPreviewImpact(
+                els.impact,
+                `Restore ${sourceName} as its own ingredient master record.`
+            );
+            appendMasterDataUndoPreviewImpact(
+                els.impact,
+                referenceCount
+                    ? `Move ${referenceCount} recipe reference${referenceCount === 1 ? "" : "s"} from ${targetName} back to ${sourceName}.`
+                    : `No recipe references need to move back to ${sourceName}.`
+            );
+            const aliasCount = (Array.isArray(source.aliases) ? source.aliases.length : 0)
+                + (Array.isArray(target.aliases) ? target.aliases.length : 0);
+            appendMasterDataUndoPreviewImpact(
+                els.impact,
+                aliasCount
+                    ? `Restore ${aliasCount} saved alias${aliasCount === 1 ? "" : "es"} across the two ingredients.`
+                    : "Restore both ingredients without any saved aliases."
+            );
+            (Array.isArray(merge.target_changes) ? merge.target_changes : []).forEach((change) => {
+                appendMasterDataUndoPreviewImpact(
+                    els.impact,
+                    `Reset ${targetName}'s ${text(change.label).toLowerCase()} from ${masterDataUndoPreviewFieldValue(change, change.current)} to ${masterDataUndoPreviewFieldValue(change, change.restored)}.`
+                );
+            });
+        }
+        if (els.referenceCount) {
+            els.referenceCount.textContent = `${referenceCount} affected`;
+        }
+        renderMasterDataUndoPreviewReferences(
+            els.references,
+            merge.reference_previews,
+            Boolean(merge.reference_preview_truncated)
+        );
+        const olderCount = Math.max(0, Number(merge.older_undo_count) || 0);
+        if (els.next) {
+            els.next.textContent = olderCount
+                ? `${olderCount} older merge${olderCount === 1 ? "" : "s"} will remain available after this undo.`
+                : "This is the oldest remaining merge in the undo history.";
+        }
+        if (els.status) {
+            els.status.hidden = true;
+            els.status.classList.remove("is-error");
+        }
+        if (els.preview) els.preview.hidden = false;
+        if (els.confirm) {
+            els.confirm.disabled = false;
+            els.confirm.textContent = `Undo and restore ${sourceName}`;
+        }
+    }
+
+    function closeMasterDataUndoPreview() {
+        const els = masterDataUndoPreviewElements();
+        activeMasterDataUndoPreview = null;
+        if (els.dialog && els.dialog.open) els.dialog.close();
+    }
+
+    async function openMasterDataUndoPreview() {
+        const duplicateEls = masterDataDuplicateElements();
+        const els = masterDataUndoPreviewElements();
+        if (!duplicateEls.panel || !els.dialog) return;
+        if (changedStoreSectionForms().length) {
+            setMasterDataDuplicateStatus("Save your pending ingredient edits before reviewing an undo.", "warning");
+            return;
+        }
+        activeMasterDataUndoPreview = null;
+        if (els.preview) els.preview.hidden = true;
+        if (els.summary) els.summary.textContent = "Loading the latest restorable merge...";
+        if (els.status) {
+            els.status.hidden = false;
+            els.status.textContent = "Loading undo details...";
+            els.status.classList.remove("is-error");
+        }
+        if (els.confirm) {
+            els.confirm.disabled = true;
+            els.confirm.textContent = "Undo this merge";
+        }
+        if (!els.dialog.open) els.dialog.showModal();
+        try {
+            const url = new URL(text(duplicateEls.panel.dataset.undoMergePreviewUrl), window.location.origin);
+            const context = masterDataDuplicateRequestContext();
+            if (context.scope) url.searchParams.set("scope", context.scope);
+            if (context.user_id) url.searchParams.set("user_id", context.user_id);
+            const response = await fetch(url.toString(), {
+                headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false || !data.merge) {
+                throw new Error(data.error || "The latest ingredient merge could not be previewed.");
+            }
+            renderMasterDataUndoPreview(data.merge);
+        } catch (error) {
+            setMasterDataUndoPreviewError(
+                error.message || "The latest ingredient merge could not be previewed."
+            );
+        }
+    }
+
     async function undoLastMasterDataIngredientMerge() {
         const els = masterDataDuplicateElements();
-        if (!els.panel || !els.undoMerge || els.undoMerge.dataset.undoAvailable !== "true") return;
+        const previewEls = masterDataUndoPreviewElements();
+        const preview = activeMasterDataUndoPreview;
+        if (!els.panel || !previewEls.dialog || !preview || !Number(preview.merge_id)) return;
         if (changedStoreSectionForms().length) {
-            setMasterDataDuplicateStatus("Save your pending ingredient edits before undoing a merge.", "warning");
+            setMasterDataUndoPreviewError("Save your pending ingredient edits before undoing a merge.");
             return;
         }
 
         setMasterDataDuplicateBusy(true, "Undoing the last ingredient merge...");
+        if (previewEls.confirm) {
+            previewEls.confirm.disabled = true;
+            previewEls.confirm.textContent = "Restoring ingredient...";
+        }
         try {
             const response = await fetch(text(els.panel.dataset.undoMergeUrl), {
                 method: "POST",
@@ -1558,23 +1826,38 @@
                     "Content-Type": "application/json",
                     "X-Requested-With": "fetch",
                 },
-                body: JSON.stringify(masterDataDuplicateRequestContext()),
+                body: JSON.stringify({
+                    ...masterDataDuplicateRequestContext(),
+                    merge_id: Number(preview.merge_id),
+                }),
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || data.ok === false) {
                 throw new Error(data.error || data.message || "The last ingredient merge could not be undone.");
             }
             setMasterDataUndoMergeState(data.next_merge || null);
+            closeMasterDataUndoPreview();
             await refreshAfterMasterDataDuplicateMerge(
                 data.message || "Ingredient merge undone."
             );
         } catch (error) {
+            activeMasterDataUndoPreview = null;
+            setMasterDataUndoPreviewError(
+                error.message || "The last ingredient merge could not be undone."
+            );
             setMasterDataDuplicateStatus(
                 error.message || "The last ingredient merge could not be undone.",
                 "error"
             );
         } finally {
             setMasterDataDuplicateBusy(false);
+            const latestPreviewEls = masterDataUndoPreviewElements();
+            if (latestPreviewEls.dialog && latestPreviewEls.dialog.open && latestPreviewEls.confirm) {
+                latestPreviewEls.confirm.disabled = !activeMasterDataUndoPreview;
+                latestPreviewEls.confirm.textContent = activeMasterDataUndoPreview
+                    ? `Undo and restore ${text(activeMasterDataUndoPreview.source_name).trim()}`
+                    : "Undo this merge";
+            }
         }
     }
 
@@ -2332,7 +2615,7 @@
             button.addEventListener("click", scanMasterDataDuplicates);
         });
         Array.from(els.undoMergeButtons || []).forEach((button) => {
-            button.addEventListener("click", () => void undoLastMasterDataIngredientMerge());
+            button.addEventListener("click", () => void openMasterDataUndoPreview());
         });
         if (els.selectHighConfidence) {
             els.selectHighConfidence.addEventListener("click", () => selectMasterDataDuplicateCards("high-confidence"));
@@ -2385,6 +2668,25 @@
             });
             referenceEls.dialog.addEventListener("click", (event) => {
                 if (event.target === referenceEls.dialog) closeMasterDataDuplicateReferences();
+            });
+        }
+
+        const undoPreviewEls = masterDataUndoPreviewElements();
+        Array.from(undoPreviewEls.closeButtons || []).forEach((button) => {
+            button.addEventListener("click", closeMasterDataUndoPreview);
+        });
+        if (undoPreviewEls.confirm) {
+            undoPreviewEls.confirm.addEventListener("click", () => {
+                void undoLastMasterDataIngredientMerge();
+            });
+        }
+        if (undoPreviewEls.dialog) {
+            undoPreviewEls.dialog.addEventListener("cancel", (event) => {
+                event.preventDefault();
+                closeMasterDataUndoPreview();
+            });
+            undoPreviewEls.dialog.addEventListener("click", (event) => {
+                if (event.target === undoPreviewEls.dialog) closeMasterDataUndoPreview();
             });
         }
     }

@@ -1789,6 +1789,154 @@ def ingredient_merge_history_summary(row):
     }
 
 
+def ingredient_merge_undo_preview(user_id=None, reference_limit=8):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    reference_limit = bounded_master_limit(reference_limit, default=8, maximum=25)
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
+        history = connection.execute(
+            """
+            SELECT id, user_id, source_ingredient_id, target_ingredient_id,
+                   source_name, target_name, snapshot_json, merged_at
+              FROM ingredient_merge_history
+             WHERE user_id = ? AND undone_at IS NULL
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (scoped_user_id,),
+        ).fetchone()
+        if not history:
+            return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
+
+        try:
+            snapshot = json.loads(history["snapshot_json"])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "This merge cannot be previewed because its restore data is unavailable.",
+            }
+
+        source = snapshot.get("source") if isinstance(snapshot, dict) else None
+        target = snapshot.get("target") if isinstance(snapshot, dict) else None
+        merged_target = snapshot.get("merged_target") if isinstance(snapshot, dict) else None
+        if not all(isinstance(value, dict) for value in (source, target, merged_target)):
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "This merge cannot be previewed because its restore data is incomplete.",
+            }
+
+        moved_reference_ids = sorted({
+            int(reference_id)
+            for reference_id in snapshot.get("moved_reference_ids", [])
+            if str(reference_id).isdigit() and int(reference_id) > 0
+        })
+        reference_rows = []
+        if moved_reference_ids:
+            placeholders = ", ".join("?" for _value in moved_reference_ids)
+            reference_rows = connection.execute(
+                f"""
+                SELECT id, recipe_id, quantity, unit, size, preparation,
+                       original_recipe_text, sort_order
+                  FROM recipe_ingredients
+                 WHERE user_id = ? AND id IN ({placeholders})
+                 ORDER BY LOWER(recipe_id) ASC, sort_order ASC, id ASC
+                 LIMIT ?
+                """,
+                (scoped_user_id, *moved_reference_ids, reference_limit),
+            ).fetchall()
+
+        metadata = recipe_reference_metadata(scoped_user_id)
+        references = []
+        for row in reference_rows:
+            row_data = dict(row)
+            recipe_id = clean_text(row_data.get("recipe_id"))
+            metadata_record = metadata.get(recipe_id)
+            metadata_record = metadata_record if isinstance(metadata_record, dict) else {}
+            references.append({
+                "id": int(row_data.get("id") or 0),
+                "recipe_id": recipe_id,
+                "recipe_title": recipe_reference_title(recipe_id, metadata_record),
+                "original_recipe_text": clean_text(row_data.get("original_recipe_text")),
+                "quantity": clean_text(row_data.get("quantity")),
+                "unit": clean_text(row_data.get("unit")),
+                "size": clean_text(row_data.get("size")),
+                "preparation": clean_text(row_data.get("preparation")),
+            })
+
+        aliases_before = snapshot.get("aliases_before")
+        aliases_before = aliases_before if isinstance(aliases_before, list) else []
+        source_id = int(history["source_ingredient_id"])
+        target_id = int(history["target_ingredient_id"])
+
+        def ingredient_preview(record, ingredient_id):
+            return {
+                "ingredient_id": ingredient_id,
+                "name": clean_text(record.get("name")),
+                "normalized_name": clean_text(record.get("normalized_name")),
+                "store_section": clean_ingredient_store_section(record.get("store_section")),
+                "image_url": clean_text(record.get("image_url")),
+                "aliases": sorted({
+                    clean_text(alias.get("alias_name"))
+                    for alias in aliases_before
+                    if isinstance(alias, dict)
+                    and int(alias.get("ingredient_id") or 0) == ingredient_id
+                    and clean_text(alias.get("alias_name"))
+                }),
+            }
+
+        field_labels = {
+            "name": "Name",
+            "normalized_name": "Normalized name",
+            "store_section": "Store section",
+            "image_url": "Image",
+        }
+        target_changes = []
+        for field, label in field_labels.items():
+            current_value = clean_text(merged_target.get(field))
+            restored_value = clean_text(target.get(field))
+            if current_value == restored_value:
+                continue
+            target_changes.append({
+                "field": field,
+                "label": label,
+                "current": current_value,
+                "restored": restored_value,
+            })
+
+        older_row = connection.execute(
+            """
+            SELECT COUNT(*) AS merge_count
+              FROM ingredient_merge_history
+             WHERE user_id = ? AND undone_at IS NULL AND id < ?
+            """,
+            (scoped_user_id, int(history["id"])),
+        ).fetchone()
+        older_undo_count = int(older_row["merge_count"] or 0) if older_row else 0
+
+        return {
+            "ok": True,
+            **ingredient_merge_history_summary(history),
+            "source_restore": ingredient_preview(source, source_id),
+            "target_restore": ingredient_preview(target, target_id),
+            "target_current": {
+                "ingredient_id": target_id,
+                "name": clean_text(merged_target.get("name")),
+                "normalized_name": clean_text(merged_target.get("normalized_name")),
+                "store_section": clean_ingredient_store_section(merged_target.get("store_section")),
+                "image_url": clean_text(merged_target.get("image_url")),
+            },
+            "target_changes": target_changes,
+            "restored_reference_count": len(moved_reference_ids),
+            "reference_previews": references,
+            "reference_preview_truncated": len(moved_reference_ids) > len(references),
+            "older_undo_count": older_undo_count,
+            "has_older_merge": older_undo_count > 0,
+        }
+
+
 def latest_undoable_ingredient_merge(user_id=None):
     scoped_user_id = scoped_recipe_user_id(user_id)
     with existing_recipe_master_connection() as connection:
@@ -2105,8 +2253,12 @@ def merge_ingredient_master_records(
         }
 
 
-def undo_last_ingredient_master_merge(user_id=None):
+def undo_last_ingredient_master_merge(user_id=None, expected_merge_id=None):
     scoped_user_id = scoped_recipe_user_id(user_id)
+    try:
+        expected_merge_id = int(expected_merge_id or 0)
+    except (TypeError, ValueError):
+        expected_merge_id = 0
     ingredient_fields = (
         "id",
         "user_id",
@@ -2157,6 +2309,12 @@ def undo_last_ingredient_master_merge(user_id=None):
         ).fetchone()
         if not history:
             return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
+        if expected_merge_id > 0 and int(history["id"]) != expected_merge_id:
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "The available merge changed. Review the latest undo before confirming again.",
+            }
 
         try:
             snapshot = json.loads(history["snapshot_json"])

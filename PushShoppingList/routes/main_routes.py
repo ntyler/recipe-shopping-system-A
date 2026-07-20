@@ -1155,6 +1155,9 @@ def master_data_context(record_type):
         "ingredient_merge_undo_url": url_for(
             "main_bp.undo_ingredient_master_merge_route"
         ),
+        "ingredient_merge_undo_preview_url": url_for(
+            "main_bp.preview_ingredient_master_merge_undo_route"
+        ),
         "latest_ingredient_merge": latest_ingredient_merge,
         "ingredient_reference_url": url_for(
             "main_bp.master_data_record_references_route",
@@ -1336,6 +1339,27 @@ def ingredient_duplicate_bulk_decision_route():
     })
 
 
+@main_bp.route("/api/master-data/ingredients/merges/undo-preview")
+def preview_ingredient_master_merge_undo_route():
+    active_public_user = current_public_user()
+    workspace_user_id = ingredient_duplicate_review_workspace(active_public_user, request.args)
+    if not workspace_user_id:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Choose one user workspace before previewing an ingredient merge undo.",
+        }), 400
+
+    result = recipe_master_data.ingredient_merge_undo_preview(workspace_user_id)
+    if not result.get("ok"):
+        return jsonify({**result, "success": False}), int(result.get("status") or 400)
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "merge": result,
+    })
+
+
 @main_bp.route("/api/master-data/ingredients/merges/undo", methods=["POST"])
 def undo_ingredient_master_merge_route():
     active_public_user = current_public_user()
@@ -1349,7 +1373,10 @@ def undo_ingredient_master_merge_route():
             "error": "Choose one user workspace before undoing an ingredient merge.",
         }), 400
 
-    result = recipe_master_data.undo_last_ingredient_master_merge(workspace_user_id)
+    result = recipe_master_data.undo_last_ingredient_master_merge(
+        workspace_user_id,
+        expected_merge_id=payload.get("merge_id"),
+    )
     if not result.get("ok"):
         return jsonify({**result, "success": False}), int(result.get("status") or 400)
 

@@ -386,6 +386,7 @@
                      data-decision-url="{{ master_data.ingredient_duplicate_decision_url }}"
                      data-bulk-decision-url="{{ master_data.ingredient_duplicate_bulk_decision_url }}"
                      data-undo-merge-url="{{ master_data.ingredient_merge_undo_url }}"
+                     data-undo-merge-preview-url="{{ master_data.ingredient_merge_undo_preview_url }}"
                      data-reference-url="{{ master_data.ingredient_reference_url }}"
                      data-scope="{{ master_data.scope }}"
                      data-user-id="{{ master_data.scope_user_id }}">
@@ -484,6 +485,102 @@
         {% endif %}
 
         {% if master_data.record_type == 'ingredients' and master_data.db_status.exists %}
+            <dialog id="masterDataUndoMergeDialog"
+                    class="master-data-undo-dialog"
+                    data-master-undo-dialog
+                    aria-labelledby="masterDataUndoMergeTitle"
+                    aria-describedby="masterDataUndoMergeSummary">
+                <div class="master-data-undo-dialog-shell">
+                    <header class="master-data-undo-dialog-header">
+                        <div>
+                            <span>Merge history</span>
+                            <h2 id="masterDataUndoMergeTitle">Review undo</h2>
+                            <p id="masterDataUndoMergeSummary" data-master-undo-preview-summary>
+                                Loading the latest restorable merge&hellip;
+                            </p>
+                        </div>
+                        <button type="button"
+                                class="master-data-undo-dialog-close"
+                                data-master-undo-preview-close
+                                aria-label="Close undo preview">&times;</button>
+                    </header>
+                    <div class="master-data-undo-dialog-body">
+                        <p class="master-data-undo-preview-status"
+                           data-master-undo-preview-status
+                           role="status"
+                           aria-live="polite">
+                            Loading undo details&hellip;
+                        </p>
+                        <div class="master-data-undo-preview" data-master-undo-preview hidden>
+                            <div class="master-data-undo-preview-meta">
+                                <strong>Newest undoable merge</strong>
+                                <time data-master-undo-preview-time></time>
+                            </div>
+                            <div class="master-data-undo-preview-comparison">
+                                <article class="master-data-undo-preview-ingredient is-restored">
+                                    <span>Restore as a separate ingredient</span>
+                                    <div class="master-data-undo-preview-identity">
+                                        <div class="master-data-undo-preview-image">
+                                            <img data-master-undo-preview-image="source" alt="" hidden>
+                                            <span data-master-undo-preview-image-fallback="source" aria-hidden="true">&#8630;</span>
+                                        </div>
+                                        <div>
+                                            <h3 data-master-undo-preview-name="source">Ingredient</h3>
+                                            <p data-master-undo-preview-section="source"></p>
+                                        </div>
+                                    </div>
+                                    <div class="master-data-undo-preview-aliases"
+                                         data-master-undo-preview-aliases="source"></div>
+                                </article>
+                                <div class="master-data-undo-preview-direction" aria-hidden="true">
+                                    <span>&larr;</span>
+                                    split from
+                                </div>
+                                <article class="master-data-undo-preview-ingredient">
+                                    <span>Keep as the surviving ingredient</span>
+                                    <div class="master-data-undo-preview-identity">
+                                        <div class="master-data-undo-preview-image">
+                                            <img data-master-undo-preview-image="target" alt="" hidden>
+                                            <span data-master-undo-preview-image-fallback="target" aria-hidden="true">&#10003;</span>
+                                        </div>
+                                        <div>
+                                            <h3 data-master-undo-preview-name="target">Ingredient</h3>
+                                            <p data-master-undo-preview-section="target"></p>
+                                        </div>
+                                    </div>
+                                    <div class="master-data-undo-preview-aliases"
+                                         data-master-undo-preview-aliases="target"></div>
+                                </article>
+                            </div>
+                            <section class="master-data-undo-preview-impact">
+                                <h3>What will be restored</h3>
+                                <ul data-master-undo-preview-impact></ul>
+                            </section>
+                            <section class="master-data-undo-preview-recipes">
+                                <header>
+                                    <h3>Recipe references</h3>
+                                    <strong data-master-undo-preview-reference-count>0 affected</strong>
+                                </header>
+                                <div data-master-undo-preview-references></div>
+                            </section>
+                            <p class="master-data-undo-preview-next" data-master-undo-preview-next></p>
+                        </div>
+                    </div>
+                    <footer class="master-data-undo-dialog-footer">
+                        <span>The most recent merge must be undone first.</span>
+                        <div>
+                            <button type="button" data-master-undo-preview-close>Cancel</button>
+                            <button type="button"
+                                    class="danger"
+                                    data-master-undo-preview-confirm
+                                    disabled>
+                                Undo this merge
+                            </button>
+                        </div>
+                    </footer>
+                </div>
+            </dialog>
+
             <dialog id="masterDataIngredientReferencesDialog"
                     class="master-data-reference-dialog"
                     data-master-duplicate-reference-dialog
