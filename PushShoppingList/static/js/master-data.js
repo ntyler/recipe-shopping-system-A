@@ -1983,6 +1983,135 @@
         return `${count} recipe use${count === 1 ? "" : "s"}`;
     }
 
+    function aiSecondOpinionVerdictLabel(opinion, panel) {
+        const verdict = text(opinion && opinion.verdict).toLowerCase();
+        if (verdict === "merge") {
+            const targetId = Number(opinion && opinion.suggested_target_id) || 0;
+            const targetName = targetId === Number(panel.dataset.leftIngredientId)
+                ? panel.dataset.leftIngredientName
+                : targetId === Number(panel.dataset.rightIngredientId)
+                ? panel.dataset.rightIngredientName
+                : "";
+            return targetName ? `Merge into ${targetName}` : "Merge these records";
+        }
+        return {
+            related: "Keep as related variants",
+            not_duplicate: "Not a duplicate",
+            insufficient_evidence: "More evidence needed",
+        }[verdict] || "Review unavailable";
+    }
+
+    function renderMasterDataAiSecondOpinion(panel, opinion) {
+        if (!panel) return;
+        const result = opinion && typeof opinion === "object" ? opinion : {};
+        const status = text(result.status || "not_generated").toLowerCase();
+        panel.className = "master-data-ai-second-opinion";
+        panel.dataset.opinionStatus = status;
+        panel.removeAttribute("aria-busy");
+        panel.replaceChildren();
+
+        const header = document.createElement("header");
+        const title = document.createElement("strong");
+        title.textContent = "AI second opinion";
+        const independence = document.createElement("small");
+        independence.textContent = "Independent review";
+        header.append(title, independence);
+        panel.appendChild(header);
+
+        if (status === "loading") {
+            panel.classList.add("is-loading");
+            panel.setAttribute("aria-busy", "true");
+            const loading = document.createElement("p");
+            loading.className = "master-data-ai-second-opinion-message";
+            loading.textContent = "Analyzing names, aliases, store sections, and recipe context...";
+            panel.appendChild(loading);
+            return;
+        }
+
+        if (status !== "ready") {
+            panel.classList.add(status === "stale" ? "is-stale" : "is-empty");
+            const message = document.createElement("p");
+            message.className = "master-data-ai-second-opinion-message";
+            message.textContent = text(result.message)
+                || "Generate a separate AI review that is not shown the queue recommendation.";
+            const action = document.createElement("button");
+            action.type = "button";
+            action.dataset.masterDuplicateAiSecondOpinion = "1";
+            action.dataset.reviewId = text(panel.dataset.reviewId);
+            action.textContent = status === "unavailable"
+                ? "Retry AI review"
+                : status === "stale"
+                ? "Refresh AI review"
+                : "Get AI second opinion";
+            panel.append(message, action);
+            return;
+        }
+
+        const verdict = text(result.verdict).toLowerCase();
+        panel.classList.add(`is-${verdict.replace(/[^a-z_]/g, "")}`);
+        if (result.agreement) panel.classList.add(`is-${text(result.agreement).toLowerCase()}`);
+
+        const recommendation = document.createElement("div");
+        recommendation.className = "master-data-ai-second-opinion-recommendation";
+        const verdictLabel = document.createElement("strong");
+        verdictLabel.textContent = aiSecondOpinionVerdictLabel(result, panel);
+        const confidence = document.createElement("span");
+        confidence.textContent = `${Math.round((Number(result.confidence) || 0) * 100)}% confidence`;
+        recommendation.append(verdictLabel, confidence);
+
+        const agreement = document.createElement("p");
+        agreement.className = "master-data-ai-second-opinion-agreement";
+        agreement.textContent = text(result.agreement_label)
+            || "Compare this opinion with the queue recommendation.";
+
+        const evidence = Array.isArray(result.evidence) ? result.evidence.filter(Boolean).slice(0, 3) : [];
+        if (evidence.length) {
+            const evidenceList = document.createElement("ul");
+            evidenceList.className = "master-data-ai-second-opinion-evidence";
+            evidence.forEach((note) => {
+                const item = document.createElement("li");
+                item.textContent = text(note);
+                evidenceList.appendChild(item);
+            });
+            panel.append(recommendation, agreement, evidenceList);
+        } else {
+            panel.append(recommendation, agreement);
+        }
+
+        const warnings = Array.isArray(result.warnings) ? result.warnings.filter(Boolean).slice(0, 2) : [];
+        if (warnings.length) {
+            const warning = document.createElement("div");
+            warning.className = "master-data-ai-second-opinion-warning";
+            warning.textContent = warnings.join(" ");
+            panel.appendChild(warning);
+        }
+
+        const footer = document.createElement("footer");
+        const advisory = document.createElement("small");
+        advisory.textContent = "Advisory only — you make the final decision.";
+        const refresh = document.createElement("button");
+        refresh.type = "button";
+        refresh.dataset.masterDuplicateAiSecondOpinion = "1";
+        refresh.dataset.reviewId = text(panel.dataset.reviewId);
+        refresh.textContent = "Refresh";
+        footer.append(advisory, refresh);
+        panel.appendChild(footer);
+    }
+
+    function masterDataAiSecondOpinionPanel(review) {
+        const panel = document.createElement("aside");
+        panel.className = "master-data-ai-second-opinion";
+        panel.dataset.reviewId = text(review && review.review_id);
+        panel.dataset.leftIngredientId = text(review && review.left && review.left.ingredient_id);
+        panel.dataset.leftIngredientName = text(review && review.left && review.left.name);
+        panel.dataset.rightIngredientId = text(review && review.right && review.right.ingredient_id);
+        panel.dataset.rightIngredientName = text(review && review.right && review.right.name);
+        panel.setAttribute("aria-label", "Independent AI second opinion");
+        panel.setAttribute("aria-live", "polite");
+        renderMasterDataAiSecondOpinion(panel, review && review.ai_second_opinion);
+        return panel;
+    }
+
     function masterDataDuplicateReferenceElements() {
         const dialog = document.querySelector("[data-master-duplicate-reference-dialog]");
         const column = (side) => {
@@ -2289,7 +2418,8 @@
         comparison.className = "master-data-duplicate-comparison";
         comparison.append(
             masterDataDuplicateIngredient(review.left, review.suggested_target_id, review),
-            masterDataDuplicateIngredient(review.right, review.suggested_target_id, review)
+            masterDataDuplicateIngredient(review.right, review.suggested_target_id, review),
+            masterDataAiSecondOpinionPanel(review)
         );
 
         const reason = document.createElement("p");
@@ -2626,7 +2756,10 @@
             setMasterDataDuplicateStatus("Save your pending ingredient edits before running a duplicate scan.", "warning");
             return;
         }
-        setMasterDataDuplicateBusy(true, "Checking likely pairs and asking AI to classify them...");
+        setMasterDataDuplicateBusy(
+            true,
+            "Checking likely pairs and asking AI to classify and independently explain them..."
+        );
         try {
             const response = await fetch(els.panel.dataset.scanUrl, {
                 method: "POST",
@@ -2654,6 +2787,42 @@
             setMasterDataDuplicateStatus(error.message || "Potential duplicates could not be reviewed.", "error");
         } finally {
             setMasterDataDuplicateBusy(false);
+        }
+    }
+
+    async function generateMasterDataAiSecondOpinion(button) {
+        const els = masterDataDuplicateElements();
+        const panel = button && button.closest
+            ? button.closest(".master-data-ai-second-opinion")
+            : null;
+        const reviewId = Number(button && button.dataset.reviewId) || 0;
+        if (!els.panel || !panel || !reviewId || !els.panel.dataset.aiSecondOpinionUrl) return;
+
+        const previousStatus = text(panel.dataset.opinionStatus).toLowerCase();
+        renderMasterDataAiSecondOpinion(panel, { status: "loading" });
+        const requestUrl = text(els.panel.dataset.aiSecondOpinionUrl)
+            .replace("/0/ai-second-opinion", `/${reviewId}/ai-second-opinion`);
+        try {
+            const response = await fetch(requestUrl, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({ force: previousStatus === "ready" || previousStatus === "stale" }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "AI second opinion could not be generated.");
+            }
+            renderMasterDataAiSecondOpinion(panel, data.ai_second_opinion);
+        } catch (error) {
+            const message = error && error.message
+                ? error.message
+                : "AI second opinion could not be generated.";
+            renderMasterDataAiSecondOpinion(panel, { status: "unavailable", message });
+            setMasterDataDuplicateStatus(message, "error");
         }
     }
 
@@ -2740,6 +2909,14 @@
         });
         if (els.list) {
             els.list.addEventListener("click", (event) => {
+                const aiSecondOpinionButton = event.target && event.target.closest
+                    ? event.target.closest("[data-master-duplicate-ai-second-opinion]")
+                    : null;
+                if (aiSecondOpinionButton) {
+                    event.preventDefault();
+                    void generateMasterDataAiSecondOpinion(aiSecondOpinionButton);
+                    return;
+                }
                 const referenceButton = event.target && event.target.closest
                     ? event.target.closest("[data-master-duplicate-references-open]")
                     : null;

@@ -1149,6 +1149,10 @@ def master_data_context(record_type):
             "main_bp.ingredient_duplicate_decision_route",
             review_id=0,
         ),
+        "ingredient_duplicate_ai_second_opinion_url": url_for(
+            "main_bp.ingredient_duplicate_ai_second_opinion_route",
+            review_id=0,
+        ),
         "ingredient_duplicate_bulk_decision_url": url_for(
             "main_bp.ingredient_duplicate_bulk_decision_route"
         ),
@@ -1266,6 +1270,29 @@ def ingredient_duplicate_reviews_route():
         "review_count": len(reviews),
         "reviews": reviews,
         "scan": ingredient_duplicate_reviews.duplicate_scan_summary(workspace_user_id),
+    })
+
+
+@main_bp.route(
+    "/api/master-data/ingredients/duplicate-reviews/<int:review_id>/ai-second-opinion",
+    methods=["POST"],
+)
+def ingredient_duplicate_ai_second_opinion_route(review_id):
+    active_public_user = current_public_user()
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    force = str(payload.get("force") or "").strip().lower() in {"1", "true", "yes", "on"}
+    result = ingredient_duplicate_reviews.generate_ai_second_opinion(
+        review_id,
+        allow_other_users=is_admin_user(active_public_user),
+        force=force,
+    )
+    if not result.get("ok"):
+        return jsonify({**result, "success": False}), int(result.get("status") or 400)
+    return jsonify({
+        **result,
+        "success": True,
+        "message": "AI second opinion updated.",
     })
 
 

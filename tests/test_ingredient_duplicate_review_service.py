@@ -226,6 +226,100 @@ def test_ai_cannot_downgrade_exact_singular_plural_guardrail(monkeypatch):
     assert result["results"]["1:2"]["analysis_source"] == "local"
 
 
+def test_ai_second_opinion_uses_raw_records_and_warns_when_usage_is_missing():
+    candidate = duplicate_reviews.candidate_ingredient_pairs([
+        ingredient_row(1, "bell pepper", 0),
+        ingredient_row(2, "bell peppers", 0),
+    ])[0]
+    payload = duplicate_reviews.second_opinion_candidate_payload(candidate)
+    opinion = duplicate_reviews.validate_ai_second_opinion(
+        {
+            "pair_key": candidate["pair_key"],
+            "verdict": "merge",
+            "confidence": 0.93,
+            "suggested_target_id": 1,
+            "evidence": ["The names differ only by pluralization."],
+            "warnings": [],
+        },
+        candidate,
+    )
+
+    assert set(payload) == {"pair_key", "left", "right"}
+    assert "signals" not in payload
+    assert "classification" not in payload
+    assert opinion["status"] == "ready"
+    assert opinion["verdict"] == "merge"
+    assert "Neither record has recipe usage" in opinion["warnings"][0]
+
+
+def test_scan_generates_and_caches_independent_ai_second_opinions(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    seed_pair()
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(duplicate_reviews, "request_ai_classifications", lambda _candidates: [])
+    opinion_calls = []
+
+    def fake_second_opinions(candidates, user_id=None):
+        opinion_calls.append((len(candidates), user_id))
+        return [{
+            "pair_key": candidates[0]["pair_key"],
+            "verdict": "merge",
+            "confidence": 0.97,
+            "suggested_target_id": int(candidates[0]["left"]["id"]),
+            "evidence": ["Both recipe contexts use the same base ingredient."],
+            "warnings": [],
+        }]
+
+    monkeypatch.setattr(duplicate_reviews, "request_ai_second_opinions", fake_second_opinions)
+
+    first_scan = duplicate_reviews.scan_potential_duplicates("user-a")
+    second_scan = duplicate_reviews.scan_potential_duplicates("user-a")
+    opinion = second_scan["reviews"][0]["ai_second_opinion"]
+
+    assert first_scan["reviews"][0]["ai_second_opinion"]["status"] == "ready"
+    assert opinion["verdict"] == "merge"
+    assert opinion["agreement"] == "agree"
+    assert opinion["evidence"] == ["Both recipe contexts use the same base ingredient."]
+    assert opinion_calls == [(1, "user-a")]
+
+
+def test_ai_second_opinion_can_be_generated_on_demand_and_reuses_cache(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    seed_pair()
+    review = duplicate_reviews.scan_potential_duplicates("user-a")["reviews"][0]
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    calls = []
+
+    def fake_second_opinions(candidates, user_id=None):
+        calls.append(candidates[0]["pair_key"])
+        return [{
+            "pair_key": candidates[0]["pair_key"],
+            "verdict": "merge",
+            "confidence": 0.95,
+            "suggested_target_id": int(candidates[0]["left"]["id"]),
+            "evidence": ["The records are singular and plural forms of one ingredient."],
+            "warnings": [],
+        }]
+
+    monkeypatch.setattr(duplicate_reviews, "request_ai_second_opinions", fake_second_opinions)
+
+    generated = duplicate_reviews.generate_ai_second_opinion(
+        review["review_id"],
+        user_id="user-a",
+    )
+    cached = duplicate_reviews.generate_ai_second_opinion(
+        review["review_id"],
+        user_id="user-a",
+    )
+
+    assert generated["ok"] is True
+    assert generated["cache_hit"] is False
+    assert generated["ai_second_opinion"]["agreement"] == "agree"
+    assert cached["ok"] is True
+    assert cached["cache_hit"] is True
+    assert calls == [f"{review['left']['ingredient_id']}:{review['right']['ingredient_id']}"]
+
+
 def test_decision_cannot_cross_workspaces(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     seed_pair(user_id="user-b")

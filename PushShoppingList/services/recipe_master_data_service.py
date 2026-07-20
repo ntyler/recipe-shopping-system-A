@@ -629,6 +629,10 @@ def ensure_recipe_master_schema(connection=None):
             signals_json TEXT NOT NULL DEFAULT '{}',
             model TEXT NOT NULL DEFAULT '',
             analysis_source TEXT NOT NULL DEFAULT 'local',
+            ai_second_opinion_json TEXT NOT NULL DEFAULT '{}',
+            ai_second_opinion_fingerprint TEXT NOT NULL DEFAULT '',
+            ai_second_opinion_model TEXT NOT NULL DEFAULT '',
+            ai_second_opinion_at TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(user_id, left_ingredient_id, right_ingredient_id)
@@ -783,6 +787,22 @@ def ensure_recipe_master_schema(connection=None):
         if column_name not in recipe_ingredient_columns:
             connection.execute(
                 f"ALTER TABLE recipe_ingredients ADD COLUMN {column_name} {column_definition}"
+            )
+    duplicate_review_columns = recipe_master_column_names(
+        connection,
+        "ingredient_duplicate_reviews",
+    )
+    duplicate_review_column_definitions = {
+        "ai_second_opinion_json": "TEXT NOT NULL DEFAULT '{}'",
+        "ai_second_opinion_fingerprint": "TEXT NOT NULL DEFAULT ''",
+        "ai_second_opinion_model": "TEXT NOT NULL DEFAULT ''",
+        "ai_second_opinion_at": "TEXT NOT NULL DEFAULT ''",
+    }
+    for column_name, column_definition in duplicate_review_column_definitions.items():
+        if column_name not in duplicate_review_columns:
+            connection.execute(
+                "ALTER TABLE ingredient_duplicate_reviews "
+                f"ADD COLUMN {column_name} {column_definition}"
             )
     migrate_existing_recipe_ingredient_units(connection)
     normalize_existing_ingredient_store_sections(connection)

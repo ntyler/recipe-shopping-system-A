@@ -712,6 +712,10 @@ def refresh_openai_model_runtime_bindings():
         "PushShoppingList.services.food_rules_service": {"MODEL": food_rules_model},
         "PushShoppingList.services.food_review_alternative_service": {"MODEL": food_review_model},
         "PushShoppingList.services.ingredient_text_review_service": {"MODEL": ingredient_review_model},
+        "PushShoppingList.services.ingredient_duplicate_review_service": {
+            "MODEL": ingredient_review_model,
+            "SECOND_OPINION_MODEL": ingredient_review_model,
+        },
     }
     for module_name, updates in module_updates.items():
         module = sys.modules.get(module_name)

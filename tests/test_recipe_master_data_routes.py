@@ -564,6 +564,59 @@ def test_duplicate_review_routes_scan_scope_and_save_decisions(monkeypatch, tmp_
     assert user_b_response.get_json()["review_count"] == 1
 
 
+def test_duplicate_review_ai_second_opinion_route_generates_independent_notes(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    for name in ("Potato", "Potatoes"):
+        master_data.sync_recipe_master_records(
+            f"https://example.com/{name.lower().replace(' ', '-')}",
+            recipe_data={"ingredients": [{"ingredient": name, "store_section": "Produce"}]},
+            user_id="user-a",
+        )
+    headers = {"X-Requested-With": "fetch", "Accept": "application/json"}
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        scan = client.post(
+            "/api/master-data/ingredients/duplicate-scan",
+            json={"scope": "mine"},
+            headers=headers,
+        ).get_json()
+        review = scan["reviews"][0]
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        def fake_second_opinions(candidates, user_id=None):
+            return [{
+                "pair_key": candidates[0]["pair_key"],
+                "verdict": "merge",
+                "confidence": 0.96,
+                "suggested_target_id": int(candidates[0]["left"]["id"]),
+                "evidence": ["The names differ only by singular and plural form."],
+                "warnings": [],
+            }]
+
+        monkeypatch.setattr(
+            duplicate_reviews,
+            "request_ai_second_opinions",
+            fake_second_opinions,
+        )
+        response = client.post(
+            f"/api/master-data/ingredients/duplicate-reviews/{review['review_id']}/ai-second-opinion",
+            json={"force": False},
+            headers=headers,
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["success"] is True
+    assert payload["ai_second_opinion"]["status"] == "ready"
+    assert payload["ai_second_opinion"]["verdict"] == "merge"
+    assert payload["ai_second_opinion"]["agreement"] == "agree"
+    assert payload["ai_second_opinion"]["evidence"] == [
+        "The names differ only by singular and plural form."
+    ]
+
+
 def test_duplicate_review_bulk_route_applies_selected_cards(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -1051,9 +1104,11 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-duplicate-scan",
         "data-master-duplicate-status",
         "data-master-duplicate-list",
+        "data-ai-second-opinion-url",
         "ingredient_duplicate_scan_url",
         "ingredient_duplicate_reviews_url",
         "ingredient_duplicate_decision_url",
+        "ingredient_duplicate_ai_second_opinion_url",
         "ingredient_duplicate_bulk_decision_url",
         "ingredient_merge_undo_url",
         "data-master-duplicate-toolbar",
@@ -1085,7 +1140,7 @@ def test_master_data_duplicate_review_ui_is_wired():
     ):
         assert marker in template
     assert "Find Potential Duplicates" in template
-    assert "Similarity checks find likely pairs, AI labels them" in template
+    assert "an independent AI second opinion explains each pair" in template
     assert "function masterDataDuplicateCard(review)" in script
     assert "function setMasterDataDuplicateSuggestedSurvivor(button)" in script
     assert "async function scanMasterDataDuplicates()" in script
@@ -1093,6 +1148,10 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "Rescan Potential Duplicates" in script
     assert "Last scanned" in script
     assert "async function decideMasterDataDuplicate(button)" in script
+    assert "function masterDataAiSecondOpinionPanel(review)" in script
+    assert "function renderMasterDataAiSecondOpinion(panel, opinion)" in script
+    assert "async function generateMasterDataAiSecondOpinion(button)" in script
+    assert "data-master-duplicate-ai-second-opinion" in script
     assert "async function applyMasterDataDuplicateBulkAction(button)" in script
     assert "function updateMasterDataDuplicateSelectionState()" in script
     assert "function masterDataDuplicateReferenceUrl(ingredientId)" in script
@@ -1144,6 +1203,9 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "initMasterDataDuplicateReview();" in script
     assert ".master-data-duplicate-review" in css
     assert ".master-data-duplicate-comparison" in css
+    assert ".master-data-ai-second-opinion" in css
+    assert ".master-data-ai-second-opinion-evidence" in css
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
     assert ".master-data-duplicate-actions" in css
     assert ".master-data-duplicate-toolbar" in css
     assert ".master-data-duplicate-toolbar-actions" in css
