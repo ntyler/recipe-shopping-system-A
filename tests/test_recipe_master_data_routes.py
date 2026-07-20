@@ -984,6 +984,7 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-duplicate-select-all",
         "data-master-duplicate-select-none",
         "data-master-duplicate-bulk-action",
+        "master-data-duplicate-scan-actions",
     ):
         assert marker in template
     assert "Find Potential Duplicates" in template
@@ -1002,6 +1003,9 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-duplicate-actions" in css
     assert ".master-data-duplicate-toolbar" in css
     assert ".master-data-duplicate-card.is-selected" in css
+    assert "grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);" in css
+    assert ".master-data-duplicate-scan-actions button" in css
+    assert "Nothing is merged automatically." in template
 
 
 def test_master_data_reference_expander_is_wired():

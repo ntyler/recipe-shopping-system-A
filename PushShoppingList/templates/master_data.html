@@ -388,16 +388,19 @@
                      data-scope="{{ master_data.scope }}"
                      data-user-id="{{ master_data.scope_user_id }}">
                 <header class="master-data-duplicate-header">
-                    <div>
+                    <div class="master-data-duplicate-header-copy">
                         <span>AI-assisted cleanup</span>
                         <h2>Potential duplicate ingredients</h2>
                         <p>Similarity checks find likely pairs, AI labels them, and you make every final decision.</p>
                     </div>
-                    <button type="button"
-                            data-master-duplicate-scan
-                            {% if master_data.scope == 'all' %}disabled{% endif %}>
-                        Find Potential Duplicates
-                    </button>
+                    <div class="master-data-duplicate-scan-actions">
+                        <button type="button"
+                                data-master-duplicate-scan
+                                {% if master_data.scope == 'all' %}disabled{% endif %}>
+                            Find Potential Duplicates
+                        </button>
+                        <small>Creates a review queue. Nothing is merged automatically.</small>
+                    </div>
                 </header>
                 {% if master_data.scope == 'all' %}
                     <p class="master-data-duplicate-scope-note">

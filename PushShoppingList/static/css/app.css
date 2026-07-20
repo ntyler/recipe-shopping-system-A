@@ -26326,37 +26326,49 @@ img[data-deferred-src] {
 
         .master-data-duplicate-review {
             display: grid;
-            gap: 12px;
-            padding: 15px;
+            gap: 14px;
+            padding: 16px;
             border: 1px solid #31516a;
-            border-radius: 10px;
-            background: linear-gradient(135deg, rgba(12, 38, 48, .96), rgba(8, 20, 28, .96));
+            border-radius: 12px;
+            background:
+                radial-gradient(circle at 88% -20%, rgba(16, 185, 129, .12), transparent 34%),
+                linear-gradient(135deg, rgba(12, 38, 48, .98), rgba(8, 20, 28, .98));
         }
 
         .master-data-duplicate-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 18px;
-        }
-
-        .master-data-duplicate-header > div {
             display: grid;
-            gap: 4px;
+            grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+            align-items: center;
+            gap: 24px;
+            min-width: 0;
+            padding: 2px 2px 0;
         }
 
-        .master-data-duplicate-header span {
+        .master-data-duplicate-header-copy {
+            display: grid;
+            min-width: 0;
+            gap: 6px;
+        }
+
+        .master-data-duplicate-header-copy > span {
+            justify-self: start;
+            padding: 3px 7px;
+            border: 1px solid rgba(110, 231, 183, .34);
+            border-radius: 999px;
+            background: rgba(6, 78, 59, .3);
             color: #6ee7b7;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 900;
-            letter-spacing: .06em;
+            letter-spacing: .075em;
+            line-height: 1.2;
             text-transform: uppercase;
         }
 
         .master-data-duplicate-header h2 {
             margin: 0;
             color: #f8fafc;
-            font-size: 17px;
+            font-size: 20px;
+            line-height: 1.15;
         }
 
         .master-data-duplicate-header p,
@@ -26369,21 +26381,74 @@ img[data-deferred-src] {
             line-height: 1.4;
         }
 
-        .master-data-duplicate-header button {
-            min-height: 40px;
-            flex: 0 0 auto;
-            padding: 8px 13px;
-            border: 1px solid #22c983;
-            border-radius: 7px;
-            background: #087447;
-            color: #fff;
-            font-size: 12px;
-            font-weight: 900;
+        .master-data-duplicate-header p {
+            max-width: 660px;
+            color: #c7d5df;
+            font-size: 13px;
+            line-height: 1.5;
         }
 
-        .master-data-duplicate-header button:disabled {
+        .master-data-duplicate-scan-actions {
+            display: grid;
+            min-width: 0;
+            gap: 6px;
+        }
+
+        .master-data-duplicate-scan-actions button {
+            width: 100%;
+            min-width: 0;
+            min-height: 44px;
+            margin: 0;
+            padding: 8px 14px;
+            border: 1px solid #22c983;
+            border-radius: 8px;
+            background: linear-gradient(180deg, #0b8051, #076b43);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 900;
+            box-shadow: 0 7px 18px rgba(5, 94, 59, .28);
+        }
+
+        .master-data-duplicate-scan-actions button:is(:hover, :focus-visible) {
+            outline: none;
+            border-color: #6ee7b7;
+            background: linear-gradient(180deg, #0d9360, #08764b);
+        }
+
+        .master-data-duplicate-scan-actions button:disabled {
             cursor: not-allowed;
             opacity: .48;
+        }
+
+        .master-data-duplicate-scan-actions small {
+            color: #91a7b8;
+            font-size: 10px;
+            font-weight: 750;
+            line-height: 1.35;
+            text-align: center;
+        }
+
+        .master-data-duplicate-status {
+            position: relative;
+            min-height: 40px;
+            box-sizing: border-box;
+            padding: 10px 12px 10px 34px;
+            border: 1px solid #2b4a5e;
+            border-radius: 8px;
+            background: rgba(7, 21, 30, .72);
+        }
+
+        .master-data-duplicate-status::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 13px;
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            background: #34d399;
+            box-shadow: 0 0 0 4px rgba(52, 211, 153, .11);
+            transform: translateY(-50%);
         }
 
         .master-data-duplicate-scope-note,
@@ -26391,8 +26456,18 @@ img[data-deferred-src] {
             color: #fde68a;
         }
 
+        .master-data-duplicate-status.is-warning::before {
+            background: #fbbf24;
+            box-shadow: 0 0 0 4px rgba(251, 191, 36, .11);
+        }
+
         .master-data-duplicate-status.is-error {
             color: #fecaca;
+        }
+
+        .master-data-duplicate-status.is-error::before {
+            background: #f87171;
+            box-shadow: 0 0 0 4px rgba(248, 113, 113, .11);
         }
 
         .master-data-duplicate-toolbar {
@@ -26430,6 +26505,7 @@ img[data-deferred-src] {
         .master-data-duplicate-toolbar button {
             width: auto;
             min-height: 32px;
+            margin: 0;
             padding: 5px 9px;
             border: 1px solid #466075;
             border-radius: 6px;
@@ -26661,6 +26737,7 @@ img[data-deferred-src] {
         .master-data-duplicate-actions button {
             width: 100%;
             min-height: 34px;
+            margin: 0;
             padding: 6px 9px;
             border: 1px solid #466075;
             border-radius: 6px;
@@ -26993,11 +27070,12 @@ img[data-deferred-src] {
             }
 
             .master-data-duplicate-header {
+                grid-template-columns: 1fr;
                 align-items: stretch;
-                flex-direction: column;
+                gap: 14px;
             }
 
-            .master-data-duplicate-header button {
+            .master-data-duplicate-scan-actions {
                 width: 100%;
             }
 
