@@ -1145,6 +1145,9 @@ def master_data_context(record_type):
         "image_generation_status_url": url_for("main_bp.recipe_master_data_image_generation_status_route"),
         "ingredient_duplicate_scan_url": url_for("main_bp.ingredient_duplicate_scan_route"),
         "ingredient_duplicate_reviews_url": url_for("main_bp.ingredient_duplicate_reviews_route"),
+        "ingredient_duplicate_review_history_url": url_for(
+            "main_bp.ingredient_duplicate_review_history_route"
+        ),
         "ingredient_duplicate_decision_url": url_for(
             "main_bp.ingredient_duplicate_decision_route",
             review_id=0,
@@ -1155,6 +1158,10 @@ def master_data_context(record_type):
         ),
         "ingredient_duplicate_bulk_decision_url": url_for(
             "main_bp.ingredient_duplicate_bulk_decision_route"
+        ),
+        "ingredient_duplicate_restore_decision_url": url_for(
+            "main_bp.ingredient_duplicate_restore_decision_route",
+            review_id=0,
         ),
         "ingredient_merge_undo_url": url_for(
             "main_bp.undo_ingredient_master_merge_route"
@@ -1273,6 +1280,29 @@ def ingredient_duplicate_reviews_route():
     })
 
 
+@main_bp.route("/api/master-data/ingredients/duplicate-reviews/history")
+def ingredient_duplicate_review_history_route():
+    active_public_user = current_public_user()
+    workspace_user_id = ingredient_duplicate_review_workspace(active_public_user, request.args)
+    if not workspace_user_id:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Choose one user workspace to view review decision history.",
+        }), 400
+    decisions = ingredient_duplicate_reviews.list_duplicate_decision_history(
+        workspace_user_id,
+        limit=int_query_arg("limit", 200, minimum=1, maximum=500),
+    )
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "user_id": workspace_user_id,
+        "decision_count": len(decisions),
+        "decisions": decisions,
+    })
+
+
 @main_bp.route(
     "/api/master-data/ingredients/duplicate-reviews/<int:review_id>/ai-second-opinion",
     methods=["POST"],
@@ -1330,6 +1360,28 @@ def ingredient_duplicate_decision_route(review_id):
         **result,
         "success": False,
     }), int(result.get("status") or 400)
+
+
+@main_bp.route(
+    "/api/master-data/ingredients/duplicate-reviews/<int:review_id>/restore",
+    methods=["POST"],
+)
+def ingredient_duplicate_restore_decision_route(review_id):
+    active_public_user = current_public_user()
+    result = ingredient_duplicate_reviews.restore_duplicate_review_decision(
+        review_id,
+        allow_other_users=is_admin_user(active_public_user),
+    )
+    if not result.get("ok"):
+        return jsonify({**result, "success": False}), int(result.get("status") or 400)
+    return jsonify({
+        **result,
+        "success": True,
+        "message": (
+            f"Restored {result.get('left_name')} and {result.get('right_name')} "
+            "to the duplicate review queue."
+        ),
+    })
 
 
 @main_bp.route(

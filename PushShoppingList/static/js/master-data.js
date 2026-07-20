@@ -1369,6 +1369,9 @@
             selectAll: panel && panel.querySelector("[data-master-duplicate-select-all]"),
             selectNone: panel && panel.querySelector("[data-master-duplicate-select-none]"),
             bulkActions: panel ? panel.querySelectorAll("[data-master-duplicate-bulk-action]") : [],
+            reviewHistoryButtons: panel ? panel.querySelectorAll(
+                "[data-master-duplicate-review-history], [data-master-duplicate-toolbar-review-history]"
+            ) : [],
             undoMerge: panel && panel.querySelector("[data-master-duplicate-undo-merge]"),
             undoMergeButtons: panel ? panel.querySelectorAll(
                 "[data-master-duplicate-undo-merge], [data-master-duplicate-toolbar-undo-merge]"
@@ -1420,6 +1423,9 @@
                 || els.panel.dataset.scope === "all"
                 || button.dataset.undoAvailable !== "true";
         });
+        Array.from(els.reviewHistoryButtons || []).forEach((button) => {
+            button.disabled = busy || els.panel.dataset.scope === "all";
+        });
         masterDataDuplicateCards().forEach((card) => {
             card.querySelectorAll("button").forEach((button) => {
                 const blockedMerge = card.dataset.mergeBlocked === "true"
@@ -1440,6 +1446,21 @@
         els.status.textContent = message;
         els.status.classList.toggle("is-error", kind === "error");
         els.status.classList.toggle("is-warning", kind === "warning");
+    }
+
+    function setMasterDataDuplicateStatusWithUndo(message, reviewId) {
+        const els = masterDataDuplicateElements();
+        if (!els.status) return;
+        setMasterDataDuplicateStatus(message);
+        const undoButton = document.createElement("button");
+        undoButton.type = "button";
+        undoButton.className = "master-data-duplicate-status-undo";
+        undoButton.dataset.masterDuplicateRestoreDecision = String(Number(reviewId) || 0);
+        undoButton.textContent = "Undo";
+        undoButton.addEventListener("click", () => {
+            void restoreMasterDataDuplicateDecision(undoButton);
+        });
+        els.status.append(" ", undoButton);
     }
 
     function setMasterDataUndoMergeState(merge = null) {
@@ -1708,6 +1729,196 @@
                 minute: "2-digit",
             }),
         };
+    }
+
+    function masterDataReviewHistoryElements() {
+        const dialog = document.querySelector("[data-master-review-history-dialog]");
+        return {
+            dialog,
+            status: dialog && dialog.querySelector("[data-master-review-history-status]"),
+            list: dialog && dialog.querySelector("[data-master-review-history-list]"),
+            closeButtons: dialog ? dialog.querySelectorAll("[data-master-review-history-close]") : [],
+        };
+    }
+
+    function masterDataReviewHistoryUrl() {
+        const duplicateEls = masterDataDuplicateElements();
+        const url = new URL(
+            text(duplicateEls.panel && duplicateEls.panel.dataset.reviewHistoryUrl),
+            window.location.origin
+        );
+        const context = masterDataDuplicateRequestContext();
+        if (context.scope) url.searchParams.set("scope", context.scope);
+        if (context.user_id) url.searchParams.set("user_id", context.user_id);
+        return url.toString();
+    }
+
+    function masterDataReviewHistoryItem(decision) {
+        const article = document.createElement("article");
+        article.className = "master-data-review-history-item";
+        article.dataset.reviewId = String(Number(decision && decision.review_id) || 0);
+        article.classList.toggle("is-blocked", decision && decision.can_restore === false);
+
+        const copy = document.createElement("div");
+        copy.className = "master-data-review-history-item-copy";
+        const heading = document.createElement("div");
+        heading.className = "master-data-review-history-item-heading";
+        const names = document.createElement("strong");
+        const leftName = text(decision && decision.left && decision.left.name).trim() || "Ingredient";
+        const rightName = text(decision && decision.right && decision.right.name).trim() || "Ingredient";
+        names.textContent = `${leftName} and ${rightName}`;
+        const badge = document.createElement("span");
+        const decisionType = text(decision && decision.decision).trim();
+        badge.className = `master-data-review-history-badge is-${decisionType || "decision"}`;
+        badge.textContent = text(decision && decision.decision_label).trim() || "Review decision";
+        heading.append(names, badge);
+
+        const detail = document.createElement("p");
+        detail.textContent = decision && decision.can_restore === false
+            ? text(decision.blocked_reason).trim()
+            : "Restore this pair to Potential duplicate ingredients for another decision.";
+        copy.append(heading, detail);
+
+        const action = document.createElement("div");
+        action.className = "master-data-review-history-item-action";
+        const dateInfo = masterDataUndoHistoryDateInfo(decision && decision.decided_at);
+        const time = document.createElement("time");
+        time.dateTime = text(decision && decision.decided_at).trim();
+        time.textContent = dateInfo.time;
+        const restore = document.createElement("button");
+        restore.type = "button";
+        restore.dataset.masterReviewHistoryRestore = String(Number(decision && decision.review_id) || 0);
+        restore.textContent = "Restore to review queue";
+        restore.disabled = decision && decision.can_restore === false;
+        restore.title = restore.disabled ? text(decision && decision.blocked_reason).trim() : "";
+        action.append(time, restore);
+        article.append(copy, action);
+        return article;
+    }
+
+    function renderMasterDataReviewHistory(decisions) {
+        const els = masterDataReviewHistoryElements();
+        if (!els.list || !els.status) return;
+        const items = Array.isArray(decisions) ? decisions : [];
+        els.list.replaceChildren();
+        if (!items.length) {
+            els.status.hidden = false;
+            els.status.classList.remove("is-error");
+            els.status.textContent = "No Related variant or Not a duplicate decisions are currently restorable.";
+            return;
+        }
+
+        const groups = new Map();
+        items.forEach((decision) => {
+            const dateInfo = masterDataUndoHistoryDateInfo(decision && decision.decided_at);
+            if (!groups.has(dateInfo.key)) groups.set(dateInfo.key, { dateInfo, decisions: [] });
+            groups.get(dateInfo.key).decisions.push(decision);
+        });
+        groups.forEach((group) => {
+            const section = document.createElement("section");
+            section.className = "master-data-review-history-date-group";
+            const header = document.createElement("header");
+            const title = document.createElement("h3");
+            title.textContent = group.dateInfo.label;
+            const count = document.createElement("span");
+            count.textContent = `${group.decisions.length} decision${group.decisions.length === 1 ? "" : "s"}`;
+            header.append(title, count);
+            const list = document.createElement("div");
+            list.append(...group.decisions.map(masterDataReviewHistoryItem));
+            section.append(header, list);
+            els.list.appendChild(section);
+        });
+        els.status.hidden = true;
+        els.status.classList.remove("is-error");
+    }
+
+    async function loadMasterDataReviewHistory() {
+        const els = masterDataReviewHistoryElements();
+        if (!els.dialog || !els.list || !els.status) return false;
+        els.status.hidden = false;
+        els.status.classList.remove("is-error");
+        els.status.textContent = "Loading review history...";
+        els.list.replaceChildren();
+        try {
+            const response = await fetch(masterDataReviewHistoryUrl(), {
+                headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || "Review decision history could not be loaded.");
+            }
+            renderMasterDataReviewHistory(data.decisions);
+            return true;
+        } catch (error) {
+            els.status.hidden = false;
+            els.status.classList.add("is-error");
+            els.status.textContent = error.message || "Review decision history could not be loaded.";
+            return false;
+        }
+    }
+
+    async function openMasterDataReviewHistory() {
+        const els = masterDataReviewHistoryElements();
+        if (!els.dialog) return;
+        if (!els.dialog.open) els.dialog.showModal();
+        await loadMasterDataReviewHistory();
+    }
+
+    function closeMasterDataReviewHistory() {
+        const els = masterDataReviewHistoryElements();
+        if (els.dialog && els.dialog.open) els.dialog.close();
+    }
+
+    async function restoreMasterDataDuplicateDecision(button) {
+        const duplicateEls = masterDataDuplicateElements();
+        const historyEls = masterDataReviewHistoryElements();
+        const reviewId = Number(
+            button && (
+                button.dataset.masterReviewHistoryRestore
+                || button.dataset.masterDuplicateRestoreDecision
+            )
+        ) || 0;
+        if (!duplicateEls.panel || !reviewId || !duplicateEls.panel.dataset.restoreDecisionUrl) return;
+        const defaultLabel = text(button.textContent).trim();
+        button.disabled = true;
+        button.textContent = "Restoring...";
+        const requestUrl = text(duplicateEls.panel.dataset.restoreDecisionUrl)
+            .replace("/0/restore", `/${reviewId}/restore`);
+        try {
+            const response = await fetch(requestUrl, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify(masterDataDuplicateRequestContext()),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "The review decision could not be restored.");
+            }
+            await loadMasterDataDuplicateReviews();
+            setMasterDataDuplicateStatus(data.message || "Review decision restored.");
+            if (historyEls.dialog && historyEls.dialog.open) {
+                await loadMasterDataReviewHistory();
+            }
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = defaultLabel;
+            if (historyEls.dialog && historyEls.dialog.open) {
+                if (historyEls.status) {
+                    historyEls.status.hidden = false;
+                    historyEls.status.classList.add("is-error");
+                    historyEls.status.textContent = error.message || "The review decision could not be restored.";
+                }
+            } else {
+                setMasterDataDuplicateStatus(
+                    error.message || "The review decision could not be restored.",
+                    "error"
+                );
+            }
+        }
     }
 
     function masterDataUndoHistoryItem(merge, selectedMergeId) {
@@ -2655,6 +2866,9 @@
                 || els.panel.dataset.scope === "all"
                 || button.dataset.undoAvailable !== "true";
         });
+        Array.from(els.reviewHistoryButtons || []).forEach((button) => {
+            button.disabled = busy || els.panel.dataset.scope === "all";
+        });
         Array.from(els.bulkActions || []).forEach((button) => {
             const action = text(button.dataset.masterDuplicateBulkAction).trim();
             const includesBlockedMerge = selected.some((card) => card.dataset.mergeBlocked === "true");
@@ -2942,7 +3156,6 @@
             if (!response.ok || data.ok === false) {
                 throw new Error(data.error || data.message || "That review decision could not be saved.");
             }
-            setMasterDataDuplicateStatus(data.message || "Review decision saved.");
             if (action === "merge") {
                 await refreshAfterMasterDataDuplicateMerge(
                     data.message || "Ingredient merge complete.",
@@ -2955,6 +3168,10 @@
             const remaining = els.list.querySelectorAll(".master-data-duplicate-card[data-review-id]").length;
             if (!remaining) renderMasterDataDuplicateReviews([]);
             updateMasterDataDuplicateSelectionState();
+            setMasterDataDuplicateStatusWithUndo(
+                data.message || "Review decision saved.",
+                reviewId
+            );
         } catch (error) {
             if (card) card.removeAttribute("aria-busy");
             if (card) {
@@ -2976,6 +3193,9 @@
         });
         Array.from(els.undoMergeButtons || []).forEach((button) => {
             button.addEventListener("click", () => void openMasterDataUndoPreview());
+        });
+        Array.from(els.reviewHistoryButtons || []).forEach((button) => {
+            button.addEventListener("click", () => void openMasterDataReviewHistory());
         });
         if (els.selectHighConfidence) {
             els.selectHighConfidence.addEventListener("click", () => selectMasterDataDuplicateCards("high-confidence"));
@@ -3055,6 +3275,28 @@
             });
             undoPreviewEls.dialog.addEventListener("click", (event) => {
                 if (event.target === undoPreviewEls.dialog) closeMasterDataUndoPreview();
+            });
+        }
+
+        const reviewHistoryEls = masterDataReviewHistoryElements();
+        Array.from(reviewHistoryEls.closeButtons || []).forEach((button) => {
+            button.addEventListener("click", closeMasterDataReviewHistory);
+        });
+        if (reviewHistoryEls.list) {
+            reviewHistoryEls.list.addEventListener("click", (event) => {
+                const restoreButton = event.target && event.target.closest
+                    ? event.target.closest("[data-master-review-history-restore]")
+                    : null;
+                if (restoreButton) void restoreMasterDataDuplicateDecision(restoreButton);
+            });
+        }
+        if (reviewHistoryEls.dialog) {
+            reviewHistoryEls.dialog.addEventListener("cancel", (event) => {
+                event.preventDefault();
+                closeMasterDataReviewHistory();
+            });
+            reviewHistoryEls.dialog.addEventListener("click", (event) => {
+                if (event.target === reviewHistoryEls.dialog) closeMasterDataReviewHistory();
             });
         }
     }

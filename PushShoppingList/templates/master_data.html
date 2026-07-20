@@ -383,7 +383,9 @@
                      data-master-duplicate-review
                      data-scan-url="{{ master_data.ingredient_duplicate_scan_url }}"
                      data-reviews-url="{{ master_data.ingredient_duplicate_reviews_url }}"
+                     data-review-history-url="{{ master_data.ingredient_duplicate_review_history_url }}"
                      data-decision-url="{{ master_data.ingredient_duplicate_decision_url }}"
+                     data-restore-decision-url="{{ master_data.ingredient_duplicate_restore_decision_url }}"
                      data-ai-second-opinion-url="{{ master_data.ingredient_duplicate_ai_second_opinion_url }}"
                      data-bulk-decision-url="{{ master_data.ingredient_duplicate_bulk_decision_url }}"
                      data-undo-merge-url="{{ master_data.ingredient_merge_undo_url }}"
@@ -402,6 +404,11 @@
                                 data-master-duplicate-scan
                                 {% if master_data.scope == 'all' %}disabled{% endif %}>
                             Find Potential Duplicates
+                        </button>
+                        <button type="button"
+                                data-master-duplicate-review-history
+                                {% if master_data.scope == 'all' %}disabled{% endif %}>
+                            Review history
                         </button>
                         <button type="button"
                                 class="master-data-undo-merge"
@@ -450,6 +457,11 @@
                                 data-master-duplicate-toolbar-scan
                                 {% if master_data.scope == 'all' %}disabled{% endif %}>
                             Find Potential Duplicates
+                        </button>
+                        <button type="button"
+                                data-master-duplicate-toolbar-review-history
+                                {% if master_data.scope == 'all' %}disabled{% endif %}>
+                            Review history
                         </button>
                         <button type="button"
                                 data-master-duplicate-toolbar-undo-merge
@@ -594,6 +606,44 @@
                                 Undo this merge
                             </button>
                         </div>
+                    </footer>
+                </div>
+            </dialog>
+
+            <dialog id="masterDataReviewHistoryDialog"
+                    class="master-data-undo-dialog master-data-review-history-dialog"
+                    data-master-review-history-dialog
+                    aria-labelledby="masterDataReviewHistoryTitle"
+                    aria-describedby="masterDataReviewHistorySummary">
+                <div class="master-data-undo-dialog-shell">
+                    <header class="master-data-undo-dialog-header">
+                        <div>
+                            <span>Review decisions</span>
+                            <h2 id="masterDataReviewHistoryTitle">Related and dismissed pairs</h2>
+                            <p id="masterDataReviewHistorySummary">
+                                Restore any Related variant or Not a duplicate decision to the review queue.
+                            </p>
+                        </div>
+                        <button type="button"
+                                class="master-data-undo-dialog-close"
+                                data-master-review-history-close
+                                aria-label="Close review history">&times;</button>
+                    </header>
+                    <div class="master-data-undo-dialog-body">
+                        <p class="master-data-review-history-status"
+                           data-master-review-history-status
+                           role="status"
+                           aria-live="polite">
+                            Loading review history&hellip;
+                        </p>
+                        <div class="master-data-review-history-list"
+                             data-master-review-history-list
+                             aria-label="Restorable duplicate review decisions"
+                             aria-live="polite"></div>
+                    </div>
+                    <footer class="master-data-undo-dialog-footer">
+                        <span>Restoring a decision only returns its pair to this review queue.</span>
+                        <button type="button" data-master-review-history-close>Close</button>
                     </footer>
                 </div>
             </dialog>

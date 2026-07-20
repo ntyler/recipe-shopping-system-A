@@ -564,6 +564,59 @@ def test_duplicate_review_routes_scan_scope_and_save_decisions(monkeypatch, tmp_
     assert user_b_response.get_json()["review_count"] == 1
 
 
+def test_duplicate_review_history_route_restores_decision_to_queue(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    for name in ("Potato", "Potatoes"):
+        master_data.sync_recipe_master_records(
+            f"https://example.com/{name.lower()}",
+            recipe_data={"ingredients": [{"ingredient": name, "store_section": "Produce"}]},
+            user_id="user-a",
+        )
+    headers = {"X-Requested-With": "fetch", "Accept": "application/json"}
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        scan = client.post(
+            "/api/master-data/ingredients/duplicate-scan",
+            json={"scope": "mine"},
+            headers=headers,
+        ).get_json()
+        review_id = scan["reviews"][0]["review_id"]
+        decision_response = client.post(
+            f"/api/master-data/ingredients/duplicate-reviews/{review_id}/decision",
+            json={"action": "related"},
+            headers=headers,
+        )
+        history_response = client.get(
+            "/api/master-data/ingredients/duplicate-reviews/history?scope=mine",
+            headers=headers,
+        )
+        restore_response = client.post(
+            f"/api/master-data/ingredients/duplicate-reviews/{review_id}/restore",
+            json={"scope": "mine"},
+            headers=headers,
+        )
+        pending_response = client.get(
+            "/api/master-data/ingredients/duplicate-reviews?scope=mine",
+            headers=headers,
+        )
+
+    history_payload = history_response.get_json()
+    restore_payload = restore_response.get_json()
+    pending_payload = pending_response.get_json()
+    assert decision_response.status_code == 200
+    assert history_response.status_code == 200
+    assert history_payload["decision_count"] == 1
+    assert history_payload["decisions"][0]["decision"] == "related"
+    assert history_payload["decisions"][0]["can_restore"] is True
+    assert restore_response.status_code == 200
+    assert restore_payload["success"] is True
+    assert "duplicate review queue" in restore_payload["message"]
+    assert pending_payload["review_count"] == 1
+    assert pending_payload["reviews"][0]["review_id"] == review_id
+
+
 def test_duplicate_review_ai_second_opinion_route_generates_independent_notes(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -1107,7 +1160,9 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-ai-second-opinion-url",
         "ingredient_duplicate_scan_url",
         "ingredient_duplicate_reviews_url",
+        "ingredient_duplicate_review_history_url",
         "ingredient_duplicate_decision_url",
+        "ingredient_duplicate_restore_decision_url",
         "ingredient_duplicate_ai_second_opinion_url",
         "ingredient_duplicate_bulk_decision_url",
         "ingredient_merge_undo_url",
@@ -1128,6 +1183,8 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-duplicate-undo-merge",
         "data-master-duplicate-toolbar-scan",
         "data-master-duplicate-toolbar-undo-merge",
+        "data-master-duplicate-review-history",
+        "data-master-duplicate-toolbar-review-history",
         "data-master-duplicate-undo-summary",
         "data-master-undo-dialog",
         "data-master-undo-preview-confirm",
@@ -1137,6 +1194,9 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-undo-history-count",
         "data-master-undo-preview-position",
         "ingredient_merge_undo_preview_url",
+        "data-master-review-history-dialog",
+        "data-master-review-history-list",
+        "data-master-review-history-status",
     ):
         assert marker in template
     assert "Find Potential Duplicates" in template
@@ -1176,6 +1236,11 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "function renderMasterDataUndoHistory(merges, selectedMergeId)" in script
     assert "function masterDataUndoHistoryDateInfo(value)" in script
     assert "function masterDataUndoHistoryItem(merge, selectedMergeId)" in script
+    assert "function masterDataReviewHistoryElements()" in script
+    assert "async function openMasterDataReviewHistory()" in script
+    assert "async function restoreMasterDataDuplicateDecision(button)" in script
+    assert "function setMasterDataDuplicateStatusWithUndo(message, reviewId)" in script
+    assert "master-data-duplicate-status-undo" in script
     assert "masterDataUndoCollapsedDateGroups" in script
     assert 'document.createElement("details")' in script
     assert 'date.toLocaleDateString([], {' in script
@@ -1231,6 +1296,9 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-undo-history-date-group" in css
     assert ".master-data-undo-history-date-summary" in css
     assert ".master-data-undo-history-date-items" in css
+    assert ".master-data-review-history-dialog" in css
+    assert ".master-data-review-history-item" in css
+    assert ".master-data-review-history-date-group" in css
     assert "Safe out-of-order undo" in script
     assert "Cannot safely undo yet" in script
     assert "Undo newer merges first" not in script

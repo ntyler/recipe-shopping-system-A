@@ -633,6 +633,8 @@ def ensure_recipe_master_schema(connection=None):
             ai_second_opinion_fingerprint TEXT NOT NULL DEFAULT '',
             ai_second_opinion_model TEXT NOT NULL DEFAULT '',
             ai_second_opinion_at TEXT NOT NULL DEFAULT '',
+            decision_previous_classification TEXT NOT NULL DEFAULT '',
+            decision_at TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(user_id, left_ingredient_id, right_ingredient_id)
@@ -797,6 +799,8 @@ def ensure_recipe_master_schema(connection=None):
         "ai_second_opinion_fingerprint": "TEXT NOT NULL DEFAULT ''",
         "ai_second_opinion_model": "TEXT NOT NULL DEFAULT ''",
         "ai_second_opinion_at": "TEXT NOT NULL DEFAULT ''",
+        "decision_previous_classification": "TEXT NOT NULL DEFAULT ''",
+        "decision_at": "TEXT NOT NULL DEFAULT ''",
     }
     for column_name, column_definition in duplicate_review_column_definitions.items():
         if column_name not in duplicate_review_columns:

@@ -147,6 +147,88 @@ def test_related_decision_is_durable(monkeypatch, tmp_path):
     assert duplicate_reviews.scan_potential_duplicates("user-a")["review_count"] == 0
 
 
+def test_related_and_not_duplicate_decisions_can_be_restored_out_of_order(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    seed_pair()
+    first_review = duplicate_reviews.scan_potential_duplicates("user-a")["reviews"][0]
+    duplicate_reviews.decide_duplicate_review(
+        first_review["review_id"],
+        "related",
+        user_id="user-a",
+    )
+    for name in ("Tomato", "Tomatoes"):
+        master_data.sync_recipe_master_records(
+            f"https://example.com/{name.lower()}",
+            recipe_data={"ingredients": [{"ingredient": name, "store_section": "Produce"}]},
+            user_id="user-a",
+        )
+    second_review = next(
+        review
+        for review in duplicate_reviews.scan_potential_duplicates("user-a")["reviews"]
+        if {review["left"]["name"].lower(), review["right"]["name"].lower()}
+        == {"tomato", "tomatoes"}
+    )
+    duplicate_reviews.decide_duplicate_review(
+        second_review["review_id"],
+        "not_duplicate",
+        user_id="user-a",
+    )
+
+    history = duplicate_reviews.list_duplicate_decision_history("user-a")
+    by_id = {decision["review_id"]: decision for decision in history}
+
+    assert by_id[first_review["review_id"]]["decision_label"] == "Related variant"
+    assert by_id[second_review["review_id"]]["decision_label"] == "Not a duplicate"
+    assert all(decision["can_restore"] for decision in by_id.values())
+    denied = duplicate_reviews.restore_duplicate_review_decision(
+        first_review["review_id"],
+        user_id="user-b",
+    )
+    assert denied["ok"] is False
+    assert denied["status"] == 404
+    restored_older = duplicate_reviews.restore_duplicate_review_decision(
+        first_review["review_id"],
+        user_id="user-a",
+    )
+    assert restored_older["ok"] is True
+    assert restored_older["restored_classification"] == first_review["classification"]
+    pending_review_ids = {
+        review["review_id"] for review in duplicate_reviews.list_duplicate_reviews("user-a")
+    }
+    assert first_review["review_id"] in pending_review_ids
+    assert second_review["review_id"] not in pending_review_ids
+    assert [decision["review_id"] for decision in duplicate_reviews.list_duplicate_decision_history("user-a")] == [
+        second_review["review_id"]
+    ]
+
+
+def test_review_decision_restore_is_blocked_when_an_ingredient_no_longer_exists(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    seed_pair()
+    review = duplicate_reviews.scan_potential_duplicates("user-a")["reviews"][0]
+    duplicate_reviews.decide_duplicate_review(
+        review["review_id"],
+        "related",
+        user_id="user-a",
+    )
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "DELETE FROM ingredients WHERE user_id = ? AND id = ?",
+            ("user-a", review["left"]["ingredient_id"]),
+        )
+
+    history = duplicate_reviews.list_duplicate_decision_history("user-a")
+    result = duplicate_reviews.restore_duplicate_review_decision(
+        review["review_id"],
+        user_id="user-a",
+    )
+
+    assert history[0]["can_restore"] is False
+    assert "no longer exist" in history[0]["blocked_reason"]
+    assert result["ok"] is False
+    assert result["status"] == 409
+
+
 def test_approved_merge_relinks_usage_and_preserves_alias(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     seed_pair()

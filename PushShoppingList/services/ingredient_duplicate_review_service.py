@@ -1071,6 +1071,146 @@ def list_duplicate_reviews(user_id=None, status="pending"):
     return reviews
 
 
+def list_duplicate_decision_history(user_id=None, limit=200):
+    scoped_user_id = master_data.scoped_recipe_user_id(user_id)
+    try:
+        limit = max(1, min(int(limit or 200), 500))
+    except (TypeError, ValueError):
+        limit = 200
+    with master_data.existing_recipe_master_connection() as connection:
+        if connection is None:
+            return []
+        rows = connection.execute(
+            """
+            SELECT r.*,
+                   left_item.name AS current_left_name,
+                   left_item.image_url AS left_image_url,
+                   right_item.name AS current_right_name,
+                   right_item.image_url AS right_image_url
+              FROM ingredient_duplicate_reviews r
+              LEFT JOIN ingredients left_item
+                ON left_item.id = r.left_ingredient_id AND left_item.user_id = r.user_id
+              LEFT JOIN ingredients right_item
+                ON right_item.id = r.right_ingredient_id AND right_item.user_id = r.user_id
+             WHERE r.user_id = ? AND r.status IN ('related', 'dismissed')
+             ORDER BY COALESCE(NULLIF(r.decision_at, ''), r.updated_at) DESC, r.id DESC
+             LIMIT ?
+            """,
+            (scoped_user_id, limit),
+        ).fetchall()
+
+    decisions = []
+    for row in rows:
+        item = dict(row)
+        left_exists = item.get("current_left_name") is not None
+        right_exists = item.get("current_right_name") is not None
+        decision = "related" if item["status"] == "related" else "not_duplicate"
+        can_restore = left_exists and right_exists
+        decisions.append({
+            "review_id": int(item["id"]),
+            "decision": decision,
+            "decision_label": "Related variant" if decision == "related" else "Not a duplicate",
+            "decided_at": master_data.clean_text(item.get("decision_at") or item.get("updated_at")),
+            "can_restore": can_restore,
+            "blocked_reason": "" if can_restore else (
+                "One or both ingredient records no longer exist, so this decision cannot be restored."
+            ),
+            "left": {
+                "ingredient_id": int(item["left_ingredient_id"]),
+                "name": master_data.clean_text(item.get("current_left_name") or item["left_name"]),
+                "image_url": master_data.clean_text(item.get("left_image_url")),
+                "exists": left_exists,
+            },
+            "right": {
+                "ingredient_id": int(item["right_ingredient_id"]),
+                "name": master_data.clean_text(item.get("current_right_name") or item["right_name"]),
+                "image_url": master_data.clean_text(item.get("right_image_url")),
+                "exists": right_exists,
+            },
+        })
+    return decisions
+
+
+def restore_duplicate_review_decision(
+    review_id,
+    user_id=None,
+    allow_other_users=False,
+):
+    try:
+        review_id = int(review_id or 0)
+    except (TypeError, ValueError):
+        review_id = 0
+    if review_id <= 0:
+        return {"ok": False, "status": 400, "error": "Choose a valid review decision."}
+
+    scoped_user_id = master_data.scoped_recipe_user_id(user_id)
+    with master_data.existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {"ok": False, "status": 404, "error": "Review decision was not found."}
+        review = connection.execute(
+            "SELECT * FROM ingredient_duplicate_reviews WHERE id = ?",
+            (review_id,),
+        ).fetchone()
+        if not review or (not allow_other_users and review["user_id"] != scoped_user_id):
+            return {"ok": False, "status": 404, "error": "Review decision was not found."}
+        if review["status"] not in {"related", "dismissed"}:
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "Only Related variant and Not a duplicate decisions can be restored here.",
+            }
+        review_user_id = review["user_id"]
+        ingredient_rows = connection.execute(
+            """
+            SELECT id, name
+              FROM ingredients
+             WHERE user_id = ? AND id IN (?, ?)
+            """,
+            (
+                review_user_id,
+                int(review["left_ingredient_id"]),
+                int(review["right_ingredient_id"]),
+            ),
+        ).fetchall()
+        ingredient_names = {int(row["id"]): master_data.clean_text(row["name"]) for row in ingredient_rows}
+        if len(ingredient_names) != 2:
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "One or both ingredient records no longer exist, so this decision cannot be restored.",
+            }
+        previous_classification = master_data.clean_text(
+            review["decision_previous_classification"]
+        ).lower()
+        if previous_classification not in VALID_CLASSIFICATIONS:
+            previous_classification = local_candidate_classification({
+                "signals": _decode_signals(review["signals_json"]),
+            })["classification"]
+        now = master_data.utc_now_iso()
+        updated = connection.execute(
+            """
+            UPDATE ingredient_duplicate_reviews
+               SET status = 'pending', classification = ?,
+                   decision_previous_classification = '', decision_at = '', updated_at = ?
+             WHERE id = ? AND user_id = ? AND status IN ('related', 'dismissed')
+            """,
+            (previous_classification, now, review_id, review_user_id),
+        )
+        if updated.rowcount != 1:
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "That review decision changed before it could be restored.",
+            }
+        return {
+            "ok": True,
+            "review_id": review_id,
+            "restored_classification": previous_classification,
+            "left_name": ingredient_names[int(review["left_ingredient_id"])],
+            "right_name": ingredient_names[int(review["right_ingredient_id"])],
+        }
+
+
 def _ingredient_for_ai_second_opinion(connection, user_id, ingredient_id):
     row = connection.execute(
         """
@@ -1322,14 +1462,28 @@ def decide_duplicate_review(review_id, action, target_ingredient_id=None, user_i
 
     status = "related" if action == "related" else "dismissed"
     classification = "related" if action == "related" else "different"
+    previous_classification = master_data.clean_text(review["classification"]).lower()
+    if previous_classification not in VALID_CLASSIFICATIONS:
+        previous_classification = local_candidate_classification({
+            "signals": _decode_signals(review["signals_json"]),
+        })["classification"]
     with master_data.recipe_master_connection() as connection:
         connection.execute(
             """
             UPDATE ingredient_duplicate_reviews
-               SET status = ?, classification = ?, updated_at = ?
+               SET status = ?, classification = ?,
+                   decision_previous_classification = ?, decision_at = ?, updated_at = ?
              WHERE id = ? AND user_id = ? AND status = 'pending'
             """,
-            (status, classification, now, review_id, review_user_id),
+            (
+                status,
+                classification,
+                previous_classification,
+                now,
+                now,
+                review_id,
+                review_user_id,
+            ),
         )
     return {"ok": True, "action": action, "review_id": review_id, "status": status}
 

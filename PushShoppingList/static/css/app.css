@@ -26484,6 +26484,25 @@ img[data-deferred-src] {
             box-shadow: 0 0 0 4px rgba(248, 113, 113, .11);
         }
 
+        .master-data-duplicate-status .master-data-duplicate-status-undo {
+            width: auto;
+            min-height: 26px;
+            margin: -3px 0 -3px 6px;
+            padding: 3px 10px;
+            border: 1px solid #4e7d97;
+            border-radius: 6px;
+            background: #132b38;
+            color: #e5f6ff;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .master-data-duplicate-status .master-data-duplicate-status-undo:is(:hover, :focus-visible) {
+            outline: none;
+            border-color: #7dd3fc;
+            background: #194052;
+        }
+
         .master-data-duplicate-toolbar {
             position: sticky;
             top: 8px;
@@ -27580,6 +27599,156 @@ img[data-deferred-src] {
             opacity: .5;
         }
 
+        .master-data-review-history-dialog {
+            width: min(860px, calc(100vw - 24px));
+            max-width: 860px;
+        }
+
+        .master-data-review-history-status {
+            margin: 0;
+            padding: 14px;
+            border: 1px solid #2d4354;
+            border-radius: 8px;
+            background: #07111c;
+            color: #b9c9d5;
+            font-size: 12px;
+            font-weight: 750;
+            line-height: 1.45;
+        }
+
+        .master-data-review-history-status.is-error {
+            border-color: #823f49;
+            background: rgba(80, 24, 31, .45);
+            color: #fecaca;
+        }
+
+        .master-data-review-history-status[hidden] {
+            display: none;
+        }
+
+        .master-data-review-history-list,
+        .master-data-review-history-date-group,
+        .master-data-review-history-date-group > div {
+            display: grid;
+            gap: 10px;
+        }
+
+        .master-data-review-history-date-group + .master-data-review-history-date-group {
+            margin-top: 16px;
+        }
+
+        .master-data-review-history-date-group > header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding-bottom: 7px;
+            border-bottom: 1px solid #2a4354;
+        }
+
+        .master-data-review-history-date-group > header h3 {
+            margin: 0;
+            color: #e8f1f7;
+            font-size: 13px;
+        }
+
+        .master-data-review-history-date-group > header span {
+            color: #8fa8b9;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .master-data-review-history-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 14px;
+            padding: 12px;
+            border: 1px solid #315267;
+            border-radius: 9px;
+            background: #091923;
+        }
+
+        .master-data-review-history-item.is-blocked {
+            border-color: #665a40;
+            background: rgba(45, 37, 22, .42);
+        }
+
+        .master-data-review-history-item-copy,
+        .master-data-review-history-item-action {
+            display: grid;
+            min-width: 0;
+            gap: 6px;
+        }
+
+        .master-data-review-history-item-heading {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 7px;
+        }
+
+        .master-data-review-history-item-heading strong {
+            color: #f1f7fa;
+            font-size: 13px;
+            line-height: 1.3;
+        }
+
+        .master-data-review-history-badge {
+            padding: 3px 7px;
+            border: 1px solid #3679a2;
+            border-radius: 999px;
+            background: rgba(20, 80, 112, .38);
+            color: #bae6fd;
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: .025em;
+            text-transform: uppercase;
+        }
+
+        .master-data-review-history-badge.is-related {
+            border-color: #37876b;
+            background: rgba(10, 93, 65, .34);
+            color: #a7f3d0;
+        }
+
+        .master-data-review-history-item p,
+        .master-data-review-history-item time {
+            margin: 0;
+            color: #9eb1bf;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .master-data-review-history-item-action {
+            justify-items: end;
+        }
+
+        .master-data-review-history-item-action button {
+            width: auto;
+            min-height: 34px;
+            margin: 0;
+            padding: 6px 11px;
+            border: 1px solid #2fad78;
+            border-radius: 7px;
+            background: #096541;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 900;
+        }
+
+        .master-data-review-history-item-action button:is(:hover, :focus-visible) {
+            outline: none;
+            border-color: #6ee7b7;
+            background: #08794c;
+        }
+
+        .master-data-review-history-item-action button:disabled {
+            cursor: not-allowed;
+            opacity: .48;
+        }
+
         .master-data-reference-dialog {
             width: min(1120px, calc(100vw - 24px));
             max-width: 1120px;
@@ -28259,6 +28428,18 @@ img[data-deferred-src] {
 
             .master-data-undo-dialog-footer > div,
             .master-data-undo-dialog-footer button {
+                width: 100%;
+            }
+
+            .master-data-review-history-item {
+                grid-template-columns: 1fr;
+            }
+
+            .master-data-review-history-item-action {
+                justify-items: stretch;
+            }
+
+            .master-data-review-history-item-action button {
                 width: 100%;
             }
 
