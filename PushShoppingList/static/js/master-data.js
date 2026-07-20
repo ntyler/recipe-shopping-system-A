@@ -1721,6 +1721,7 @@
     function masterDataDuplicateIngredient(record, suggestedTargetId, review) {
         const item = document.createElement("article");
         item.className = "master-data-duplicate-ingredient";
+        item.dataset.ingredientId = text(record.ingredient_id);
         if (Number(record.ingredient_id) === Number(suggestedTargetId)) {
             item.classList.add("is-suggested");
         }
@@ -1765,11 +1766,11 @@
         const name = document.createElement("strong");
         name.textContent = text(record.name);
         heading.appendChild(name);
-        if (Number(record.ingredient_id) === Number(suggestedTargetId)) {
-            const recommended = document.createElement("span");
-            recommended.textContent = "Suggested survivor";
-            heading.appendChild(recommended);
-        }
+        const recommended = document.createElement("span");
+        recommended.dataset.masterDuplicateSuggestedSurvivor = "1";
+        recommended.textContent = "Suggested survivor";
+        recommended.hidden = Number(record.ingredient_id) !== Number(suggestedTargetId);
+        heading.appendChild(recommended);
         const normalized = document.createElement("code");
         normalized.textContent = text(record.normalized_name);
         const detail = document.createElement("small");
@@ -1805,6 +1806,32 @@
         }
         if (className) button.className = className;
         return button;
+    }
+
+    function setMasterDataDuplicateSuggestedSurvivor(button) {
+        const card = button && button.closest ? button.closest(".master-data-duplicate-card") : null;
+        const targetId = Number(button && button.dataset.targetIngredientId) || 0;
+        if (!card || !targetId) return;
+
+        card.dataset.suggestedTargetId = text(targetId);
+        card.dataset.suggestedTargetName = text(button.dataset.targetName);
+        card.dataset.suggestedSourceName = text(button.dataset.sourceName);
+        card.querySelectorAll(".master-data-duplicate-ingredient[data-ingredient-id]").forEach((ingredient) => {
+            const isSuggested = Number(ingredient.dataset.ingredientId) === targetId;
+            ingredient.classList.toggle("is-suggested", isSuggested);
+            const label = ingredient.querySelector("[data-master-duplicate-suggested-survivor]");
+            if (label) label.hidden = !isSuggested;
+        });
+        card.querySelectorAll("[data-master-duplicate-references-open]").forEach((referenceButton) => {
+            referenceButton.dataset.suggestedTargetId = text(targetId);
+        });
+        card.querySelectorAll('[data-master-duplicate-decision="merge"]').forEach((mergeButton) => {
+            const isSuggested = Number(mergeButton.dataset.targetIngredientId) === targetId;
+            mergeButton.setAttribute("aria-pressed", isSuggested ? "true" : "false");
+            if (card.dataset.classification === "duplicate") {
+                mergeButton.classList.toggle("primary", isSuggested);
+            }
+        });
     }
 
     function masterDataDuplicateCard(review) {
@@ -1880,6 +1907,8 @@
             review.classification === "duplicate" ? "primary" : ""
         );
         const mergeAlternate = masterDataDuplicateAction(`Merge into ${alternate.name}`, "merge", review, alternate);
+        mergeSuggested.setAttribute("aria-pressed", "true");
+        mergeAlternate.setAttribute("aria-pressed", "false");
         const related = masterDataDuplicateAction(
             "Related variant",
             "related",
@@ -2172,6 +2201,7 @@
         const reviewId = text(button.dataset.reviewId).trim();
         if (!els.panel || !action || !reviewId) return;
         if (action === "merge") {
+            setMasterDataDuplicateSuggestedSurvivor(button);
             if (changedStoreSectionForms().length) {
                 setMasterDataDuplicateStatus("Save your pending ingredient edits before merging records.", "warning");
                 return;

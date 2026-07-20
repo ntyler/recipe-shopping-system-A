@@ -1002,6 +1002,7 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "Find Potential Duplicates" in template
     assert "Similarity checks find likely pairs, AI labels them" in template
     assert "function masterDataDuplicateCard(review)" in script
+    assert "function setMasterDataDuplicateSuggestedSurvivor(button)" in script
     assert "async function scanMasterDataDuplicates()" in script
     assert "async function decideMasterDataDuplicate(button)" in script
     assert "async function applyMasterDataDuplicateBulkAction(button)" in script
@@ -1019,6 +1020,17 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert 'url.searchParams.set("limit", "500")' in script
     assert 'card.dataset.highConfidenceDuplicate' in script
     assert 'button.closest(".master-data-duplicate-card")' in script
+    assert 'ingredient.classList.toggle("is-suggested", isSuggested)' in script
+    assert 'if (label) label.hidden = !isSuggested' in script
+    assert 'referenceButton.dataset.suggestedTargetId = text(targetId)' in script
+    assert 'mergeButton.setAttribute("aria-pressed", isSuggested ? "true" : "false")' in script
+    decide_block = script[
+        script.index("async function decideMasterDataDuplicate(button)"):
+        script.index("function initMasterDataDuplicateReview()")
+    ]
+    assert decide_block.index("setMasterDataDuplicateSuggestedSurvivor(button);") < decide_block.index(
+        "confirmMasterDataDuplicateMerge({"
+    )
     duplicate_review_block = script[
         script.index("function masterDataDuplicateElements()"):
         script.index("function renderProgress(")
