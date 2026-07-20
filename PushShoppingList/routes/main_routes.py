@@ -26,6 +26,7 @@ from flask import url_for
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services import recipe_master_data_service as recipe_master_data
 from PushShoppingList.services import recipe_master_image_service as recipe_master_images
+from PushShoppingList.services import ingredient_duplicate_review_service as ingredient_duplicate_reviews
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
@@ -865,6 +866,19 @@ def master_data_scope(is_admin):
     }
 
 
+def ingredient_duplicate_review_workspace(active_public_user, values):
+    values = values if isinstance(values, dict) or hasattr(values, "get") else {}
+    current_scope_user_id = recipe_master_data.scoped_recipe_user_id()
+    if is_admin_user(active_public_user):
+        requested_user_id = recipe_master_data.clean_text(values.get("user_id"))
+        requested_scope = recipe_master_data.clean_text(values.get("scope")).lower()
+        if requested_user_id:
+            return requested_user_id
+        if requested_scope == "all":
+            return ""
+    return current_scope_user_id
+
+
 def master_data_query_args(search, sort, limit, scope_info, page=None, store_section=None, equipment_section=None):
     query_args = {
         "sort": sort,
@@ -1118,6 +1132,12 @@ def master_data_context(record_type):
         "backfill_status_url": url_for("main_bp.recipe_master_data_backfill_status_route"),
         "image_generation_url": url_for("main_bp.recipe_master_data_generate_missing_images_route"),
         "image_generation_status_url": url_for("main_bp.recipe_master_data_image_generation_status_route"),
+        "ingredient_duplicate_scan_url": url_for("main_bp.ingredient_duplicate_scan_route"),
+        "ingredient_duplicate_reviews_url": url_for("main_bp.ingredient_duplicate_reviews_route"),
+        "ingredient_duplicate_decision_url": url_for(
+            "main_bp.ingredient_duplicate_decision_route",
+            review_id=0,
+        ),
         "current_url": current_url,
         "prev_url": prev_url,
         "next_url": next_url,
@@ -1183,6 +1203,79 @@ def ingredient_master_options_route():
         ],
         "manage_url": url_for("main_bp.master_data_ingredients_route"),
     })
+
+
+@main_bp.route("/api/master-data/ingredients/duplicate-scan", methods=["POST"])
+def ingredient_duplicate_scan_route():
+    active_public_user = current_public_user()
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    workspace_user_id = ingredient_duplicate_review_workspace(active_public_user, payload)
+    if not workspace_user_id:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Choose one user workspace before scanning for duplicate ingredients.",
+        }), 400
+
+    result = ingredient_duplicate_reviews.scan_potential_duplicates(workspace_user_id)
+    return jsonify({**result, "success": result.get("ok", False)})
+
+
+@main_bp.route("/api/master-data/ingredients/duplicate-reviews")
+def ingredient_duplicate_reviews_route():
+    active_public_user = current_public_user()
+    workspace_user_id = ingredient_duplicate_review_workspace(active_public_user, request.args)
+    if not workspace_user_id:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Choose one user workspace to view duplicate ingredient reviews.",
+        }), 400
+    reviews = ingredient_duplicate_reviews.list_duplicate_reviews(workspace_user_id)
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "user_id": workspace_user_id,
+        "review_count": len(reviews),
+        "reviews": reviews,
+    })
+
+
+@main_bp.route(
+    "/api/master-data/ingredients/duplicate-reviews/<int:review_id>/decision",
+    methods=["POST"],
+)
+def ingredient_duplicate_decision_route(review_id):
+    active_public_user = current_public_user()
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    result = ingredient_duplicate_reviews.decide_duplicate_review(
+        review_id,
+        payload.get("action"),
+        target_ingredient_id=payload.get("target_ingredient_id"),
+        allow_other_users=is_admin_user(active_public_user),
+    )
+    if result.get("ok"):
+        if result.get("action") == "merge":
+            merge = result.get("merge") or {}
+            message = (
+                f"Merged {merge.get('source_name')} into {merge.get('target_name')} and kept "
+                "the removed name as an alias."
+            )
+        elif result.get("action") == "related":
+            message = "Marked as a related variant. This pair will not be suggested again."
+        else:
+            message = "Marked as not a duplicate. This pair will not be suggested again."
+        return jsonify({
+            **result,
+            "success": True,
+            "message": message,
+        })
+    return jsonify({
+        **result,
+        "success": False,
+    }), int(result.get("status") or 400)
 
 
 @main_bp.route("/api/master-data/<record_type>/<int:record_id>/references")

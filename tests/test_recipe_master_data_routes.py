@@ -3,6 +3,7 @@ from pathlib import Path
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import recipe_master_data_service as master_data
+from PushShoppingList.services import ingredient_duplicate_review_service as duplicate_reviews
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
 
@@ -425,6 +426,66 @@ def test_ingredient_master_merge_routes_scope_candidates_and_resolve_aliases(mon
     assert page_response.status_code == 200
     assert "Potato" in page_html
     assert "Potatoes" in page_html
+
+
+def test_duplicate_review_routes_scan_scope_and_save_decisions(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    for user_id in ("user-a", "user-b"):
+        master_data.sync_recipe_master_records(
+            f"https://example.com/{user_id}/potato",
+            recipe_data={"ingredients": [{"ingredient": "Potato", "store_section": "Produce"}]},
+            user_id=user_id,
+        )
+        master_data.sync_recipe_master_records(
+            f"https://example.com/{user_id}/potatoes",
+            recipe_data={"ingredients": [{"ingredient": "Potatoes", "store_section": "Produce"}]},
+            user_id=user_id,
+        )
+    headers = {"X-Requested-With": "fetch", "Accept": "application/json"}
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        scan_response = client.post(
+            "/api/master-data/ingredients/duplicate-scan",
+            json={"scope": "user", "user_id": "user-b"},
+            headers=headers,
+        )
+        scan_payload = scan_response.get_json()
+        review_id = scan_payload["reviews"][0]["review_id"]
+        decision_response = client.post(
+            f"/api/master-data/ingredients/duplicate-reviews/{review_id}/decision",
+            json={"action": "related"},
+            headers=headers,
+        )
+        list_response = client.get(
+            "/api/master-data/ingredients/duplicate-reviews?user_id=user-b",
+            headers=headers,
+        )
+        sign_in(client, "admin-user")
+        all_scope_response = client.post(
+            "/api/master-data/ingredients/duplicate-scan",
+            json={"scope": "all"},
+            headers=headers,
+        )
+        user_b_response = client.post(
+            "/api/master-data/ingredients/duplicate-scan",
+            json={"scope": "user", "user_id": "user-b"},
+            headers=headers,
+        )
+
+    assert scan_response.status_code == 200
+    assert scan_payload["user_id"] == "user-a"
+    assert scan_payload["review_count"] == 1
+    assert decision_response.status_code == 200
+    assert decision_response.get_json()["status"] == "related"
+    assert list_response.status_code == 200
+    assert list_response.get_json()["user_id"] == "user-a"
+    assert list_response.get_json()["review_count"] == 0
+    assert all_scope_response.status_code == 400
+    assert user_b_response.status_code == 200
+    assert user_b_response.get_json()["user_id"] == "user-b"
+    assert user_b_response.get_json()["review_count"] == 1
 
 
 def test_ingredient_master_record_edit_is_scoped_and_admin_can_edit_other_users(monkeypatch, tmp_path):
@@ -854,6 +915,34 @@ def test_master_data_ingredient_merge_ui_is_wired():
     assert ".master-data-merge-dialog" in css
     assert ".master-data-merge-option[aria-selected=\"true\"]" in css
     assert ".master-data-aliases" in css
+
+
+def test_master_data_duplicate_review_ui_is_wired():
+    template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
+    script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "data-master-duplicate-review",
+        "data-master-duplicate-scan",
+        "data-master-duplicate-status",
+        "data-master-duplicate-list",
+        "ingredient_duplicate_scan_url",
+        "ingredient_duplicate_reviews_url",
+        "ingredient_duplicate_decision_url",
+    ):
+        assert marker in template
+    assert "Find Potential Duplicates" in template
+    assert "Similarity checks find likely pairs, AI labels them" in template
+    assert "function masterDataDuplicateCard(review)" in script
+    assert "async function scanMasterDataDuplicates()" in script
+    assert "async function decideMasterDataDuplicate(button)" in script
+    assert 'button.closest(".master-data-duplicate-card")' in script
+    assert "window.confirm(" in script
+    assert "initMasterDataDuplicateReview();" in script
+    assert ".master-data-duplicate-review" in css
+    assert ".master-data-duplicate-comparison" in css
+    assert ".master-data-duplicate-actions" in css
 
 
 def test_master_data_reference_expander_is_wired():

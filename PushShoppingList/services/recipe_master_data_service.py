@@ -611,6 +611,31 @@ def ensure_recipe_master_schema(connection=None):
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS ingredient_duplicate_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            left_ingredient_id INTEGER NOT NULL,
+            right_ingredient_id INTEGER NOT NULL,
+            left_name TEXT NOT NULL,
+            right_name TEXT NOT NULL,
+            left_normalized_name TEXT NOT NULL,
+            right_normalized_name TEXT NOT NULL,
+            classification TEXT NOT NULL DEFAULT 'pending',
+            status TEXT NOT NULL DEFAULT 'pending',
+            confidence REAL NOT NULL DEFAULT 0,
+            reason TEXT NOT NULL DEFAULT '',
+            suggested_target_id INTEGER DEFAULT NULL,
+            signals_json TEXT NOT NULL DEFAULT '{}',
+            model TEXT NOT NULL DEFAULT '',
+            analysis_source TEXT NOT NULL DEFAULT 'local',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(user_id, left_ingredient_id, right_ingredient_id)
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS equipment (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -738,6 +763,8 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_name ON ingredients(user_id, normalized_name)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_aliases_ingredient ON ingredient_aliases(ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_aliases_user_name ON ingredient_aliases(user_id, normalized_alias)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_duplicate_reviews_user_status ON ingredient_duplicate_reviews(user_id, status)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_duplicate_reviews_pair ON ingredient_duplicate_reviews(left_ingredient_id, right_ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_section ON ingredients(user_id, store_section)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_name ON equipment(user_id, normalized_name)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_section ON equipment(user_id, equipment_section)")

@@ -378,6 +378,43 @@
             <button type="submit">Apply</button>
         </form>
 
+        {% if master_data.record_type == 'ingredients' and master_data.db_status.exists %}
+            <section class="master-data-duplicate-review"
+                     data-master-duplicate-review
+                     data-scan-url="{{ master_data.ingredient_duplicate_scan_url }}"
+                     data-reviews-url="{{ master_data.ingredient_duplicate_reviews_url }}"
+                     data-decision-url="{{ master_data.ingredient_duplicate_decision_url }}"
+                     data-scope="{{ master_data.scope }}"
+                     data-user-id="{{ master_data.scope_user_id }}">
+                <header class="master-data-duplicate-header">
+                    <div>
+                        <span>AI-assisted cleanup</span>
+                        <h2>Potential duplicate ingredients</h2>
+                        <p>Similarity checks find likely pairs, AI labels them, and you make every final decision.</p>
+                    </div>
+                    <button type="button"
+                            data-master-duplicate-scan
+                            {% if master_data.scope == 'all' %}disabled{% endif %}>
+                        Find Potential Duplicates
+                    </button>
+                </header>
+                {% if master_data.scope == 'all' %}
+                    <p class="master-data-duplicate-scope-note">
+                        Choose My data or one user workspace before running a duplicate scan.
+                    </p>
+                {% endif %}
+                <div class="master-data-duplicate-status"
+                     data-master-duplicate-status
+                     role="status"
+                     aria-live="polite">
+                    Loading saved review decisions&hellip;
+                </div>
+                <div class="master-data-duplicate-list"
+                     data-master-duplicate-list
+                     aria-live="polite"></div>
+            </section>
+        {% endif %}
+
         <div class="master-data-results-header">
             <div class="master-data-results-summary" aria-live="polite">
                 {% if master_data.total_count %}

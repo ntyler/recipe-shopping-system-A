@@ -1351,6 +1351,365 @@
         });
     }
 
+    function masterDataDuplicateElements() {
+        const panel = document.querySelector("[data-master-duplicate-review]");
+        return {
+            panel,
+            scan: panel && panel.querySelector("[data-master-duplicate-scan]"),
+            status: panel && panel.querySelector("[data-master-duplicate-status]"),
+            list: panel && panel.querySelector("[data-master-duplicate-list]"),
+        };
+    }
+
+    function setMasterDataDuplicateBusy(busy, message = "") {
+        const els = masterDataDuplicateElements();
+        if (!els.panel) return;
+        els.panel.setAttribute("aria-busy", busy ? "true" : "false");
+        if (els.scan) {
+            els.scan.disabled = busy || els.panel.dataset.scope === "all";
+            els.scan.textContent = busy ? "Reviewing ingredient pairs..." : "Find Potential Duplicates";
+        }
+        if (message && els.status) {
+            els.status.textContent = message;
+            els.status.classList.remove("is-error", "is-warning");
+        }
+    }
+
+    function setMasterDataDuplicateStatus(message, kind = "") {
+        const els = masterDataDuplicateElements();
+        if (!els.status) return;
+        els.status.textContent = message;
+        els.status.classList.toggle("is-error", kind === "error");
+        els.status.classList.toggle("is-warning", kind === "warning");
+    }
+
+    function masterDataDuplicateRequestContext() {
+        const els = masterDataDuplicateElements();
+        return {
+            scope: text(els.panel && els.panel.dataset.scope).trim(),
+            user_id: text(els.panel && els.panel.dataset.userId).trim(),
+        };
+    }
+
+    function duplicateClassificationLabel(classification) {
+        return {
+            duplicate: "Likely duplicate",
+            related: "Related variant",
+            different: "Likely different",
+        }[text(classification).toLowerCase()] || "Needs review";
+    }
+
+    function duplicateUsageLabel(value) {
+        const count = Math.max(0, Number(value) || 0);
+        return `${count} recipe use${count === 1 ? "" : "s"}`;
+    }
+
+    function masterDataDuplicateIngredient(record, suggestedTargetId) {
+        const item = document.createElement("article");
+        item.className = "master-data-duplicate-ingredient";
+        if (Number(record.ingredient_id) === Number(suggestedTargetId)) {
+            item.classList.add("is-suggested");
+        }
+
+        const media = document.createElement("div");
+        media.className = "master-data-duplicate-media";
+        if (record.image_url) {
+            const image = document.createElement("img");
+            image.src = text(record.image_url);
+            image.alt = `${text(record.name)} ingredient`;
+            media.appendChild(image);
+        } else {
+            media.textContent = "No image";
+        }
+
+        const copy = document.createElement("div");
+        copy.className = "master-data-duplicate-ingredient-copy";
+        const heading = document.createElement("div");
+        heading.className = "master-data-duplicate-ingredient-heading";
+        const name = document.createElement("strong");
+        name.textContent = text(record.name);
+        heading.appendChild(name);
+        if (Number(record.ingredient_id) === Number(suggestedTargetId)) {
+            const recommended = document.createElement("span");
+            recommended.textContent = "Suggested survivor";
+            heading.appendChild(recommended);
+        }
+        const normalized = document.createElement("code");
+        normalized.textContent = text(record.normalized_name);
+        const detail = document.createElement("small");
+        detail.textContent = `${text(record.store_section)} · ${duplicateUsageLabel(record.usage_count)}`;
+        copy.append(heading, normalized, detail);
+        const aliases = Array.isArray(record.aliases) ? record.aliases.filter(Boolean) : [];
+        if (aliases.length) {
+            const aliasText = document.createElement("small");
+            aliasText.textContent = `Aliases: ${aliases.join(", ")}`;
+            copy.appendChild(aliasText);
+        }
+        item.append(media, copy);
+        return item;
+    }
+
+    function masterDataDuplicateAction(label, action, review, target = null, className = "") {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.dataset.masterDuplicateDecision = action;
+        button.dataset.reviewId = text(review.review_id);
+        if (target) {
+            const source = Number(target.ingredient_id) === Number(review.left.ingredient_id)
+                ? review.right
+                : review.left;
+            button.dataset.targetIngredientId = text(target.ingredient_id);
+            button.dataset.targetName = text(target.name);
+            button.dataset.sourceName = text(source.name);
+        }
+        if (className) button.className = className;
+        return button;
+    }
+
+    function masterDataDuplicateCard(review) {
+        const card = document.createElement("article");
+        card.className = `master-data-duplicate-card is-${text(review.classification).toLowerCase()}`;
+        card.dataset.reviewId = text(review.review_id);
+
+        const header = document.createElement("header");
+        const classification = document.createElement("span");
+        classification.className = "master-data-duplicate-classification";
+        classification.textContent = duplicateClassificationLabel(review.classification);
+        const confidence = document.createElement("strong");
+        confidence.textContent = `${Math.round((Number(review.confidence) || 0) * 100)}% confidence`;
+        const source = document.createElement("small");
+        source.textContent = review.analysis_source === "ai" ? "AI review" : "Local similarity review";
+        header.append(classification, confidence, source);
+
+        const comparison = document.createElement("div");
+        comparison.className = "master-data-duplicate-comparison";
+        comparison.append(
+            masterDataDuplicateIngredient(review.left, review.suggested_target_id),
+            masterDataDuplicateIngredient(review.right, review.suggested_target_id)
+        );
+
+        const reason = document.createElement("p");
+        reason.className = "master-data-duplicate-reason";
+        reason.textContent = text(review.reason) || "These names have overlapping ingredient signals.";
+
+        const signals = document.createElement("div");
+        signals.className = "master-data-duplicate-signals";
+        const signalLabels = [];
+        if (review.signals && review.signals.singular_exact) signalLabels.push("singular/plural match");
+        if (review.signals && review.signals.alias_match) signalLabels.push("alias match");
+        if (review.signals && review.signals.token_subset) signalLabels.push("shared base name");
+        if (review.signals && review.signals.same_store_section) signalLabels.push("same store section");
+        signalLabels.forEach((label) => {
+            const chip = document.createElement("span");
+            chip.textContent = label;
+            signals.appendChild(chip);
+        });
+
+        const actions = document.createElement("div");
+        actions.className = "master-data-duplicate-actions";
+        const suggested = Number(review.suggested_target_id) === Number(review.right.ingredient_id)
+            ? review.right
+            : review.left;
+        const alternate = suggested === review.left ? review.right : review.left;
+        const mergeSuggested = masterDataDuplicateAction(
+            `Merge into ${suggested.name}`,
+            "merge",
+            review,
+            suggested,
+            review.classification === "duplicate" ? "primary" : ""
+        );
+        const mergeAlternate = masterDataDuplicateAction(`Merge into ${alternate.name}`, "merge", review, alternate);
+        const related = masterDataDuplicateAction(
+            "Related variant",
+            "related",
+            review,
+            null,
+            review.classification === "related" ? "primary" : ""
+        );
+        const notDuplicate = masterDataDuplicateAction(
+            "Not a duplicate",
+            "not_duplicate",
+            review,
+            null,
+            review.classification === "different" ? "primary" : ""
+        );
+        if (review.classification === "related") {
+            actions.append(related, mergeSuggested, mergeAlternate, notDuplicate);
+        } else if (review.classification === "different") {
+            actions.append(notDuplicate, related, mergeSuggested, mergeAlternate);
+        } else {
+            actions.append(mergeSuggested, mergeAlternate, related, notDuplicate);
+        }
+        card.append(header, comparison, reason);
+        if (signalLabels.length) card.appendChild(signals);
+        card.appendChild(actions);
+        return card;
+    }
+
+    function renderMasterDataDuplicateReviews(reviews) {
+        const els = masterDataDuplicateElements();
+        if (!els.list) return;
+        els.list.replaceChildren();
+        const rows = Array.isArray(reviews) ? reviews : [];
+        if (!rows.length) {
+            const empty = document.createElement("div");
+            empty.className = "master-data-duplicate-empty";
+            empty.textContent = "No unresolved duplicate suggestions.";
+            els.list.appendChild(empty);
+            return;
+        }
+        rows.forEach((review) => els.list.appendChild(masterDataDuplicateCard(review)));
+    }
+
+    function duplicateReviewsUrl() {
+        const els = masterDataDuplicateElements();
+        const url = new URL(text(els.panel && els.panel.dataset.reviewsUrl), window.location.origin);
+        const context = masterDataDuplicateRequestContext();
+        if (context.scope) url.searchParams.set("scope", context.scope);
+        if (context.user_id) url.searchParams.set("user_id", context.user_id);
+        return url.toString();
+    }
+
+    async function loadMasterDataDuplicateReviews() {
+        const els = masterDataDuplicateElements();
+        if (!els.panel || !els.list || els.panel.dataset.scope === "all") return;
+        try {
+            const response = await fetch(duplicateReviewsUrl(), {
+                headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || "Saved duplicate reviews could not be loaded.");
+            }
+            renderMasterDataDuplicateReviews(data.reviews);
+            setMasterDataDuplicateStatus(
+                data.review_count
+                    ? `${data.review_count} ingredient pair${data.review_count === 1 ? "" : "s"} waiting for your decision.`
+                    : "No unresolved suggestions. Run a scan whenever your ingredient master data changes."
+            );
+        } catch (error) {
+            renderMasterDataDuplicateReviews([]);
+            setMasterDataDuplicateStatus(error.message || "Saved duplicate reviews could not be loaded.", "error");
+        }
+    }
+
+    async function scanMasterDataDuplicates() {
+        const els = masterDataDuplicateElements();
+        if (!els.panel || !els.scan || !els.panel.dataset.scanUrl) return;
+        if (changedStoreSectionForms().length) {
+            setMasterDataDuplicateStatus("Save your pending ingredient edits before running a duplicate scan.", "warning");
+            return;
+        }
+        setMasterDataDuplicateBusy(true, "Checking likely pairs and asking AI to classify them...");
+        try {
+            const response = await fetch(els.panel.dataset.scanUrl, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify(masterDataDuplicateRequestContext()),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || "Potential duplicates could not be reviewed.");
+            }
+            renderMasterDataDuplicateReviews(data.reviews);
+            const baseMessage = data.review_count
+                ? `Found ${data.review_count} pair${data.review_count === 1 ? "" : "s"} for your review.`
+                : `Scanned ${data.scanned_count || 0} ingredients and found no unresolved pairs.`;
+            setMasterDataDuplicateStatus(
+                data.warning ? `${baseMessage} ${data.warning}` : baseMessage,
+                data.warning ? "warning" : ""
+            );
+        } catch (error) {
+            setMasterDataDuplicateStatus(error.message || "Potential duplicates could not be reviewed.", "error");
+        } finally {
+            setMasterDataDuplicateBusy(false);
+        }
+    }
+
+    async function decideMasterDataDuplicate(button) {
+        const els = masterDataDuplicateElements();
+        const action = text(button.dataset.masterDuplicateDecision).trim();
+        const reviewId = text(button.dataset.reviewId).trim();
+        if (!els.panel || !action || !reviewId) return;
+        if (action === "merge") {
+            if (changedStoreSectionForms().length) {
+                setMasterDataDuplicateStatus("Save your pending ingredient edits before merging records.", "warning");
+                return;
+            }
+            const confirmed = window.confirm(
+                `Merge “${text(button.dataset.sourceName)}” into “${text(button.dataset.targetName)}”? `
+                + "Recipe references will move to the surviving item and the removed name will be kept as an alias."
+            );
+            if (!confirmed) return;
+        }
+
+        const card = button.closest(".master-data-duplicate-card");
+        if (card) card.setAttribute("aria-busy", "true");
+        if (card) card.querySelectorAll("button").forEach((actionButton) => { actionButton.disabled = true; });
+        const decisionUrl = text(els.panel.dataset.decisionUrl).replace("/0/decision", `/${reviewId}/decision`);
+        try {
+            const response = await fetch(decisionUrl, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({
+                    action,
+                    target_ingredient_id: text(button.dataset.targetIngredientId).trim() || null,
+                }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "That review decision could not be saved.");
+            }
+            setMasterDataDuplicateStatus(data.message || "Review decision saved.");
+            if (action === "merge") {
+                try {
+                    if (window.localStorage) {
+                        window.localStorage.setItem(INGREDIENT_MASTER_DATA_VERSION_STORAGE_KEY, String(Date.now()));
+                    }
+                } catch (storageError) {
+                    console.debug("Unable to notify other tabs about the ingredient merge.", storageError);
+                }
+                window.setTimeout(() => window.location.assign(window.location.href), 650);
+                return;
+            }
+            if (card) card.remove();
+            const remaining = els.list.querySelectorAll(".master-data-duplicate-card[data-review-id]").length;
+            if (!remaining) renderMasterDataDuplicateReviews([]);
+        } catch (error) {
+            if (card) card.removeAttribute("aria-busy");
+            if (card) card.querySelectorAll("button").forEach((actionButton) => { actionButton.disabled = false; });
+            setMasterDataDuplicateStatus(error.message || "That review decision could not be saved.", "error");
+        }
+    }
+
+    function initMasterDataDuplicateReview() {
+        const els = masterDataDuplicateElements();
+        if (!els.panel) return;
+        if (els.scan) els.scan.addEventListener("click", scanMasterDataDuplicates);
+        if (els.list) {
+            els.list.addEventListener("click", (event) => {
+                const button = event.target && event.target.closest
+                    ? event.target.closest("[data-master-duplicate-decision]")
+                    : null;
+                if (button) void decideMasterDataDuplicate(button);
+            });
+        }
+        if (els.panel.dataset.scope === "all") {
+            setMasterDataDuplicateStatus("Select one workspace to load or create duplicate suggestions.", "warning");
+        } else {
+            void loadMasterDataDuplicateReviews();
+        }
+    }
+
     function renderProgress(form, progress) {
         const els = elementsFor(form);
         if (!els.panel || !progress) {
@@ -1749,6 +2108,7 @@
         initMasterDataImageLightbox();
         initMasterDataStoreSectionBatchSave();
         initMasterDataIngredientMerge();
+        initMasterDataDuplicateReview();
 
         const form = document.querySelector("[data-master-backfill-form]");
         if (form && window.fetch && window.FormData) {
