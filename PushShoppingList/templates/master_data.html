@@ -503,43 +503,6 @@
                     </footer>
                 </div>
             </dialog>
-
-            <dialog id="masterDataDuplicateConfirmDialog"
-                    class="master-data-reference-dialog master-data-duplicate-confirm-dialog"
-                    data-master-duplicate-confirm-dialog
-                    aria-labelledby="masterDataDuplicateConfirmTitle"
-                    aria-describedby="masterDataDuplicateConfirmSummary">
-                <div class="master-data-reference-dialog-shell master-data-duplicate-confirm-shell">
-                    <header class="master-data-reference-dialog-header">
-                        <div>
-                            <span>Confirm merge</span>
-                            <h2 id="masterDataDuplicateConfirmTitle"
-                                data-master-duplicate-confirm-title>Confirm ingredient merge</h2>
-                            <p id="masterDataDuplicateConfirmSummary"
-                               data-master-duplicate-confirm-summary></p>
-                        </div>
-                        <button type="button"
-                                class="master-data-reference-dialog-close"
-                                data-master-duplicate-confirm-cancel
-                                aria-label="Cancel ingredient merge">&times;</button>
-                    </header>
-                    <div class="master-data-reference-dialog-body master-data-duplicate-confirm-body">
-                        <ul data-master-duplicate-confirm-list></ul>
-                        <p>
-                            This combines the ingredient records. Recipe references will be reassigned and the removed names will be kept as aliases.
-                        </p>
-                    </div>
-                    <footer class="master-data-reference-dialog-footer master-data-duplicate-confirm-footer">
-                        <span>You stay on this page after the merge.</span>
-                        <div>
-                            <button type="button" data-master-duplicate-confirm-cancel>Cancel</button>
-                            <button type="button"
-                                    class="primary"
-                                    data-master-duplicate-confirm-accept>Merge ingredients</button>
-                        </div>
-                    </footer>
-                </div>
-            </dialog>
         {% endif %}
 
         <div class="master-data-results-header" data-master-results-header>

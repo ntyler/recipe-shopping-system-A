@@ -992,8 +992,6 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-duplicate-reference-column",
         "data-master-duplicate-reference-pair-name",
         "ingredient_reference_url",
-        "data-master-duplicate-confirm-dialog",
-        "data-master-duplicate-confirm-accept",
         "data-master-record-results",
         "data-master-results-header",
         "data-master-pagination",
@@ -1013,7 +1011,6 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "async function loadMasterDataDuplicateReferenceColumn(column, record, requestId)" in script
     assert "async function openMasterDataDuplicateReferences(button)" in script
     assert "function closeMasterDataDuplicateReferences()" in script
-    assert "function confirmMasterDataDuplicateMerge(options = {})" in script
     assert "function refreshMasterDataRecordResults()" in script
     assert "async function refreshAfterMasterDataDuplicateMerge(message, kind = \"\")" in script
     assert "data-master-duplicate-references-open" in script
@@ -1028,8 +1025,9 @@ def test_master_data_duplicate_review_ui_is_wired():
         script.index("async function decideMasterDataDuplicate(button)"):
         script.index("function initMasterDataDuplicateReview()")
     ]
+    assert "confirmMasterDataDuplicateMerge" not in decide_block
     assert decide_block.index("setMasterDataDuplicateSuggestedSurvivor(button);") < decide_block.index(
-        "confirmMasterDataDuplicateMerge({"
+        "const response = await fetch(decisionUrl"
     )
     duplicate_review_block = script[
         script.index("function masterDataDuplicateElements()"):
@@ -1048,8 +1046,9 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-reference-dialog" in css
     assert ".master-data-reference-dialog-comparison" in css
     assert ".master-data-reference-column.is-suggested" in css
-    assert ".master-data-duplicate-confirm-dialog" in css
-    assert ".master-data-duplicate-confirm-footer button.primary" in css
+    assert "data-master-duplicate-confirm-dialog" not in template
+    assert "confirmMasterDataDuplicateMerge" not in script
+    assert ".master-data-duplicate-confirm-dialog" not in css
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);" in css
     assert ".master-data-duplicate-scan-actions button" in css

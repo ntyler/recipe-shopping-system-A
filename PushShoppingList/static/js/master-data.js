@@ -19,8 +19,6 @@
     let masterDataMergeReturnFocus = null;
     let masterDataDuplicateReferenceRequestId = 0;
     let masterDataDuplicateReferenceReturnFocus = null;
-    let masterDataDuplicateConfirmationResolve = null;
-    let masterDataDuplicateConfirmationReturnFocus = null;
 
     function text(value) {
         return String(value == null ? "" : value);
@@ -1397,87 +1395,6 @@
         els.status.classList.toggle("is-warning", kind === "warning");
     }
 
-    function masterDataDuplicateConfirmationElements() {
-        const dialog = document.querySelector("[data-master-duplicate-confirm-dialog]");
-        return {
-            dialog,
-            title: dialog && dialog.querySelector("[data-master-duplicate-confirm-title]"),
-            summary: dialog && dialog.querySelector("[data-master-duplicate-confirm-summary]"),
-            list: dialog && dialog.querySelector("[data-master-duplicate-confirm-list]"),
-            confirm: dialog && dialog.querySelector("[data-master-duplicate-confirm-accept]"),
-            cancelButtons: dialog ? dialog.querySelectorAll("[data-master-duplicate-confirm-cancel]") : [],
-        };
-    }
-
-    function finishMasterDataDuplicateConfirmation(confirmed) {
-        const els = masterDataDuplicateConfirmationElements();
-        const resolve = masterDataDuplicateConfirmationResolve;
-        const returnFocus = masterDataDuplicateConfirmationReturnFocus;
-        masterDataDuplicateConfirmationResolve = null;
-        masterDataDuplicateConfirmationReturnFocus = null;
-        if (els.dialog) {
-            if (els.dialog.open && typeof els.dialog.close === "function") {
-                els.dialog.close();
-            } else {
-                els.dialog.removeAttribute("open");
-            }
-        }
-        if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === "function") {
-            returnFocus.focus({ preventScroll: true });
-        }
-        if (resolve) resolve(Boolean(confirmed));
-    }
-
-    function confirmMasterDataDuplicateMerge(options = {}) {
-        const els = masterDataDuplicateConfirmationElements();
-        if (!els.dialog || !els.confirm) {
-            setMasterDataDuplicateStatus("The merge confirmation could not be opened. Reload and try again.", "error");
-            return Promise.resolve(false);
-        }
-        if (masterDataDuplicateConfirmationResolve) {
-            finishMasterDataDuplicateConfirmation(false);
-        }
-        if (els.title) els.title.textContent = text(options.title) || "Confirm ingredient merge";
-        if (els.summary) els.summary.textContent = text(options.summary);
-        if (els.list) {
-            els.list.replaceChildren();
-            (Array.isArray(options.items) ? options.items : []).forEach((item) => {
-                const row = document.createElement("li");
-                row.textContent = text(item);
-                els.list.appendChild(row);
-            });
-            els.list.hidden = !els.list.children.length;
-        }
-        els.confirm.textContent = text(options.confirmLabel) || "Merge ingredients";
-        masterDataDuplicateConfirmationReturnFocus = options.returnFocus || document.activeElement;
-        return new Promise((resolve) => {
-            masterDataDuplicateConfirmationResolve = resolve;
-            if (typeof els.dialog.showModal === "function") {
-                els.dialog.showModal();
-            } else {
-                els.dialog.setAttribute("open", "");
-            }
-            els.confirm.focus({ preventScroll: true });
-        });
-    }
-
-    function initMasterDataDuplicateConfirmation() {
-        const els = masterDataDuplicateConfirmationElements();
-        if (!els.dialog || els.dialog.dataset.confirmationBound === "true") return;
-        els.dialog.dataset.confirmationBound = "true";
-        Array.from(els.cancelButtons || []).forEach((button) => {
-            button.addEventListener("click", () => finishMasterDataDuplicateConfirmation(false));
-        });
-        els.confirm.addEventListener("click", () => finishMasterDataDuplicateConfirmation(true));
-        els.dialog.addEventListener("cancel", (event) => {
-            event.preventDefault();
-            finishMasterDataDuplicateConfirmation(false);
-        });
-        els.dialog.addEventListener("click", (event) => {
-            if (event.target === els.dialog) finishMasterDataDuplicateConfirmation(false);
-        });
-    }
-
     async function refreshMasterDataRecordResults() {
         const response = await fetch(window.location.href, {
             headers: { Accept: "text/html", "X-Requested-With": "fetch" },
@@ -2073,18 +1990,6 @@
                 setMasterDataDuplicateStatus("Save your pending ingredient edits before merging records.", "warning");
                 return;
             }
-            const preview = selected.slice(0, 5).map((card) => (
-                `${card.dataset.suggestedSourceName} → ${card.dataset.suggestedTargetName}`
-            ));
-            if (selected.length > preview.length) preview.push(`...and ${selected.length - preview.length} more`);
-            const confirmed = await confirmMasterDataDuplicateMerge({
-                title: `Merge ${selected.length} selected duplicate pair${selected.length === 1 ? "" : "s"}?`,
-                summary: "Recipe references will move to each surviving ingredient. Removed names will remain as aliases.",
-                items: preview,
-                confirmLabel: selected.length === 1 ? "Merge ingredient" : `Merge ${selected.length} pairs`,
-                returnFocus: button,
-            });
-            if (!confirmed) return;
         }
 
         setMasterDataDuplicateBulkBusy(true, action);
@@ -2206,14 +2111,6 @@
                 setMasterDataDuplicateStatus("Save your pending ingredient edits before merging records.", "warning");
                 return;
             }
-            const confirmed = await confirmMasterDataDuplicateMerge({
-                title: `Merge “${text(button.dataset.sourceName)}” into “${text(button.dataset.targetName)}”?`,
-                summary: "Recipe references will move to the surviving ingredient. The removed name will remain as an alias.",
-                items: [`${text(button.dataset.sourceName)} → ${text(button.dataset.targetName)}`],
-                confirmLabel: `Merge into ${text(button.dataset.targetName)}`,
-                returnFocus: button,
-            });
-            if (!confirmed) return;
         }
 
         const card = button.closest(".master-data-duplicate-card");
@@ -2256,7 +2153,6 @@
     function initMasterDataDuplicateReview() {
         const els = masterDataDuplicateElements();
         if (!els.panel) return;
-        initMasterDataDuplicateConfirmation();
         if (els.scan) els.scan.addEventListener("click", scanMasterDataDuplicates);
         if (els.selectHighConfidence) {
             els.selectHighConfidence.addEventListener("click", () => selectMasterDataDuplicateCards("high-confidence"));
