@@ -47879,6 +47879,9 @@ function setRecipeImagePanelComplete(panel, item) {
     updateRecipeImagePanelUploadButton(panel, kind);
     updateRecipeImagePanelRowMenu(panel);
     syncRecipeIngredientModalImageActions(panel);
+    if (kind === "ingredient") {
+        updateRecipeEditIngredientGallery();
+    }
 }
 
 function recipeDetailImageEmptyMessage(kind) {
@@ -47942,6 +47945,9 @@ function setRecipeImagePanelRemoved(panel, kind) {
     updateRecipeImagePanelUploadButton(panel, normalizedKind);
     updateRecipeImagePanelRowMenu(panel);
     syncRecipeIngredientModalImageActions(panel);
+    if (normalizedKind === "ingredient") {
+        updateRecipeEditIngredientGallery();
+    }
 }
 
 function setRecipeImagePanelFailed(panel, message, imagePrompt = "") {

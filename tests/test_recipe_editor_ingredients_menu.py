@@ -397,6 +397,10 @@ def test_recipe_editor_image_empty_state_tracks_generated_and_removed_images():
     assert 'panel.classList.toggle("recipe-image-empty", !imageUrl);' in complete_block
     assert 'panel.classList.add("recipe-image-empty");' in removed_block
     assert 'panel.classList.toggle("recipe-image-empty", !imageUrl);' not in removed_block
+    assert 'if (kind === "ingredient") {' in complete_block
+    assert "updateRecipeEditIngredientGallery();" in complete_block
+    assert 'if (normalizedKind === "ingredient") {' in removed_block
+    assert "updateRecipeEditIngredientGallery();" in removed_block
 
 
 def test_recipe_editor_ingredient_row_menu_is_grouped():
