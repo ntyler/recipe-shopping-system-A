@@ -484,6 +484,109 @@ def test_merge_ingredient_master_records_relinks_usage_and_preserves_alias(monke
     assert lookup["by_normalized_name"]["potatoes"]["id"] == target["id"]
 
 
+def test_undo_last_ingredient_merge_restores_records_aliases_metadata_and_references(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/bean-soup",
+        recipe_data={"ingredients": [{
+            "ingredient": "Bean",
+            "store_section": "Misc",
+        }]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/roasted-beans",
+        recipe_data={"ingredients": [{
+            "ingredient": "Beans",
+            "store_section": "Produce",
+            "ingredient_image_url": "/static/generated/beans.png",
+        }]},
+        user_id="user-a",
+    )
+    target = master_data.master_record_for_name("ingredients", "user-a", "bean")
+    source = master_data.master_record_for_name("ingredients", "user-a", "beans")
+    with master_data.recipe_master_connection() as connection:
+        now = master_data.utc_now_iso()
+        connection.execute(
+            """
+            INSERT INTO ingredient_aliases (
+                user_id, ingredient_id, alias_name, normalized_alias, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("user-a", source["id"], "Garden beans", "garden beans", now, now),
+        )
+        connection.execute(
+            """
+            INSERT INTO ingredient_aliases (
+                user_id, ingredient_id, alias_name, normalized_alias, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("user-a", target["id"], "Bean pod", "bean pod", now, now),
+        )
+
+    merge_result = master_data.merge_ingredient_master_records(
+        source["id"],
+        target["id"],
+        user_id="user-a",
+    )
+    merged_target = master_data.master_record_for_name("ingredients", "user-a", "bean")
+
+    assert merge_result["ok"] is True
+    assert merge_result["merge_id"] > 0
+    assert merged_target["store_section"] == "PRODUCE"
+    assert merged_target["image_url"] == "/static/generated/beans.png"
+    assert master_data.latest_undoable_ingredient_merge("user-a")["merge_id"] == merge_result["merge_id"]
+
+    undo_result = master_data.undo_last_ingredient_master_merge("user-a")
+    restored_source = master_data.master_record_for_name("ingredients", "user-a", "beans")
+    restored_target = master_data.master_record_for_name("ingredients", "user-a", "bean")
+
+    assert undo_result["ok"] is True
+    assert undo_result["restored_reference_count"] == 1
+    assert undo_result["next_merge"] is None
+    assert restored_source["id"] == source["id"]
+    assert restored_source["store_section"] == "PRODUCE"
+    assert restored_source["image_url"] == "/static/generated/beans.png"
+    assert restored_target["id"] == target["id"]
+    assert restored_target["store_section"] == "MISC"
+    assert restored_target["image_url"] == ""
+    assert master_data.count_ingredient_usage(source["id"], user_id="user-a") == 1
+    assert master_data.count_ingredient_usage(target["id"], user_id="user-a") == 1
+    assert master_data.list_ingredients(user_id="user-a", search="garden beans")[0]["id"] == source["id"]
+    assert master_data.list_ingredients(user_id="user-a", search="bean pod")[0]["id"] == target["id"]
+    assert master_data.latest_undoable_ingredient_merge("user-a") is None
+
+
+def test_undo_ingredient_merge_refuses_to_overwrite_later_target_edits(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/onion",
+        recipe_data={"ingredients": [{"ingredient": "Onion", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/onions",
+        recipe_data={"ingredients": [{"ingredient": "Onions", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    target = master_data.master_record_for_name("ingredients", "user-a", "onion")
+    source = master_data.master_record_for_name("ingredients", "user-a", "onions")
+    assert master_data.merge_ingredient_master_records(
+        source["id"], target["id"], user_id="user-a"
+    )["ok"] is True
+    assert master_data.update_ingredient_master_record(
+        target["id"], "Yellow Onion", "yellow onion", "PRODUCE", user_id="user-a"
+    )["ok"] is True
+
+    undo_result = master_data.undo_last_ingredient_master_merge("user-a")
+
+    assert undo_result["ok"] is False
+    assert undo_result["status"] == 409
+    assert "changed after this merge" in undo_result["error"]
+    assert master_data.master_record_for_name("ingredients", "user-a", "onions") is None
+    assert master_data.latest_undoable_ingredient_merge("user-a") is not None
+
+
 def test_merge_ingredient_master_records_rejects_cross_workspace_targets(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     master_data.sync_recipe_master_records(

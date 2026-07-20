@@ -981,6 +981,17 @@ def master_data_context(record_type):
         if is_admin:
             available_user_ids = recipe_master_data.recipe_master_user_ids()
 
+    latest_ingredient_merge = None
+    if (
+        status["exists"]
+        and record_type == "ingredients"
+        and scope_info["scope"] != "all"
+        and scope_info["user_id"]
+    ):
+        latest_ingredient_merge = recipe_master_data.latest_undoable_ingredient_merge(
+            scope_info["user_id"]
+        )
+
     total_pages = max(1, (total_count + limit - 1) // limit)
     if page > total_pages:
         page = total_pages
@@ -1141,6 +1152,10 @@ def master_data_context(record_type):
         "ingredient_duplicate_bulk_decision_url": url_for(
             "main_bp.ingredient_duplicate_bulk_decision_route"
         ),
+        "ingredient_merge_undo_url": url_for(
+            "main_bp.undo_ingredient_master_merge_route"
+        ),
+        "latest_ingredient_merge": latest_ingredient_merge,
         "ingredient_reference_url": url_for(
             "main_bp.master_data_record_references_route",
             record_type="ingredients",
@@ -1318,6 +1333,37 @@ def ingredient_duplicate_bulk_decision_route():
         **result,
         "success": True,
         "message": message,
+    })
+
+
+@main_bp.route("/api/master-data/ingredients/merges/undo", methods=["POST"])
+def undo_ingredient_master_merge_route():
+    active_public_user = current_public_user()
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    workspace_user_id = ingredient_duplicate_review_workspace(active_public_user, payload)
+    if not workspace_user_id:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Choose one user workspace before undoing an ingredient merge.",
+        }), 400
+
+    result = recipe_master_data.undo_last_ingredient_master_merge(workspace_user_id)
+    if not result.get("ok"):
+        return jsonify({**result, "success": False}), int(result.get("status") or 400)
+
+    restored_count = int(result.get("restored_reference_count") or 0)
+    message = (
+        f"Restored {result.get('source_name')} after undoing its merge into "
+        f"{result.get('target_name')}; restored {restored_count} recipe "
+        f"reference{'s' if restored_count != 1 else ''}."
+    )
+    return jsonify({
+        **result,
+        "success": True,
+        "message": message,
+        "undo_available": bool(result.get("next_merge")),
     })
 
 

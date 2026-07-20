@@ -307,6 +307,26 @@ def test_bulk_merge_uses_each_suggested_survivor(monkeypatch, tmp_path):
     assert len(master_data.list_ingredients(user_id="user-a", search="tomatoes")) == 1
 
 
+def test_undo_merge_restores_duplicate_review_to_pending(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    seed_pair()
+    review = duplicate_reviews.scan_potential_duplicates("user-a")["reviews"][0]
+
+    merge_result = duplicate_reviews.decide_duplicate_review(
+        review["review_id"],
+        "merge",
+        target_ingredient_id=review["suggested_target_id"],
+        user_id="user-a",
+    )
+    undo_result = master_data.undo_last_ingredient_master_merge("user-a")
+    restored_reviews = duplicate_reviews.list_duplicate_reviews("user-a")
+
+    assert merge_result["ok"] is True
+    assert undo_result["ok"] is True
+    assert [item["review_id"] for item in restored_reviews] == [review["review_id"]]
+    assert restored_reviews[0]["status"] == "pending"
+
+
 def test_bulk_merge_rejects_lower_confidence_spelling_candidates(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     master_data.sync_recipe_master_records(

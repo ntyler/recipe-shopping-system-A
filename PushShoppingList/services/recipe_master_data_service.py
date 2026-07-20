@@ -648,6 +648,21 @@ def ensure_recipe_master_schema(connection=None):
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS ingredient_merge_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            source_ingredient_id INTEGER NOT NULL,
+            target_ingredient_id INTEGER NOT NULL,
+            source_name TEXT NOT NULL,
+            target_name TEXT NOT NULL,
+            snapshot_json TEXT NOT NULL,
+            merged_at TEXT NOT NULL,
+            undone_at TEXT DEFAULT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS equipment (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -777,6 +792,7 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_aliases_user_name ON ingredient_aliases(user_id, normalized_alias)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_duplicate_reviews_user_status ON ingredient_duplicate_reviews(user_id, status)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_duplicate_reviews_pair ON ingredient_duplicate_reviews(left_ingredient_id, right_ingredient_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_merge_history_user_undo ON ingredient_merge_history(user_id, undone_at, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_section ON ingredients(user_id, store_section)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_name ON equipment(user_id, normalized_name)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_section ON equipment(user_id, equipment_section)")
@@ -1759,6 +1775,39 @@ def update_ingredient_master_record(
         }
 
 
+def ingredient_merge_history_summary(row):
+    if not row:
+        return None
+    return {
+        "merge_id": int(row["id"]),
+        "user_id": clean_text(row["user_id"]),
+        "source_ingredient_id": int(row["source_ingredient_id"]),
+        "source_name": clean_text(row["source_name"]),
+        "target_ingredient_id": int(row["target_ingredient_id"]),
+        "target_name": clean_text(row["target_name"]),
+        "merged_at": clean_text(row["merged_at"]),
+    }
+
+
+def latest_undoable_ingredient_merge(user_id=None):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return None
+        row = connection.execute(
+            """
+            SELECT id, user_id, source_ingredient_id, target_ingredient_id,
+                   source_name, target_name, merged_at
+              FROM ingredient_merge_history
+             WHERE user_id = ? AND undone_at IS NULL
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (scoped_user_id,),
+        ).fetchone()
+    return ingredient_merge_history_summary(row)
+
+
 def merge_ingredient_master_records(
     source_ingredient_id,
     target_ingredient_id,
@@ -1804,9 +1853,12 @@ def merge_ingredient_master_records(
         if source["user_id"] != target["user_id"]:
             return {"ok": False, "status": 400, "error": "Ingredients can only be merged within the same workspace."}
 
+        source_snapshot = dict(source)
+        target_snapshot = dict(target)
         source_alias_rows = connection.execute(
             """
-            SELECT alias_name, normalized_alias
+            SELECT id, user_id, ingredient_id, alias_name, normalized_alias,
+                   created_at, updated_at
               FROM ingredient_aliases
              WHERE user_id = ?
                AND ingredient_id = ?
@@ -1814,6 +1866,40 @@ def merge_ingredient_master_records(
             """,
             (source["user_id"], source_ingredient_id),
         ).fetchall()
+        target_alias_rows = connection.execute(
+            """
+            SELECT id, user_id, ingredient_id, alias_name, normalized_alias,
+                   created_at, updated_at
+              FROM ingredient_aliases
+             WHERE user_id = ?
+               AND ingredient_id = ?
+             ORDER BY normalized_alias ASC
+            """,
+            (source["user_id"], target_ingredient_id),
+        ).fetchall()
+        moved_reference_rows = connection.execute(
+            """
+            SELECT id
+              FROM recipe_ingredients
+             WHERE user_id = ? AND ingredient_id = ?
+             ORDER BY id ASC
+            """,
+            (source["user_id"], source_ingredient_id),
+        ).fetchall()
+        duplicate_review_rows = connection.execute(
+            """
+            SELECT id, status, classification, suggested_target_id, updated_at
+              FROM ingredient_duplicate_reviews
+             WHERE user_id = ?
+               AND (left_ingredient_id = ? OR right_ingredient_id = ?)
+             ORDER BY id ASC
+            """,
+            (source["user_id"], source_ingredient_id, source_ingredient_id),
+        ).fetchall()
+        aliases_before_merge = [
+            dict(row)
+            for row in (*source_alias_rows, *target_alias_rows)
+        ]
         alias_candidates = {
             normalized_master_name(source["name"]): clean_text(source["name"]),
             normalized_master_name(source["normalized_name"]): clean_text(source["name"]),
@@ -1952,6 +2038,53 @@ def merge_ingredient_master_records(
             """,
             (source["user_id"], target_ingredient_id),
         ).fetchall()
+        merged_target = connection.execute(
+            """
+            SELECT id, user_id, name, normalized_name, store_section,
+                   image_url, image_path, created_at, updated_at
+              FROM ingredients
+             WHERE id = ? AND user_id = ?
+            """,
+            (target_ingredient_id, source["user_id"]),
+        ).fetchone()
+        merged_alias_rows = connection.execute(
+            """
+            SELECT id, user_id, ingredient_id, alias_name, normalized_alias,
+                   created_at, updated_at
+              FROM ingredient_aliases
+             WHERE user_id = ? AND ingredient_id = ?
+             ORDER BY normalized_alias ASC
+            """,
+            (source["user_id"], target_ingredient_id),
+        ).fetchall()
+        merge_snapshot = {
+            "version": 1,
+            "source": source_snapshot,
+            "target": target_snapshot,
+            "aliases_before": aliases_before_merge,
+            "moved_reference_ids": [int(row["id"]) for row in moved_reference_rows],
+            "duplicate_reviews_before": [dict(row) for row in duplicate_review_rows],
+            "merged_target": dict(merged_target),
+            "merged_aliases": [dict(row) for row in merged_alias_rows],
+        }
+        history_cursor = connection.execute(
+            """
+            INSERT INTO ingredient_merge_history (
+                user_id, source_ingredient_id, target_ingredient_id,
+                source_name, target_name, snapshot_json, merged_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                source["user_id"],
+                source_ingredient_id,
+                target_ingredient_id,
+                clean_text(source["name"]),
+                clean_text(target["name"]),
+                json.dumps(merge_snapshot, separators=(",", ":"), sort_keys=True),
+                now,
+            ),
+        )
 
         return {
             "ok": True,
@@ -1967,6 +2100,309 @@ def merge_ingredient_master_records(
             "aliases": [clean_text(alias_row["alias_name"]) for alias_row in alias_rows],
             "store_section": merged_section,
             "image_url": merged_image_url,
+            "merge_id": int(history_cursor.lastrowid),
+            "merged_at": now,
+        }
+
+
+def undo_last_ingredient_master_merge(user_id=None):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    ingredient_fields = (
+        "id",
+        "user_id",
+        "name",
+        "normalized_name",
+        "store_section",
+        "image_url",
+        "image_path",
+        "created_at",
+        "updated_at",
+    )
+    alias_fields = (
+        "id",
+        "user_id",
+        "ingredient_id",
+        "alias_name",
+        "normalized_alias",
+        "created_at",
+        "updated_at",
+    )
+
+    def snapshot_matches(row, expected, fields):
+        if not row or not isinstance(expected, dict):
+            return False
+        current = dict(row)
+        return all(current.get(field) == expected.get(field) for field in fields)
+
+    def alias_signatures(rows):
+        return sorted(
+            tuple(dict(row).get(field) for field in alias_fields)
+            for row in rows or []
+        )
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
+
+        history = connection.execute(
+            """
+            SELECT id, user_id, source_ingredient_id, target_ingredient_id,
+                   source_name, target_name, snapshot_json, merged_at
+              FROM ingredient_merge_history
+             WHERE user_id = ? AND undone_at IS NULL
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (scoped_user_id,),
+        ).fetchone()
+        if not history:
+            return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
+
+        try:
+            snapshot = json.loads(history["snapshot_json"])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "This merge cannot be undone because its restore data is unavailable.",
+            }
+
+        source = snapshot.get("source") if isinstance(snapshot, dict) else None
+        target = snapshot.get("target") if isinstance(snapshot, dict) else None
+        merged_target = snapshot.get("merged_target") if isinstance(snapshot, dict) else None
+        aliases_before = snapshot.get("aliases_before") if isinstance(snapshot, dict) else None
+        merged_aliases = snapshot.get("merged_aliases") if isinstance(snapshot, dict) else None
+        if not all(isinstance(value, dict) for value in (source, target, merged_target)):
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "This merge cannot be undone because its restore data is incomplete.",
+            }
+        aliases_before = aliases_before if isinstance(aliases_before, list) else []
+        merged_aliases = merged_aliases if isinstance(merged_aliases, list) else []
+        source_id = int(history["source_ingredient_id"])
+        target_id = int(history["target_ingredient_id"])
+        if (
+            int(source.get("id") or 0) != source_id
+            or int(target.get("id") or 0) != target_id
+            or clean_text(source.get("user_id")) != scoped_user_id
+            or clean_text(target.get("user_id")) != scoped_user_id
+        ):
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "This merge cannot be undone because its restore data does not match the workspace.",
+            }
+
+        current_target = connection.execute(
+            """
+            SELECT id, user_id, name, normalized_name, store_section,
+                   image_url, image_path, created_at, updated_at
+              FROM ingredients
+             WHERE id = ? AND user_id = ?
+            """,
+            (target_id, scoped_user_id),
+        ).fetchone()
+        if not snapshot_matches(current_target, merged_target, ingredient_fields):
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "The surviving ingredient changed after this merge, so it was not overwritten.",
+            }
+
+        current_aliases = connection.execute(
+            """
+            SELECT id, user_id, ingredient_id, alias_name, normalized_alias,
+                   created_at, updated_at
+              FROM ingredient_aliases
+             WHERE user_id = ? AND ingredient_id = ?
+             ORDER BY normalized_alias ASC
+            """,
+            (scoped_user_id, target_id),
+        ).fetchall()
+        if alias_signatures(current_aliases) != alias_signatures(merged_aliases):
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "The surviving ingredient aliases changed after this merge, so they were not overwritten.",
+            }
+
+        source_conflict = connection.execute(
+            """
+            SELECT id
+              FROM ingredients
+             WHERE id = ?
+                OR (user_id = ? AND normalized_name = ?)
+             LIMIT 1
+            """,
+            (source_id, scoped_user_id, normalized_master_name(source.get("normalized_name"))),
+        ).fetchone()
+        if source_conflict:
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "The removed ingredient name is in use again, so this merge cannot be undone safely.",
+            }
+
+        restored_alias_names = sorted({
+            normalized_master_name(alias.get("normalized_alias"))
+            for alias in aliases_before
+            if isinstance(alias, dict) and normalized_master_name(alias.get("normalized_alias"))
+        })
+        if restored_alias_names:
+            placeholders = ", ".join("?" for _value in restored_alias_names)
+            alias_conflict = connection.execute(
+                f"""
+                SELECT normalized_alias
+                  FROM ingredient_aliases
+                 WHERE user_id = ?
+                   AND normalized_alias IN ({placeholders})
+                   AND ingredient_id != ?
+                 LIMIT 1
+                """,
+                (scoped_user_id, *restored_alias_names, target_id),
+            ).fetchone()
+            if alias_conflict:
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": (
+                        f"The alias {alias_conflict['normalized_alias']} is in use, "
+                        "so this merge cannot be undone safely."
+                    ),
+                }
+
+        moved_reference_ids = sorted({
+            int(reference_id)
+            for reference_id in snapshot.get("moved_reference_ids", [])
+            if str(reference_id).isdigit() and int(reference_id) > 0
+        })
+        if moved_reference_ids:
+            placeholders = ", ".join("?" for _value in moved_reference_ids)
+            moved_reference_rows = connection.execute(
+                f"""
+                SELECT id, ingredient_id
+                  FROM recipe_ingredients
+                 WHERE user_id = ? AND id IN ({placeholders})
+                """,
+                (scoped_user_id, *moved_reference_ids),
+            ).fetchall()
+            if any(int(row["ingredient_id"]) != target_id for row in moved_reference_rows):
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": "A moved recipe reference changed after this merge, so it was not overwritten.",
+                }
+
+        connection.execute(
+            """
+            INSERT INTO ingredients (
+                id, user_id, name, normalized_name, store_section,
+                image_url, image_path, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            tuple(source.get(field) for field in ingredient_fields),
+        )
+        connection.execute(
+            """
+            UPDATE ingredients
+               SET name = ?, normalized_name = ?, store_section = ?,
+                   image_url = ?, image_path = ?, created_at = ?, updated_at = ?
+             WHERE id = ? AND user_id = ?
+            """,
+            (
+                target.get("name"),
+                target.get("normalized_name"),
+                target.get("store_section"),
+                target.get("image_url"),
+                target.get("image_path"),
+                target.get("created_at"),
+                target.get("updated_at"),
+                target_id,
+                scoped_user_id,
+            ),
+        )
+        connection.execute(
+            "DELETE FROM ingredient_aliases WHERE user_id = ? AND ingredient_id IN (?, ?)",
+            (scoped_user_id, source_id, target_id),
+        )
+        for alias in aliases_before:
+            if not isinstance(alias, dict):
+                continue
+            connection.execute(
+                """
+                INSERT INTO ingredient_aliases (
+                    id, user_id, ingredient_id, alias_name, normalized_alias,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                tuple(alias.get(field) for field in alias_fields),
+            )
+
+        restored_reference_count = 0
+        if moved_reference_ids:
+            placeholders = ", ".join("?" for _value in moved_reference_ids)
+            restored_cursor = connection.execute(
+                f"""
+                UPDATE recipe_ingredients
+                   SET ingredient_id = ?
+                 WHERE user_id = ? AND ingredient_id = ? AND id IN ({placeholders})
+                """,
+                (source_id, scoped_user_id, target_id, *moved_reference_ids),
+            )
+            restored_reference_count = max(0, int(restored_cursor.rowcount or 0))
+
+        duplicate_reviews = snapshot.get("duplicate_reviews_before", [])
+        for review in duplicate_reviews if isinstance(duplicate_reviews, list) else []:
+            if not isinstance(review, dict):
+                continue
+            connection.execute(
+                """
+                UPDATE ingredient_duplicate_reviews
+                   SET status = ?, classification = ?, suggested_target_id = ?, updated_at = ?
+                 WHERE id = ? AND user_id = ?
+                """,
+                (
+                    review.get("status"),
+                    review.get("classification"),
+                    review.get("suggested_target_id"),
+                    review.get("updated_at"),
+                    review.get("id"),
+                    scoped_user_id,
+                ),
+            )
+
+        undone_at = utc_now_iso()
+        connection.execute(
+            "UPDATE ingredient_merge_history SET undone_at = ? WHERE id = ? AND undone_at IS NULL",
+            (undone_at, int(history["id"])),
+        )
+        next_history = connection.execute(
+            """
+            SELECT id, user_id, source_ingredient_id, target_ingredient_id,
+                   source_name, target_name, merged_at
+              FROM ingredient_merge_history
+             WHERE user_id = ? AND undone_at IS NULL
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (scoped_user_id,),
+        ).fetchone()
+
+        return {
+            "ok": True,
+            "changed": True,
+            "merge_id": int(history["id"]),
+            "user_id": scoped_user_id,
+            "source_ingredient_id": source_id,
+            "source_name": clean_text(source.get("name")),
+            "target_ingredient_id": target_id,
+            "target_name": clean_text(target.get("name")),
+            "restored_reference_count": restored_reference_count,
+            "undone_at": undone_at,
+            "next_merge": ingredient_merge_history_summary(next_history),
         }
 
 

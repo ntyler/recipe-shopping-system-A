@@ -1366,6 +1366,8 @@
             selectAll: panel && panel.querySelector("[data-master-duplicate-select-all]"),
             selectNone: panel && panel.querySelector("[data-master-duplicate-select-none]"),
             bulkActions: panel ? panel.querySelectorAll("[data-master-duplicate-bulk-action]") : [],
+            undoMerge: panel && panel.querySelector("[data-master-duplicate-undo-merge]"),
+            undoSummary: panel && panel.querySelector("[data-master-duplicate-undo-summary]"),
         };
     }
 
@@ -1405,6 +1407,11 @@
                 ? "Reviewing ingredient pairs..."
                 : (els.panel.dataset.lastScanAt ? "Rescan Potential Duplicates" : "Find Potential Duplicates");
         }
+        if (els.undoMerge) {
+            els.undoMerge.disabled = busy
+                || els.panel.dataset.scope === "all"
+                || els.undoMerge.dataset.undoAvailable !== "true";
+        }
         masterDataDuplicateCards().forEach((card) => {
             card.querySelectorAll("button").forEach((button) => {
                 const blockedMerge = card.dataset.mergeBlocked === "true"
@@ -1425,6 +1432,25 @@
         els.status.textContent = message;
         els.status.classList.toggle("is-error", kind === "error");
         els.status.classList.toggle("is-warning", kind === "warning");
+    }
+
+    function setMasterDataUndoMergeState(merge = null) {
+        const els = masterDataDuplicateElements();
+        if (!els.panel || !els.undoMerge) return;
+        const available = Boolean(merge);
+        const sourceName = available ? text(merge.source_name).trim() : "";
+        const targetName = available ? text(merge.target_name).trim() : "";
+        els.undoMerge.dataset.undoAvailable = available ? "true" : "false";
+        els.undoMerge.dataset.sourceName = sourceName;
+        els.undoMerge.dataset.targetName = targetName;
+        els.undoMerge.disabled = !available
+            || els.panel.dataset.scope === "all"
+            || els.panel.getAttribute("aria-busy") === "true";
+        if (els.undoSummary) {
+            els.undoSummary.textContent = available
+                ? `Last merge: ${sourceName} into ${targetName}.`
+                : "No merge is currently available to undo.";
+        }
     }
 
     async function refreshMasterDataRecordResults() {
@@ -1476,8 +1502,9 @@
         }
     }
 
-    async function refreshAfterMasterDataDuplicateMerge(message, kind = "") {
+    async function refreshAfterMasterDataDuplicateMerge(message, kind = "", merge = null) {
         broadcastIngredientMasterDataMerge();
+        if (merge) setMasterDataUndoMergeState(merge);
         let recordsError = null;
         const [reviewsRefreshed] = await Promise.all([
             loadMasterDataDuplicateReviews(),
@@ -1502,6 +1529,41 @@
             scope: text(els.panel && els.panel.dataset.scope).trim(),
             user_id: text(els.panel && els.panel.dataset.userId).trim(),
         };
+    }
+
+    async function undoLastMasterDataIngredientMerge() {
+        const els = masterDataDuplicateElements();
+        if (!els.panel || !els.undoMerge || els.undoMerge.dataset.undoAvailable !== "true") return;
+        if (changedStoreSectionForms().length) {
+            setMasterDataDuplicateStatus("Save your pending ingredient edits before undoing a merge.", "warning");
+            return;
+        }
+
+        setMasterDataDuplicateBusy(true, "Undoing the last ingredient merge...");
+        try {
+            const response = await fetch(text(els.panel.dataset.undoMergeUrl), {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify(masterDataDuplicateRequestContext()),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "The last ingredient merge could not be undone.");
+            }
+            setMasterDataUndoMergeState(data.next_merge || null);
+            await refreshAfterMasterDataDuplicateMerge(data.message || "Ingredient merge undone.");
+        } catch (error) {
+            setMasterDataDuplicateStatus(
+                error.message || "The last ingredient merge could not be undone.",
+                "error"
+            );
+        } finally {
+            setMasterDataDuplicateBusy(false);
+        }
     }
 
     function duplicateClassificationLabel(classification) {
@@ -1972,6 +2034,11 @@
         [els.selectHighConfidence, els.selectAll, els.selectNone].forEach((button) => {
             if (button) button.disabled = busy || !cards.length;
         });
+        if (els.undoMerge) {
+            els.undoMerge.disabled = busy
+                || els.panel.dataset.scope === "all"
+                || els.undoMerge.dataset.undoAvailable !== "true";
+        }
         Array.from(els.bulkActions || []).forEach((button) => {
             const action = text(button.dataset.masterDuplicateBulkAction).trim();
             const includesBlockedMerge = selected.some((card) => card.dataset.mergeBlocked === "true");
@@ -2086,9 +2153,16 @@
                 throw new Error(data.error || data.message || "Bulk review decisions could not be applied.");
             }
             if (Number(data.merged_count) > 0) {
+                const mergedResults = Array.isArray(data.results)
+                    ? data.results.filter((result) => result && result.ok && result.merge)
+                    : [];
+                const latestMerge = mergedResults.length
+                    ? mergedResults[mergedResults.length - 1].merge
+                    : null;
                 await refreshAfterMasterDataDuplicateMerge(
                     data.message || "Bulk merge complete.",
-                    Number(data.failed_count) > 0 ? "warning" : ""
+                    Number(data.failed_count) > 0 ? "warning" : "",
+                    latestMerge
                 );
                 return;
             }
@@ -2213,7 +2287,11 @@
             }
             setMasterDataDuplicateStatus(data.message || "Review decision saved.");
             if (action === "merge") {
-                await refreshAfterMasterDataDuplicateMerge(data.message || "Ingredient merge complete.");
+                await refreshAfterMasterDataDuplicateMerge(
+                    data.message || "Ingredient merge complete.",
+                    "",
+                    data.merge || null
+                );
                 return;
             }
             if (card) card.remove();
@@ -2237,6 +2315,9 @@
         const els = masterDataDuplicateElements();
         if (!els.panel) return;
         if (els.scan) els.scan.addEventListener("click", scanMasterDataDuplicates);
+        if (els.undoMerge) {
+            els.undoMerge.addEventListener("click", () => void undoLastMasterDataIngredientMerge());
+        }
         if (els.selectHighConfidence) {
             els.selectHighConfidence.addEventListener("click", () => selectMasterDataDuplicateCards("high-confidence"));
         }

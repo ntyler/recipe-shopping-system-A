@@ -385,6 +385,7 @@
                      data-reviews-url="{{ master_data.ingredient_duplicate_reviews_url }}"
                      data-decision-url="{{ master_data.ingredient_duplicate_decision_url }}"
                      data-bulk-decision-url="{{ master_data.ingredient_duplicate_bulk_decision_url }}"
+                     data-undo-merge-url="{{ master_data.ingredient_merge_undo_url }}"
                      data-reference-url="{{ master_data.ingredient_reference_url }}"
                      data-scope="{{ master_data.scope }}"
                      data-user-id="{{ master_data.scope_user_id }}">
@@ -400,7 +401,23 @@
                                 {% if master_data.scope == 'all' %}disabled{% endif %}>
                             Find Potential Duplicates
                         </button>
-                        <small>Creates a review queue. Nothing is merged automatically.</small>
+                        <button type="button"
+                                class="master-data-undo-merge"
+                                data-master-duplicate-undo-merge
+                                data-undo-available="{{ 'true' if master_data.latest_ingredient_merge else 'false' }}"
+                                data-source-name="{{ master_data.latest_ingredient_merge.source_name if master_data.latest_ingredient_merge else '' }}"
+                                data-target-name="{{ master_data.latest_ingredient_merge.target_name if master_data.latest_ingredient_merge else '' }}"
+                                {% if not master_data.latest_ingredient_merge or master_data.scope == 'all' %}disabled{% endif %}>
+                            Undo last merge
+                        </button>
+                        <small data-master-duplicate-undo-summary>
+                            {% if master_data.latest_ingredient_merge %}
+                                Last merge: {{ master_data.latest_ingredient_merge.source_name }} into {{ master_data.latest_ingredient_merge.target_name }}.
+                            {% else %}
+                                No merge is currently available to undo.
+                            {% endif %}
+                        </small>
+                        <small>Duplicate scans create a review queue. Nothing is merged automatically.</small>
                     </div>
                 </header>
                 {% if master_data.scope == 'all' %}

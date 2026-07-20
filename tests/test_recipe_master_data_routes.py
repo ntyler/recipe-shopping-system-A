@@ -430,6 +430,59 @@ def test_ingredient_master_merge_routes_scope_candidates_and_resolve_aliases(mon
     assert "Potatoes" in page_html
 
 
+def test_ingredient_master_merge_undo_route_and_button_restore_last_merge(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/carrot-soup",
+        recipe_data={"ingredients": [{"ingredient": "Carrot", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/roasted-carrots",
+        recipe_data={"ingredients": [{"ingredient": "Carrots", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    target = master_data.master_record_for_name("ingredients", "user-a", "carrot")
+    source = master_data.master_record_for_name("ingredients", "user-a", "carrots")
+    headers = {"X-Requested-With": "fetch", "Accept": "application/json"}
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        merge_response = client.post(
+            f"/admin/master-data/ingredients/{source['id']}/merge",
+            data={"target_ingredient_id": target["id"]},
+            headers=headers,
+        )
+        merged_page = client.get("/admin/master-data/ingredients")
+        undo_response = client.post(
+            "/api/master-data/ingredients/merges/undo",
+            json={"scope": "user", "user_id": "user-b"},
+            headers=headers,
+        )
+        restored_page = client.get("/admin/master-data/ingredients")
+
+    merged_html = merged_page.get_data(as_text=True)
+    undo_payload = undo_response.get_json()
+    restored_html = restored_page.get_data(as_text=True)
+
+    assert merge_response.status_code == 200
+    assert 'data-master-duplicate-undo-merge' in merged_html
+    assert 'data-undo-available="true"' in merged_html
+    assert 'data-source-name="Carrots"' in merged_html
+    assert 'data-target-name="Carrot"' in merged_html
+    assert "Last merge: Carrots into Carrot." in merged_html
+    assert undo_response.status_code == 200
+    assert undo_payload["ok"] is True
+    assert undo_payload["source_name"] == "Carrots"
+    assert undo_payload["target_name"] == "Carrot"
+    assert undo_payload["restored_reference_count"] == 1
+    assert undo_payload["undo_available"] is False
+    assert master_data.master_record_for_name("ingredients", "user-a", "carrot")["id"] == target["id"]
+    assert master_data.master_record_for_name("ingredients", "user-a", "carrots")["id"] == source["id"]
+    assert 'data-undo-available="false"' in restored_html
+    assert "No merge is currently available to undo." in restored_html
+
+
 def test_duplicate_review_routes_scan_scope_and_save_decisions(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -984,6 +1037,7 @@ def test_master_data_duplicate_review_ui_is_wired():
         "ingredient_duplicate_reviews_url",
         "ingredient_duplicate_decision_url",
         "ingredient_duplicate_bulk_decision_url",
+        "ingredient_merge_undo_url",
         "data-master-duplicate-toolbar",
         "data-master-duplicate-select-high-confidence",
         "data-master-duplicate-select-all",
@@ -998,6 +1052,8 @@ def test_master_data_duplicate_review_ui_is_wired():
         "data-master-record-results",
         "data-master-results-header",
         "data-master-pagination",
+        "data-master-duplicate-undo-merge",
+        "data-master-duplicate-undo-summary",
     ):
         assert marker in template
     assert "Find Potential Duplicates" in template
@@ -1018,7 +1074,10 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "async function openMasterDataDuplicateReferences(button)" in script
     assert "function closeMasterDataDuplicateReferences()" in script
     assert "function refreshMasterDataRecordResults()" in script
-    assert "async function refreshAfterMasterDataDuplicateMerge(message, kind = \"\")" in script
+    assert "async function refreshAfterMasterDataDuplicateMerge(message, kind = \"\", merge = null)" in script
+    assert "function setMasterDataUndoMergeState(merge = null)" in script
+    assert "async function undoLastMasterDataIngredientMerge()" in script
+    assert "undoLastMasterDataIngredientMerge()" in script
     assert "data-master-duplicate-references-open" in script
     assert 'url.searchParams.set("limit", "500")' in script
     assert 'card.dataset.highConfidenceDuplicate' in script
@@ -1061,6 +1120,7 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);" in css
     assert ".master-data-duplicate-scan-actions button" in css
+    assert ".master-data-duplicate-scan-actions button.master-data-undo-merge" in css
     assert "Nothing is merged automatically." in template
 
 

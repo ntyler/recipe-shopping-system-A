@@ -26420,6 +26420,20 @@ img[data-deferred-src] {
             opacity: .48;
         }
 
+        .master-data-duplicate-scan-actions button.master-data-undo-merge {
+            min-height: 38px;
+            border-color: #607487;
+            background: #14212a;
+            color: #e5edf5;
+            box-shadow: none;
+            font-size: 12px;
+        }
+
+        .master-data-duplicate-scan-actions button.master-data-undo-merge:is(:hover, :focus-visible) {
+            border-color: #93c5fd;
+            background: #1b2d39;
+        }
+
         .master-data-duplicate-scan-actions small {
             color: #91a7b8;
             font-size: 10px;
