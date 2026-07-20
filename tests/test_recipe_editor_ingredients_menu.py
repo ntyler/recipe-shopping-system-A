@@ -1044,6 +1044,10 @@ def test_ingredient_name_fields_use_the_normalized_master_data_picker():
         assert f'setRowFieldValue(row, "{field_name}"' in picker
     assert 'match_source: "ingredient master data"' in picker
     assert "Manage master ingredients" in picker
+    assert "ingredient.aliases" in picker
+    assert "Also matches" in picker
+    assert 'const RECIPE_EDIT_INGREDIENT_MASTER_VERSION_STORAGE_KEY = "ingredient-master-data-version";' in script
+    assert "recipeEditIngredientMasterCache.clear();" in script
 
     outside_click_start = script.index("function handleRecipeEditRowMenuOutsideClick")
     outside_click_end = script.index("function handleRecipeEditRowMenuScrollOrResize", outside_click_start)

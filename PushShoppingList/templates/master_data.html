@@ -52,6 +52,28 @@
                                        aria-label="Normalized name for {{ row.name }}">
                             </label>
                         </form>
+                        {% if row.aliases %}
+                            <div class="master-data-aliases" aria-label="Aliases for {{ row.name }}">
+                                <span>Aliases</span>
+                                <div>
+                                    {% for alias in row.aliases %}
+                                        <code>{{ alias }}</code>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                        <button type="button"
+                                class="master-data-merge-open"
+                                data-master-merge-open
+                                data-source-id="{{ row.id }}"
+                                data-source-name="{{ row.name }}"
+                                data-source-normalized-name="{{ row.normalized_name }}"
+                                data-source-usage-count="{{ row.usage_count }}"
+                                data-merge-options-url="{{ url_for('main_bp.ingredient_master_merge_options_route', ingredient_id=row.id) }}"
+                                data-merge-url="{{ url_for('main_bp.merge_ingredient_master_record_route', ingredient_id=row.id) }}"
+                                aria-controls="masterDataIngredientMergeDialog">
+                            Merge duplicate
+                        </button>
                     </div>
                 {% else %}
                     <div class="master-data-item-copy">
@@ -447,6 +469,71 @@
             <div class="master-data-empty-state">
                 No matching {{ master_data.empty_label }} records were found for this scope.
             </div>
+        {% endif %}
+
+        {% if master_data.record_type == 'ingredients' and master_data.rows %}
+            <dialog id="masterDataIngredientMergeDialog"
+                    class="master-data-merge-dialog"
+                    data-master-merge-dialog
+                    aria-labelledby="masterDataMergeTitle">
+                <form class="master-data-merge-form"
+                      data-master-merge-form
+                      method="POST"
+                      action="">
+                    <input type="hidden" name="target_ingredient_id" data-master-merge-target-id>
+                    <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
+                    <header class="master-data-merge-header">
+                        <div>
+                            <span>Ingredient Master Data</span>
+                            <h2 id="masterDataMergeTitle">Merge duplicate ingredient</h2>
+                        </div>
+                        <button type="button"
+                                class="master-data-merge-close"
+                                data-master-merge-close
+                                aria-label="Close merge dialog">×</button>
+                    </header>
+                    <div class="master-data-merge-body">
+                        <div class="master-data-merge-source">
+                            <span>Duplicate to remove</span>
+                            <strong data-master-merge-source-name></strong>
+                            <code data-master-merge-source-normalized></code>
+                            <small data-master-merge-source-usage></small>
+                        </div>
+                        <div class="master-data-merge-explanation">
+                            Recipe references will move to the canonical ingredient. The duplicate name will remain as an alias, so future imports still match correctly.
+                        </div>
+                        <label class="master-data-merge-search-label">
+                            <span>Find the canonical ingredient</span>
+                            <input type="search"
+                                   data-master-merge-search
+                                   autocomplete="off"
+                                   placeholder="Search master ingredients"
+                                   role="combobox"
+                                   aria-haspopup="listbox"
+                                   aria-expanded="true"
+                                   aria-controls="masterDataMergeResults"
+                                   aria-autocomplete="list">
+                        </label>
+                        <div id="masterDataMergeResults"
+                             class="master-data-merge-results"
+                             data-master-merge-results
+                             role="listbox"
+                             aria-label="Canonical ingredient choices"></div>
+                        <div class="master-data-merge-selection" data-master-merge-selection hidden>
+                            <span>Merge into</span>
+                            <strong data-master-merge-target-name></strong>
+                            <small data-master-merge-combined-usage></small>
+                        </div>
+                        <div class="master-data-merge-error" data-master-merge-error role="alert" hidden></div>
+                    </div>
+                    <footer class="master-data-merge-footer">
+                        <button type="button" data-master-merge-close>Cancel</button>
+                        <button type="submit" class="primary" data-master-merge-submit disabled>
+                            Merge ingredient
+                        </button>
+                    </footer>
+                </form>
+            </dialog>
         {% endif %}
 
         <div class="master-data-pagination">

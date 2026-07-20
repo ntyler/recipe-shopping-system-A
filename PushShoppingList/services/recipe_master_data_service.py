@@ -596,6 +596,21 @@ def ensure_recipe_master_schema(connection=None):
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS ingredient_aliases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            ingredient_id INTEGER NOT NULL,
+            alias_name TEXT NOT NULL,
+            normalized_alias TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(user_id, normalized_alias),
+            FOREIGN KEY(ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS equipment (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -721,6 +736,8 @@ def ensure_recipe_master_schema(connection=None):
     normalize_existing_ingredient_store_sections(connection)
     normalize_existing_equipment_sections(connection)
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_name ON ingredients(user_id, normalized_name)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_aliases_ingredient ON ingredient_aliases(ingredient_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_aliases_user_name ON ingredient_aliases(user_id, normalized_alias)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_section ON ingredients(user_id, store_section)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_name ON equipment(user_id, normalized_name)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_section ON equipment(user_id, equipment_section)")
@@ -1031,8 +1048,29 @@ def master_record_filters(
     search = clean_text(search)
     if search:
         search_like = f"%{search.lower()}%"
-        where.append("(LOWER(m.name) LIKE ? OR LOWER(m.normalized_name) LIKE ?)")
-        params.extend([search_like, search_like])
+        if table_name == "ingredients":
+            where.append(
+                """
+                (
+                    LOWER(m.name) LIKE ?
+                    OR LOWER(m.normalized_name) LIKE ?
+                    OR EXISTS (
+                        SELECT 1
+                          FROM ingredient_aliases a
+                         WHERE a.user_id = m.user_id
+                           AND a.ingredient_id = m.id
+                           AND (
+                               LOWER(a.alias_name) LIKE ?
+                               OR LOWER(a.normalized_alias) LIKE ?
+                           )
+                    )
+                )
+                """
+            )
+            params.extend([search_like, search_like, search_like, search_like])
+        else:
+            where.append("(LOWER(m.name) LIKE ? OR LOWER(m.normalized_name) LIKE ?)")
+            params.extend([search_like, search_like])
 
     if table_name == "ingredients":
         section = ingredient_store_section_from_source(store_section)
@@ -1076,10 +1114,23 @@ def list_master_records(
     usage_fk = config["usage_fk"]
     if table_name == "ingredients":
         section_select = ",\n                m.store_section"
+        alias_select = """,
+                COALESCE((
+                    SELECT GROUP_CONCAT(alias_rows.alias_name, CHAR(31))
+                      FROM (
+                          SELECT a.alias_name
+                            FROM ingredient_aliases a
+                           WHERE a.user_id = m.user_id
+                             AND a.ingredient_id = m.id
+                           ORDER BY a.normalized_alias ASC
+                      ) alias_rows
+                ), '') AS aliases_serialized"""
     elif table_name == "equipment":
         section_select = ",\n                m.equipment_section"
+        alias_select = ""
     else:
         section_select = ""
+        alias_select = ""
 
     with existing_recipe_master_connection() as connection:
         if connection is None:
@@ -1095,7 +1146,7 @@ def list_master_records(
                 m.image_url,
                 m.image_path,
                 m.created_at,
-                m.updated_at,
+                m.updated_at{alias_select},
                 COUNT(u.id) AS usage_count
               FROM {table_name} m
               LEFT JOIN {usage_table} u
@@ -1116,6 +1167,12 @@ def list_master_records(
         if table_name == "ingredients":
             row_data["store_section"] = clean_ingredient_store_section(row_data.get("store_section"))
             row_data["store_section_order"] = ingredient_store_section_sort_key(row_data["store_section"])
+            aliases_serialized = clean_text(row_data.pop("aliases_serialized", ""))
+            row_data["aliases"] = [
+                clean_text(alias)
+                for alias in aliases_serialized.split(chr(31))
+                if clean_text(alias)
+            ]
         elif table_name == "equipment":
             row_data["equipment_section"] = clean_equipment_section(row_data.get("equipment_section"))
             row_data["equipment_section_order"] = equipment_section_sort_key(row_data["equipment_section"])
@@ -1601,6 +1658,32 @@ def update_ingredient_master_record(
                 "error": "That normalized ingredient already exists in this workspace.",
             }
 
+        alias_conflict = connection.execute(
+            """
+            SELECT ingredient_id
+              FROM ingredient_aliases
+             WHERE user_id = ?
+               AND normalized_alias = ?
+            """,
+            (row["user_id"], normalized_name),
+        ).fetchone()
+        if alias_conflict and int(alias_conflict["ingredient_id"]) != int(row["id"]):
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "That normalized ingredient is already an alias for another master ingredient.",
+            }
+        if alias_conflict:
+            connection.execute(
+                """
+                DELETE FROM ingredient_aliases
+                 WHERE user_id = ?
+                   AND normalized_alias = ?
+                   AND ingredient_id = ?
+                """,
+                (row["user_id"], normalized_name, int(row["id"])),
+            )
+
         previous = {
             "name": clean_text(row["name"]),
             "normalized_name": normalized_master_name(row["normalized_name"]),
@@ -1634,6 +1717,217 @@ def update_ingredient_master_record(
             "normalized_name": normalized_name,
             "store_section": section,
             "previous": previous,
+        }
+
+
+def merge_ingredient_master_records(
+    source_ingredient_id,
+    target_ingredient_id,
+    user_id=None,
+    allow_other_users=False,
+):
+    try:
+        source_ingredient_id = int(source_ingredient_id or 0)
+        target_ingredient_id = int(target_ingredient_id or 0)
+    except (TypeError, ValueError):
+        source_ingredient_id = 0
+        target_ingredient_id = 0
+
+    if source_ingredient_id <= 0 or target_ingredient_id <= 0:
+        return {"ok": False, "status": 400, "error": "Source and target ingredients are required."}
+    if source_ingredient_id == target_ingredient_id:
+        return {"ok": False, "status": 400, "error": "Choose a different canonical ingredient."}
+
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {"ok": False, "status": 404, "error": "Recipe master database was not found."}
+
+        rows = connection.execute(
+            """
+            SELECT id, user_id, name, normalized_name, store_section,
+                   image_url, image_path, created_at, updated_at
+              FROM ingredients
+             WHERE id IN (?, ?)
+            """,
+            (source_ingredient_id, target_ingredient_id),
+        ).fetchall()
+        rows_by_id = {int(row["id"]): row for row in rows}
+        source = rows_by_id.get(source_ingredient_id)
+        target = rows_by_id.get(target_ingredient_id)
+        if not source or not target:
+            return {"ok": False, "status": 404, "error": "One of those ingredient records was not found."}
+        if not allow_other_users and (
+            source["user_id"] != scoped_user_id
+            or target["user_id"] != scoped_user_id
+        ):
+            return {"ok": False, "status": 404, "error": "Ingredient record was not found."}
+        if source["user_id"] != target["user_id"]:
+            return {"ok": False, "status": 400, "error": "Ingredients can only be merged within the same workspace."}
+
+        source_alias_rows = connection.execute(
+            """
+            SELECT alias_name, normalized_alias
+              FROM ingredient_aliases
+             WHERE user_id = ?
+               AND ingredient_id = ?
+             ORDER BY normalized_alias ASC
+            """,
+            (source["user_id"], source_ingredient_id),
+        ).fetchall()
+        alias_candidates = {
+            normalized_master_name(source["name"]): clean_text(source["name"]),
+            normalized_master_name(source["normalized_name"]): clean_text(source["name"]),
+        }
+        for alias_row in source_alias_rows:
+            normalized_alias = normalized_master_name(alias_row["normalized_alias"])
+            if normalized_alias:
+                alias_candidates[normalized_alias] = clean_text(alias_row["alias_name"]) or normalized_alias
+        alias_candidates.pop(normalized_master_name(target["normalized_name"]), None)
+        alias_candidates = {
+            normalized_alias: alias_name
+            for normalized_alias, alias_name in alias_candidates.items()
+            if normalized_alias
+        }
+
+        if alias_candidates:
+            placeholders = ", ".join("?" for _ in alias_candidates)
+            alias_conflict = connection.execute(
+                f"""
+                SELECT normalized_alias
+                  FROM ingredient_aliases
+                 WHERE user_id = ?
+                   AND normalized_alias IN ({placeholders})
+                   AND ingredient_id NOT IN (?, ?)
+                 LIMIT 1
+                """,
+                (
+                    source["user_id"],
+                    *alias_candidates.keys(),
+                    source_ingredient_id,
+                    target_ingredient_id,
+                ),
+            ).fetchone()
+            if alias_conflict:
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": f"The alias {alias_conflict['normalized_alias']} belongs to another ingredient.",
+                }
+
+        now = utc_now_iso()
+        target_section = clean_ingredient_store_section(target["store_section"])
+        source_section = clean_ingredient_store_section(source["store_section"])
+        merged_section = source_section if target_section == "MISC" and source_section != "MISC" else target_section
+        merged_image_url = clean_text(target["image_url"]) or clean_text(source["image_url"])
+        merged_image_path = clean_text(target["image_path"]) or clean_text(source["image_path"])
+
+        moved_reference_cursor = connection.execute(
+            """
+            UPDATE recipe_ingredients
+               SET ingredient_id = ?
+             WHERE user_id = ?
+               AND ingredient_id = ?
+            """,
+            (target_ingredient_id, source["user_id"], source_ingredient_id),
+        )
+        connection.execute(
+            """
+            UPDATE ingredient_aliases
+               SET ingredient_id = ?,
+                   updated_at = ?
+             WHERE user_id = ?
+               AND ingredient_id = ?
+            """,
+            (target_ingredient_id, now, source["user_id"], source_ingredient_id),
+        )
+        for normalized_alias, alias_name in alias_candidates.items():
+            connection.execute(
+                """
+                INSERT INTO ingredient_aliases (
+                    user_id, ingredient_id, alias_name, normalized_alias, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, normalized_alias) DO UPDATE SET
+                    ingredient_id = excluded.ingredient_id,
+                    alias_name = excluded.alias_name,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    source["user_id"],
+                    target_ingredient_id,
+                    alias_name,
+                    normalized_alias,
+                    now,
+                    now,
+                ),
+            )
+        connection.execute(
+            """
+            DELETE FROM ingredient_aliases
+             WHERE user_id = ?
+               AND ingredient_id = ?
+               AND normalized_alias = ?
+            """,
+            (source["user_id"], target_ingredient_id, normalized_master_name(target["normalized_name"])),
+        )
+        connection.execute(
+            """
+            UPDATE ingredients
+               SET store_section = ?,
+                   image_url = ?,
+                   image_path = ?,
+                   updated_at = ?
+             WHERE id = ?
+               AND user_id = ?
+            """,
+            (
+                merged_section,
+                merged_image_url,
+                merged_image_path,
+                now,
+                target_ingredient_id,
+                source["user_id"],
+            ),
+        )
+        connection.execute(
+            "DELETE FROM ingredients WHERE id = ? AND user_id = ?",
+            (source_ingredient_id, source["user_id"]),
+        )
+        combined_usage_row = connection.execute(
+            """
+            SELECT COUNT(*) AS usage_count
+              FROM recipe_ingredients
+             WHERE user_id = ?
+               AND ingredient_id = ?
+            """,
+            (source["user_id"], target_ingredient_id),
+        ).fetchone()
+        alias_rows = connection.execute(
+            """
+            SELECT alias_name
+              FROM ingredient_aliases
+             WHERE user_id = ?
+               AND ingredient_id = ?
+             ORDER BY normalized_alias ASC
+            """,
+            (source["user_id"], target_ingredient_id),
+        ).fetchall()
+
+        return {
+            "ok": True,
+            "changed": True,
+            "user_id": source["user_id"],
+            "source_ingredient_id": source_ingredient_id,
+            "source_name": clean_text(source["name"]),
+            "target_ingredient_id": target_ingredient_id,
+            "target_name": clean_text(target["name"]),
+            "target_normalized_name": normalized_master_name(target["normalized_name"]),
+            "moved_reference_count": max(0, int(moved_reference_cursor.rowcount or 0)),
+            "combined_usage_count": int(combined_usage_row["usage_count"] or 0),
+            "aliases": [clean_text(alias_row["alias_name"]) for alias_row in alias_rows],
+            "store_section": merged_section,
+            "image_url": merged_image_url,
         }
 
 
@@ -1681,6 +1975,18 @@ def ingredient_master_records_for_items(items, user_id=None):
         placeholders = ", ".join("?" for _ in normalized_names)
         match_parts.append(f"normalized_name IN ({placeholders})")
         params.extend(sorted(normalized_names))
+        match_parts.append(
+            f"""
+            id IN (
+                SELECT ingredient_id
+                  FROM ingredient_aliases
+                 WHERE user_id = ?
+                   AND normalized_alias IN ({placeholders})
+            )
+            """
+        )
+        params.append(scoped_user_id)
+        params.extend(sorted(normalized_names))
 
     where_parts.append("(" + " OR ".join(match_parts) + ")")
 
@@ -1697,6 +2003,20 @@ def ingredient_master_records_for_items(items, user_id=None):
             params,
         ).fetchall()
 
+        ingredient_row_ids = [int(row["id"]) for row in rows]
+        alias_rows = []
+        if ingredient_row_ids:
+            placeholders = ", ".join("?" for _ in ingredient_row_ids)
+            alias_rows = connection.execute(
+                f"""
+                SELECT ingredient_id, normalized_alias
+                  FROM ingredient_aliases
+                 WHERE user_id = ?
+                   AND ingredient_id IN ({placeholders})
+                """,
+                (scoped_user_id, *ingredient_row_ids),
+            ).fetchall()
+
     by_id = {}
     by_normalized_name = {}
     for row in rows:
@@ -1704,6 +2024,10 @@ def ingredient_master_records_for_items(items, user_id=None):
         row_data["store_section"] = clean_ingredient_store_section(row_data.get("store_section"))
         by_id[int(row_data["id"])] = row_data
         by_normalized_name[row_data["normalized_name"]] = row_data
+    for alias_row in alias_rows:
+        ingredient = by_id.get(int(alias_row["ingredient_id"]))
+        if ingredient:
+            by_normalized_name[clean_text(alias_row["normalized_alias"])] = ingredient
 
     return {"by_id": by_id, "by_normalized_name": by_normalized_name}
 
@@ -1984,6 +2308,60 @@ def upsert_master_record(
             """,
             (user_id, normalized_name),
         ).fetchone()
+        alias_row = None
+        if previous_row is None:
+            alias_row = connection.execute(
+                """
+                SELECT i.id, i.name, i.normalized_name, i.store_section
+                  FROM ingredient_aliases a
+                  JOIN ingredients i
+                    ON i.id = a.ingredient_id
+                   AND i.user_id = a.user_id
+                 WHERE a.user_id = ?
+                   AND a.normalized_alias = ?
+                """,
+                (user_id, normalized_name),
+            ).fetchone()
+        if alias_row is not None:
+            previous_section = clean_ingredient_store_section(alias_row["store_section"])
+            next_section = (
+                store_section
+                if force_store_section or previous_section == "MISC"
+                else previous_section
+            )
+            clean_image_url = clean_text(image_url)
+            clean_image_path = clean_text(image_path)
+            connection.execute(
+                """
+                UPDATE ingredients
+                   SET store_section = ?,
+                       image_url = CASE WHEN ? != '' THEN ? ELSE image_url END,
+                       image_path = CASE WHEN ? != '' THEN ? ELSE image_path END,
+                       updated_at = ?
+                 WHERE id = ?
+                   AND user_id = ?
+                """,
+                (
+                    next_section,
+                    clean_image_url,
+                    clean_image_url,
+                    clean_image_path,
+                    clean_image_path,
+                    now,
+                    int(alias_row["id"]),
+                    user_id,
+                ),
+            )
+            return {
+                "id": int(alias_row["id"]),
+                "name": clean_text(alias_row["name"]),
+                "normalized_name": normalized_master_name(alias_row["normalized_name"]),
+                "matched_alias": normalized_name,
+                "store_section": next_section,
+                "previous_store_section": previous_section,
+                "store_section_changed": previous_section != next_section,
+                "store_section_inserted": False,
+            }
         previous_section = (
             clean_ingredient_store_section(previous_row["store_section"])
             if previous_row

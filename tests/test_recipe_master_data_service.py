@@ -429,6 +429,94 @@ def test_update_ingredient_master_record_changes_identity_without_breaking_recip
     assert master_data.master_record_for_name("ingredients", "user-a", "garlic")["id"] == garlic["id"]
 
 
+def test_merge_ingredient_master_records_relinks_usage_and_preserves_alias(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/potato-soup",
+        recipe_data={"ingredients": [{
+            "ingredient": "Potato",
+            "store_section": "Produce",
+            "ingredient_image_url": "/static/generated/potato.png",
+        }]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/roasted-potatoes",
+        recipe_data={"ingredients": [{"ingredient": "Potatoes", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    target = master_data.master_record_for_name("ingredients", "user-a", "potato")
+    source = master_data.master_record_for_name("ingredients", "user-a", "potatoes")
+
+    result = master_data.merge_ingredient_master_records(
+        source["id"],
+        target["id"],
+        user_id="user-a",
+    )
+
+    assert result["ok"] is True
+    assert result["moved_reference_count"] == 1
+    assert result["combined_usage_count"] == 2
+    assert result["aliases"] == ["Potatoes"]
+    assert master_data.master_record_for_name("ingredients", "user-a", "potatoes") is None
+
+    matches = master_data.list_ingredients(user_id="user-a", search="potatoes")
+    assert len(matches) == 1
+    assert matches[0]["id"] == target["id"]
+    assert matches[0]["name"] == "Potato"
+    assert matches[0]["aliases"] == ["Potatoes"]
+    assert matches[0]["usage_count"] == 2
+
+    master_data.sync_recipe_master_records(
+        "https://example.com/mashed-potatoes",
+        recipe_data={"ingredients": [{"ingredient": "Potatoes", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    refreshed_target = master_data.master_record_for_name("ingredients", "user-a", "potato")
+    assert refreshed_target["name"] == "Potato"
+    assert master_data.master_record_for_name("ingredients", "user-a", "potatoes") is None
+    assert master_data.count_ingredient_usage(target["id"], user_id="user-a") == 3
+
+    lookup = master_data.ingredient_master_records_for_items(
+        [{"ingredient": "potatoes"}],
+        user_id="user-a",
+    )
+    assert lookup["by_normalized_name"]["potatoes"]["id"] == target["id"]
+
+
+def test_merge_ingredient_master_records_rejects_cross_workspace_targets(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/user-a-potato",
+        recipe_data={"ingredients": [{"ingredient": "Potato"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/user-b-potatoes",
+        recipe_data={"ingredients": [{"ingredient": "Potatoes"}]},
+        user_id="user-b",
+    )
+    user_a_target = master_data.master_record_for_name("ingredients", "user-a", "potato")
+    user_b_source = master_data.master_record_for_name("ingredients", "user-b", "potatoes")
+
+    scoped_result = master_data.merge_ingredient_master_records(
+        user_b_source["id"],
+        user_a_target["id"],
+        user_id="user-a",
+    )
+    admin_result = master_data.merge_ingredient_master_records(
+        user_b_source["id"],
+        user_a_target["id"],
+        user_id="admin-user",
+        allow_other_users=True,
+    )
+
+    assert scoped_result["ok"] is False
+    assert scoped_result["status"] == 404
+    assert admin_result["ok"] is False
+    assert admin_result["status"] == 400
+
+
 def test_list_master_record_recipe_references_returns_usage_details(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     monkeypatch.setattr(master_data.storage_service, "USER_DATA_DIR", tmp_path / "users")

@@ -22636,6 +22636,12 @@ const recipeEditSavedFormSnapshots = new WeakMap();
 const RECIPE_EDITOR_CACHE_TTL_MS = 60 * 1000;
 const recipeEditorDataCache = new Map();
 const recipeEditIngredientMasterCache = new Map();
+const RECIPE_EDIT_INGREDIENT_MASTER_VERSION_STORAGE_KEY = "ingredient-master-data-version";
+window.addEventListener("storage", event => {
+    if (event && event.key === RECIPE_EDIT_INGREDIENT_MASTER_VERSION_STORAGE_KEY) {
+        recipeEditIngredientMasterCache.clear();
+    }
+});
 const RECIPE_EDIT_MENU_SECTION_FIELD_NAME = "menu_section";
 const RECIPE_EDIT_CATEGORY_AI_FIELD_NAMES = CATEGORY_FIELD_NAMES;
 const RECIPE_EDIT_CATEGORY_FIELD_NAMES = [...CATEGORY_FIELD_NAMES, RECIPE_EDIT_MENU_SECTION_FIELD_NAME];
@@ -38737,6 +38743,10 @@ function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) 
             const storeSection = String(ingredient.store_section || "MISC").trim();
             const imageUrl = String(ingredient.image_url || "").trim();
             const usageCount = Number(ingredient.usage_count || 0);
+            const aliases = Array.isArray(ingredient.aliases)
+                ? ingredient.aliases.map(alias => String(alias || "").trim()).filter(Boolean)
+                : [];
+            const aliasDetail = aliases.length ? ` · Also matches ${aliases.join(", ")}` : "";
             const selected = Boolean(ingredientId && ingredientId === selectedId);
             return `
                 <button type="button"
@@ -38757,7 +38767,7 @@ function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) 
                     </span>
                     <span class="recipe-edit-ingredient-master-copy">
                         <strong>${escapeHtml(name)}</strong>
-                        <span>${escapeHtml(normalizedName)} · ${escapeHtml(recipeStoreSectionDisplayLabel(storeSection) || storeSection)}</span>
+                        <span>${escapeHtml(normalizedName)} · ${escapeHtml(recipeStoreSectionDisplayLabel(storeSection) || storeSection)}${escapeHtml(aliasDetail)}</span>
                     </span>
                     <span class="recipe-edit-ingredient-master-usage">${usageCount} use${usageCount === 1 ? "" : "s"}</span>
                     <span class="recipe-edit-ingredient-master-check" aria-hidden="true">${recipeEditSvgIcon("check")}</span>

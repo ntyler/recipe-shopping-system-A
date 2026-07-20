@@ -6,6 +6,7 @@
     const MASTER_DATA_THUMBNAIL_MIN_SIZE = 32;
     const MASTER_DATA_THUMBNAIL_MAX_SIZE = 80;
     const MASTER_DATA_THUMBNAIL_STEP_SIZE = 8;
+    const INGREDIENT_MASTER_DATA_VERSION_STORAGE_KEY = "ingredient-master-data-version";
     let activeJobId = "";
     let pollTimer = null;
     let activeImageJobId = "";
@@ -13,6 +14,9 @@
     let imageRefreshTimer = null;
     let masterDataThumbnailSize = MASTER_DATA_THUMBNAIL_DEFAULT_SIZE;
     let masterDataThumbnailSizeEventsBound = false;
+    let masterDataMergeSearchTimer = null;
+    let masterDataMergeRequestId = 0;
+    let masterDataMergeReturnFocus = null;
 
     function text(value) {
         return String(value == null ? "" : value);
@@ -1004,6 +1008,349 @@
         updateStoreSectionSavePanel();
     }
 
+    function masterDataMergeElements() {
+        const dialog = document.querySelector("[data-master-merge-dialog]");
+        const form = dialog && dialog.querySelector("[data-master-merge-form]");
+        return {
+            dialog,
+            form,
+            search: dialog && dialog.querySelector("[data-master-merge-search]"),
+            results: dialog && dialog.querySelector("[data-master-merge-results]"),
+            targetId: form && form.querySelector("[data-master-merge-target-id]"),
+            sourceName: dialog && dialog.querySelector("[data-master-merge-source-name]"),
+            sourceNormalized: dialog && dialog.querySelector("[data-master-merge-source-normalized]"),
+            sourceUsage: dialog && dialog.querySelector("[data-master-merge-source-usage]"),
+            selection: dialog && dialog.querySelector("[data-master-merge-selection]"),
+            targetName: dialog && dialog.querySelector("[data-master-merge-target-name]"),
+            combinedUsage: dialog && dialog.querySelector("[data-master-merge-combined-usage]"),
+            error: dialog && dialog.querySelector("[data-master-merge-error]"),
+            submit: form && form.querySelector("[data-master-merge-submit]"),
+        };
+    }
+
+    function masterDataMergeUsageLabel(count) {
+        const usageCount = Math.max(0, Number(count) || 0);
+        return `${usageCount} recipe reference${usageCount === 1 ? "" : "s"}`;
+    }
+
+    function setMasterDataMergeError(message = "") {
+        const els = masterDataMergeElements();
+        if (!els.error) {
+            return;
+        }
+        els.error.textContent = text(message).trim();
+        els.error.hidden = !els.error.textContent;
+    }
+
+    function setMasterDataMergeBusy(busy) {
+        const els = masterDataMergeElements();
+        if (els.dialog) {
+            els.dialog.setAttribute("aria-busy", busy ? "true" : "false");
+        }
+        if (els.search) {
+            els.search.disabled = busy;
+        }
+        if (els.submit) {
+            els.submit.disabled = busy || !(els.targetId && els.targetId.value);
+            els.submit.textContent = busy ? "Merging..." : "Merge ingredient";
+        }
+        if (els.results) {
+            els.results.querySelectorAll("button").forEach((button) => {
+                button.disabled = busy;
+            });
+        }
+    }
+
+    function resetMasterDataMergeSelection() {
+        const els = masterDataMergeElements();
+        if (els.targetId) els.targetId.value = "";
+        if (els.targetName) els.targetName.textContent = "";
+        if (els.combinedUsage) els.combinedUsage.textContent = "";
+        if (els.selection) els.selection.hidden = true;
+        if (els.submit) els.submit.disabled = true;
+        if (els.results) {
+            els.results.querySelectorAll("[role=\"option\"]").forEach((option) => {
+                option.setAttribute("aria-selected", "false");
+            });
+        }
+    }
+
+    function chooseMasterDataMergeTarget(button) {
+        const els = masterDataMergeElements();
+        if (!button || !els.targetId) {
+            return;
+        }
+        const targetId = text(button.dataset.ingredientId).trim();
+        const targetName = text(button.dataset.ingredientName).trim();
+        const targetUsage = Math.max(0, Number(button.dataset.usageCount) || 0);
+        const sourceUsage = Math.max(0, Number(els.dialog && els.dialog.dataset.sourceUsageCount) || 0);
+        els.targetId.value = targetId;
+        if (els.targetName) els.targetName.textContent = targetName;
+        if (els.combinedUsage) {
+            els.combinedUsage.textContent = `${masterDataMergeUsageLabel(sourceUsage + targetUsage)} after merge`;
+        }
+        if (els.selection) els.selection.hidden = false;
+        if (els.submit) els.submit.disabled = !targetId;
+        if (els.results) {
+            els.results.querySelectorAll("[role=\"option\"]").forEach((option) => {
+                option.setAttribute("aria-selected", option === button ? "true" : "false");
+            });
+        }
+        setMasterDataMergeError("");
+    }
+
+    function masterDataMergeOptionButton(ingredient) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "master-data-merge-option";
+        button.setAttribute("role", "option");
+        button.setAttribute("aria-selected", "false");
+        button.dataset.ingredientId = text(ingredient.ingredient_id);
+        button.dataset.ingredientName = text(ingredient.name);
+        button.dataset.usageCount = text(ingredient.usage_count || 0);
+
+        const media = document.createElement("span");
+        media.className = "master-data-merge-option-media";
+        if (ingredient.image_url) {
+            const image = document.createElement("img");
+            image.src = text(ingredient.image_url);
+            image.alt = "";
+            media.appendChild(image);
+        } else {
+            media.textContent = "—";
+        }
+
+        const copy = document.createElement("span");
+        copy.className = "master-data-merge-option-copy";
+        const name = document.createElement("strong");
+        name.textContent = text(ingredient.name);
+        const detail = document.createElement("span");
+        const aliases = Array.isArray(ingredient.aliases) && ingredient.aliases.length
+            ? ` · aliases: ${ingredient.aliases.join(", ")}`
+            : "";
+        detail.textContent = `${text(ingredient.normalized_name)} · ${text(ingredient.store_section)}${aliases}`;
+        copy.append(name, detail);
+
+        const usage = document.createElement("span");
+        usage.className = "master-data-merge-option-usage";
+        usage.textContent = masterDataMergeUsageLabel(ingredient.usage_count);
+        button.append(media, copy, usage);
+        button.addEventListener("click", () => chooseMasterDataMergeTarget(button));
+        return button;
+    }
+
+    function renderMasterDataMergeOptions(ingredients, message = "") {
+        const els = masterDataMergeElements();
+        if (!els.results) {
+            return;
+        }
+        els.results.replaceChildren();
+        resetMasterDataMergeSelection();
+        const rows = Array.isArray(ingredients) ? ingredients : [];
+        if (!rows.length) {
+            const empty = document.createElement("div");
+            empty.className = "master-data-merge-empty";
+            empty.textContent = message || "No other master ingredients match this search.";
+            els.results.appendChild(empty);
+            return;
+        }
+        rows.forEach((ingredient) => {
+            els.results.appendChild(masterDataMergeOptionButton(ingredient));
+        });
+    }
+
+    async function loadMasterDataMergeOptions(options = {}) {
+        const els = masterDataMergeElements();
+        const optionsUrl = text(els.dialog && els.dialog.dataset.mergeOptionsUrl).trim();
+        if (!els.dialog || !els.search || !els.results || !optionsUrl) {
+            return;
+        }
+
+        window.clearTimeout(masterDataMergeSearchTimer);
+        const delay = options.immediate ? 0 : 180;
+        masterDataMergeSearchTimer = window.setTimeout(async () => {
+            const requestId = ++masterDataMergeRequestId;
+            const queryValue = text(els.search.value).trim();
+            renderMasterDataMergeOptions([], "Loading canonical ingredients...");
+            setMasterDataMergeError("");
+            try {
+                const params = new URLSearchParams({ search: queryValue, limit: "20" });
+                const response = await fetch(`${optionsUrl}?${params.toString()}`, {
+                    headers: {
+                        Accept: "application/json",
+                        "X-Requested-With": "fetch",
+                    },
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || data.ok === false || data.success === false) {
+                    throw new Error(data.error || "Canonical ingredients could not be loaded.");
+                }
+                if (requestId !== masterDataMergeRequestId || !els.dialog.open) {
+                    return;
+                }
+                renderMasterDataMergeOptions(
+                    data.ingredients,
+                    queryValue
+                        ? `No master ingredients match “${queryValue}”.`
+                        : "No other master ingredients are available in this workspace."
+                );
+            } catch (error) {
+                if (requestId === masterDataMergeRequestId) {
+                    renderMasterDataMergeOptions([], "Canonical ingredients could not be loaded.");
+                    setMasterDataMergeError(
+                        error && error.message ? error.message : "Canonical ingredients could not be loaded."
+                    );
+                }
+            }
+        }, delay);
+    }
+
+    function closeMasterDataMergeDialog() {
+        const els = masterDataMergeElements();
+        window.clearTimeout(masterDataMergeSearchTimer);
+        masterDataMergeRequestId += 1;
+        if (els.dialog) {
+            if (typeof els.dialog.close === "function" && els.dialog.open) {
+                els.dialog.close();
+            } else {
+                els.dialog.removeAttribute("open");
+            }
+            els.dialog.removeAttribute("aria-busy");
+            delete els.dialog.dataset.mergeOptionsUrl;
+            delete els.dialog.dataset.sourceUsageCount;
+        }
+        if (els.form) els.form.action = "";
+        if (els.search) els.search.value = "";
+        if (els.results) els.results.replaceChildren();
+        resetMasterDataMergeSelection();
+        setMasterDataMergeError("");
+        setMasterDataMergeBusy(false);
+        if (masterDataMergeReturnFocus && masterDataMergeReturnFocus.isConnected) {
+            masterDataMergeReturnFocus.focus({ preventScroll: true });
+        }
+        masterDataMergeReturnFocus = null;
+    }
+
+    function openMasterDataMergeDialog(button) {
+        const els = masterDataMergeElements();
+        if (!button || !els.dialog || !els.form || !els.search) {
+            return;
+        }
+        if (changedStoreSectionForms().length) {
+            setStoreSectionPanelMessage(
+                "Save ingredient changes before merging",
+                "Merging refreshes this page, so save the pending name or store-section edits first."
+            );
+            const panel = document.querySelector("[data-master-store-section-panel]");
+            if (panel) panel.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+
+        masterDataMergeReturnFocus = button;
+        els.form.action = text(button.dataset.mergeUrl);
+        els.dialog.dataset.mergeOptionsUrl = text(button.dataset.mergeOptionsUrl);
+        els.dialog.dataset.sourceUsageCount = text(button.dataset.sourceUsageCount || 0);
+        if (els.sourceName) els.sourceName.textContent = text(button.dataset.sourceName);
+        if (els.sourceNormalized) els.sourceNormalized.textContent = text(button.dataset.sourceNormalizedName);
+        if (els.sourceUsage) {
+            els.sourceUsage.textContent = masterDataMergeUsageLabel(button.dataset.sourceUsageCount);
+        }
+        els.search.value = "";
+        resetMasterDataMergeSelection();
+        setMasterDataMergeError("");
+        setMasterDataMergeBusy(false);
+        if (typeof els.dialog.showModal === "function") {
+            els.dialog.showModal();
+        } else {
+            els.dialog.setAttribute("open", "");
+        }
+        els.search.focus({ preventScroll: true });
+        void loadMasterDataMergeOptions({ immediate: true });
+    }
+
+    async function submitMasterDataMerge(event) {
+        event.preventDefault();
+        const els = masterDataMergeElements();
+        if (!els.form || !els.targetId || !els.targetId.value) {
+            setMasterDataMergeError("Choose the canonical ingredient first.");
+            return;
+        }
+        setMasterDataMergeBusy(true);
+        setMasterDataMergeError("");
+        try {
+            const response = await fetch(els.form.action, {
+                method: els.form.method || "POST",
+                body: new FormData(els.form),
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "fetch",
+                },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false || data.success === false) {
+                throw new Error(data.message || data.error || "Ingredient records could not be merged.");
+            }
+            if (els.selection) els.selection.classList.add("is-complete");
+            if (els.combinedUsage) els.combinedUsage.textContent = data.message || "Ingredient merge complete.";
+            try {
+                if (window.localStorage) {
+                    window.localStorage.setItem(
+                        INGREDIENT_MASTER_DATA_VERSION_STORAGE_KEY,
+                        String(Date.now())
+                    );
+                }
+            } catch (storageError) {
+                console.debug("Unable to notify other tabs about the ingredient merge.", storageError);
+            }
+            window.setTimeout(() => {
+                window.location.assign(data.redirect_url || window.location.href);
+            }, 650);
+        } catch (error) {
+            setMasterDataMergeBusy(false);
+            setMasterDataMergeError(
+                error && error.message ? error.message : "Ingredient records could not be merged."
+            );
+        }
+    }
+
+    function initMasterDataIngredientMerge() {
+        const els = masterDataMergeElements();
+        if (!els.dialog || !els.form) {
+            return;
+        }
+        document.addEventListener("click", (event) => {
+            const target = event.target && event.target.closest ? event.target : null;
+            const openButton = target && target.closest("[data-master-merge-open]");
+            const closeButton = target && target.closest("[data-master-merge-close]");
+            if (openButton) {
+                event.preventDefault();
+                openMasterDataMergeDialog(openButton);
+            } else if (closeButton) {
+                event.preventDefault();
+                closeMasterDataMergeDialog();
+            }
+        });
+        if (els.search) {
+            els.search.addEventListener("input", () => {
+                void loadMasterDataMergeOptions();
+            });
+            els.search.addEventListener("keydown", (event) => {
+                if (event.key === "ArrowDown" && els.results) {
+                    const firstOption = els.results.querySelector("[role=\"option\"]");
+                    if (firstOption) {
+                        event.preventDefault();
+                        firstOption.focus();
+                    }
+                }
+            });
+        }
+        els.form.addEventListener("submit", submitMasterDataMerge);
+        els.dialog.addEventListener("cancel", (event) => {
+            event.preventDefault();
+            closeMasterDataMergeDialog();
+        });
+    }
+
     function renderProgress(form, progress) {
         const els = elementsFor(form);
         if (!els.panel || !progress) {
@@ -1401,6 +1748,7 @@
         initMasterDataThumbnailSizeControls();
         initMasterDataImageLightbox();
         initMasterDataStoreSectionBatchSave();
+        initMasterDataIngredientMerge();
 
         const form = document.querySelector("[data-master-backfill-form]");
         if (form && window.fetch && window.FormData) {

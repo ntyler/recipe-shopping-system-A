@@ -1173,6 +1173,11 @@ def ingredient_master_options_route():
                 ),
                 "image_url": recipe_master_data.clean_text(row.get("image_url")),
                 "usage_count": int(row.get("usage_count") or 0),
+                "aliases": [
+                    recipe_master_data.clean_text(alias)
+                    for alias in row.get("aliases", [])
+                    if recipe_master_data.clean_text(alias)
+                ],
             }
             for row in rows
         ],
@@ -1276,6 +1281,121 @@ def update_ingredient_master_record_route(ingredient_id):
         category = "success"
     else:
         message = result.get("error") or "Ingredient master record could not be updated."
+        category = "error"
+
+    session["recipe_master_data_messages"] = [{
+        "category": category,
+        "text": message,
+    }]
+    wants_json = (
+        request.is_json
+        or request.headers.get("X-Requested-With") == "fetch"
+        or request.accept_mimetypes.best == "application/json"
+    )
+    if wants_json:
+        status = 200 if result.get("ok") else int(result.get("status") or 400)
+        return jsonify({
+            "ok": result.get("ok", False),
+            "success": result.get("ok", False),
+            "category": category,
+            "message": message,
+            "result": result,
+            "redirect_url": redirect_url,
+        }), status
+
+    return redirect(redirect_url)
+
+
+@main_bp.route("/api/master-data/ingredients/<int:ingredient_id>/merge-options")
+def ingredient_master_merge_options_route(ingredient_id):
+    active_public_user = current_public_user()
+    allow_other_users = is_admin_user(active_public_user)
+    source = recipe_master_data.master_record_for_id(
+        "ingredients",
+        ingredient_id,
+        include_all_users=allow_other_users,
+    )
+    if not source:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Ingredient record was not found.",
+        }), 404
+
+    search = recipe_master_data.clean_text(request.args.get("search"))
+    limit = int_query_arg("limit", 20, minimum=1, maximum=50)
+    rows = recipe_master_data.list_ingredients(
+        user_id=source["user_id"],
+        search=search,
+        limit=min(50, limit + 1),
+        sort="usage_count_desc" if not search else "name_asc",
+    )
+    candidates = [
+        row
+        for row in rows
+        if int(row.get("id") or 0) != int(source["id"])
+    ][:limit]
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "search": search,
+        "source": {
+            "ingredient_id": int(source["id"]),
+            "name": recipe_master_data.clean_text(source.get("name")),
+            "normalized_name": recipe_master_data.normalized_master_name(source.get("normalized_name")),
+            "usage_count": recipe_master_data.count_ingredient_usage(
+                source["id"],
+                user_id=source["user_id"],
+            ),
+        },
+        "ingredients": [
+            {
+                "ingredient_id": int(row.get("id") or 0),
+                "name": recipe_master_data.clean_text(row.get("name")),
+                "normalized_name": recipe_master_data.normalized_master_name(
+                    row.get("normalized_name") or row.get("name")
+                ),
+                "store_section": recipe_master_data.clean_ingredient_store_section(
+                    row.get("store_section")
+                ),
+                "image_url": recipe_master_data.clean_text(row.get("image_url")),
+                "usage_count": int(row.get("usage_count") or 0),
+                "aliases": [
+                    recipe_master_data.clean_text(alias)
+                    for alias in row.get("aliases", [])
+                    if recipe_master_data.clean_text(alias)
+                ],
+            }
+            for row in candidates
+        ],
+    })
+
+
+@main_bp.route("/admin/master-data/ingredients/<int:ingredient_id>/merge", methods=["POST"])
+def merge_ingredient_master_record_route(ingredient_id):
+    active_public_user = current_public_user()
+    allow_other_users = is_admin_user(active_public_user)
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    result = recipe_master_data.merge_ingredient_master_records(
+        ingredient_id,
+        payload.get("target_ingredient_id"),
+        allow_other_users=allow_other_users,
+    )
+    redirect_url = recipe_master_data.clean_text(payload.get("redirect_url"))
+    if not redirect_url.startswith("/") or redirect_url.startswith("//"):
+        redirect_url = url_for("main_bp.master_data_ingredients_route")
+
+    if result.get("ok"):
+        moved_count = int(result.get("moved_reference_count") or 0)
+        message = (
+            f"Merged {result.get('source_name')} into {result.get('target_name')}; "
+            f"moved {moved_count} recipe reference{'s' if moved_count != 1 else ''} "
+            "and kept the old name as an alias."
+        )
+        category = "success"
+    else:
+        message = result.get("error") or "Ingredient records could not be merged."
         category = "error"
 
     session["recipe_master_data_messages"] = [{

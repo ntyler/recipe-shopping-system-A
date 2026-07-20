@@ -355,7 +355,76 @@ def test_ingredient_master_options_are_scoped_for_recipe_editor(monkeypatch, tmp
         "store_section": "PRODUCE",
         "image_url": "/static/generated/tomato.png",
         "usage_count": 1,
+        "aliases": [],
     }]
+
+
+def test_ingredient_master_merge_routes_scope_candidates_and_resolve_aliases(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/potato-soup",
+        recipe_data={"ingredients": [{"ingredient": "Potato", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/roasted-potatoes",
+        recipe_data={"ingredients": [{"ingredient": "Potatoes", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/user-b-potato",
+        recipe_data={"ingredients": [{"ingredient": "Potato", "store_section": "Produce"}]},
+        user_id="user-b",
+    )
+    target = master_data.master_record_for_name("ingredients", "user-a", "potato")
+    source = master_data.master_record_for_name("ingredients", "user-a", "potatoes")
+    user_b_potato = master_data.master_record_for_name("ingredients", "user-b", "potato")
+    headers = {"X-Requested-With": "fetch", "Accept": "application/json"}
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        options_response = client.get(
+            f"/api/master-data/ingredients/{source['id']}/merge-options?search=potato",
+            headers=headers,
+        )
+        blocked_options_response = client.get(
+            f"/api/master-data/ingredients/{user_b_potato['id']}/merge-options",
+            headers=headers,
+        )
+        merge_response = client.post(
+            f"/admin/master-data/ingredients/{source['id']}/merge",
+            data={
+                "target_ingredient_id": target["id"],
+                "redirect_url": "/admin/master-data/ingredients?search=potato",
+            },
+            headers=headers,
+        )
+        picker_response = client.get(
+            "/api/master-data/ingredients/options?search=potatoes&limit=10",
+            headers=headers,
+        )
+        page_response = client.get("/admin/master-data/ingredients?search=potatoes")
+
+    options_payload = options_response.get_json()
+    merge_payload = merge_response.get_json()
+    picker_payload = picker_response.get_json()
+    page_html = page_response.get_data(as_text=True)
+
+    assert options_response.status_code == 200
+    assert options_payload["source"]["ingredient_id"] == source["id"]
+    assert [row["ingredient_id"] for row in options_payload["ingredients"]] == [target["id"]]
+    assert blocked_options_response.status_code == 404
+    assert merge_response.status_code == 200
+    assert merge_payload["result"]["target_ingredient_id"] == target["id"]
+    assert merge_payload["result"]["moved_reference_count"] == 1
+    assert merge_payload["redirect_url"] == "/admin/master-data/ingredients?search=potato"
+    assert picker_response.status_code == 200
+    assert [row["name"] for row in picker_payload["ingredients"]] == ["Potato"]
+    assert picker_payload["ingredients"][0]["usage_count"] == 2
+    assert picker_payload["ingredients"][0]["aliases"] == ["Potatoes"]
+    assert page_response.status_code == 200
+    assert "Potato" in page_html
+    assert "Potatoes" in page_html
 
 
 def test_ingredient_master_record_edit_is_scoped_and_admin_can_edit_other_users(monkeypatch, tmp_path):
@@ -756,6 +825,35 @@ def test_master_data_store_section_batch_save_is_wired():
     assert ".master-data-record-field input:is(:hover, :focus-visible)" in css
     assert ".master-data-record-field input:focus-visible" in css
     assert '.master-data-ingredients-table select[name="store_section"]' in css
+
+
+def test_master_data_ingredient_merge_ui_is_wired():
+    template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
+    script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "data-master-merge-open",
+        "data-master-merge-dialog",
+        "data-master-merge-form",
+        "data-master-merge-search",
+        "data-master-merge-results",
+        "data-master-merge-target-id",
+        "data-master-merge-submit",
+        "ingredient_master_merge_options_route",
+        "merge_ingredient_master_record_route",
+    ):
+        assert marker in template
+    assert "The duplicate name will remain as an alias" in template
+    assert "function openMasterDataMergeDialog(button)" in script
+    assert "async function loadMasterDataMergeOptions(options = {})" in script
+    assert "async function submitMasterDataMerge(event)" in script
+    assert "initMasterDataIngredientMerge();" in script
+    assert 'const INGREDIENT_MASTER_DATA_VERSION_STORAGE_KEY = "ingredient-master-data-version";' in script
+    assert "window.localStorage.setItem(" in script
+    assert ".master-data-merge-dialog" in css
+    assert ".master-data-merge-option[aria-selected=\"true\"]" in css
+    assert ".master-data-aliases" in css
 
 
 def test_master_data_reference_expander_is_wired():
