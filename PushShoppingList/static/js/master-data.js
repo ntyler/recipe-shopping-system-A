@@ -1542,6 +1542,8 @@
     }
 
     let activeMasterDataUndoPreview = null;
+    const masterDataUndoCollapsedDateGroups = new Set();
+    let masterDataUndoHistoryGroupsInitialized = false;
 
     function masterDataUndoPreviewElements() {
         const dialog = document.querySelector("[data-master-undo-dialog]");
@@ -1680,57 +1682,141 @@
         if (els.confirm) els.confirm.disabled = true;
     }
 
+    function masterDataUndoHistoryDateInfo(value) {
+        const date = new Date(text(value));
+        if (Number.isNaN(date.getTime())) {
+            return {
+                key: "date-unavailable",
+                label: "Date unavailable",
+                time: "Time unavailable",
+            };
+        }
+        const key = [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, "0"),
+            String(date.getDate()).padStart(2, "0"),
+        ].join("-");
+        return {
+            key,
+            label: date.toLocaleDateString([], {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+            }),
+            time: date.toLocaleTimeString([], {
+                hour: "numeric",
+                minute: "2-digit",
+            }),
+        };
+    }
+
+    function masterDataUndoHistoryItem(merge, selectedMergeId) {
+        const mergeId = Number(merge && merge.merge_id) || 0;
+        const newerCount = Math.max(0, Number(merge && merge.newer_undo_count) || 0);
+        const referenceCount = Math.max(0, Number(merge && merge.restored_reference_count) || 0);
+        const canUndoNow = Boolean(merge && merge.can_undo_now);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "master-data-undo-history-item";
+        button.classList.toggle("is-blocked", !canUndoNow);
+        button.dataset.masterUndoHistoryMergeId = String(mergeId);
+        button.setAttribute("aria-current", mergeId === Number(selectedMergeId) ? "true" : "false");
+        button.title = canUndoNow
+            ? (newerCount ? "This merge is independent and can be undone out of order." : "This merge can be undone now.")
+            : text(merge && merge.blocked_reason).trim();
+
+        const header = document.createElement("span");
+        header.className = "master-data-undo-history-item-header";
+        const source = document.createElement("strong");
+        source.textContent = text(merge && merge.source_name).trim() || "Ingredient";
+        const badge = document.createElement("span");
+        badge.className = "master-data-undo-history-item-badge";
+        badge.textContent = canUndoNow
+            ? (newerCount ? "Safe" : "Next")
+            : "Blocked";
+        badge.title = canUndoNow
+            ? (newerCount ? "Safe independent out-of-order undo" : "Newest merge — undo next")
+            : "This merge cannot currently be restored";
+        header.append(source, badge);
+
+        const target = document.createElement("span");
+        target.className = "master-data-undo-history-item-target";
+        target.textContent = `Merged into ${text(merge && merge.target_name).trim() || "ingredient"}`;
+
+        const meta = document.createElement("span");
+        meta.className = "master-data-undo-history-item-meta";
+        const mergedAt = document.createElement("span");
+        mergedAt.textContent = masterDataUndoHistoryDateInfo(merge && merge.merged_at).time;
+        const references = document.createElement("span");
+        references.textContent = `${referenceCount} recipe ref${referenceCount === 1 ? "" : "s"}`;
+        meta.append(mergedAt, references);
+
+        button.append(header, target, meta);
+        button.addEventListener("click", () => {
+            if (mergeId && mergeId !== Number(activeMasterDataUndoPreview && activeMasterDataUndoPreview.merge_id)) {
+                void loadMasterDataUndoPreview(mergeId);
+            }
+        });
+        return button;
+    }
+
     function renderMasterDataUndoHistory(merges, selectedMergeId) {
         const els = masterDataUndoPreviewElements();
         const rows = Array.isArray(merges) ? merges : [];
         if (els.historyCount) els.historyCount.textContent = String(rows.length);
         if (!els.historyList) return;
         els.historyList.replaceChildren();
+        const groups = [];
+        const groupsByKey = new Map();
         rows.forEach((merge) => {
-            const mergeId = Number(merge && merge.merge_id) || 0;
-            const newerCount = Math.max(0, Number(merge && merge.newer_undo_count) || 0);
-            const referenceCount = Math.max(0, Number(merge && merge.restored_reference_count) || 0);
-            const canUndoNow = Boolean(merge && merge.can_undo_now);
-            const button = document.createElement("button");
-            button.type = "button";
-            button.className = "master-data-undo-history-item";
-            button.classList.toggle("is-blocked", !canUndoNow);
-            button.dataset.masterUndoHistoryMergeId = String(mergeId);
-            button.setAttribute("aria-current", mergeId === Number(selectedMergeId) ? "true" : "false");
-            button.title = canUndoNow
-                ? (newerCount ? "This merge is independent and can be undone out of order." : "This merge can be undone now.")
-                : text(merge && merge.blocked_reason).trim();
+            const date = masterDataUndoHistoryDateInfo(merge && merge.merged_at);
+            let group = groupsByKey.get(date.key);
+            if (!group) {
+                group = { ...date, merges: [] };
+                groupsByKey.set(date.key, group);
+                groups.push(group);
+            }
+            group.merges.push(merge);
+        });
 
-            const header = document.createElement("span");
-            header.className = "master-data-undo-history-item-header";
-            const source = document.createElement("strong");
-            source.textContent = text(merge && merge.source_name).trim() || "Ingredient";
-            const badge = document.createElement("span");
-            badge.className = "master-data-undo-history-item-badge";
-            badge.textContent = canUndoNow
-                ? (newerCount ? "Safe now" : "Undo next")
-                : "Blocked";
-            header.append(source, badge);
+        const selectedGroup = groups.find((group) => group.merges.some(
+            (merge) => Number(merge && merge.merge_id) === Number(selectedMergeId)
+        ));
+        if (!masterDataUndoHistoryGroupsInitialized) {
+            masterDataUndoCollapsedDateGroups.clear();
+            groups.slice(1).forEach((group) => masterDataUndoCollapsedDateGroups.add(group.key));
+            masterDataUndoHistoryGroupsInitialized = true;
+        }
+        if (selectedGroup) masterDataUndoCollapsedDateGroups.delete(selectedGroup.key);
 
-            const target = document.createElement("span");
-            target.className = "master-data-undo-history-item-target";
-            target.textContent = `Merged into ${text(merge && merge.target_name).trim() || "ingredient"}`;
+        groups.forEach((group) => {
+            const dateGroup = document.createElement("details");
+            dateGroup.className = "master-data-undo-history-date-group";
+            dateGroup.dataset.undoHistoryDate = group.key;
+            dateGroup.open = !masterDataUndoCollapsedDateGroups.has(group.key);
 
-            const meta = document.createElement("span");
-            meta.className = "master-data-undo-history-item-meta";
-            const mergedAt = document.createElement("span");
-            mergedAt.textContent = formatMasterDataDuplicateScanTime(merge && merge.merged_at) || "Time unavailable";
-            const references = document.createElement("span");
-            references.textContent = `${referenceCount} recipe ref${referenceCount === 1 ? "" : "s"}`;
-            meta.append(mergedAt, references);
+            const summary = document.createElement("summary");
+            summary.className = "master-data-undo-history-date-summary";
+            const label = document.createElement("strong");
+            label.textContent = group.label;
+            const count = document.createElement("span");
+            count.textContent = String(group.merges.length);
+            summary.append(label, count);
 
-            button.append(header, target, meta);
-            button.addEventListener("click", () => {
-                if (mergeId && mergeId !== Number(activeMasterDataUndoPreview && activeMasterDataUndoPreview.merge_id)) {
-                    void loadMasterDataUndoPreview(mergeId);
+            const items = document.createElement("div");
+            items.className = "master-data-undo-history-date-items";
+            group.merges.forEach((merge) => {
+                items.appendChild(masterDataUndoHistoryItem(merge, selectedMergeId));
+            });
+            dateGroup.append(summary, items);
+            dateGroup.addEventListener("toggle", () => {
+                if (dateGroup.open) {
+                    masterDataUndoCollapsedDateGroups.delete(group.key);
+                } else {
+                    masterDataUndoCollapsedDateGroups.add(group.key);
                 }
             });
-            els.historyList.appendChild(button);
+            els.historyList.appendChild(dateGroup);
         });
     }
 
@@ -1896,6 +1982,8 @@
             setMasterDataDuplicateStatus("Save your pending ingredient edits before reviewing an undo.", "warning");
             return;
         }
+        masterDataUndoCollapsedDateGroups.clear();
+        masterDataUndoHistoryGroupsInitialized = false;
         if (els.historyList) els.historyList.replaceChildren();
         if (els.historyCount) els.historyCount.textContent = "0";
         if (!els.dialog.open) els.dialog.showModal();

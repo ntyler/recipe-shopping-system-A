@@ -27152,6 +27152,78 @@ img[data-deferred-src] {
             scrollbar-gutter: stable;
         }
 
+        .master-data-undo-history-date-group {
+            display: grid;
+            min-width: 0;
+            gap: 7px;
+        }
+
+        .master-data-undo-history-date-summary {
+            display: grid;
+            min-width: 0;
+            grid-template-columns: 9px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 7px;
+            border: 1px solid #2d4354;
+            border-radius: 6px;
+            background: #0b1720;
+            color: #dce7ef;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        .master-data-undo-history-date-summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .master-data-undo-history-date-summary::before {
+            width: 6px;
+            height: 6px;
+            border-right: 2px solid #6ee7b7;
+            border-bottom: 2px solid #6ee7b7;
+            content: "";
+            transform: rotate(-45deg);
+            transition: transform 140ms ease;
+        }
+
+        .master-data-undo-history-date-group[open]
+        > .master-data-undo-history-date-summary::before {
+            transform: rotate(45deg) translate(-1px, -1px);
+        }
+
+        .master-data-undo-history-date-summary:is(:hover, :focus-visible) {
+            outline: none;
+            border-color: #4d7188;
+            background: #10202b;
+        }
+
+        .master-data-undo-history-date-summary strong {
+            min-width: 0;
+            color: #dce7ef;
+            font-size: 9px;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-undo-history-date-summary span {
+            display: grid;
+            min-width: 20px;
+            height: 20px;
+            place-items: center;
+            padding: 0 5px;
+            border: 1px solid #3b5a70;
+            border-radius: 999px;
+            color: #a9c2d3;
+            font-size: 8px;
+            font-weight: 900;
+        }
+
+        .master-data-undo-history-date-items {
+            display: grid;
+            gap: 7px;
+        }
+
         .master-data-undo-history-item {
             display: grid;
             width: 100%;

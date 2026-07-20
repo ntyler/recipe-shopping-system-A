@@ -1167,6 +1167,14 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "async function openMasterDataUndoPreview()" in script
     assert "async function loadMasterDataUndoPreview(mergeId = 0)" in script
     assert "function renderMasterDataUndoHistory(merges, selectedMergeId)" in script
+    assert "function masterDataUndoHistoryDateInfo(value)" in script
+    assert "function masterDataUndoHistoryItem(merge, selectedMergeId)" in script
+    assert "masterDataUndoCollapsedDateGroups" in script
+    assert 'document.createElement("details")' in script
+    assert 'date.toLocaleDateString([], {' in script
+    assert 'date.toLocaleTimeString([], {' in script
+    assert '(newerCount ? "Safe" : "Next")' in script
+    assert '"Newest merge — undo next"' in script
     assert "undoLastMasterDataIngredientMerge()" in script
     undo_start = script.index("async function undoLastMasterDataIngredientMerge()")
     undo_end = script.index("function duplicateClassificationLabel", undo_start)
@@ -1213,6 +1221,9 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert ".master-data-undo-preview-comparison" in css
     assert ".master-data-undo-history-layout" in css
     assert ".master-data-undo-history-item" in css
+    assert ".master-data-undo-history-date-group" in css
+    assert ".master-data-undo-history-date-summary" in css
+    assert ".master-data-undo-history-date-items" in css
     assert "Safe out-of-order undo" in script
     assert "Cannot safely undo yet" in script
     assert "Undo newer merges first" not in script
