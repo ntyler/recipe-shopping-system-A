@@ -1142,6 +1142,13 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "Find Potential Duplicates" in template
     assert "an independent AI second opinion explains each pair" in template
     assert "function masterDataDuplicateCard(review)" in script
+    duplicate_card_block = script[
+        script.index("function masterDataDuplicateCard(review)"):
+        script.index("function renderMasterDataDuplicateReviews(reviews)")
+    ]
+    assert "actions.append(mergeSuggested, mergeAlternate, related, notDuplicate);" in duplicate_card_block
+    assert 'if (review.classification === "related")' not in duplicate_card_block
+    assert 'else if (review.classification === "different")' not in duplicate_card_block
     assert "function setMasterDataDuplicateSuggestedSurvivor(button)" in script
     assert "async function scanMasterDataDuplicates()" in script
     assert "function updateMasterDataDuplicateScanState(scan)" in script

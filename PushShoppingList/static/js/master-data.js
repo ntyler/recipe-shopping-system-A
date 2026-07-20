@@ -2584,13 +2584,7 @@
             null,
             review.classification === "different" ? "primary" : ""
         );
-        if (review.classification === "related") {
-            actions.append(related, mergeSuggested, mergeAlternate, notDuplicate);
-        } else if (review.classification === "different") {
-            actions.append(notDuplicate, related, mergeSuggested, mergeAlternate);
-        } else {
-            actions.append(mergeSuggested, mergeAlternate, related, notDuplicate);
-        }
+        actions.append(mergeSuggested, mergeAlternate, related, notDuplicate);
         card.append(header, comparison, reason);
         if (dataQualityWarning) card.appendChild(dataQualityWarning);
         if (signalLabels.length) card.appendChild(signals);
