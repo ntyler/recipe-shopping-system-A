@@ -286,7 +286,7 @@ def test_regenerate_ingredients_preview_uses_current_editor_context_without_savi
     assert "Preserve clearly useful current ingredient details" not in calls[0]["prompt"]
 
 
-def test_regenerate_ingredients_preserves_noncanonical_recipe_unit_for_review(monkeypatch, tmp_path):
+def test_regenerate_ingredients_normalizes_link_as_canonical_count_unit(monkeypatch, tmp_path):
     configure_inference_storage(monkeypatch, tmp_path)
     seed_cookbook_and_recipe(recipe_overrides={
         "recipe_title": "Chaufa Amazonico",
@@ -318,10 +318,10 @@ def test_regenerate_ingredients_preserves_noncanonical_recipe_unit_for_review(mo
     ingredient = result["ingredients"][0]
     assert ingredient["quantity"] == "1"
     assert ingredient["unit"] == "link"
-    assert ingredient["unit_id"] == ""
+    assert ingredient["unit_id"] == "count_link"
     assert ingredient["unit_raw"] == "link"
-    assert ingredient["unit_review_required"] is True
-    assert ingredient["unit_review_value"] == "link"
+    assert ingredient["unit_review_required"] is False
+    assert ingredient["unit_review_value"] == ""
 
 
 def test_regenerate_ingredients_reclassifies_plain_inca_pepper_as_produce(monkeypatch, tmp_path):

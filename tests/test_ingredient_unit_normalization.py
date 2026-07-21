@@ -38,6 +38,7 @@ from PushShoppingList.services.recipe_extract_service import parse_structured_in
         (("bottles",), "bottle"),
         (("cloves",), "clove"),
         (("slices",), "slice"),
+        (("links",), "link"),
         (("sprigs",), "sprig"),
         (("bunches",), "bunch"),
         (("heads",), "head"),
@@ -103,9 +104,9 @@ def test_forbidden_values_are_relocated_and_unknown_units_are_preserved_for_revi
         "ingredient": "chorizo",
     })
     assert previously_normalized["unit"] == "link"
-    assert previously_normalized["unit_id"] == ""
-    assert previously_normalized["unit_review_required"] is True
-    assert previously_normalized["unit_review_value"] == "link"
+    assert previously_normalized["unit_id"] == "count_link"
+    assert previously_normalized["unit_review_required"] is False
+    assert previously_normalized["unit_review_value"] == ""
 
     cleared = normalize_ingredient_unit_fields({
         "quantity": "1",
@@ -202,15 +203,16 @@ def test_editor_load_recovers_legacy_reviewed_unit_without_mutating_master_data(
 
     assert rows[0]["quantity"] == "1"
     assert rows[0]["unit"] == "link"
-    assert rows[0]["unit_id"] == ""
-    assert rows[0]["unit_review_required"] is True
-    assert rows[0]["unit_review_value"] == "link"
+    assert rows[0]["unit_id"] == "count_link"
+    assert rows[0]["unit_review_required"] is False
+    assert rows[0]["unit_review_value"] == ""
 
 
 def test_units_are_pluralized_only_for_display():
     assert display_unit("cup", "1") == "cup"
     assert display_unit("cup", "2") == "cups"
     assert display_unit("leaf", "2") == "leaves"
+    assert display_unit("link", "2") == "links"
     assert display_unit("dash", "2") == "dashes"
     assert display_unit("to taste", "") == "to taste"
 
