@@ -301,7 +301,7 @@ def test_regenerate_ingredients_normalizes_link_as_canonical_count_unit(monkeypa
                     "quantity": "1",
                     "unit": "link",
                     "notes": "sliced",
-                    "store_section": "MEAT & SEAFOOD",
+                    "store_section": "MISC",
                 },
             ],
             "confidence": "medium",
@@ -322,6 +322,7 @@ def test_regenerate_ingredients_normalizes_link_as_canonical_count_unit(monkeypa
     assert ingredient["unit_raw"] == "link"
     assert ingredient["unit_review_required"] is False
     assert ingredient["unit_review_value"] == ""
+    assert ingredient["store_section"] == "MEAT & SEAFOOD"
 
 
 def test_regenerate_ingredients_reclassifies_plain_inca_pepper_as_produce(monkeypatch, tmp_path):

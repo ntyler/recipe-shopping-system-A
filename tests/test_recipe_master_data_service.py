@@ -264,6 +264,7 @@ def test_backfill_ingredient_store_sections_choose_most_common_per_user(monkeypa
 def test_resolve_ingredient_store_section_repairs_generic_or_conflicting_values():
     assert master_data.resolve_ingredient_store_section("4 medium potatoes", "MISC") == "PRODUCE"
     assert master_data.resolve_ingredient_store_section("1 cup crema", "") == "DAIRY & EGGS"
+    assert master_data.resolve_ingredient_store_section("1 link Peruvian chorizo", "MISC") == "MEAT & SEAFOOD"
     assert master_data.resolve_ingredient_store_section("2 cups chicken broth", "MEAT & SEAFOOD") == "CANNED"
     assert master_data.resolve_ingredient_store_section("crema de huancaina sauce", "MISC") == "SAUCES & CONDIMENTS"
     assert master_data.resolve_ingredient_store_section("inca pepper", "SPICES & SEASONINGS") == "PRODUCE"

@@ -112,7 +112,7 @@ INGREDIENT_STORE_SECTION_KEYWORD_RULES = (
     ),
     (
         (
-            r"\b(?:beef|chicken|pork|turkey|fish|shrimp|salmon|sausage|bacon|ham)\b",
+            r"\b(?:beef|chicken|pork|turkey|fish|shrimp|salmon|sausage|chorizo|bacon|ham)\b",
         ),
         "MEAT & SEAFOOD",
     ),
