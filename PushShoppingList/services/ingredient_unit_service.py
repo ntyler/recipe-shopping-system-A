@@ -275,8 +275,10 @@ def _strip_leading_metadata(row):
 def normalize_ingredient_unit_fields(item, *, log_unrecognized=True):
     """Normalize unit metadata in place and return *item*.
 
-    Unknown values are retained in ``unit_raw``/``unit_review_value`` but are
-    never stored as canonical units. The review flag makes ambiguity explicit.
+    Unknown values remain in the recipe-specific ``unit`` field and are also
+    retained in ``unit_raw``/``unit_review_value``. They never receive a
+    canonical ``unit_id``; the review flag makes that distinction explicit
+    without discarding what the recipe or user supplied.
     """
     if not isinstance(item, dict):
         return item
@@ -343,7 +345,9 @@ def normalize_ingredient_unit_fields(item, *, log_unrecognized=True):
             item["unit_id"] = normalized["id"]
             item["unit_custom"] = False
         else:
-            item["unit"] = ""
+            # Unit text belongs to the recipe. Normalization may decline to
+            # assign a canonical ID, but it must not erase the source value.
+            item["unit"] = candidate
             item["unit_id"] = ""
             item["unit_review_required"] = True
             item["unit_review_value"] = candidate

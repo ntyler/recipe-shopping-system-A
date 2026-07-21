@@ -37786,6 +37786,13 @@ function canonicalizeRecipeIngredientUnitControl(input, options = {}) {
     const reviewValue = row ? recipeIngredientDirectField(row, "unit_review_value") : null;
     const customUnit = row ? recipeIngredientDirectField(row, "unit_custom") : null;
     const savedAsCustom = customUnit && String(customUnit.value || "").toLowerCase() === "true";
+    const savedForReview = Boolean(
+        raw
+        && reviewRequired
+        && String(reviewRequired.value || "").toLowerCase() === "true"
+        && reviewValue
+        && recipeIngredientUnitKey(reviewValue.value) === recipeIngredientUnitKey(raw)
+    );
 
     if (unitRaw && raw) {
         unitRaw.value = raw;
@@ -37808,6 +37815,19 @@ function canonicalizeRecipeIngredientUnitControl(input, options = {}) {
         if (reviewRequired) reviewRequired.value = "false";
         if (reviewValue) reviewValue.value = "";
         if (customUnit) customUnit.value = shouldStoreAsCustom ? "true" : "false";
+        return true;
+    }
+    if (savedForReview) {
+        // A recipe-specific unit may be valid source data without having a
+        // canonical registry match. Keep it editable and saveable while the
+        // separate review metadata records that normalization is unresolved.
+        input.setCustomValidity("");
+        input.removeAttribute("aria-invalid");
+        if (unitId) unitId.value = "";
+        if (unitRaw) unitRaw.value = raw;
+        if (reviewRequired) reviewRequired.value = "true";
+        if (reviewValue) reviewValue.value = raw;
+        if (customUnit) customUnit.value = "false";
         return true;
     }
 
@@ -46318,7 +46338,7 @@ function fieldValuesFromRow(row) {
     });
 
     if (unitInput && !unitIsValid) {
-        item.unit = "";
+        item.unit = String(unitInput.value || "").trim();
         item.unit_id = "";
         item.unit_review_required = "true";
         item.unit_review_value = String(unitInput.value || "").trim();

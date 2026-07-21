@@ -9754,6 +9754,9 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
     for item in ingredients:
         if not isinstance(item, dict):
             continue
+        # Normalize a copy for display so legacy rows whose unknown unit was
+        # moved into review metadata regain their recipe-specific unit text.
+        item = normalize_ingredient_unit_fields(dict(item))
 
         store_section, master_record = recipe_edit_store_section_for_ingredient(
             item,

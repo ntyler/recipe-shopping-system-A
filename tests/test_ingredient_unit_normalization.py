@@ -10,6 +10,7 @@ from PushShoppingList.services.ingredient_unit_service import canonical_unit
 from PushShoppingList.services.ingredient_unit_service import display_unit
 from PushShoppingList.services.ingredient_unit_service import misplaced_unit_ingredient_details
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
+from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
 from PushShoppingList.services.recipe_extract_service import parse_structured_ingredient_line
 
@@ -72,7 +73,7 @@ def test_field_placement_examples_are_deterministic(source, expected):
         assert row.get(key, "") == value
 
 
-def test_forbidden_and_unknown_unit_values_never_become_canonical_units(caplog):
+def test_forbidden_values_are_relocated_and_unknown_units_are_preserved_for_review(caplog):
     size = normalize_ingredient_unit_fields({"quantity": "1", "unit": "large", "ingredient": "onion"})
     assert size["unit"] == "piece"
     assert size["size"] == "large"
@@ -86,11 +87,25 @@ def test_forbidden_and_unknown_unit_values_never_become_canonical_units(caplog):
     assert ingredient["unit"] == "piece"
 
     unknown = normalize_ingredient_unit_fields({"quantity": "1", "unit": "heaping", "ingredient": "sugar"})
-    assert unknown["unit"] == ""
+    assert unknown["unit"] == "heaping"
+    assert unknown["unit_id"] == ""
     assert unknown["unit_raw"] == "heaping"
     assert unknown["unit_review_required"] is True
     assert unknown["unit_review_value"] == "heaping"
     assert "requires review" in caplog.text
+
+    previously_normalized = normalize_ingredient_unit_fields({
+        "quantity": "1",
+        "unit": "",
+        "unit_raw": "link",
+        "unit_review_required": True,
+        "unit_review_value": "link",
+        "ingredient": "chorizo",
+    })
+    assert previously_normalized["unit"] == "link"
+    assert previously_normalized["unit_id"] == ""
+    assert previously_normalized["unit_review_required"] is True
+    assert previously_normalized["unit_review_value"] == "link"
 
     cleared = normalize_ingredient_unit_fields({
         "quantity": "1",
@@ -152,7 +167,8 @@ def test_explicit_custom_unit_is_preserved_without_weakening_unknown_unit_review
         "quantity": "1",
         "unit": "scoop",
     }, log_unrecognized=False)
-    assert unknown["unit"] == ""
+    assert unknown["unit"] == "scoop"
+    assert unknown["unit_id"] == ""
     assert unknown["unit_custom"] is False
     assert unknown["unit_review_required"] is True
     assert unknown["unit_review_value"] == "scoop"
@@ -168,8 +184,27 @@ def test_shared_post_extraction_normalizer_covers_aliases_and_review_flags():
     normalize_extracted_ingredient_fields(recipe, source_text="2 tbsp sugar\n1 heaping scoop protein powder")
     assert recipe["ingredients"][0]["unit"] == "tablespoon"
     assert recipe["ingredients"][0]["unit_id"] == "volume_tablespoon"
-    assert recipe["ingredients"][1]["unit"] == ""
+    assert recipe["ingredients"][1]["unit"] == "scoop"
+    assert recipe["ingredients"][1]["unit_id"] == ""
     assert recipe["ingredients"][1]["unit_review_required"] is True
+
+
+def test_editor_load_recovers_legacy_reviewed_unit_without_mutating_master_data(monkeypatch):
+    monkeypatch.setattr(recipe_edit_service, "recipe_edit_ingredient_master_lookup", lambda *args, **kwargs: {})
+    rows = recipe_edit_service.normalize_edit_ingredients([{
+        "ingredient": "Peruvian chorizo",
+        "quantity": "1",
+        "unit": "",
+        "unit_raw": "link",
+        "unit_review_required": True,
+        "unit_review_value": "link",
+    }])
+
+    assert rows[0]["quantity"] == "1"
+    assert rows[0]["unit"] == "link"
+    assert rows[0]["unit_id"] == ""
+    assert rows[0]["unit_review_required"] is True
+    assert rows[0]["unit_review_value"] == "link"
 
 
 def test_units_are_pluralized_only_for_display():
@@ -289,7 +324,8 @@ def test_saved_json_backfill_preserves_quantities_and_records_review(tmp_path):
     assert summary["files_updated"] == 1
     assert updated[0]["quantity"] == "2"
     assert updated[0]["unit"] == "ounce"
-    assert updated[1]["unit"] == ""
+    assert updated[1]["unit"] == "scoop"
+    assert updated[1]["unit_id"] == ""
     assert updated[1]["unit_raw"] == "scoop"
     assert updated[1]["unit_review_required"] is True
 
@@ -407,3 +443,5 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert 'data-field="size"' in app_js
     assert 'data-field="preparation"' in app_js
     assert 'data-field="notes"' in app_js
+    assert "const savedForReview = Boolean(" in app_js
+    assert 'item.unit = String(unitInput.value || "").trim();' in app_js

@@ -286,6 +286,44 @@ def test_regenerate_ingredients_preview_uses_current_editor_context_without_savi
     assert "Preserve clearly useful current ingredient details" not in calls[0]["prompt"]
 
 
+def test_regenerate_ingredients_preserves_noncanonical_recipe_unit_for_review(monkeypatch, tmp_path):
+    configure_inference_storage(monkeypatch, tmp_path)
+    seed_cookbook_and_recipe(recipe_overrides={
+        "recipe_title": "Chaufa Amazonico",
+        "ingredients": [{"ingredient": "old chorizo", "quantity": "1"}],
+    })
+    patch_ingredient_regeneration_response(
+        monkeypatch,
+        payload=json.dumps({
+            "ingredients": [
+                {
+                    "name": "Peruvian chorizo",
+                    "quantity": "1",
+                    "unit": "link",
+                    "notes": "sliced",
+                    "store_section": "MEAT & SEAFOOD",
+                },
+            ],
+            "confidence": "medium",
+        }),
+    )
+
+    result = inference.regenerate_ingredients_for_recipe(
+        SPRING_ROLL_URL,
+        current_recipe={"recipe_title": "Chaufa Amazonico"},
+        preview_only=True,
+    )
+
+    assert result["ok"] is True
+    ingredient = result["ingredients"][0]
+    assert ingredient["quantity"] == "1"
+    assert ingredient["unit"] == "link"
+    assert ingredient["unit_id"] == ""
+    assert ingredient["unit_raw"] == "link"
+    assert ingredient["unit_review_required"] is True
+    assert ingredient["unit_review_value"] == "link"
+
+
 def test_regenerate_ingredients_reclassifies_plain_inca_pepper_as_produce(monkeypatch, tmp_path):
     configure_inference_storage(monkeypatch, tmp_path)
     seed_cookbook_and_recipe(recipe_overrides={
