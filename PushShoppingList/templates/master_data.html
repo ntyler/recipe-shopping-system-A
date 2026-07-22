@@ -195,6 +195,9 @@
                      data-master-misc-reclassification
                      data-reclassify-url="{{ url_for('main_bp.reclassify_misc_ingredient_master_data_route') }}"
                      data-ai-second-opinion-url="{{ url_for('main_bp.reclassify_misc_ingredient_ai_second_opinion_route') }}"
+                     data-reference-url="{{ master_data.ingredient_reference_url }}"
+                     data-scope="{{ master_data.scope }}"
+                     data-user-id="{{ master_data.scope_user_id }}"
                      data-undo-url="{{ master_data.ingredient_store_section_undo_url }}"
                      data-undo-available="{{ 'true' if master_data.latest_store_section_reclassification else 'false' }}"
                      data-undo-batch-id="{{ master_data.latest_store_section_reclassification.batch_id if master_data.latest_store_section_reclassification else '' }}"

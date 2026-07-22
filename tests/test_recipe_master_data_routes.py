@@ -361,6 +361,11 @@ def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_
     seed_master_records()
     user_a_tomato = master_data.master_record_for_name("ingredients", "user-a", "tomato")
     user_b_garlic = master_data.master_record_for_name("ingredients", "user-b", "garlic")
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "UPDATE recipe_ingredients SET preparation = 'diced', notes = 'use ripe tomatoes' WHERE ingredient_id = ?",
+            (user_a_tomato["id"],),
+        )
     metadata_path = users_root / "user-a" / "recipe-extractor" / "data" / "recipe_ingredients.json"
     metadata_path.parent.mkdir(parents=True)
     metadata_path.write_text(
@@ -402,6 +407,8 @@ def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_
     assert admin_payload["total"] == 1
     assert admin_payload["references"][0]["recipe_title"] == "User A Soup"
     assert admin_payload["references"][0]["recipe_url"] == "https://example.com/user-a-soup"
+    assert admin_payload["references"][0]["preparation"] == "diced"
+    assert admin_payload["references"][0]["notes"] == "use ripe tomatoes"
     assert "/recipe/edit?url=https://example.com/user-a-soup" in admin_payload["references"][0]["edit_url"]
     assert "/recipe_cover_image?url=https://example.com/user-a-soup" in admin_payload["references"][0]["recipe_image_url"]
     assert "/recipe_cover_image?url=https://example.com/user-a-soup" in admin_payload["references"][0]["recipe_image_full_url"]
@@ -437,6 +444,7 @@ def test_ingredient_master_data_filters_and_groups_by_store_section(monkeypatch,
 
 def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     root = Path(__file__).resolve().parents[1]
+    template = (root / "PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     script = (root / "PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
     css = (root / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -449,9 +457,16 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "acceptMiscAiSuggestions" in script
     assert "miscReviewDecisionPayload" in script
     assert "function miscReviewIngredientImage(row)" in script
+    assert "function miscReviewReferenceUrl(panel, ingredientId)" in script
+    assert "function miscReviewReferencePanel(row)" in script
+    assert "async function toggleMiscReviewReferences(panel, row)" in script
     assert "imageUrl: text(change.image_url)" in script
     assert "imageUrl: text(opinion.image_url)" in script
     assert 'image.className = "master-data-thumbnail master-data-misc-thumbnail"' in script
+    assert 'name.className = "master-data-misc-ingredient-name"' in script
+    assert 'name.setAttribute("aria-expanded", row.referencesExpanded ? "true" : "false")' in script
+    assert "miscReviewReferencePanel(row)" in script
+    assert 'data-reference-url="{{ master_data.ingredient_reference_url }}"' in template
     assert "requestMiscReclassificationUndo" in script
     assert "panel.dataset.undoBatchId" in script
     assert "AI suggestions for unresolved ingredients are preselected and remain editable." in script
@@ -464,6 +479,8 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert ".master-data-misc-decision-control" in css
     assert ".master-data-misc-ingredient-copy" in css
     assert ".master-data-misc-thumbnail" in css
+    assert ".master-data-misc-ingredient-name" in css
+    assert ".master-data-misc-reference-panel" in css
     assert ".is-accept-ai" in css
     assert ".master-data-action-undo" in css
     decision_start = script.index("function miscReviewDecisionSelect")
@@ -1563,8 +1580,11 @@ def test_master_data_reference_expander_is_wired():
     assert "recipe_image_srcset" in script
     assert "master-data-reference-title-image" in script
     assert "master-data-reference-copy" in script
+    assert "master-data-reference-title-link" in script
     assert "has-title-image" in script
     assert "Open Recipe" in script
+    assert 'details.push(`Preparation: ${reference.preparation}`)' in script
+    assert 'details.push(`Notes: ${reference.notes}`)' in script
     assert "function ensureMasterDataImageLightbox" in script
     assert "function openMasterDataImageLightbox" in script
     assert "function closeMasterDataImageLightbox" in script
@@ -1584,6 +1604,7 @@ def test_master_data_reference_expander_is_wired():
     assert ".master-data-reference-title-row.has-title-image" in css
     assert ".master-data-reference-title-image" in css
     assert ".master-data-reference-copy" in css
+    assert ".master-data-reference-title-link" in css
     assert ".master-data-reference-item" in css
     assert ".master-data-item" in css
     assert ".master-data-item-copy" in css

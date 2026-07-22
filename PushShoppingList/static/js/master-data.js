@@ -562,6 +562,12 @@
         if (reference.original_recipe_text) {
             details.push(reference.original_recipe_text);
         }
+        if (reference.preparation) {
+            details.push(`Preparation: ${reference.preparation}`);
+        }
+        if (reference.notes) {
+            details.push(`Notes: ${reference.notes}`);
+        }
         if (reference.optional) {
             details.push("Optional");
         }
@@ -598,7 +604,13 @@
         const copy = document.createElement("div");
         copy.className = "master-data-reference-copy";
 
-        const title = document.createElement("strong");
+        const title = document.createElement(reference.edit_url ? "a" : "strong");
+        if (reference.edit_url) {
+            title.className = "master-data-reference-title-link";
+            title.href = reference.edit_url;
+            title.target = "_blank";
+            title.rel = "noopener noreferrer";
+        }
         title.textContent = text(reference.recipe_title || reference.recipe_id || "Recipe");
         copy.appendChild(title);
 
@@ -3779,6 +3791,10 @@
             normalizedName: text(change.normalized_name),
             imageUrl: text(change.image_url),
             form: text(change.form),
+            referencesExpanded: false,
+            referencesLoading: false,
+            referencesData: null,
+            referencesError: "",
             deterministic: {
                 storeSection: text(change.proposed_store_section || "MISC"),
                 confidence: Number(change.store_section_confidence),
@@ -3890,13 +3906,101 @@
         return image;
     }
 
-    function miscReviewIngredientCell(row) {
+    function miscReviewReferenceUrl(panel, ingredientId) {
+        const rawUrl = text(panel && panel.dataset.referenceUrl).trim();
+        if (!rawUrl) return "";
+        try {
+            const url = new URL(rawUrl, window.location.origin);
+            url.pathname = url.pathname.replace(/\/0\/references$/, `/${Number(ingredientId) || 0}/references`);
+            const scope = text(panel.dataset.scope).trim();
+            const userId = text(panel.dataset.userId).trim();
+            if (scope) url.searchParams.set("scope", scope);
+            if (userId) url.searchParams.set("user_id", userId);
+            url.searchParams.set("limit", "500");
+            return url.toString();
+        } catch (error) {
+            return "";
+        }
+    }
+
+    function miscReviewReferencePanel(row) {
+        const references = document.createElement("section");
+        references.id = `masterDataMiscReferences-${row.ingredientId}`;
+        references.className = "master-data-reference-panel master-data-misc-reference-panel";
+        references.dataset.masterMiscReferencePanel = String(row.ingredientId);
+        references.setAttribute("aria-live", "polite");
+        references.hidden = !row.referencesExpanded;
+        if (row.referencesLoading) {
+            setReferenceLoading(references);
+        } else if (row.referencesError) {
+            setReferenceError(references, row.referencesError);
+        } else if (row.referencesData) {
+            renderReferences(references, row.referencesData);
+        }
+        return references;
+    }
+
+    async function toggleMiscReviewReferences(panel, row) {
+        const shouldExpand = !row.referencesExpanded;
+        (panel.miscReclassificationRows || []).forEach((candidate) => {
+            candidate.referencesExpanded = candidate === row ? shouldExpand : false;
+        });
+        if (!shouldExpand || row.referencesData || row.referencesLoading) {
+            renderMiscReclassificationRows(panel);
+            return;
+        }
+
+        const referenceUrl = miscReviewReferenceUrl(panel, row.ingredientId);
+        if (!referenceUrl || !window.fetch) {
+            row.referencesError = "Recipe references are not available in this browser.";
+            renderMiscReclassificationRows(panel);
+            return;
+        }
+
+        row.referencesLoading = true;
+        row.referencesError = "";
+        renderMiscReclassificationRows(panel);
+        try {
+            const response = await fetch(referenceUrl, {
+                headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "Recipe references could not be loaded.");
+            }
+            row.referencesData = data;
+        } catch (error) {
+            row.referencesError = error && error.message
+                ? error.message
+                : "Recipe references could not be loaded.";
+        } finally {
+            row.referencesLoading = false;
+            renderMiscReclassificationRows(panel);
+        }
+    }
+
+    function miscReviewIngredientCell(panel, row) {
         const cell = document.createElement("div");
         cell.className = "master-data-misc-review-cell is-ingredient";
         const copy = document.createElement("div");
         copy.className = "master-data-misc-ingredient-copy";
-        const name = document.createElement("strong");
-        name.textContent = miscReviewDisplayName(row.ingredient);
+        const name = document.createElement("button");
+        name.type = "button";
+        name.className = "master-data-misc-ingredient-name";
+        name.setAttribute("aria-expanded", row.referencesExpanded ? "true" : "false");
+        name.setAttribute("aria-controls", `masterDataMiscReferences-${row.ingredientId}`);
+        name.setAttribute(
+            "aria-label",
+            `${row.referencesExpanded ? "Hide" : "Show"} recipes referencing ${miscReviewDisplayName(row.ingredient)}`
+        );
+        const nameText = document.createElement("span");
+        nameText.textContent = miscReviewDisplayName(row.ingredient);
+        const indicator = document.createElement("span");
+        indicator.className = "master-data-misc-ingredient-indicator";
+        indicator.setAttribute("aria-hidden", "true");
+        indicator.textContent = row.referencesExpanded ? "−" : "+";
+        name.append(nameText, indicator);
+        name.addEventListener("click", () => toggleMiscReviewReferences(panel, row));
         const current = document.createElement("span");
         current.className = "master-data-misc-current-label";
         current.textContent = "Currently: Misc";
@@ -3984,10 +4088,11 @@
                 if (row.ai && row.ai.agreement === "disagree") item.classList.add("has-disagreement");
                 item.dataset.ingredientId = String(row.ingredientId);
                 item.append(
-                    miscReviewIngredientCell(row),
+                    miscReviewIngredientCell(panel, row),
                     miscReviewDeterministicCell(row),
                     miscReviewAiCell(panel, row),
-                    miscReviewDecisionSelect(panel, row)
+                    miscReviewDecisionSelect(panel, row),
+                    miscReviewReferencePanel(row)
                 );
                 list.appendChild(item);
             });
@@ -4243,6 +4348,10 @@
                         normalizedName: text(opinion.normalized_name),
                         imageUrl: text(opinion.image_url),
                         form: "",
+                        referencesExpanded: false,
+                        referencesLoading: false,
+                        referencesData: null,
+                        referencesError: "",
                         deterministic: null,
                         ai: null,
                         decisionSection: "",
