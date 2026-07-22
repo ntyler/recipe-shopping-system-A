@@ -417,6 +417,116 @@ def test_misc_reclassification_previews_then_applies_only_unconfirmed_rows(monke
     assert master_data.master_record_for_name("ingredients", "user-a", "ginger")["store_section"] == "MISC"
 
 
+def test_misc_reclassification_applies_reviewed_rule_ai_and_keep_misc_decisions(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/reviewed-sections",
+        recipe_data={"ingredients": [
+            {"ingredient": "Ground ginger", "store_section": "MISC"},
+            {"ingredient": "Mystery crunch", "store_section": "MISC"},
+            {"ingredient": "Unknown morsels", "store_section": "MISC"},
+        ]},
+        user_id="user-a",
+    )
+    ground = master_data.master_record_for_name("ingredients", "user-a", "ground ginger")
+    mystery = master_data.master_record_for_name("ingredients", "user-a", "mystery crunch")
+    unknown = master_data.master_record_for_name("ingredients", "user-a", "unknown morsels")
+    ingredient_ids = [ground["id"], mystery["id"], unknown["id"]]
+    with master_data.recipe_master_connection() as connection:
+        placeholders = ", ".join("?" for _value in ingredient_ids)
+        connection.execute(
+            f"UPDATE ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE id IN ({placeholders})",
+            ingredient_ids,
+        )
+        connection.execute(
+            f"UPDATE recipe_ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE ingredient_id IN ({placeholders})",
+            ingredient_ids,
+        )
+
+    applied = master_data.apply_misc_ingredient_store_section_decisions(
+        "user-a",
+        [
+            {
+                "ingredient_id": ground["id"],
+                "store_section": "Spices",
+                "decision_source": "deterministic",
+                "confidence": 1,
+            },
+            {
+                "ingredient_id": mystery["id"],
+                "store_section": "Sauces & Condiments",
+                "decision_source": "ai",
+                "confidence": 0.74,
+                "reason": "The ingredient is sold as a prepared condiment.",
+            },
+            {
+                "ingredient_id": unknown["id"],
+                "store_section": "Misc",
+                "decision_source": "keep_misc",
+                "confidence": 1,
+            },
+        ],
+    )
+
+    ground_after = master_data.master_record_for_name("ingredients", "user-a", "ground ginger")
+    mystery_after = master_data.master_record_for_name("ingredients", "user-a", "mystery crunch")
+    unknown_after = master_data.master_record_for_name("ingredients", "user-a", "unknown morsels")
+    assert applied["ok"] is True
+    assert applied["changed_count"] == 3
+    assert applied["kept_misc_count"] == 1
+    assert ground_after["store_section"] == "SPICES & SEASONINGS"
+    assert ground_after["store_section_user_confirmed"] == 0
+    assert mystery_after["store_section"] == "SAUCES & CONDIMENTS"
+    assert mystery_after["store_section_source"] == "manual"
+    assert mystery_after["store_section_user_confirmed"] == 1
+    assert unknown_after["store_section"] == "MISC"
+    assert unknown_after["store_section_source"] == "manual"
+    assert unknown_after["store_section_user_confirmed"] == 1
+
+
+def test_misc_reclassification_rejects_stale_rule_batch_before_writing(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/atomic-review",
+        recipe_data={"ingredients": [
+            {"ingredient": "Mystery crunch", "store_section": "MISC"},
+            {"ingredient": "Ground ginger", "store_section": "MISC"},
+        ]},
+        user_id="user-a",
+    )
+    mystery = master_data.master_record_for_name("ingredients", "user-a", "mystery crunch")
+    ground = master_data.master_record_for_name("ingredients", "user-a", "ground ginger")
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "UPDATE ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE id IN (?, ?)",
+            (mystery["id"], ground["id"]),
+        )
+
+    result = master_data.apply_misc_ingredient_store_section_decisions(
+        "user-a",
+        [
+            {
+                "ingredient_id": mystery["id"],
+                "store_section": "Sauces & Condiments",
+                "decision_source": "ai",
+                "confidence": 0.7,
+            },
+            {
+                "ingredient_id": ground["id"],
+                "store_section": "Produce",
+                "decision_source": "deterministic",
+                "confidence": 1,
+            },
+        ],
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == 409
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "mystery crunch"
+    )["store_section"] == "MISC"
+
+
 def test_store_section_classifier_logs_source_confidence_version_and_rule(capsys):
     result = master_data.classify_ingredient_store_section_result("ground ginger")
     output = capsys.readouterr().out

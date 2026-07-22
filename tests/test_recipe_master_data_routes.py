@@ -4,6 +4,7 @@ from pathlib import Path
 from PushShoppingList.app import create_app
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import ingredient_duplicate_review_service as duplicate_reviews
+from PushShoppingList.services import ingredient_store_section_review_service as store_section_reviews
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
 
@@ -166,6 +167,44 @@ def test_misc_reclassification_route_requires_previewable_unconfirmed_rows(monke
     )["store_section"] == "SPICES & SEASONINGS"
 
 
+def test_misc_reclassification_ai_second_opinion_route_is_user_scoped(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    captured = {}
+
+    def fake_review(**kwargs):
+        captured.update(kwargs)
+        return {
+            "ok": True,
+            "scope": kwargs["scope"],
+            "opinion_count": 1,
+            "opinions": [{
+                "ingredient_id": 12,
+                "store_section": "SPICES & SEASONINGS",
+                "agreement": "agree",
+            }],
+        }
+
+    monkeypatch.setattr(
+        store_section_reviews,
+        "review_misc_ingredient_store_sections_with_ai",
+        fake_review,
+    )
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.post(
+            "/api/master-data/ingredients/reclassify-misc/ai-second-opinion",
+            json={"scope": "unresolved", "ingredient_ids": [12]},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json()["opinions"][0]["agreement"] == "agree"
+    assert captured == {
+        "user_id": "user-a",
+        "scope": "unresolved",
+        "ingredient_ids": [12],
+    }
+
+
 def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     seed_master_records()
@@ -213,6 +252,10 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "data-master-misc-reclassification-preview-panel" in all_html
     assert "data-master-misc-reclassification-count" in all_html
     assert "data-master-misc-reclassification-empty" in all_html
+    assert "Get AI Second Opinions" in all_html
+    assert "AI second opinion" in all_html
+    assert "Final decision" in all_html
+    assert "data-ai-second-opinion-url" in all_html
     assert "Apply Changes" in all_html
     assert "/api/master-data/ingredients/reclassify-misc" in all_html
     assert 'data-original-store-section="PRODUCE"' in all_html
@@ -341,11 +384,16 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert '"SPICES & SEASONINGS": "Spices"' in script
     assert '"CANNED": "Canned Goods"' in script
     assert "Classification details" in script
-    assert "Apply ${changedCount} Change" in script
+    assert "MISC_REVIEW_STORE_SECTIONS" in script
+    assert "requestMiscAiSecondOpinions" in script
+    assert "miscReviewDecisionPayload" in script
+    assert "AI review is optional and never changes the final decision automatically." in script
     assert ".master-data-misc-reclassification-header" in css
     assert ".master-data-misc-reclassification-list" in css
     assert ".master-data-section-pill.is-proposed" in css
     assert ".master-data-misc-reclassification-actions" in css
+    assert ".master-data-misc-ai-status" in css
+    assert ".master-data-misc-decision" in css
 
 
 def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch, tmp_path):

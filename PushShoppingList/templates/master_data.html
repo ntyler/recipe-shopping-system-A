@@ -194,6 +194,7 @@
             <section class="master-data-misc-reclassification"
                      data-master-misc-reclassification
                      data-reclassify-url="{{ url_for('main_bp.reclassify_misc_ingredient_master_data_route') }}"
+                     data-ai-second-opinion-url="{{ url_for('main_bp.reclassify_misc_ingredient_ai_second_opinion_route') }}"
                      aria-live="polite">
                 <div class="master-data-misc-reclassification-header">
                     <div class="master-data-misc-reclassification-copy">
@@ -219,8 +220,28 @@
                      data-master-misc-reclassification-preview-panel
                      hidden>
                     <div class="master-data-misc-reclassification-preview-header">
-                        <strong>Proposed changes</strong>
-                        <span data-master-misc-reclassification-count></span>
+                        <div>
+                            <strong>Review decisions</strong>
+                            <span data-master-misc-reclassification-count></span>
+                        </div>
+                        <div class="master-data-misc-reclassification-ai-actions">
+                            <button type="button"
+                                    data-master-misc-ai-review-suggested
+                                    disabled>
+                                Get AI Second Opinions
+                            </button>
+                            <button type="button"
+                                    data-master-misc-ai-review-unresolved
+                                    disabled>
+                                Review Unresolved with AI
+                            </button>
+                        </div>
+                    </div>
+                    <div class="master-data-misc-reclassification-columns" aria-hidden="true">
+                        <span>Ingredient</span>
+                        <span>Rule-based result</span>
+                        <span>AI second opinion</span>
+                        <span>Final decision</span>
                     </div>
                     <ol class="master-data-misc-reclassification-list"
                         data-master-misc-reclassification-list></ol>

@@ -3693,6 +3693,28 @@
         }
     }
 
+    const MISC_REVIEW_STORE_SECTIONS = [
+        "PRODUCE",
+        "MEAT & SEAFOOD",
+        "DAIRY & EGGS",
+        "FROZEN",
+        "DRY GOODS",
+        "PASTA, RICE & GRAINS",
+        "BAKING",
+        "CANNED",
+        "SAUCES & CONDIMENTS",
+        "SNACKS",
+        "BEVERAGES",
+        "SPICES & SEASONINGS",
+        "OILS & VINEGARS",
+        "BAKERY",
+        "DELI",
+        "HOUSEHOLD",
+        "PERSONAL CARE",
+        "PET SUPPLIES",
+        "MISC",
+    ];
+
     function friendlyIngredientStoreSection(value) {
         const section = text(value).trim().toUpperCase();
         const labels = {
@@ -3719,113 +3741,323 @@
         return labels[section] || text(value).trim() || "Misc";
     }
 
-    function renderMiscReclassification(panel, data) {
-        const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
+    function miscReviewDisplayName(value) {
+        const name = text(value).trim();
+        return name ? `${name.charAt(0).toUpperCase()}${name.slice(1)}` : "Ingredient";
+    }
+
+    function miscReviewSectionPill(section, className = "is-proposed") {
+        const pill = document.createElement("span");
+        pill.className = `master-data-section-pill ${className}`;
+        pill.textContent = friendlyIngredientStoreSection(section);
+        return pill;
+    }
+
+    function miscReviewConfidence(value) {
+        const confidence = Number(value);
+        return Number.isFinite(confidence) ? `${Math.round(confidence * 100)}% confidence` : "";
+    }
+
+    function miscReviewDetails(parts) {
+        const values = parts.filter(Boolean);
+        if (!values.length) return null;
+        const details = document.createElement("details");
+        details.className = "master-data-misc-reclassification-details";
+        const summary = document.createElement("summary");
+        summary.textContent = "Classification details";
+        const detailText = document.createElement("code");
+        detailText.textContent = values.join(" · ");
+        details.append(summary, detailText);
+        return details;
+    }
+
+    function miscReviewRowsFromPreview(data) {
+        const changes = Array.isArray(data && data.changes) ? data.changes : [];
+        return changes.map((change) => ({
+            ingredientId: Number(change.ingredient_id) || 0,
+            ingredient: text(change.ingredient || change.normalized_name || "Ingredient"),
+            normalizedName: text(change.normalized_name),
+            form: text(change.form),
+            deterministic: {
+                storeSection: text(change.proposed_store_section || "MISC"),
+                confidence: Number(change.store_section_confidence),
+                reason: text(change.reason || "Matched a store-section classification rule."),
+                rule: text(change.rule),
+                source: text(change.store_section_source),
+            },
+            ai: null,
+            decisionSection: text(change.proposed_store_section || "MISC"),
+            decisionSource: "deterministic",
+            requiresDecision: false,
+        }));
+    }
+
+    function miscReviewDecisionSource(row, section) {
+        if (row.deterministic && section === row.deterministic.storeSection) return "deterministic";
+        if (row.ai && section === row.ai.storeSection) return "ai";
+        return section === "MISC" ? "keep_misc" : "manual";
+    }
+
+    function miscReviewDecisionSelect(panel, row) {
+        const wrap = document.createElement("div");
+        wrap.className = "master-data-misc-review-cell master-data-misc-decision is-decision";
+        const label = document.createElement("label");
+        label.className = "sr-only";
+        label.textContent = `Final store section for ${miscReviewDisplayName(row.ingredient)}`;
+        const select = document.createElement("select");
+        select.dataset.masterMiscDecision = String(row.ingredientId);
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = row.deterministic ? "Choose a final result" : "Skip for now";
+        select.appendChild(placeholder);
+
+        const sections = [];
+        if (row.deterministic) sections.push(row.deterministic.storeSection);
+        if (row.ai && row.ai.storeSection !== "MISC" && !sections.includes(row.ai.storeSection)) {
+            sections.push(row.ai.storeSection);
+        }
+        sections.forEach((section) => {
+            const option = document.createElement("option");
+            option.value = section;
+            const agrees = row.ai && row.deterministic && row.ai.storeSection === row.deterministic.storeSection;
+            const sourceLabel = agrees
+                ? "rules + AI"
+                : row.deterministic && section === row.deterministic.storeSection
+                    ? "rule-based"
+                    : "AI opinion";
+            option.textContent = `${friendlyIngredientStoreSection(section)} (${sourceLabel})`;
+            select.appendChild(option);
+        });
+        const otherSections = MISC_REVIEW_STORE_SECTIONS.filter(
+            (section) => section !== "MISC" && !sections.includes(section)
+        );
+        if (otherSections.length) {
+            const group = document.createElement("optgroup");
+            group.label = "Choose another section";
+            otherSections.forEach((section) => {
+                const option = document.createElement("option");
+                option.value = section;
+                option.textContent = friendlyIngredientStoreSection(section);
+                group.appendChild(option);
+            });
+            select.appendChild(group);
+        }
+        const keep = document.createElement("option");
+        keep.value = "MISC";
+        keep.textContent = "Keep in Misc";
+        select.appendChild(keep);
+        select.value = row.decisionSection || "";
+        select.addEventListener("change", () => {
+            row.decisionSection = select.value;
+            row.decisionSource = miscReviewDecisionSource(row, select.value);
+            row.requiresDecision = false;
+            renderMiscReclassificationRows(panel);
+        });
+        label.appendChild(select);
+        wrap.appendChild(label);
+        if (row.requiresDecision && !row.decisionSection) {
+            const warning = document.createElement("small");
+            warning.textContent = "AI disagrees—choose the final section.";
+            wrap.appendChild(warning);
+        }
+        return wrap;
+    }
+
+    function miscReviewIngredientCell(row) {
+        const cell = document.createElement("div");
+        cell.className = "master-data-misc-review-cell is-ingredient";
+        const name = document.createElement("strong");
+        name.textContent = miscReviewDisplayName(row.ingredient);
+        const current = document.createElement("span");
+        current.className = "master-data-misc-current-label";
+        current.textContent = "Currently: Misc";
+        cell.append(name, current);
+        return cell;
+    }
+
+    function miscReviewDeterministicCell(row) {
+        const cell = document.createElement("div");
+        cell.className = "master-data-misc-review-cell is-classification";
+        if (!row.deterministic) {
+            const empty = document.createElement("span");
+            empty.className = "master-data-misc-no-result";
+            empty.textContent = "No confident rule match";
+            cell.appendChild(empty);
+            return cell;
+        }
+        const result = document.createElement("div");
+        result.className = "master-data-misc-classification-result";
+        result.appendChild(miscReviewSectionPill(row.deterministic.storeSection));
+        const confidence = document.createElement("span");
+        confidence.textContent = miscReviewConfidence(row.deterministic.confidence);
+        result.appendChild(confidence);
+        const reason = document.createElement("p");
+        reason.textContent = row.deterministic.reason;
+        cell.append(result, reason);
+        const details = miscReviewDetails([
+            row.deterministic.source ? `Source: ${row.deterministic.source.replaceAll("_", " ")}` : "",
+            row.deterministic.rule ? `Rule: ${row.deterministic.rule}` : "",
+        ]);
+        if (details) cell.appendChild(details);
+        return cell;
+    }
+
+    function miscReviewAiCell(panel, row) {
+        const cell = document.createElement("div");
+        cell.className = "master-data-misc-review-cell is-ai";
+        if (!row.ai) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "master-data-misc-row-ai-button";
+            button.textContent = "Ask AI";
+            button.addEventListener("click", () => requestMiscAiSecondOpinions(panel, "all", [row.ingredientId], button));
+            cell.appendChild(button);
+            return cell;
+        }
+        const status = document.createElement("span");
+        status.className = `master-data-misc-ai-status is-${row.ai.agreement}`;
+        status.textContent = row.ai.agreement === "agree"
+            ? "Agrees"
+            : row.ai.agreement === "disagree"
+                ? "Disagrees"
+                : "AI suggestion";
+        const result = document.createElement("div");
+        result.className = "master-data-misc-classification-result";
+        result.appendChild(miscReviewSectionPill(row.ai.storeSection, "is-ai"));
+        const confidence = document.createElement("span");
+        confidence.textContent = miscReviewConfidence(row.ai.confidence);
+        result.appendChild(confidence);
+        const reason = document.createElement("p");
+        reason.textContent = row.ai.reason;
+        cell.append(status, result, reason);
+        const details = miscReviewDetails([
+            row.ai.model ? `Model: ${row.ai.model}` : "",
+            row.ai.generatedAt ? `Reviewed: ${row.ai.generatedAt}` : "",
+        ]);
+        if (details) cell.appendChild(details);
+        return cell;
+    }
+
+    function renderMiscReclassificationRows(panel) {
         const list = panel.querySelector("[data-master-misc-reclassification-list]");
-        const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
-        const previewPanel = panel.querySelector("[data-master-misc-reclassification-preview-panel]");
         const count = panel.querySelector("[data-master-misc-reclassification-count]");
         const empty = panel.querySelector("[data-master-misc-reclassification-empty]");
-        const changes = Array.isArray(data && data.changes) ? data.changes : [];
-        const reviewedCount = Number(data && data.reviewed_count) || 0;
-        const changedCount = Number(data && data.changed_count) || changes.length;
-
-        if (summary) {
-            summary.textContent = data && data.applied
-                ? `Applied ${changedCount} change${changedCount === 1 ? "" : "s"} to Ingredient Master Data.`
-                : changedCount
-                    ? `${changedCount} suggested change${changedCount === 1 ? "" : "s"} found across ${reviewedCount} unconfirmed Misc ingredient${reviewedCount === 1 ? "" : "s"}. Review them below before applying.`
-                    : `Reviewed ${reviewedCount} unconfirmed Misc ingredient${reviewedCount === 1 ? "" : "s"}; no automatic changes are available.`;
-        }
-        if (count) {
-            count.textContent = `${changedCount} suggested change${changedCount === 1 ? "" : "s"}`;
-        }
+        const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
+        const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
+        const rows = Array.isArray(panel.miscReclassificationRows) ? panel.miscReclassificationRows : [];
         if (list) {
             list.replaceChildren();
-            changes.slice(0, 20).forEach((change) => {
+            rows.forEach((row) => {
                 const item = document.createElement("li");
                 item.className = "master-data-misc-reclassification-item";
-                const rawName = text(change.ingredient || change.normalized_name || "Ingredient").trim();
-                const name = rawName ? `${rawName.charAt(0).toUpperCase()}${rawName.slice(1)}` : "Ingredient";
-                const section = friendlyIngredientStoreSection(change.proposed_store_section || "MISC");
-                const reason = text(change.reason || "Matched a store-section classification rule.");
-                const result = document.createElement("div");
-                result.className = "master-data-misc-reclassification-result";
-
-                const ingredient = document.createElement("strong");
-                ingredient.textContent = name;
-                const direction = document.createElement("div");
-                direction.className = "master-data-misc-reclassification-direction";
-                direction.setAttribute("aria-label", `${name} changes from Misc to ${section}`);
-                const current = document.createElement("span");
-                current.className = "master-data-section-pill is-current";
-                current.textContent = "Misc";
-                const arrow = document.createElement("span");
-                arrow.className = "master-data-section-arrow";
-                arrow.setAttribute("aria-hidden", "true");
-                arrow.textContent = "→";
-                const proposed = document.createElement("span");
-                proposed.className = "master-data-section-pill is-proposed";
-                proposed.textContent = section;
-                direction.append(current, arrow, proposed);
-                result.append(ingredient, direction);
-
-                const explanation = document.createElement("p");
-                explanation.textContent = reason;
-                item.append(result, explanation);
-
-                const rule = text(change.rule);
-                const source = text(change.store_section_source).replaceAll("_", " ");
-                const confidence = Number(change.store_section_confidence);
-                if (rule || source || Number.isFinite(confidence)) {
-                    const details = document.createElement("details");
-                    details.className = "master-data-misc-reclassification-details";
-                    const detailsSummary = document.createElement("summary");
-                    detailsSummary.textContent = "Classification details";
-                    const detailText = document.createElement("code");
-                    const detailParts = [];
-                    if (source) detailParts.push(`Source: ${source}`);
-                    if (Number.isFinite(confidence)) detailParts.push(`Confidence: ${Math.round(confidence * 100)}%`);
-                    if (rule) detailParts.push(`Rule: ${rule}`);
-                    detailText.textContent = detailParts.join(" · ");
-                    details.append(detailsSummary, detailText);
-                    item.append(details);
-                }
+                if (row.ai && row.ai.agreement === "disagree") item.classList.add("has-disagreement");
+                item.dataset.ingredientId = String(row.ingredientId);
+                item.append(
+                    miscReviewIngredientCell(row),
+                    miscReviewDeterministicCell(row),
+                    miscReviewAiCell(panel, row),
+                    miscReviewDecisionSelect(panel, row)
+                );
                 list.appendChild(item);
             });
-            if (changes.length > 20) {
-                const more = document.createElement("li");
-                more.className = "master-data-misc-reclassification-more";
-                more.textContent = `+${changes.length - 20} more proposed changes`;
-                list.appendChild(more);
-            }
-            list.hidden = !changes.length;
+            list.hidden = !rows.length;
         }
-        if (empty) empty.hidden = Boolean(changes.length);
-        if (previewPanel) previewPanel.hidden = false;
-        panel.classList.toggle("is-applied", Boolean(data && data.applied));
-        panel.dataset.miscPreviewReady = data && !data.applied && changedCount > 0 ? "true" : "false";
+        if (empty) empty.hidden = Boolean(rows.length);
+        const selectedDecisions = rows.filter((row) => row.decisionSection);
+        const unresolvedDecisions = rows.filter((row) => row.requiresDecision && !row.decisionSection);
+        if (count) {
+            const unresolvedLabel = panel.miscUnresolvedCount
+                ? ` · ${panel.miscUnresolvedCount} without a rule match`
+                : "";
+            count.textContent = `${rows.length} review row${rows.length === 1 ? "" : "s"}${unresolvedLabel}`;
+        }
+        panel.dataset.miscPreviewReady = selectedDecisions.length && !unresolvedDecisions.length ? "true" : "false";
         if (applyButton) {
             applyButton.disabled = panel.dataset.miscPreviewReady !== "true";
-            applyButton.textContent = data && data.applied
-                ? "Applied"
-                : changedCount
-                    ? `Apply ${changedCount} Change${changedCount === 1 ? "" : "s"}`
-                    : "Apply Changes";
+            applyButton.textContent = selectedDecisions.length
+                ? `Apply ${selectedDecisions.length} Decision${selectedDecisions.length === 1 ? "" : "s"}`
+                : "Apply Changes";
         }
+        if (summary && panel.dataset.miscApplied !== "true") {
+            summary.textContent = unresolvedDecisions.length
+                ? `${unresolvedDecisions.length} AI disagreement${unresolvedDecisions.length === 1 ? " requires" : "s require"} a final decision before applying.`
+                : `${selectedDecisions.length} decision${selectedDecisions.length === 1 ? " is" : "s are"} selected. AI review is optional and never changes the final decision automatically.`;
+        }
+    }
+
+    function renderMiscReclassification(panel, data) {
+        const previewPanel = panel.querySelector("[data-master-misc-reclassification-preview-panel]");
+        const suggestedAiButton = panel.querySelector("[data-master-misc-ai-review-suggested]");
+        const unresolvedAiButton = panel.querySelector("[data-master-misc-ai-review-unresolved]");
+        panel.miscReclassificationRows = miscReviewRowsFromPreview(data);
+        panel.miscUnresolvedCount = Number(data && data.unresolved_count) || 0;
+        panel.dataset.miscApplied = data && data.applied ? "true" : "false";
+        panel.classList.toggle("is-applied", Boolean(data && data.applied));
+        if (previewPanel) previewPanel.hidden = false;
+        if (suggestedAiButton) {
+            suggestedAiButton.disabled = !panel.miscReclassificationRows.length;
+            suggestedAiButton.textContent = "Get AI Second Opinions";
+        }
+        if (unresolvedAiButton) {
+            unresolvedAiButton.disabled = !panel.miscUnresolvedCount;
+            unresolvedAiButton.textContent = panel.miscUnresolvedCount
+                ? `Review ${panel.miscUnresolvedCount} Unresolved with AI`
+                : "No Unresolved Ingredients";
+        }
+        renderMiscReclassificationRows(panel);
+    }
+
+    function miscReviewDecisionPayload(panel) {
+        return (panel.miscReclassificationRows || [])
+            .filter((row) => row.decisionSection)
+            .map((row) => {
+                const opinion = row.decisionSource === "ai"
+                    ? row.ai
+                    : row.decisionSource === "deterministic"
+                        ? row.deterministic
+                        : null;
+                return {
+                    ingredient_id: row.ingredientId,
+                    store_section: row.decisionSection,
+                    decision_source: row.decisionSource,
+                    confidence: opinion ? opinion.confidence : 1,
+                    reason: opinion
+                        ? opinion.reason
+                        : row.decisionSection === "MISC"
+                            ? "User confirmed that this ingredient should remain in Misc."
+                            : "User selected the final store section during maintenance.",
+                };
+            });
+    }
+
+    function setMiscReviewBusy(panel, busy) {
+        panel.setAttribute("aria-busy", busy ? "true" : "false");
+        panel.querySelectorAll("button, select").forEach((control) => {
+            control.disabled = Boolean(busy);
+        });
+    }
+
+    function restoreMiscReviewControls(panel) {
+        const previewButton = panel.querySelector("[data-master-misc-reclassification-preview]");
+        const suggestedAiButton = panel.querySelector("[data-master-misc-ai-review-suggested]");
+        const unresolvedAiButton = panel.querySelector("[data-master-misc-ai-review-unresolved]");
+        panel.setAttribute("aria-busy", "false");
+        if (previewButton) previewButton.disabled = false;
+        if (suggestedAiButton) {
+            suggestedAiButton.disabled = !(panel.miscReclassificationRows || []).some((row) => row.deterministic);
+        }
+        if (unresolvedAiButton) unresolvedAiButton.disabled = !panel.miscUnresolvedCount;
+        renderMiscReclassificationRows(panel);
     }
 
     async function requestMiscReclassification(panel, apply) {
         const previewButton = panel.querySelector("[data-master-misc-reclassification-preview]");
         const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
         const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
-        [previewButton, applyButton].forEach((button) => {
-            if (button) button.disabled = true;
-        });
+        setMiscReviewBusy(panel, true);
         if (previewButton) previewButton.textContent = apply ? "Preview Changes" : "Previewing...";
         if (applyButton && apply) applyButton.textContent = "Applying...";
-        panel.setAttribute("aria-busy", "true");
-        if (summary) summary.textContent = apply ? "Applying reviewed changes…" : "Reviewing unconfirmed Misc ingredients…";
+        if (summary) summary.textContent = apply ? "Applying reviewed decisions…" : "Reviewing unconfirmed Misc ingredients…";
         try {
             const response = await fetch(panel.dataset.reclassifyUrl, {
                 method: "POST",
@@ -3834,25 +4066,106 @@
                     "Content-Type": "application/json",
                     "X-Requested-With": "fetch",
                 },
-                body: JSON.stringify({ apply }),
+                body: JSON.stringify({
+                    apply,
+                    ...(apply ? { decisions: miscReviewDecisionPayload(panel) } : {}),
+                }),
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || data.ok === false) {
                 throw new Error(data.error || "Misc ingredient reclassification failed.");
             }
-            renderMiscReclassification(panel, data);
-            if (data.applied && data.changed_count) {
+            if (data.applied) {
+                panel.dataset.miscApplied = "true";
+                panel.classList.add("is-applied");
+                if (summary) summary.textContent = `Applied ${Number(data.changed_count) || 0} reviewed change${Number(data.changed_count) === 1 ? "" : "s"} to Ingredient Master Data.`;
+                if (applyButton) {
+                    applyButton.textContent = "Applied";
+                    applyButton.disabled = true;
+                }
                 window.setTimeout(() => window.location.reload(), REFRESH_DELAY_MS);
+            } else {
+                renderMiscReclassification(panel, data);
             }
         } catch (error) {
             panel.dataset.miscPreviewReady = "false";
             if (summary) summary.textContent = error && error.message ? error.message : "Misc ingredient reclassification failed.";
-            if (applyButton) applyButton.textContent = "Apply Changes";
         } finally {
-            panel.setAttribute("aria-busy", "false");
-            if (previewButton) previewButton.textContent = "Preview Changes";
-            if (previewButton) previewButton.disabled = false;
-            if (applyButton) applyButton.disabled = panel.dataset.miscPreviewReady !== "true";
+            if (previewButton) {
+                previewButton.textContent = "Preview Changes";
+            }
+            if (panel.dataset.miscApplied !== "true") restoreMiscReviewControls(panel);
+        }
+    }
+
+    async function requestMiscAiSecondOpinions(panel, scope, ingredientIds, trigger) {
+        const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
+        const originalLabel = trigger ? trigger.textContent : "";
+        setMiscReviewBusy(panel, true);
+        if (trigger) trigger.textContent = "Asking AI…";
+        if (summary) summary.textContent = "Getting independent AI store-section opinions…";
+        try {
+            const response = await fetch(panel.dataset.aiSecondOpinionUrl, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({ scope, ingredient_ids: ingredientIds || [] }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || "AI second opinions are unavailable.");
+            }
+            const rows = panel.miscReclassificationRows || [];
+            (Array.isArray(data.opinions) ? data.opinions : []).forEach((opinion) => {
+                const ingredientId = Number(opinion.ingredient_id) || 0;
+                let row = rows.find((candidate) => candidate.ingredientId === ingredientId);
+                if (!row) {
+                    row = {
+                        ingredientId,
+                        ingredient: text(opinion.ingredient || opinion.normalized_name || "Ingredient"),
+                        normalizedName: text(opinion.normalized_name),
+                        form: "",
+                        deterministic: null,
+                        ai: null,
+                        decisionSection: "",
+                        decisionSource: "",
+                        requiresDecision: false,
+                    };
+                    rows.push(row);
+                }
+                if (!row) return;
+                row.ai = {
+                    storeSection: text(opinion.store_section),
+                    confidence: Number(opinion.confidence),
+                    reason: text(opinion.reason),
+                    agreement: text(opinion.agreement || "suggestion"),
+                    model: text(opinion.model),
+                    generatedAt: text(opinion.generated_at),
+                };
+                if (row.deterministic && row.ai.storeSection !== row.deterministic.storeSection) {
+                    row.decisionSection = "";
+                    row.decisionSource = "";
+                    row.requiresDecision = true;
+                }
+            });
+            panel.miscReclassificationRows = rows;
+            renderMiscReclassificationRows(panel);
+            if (summary && Number(data.missing_opinion_count)) {
+                summary.textContent = `AI reviewed ${Number(data.opinion_count) || 0} ingredient${Number(data.opinion_count) === 1 ? "" : "s"}; ${Number(data.missing_opinion_count)} did not return a valid opinion.`;
+            }
+            if (trigger) {
+                trigger.textContent = scope === "unresolved"
+                    ? `AI Reviewed ${Number(data.opinion_count) || 0} Unresolved`
+                    : "AI Opinions Added";
+            }
+        } catch (error) {
+            if (summary) summary.textContent = error && error.message ? error.message : "AI second opinions are unavailable.";
+            if (trigger) trigger.textContent = originalLabel;
+        } finally {
+            restoreMiscReviewControls(panel);
         }
     }
 
@@ -3861,14 +4174,25 @@
         if (!panel || !window.fetch) return;
         const previewButton = panel.querySelector("[data-master-misc-reclassification-preview]");
         const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
-        if (previewButton) {
-            previewButton.addEventListener("click", () => requestMiscReclassification(panel, false));
-        }
+        const suggestedAiButton = panel.querySelector("[data-master-misc-ai-review-suggested]");
+        const unresolvedAiButton = panel.querySelector("[data-master-misc-ai-review-unresolved]");
+        if (previewButton) previewButton.addEventListener("click", () => requestMiscReclassification(panel, false));
         if (applyButton) {
             applyButton.addEventListener("click", () => {
-                if (panel.dataset.miscPreviewReady === "true") {
-                    requestMiscReclassification(panel, true);
-                }
+                if (panel.dataset.miscPreviewReady === "true") requestMiscReclassification(panel, true);
+            });
+        }
+        if (suggestedAiButton) {
+            suggestedAiButton.addEventListener("click", () => {
+                const ingredientIds = (panel.miscReclassificationRows || [])
+                    .filter((row) => row.deterministic)
+                    .map((row) => row.ingredientId);
+                requestMiscAiSecondOpinions(panel, "suggested", ingredientIds, suggestedAiButton);
+            });
+        }
+        if (unresolvedAiButton) {
+            unresolvedAiButton.addEventListener("click", () => {
+                requestMiscAiSecondOpinions(panel, "unresolved", [], unresolvedAiButton);
             });
         }
     }

@@ -25585,6 +25585,59 @@ img[data-deferred-src] {
             font-weight: 800;
         }
 
+        .master-data-misc-reclassification-preview-header > div:first-child {
+            display: grid;
+            gap: 3px;
+        }
+
+        .master-data-misc-reclassification-ai-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .master-data-misc-reclassification-ai-actions button,
+        .master-data-misc-row-ai-button {
+            min-height: 34px;
+            padding: 0 11px;
+            border: 1px solid #496da0;
+            border-radius: 7px;
+            background: #172a48;
+            color: #dceaff;
+            font-size: 12px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .master-data-misc-reclassification-ai-actions button:is(:hover, :focus-visible),
+        .master-data-misc-row-ai-button:is(:hover, :focus-visible) {
+            border-color: #769bd1;
+            background: #203b66;
+        }
+
+        .master-data-misc-reclassification-ai-actions button:disabled,
+        .master-data-misc-row-ai-button:disabled {
+            cursor: not-allowed;
+            opacity: .46;
+        }
+
+        .master-data-misc-reclassification-columns,
+        .master-data-misc-reclassification-item {
+            display: grid;
+            grid-template-columns: minmax(150px, .9fr) minmax(210px, 1.3fr) minmax(210px, 1.3fr) minmax(170px, .9fr);
+            gap: 14px;
+        }
+
+        .master-data-misc-reclassification-columns {
+            padding: 0 14px;
+            color: #7890a2;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+
         .master-data-misc-reclassification-list {
             display: grid;
             gap: 8px;
@@ -25598,12 +25651,124 @@ img[data-deferred-src] {
         }
 
         .master-data-misc-reclassification-item {
-            display: grid;
-            gap: 7px;
+            align-items: start;
             padding: 12px 14px;
             border: 1px solid #263e51;
             border-radius: 8px;
             background: rgba(10, 24, 35, .86);
+        }
+
+        .master-data-misc-reclassification-item.has-disagreement {
+            border-color: #a86f24;
+            box-shadow: inset 3px 0 0 #d3943d;
+        }
+
+        .master-data-misc-review-cell {
+            display: grid;
+            align-content: start;
+            gap: 7px;
+            min-width: 0;
+        }
+
+        .master-data-misc-review-cell::before {
+            display: none;
+        }
+
+        .master-data-misc-review-cell.is-ingredient > strong {
+            color: #f8fafc;
+            font-size: 14px;
+            line-height: 1.3;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-misc-current-label,
+        .master-data-misc-no-result {
+            color: #879bab;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .master-data-misc-no-result {
+            display: inline-flex;
+            min-height: 30px;
+            align-items: center;
+            padding: 0 9px;
+            border: 1px dashed #425667;
+            border-radius: 7px;
+        }
+
+        .master-data-misc-classification-result {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .master-data-misc-classification-result > span:last-child:not(.master-data-section-pill) {
+            color: #92a8b8;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .master-data-misc-review-cell > p {
+            margin: 0;
+            color: #aec0cd;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .master-data-misc-ai-status {
+            display: inline-flex;
+            width: max-content;
+            min-height: 23px;
+            align-items: center;
+            padding: 0 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .master-data-misc-ai-status.is-agree {
+            background: #0a4936;
+            color: #bbf7d0;
+        }
+
+        .master-data-misc-ai-status.is-disagree {
+            background: #5a3510;
+            color: #fde0a3;
+        }
+
+        .master-data-misc-ai-status.is-suggestion,
+        .master-data-misc-ai-status.is-unresolved {
+            background: #243b66;
+            color: #d6e5ff;
+        }
+
+        .master-data-section-pill.is-ai {
+            border: 1px solid #657fbd;
+            background: #22375e;
+            color: #dce8ff;
+        }
+
+        .master-data-misc-decision select {
+            width: 100%;
+            min-height: 38px;
+            padding: 7px 30px 7px 9px;
+            border: 1px solid #536879;
+            border-radius: 7px;
+            background: #111d27;
+            color: #eef5fa;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .master-data-misc-decision small {
+            color: #f2c16d;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.35;
         }
 
         .master-data-misc-reclassification-result {
@@ -28492,6 +28657,42 @@ img[data-deferred-src] {
             font-weight: 900;
         }
 
+        @media (max-width: 1200px) {
+            .master-data-misc-reclassification-columns {
+                display: none;
+            }
+
+            .master-data-misc-reclassification-item {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                row-gap: 16px;
+            }
+
+            .master-data-misc-review-cell::before {
+                display: block;
+                color: #71899a;
+                font-size: 9px;
+                font-weight: 900;
+                letter-spacing: .06em;
+                text-transform: uppercase;
+            }
+
+            .master-data-misc-review-cell.is-ingredient::before {
+                content: "Ingredient";
+            }
+
+            .master-data-misc-review-cell.is-classification::before {
+                content: "Rule-based result";
+            }
+
+            .master-data-misc-review-cell.is-ai::before {
+                content: "AI second opinion";
+            }
+
+            .master-data-misc-review-cell.is-decision::before {
+                content: "Final decision";
+            }
+        }
+
         @media (max-width: 860px) {
             .master-data-header,
             .master-data-status {
@@ -28499,9 +28700,13 @@ img[data-deferred-src] {
             }
 
             .master-data-misc-reclassification-header,
-            .master-data-misc-reclassification-result {
+            .master-data-misc-reclassification-preview-header {
                 display: grid;
                 align-items: stretch;
+            }
+
+            .master-data-misc-reclassification-item {
+                grid-template-columns: 1fr;
             }
 
             .master-data-misc-reclassification-actions {
@@ -28514,8 +28719,9 @@ img[data-deferred-src] {
                 width: 100%;
             }
 
-            .master-data-misc-reclassification-direction {
+            .master-data-misc-reclassification-ai-actions {
                 justify-content: flex-start;
+                flex-wrap: wrap;
             }
 
             .master-data-header {
@@ -28643,13 +28849,13 @@ img[data-deferred-src] {
                 grid-template-columns: 1fr;
             }
 
-            .master-data-misc-reclassification-preview-header {
+            .master-data-misc-reclassification-ai-actions {
                 display: grid;
-                gap: 3px;
+                grid-template-columns: 1fr;
             }
 
-            .master-data-misc-reclassification-direction {
-                flex-wrap: wrap;
+            .master-data-misc-reclassification-ai-actions button {
+                width: 100%;
             }
 
             .master-data-backfill-metrics {

@@ -2203,7 +2203,336 @@ def review_misc_ingredient_store_sections(user_id=None, apply=False):
         "user_id": scoped_user_id,
         "reviewed_count": len(rows),
         "changed_count": len(changes),
+        "unresolved_count": max(0, len(rows) - len(changes)),
         "changes": changes,
+    }
+
+
+def misc_ingredient_store_section_review_candidates(
+    user_id=None,
+    scope="all",
+    ingredient_ids=None,
+    limit=100,
+):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    scope = clean_text(scope).lower()
+    if scope not in {"all", "suggested", "unresolved"}:
+        scope = "all"
+    try:
+        limit = max(1, min(100, int(limit or 100)))
+    except (TypeError, ValueError):
+        limit = 100
+    selected_ids = set()
+    id_filter_requested = bool(ingredient_ids)
+    for value in ingredient_ids or []:
+        try:
+            ingredient_id = int(value or 0)
+        except (TypeError, ValueError):
+            ingredient_id = 0
+        if ingredient_id > 0:
+            selected_ids.add(ingredient_id)
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {"ok": False, "error": "Recipe master database was not found."}
+        params = [scoped_user_id]
+        id_clause = ""
+        if id_filter_requested and not selected_ids:
+            return {
+                "ok": True,
+                "user_id": scoped_user_id,
+                "scope": scope,
+                "candidate_count": 0,
+                "candidates": [],
+            }
+        if selected_ids:
+            placeholders = ", ".join("?" for _value in selected_ids)
+            id_clause = f"AND id IN ({placeholders})"
+            params.extend(sorted(selected_ids))
+        rows = connection.execute(
+            f"""
+            SELECT *
+              FROM ingredients
+             WHERE user_id = ?
+               AND COALESCE(NULLIF(TRIM(store_section), ''), 'MISC') = 'MISC'
+               AND COALESCE(store_section_user_confirmed, 0) = 0
+               {id_clause}
+             ORDER BY normalized_name ASC, id ASC
+            """,
+            params,
+        ).fetchall()
+
+        candidates = []
+        for row in rows:
+            row_data = dict(row)
+            result = classify_ingredient_store_section_result(
+                {
+                    "raw_name": row_data.get("name"),
+                    "normalized_name": row_data.get("normalized_name"),
+                    "canonical_ingredient": row_data.get("canonical_ingredient"),
+                    "form": row_data.get("form"),
+                },
+                default="MISC",
+                log_result=False,
+            )
+            has_suggestion = result["store_section"] != "MISC"
+            if scope == "suggested" and not has_suggestion:
+                continue
+            if scope == "unresolved" and has_suggestion:
+                continue
+            candidates.append({
+                "ingredient_id": int(row_data["id"]),
+                "ingredient": clean_text(row_data.get("name")),
+                "normalized_name": clean_text(result.get("normalized_name")),
+                "canonical_ingredient": clean_text(result.get("canonical_ingredient")),
+                "form": clean_text(result.get("form")),
+                "current_store_section": "MISC",
+                "deterministic": (
+                    {
+                        "store_section": result["store_section"],
+                        "confidence": result["store_section_confidence"],
+                        "reason": result["store_section_reason"],
+                        "rule": result["store_section_rule"],
+                        "source": result["store_section_source"],
+                    }
+                    if has_suggestion
+                    else None
+                ),
+                "recipe_context": [],
+            })
+            if len(candidates) >= limit:
+                break
+
+        candidate_by_id = {
+            candidate["ingredient_id"]: candidate
+            for candidate in candidates
+        }
+        if candidate_by_id:
+            placeholders = ", ".join("?" for _value in candidate_by_id)
+            context_rows = connection.execute(
+                f"""
+                SELECT ingredient_id, recipe_id, original_recipe_text,
+                       preparation, notes
+                  FROM recipe_ingredients
+                 WHERE user_id = ?
+                   AND ingredient_id IN ({placeholders})
+                 ORDER BY ingredient_id ASC, sort_order ASC, id ASC
+                """,
+                (scoped_user_id, *candidate_by_id.keys()),
+            ).fetchall()
+            for context_row in context_rows:
+                ingredient_id = int(context_row["ingredient_id"])
+                recipe_context = candidate_by_id[ingredient_id]["recipe_context"]
+                if len(recipe_context) >= 3:
+                    continue
+                recipe_context.append({
+                    "recipe_id": clean_text(context_row["recipe_id"]),
+                    "source_text": clean_text(context_row["original_recipe_text"]),
+                    "preparation": clean_text(context_row["preparation"]),
+                    "notes": clean_text(context_row["notes"]),
+                })
+
+    return {
+        "ok": True,
+        "user_id": scoped_user_id,
+        "scope": scope,
+        "candidate_count": len(candidates),
+        "candidates": candidates,
+    }
+
+
+def apply_misc_ingredient_store_section_decisions(user_id=None, decisions=None):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    normalized_decisions = []
+    seen_ids = set()
+    for decision in decisions or []:
+        if not isinstance(decision, dict):
+            continue
+        try:
+            ingredient_id = int(decision.get("ingredient_id") or 0)
+        except (TypeError, ValueError):
+            ingredient_id = 0
+        section = ingredient_store_section_from_source(decision.get("store_section"))
+        if ingredient_id <= 0 or ingredient_id in seen_ids or not section:
+            continue
+        seen_ids.add(ingredient_id)
+        normalized_decisions.append({
+            "ingredient_id": ingredient_id,
+            "store_section": section,
+            "decision_source": clean_text(decision.get("decision_source")).lower(),
+            "confidence": ingredient_store_section_confidence(decision.get("confidence")),
+            "reason": clean_text(decision.get("reason")),
+        })
+    if not normalized_decisions:
+        return {"ok": False, "status": 400, "error": "Choose at least one store-section decision."}
+
+    changed = []
+    kept_misc = 0
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {"ok": False, "status": 404, "error": "Recipe master database was not found."}
+        prepared_decisions = []
+        for decision in normalized_decisions:
+            row = connection.execute(
+                """
+                SELECT *
+                  FROM ingredients
+                 WHERE id = ?
+                   AND user_id = ?
+                   AND COALESCE(NULLIF(TRIM(store_section), ''), 'MISC') = 'MISC'
+                   AND COALESCE(store_section_user_confirmed, 0) = 0
+                 LIMIT 1
+                """,
+                (decision["ingredient_id"], scoped_user_id),
+            ).fetchone()
+            if not row:
+                continue
+
+            row_data = dict(row)
+            deterministic = classify_ingredient_store_section_result(
+                {
+                    "raw_name": row_data.get("name"),
+                    "normalized_name": row_data.get("normalized_name"),
+                    "canonical_ingredient": row_data.get("canonical_ingredient"),
+                    "form": row_data.get("form"),
+                },
+                default="MISC",
+                log_result=False,
+            )
+            decision_source = decision["decision_source"]
+            if decision["store_section"] == "MISC":
+                metadata = {
+                    **normalize_ingredient_classification_context({
+                        "raw_name": row_data.get("name"),
+                        "normalized_name": row_data.get("normalized_name"),
+                        "canonical_ingredient": row_data.get("canonical_ingredient"),
+                        "form": row_data.get("form"),
+                    }),
+                    "store_section": "MISC",
+                    "store_section_source": "manual",
+                    "store_section_confidence": decision["confidence"],
+                    "classifier_version": INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION,
+                    "store_section_reason": decision["reason"] or "User confirmed that this ingredient should remain in Misc.",
+                    "store_section_rule": "manual.keep_misc",
+                }
+                user_confirmed = True
+                kept_misc += 1
+            elif decision_source == "deterministic":
+                if deterministic["store_section"] != decision["store_section"]:
+                    return {
+                        "ok": False,
+                        "status": 409,
+                        "error": f"The rule-based recommendation for {clean_text(row_data.get('name'))} changed. Preview again.",
+                    }
+                metadata = deterministic
+                user_confirmed = False
+            else:
+                chose_ai_opinion = decision_source == "ai"
+                metadata = {
+                    **normalize_ingredient_classification_context({
+                        "raw_name": row_data.get("name"),
+                        "normalized_name": row_data.get("normalized_name"),
+                        "canonical_ingredient": row_data.get("canonical_ingredient"),
+                        "form": row_data.get("form"),
+                    }),
+                    "store_section": decision["store_section"],
+                    "store_section_source": "manual",
+                    "store_section_confidence": decision["confidence"],
+                    "classifier_version": INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION,
+                    "store_section_reason": decision["reason"] or (
+                        "User selected an AI second opinion during store-section maintenance."
+                        if chose_ai_opinion
+                        else "User selected the final store section during store-section maintenance."
+                    ),
+                    "store_section_rule": (
+                        "manual.ai_second_opinion"
+                        if chose_ai_opinion
+                        else "manual.store_section_choice"
+                    ),
+                }
+                user_confirmed = True
+
+            prepared_decisions.append({
+                "decision": decision,
+                "row_data": row_data,
+                "metadata": metadata,
+                "user_confirmed": user_confirmed,
+            })
+
+        # Validate the entire batch before writing so a stale rule-based choice
+        # cannot leave earlier decisions partially applied.
+        for prepared in prepared_decisions:
+            decision = prepared["decision"]
+            row_data = prepared["row_data"]
+            metadata = prepared["metadata"]
+            user_confirmed = prepared["user_confirmed"]
+            now = utc_now_iso()
+            connection.execute(
+                """
+                UPDATE ingredients
+                   SET canonical_ingredient = ?, form = ?, store_section = ?,
+                       store_section_source = ?, store_section_confidence = ?,
+                       store_section_user_confirmed = ?, classifier_version = ?,
+                       store_section_reason = ?, store_section_rule = ?, updated_at = ?
+                 WHERE id = ? AND user_id = ?
+                """,
+                (
+                    clean_text(metadata.get("canonical_ingredient")),
+                    clean_text(metadata.get("form")),
+                    decision["store_section"],
+                    clean_ingredient_store_section_source(metadata.get("store_section_source")),
+                    ingredient_store_section_confidence(metadata.get("store_section_confidence")),
+                    1 if user_confirmed else 0,
+                    clean_text(metadata.get("classifier_version")) or INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION,
+                    clean_text(metadata.get("store_section_reason")),
+                    clean_text(metadata.get("store_section_rule")),
+                    now,
+                    decision["ingredient_id"],
+                    scoped_user_id,
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE recipe_ingredients
+                   SET store_section = ?, store_section_source = ?,
+                       store_section_confidence = ?, store_section_user_confirmed = ?,
+                       classifier_version = ?, store_section_reason = ?, store_section_rule = ?
+                 WHERE ingredient_id = ?
+                   AND user_id = ?
+                   AND COALESCE(store_section_user_confirmed, 0) = 0
+                   AND COALESCE(NULLIF(TRIM(store_section), ''), 'MISC') = 'MISC'
+                """,
+                (
+                    decision["store_section"],
+                    clean_ingredient_store_section_source(metadata.get("store_section_source")),
+                    ingredient_store_section_confidence(metadata.get("store_section_confidence")),
+                    1 if user_confirmed else 0,
+                    clean_text(metadata.get("classifier_version")) or INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION,
+                    clean_text(metadata.get("store_section_reason")),
+                    clean_text(metadata.get("store_section_rule")),
+                    decision["ingredient_id"],
+                    scoped_user_id,
+                ),
+            )
+            log_ingredient_store_section_result({
+                **metadata,
+                "store_section": decision["store_section"],
+                "store_section_user_confirmed": user_confirmed,
+            })
+            changed.append({
+                "ingredient_id": decision["ingredient_id"],
+                "ingredient": clean_text(row_data.get("name")),
+                "store_section": decision["store_section"],
+                "decision_source": decision["decision_source"] or "manual",
+            })
+
+    return {
+        "ok": True,
+        "applied": True,
+        "user_id": scoped_user_id,
+        "changed_count": len(changed),
+        "kept_misc_count": kept_misc,
+        "changes": changed,
     }
 
 

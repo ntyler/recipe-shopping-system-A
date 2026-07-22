@@ -26,6 +26,7 @@ from flask import url_for
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services import recipe_master_data_service as recipe_master_data
 from PushShoppingList.services import recipe_master_image_service as recipe_master_images
+from PushShoppingList.services import ingredient_store_section_review_service as ingredient_store_section_reviews
 from PushShoppingList.services import ingredient_duplicate_review_service as ingredient_duplicate_reviews
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
@@ -1245,11 +1246,31 @@ def ingredient_master_options_route():
 @main_bp.route("/api/master-data/ingredients/reclassify-misc", methods=["POST"])
 def reclassify_misc_ingredient_master_data_route():
     payload = request.get_json(silent=True) or {}
-    result = recipe_master_data.review_misc_ingredient_store_sections(
+    decisions = payload.get("decisions") if isinstance(payload.get("decisions"), list) else None
+    if bool(payload.get("apply")) and decisions is not None:
+        result = recipe_master_data.apply_misc_ingredient_store_section_decisions(
+            user_id=active_user_id(),
+            decisions=decisions,
+        )
+    else:
+        result = recipe_master_data.review_misc_ingredient_store_sections(
+            user_id=active_user_id(),
+            apply=bool(payload.get("apply")),
+        )
+    status = 200 if result.get("ok") else int(result.get("status") or 400)
+    return jsonify({**result, "success": result.get("ok", False)}), status
+
+
+@main_bp.route("/api/master-data/ingredients/reclassify-misc/ai-second-opinion", methods=["POST"])
+def reclassify_misc_ingredient_ai_second_opinion_route():
+    payload = request.get_json(silent=True) or {}
+    ingredient_ids = payload.get("ingredient_ids") if isinstance(payload.get("ingredient_ids"), list) else None
+    result = ingredient_store_section_reviews.review_misc_ingredient_store_sections_with_ai(
         user_id=active_user_id(),
-        apply=bool(payload.get("apply")),
+        scope=payload.get("scope") or "suggested",
+        ingredient_ids=ingredient_ids,
     )
-    status = 200 if result.get("ok") else 400
+    status = 200 if result.get("ok") else int(result.get("status") or 400)
     return jsonify({**result, "success": result.get("ok", False)}), status
 
 
