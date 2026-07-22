@@ -25462,6 +25462,249 @@ img[data-deferred-src] {
             accent-color: #2d8f70;
         }
 
+        .master-data-misc-reclassification {
+            display: grid;
+            gap: 16px;
+            padding: 16px;
+            border: 1px solid #31516b;
+            border-radius: 10px;
+            background:
+                linear-gradient(135deg, rgba(18, 78, 66, .18), transparent 55%),
+                #08131e;
+        }
+
+        .master-data-misc-reclassification[aria-busy="true"] {
+            cursor: progress;
+        }
+
+        .master-data-misc-reclassification-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .master-data-misc-reclassification-copy {
+            display: grid;
+            gap: 5px;
+            min-width: 0;
+        }
+
+        .master-data-misc-reclassification-copy strong {
+            color: #f8fafc;
+            font-size: 17px;
+            line-height: 1.25;
+        }
+
+        .master-data-misc-reclassification-copy > span:last-child {
+            color: #b9cad8;
+            font-size: 13px;
+            font-weight: 750;
+            line-height: 1.4;
+        }
+
+        .master-data-misc-reclassification-kicker {
+            color: #5ee6b0;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .master-data-misc-reclassification-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex: 0 0 auto;
+        }
+
+        .master-data-misc-reclassification-actions button {
+            min-height: 42px;
+            padding: 0 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 900;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .master-data-misc-reclassification-actions .master-data-action-secondary {
+            border: 1px solid #45647c;
+            background: #132332;
+            color: #dcecff;
+        }
+
+        .master-data-misc-reclassification-actions .master-data-action-secondary:is(:hover, :focus-visible) {
+            border-color: #6b8ba5;
+            background: #1a3042;
+        }
+
+        .master-data-misc-reclassification-actions .master-data-action-primary {
+            border: 1px solid #1ea873;
+            background: #087447;
+        }
+
+        .master-data-misc-reclassification-actions .master-data-action-primary:is(:hover, :focus-visible) {
+            border-color: #45d39b;
+            background: #0a8a56;
+        }
+
+        .master-data-misc-reclassification-actions button:disabled {
+            cursor: not-allowed;
+            opacity: .46;
+        }
+
+        .master-data-misc-reclassification-preview {
+            display: grid;
+            gap: 10px;
+            padding-top: 14px;
+            border-top: 1px solid #2a4357;
+        }
+
+        .master-data-misc-reclassification-preview[hidden] {
+            display: none;
+        }
+
+        .master-data-misc-reclassification-preview-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .master-data-misc-reclassification-preview-header strong {
+            color: #f1f5f9;
+            font-size: 14px;
+        }
+
+        .master-data-misc-reclassification-preview-header span {
+            color: #9eb3c3;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .master-data-misc-reclassification-list {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .master-data-misc-reclassification-list[hidden] {
+            display: none;
+        }
+
+        .master-data-misc-reclassification-item {
+            display: grid;
+            gap: 7px;
+            padding: 12px 14px;
+            border: 1px solid #263e51;
+            border-radius: 8px;
+            background: rgba(10, 24, 35, .86);
+        }
+
+        .master-data-misc-reclassification-result {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .master-data-misc-reclassification-result > strong {
+            min-width: 0;
+            color: #f8fafc;
+            font-size: 14px;
+            line-height: 1.3;
+        }
+
+        .master-data-misc-reclassification-direction {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex: 0 0 auto;
+        }
+
+        .master-data-section-pill {
+            display: inline-flex;
+            min-height: 27px;
+            align-items: center;
+            padding: 0 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .master-data-section-pill.is-current {
+            border: 1px solid #4b5f70;
+            background: #17232d;
+            color: #b8c5cf;
+        }
+
+        .master-data-section-pill.is-proposed {
+            border: 1px solid #238e69;
+            background: #0c3d2f;
+            color: #bff7de;
+        }
+
+        .master-data-section-arrow {
+            color: #6e8799;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .master-data-misc-reclassification-item > p {
+            margin: 0;
+            color: #aec0cd;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .master-data-misc-reclassification-details {
+            color: #8fa6b7;
+            font-size: 11px;
+        }
+
+        .master-data-misc-reclassification-details summary {
+            width: max-content;
+            cursor: pointer;
+            color: #8ebde0;
+            font-weight: 800;
+        }
+
+        .master-data-misc-reclassification-details code {
+            display: block;
+            margin-top: 6px;
+            color: #a9bac6;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-misc-reclassification-more,
+        .master-data-misc-reclassification-empty {
+            padding: 11px 13px;
+            border: 1px dashed #355066;
+            border-radius: 8px;
+            color: #aabcc9;
+            font-size: 12px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .master-data-misc-reclassification-empty[hidden] {
+            display: none;
+        }
+
+        .master-data-misc-reclassification.is-applied {
+            border-color: #16815c;
+            background:
+                linear-gradient(135deg, rgba(11, 116, 71, .26), transparent 60%),
+                #08151c;
+        }
+
         .master-data-backfill-progress {
             display: grid;
             gap: 12px;
@@ -28255,6 +28498,26 @@ img[data-deferred-src] {
                 grid-template-columns: 1fr;
             }
 
+            .master-data-misc-reclassification-header,
+            .master-data-misc-reclassification-result {
+                display: grid;
+                align-items: stretch;
+            }
+
+            .master-data-misc-reclassification-actions {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                width: 100%;
+            }
+
+            .master-data-misc-reclassification-actions button {
+                width: 100%;
+            }
+
+            .master-data-misc-reclassification-direction {
+                justify-content: flex-start;
+            }
+
             .master-data-header {
                 display: grid;
             }
@@ -28372,6 +28635,23 @@ img[data-deferred-src] {
         }
 
         @media (max-width: 520px) {
+            .master-data-misc-reclassification {
+                padding: 13px;
+            }
+
+            .master-data-misc-reclassification-actions {
+                grid-template-columns: 1fr;
+            }
+
+            .master-data-misc-reclassification-preview-header {
+                display: grid;
+                gap: 3px;
+            }
+
+            .master-data-misc-reclassification-direction {
+                flex-wrap: wrap;
+            }
+
             .master-data-backfill-metrics {
                 grid-template-columns: 1fr;
             }

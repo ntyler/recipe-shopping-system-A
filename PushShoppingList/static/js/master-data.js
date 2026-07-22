@@ -3693,39 +3693,125 @@
         }
     }
 
+    function friendlyIngredientStoreSection(value) {
+        const section = text(value).trim().toUpperCase();
+        const labels = {
+            "PRODUCE": "Produce",
+            "MEAT & SEAFOOD": "Meat & Seafood",
+            "DAIRY & EGGS": "Dairy",
+            "FROZEN": "Frozen",
+            "DRY GOODS": "Dry Goods",
+            "PASTA, RICE & GRAINS": "Pasta, Rice & Grains",
+            "BAKING": "Baking",
+            "CANNED": "Canned Goods",
+            "SAUCES & CONDIMENTS": "Sauces & Condiments",
+            "SNACKS": "Snacks",
+            "BEVERAGES": "Beverages",
+            "SPICES & SEASONINGS": "Spices",
+            "OILS & VINEGARS": "Oils & Vinegars",
+            "BAKERY": "Bakery",
+            "DELI": "Deli",
+            "HOUSEHOLD": "Household",
+            "PERSONAL CARE": "Personal Care",
+            "PET SUPPLIES": "Pet Supplies",
+            "MISC": "Misc",
+        };
+        return labels[section] || text(value).trim() || "Misc";
+    }
+
     function renderMiscReclassification(panel, data) {
         const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
         const list = panel.querySelector("[data-master-misc-reclassification-list]");
         const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
+        const previewPanel = panel.querySelector("[data-master-misc-reclassification-preview-panel]");
+        const count = panel.querySelector("[data-master-misc-reclassification-count]");
+        const empty = panel.querySelector("[data-master-misc-reclassification-empty]");
         const changes = Array.isArray(data && data.changes) ? data.changes : [];
         const reviewedCount = Number(data && data.reviewed_count) || 0;
         const changedCount = Number(data && data.changed_count) || changes.length;
 
         if (summary) {
             summary.textContent = data && data.applied
-                ? `Applied ${changedCount} change${changedCount === 1 ? "" : "s"}; ${reviewedCount} unconfirmed Misc ingredient${reviewedCount === 1 ? " was" : "s were"} reviewed.`
-                : `Preview: ${changedCount} of ${reviewedCount} unconfirmed Misc ingredient${reviewedCount === 1 ? "" : "s"} can be reclassified.`;
+                ? `Applied ${changedCount} change${changedCount === 1 ? "" : "s"} to Ingredient Master Data.`
+                : changedCount
+                    ? `${changedCount} suggested change${changedCount === 1 ? "" : "s"} found across ${reviewedCount} unconfirmed Misc ingredient${reviewedCount === 1 ? "" : "s"}. Review them below before applying.`
+                    : `Reviewed ${reviewedCount} unconfirmed Misc ingredient${reviewedCount === 1 ? "" : "s"}; no automatic changes are available.`;
+        }
+        if (count) {
+            count.textContent = `${changedCount} suggested change${changedCount === 1 ? "" : "s"}`;
         }
         if (list) {
             list.replaceChildren();
             changes.slice(0, 20).forEach((change) => {
                 const item = document.createElement("li");
-                const name = text(change.ingredient || change.normalized_name || "Ingredient");
-                const section = text(change.proposed_store_section || "MISC");
-                const rule = text(change.rule || change.store_section_source || "classifier");
-                item.textContent = `${name}: Misc → ${section} (${rule})`;
+                item.className = "master-data-misc-reclassification-item";
+                const rawName = text(change.ingredient || change.normalized_name || "Ingredient").trim();
+                const name = rawName ? `${rawName.charAt(0).toUpperCase()}${rawName.slice(1)}` : "Ingredient";
+                const section = friendlyIngredientStoreSection(change.proposed_store_section || "MISC");
+                const reason = text(change.reason || "Matched a store-section classification rule.");
+                const result = document.createElement("div");
+                result.className = "master-data-misc-reclassification-result";
+
+                const ingredient = document.createElement("strong");
+                ingredient.textContent = name;
+                const direction = document.createElement("div");
+                direction.className = "master-data-misc-reclassification-direction";
+                direction.setAttribute("aria-label", `${name} changes from Misc to ${section}`);
+                const current = document.createElement("span");
+                current.className = "master-data-section-pill is-current";
+                current.textContent = "Misc";
+                const arrow = document.createElement("span");
+                arrow.className = "master-data-section-arrow";
+                arrow.setAttribute("aria-hidden", "true");
+                arrow.textContent = "→";
+                const proposed = document.createElement("span");
+                proposed.className = "master-data-section-pill is-proposed";
+                proposed.textContent = section;
+                direction.append(current, arrow, proposed);
+                result.append(ingredient, direction);
+
+                const explanation = document.createElement("p");
+                explanation.textContent = reason;
+                item.append(result, explanation);
+
+                const rule = text(change.rule);
+                const source = text(change.store_section_source).replaceAll("_", " ");
+                const confidence = Number(change.store_section_confidence);
+                if (rule || source || Number.isFinite(confidence)) {
+                    const details = document.createElement("details");
+                    details.className = "master-data-misc-reclassification-details";
+                    const detailsSummary = document.createElement("summary");
+                    detailsSummary.textContent = "Classification details";
+                    const detailText = document.createElement("code");
+                    const detailParts = [];
+                    if (source) detailParts.push(`Source: ${source}`);
+                    if (Number.isFinite(confidence)) detailParts.push(`Confidence: ${Math.round(confidence * 100)}%`);
+                    if (rule) detailParts.push(`Rule: ${rule}`);
+                    detailText.textContent = detailParts.join(" · ");
+                    details.append(detailsSummary, detailText);
+                    item.append(details);
+                }
                 list.appendChild(item);
             });
             if (changes.length > 20) {
                 const more = document.createElement("li");
+                more.className = "master-data-misc-reclassification-more";
                 more.textContent = `+${changes.length - 20} more proposed changes`;
                 list.appendChild(more);
             }
             list.hidden = !changes.length;
         }
+        if (empty) empty.hidden = Boolean(changes.length);
+        if (previewPanel) previewPanel.hidden = false;
+        panel.classList.toggle("is-applied", Boolean(data && data.applied));
         panel.dataset.miscPreviewReady = data && !data.applied && changedCount > 0 ? "true" : "false";
         if (applyButton) {
             applyButton.disabled = panel.dataset.miscPreviewReady !== "true";
+            applyButton.textContent = data && data.applied
+                ? "Applied"
+                : changedCount
+                    ? `Apply ${changedCount} Change${changedCount === 1 ? "" : "s"}`
+                    : "Apply Changes";
         }
     }
 
@@ -3736,6 +3822,8 @@
         [previewButton, applyButton].forEach((button) => {
             if (button) button.disabled = true;
         });
+        if (previewButton) previewButton.textContent = apply ? "Preview Changes" : "Previewing...";
+        if (applyButton && apply) applyButton.textContent = "Applying...";
         panel.setAttribute("aria-busy", "true");
         if (summary) summary.textContent = apply ? "Applying reviewed changes…" : "Reviewing unconfirmed Misc ingredients…";
         try {
@@ -3759,8 +3847,10 @@
         } catch (error) {
             panel.dataset.miscPreviewReady = "false";
             if (summary) summary.textContent = error && error.message ? error.message : "Misc ingredient reclassification failed.";
+            if (applyButton) applyButton.textContent = "Apply Changes";
         } finally {
             panel.setAttribute("aria-busy", "false");
+            if (previewButton) previewButton.textContent = "Preview Changes";
             if (previewButton) previewButton.disabled = false;
             if (applyButton) applyButton.disabled = panel.dataset.miscPreviewReady !== "true";
         }

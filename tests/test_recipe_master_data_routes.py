@@ -209,6 +209,11 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "data-master-store-section-form" in all_html
     assert "Reclassify unconfirmed Misc ingredients" in all_html
     assert "data-master-misc-reclassification" in all_html
+    assert "Store-section maintenance" in all_html
+    assert "data-master-misc-reclassification-preview-panel" in all_html
+    assert "data-master-misc-reclassification-count" in all_html
+    assert "data-master-misc-reclassification-empty" in all_html
+    assert "Apply Changes" in all_html
     assert "/api/master-data/ingredients/reclassify-misc" in all_html
     assert 'data-original-store-section="PRODUCE"' in all_html
     assert '<button type="submit">Save</button>' not in all_html
@@ -325,6 +330,22 @@ def test_ingredient_master_data_filters_and_groups_by_store_section(monkeypatch,
     assert "Tomato" in produce_html
     assert "Garlic" not in produce_html
     assert '<tr class="master-data-section-row">' not in produce_html
+
+
+def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
+    css = (root / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert "function friendlyIngredientStoreSection(value)" in script
+    assert '"SPICES & SEASONINGS": "Spices"' in script
+    assert '"CANNED": "Canned Goods"' in script
+    assert "Classification details" in script
+    assert "Apply ${changedCount} Change" in script
+    assert ".master-data-misc-reclassification-header" in css
+    assert ".master-data-misc-reclassification-list" in css
+    assert ".master-data-section-pill.is-proposed" in css
+    assert ".master-data-misc-reclassification-actions" in css
 
 
 def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch, tmp_path):

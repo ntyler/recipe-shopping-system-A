@@ -191,17 +191,45 @@
         {% endif %}
 
         {% if master_data.record_type == 'ingredients' and master_data.db_status.exists %}
-            <section class="master-data-backfill-form master-data-misc-reclassification"
+            <section class="master-data-misc-reclassification"
                      data-master-misc-reclassification
                      data-reclassify-url="{{ url_for('main_bp.reclassify_misc_ingredient_master_data_route') }}"
                      aria-live="polite">
-                <div>
-                    <strong>Reclassify unconfirmed Misc ingredients</strong>
-                    <span data-master-misc-reclassification-summary>Preview deterministic changes before applying them to Ingredient Master Data.</span>
+                <div class="master-data-misc-reclassification-header">
+                    <div class="master-data-misc-reclassification-copy">
+                        <span class="master-data-misc-reclassification-kicker">Store-section maintenance</span>
+                        <strong>Reclassify unconfirmed Misc ingredients</strong>
+                        <span data-master-misc-reclassification-summary>Preview suggested changes before updating Ingredient Master Data.</span>
+                    </div>
+                    <div class="master-data-misc-reclassification-actions">
+                        <button type="button"
+                                class="master-data-action-secondary"
+                                data-master-misc-reclassification-preview>
+                            Preview Changes
+                        </button>
+                        <button type="button"
+                                class="master-data-action-primary"
+                                data-master-misc-reclassification-apply
+                                disabled>
+                            Apply Changes
+                        </button>
+                    </div>
                 </div>
-                <button type="button" data-master-misc-reclassification-preview>Preview Changes</button>
-                <button type="button" data-master-misc-reclassification-apply disabled>Apply Preview</button>
-                <ol class="master-data-backfill-item-list" data-master-misc-reclassification-list hidden></ol>
+                <div class="master-data-misc-reclassification-preview"
+                     data-master-misc-reclassification-preview-panel
+                     hidden>
+                    <div class="master-data-misc-reclassification-preview-header">
+                        <strong>Proposed changes</strong>
+                        <span data-master-misc-reclassification-count></span>
+                    </div>
+                    <ol class="master-data-misc-reclassification-list"
+                        data-master-misc-reclassification-list></ol>
+                    <div class="master-data-misc-reclassification-empty"
+                         data-master-misc-reclassification-empty
+                         hidden>
+                        No unconfirmed Misc ingredients can be reclassified automatically.
+                    </div>
+                </div>
             </section>
         {% endif %}
 
