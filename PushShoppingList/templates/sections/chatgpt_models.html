@@ -78,6 +78,7 @@
                         <th scope="col">Environment Variable</th>
                         <th scope="col">Active Model</th>
                         <th scope="col">Proposed Model</th>
+                        <th scope="col">Used In</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -122,6 +123,31 @@
                                         value="use_proposed:{{ row.env_var }}">
                                     Use Proposed Model
                                 </button>
+                            </td>
+                            <td class="chatgpt-model-usage">
+                                <a href="{{ row.usage.href }}"
+                                   class="chatgpt-model-usage-link"
+                                   aria-label="Open {{ row.usage.title }}: {{ row.usage.detail }}">
+                                    <span class="chatgpt-model-usage-preview is-{{ row.usage.kind }}" aria-hidden="true">
+                                        <span class="chatgpt-model-usage-browser-bar">
+                                            <i></i><i></i><i></i>
+                                        </span>
+                                        <span class="chatgpt-model-usage-rail"></span>
+                                        <span class="chatgpt-model-usage-canvas">
+                                            <span class="chatgpt-model-usage-icon">{{ row.usage.icon }}</span>
+                                            <span class="chatgpt-model-usage-lines"><i></i><i></i><i></i></span>
+                                            <span class="chatgpt-model-usage-ai">AI</span>
+                                        </span>
+                                    </span>
+                                    <span class="chatgpt-model-usage-copy">
+                                        <strong>{{ row.usage.title }}</strong>
+                                        <small>{{ row.usage.detail }}</small>
+                                        <span class="chatgpt-model-usage-tags">
+                                            {% for surface in row.usage.surfaces %}<span>{{ surface }}</span>{% endfor %}
+                                        </span>
+                                        <span class="chatgpt-model-usage-open">Open location <span aria-hidden="true">&rarr;</span></span>
+                                    </span>
+                                </a>
                             </td>
                         </tr>
                     {% endfor %}

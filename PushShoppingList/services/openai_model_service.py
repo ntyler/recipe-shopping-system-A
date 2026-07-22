@@ -156,6 +156,176 @@ OPENAI_MODEL_SETTINGS = (
     },
 )
 
+OPENAI_MODEL_USAGE_BY_ENV = {
+    "OPENAI_MENU_MODEL": {
+        "kind": "import",
+        "icon": "URL",
+        "title": "Import workspace",
+        "detail": "Recipe URLs and menu documents",
+        "href": "/#importPage",
+        "surfaces": ("Recipe URL", "Menu document"),
+    },
+    "OPENAI_MENU_CLEANUP_MODEL": {
+        "kind": "menu",
+        "icon": "FIX",
+        "title": "Menu imports",
+        "detail": "Cleanup and equipment prediction",
+        "href": "/#menusPage",
+        "surfaces": ("Menu cleanup", "Equipment"),
+    },
+    "OPENAI_MENU_RECIPE_MODEL": {
+        "kind": "menu",
+        "icon": "FULL",
+        "title": "Menus",
+        "detail": "Full recipe generation jobs",
+        "href": "/#menusPage",
+        "surfaces": ("Menu item", "Full generation"),
+    },
+    "OPENAI_MENU_FAST_RECIPE_MODEL": {
+        "kind": "menu",
+        "icon": "FAST",
+        "title": "Menus",
+        "detail": "Fast recipe generation batches",
+        "href": "/#menusPage",
+        "surfaces": ("Menu item", "Fast generation"),
+    },
+    "OPENAI_MENU_FAILED_ITEM_MODEL": {
+        "kind": "menu",
+        "icon": "TRY",
+        "title": "Menu job recovery",
+        "detail": "Retries failed menu items",
+        "href": "/#menusPage",
+        "surfaces": ("Failed items", "Retry"),
+    },
+    "OPENAI_VISION_MODEL": {
+        "kind": "media",
+        "icon": "IMG",
+        "title": "Import from image",
+        "detail": "Reads and describes uploaded photos",
+        "href": "/#generateImagePage",
+        "surfaces": ("Photo upload", "Vision"),
+    },
+    "OPENAI_RECIPE_MODEL": {
+        "kind": "recipe",
+        "icon": "HELP",
+        "title": "Recipe helpers",
+        "detail": "General recipe AI fallback",
+        "href": "/#recipesPage",
+        "surfaces": ("Recipes", "Editor helpers"),
+    },
+    "OPENAI_COOKBOOK_ITEM_MODEL": {
+        "kind": "recipe",
+        "icon": "BOOK",
+        "title": "Cookbooks",
+        "detail": "Fills missing recipe details",
+        "href": "/#cookbooksPage",
+        "surfaces": ("Cookbook item", "Fill details"),
+    },
+    "OPENAI_RECIPE_CATEGORY_MODEL": {
+        "kind": "recipe",
+        "icon": "TAG",
+        "title": "Recipe categories",
+        "detail": "Suggests cookbook organization",
+        "href": "/#cookbooksPage",
+        "surfaces": ("Categories", "Cookbooks"),
+    },
+    "OPENAI_NUTRITION_MODEL": {
+        "kind": "recipe",
+        "icon": "NUTR",
+        "title": "Recipe editor",
+        "detail": "Nutrition tab estimates",
+        "href": "/#recipesPage",
+        "surfaces": ("Nutrition", "Per serving"),
+    },
+    "OPENAI_RECIPE_NOTE_MODEL": {
+        "kind": "recipe",
+        "icon": "NOTE",
+        "title": "Recipe editor",
+        "detail": "Notes and reflection helpers",
+        "href": "/#recipesPage",
+        "surfaces": ("Notes", "Recipe editor"),
+    },
+    "OPENAI_PRODUCT_ANALYSIS_MODEL": {
+        "kind": "shopping",
+        "icon": "SHOP",
+        "title": "Compare Prices",
+        "detail": "Product matching and selection",
+        "href": "/#priceComparisonPage",
+        "surfaces": ("Store products", "Comparison"),
+    },
+    "OPENAI_INGREDIENT_REVIEW_MODEL": {
+        "kind": "data",
+        "icon": "DATA",
+        "title": "Ingredient Master Data",
+        "detail": "Cleanup, duplicates, and AI review",
+        "href": "/admin/master-data/ingredients",
+        "surfaces": ("Ingredients", "AI review"),
+    },
+    "OPENAI_FOOD_RULES_MODEL": {
+        "kind": "settings",
+        "icon": "RULE",
+        "title": "Rules & Automation",
+        "detail": "Food restriction checks",
+        "href": "/#settingsRulesAutomationPanel",
+        "surfaces": ("Food rules", "Restrictions"),
+    },
+    "OPENAI_FOOD_REVIEW_MODEL": {
+        "kind": "recipe",
+        "icon": "SWAP",
+        "title": "Recipe alternatives",
+        "detail": "Food-review substitutions",
+        "href": "/#recipesPage",
+        "surfaces": ("Alternatives", "Ingredients"),
+    },
+    "OPENAI_ADDRESS_MODEL": {
+        "kind": "settings",
+        "icon": "MAP",
+        "title": "Location settings",
+        "detail": "Home-address completion",
+        "href": "/#settingsLocationPanel",
+        "surfaces": ("Home address", "Location"),
+    },
+    "OPENAI_PING_TEXT_MODEL": {
+        "kind": "settings",
+        "icon": "PING",
+        "title": "AI connection test",
+        "detail": "Basic text-model diagnostics",
+        "href": "/#userAccountSection",
+        "surfaces": ("Diagnostics", "Connection"),
+    },
+    "OPENAI_TRANSCRIPTION_MODEL": {
+        "kind": "media",
+        "icon": "AUDIO",
+        "title": "Import workspace",
+        "detail": "Social-video audio transcription",
+        "href": "/#importPage",
+        "surfaces": ("Social video", "Transcription"),
+    },
+    "OPENAI_STEP_IMAGE_MODEL": {
+        "kind": "media",
+        "icon": "STEP",
+        "title": "Recipe instructions",
+        "detail": "Generates step illustrations",
+        "href": "/#recipesPage",
+        "surfaces": ("Instructions", "Step images"),
+    },
+}
+
+
+def openai_model_usage(env_var):
+    usage = OPENAI_MODEL_USAGE_BY_ENV.get(env_var) or {
+        "kind": "settings",
+        "icon": "AI",
+        "title": "AI Pantry",
+        "detail": "OpenAI-powered application feature",
+        "href": "/#userAccountSection",
+        "surfaces": ("AI feature",),
+    }
+    return {
+        **usage,
+        "surfaces": list(usage.get("surfaces") or []),
+    }
+
 DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_MENU_MODEL": "gpt-5.5",
     "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.4-mini",
@@ -812,6 +982,7 @@ def chatgpt_models_dashboard_for_user(user, show_advanced_models=False, force_re
             "source": source,
             "is_override": setting["env_var"] in overrides,
             "supports_temperature": supports_custom_temperature(model),
+            "usage": openai_model_usage(setting["env_var"]),
         })
 
     messages = []

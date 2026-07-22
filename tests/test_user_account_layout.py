@@ -522,10 +522,17 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert '<table class="chatgpt-model-table">' in models_template
     assert '<th scope="col">Active Model</th>' in models_template
     assert '<th scope="col">Proposed Model</th>' in models_template
+    assert '<th scope="col">Used In</th>' in models_template
     assert '<tr class="chatgpt-model-row">' in models_template
     assert "Reason: {{ row.proposed_model_reason }}" in models_template
     assert "Use Proposed Model" in models_template
     assert 'value="use_proposed:{{ row.env_var }}"' in models_template
+    assert 'href="{{ row.usage.href }}"' in models_template
+    assert 'class="chatgpt-model-usage-preview is-{{ row.usage.kind }}"' in models_template
+    assert "{{ row.usage.title }}" in models_template
+    assert "{{ row.usage.detail }}" in models_template
+    assert "{% for surface in row.usage.surfaces %}" in models_template
+    assert "Open location" in models_template
     assert "type=\"text\"" not in models_template
     assert "account_panel=\"chatgpt_models\"" in route
     assert "refresh_lowest_viable_mappings" in route
@@ -542,6 +549,7 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert '"proposed_model_reason": proposed_model_reason' in service
     assert '"recommended_mapping_count": int(recommendations.get("total_count") or 0)' in service
     assert '"model_groups": choices["groups"]' in service
+    assert '"usage": openai_model_usage(setting["env_var"])' in service
     assert ".chatgpt-models-card" in css
     assert "background: transparent;" in css
     assert ".user-chatgpt-models-divider" in css
@@ -552,6 +560,10 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert ".chatgpt-model-toolbar-actions" in css
     assert ".chatgpt-model-table-wrap" in css
     assert ".chatgpt-model-table {" in css
+    assert ".chatgpt-model-usage-link" in css
+    assert ".chatgpt-model-usage-preview" in css
+    assert ".chatgpt-model-usage-tags" in css
+    assert ".chatgpt-model-table th:nth-child(5)" in css
     assert ".chatgpt-model-warning-badge" in css
     assert ".chatgpt-model-row select" in css
     assert "border-collapse: collapse;" in css

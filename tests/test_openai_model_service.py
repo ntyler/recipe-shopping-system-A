@@ -92,7 +92,22 @@ def test_dashboard_includes_all_openai_model_environment_variables(monkeypatch, 
     assert row_env_vars == EXPECTED_OPENAI_MODEL_ENV_VARS
     assert set(models.DEFAULT_RECOMMENDED_MODEL_BY_ENV) == EXPECTED_OPENAI_MODEL_ENV_VARS
     assert set(models.LOWEST_VIABLE_MODEL_BY_ENV) == EXPECTED_OPENAI_MODEL_ENV_VARS
+    assert set(models.OPENAI_MODEL_USAGE_BY_ENV) == EXPECTED_OPENAI_MODEL_ENV_VARS
     assert dashboard["recommended_mapping_count"] == len(EXPECTED_OPENAI_MODEL_ENV_VARS)
+
+    rows = {row["env_var"]: row for row in dashboard["rows"]}
+    assert rows["OPENAI_MENU_MODEL"]["usage"] == {
+        "kind": "import",
+        "icon": "URL",
+        "title": "Import workspace",
+        "detail": "Recipe URLs and menu documents",
+        "href": "/#importPage",
+        "surfaces": ["Recipe URL", "Menu document"],
+    }
+    assert rows["OPENAI_INGREDIENT_REVIEW_MODEL"]["usage"]["title"] == "Ingredient Master Data"
+    assert rows["OPENAI_INGREDIENT_REVIEW_MODEL"]["usage"]["href"] == "/admin/master-data/ingredients"
+    assert all(row["usage"]["title"] for row in dashboard["rows"])
+    assert all(row["usage"]["href"] for row in dashboard["rows"])
 
 
 def test_use_proposed_model_persists_recommended_value(monkeypatch, tmp_path):
