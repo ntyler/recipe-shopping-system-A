@@ -359,35 +359,72 @@
                                         <strong data-master-store-section-undo-position>Newest store-section apply</strong>
                                         <time data-master-store-section-undo-time></time>
                                     </div>
-                                    <div class="master-data-store-section-undo-overview">
-                                        <article>
-                                            <span>Ingredient decisions</span>
-                                            <strong data-master-store-section-undo-change-count>0</strong>
+                                    <div class="master-data-store-section-undo-comparison">
+                                        <article class="master-data-store-section-undo-state is-restored">
+                                            <span>Restore previous assignments</span>
+                                            <div class="master-data-store-section-undo-state-identity">
+                                                <div class="master-data-store-section-undo-montage"
+                                                     data-master-store-section-undo-restored-montage></div>
+                                                <div>
+                                                    <h3 data-master-store-section-undo-restored-title>
+                                                        Previous store sections
+                                                    </h3>
+                                                    <p data-master-store-section-undo-restored-summary></p>
+                                                </div>
+                                            </div>
+                                            <div class="master-data-store-section-undo-distribution"
+                                                 data-master-store-section-undo-restored-sections></div>
                                         </article>
-                                        <article>
-                                            <span>Recipe references</span>
-                                            <strong data-master-store-section-undo-reference-count>0</strong>
-                                        </article>
-                                        <article>
-                                            <span>Action</span>
-                                            <strong>Restore prior sections</strong>
+                                        <div class="master-data-store-section-undo-direction" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" role="img">
+                                                <path d="M19 12H5m6-6-6 6 6 6"></path>
+                                            </svg>
+                                            <span>Undo apply</span>
+                                        </div>
+                                        <article class="master-data-store-section-undo-state">
+                                            <span>Keep current assignments</span>
+                                            <div class="master-data-store-section-undo-state-identity">
+                                                <div class="master-data-store-section-undo-montage"
+                                                     data-master-store-section-undo-current-montage></div>
+                                                <div>
+                                                    <h3 data-master-store-section-undo-current-title>
+                                                        Current store sections
+                                                    </h3>
+                                                    <p data-master-store-section-undo-current-summary></p>
+                                                </div>
+                                            </div>
+                                            <div class="master-data-store-section-undo-distribution"
+                                                 data-master-store-section-undo-current-sections></div>
                                         </article>
                                     </div>
-                                    <section class="master-data-store-section-undo-changes">
-                                        <header>
-                                            <div>
-                                                <span>Restore preview</span>
-                                                <h3>Store-section decisions</h3>
-                                            </div>
-                                            <strong data-master-store-section-undo-list-count>0 changes</strong>
-                                        </header>
-                                        <div class="master-data-store-section-undo-change-list"
-                                             data-master-store-section-undo-change-list></div>
-                                    </section>
                                     <section class="master-data-undo-preview-impact">
                                         <h3>What will be restored</h3>
                                         <ul data-master-store-section-undo-impact></ul>
                                     </section>
+                                    <section class="master-data-undo-preview-recipes">
+                                        <header>
+                                            <h3>Recipe references</h3>
+                                            <strong data-master-store-section-undo-recipe-count>0 affected</strong>
+                                        </header>
+                                        <div class="master-data-store-section-undo-recipes"
+                                             data-master-store-section-undo-recipes></div>
+                                    </section>
+                                    <details class="master-data-store-section-undo-changes">
+                                        <summary>
+                                            <span>
+                                                <strong>Review ingredient details</strong>
+                                                <small>See every store-section assignment in this apply.</small>
+                                            </span>
+                                            <span class="master-data-store-section-undo-details-count">
+                                                <strong data-master-store-section-undo-list-count>0 changes</strong>
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="m7 10 5 5 5-5"></path>
+                                                </svg>
+                                            </span>
+                                        </summary>
+                                        <div class="master-data-store-section-undo-change-list"
+                                             data-master-store-section-undo-change-list></div>
+                                    </details>
                                     <p class="master-data-undo-preview-next"
                                        data-master-store-section-undo-next></p>
                                 </div>

@@ -28298,24 +28298,6 @@ img[data-deferred-src] {
             color: #fde68a;
         }
 
-        .master-data-store-section-undo-overview {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 8px;
-        }
-
-        .master-data-store-section-undo-overview article {
-            display: grid;
-            min-width: 0;
-            gap: 4px;
-            padding: 10px;
-            border: 1px solid #2d4354;
-            border-radius: 8px;
-            background: #07111c;
-        }
-
-        .master-data-store-section-undo-overview span,
-        .master-data-store-section-undo-changes > header span,
         .master-data-store-section-undo-transition > div > span:first-child {
             color: #8fa6b8;
             font-size: 8px;
@@ -28324,10 +28306,204 @@ img[data-deferred-src] {
             text-transform: uppercase;
         }
 
-        .master-data-store-section-undo-overview strong {
-            color: #eef6fb;
-            font-size: 13px;
+        .master-data-store-section-undo-comparison {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1fr);
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .master-data-store-section-undo-state {
+            display: grid;
+            min-width: 0;
+            align-content: start;
+            gap: 11px;
+            padding: 12px;
+            border: 1px solid #334a5b;
+            border-radius: 9px;
+            background: #07111c;
+        }
+
+        .master-data-store-section-undo-state.is-restored {
+            border-color: #2d8f70;
+            background: #09231d;
+        }
+
+        .master-data-store-section-undo-state > span {
+            color: #8fa6b8;
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        .master-data-store-section-undo-state.is-restored > span {
+            color: #6ee7b7;
+        }
+
+        .master-data-store-section-undo-state-identity {
+            display: grid;
+            min-width: 0;
+            grid-template-columns: 86px minmax(0, 1fr);
+            align-items: center;
+            gap: 10px;
+        }
+
+        .master-data-store-section-undo-state-identity > div:last-child {
+            display: grid;
+            min-width: 0;
+            gap: 4px;
+        }
+
+        .master-data-store-section-undo-state h3 {
+            font-size: 14px;
+            line-height: 1.3;
             overflow-wrap: anywhere;
+        }
+
+        .master-data-store-section-undo-state p {
+            margin: 0;
+            color: #aebdca;
+            font-size: 10px;
+            font-weight: 750;
+            line-height: 1.4;
+        }
+
+        .master-data-store-section-undo-montage {
+            position: relative;
+            width: 86px;
+            height: 58px;
+        }
+
+        .master-data-store-section-undo-montage > span {
+            position: absolute;
+            top: 0;
+            display: grid;
+            width: 54px;
+            height: 54px;
+            place-items: center;
+            overflow: hidden;
+            border: 2px solid #0b1822;
+            border-radius: 8px;
+            background: #e9e4d9;
+            color: #0b6542;
+            font-size: 21px;
+            font-weight: 900;
+            box-shadow: 0 5px 13px rgba(0, 0, 0, .25);
+        }
+
+        .master-data-store-section-undo-state.is-restored
+        .master-data-store-section-undo-montage > span {
+            border-color: #09231d;
+        }
+
+        .master-data-store-section-undo-montage > span:nth-child(1) {
+            left: 0;
+            z-index: 3;
+        }
+
+        .master-data-store-section-undo-montage > span:nth-child(2) {
+            left: 16px;
+            z-index: 2;
+        }
+
+        .master-data-store-section-undo-montage > span:nth-child(3) {
+            left: 32px;
+            z-index: 1;
+        }
+
+        .master-data-store-section-undo-montage img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .master-data-store-section-undo-montage > strong {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            z-index: 4;
+            display: grid;
+            min-width: 30px;
+            height: 23px;
+            place-items: center;
+            padding: 0 5px;
+            border: 1px solid #3d6075;
+            border-radius: 999px;
+            background: #102333;
+            color: #dbeafe;
+            font-size: 8px;
+            font-weight: 900;
+        }
+
+        .master-data-store-section-undo-distribution {
+            display: flex;
+            min-height: 24px;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .master-data-store-section-undo-distribution > span {
+            display: inline-flex;
+            min-width: 0;
+            min-height: 23px;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 7px;
+            border: 1px solid #345069;
+            border-radius: 999px;
+            background: #102333;
+            color: #bfdbfe;
+            font-size: 8px;
+            font-weight: 800;
+        }
+
+        .master-data-store-section-undo-state.is-restored
+        .master-data-store-section-undo-distribution > span {
+            border-color: #2d8f70;
+            background: #0f3328;
+            color: #bff7de;
+        }
+
+        .master-data-store-section-undo-distribution small {
+            color: #f8fafc;
+            font-size: 8px;
+            font-weight: 900;
+        }
+
+        .master-data-store-section-undo-distribution > span.is-more {
+            color: #91a7b8;
+        }
+
+        .master-data-store-section-undo-direction {
+            display: grid;
+            align-content: center;
+            justify-items: center;
+            gap: 4px;
+            color: #91a7b8;
+            font-size: 7px;
+            font-weight: 900;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .master-data-store-section-undo-direction svg {
+            width: 28px;
+            height: 28px;
+            fill: none;
+            stroke: #6ee7b7;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.8;
+        }
+
+        .master-data-store-section-undo-recipes {
+            display: grid;
+            max-height: 190px;
+            gap: 5px;
+            overflow-y: auto;
+            scrollbar-gutter: stable;
         }
 
         .master-data-store-section-undo-changes {
@@ -28339,25 +28515,65 @@ img[data-deferred-src] {
             background: #091721;
         }
 
-        .master-data-store-section-undo-changes > header {
+        .master-data-store-section-undo-changes > summary {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 10px;
+            gap: 12px;
+            cursor: pointer;
+            list-style: none;
         }
 
-        .master-data-store-section-undo-changes > header > div {
+        .master-data-store-section-undo-changes > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .master-data-store-section-undo-changes > summary > span:first-child {
             display: grid;
             gap: 2px;
         }
 
-        .master-data-store-section-undo-changes > header h3 {
-            font-size: 12px;
+        .master-data-store-section-undo-changes > summary > span:first-child > strong {
+            color: #eef6fb;
+            font-size: 11px;
         }
 
-        .master-data-store-section-undo-changes > header > strong {
+        .master-data-store-section-undo-changes > summary small {
+            color: #8fa6b8;
+            font-size: 9px;
+            font-weight: 750;
+        }
+
+        .master-data-store-section-undo-details-count {
+            display: flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 7px;
             color: #a7f3d0;
             font-size: 9px;
+        }
+
+        .master-data-store-section-undo-details-count svg {
+            width: 16px;
+            height: 16px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 2;
+            transition: transform 150ms ease;
+        }
+
+        .master-data-store-section-undo-changes[open]
+        .master-data-store-section-undo-details-count svg {
+            transform: rotate(180deg);
+        }
+
+        .master-data-store-section-undo-changes[open]
+        .master-data-store-section-undo-change-list {
+            margin-top: 9px;
+            padding-top: 9px;
+            border-top: 1px solid #263d4e;
         }
 
         .master-data-store-section-undo-change-list {
@@ -29325,8 +29541,16 @@ img[data-deferred-src] {
                 grid-template-columns: 1fr;
             }
 
-            .master-data-store-section-undo-overview {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+            .master-data-store-section-undo-comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .master-data-store-section-undo-direction {
+                grid-template-columns: auto auto;
+            }
+
+            .master-data-store-section-undo-direction svg {
+                transform: rotate(90deg);
             }
 
             .master-data-undo-history-list {
@@ -29467,9 +29691,20 @@ img[data-deferred-src] {
                 width: 100%;
             }
 
-            .master-data-store-section-undo-overview,
             .master-data-store-section-undo-change {
                 grid-template-columns: 1fr;
+            }
+
+            .master-data-store-section-undo-state-identity {
+                grid-template-columns: 74px minmax(0, 1fr);
+            }
+
+            .master-data-store-section-undo-montage {
+                width: 74px;
+            }
+
+            .master-data-store-section-undo-changes > summary {
+                align-items: flex-start;
             }
 
             .master-data-store-section-undo-change-list {

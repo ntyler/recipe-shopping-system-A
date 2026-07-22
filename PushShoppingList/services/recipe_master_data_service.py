@@ -3026,6 +3026,15 @@ def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_i
                 "error": "This store-section apply cannot be previewed because its restore data is unavailable.",
             }
 
+        selected_recipe_row_ids = sorted({
+            int(recipe_row.get("id") or 0)
+            for change in selected_changes
+            if isinstance(change, dict)
+            for recipe_row in (change.get("recipe_ingredients_after") or [])
+            if isinstance(recipe_row, dict)
+            and str(recipe_row.get("id") or "").isdigit()
+            and int(recipe_row.get("id") or 0) > 0
+        })
         ingredient_ids = sorted({
             int((change.get("ingredient_after") or {}).get("id") or 0)
             for change in selected_changes
@@ -3052,12 +3061,50 @@ def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_i
                 for row in image_rows
             }
 
+        recipe_reference_rows = []
+        if selected_recipe_row_ids:
+            placeholders = ", ".join("?" for _value in selected_recipe_row_ids)
+            recipe_reference_rows = connection.execute(
+                f"""
+                SELECT r.id, r.recipe_id, r.original_recipe_text,
+                       r.quantity, r.unit, r.size, r.preparation,
+                       i.name AS ingredient_name
+                  FROM recipe_ingredients r
+                  LEFT JOIN ingredients i
+                    ON i.id = r.ingredient_id AND i.user_id = r.user_id
+                 WHERE r.user_id = ? AND r.id IN ({placeholders})
+                 ORDER BY LOWER(r.recipe_id) ASC, r.sort_order ASC, r.id ASC
+                """,
+                (scoped_user_id, *selected_recipe_row_ids),
+            ).fetchall()
+
     latest_batch_id = int(history_rows[0]["id"])
     latest_validation = undo_last_ingredient_store_section_reclassification(
         user_id=scoped_user_id,
         expected_batch_id=latest_batch_id,
         preview_only=True,
     )
+    recipe_metadata = recipe_reference_metadata(scoped_user_id)
+    recipe_reference_groups = {}
+    for row in recipe_reference_rows:
+        row_data = dict(row)
+        recipe_id = clean_text(row_data.get("recipe_id"))
+        if not recipe_id:
+            continue
+        metadata_record = recipe_metadata.get(recipe_id)
+        metadata_record = metadata_record if isinstance(metadata_record, dict) else {}
+        reference = recipe_reference_groups.setdefault(recipe_id, {
+            "recipe_id": recipe_id,
+            "recipe_url": clean_text(metadata_record.get("url")) or recipe_id,
+            "recipe_title": recipe_reference_title(recipe_id, metadata_record),
+            "ingredient_reference_count": 0,
+            "ingredients": [],
+        })
+        reference["ingredient_reference_count"] += 1
+        ingredient_name = clean_text(row_data.get("ingredient_name"))
+        if ingredient_name and ingredient_name not in reference["ingredients"]:
+            reference["ingredients"].append(ingredient_name)
+    recipe_references = list(recipe_reference_groups.values())
 
     def snapshot_reference_count(snapshot):
         changes = snapshot.get("changes") if isinstance(snapshot, dict) else []
@@ -3131,6 +3178,8 @@ def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_i
             int(change.get("recipe_reference_count") or 0)
             for change in change_previews
         ),
+        "affected_recipe_count": len(recipe_references),
+        "recipe_references": recipe_references,
         "newer_undo_count": newer_undo_count,
         "older_undo_count": max(0, len(history_rows) - selected_index - 1),
         "is_next_undo": selected_is_next,

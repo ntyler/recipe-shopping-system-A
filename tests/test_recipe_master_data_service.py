@@ -504,6 +504,13 @@ def test_misc_reclassification_applies_reviewed_rule_ai_and_keep_misc_decisions(
     assert undo_preview["batch_id"] == applied["batch_id"]
     assert undo_preview["change_count"] == 3
     assert undo_preview["recipe_reference_count"] == 3
+    assert undo_preview["affected_recipe_count"] == 1
+    assert undo_preview["recipe_references"][0]["ingredient_reference_count"] == 3
+    assert undo_preview["recipe_references"][0]["ingredients"] == [
+        "Ground ginger",
+        "Mystery crunch",
+        "Unknown morsels",
+    ]
     assert undo_preview["is_next_undo"] is True
     assert undo_preview["can_undo_now"] is True
     assert undo_preview["newer_undo_count"] == 0

@@ -317,6 +317,11 @@ def test_misc_reclassification_undo_route_and_button_restore_last_apply(monkeypa
     assert preview_payload["preview"]["batch_id"] == batch_id
     assert preview_payload["preview"]["change_count"] == 1
     assert preview_payload["preview"]["recipe_reference_count"] == 1
+    assert preview_payload["preview"]["affected_recipe_count"] == 1
+    assert len(preview_payload["preview"]["recipe_references"]) == 1
+    assert preview_payload["preview"]["recipe_references"][0]["ingredients"] == [
+        "Ground ginger"
+    ]
     assert preview_payload["preview"]["can_undo_now"] is True
     preview_change = preview_payload["preview"]["changes"][0]
     assert preview_change["ingredient"] == "Ground ginger"
@@ -558,6 +563,10 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "data-master-store-section-undo-history-list" in template
     assert "data-master-store-section-undo-change-list" in template
     assert "data-master-store-section-undo-confirm" in template
+    assert "data-master-store-section-undo-restored-sections" in template
+    assert "data-master-store-section-undo-current-sections" in template
+    assert "data-master-store-section-undo-recipes" in template
+    assert "Review ingredient details" in template
     assert "data-undo-preview-url" in template
     assert "requestMiscReclassificationUndo" in script
     assert "panel.dataset.undoBatchId" in script
@@ -565,6 +574,8 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "async function openMiscStoreSectionUndoPreview(panel, trigger)" in script
     assert "async function loadMiscStoreSectionUndoPreview(panel, batchId = 0)" in script
     assert "function renderMiscStoreSectionUndoPreview(panel, preview, batches)" in script
+    assert "function renderMiscStoreSectionUndoComparison(els, preview)" in script
+    assert "function renderMiscStoreSectionUndoRecipes(els, preview)" in script
     assert "openMiscStoreSectionUndoPreview(panel, undoButton)" in script
     assert "requestMiscReclassificationUndo(panel)" in script
     assert "batch_id: Number(preview.batch_id) || 0" in script
@@ -584,7 +595,10 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert ".master-data-misc-reference-dialog" in css
     assert ".master-data-misc-reference-heading" in css
     assert ".master-data-misc-reference-dialog-content" in css
-    assert ".master-data-store-section-undo-overview" in css
+    assert ".master-data-store-section-undo-comparison" in css
+    assert ".master-data-store-section-undo-state.is-restored" in css
+    assert ".master-data-store-section-undo-direction svg" in css
+    assert ".master-data-store-section-undo-recipes" in css
     assert ".master-data-store-section-undo-change-list" in css
     assert ".master-data-store-section-undo-transition" in css
     assert ".master-data-section-pill.is-restored" in css

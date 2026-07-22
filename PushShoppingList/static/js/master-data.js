@@ -4393,8 +4393,16 @@
             preview: dialog && dialog.querySelector("[data-master-store-section-undo-preview]"),
             position: dialog && dialog.querySelector("[data-master-store-section-undo-position]"),
             time: dialog && dialog.querySelector("[data-master-store-section-undo-time]"),
-            changeCount: dialog && dialog.querySelector("[data-master-store-section-undo-change-count]"),
-            referenceCount: dialog && dialog.querySelector("[data-master-store-section-undo-reference-count]"),
+            restoredMontage: dialog && dialog.querySelector("[data-master-store-section-undo-restored-montage]"),
+            restoredTitle: dialog && dialog.querySelector("[data-master-store-section-undo-restored-title]"),
+            restoredSummary: dialog && dialog.querySelector("[data-master-store-section-undo-restored-summary]"),
+            restoredSections: dialog && dialog.querySelector("[data-master-store-section-undo-restored-sections]"),
+            currentMontage: dialog && dialog.querySelector("[data-master-store-section-undo-current-montage]"),
+            currentTitle: dialog && dialog.querySelector("[data-master-store-section-undo-current-title]"),
+            currentSummary: dialog && dialog.querySelector("[data-master-store-section-undo-current-summary]"),
+            currentSections: dialog && dialog.querySelector("[data-master-store-section-undo-current-sections]"),
+            recipeCount: dialog && dialog.querySelector("[data-master-store-section-undo-recipe-count]"),
+            recipes: dialog && dialog.querySelector("[data-master-store-section-undo-recipes]"),
             listCount: dialog && dialog.querySelector("[data-master-store-section-undo-list-count]"),
             changeList: dialog && dialog.querySelector("[data-master-store-section-undo-change-list]"),
             impact: dialog && dialog.querySelector("[data-master-store-section-undo-impact]"),
@@ -4537,6 +4545,139 @@
         });
     }
 
+    function miscStoreSectionUndoDistribution(changes, field) {
+        const counts = new Map();
+        (Array.isArray(changes) ? changes : []).forEach((change) => {
+            const section = friendlyIngredientStoreSection(change && change[field]) || "Misc";
+            counts.set(section, (counts.get(section) || 0) + 1);
+        });
+        return Array.from(counts.entries())
+            .map(([section, count]) => ({ section, count }))
+            .sort((left, right) => right.count - left.count || left.section.localeCompare(right.section));
+    }
+
+    function renderMiscStoreSectionUndoDistribution(container, distribution) {
+        if (!container) return;
+        container.replaceChildren();
+        const rows = Array.isArray(distribution) ? distribution : [];
+        const visible = rows.slice(0, 4);
+        visible.forEach((entry) => {
+            const chip = document.createElement("span");
+            const label = document.createElement("strong");
+            label.textContent = entry.section;
+            const count = document.createElement("small");
+            count.textContent = String(entry.count);
+            chip.append(label, count);
+            container.appendChild(chip);
+        });
+        if (rows.length > visible.length) {
+            const more = document.createElement("span");
+            more.className = "is-more";
+            more.textContent = `+${rows.length - visible.length} sections`;
+            container.appendChild(more);
+        }
+    }
+
+    function renderMiscStoreSectionUndoMontage(container, changes) {
+        if (!container) return;
+        container.replaceChildren();
+        const rows = Array.isArray(changes) ? changes : [];
+        const images = rows
+            .filter((change) => text(change && change.image_url).trim())
+            .slice(0, 3);
+        images.forEach((change) => {
+            const frame = document.createElement("span");
+            const image = document.createElement("img");
+            image.src = text(change.image_url).trim();
+            image.alt = "";
+            image.loading = "lazy";
+            image.addEventListener("error", () => frame.remove(), { once: true });
+            frame.appendChild(image);
+            container.appendChild(frame);
+        });
+        if (!images.length) {
+            const fallback = document.createElement("span");
+            fallback.className = "is-fallback";
+            fallback.textContent = "↶";
+            fallback.setAttribute("aria-hidden", "true");
+            container.appendChild(fallback);
+        }
+        const remaining = Math.max(0, rows.length - images.length);
+        if (remaining) {
+            const more = document.createElement("strong");
+            more.textContent = `+${remaining}`;
+            more.setAttribute("aria-label", `${remaining} additional ingredients`);
+            container.appendChild(more);
+        }
+    }
+
+    function renderMiscStoreSectionUndoRecipes(els, preview) {
+        const references = Array.isArray(preview && preview.recipe_references)
+            ? preview.recipe_references
+            : [];
+        const affectedCount = Math.max(
+            references.length,
+            Number(preview && preview.affected_recipe_count) || 0
+        );
+        if (els.recipeCount) {
+            els.recipeCount.textContent = `${affectedCount} affected`;
+        }
+        if (!references.length && els.recipes) {
+            els.recipes.replaceChildren();
+            const empty = document.createElement("div");
+            empty.className = "master-data-undo-preview-reference";
+            const label = document.createElement("strong");
+            label.textContent = "No linked recipes need restoration.";
+            empty.appendChild(label);
+            els.recipes.appendChild(empty);
+            return;
+        }
+        const visible = references.slice(0, 6).map((reference) => {
+            const ingredientCount = Math.max(0, Number(reference.ingredient_reference_count) || 0);
+            const ingredients = Array.isArray(reference.ingredients) ? reference.ingredients : [];
+            return {
+                recipe_title: reference.recipe_title,
+                quantity: String(ingredientCount),
+                unit: `ingredient${ingredientCount === 1 ? "" : "s"}`,
+                original_recipe_text: ingredients.slice(0, 4).join(", "),
+            };
+        });
+        renderMasterDataUndoPreviewReferences(
+            els.recipes,
+            visible,
+            references.length > visible.length
+        );
+    }
+
+    function renderMiscStoreSectionUndoComparison(els, preview) {
+        const changes = Array.isArray(preview && preview.changes) ? preview.changes : [];
+        const changeCount = changes.length;
+        const restoredDistribution = miscStoreSectionUndoDistribution(
+            changes,
+            "restored_store_section"
+        );
+        const currentDistribution = miscStoreSectionUndoDistribution(
+            changes,
+            "applied_store_section"
+        );
+        renderMiscStoreSectionUndoMontage(els.restoredMontage, changes);
+        renderMiscStoreSectionUndoMontage(els.currentMontage, changes);
+        renderMiscStoreSectionUndoDistribution(els.restoredSections, restoredDistribution);
+        renderMiscStoreSectionUndoDistribution(els.currentSections, currentDistribution);
+        if (els.restoredTitle) {
+            els.restoredTitle.textContent = `${changeCount} previous assignment${changeCount === 1 ? "" : "s"}`;
+        }
+        if (els.currentTitle) {
+            els.currentTitle.textContent = `${changeCount} current assignment${changeCount === 1 ? "" : "s"}`;
+        }
+        if (els.restoredSummary) {
+            els.restoredSummary.textContent = `Restore ${restoredDistribution.length} prior store section${restoredDistribution.length === 1 ? "" : "s"}.`;
+        }
+        if (els.currentSummary) {
+            els.currentSummary.textContent = `Keep classifications across ${currentDistribution.length} store section${currentDistribution.length === 1 ? "" : "s"}.`;
+        }
+    }
+
     function renderMiscStoreSectionUndoPreview(panel, preview, batches) {
         const els = miscStoreSectionUndoElements();
         if (!els.dialog || !preview) return;
@@ -4559,11 +4700,11 @@
             els.time.textContent = formatMasterDataDuplicateScanTime(preview.applied_at)
                 || "Apply time unavailable";
         }
-        if (els.changeCount) els.changeCount.textContent = String(changeCount);
-        if (els.referenceCount) els.referenceCount.textContent = String(referenceCount);
         if (els.listCount) {
             els.listCount.textContent = `${changeCount} change${changeCount === 1 ? "" : "s"}`;
         }
+        renderMiscStoreSectionUndoComparison(els, preview);
+        renderMiscStoreSectionUndoRecipes(els, preview);
         renderMiscStoreSectionUndoChanges(els.changeList, preview.changes);
         if (els.impact) {
             els.impact.replaceChildren();
