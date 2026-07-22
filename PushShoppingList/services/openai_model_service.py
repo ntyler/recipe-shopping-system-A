@@ -119,6 +119,13 @@ OPENAI_MODEL_SETTINGS = (
         "description": "Ingredient cleanup and ambiguity review.",
     },
     {
+        "env_var": "OPENAI_INGREDIENT_STORE_SECTION_MODEL",
+        "feature": "Ingredient Store-Section Review",
+        "default_model": "gpt-4o-mini",
+        "fallback_env_vars": ("OPENAI_INGREDIENT_REVIEW_MODEL", "OPENAI_RECIPE_MODEL"),
+        "description": "Independent AI second opinions for unconfirmed Misc ingredient store sections.",
+    },
+    {
         "env_var": "OPENAI_FOOD_RULES_MODEL",
         "feature": "Food Rules",
         "default_model": "gpt-4o-mini",
@@ -153,6 +160,20 @@ OPENAI_MODEL_SETTINGS = (
         "feature": "Recipe Step Images",
         "default_model": "gpt-image-1",
         "description": "Image generation for recipe step illustrations.",
+    },
+    {
+        "env_var": "OPENAI_RECIPE_TITLE_IMAGE_MODEL",
+        "feature": "Recipe Title Images",
+        "default_model": "gpt-image-1",
+        "fallback_env_vars": ("OPENAI_STEP_IMAGE_MODEL",),
+        "description": "OpenAI image generation for recipe title and gallery artwork.",
+    },
+    {
+        "env_var": "OPENAI_PANTRY_IMAGE_MODEL",
+        "feature": "Pantry Item Images",
+        "default_model": "gpt-image-1",
+        "fallback_env_vars": ("OPENAI_STEP_IMAGE_MODEL",),
+        "description": "OpenAI image generation for pantry inventory items.",
     },
 )
 
@@ -261,6 +282,14 @@ OPENAI_MODEL_USAGE_BY_ENV = {
         "href": "/admin/master-data/ingredients",
         "surfaces": ("Ingredients", "AI review"),
     },
+    "OPENAI_INGREDIENT_STORE_SECTION_MODEL": {
+        "kind": "data",
+        "icon": "AIS",
+        "title": "Ingredient Store Sections",
+        "detail": "AI second opinions for unconfirmed Misc items",
+        "href": "/admin/master-data/ingredients",
+        "surfaces": ("Store sections", "AI second opinion"),
+    },
     "OPENAI_FOOD_RULES_MODEL": {
         "kind": "settings",
         "icon": "RULE",
@@ -309,6 +338,22 @@ OPENAI_MODEL_USAGE_BY_ENV = {
         "href": "/#recipesPage",
         "surfaces": ("Instructions", "Step images"),
     },
+    "OPENAI_RECIPE_TITLE_IMAGE_MODEL": {
+        "kind": "media",
+        "icon": "TITLE",
+        "title": "Recipe editor",
+        "detail": "Generates title and gallery artwork",
+        "href": "/#recipesPage",
+        "surfaces": ("Title image", "Recipe gallery"),
+    },
+    "OPENAI_PANTRY_IMAGE_MODEL": {
+        "kind": "media",
+        "icon": "PAN",
+        "title": "Pantry",
+        "detail": "Generates pantry item images",
+        "href": "/#pantryPage",
+        "surfaces": ("Pantry items", "Inventory images"),
+    },
 }
 
 
@@ -340,12 +385,15 @@ DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_RECIPE_NOTE_MODEL": "gpt-5.5-mini",
     "OPENAI_PRODUCT_ANALYSIS_MODEL": "gpt-5.5-mini",
     "OPENAI_INGREDIENT_REVIEW_MODEL": "gpt-5.5-mini",
+    "OPENAI_INGREDIENT_STORE_SECTION_MODEL": "gpt-5.5-mini",
     "OPENAI_FOOD_RULES_MODEL": "gpt-5.5-mini",
     "OPENAI_FOOD_REVIEW_MODEL": "gpt-5.5-mini",
     "OPENAI_ADDRESS_MODEL": "gpt-5.5-mini",
     "OPENAI_PING_TEXT_MODEL": "gpt-5.5-mini",
     "OPENAI_TRANSCRIPTION_MODEL": "whisper-1",
     "OPENAI_STEP_IMAGE_MODEL": "gpt-image-1",
+    "OPENAI_RECIPE_TITLE_IMAGE_MODEL": "gpt-image-1",
+    "OPENAI_PANTRY_IMAGE_MODEL": "gpt-image-1",
 }
 
 LOWEST_VIABLE_MODEL_BY_ENV = {
@@ -362,12 +410,15 @@ LOWEST_VIABLE_MODEL_BY_ENV = {
     "OPENAI_RECIPE_NOTE_MODEL": "gpt-5.4-nano",
     "OPENAI_PRODUCT_ANALYSIS_MODEL": "gpt-5.4-nano",
     "OPENAI_INGREDIENT_REVIEW_MODEL": "gpt-5.4-nano",
+    "OPENAI_INGREDIENT_STORE_SECTION_MODEL": "gpt-5.4-nano",
     "OPENAI_FOOD_RULES_MODEL": "gpt-5.4-nano",
     "OPENAI_FOOD_REVIEW_MODEL": "gpt-5.4-nano",
     "OPENAI_ADDRESS_MODEL": "gpt-5.4-nano",
     "OPENAI_PING_TEXT_MODEL": "gpt-5.4-nano",
     "OPENAI_TRANSCRIPTION_MODEL": "whisper-1",
     "OPENAI_STEP_IMAGE_MODEL": "gpt-image-1",
+    "OPENAI_RECIPE_TITLE_IMAGE_MODEL": "gpt-image-1",
+    "OPENAI_PANTRY_IMAGE_MODEL": "gpt-image-1",
 }
 
 LEGACY_MODEL_RECOMMENDATIONS = {
@@ -866,6 +917,10 @@ def refresh_openai_model_runtime_bindings():
     food_rules_model = os.getenv("OPENAI_FOOD_RULES_MODEL", recipe_model)
     food_review_model = os.getenv("OPENAI_FOOD_REVIEW_MODEL", recipe_model)
     ingredient_review_model = os.getenv("OPENAI_INGREDIENT_REVIEW_MODEL", recipe_model)
+    ingredient_store_section_model = os.getenv(
+        "OPENAI_INGREDIENT_STORE_SECTION_MODEL",
+        ingredient_review_model,
+    )
 
     module_updates = {
         "PushShoppingList.services.recipe_extract_service": {
@@ -885,6 +940,9 @@ def refresh_openai_model_runtime_bindings():
         "PushShoppingList.services.ingredient_duplicate_review_service": {
             "MODEL": ingredient_review_model,
             "SECOND_OPINION_MODEL": ingredient_review_model,
+        },
+        "PushShoppingList.services.ingredient_store_section_review_service": {
+            "MODEL": ingredient_store_section_model,
         },
     }
     for module_name, updates in module_updates.items():
@@ -910,6 +968,10 @@ def model_value_for_env(env_var, default_model=None):
     sync_openai_model_environment_from_overrides()
     env_var = str(env_var or "").strip()
     default_model = str(default_model or default_model_for_env(env_var)).strip() or "gpt-4o-mini"
+    setting = next(
+        (candidate for candidate in unique_model_settings() if candidate["env_var"] == env_var),
+        {},
+    )
     override = load_openai_model_overrides().get(env_var, "")
     env_model = str(os.getenv(env_var, "")).strip()
     if override:
@@ -921,6 +983,11 @@ def model_value_for_env(env_var, default_model=None):
 
     if env_model:
         return env_model, "environment"
+
+    for fallback_env_var in setting.get("fallback_env_vars", ()):
+        fallback_model = str(os.getenv(fallback_env_var, "")).strip()
+        if fallback_model:
+            return fallback_model, f"fallback: {fallback_env_var}"
 
     return default_model, "default"
 

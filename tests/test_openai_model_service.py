@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -8,6 +9,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from PushShoppingList.services import openai_model_service as models
+from PushShoppingList.services import ingredient_store_section_review_service as store_section_review
 
 
 ADMIN_USER = {"email": "admin@example.com"}
@@ -25,12 +27,15 @@ EXPECTED_OPENAI_MODEL_ENV_VARS = {
     "OPENAI_RECIPE_NOTE_MODEL",
     "OPENAI_PRODUCT_ANALYSIS_MODEL",
     "OPENAI_INGREDIENT_REVIEW_MODEL",
+    "OPENAI_INGREDIENT_STORE_SECTION_MODEL",
     "OPENAI_FOOD_RULES_MODEL",
     "OPENAI_FOOD_REVIEW_MODEL",
     "OPENAI_ADDRESS_MODEL",
     "OPENAI_PING_TEXT_MODEL",
     "OPENAI_TRANSCRIPTION_MODEL",
     "OPENAI_STEP_IMAGE_MODEL",
+    "OPENAI_RECIPE_TITLE_IMAGE_MODEL",
+    "OPENAI_PANTRY_IMAGE_MODEL",
 }
 
 
@@ -106,8 +111,29 @@ def test_dashboard_includes_all_openai_model_environment_variables(monkeypatch, 
     }
     assert rows["OPENAI_INGREDIENT_REVIEW_MODEL"]["usage"]["title"] == "Ingredient Master Data"
     assert rows["OPENAI_INGREDIENT_REVIEW_MODEL"]["usage"]["href"] == "/admin/master-data/ingredients"
+    assert rows["OPENAI_INGREDIENT_STORE_SECTION_MODEL"]["usage"]["title"] == "Ingredient Store Sections"
+    assert rows["OPENAI_INGREDIENT_STORE_SECTION_MODEL"]["usage"]["href"] == "/admin/master-data/ingredients"
+    assert rows["OPENAI_RECIPE_TITLE_IMAGE_MODEL"]["usage"]["title"] == "Recipe editor"
+    assert rows["OPENAI_PANTRY_IMAGE_MODEL"]["usage"]["href"] == "/#pantryPage"
     assert all(row["usage"]["title"] for row in dashboard["rows"])
     assert all(row["usage"]["href"] for row in dashboard["rows"])
+
+
+def test_dashboard_registry_covers_model_variables_referenced_by_the_application(monkeypatch, tmp_path):
+    configure_model_files(monkeypatch, tmp_path, ["gpt-5.5", "gpt-image-1"])
+    referenced_env_vars = set()
+    pattern = re.compile(r"\bOPENAI_[A-Z0-9_]+_MODEL\b")
+    model_service_path = ROOT / "PushShoppingList" / "services" / "openai_model_service.py"
+    for path in (ROOT / "PushShoppingList").rglob("*.py"):
+        if path == model_service_path:
+            continue
+        referenced_env_vars.update(pattern.findall(path.read_text(encoding="utf-8")))
+    referenced_env_vars.discard("OPENAI_UNSUPPORTED_MODEL")
+
+    dashboard = models.chatgpt_models_dashboard_for_user(ADMIN_USER)
+    registered_env_vars = {row["env_var"] for row in dashboard["rows"]}
+
+    assert referenced_env_vars <= registered_env_vars
 
 
 def test_use_proposed_model_persists_recommended_value(monkeypatch, tmp_path):
@@ -154,6 +180,11 @@ def test_save_models_updates_environment_and_local_env_file(monkeypatch, tmp_pat
     form["model_OPENAI_MENU_CLEANUP_MODEL"] = "gpt-5.4-nano"
     form["model_OPENAI_TRANSCRIPTION_MODEL"] = "whisper-1"
     form["model_OPENAI_STEP_IMAGE_MODEL"] = "gpt-image-1"
+    form["model_OPENAI_INGREDIENT_STORE_SECTION_MODEL"] = "gpt-5.4-mini"
+    form["model_OPENAI_RECIPE_TITLE_IMAGE_MODEL"] = "gpt-image-1"
+    form["model_OPENAI_PANTRY_IMAGE_MODEL"] = "gpt-image-1"
+    original_store_section_model = store_section_review.MODEL
+    monkeypatch.setattr(store_section_review, "MODEL", original_store_section_model)
 
     result = models.update_openai_model_settings_for_admin(ADMIN_USER, form)
 
@@ -163,6 +194,10 @@ def test_save_models_updates_environment_and_local_env_file(monkeypatch, tmp_pat
     assert os.environ["OPENAI_MENU_CLEANUP_MODEL"] == "gpt-5.4-nano"
     assert os.environ["OPENAI_TRANSCRIPTION_MODEL"] == "whisper-1"
     assert os.environ["OPENAI_STEP_IMAGE_MODEL"] == "gpt-image-1"
+    assert os.environ["OPENAI_INGREDIENT_STORE_SECTION_MODEL"] == "gpt-5.4-mini"
+    assert os.environ["OPENAI_RECIPE_TITLE_IMAGE_MODEL"] == "gpt-image-1"
+    assert os.environ["OPENAI_PANTRY_IMAGE_MODEL"] == "gpt-image-1"
+    assert store_section_review.MODEL == "gpt-5.4-mini"
     local_env = models.LOCAL_ENV_FILE.read_text(encoding="utf-8")
     assert "set SHOPPING_APP_SMTP_HOST=smtp.gmail.com" in local_env
     assert "old-menu-model" not in local_env
@@ -172,12 +207,33 @@ def test_save_models_updates_environment_and_local_env_file(monkeypatch, tmp_pat
     assert "set OPENAI_MENU_CLEANUP_MODEL=gpt-5.4-nano" in local_env
     assert "set OPENAI_TRANSCRIPTION_MODEL=whisper-1" in local_env
     assert "set OPENAI_STEP_IMAGE_MODEL=gpt-image-1" in local_env
+    assert "set OPENAI_INGREDIENT_STORE_SECTION_MODEL=gpt-5.4-mini" in local_env
+    assert "set OPENAI_RECIPE_TITLE_IMAGE_MODEL=gpt-image-1" in local_env
+    assert "set OPENAI_PANTRY_IMAGE_MODEL=gpt-image-1" in local_env
     assert local_env.count("OPENAI_MENU_MODEL") == 1
 
     dashboard = models.chatgpt_models_dashboard_for_user(ADMIN_USER)
     rows = {row["env_var"]: row for row in dashboard["rows"]}
     assert rows["OPENAI_MENU_MODEL"]["model"] == "gpt-5.4-mini"
     assert rows["OPENAI_MENU_MODEL"]["source"] == "admin override"
+
+
+def test_feature_specific_model_row_reports_its_active_fallback(monkeypatch, tmp_path):
+    configure_model_files(monkeypatch, tmp_path, ["gpt-5.5", "gpt-4o-mini"])
+    monkeypatch.setenv("OPENAI_RECIPE_MODEL", "gpt-5.5")
+
+    model, source = models.model_value_for_env(
+        "OPENAI_INGREDIENT_STORE_SECTION_MODEL",
+        "gpt-4o-mini",
+    )
+
+    assert model == "gpt-5.5"
+    assert source == "fallback: OPENAI_RECIPE_MODEL"
+
+    dashboard = models.chatgpt_models_dashboard_for_user(ADMIN_USER)
+    rows = {row["env_var"]: row for row in dashboard["rows"]}
+    assert rows["OPENAI_INGREDIENT_STORE_SECTION_MODEL"]["model"] == "gpt-5.5"
+    assert rows["OPENAI_INGREDIENT_STORE_SECTION_MODEL"]["source"] == "fallback: OPENAI_RECIPE_MODEL"
 
 
 def test_model_value_syncs_changed_override_file_without_restart(monkeypatch, tmp_path):
