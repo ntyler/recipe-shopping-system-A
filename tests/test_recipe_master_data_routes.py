@@ -304,6 +304,8 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "data-master-store-section-form" in all_html
     assert "Reclassify unconfirmed Misc ingredients" in all_html
     assert "data-master-misc-reclassification" in all_html
+    assert 'id="masterDataMiscReferencesDialog"' in all_html
+    assert "Recipes using this ingredient" in all_html
     assert "Store-section maintenance" in all_html
     assert "data-master-misc-reclassification-preview-panel" in all_html
     assert "data-master-misc-reclassification-count" in all_html
@@ -458,15 +460,25 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "miscReviewDecisionPayload" in script
     assert "function miscReviewIngredientImage(row)" in script
     assert "function miscReviewReferenceUrl(panel, ingredientId)" in script
-    assert "function miscReviewReferencePanel(row)" in script
-    assert "async function toggleMiscReviewReferences(panel, row)" in script
+    assert "function miscReviewReferenceElements()" in script
+    assert "function renderMiscReviewReferenceDialog(els, row)" in script
+    assert "async function openMiscReviewReferences(panel, row, trigger)" in script
+    assert "function closeMiscReviewReferences()" in script
+    assert "function initMiscReviewReferenceDialog()" in script
     assert "imageUrl: text(change.image_url)" in script
     assert "imageUrl: text(opinion.image_url)" in script
     assert 'image.className = "master-data-thumbnail master-data-misc-thumbnail"' in script
     assert 'name.className = "master-data-misc-ingredient-name"' in script
-    assert 'name.setAttribute("aria-expanded", row.referencesExpanded ? "true" : "false")' in script
-    assert "miscReviewReferencePanel(row)" in script
+    assert 'name.setAttribute("aria-haspopup", "dialog")' in script
+    assert 'name.setAttribute("aria-controls", "masterDataMiscReferencesDialog")' in script
+    assert "openMiscReviewReferences(panel, row, name)" in script
+    assert "if (event.target === els.dialog) closeMiscReviewReferences()" in script
+    assert "if (returnFocus && returnFocus.isConnected) returnFocus.focus()" in script
     assert 'data-reference-url="{{ master_data.ingredient_reference_url }}"' in template
+    assert 'id="masterDataMiscReferencesDialog"' in template
+    assert "data-master-misc-reference-dialog" in template
+    assert "data-master-misc-reference-close" in template
+    assert "data-master-misc-reference-body" in template
     assert "requestMiscReclassificationUndo" in script
     assert "panel.dataset.undoBatchId" in script
     assert "AI suggestions for unresolved ingredients are preselected and remain editable." in script
@@ -480,7 +492,12 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert ".master-data-misc-ingredient-copy" in css
     assert ".master-data-misc-thumbnail" in css
     assert ".master-data-misc-ingredient-name" in css
-    assert ".master-data-misc-reference-panel" in css
+    assert ".master-data-misc-reference-dialog" in css
+    assert ".master-data-misc-reference-heading" in css
+    assert ".master-data-misc-reference-dialog-content" in css
+    assert "height: calc(100dvh - 12px);" in css
+    assert "miscReviewReferencePanel" not in script
+    assert "referencesExpanded" not in script
     assert ".is-accept-ai" in css
     assert ".master-data-action-undo" in css
     decision_start = script.index("function miscReviewDecisionSelect")

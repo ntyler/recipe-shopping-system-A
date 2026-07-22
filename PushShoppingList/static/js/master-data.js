@@ -19,6 +19,7 @@
     let masterDataMergeReturnFocus = null;
     let masterDataDuplicateReferenceRequestId = 0;
     let masterDataDuplicateReferenceReturnFocus = null;
+    let masterDataMiscReferenceReturnFocus = null;
 
     function text(value) {
         return String(value == null ? "" : value);
@@ -3791,7 +3792,6 @@
             normalizedName: text(change.normalized_name),
             imageUrl: text(change.image_url),
             form: text(change.form),
-            referencesExpanded: false,
             referencesLoading: false,
             referencesData: null,
             referencesError: "",
@@ -3923,43 +3923,87 @@
         }
     }
 
-    function miscReviewReferencePanel(row) {
-        const references = document.createElement("section");
-        references.id = `masterDataMiscReferences-${row.ingredientId}`;
-        references.className = "master-data-reference-panel master-data-misc-reference-panel";
-        references.dataset.masterMiscReferencePanel = String(row.ingredientId);
-        references.setAttribute("aria-live", "polite");
-        references.hidden = !row.referencesExpanded;
-        if (row.referencesLoading) {
-            setReferenceLoading(references);
-        } else if (row.referencesError) {
-            setReferenceError(references, row.referencesError);
-        } else if (row.referencesData) {
-            renderReferences(references, row.referencesData);
-        }
-        return references;
+    function miscReviewReferenceElements() {
+        const dialog = document.querySelector("[data-master-misc-reference-dialog]");
+        return {
+            dialog,
+            title: dialog && dialog.querySelector("[data-master-misc-reference-title]"),
+            context: dialog && dialog.querySelector("[data-master-misc-reference-context]"),
+            image: dialog && dialog.querySelector("[data-master-misc-reference-image]"),
+            imageFallback: dialog && dialog.querySelector("[data-master-misc-reference-image-fallback]"),
+            body: dialog && dialog.querySelector("[data-master-misc-reference-body]"),
+            closeButtons: dialog ? dialog.querySelectorAll("[data-master-misc-reference-close]") : [],
+        };
     }
 
-    async function toggleMiscReviewReferences(panel, row) {
-        const shouldExpand = !row.referencesExpanded;
-        (panel.miscReclassificationRows || []).forEach((candidate) => {
-            candidate.referencesExpanded = candidate === row ? shouldExpand : false;
-        });
-        if (!shouldExpand || row.referencesData || row.referencesLoading) {
-            renderMiscReclassificationRows(panel);
+    function setMiscReviewReferenceIdentity(els, row) {
+        const ingredientName = miscReviewDisplayName(row.ingredient);
+        if (els.title) els.title.textContent = `Recipes using ${ingredientName}`;
+        if (els.context) els.context.textContent = "Loading connected recipes…";
+        const imageUrl = text(row.imageUrl).trim();
+        if (els.image) {
+            els.image.hidden = !imageUrl;
+            if (imageUrl) {
+                els.image.src = imageUrl;
+                els.image.alt = `${ingredientName} image`;
+            } else {
+                els.image.removeAttribute("src");
+                els.image.alt = "";
+            }
+        }
+        if (els.imageFallback) els.imageFallback.hidden = Boolean(imageUrl);
+    }
+
+    function renderMiscReviewReferenceDialog(els, row) {
+        if (!els.body) return;
+        if (row.referencesLoading) {
+            setReferenceLoading(els.body);
+            return;
+        }
+        if (row.referencesError) {
+            setReferenceError(els.body, row.referencesError);
+            if (els.context) els.context.textContent = "Connected recipes could not be loaded.";
+            return;
+        }
+        if (row.referencesData) {
+            renderReferences(els.body, row.referencesData);
+            const references = Array.isArray(row.referencesData.references)
+                ? row.referencesData.references
+                : [];
+            const total = Number(row.referencesData.total) || references.length;
+            if (els.context) {
+                els.context.textContent = `${total} connected recipe${total === 1 ? "" : "s"}. Recipe links open in a new tab.`;
+            }
+        }
+    }
+
+    function closeMiscReviewReferences() {
+        const els = miscReviewReferenceElements();
+        if (els.dialog && els.dialog.open) els.dialog.close();
+    }
+
+    async function openMiscReviewReferences(panel, row, trigger) {
+        const els = miscReviewReferenceElements();
+        if (!els.dialog || !els.body) return;
+        masterDataMiscReferenceReturnFocus = trigger || null;
+        setMiscReviewReferenceIdentity(els, row);
+        if (!els.dialog.open) els.dialog.showModal();
+
+        if (row.referencesData || row.referencesLoading) {
+            renderMiscReviewReferenceDialog(els, row);
             return;
         }
 
         const referenceUrl = miscReviewReferenceUrl(panel, row.ingredientId);
         if (!referenceUrl || !window.fetch) {
             row.referencesError = "Recipe references are not available in this browser.";
-            renderMiscReclassificationRows(panel);
+            renderMiscReviewReferenceDialog(els, row);
             return;
         }
 
-        row.referencesLoading = true;
         row.referencesError = "";
-        renderMiscReclassificationRows(panel);
+        row.referencesLoading = true;
+        renderMiscReviewReferenceDialog(els, row);
         try {
             const response = await fetch(referenceUrl, {
                 headers: { Accept: "application/json", "X-Requested-With": "fetch" },
@@ -3975,7 +4019,7 @@
                 : "Recipe references could not be loaded.";
         } finally {
             row.referencesLoading = false;
-            renderMiscReclassificationRows(panel);
+            if (els.dialog.open) renderMiscReviewReferenceDialog(els, row);
         }
     }
 
@@ -3987,20 +4031,17 @@
         const name = document.createElement("button");
         name.type = "button";
         name.className = "master-data-misc-ingredient-name";
-        name.setAttribute("aria-expanded", row.referencesExpanded ? "true" : "false");
-        name.setAttribute("aria-controls", `masterDataMiscReferences-${row.ingredientId}`);
-        name.setAttribute(
-            "aria-label",
-            `${row.referencesExpanded ? "Hide" : "Show"} recipes referencing ${miscReviewDisplayName(row.ingredient)}`
-        );
+        name.setAttribute("aria-haspopup", "dialog");
+        name.setAttribute("aria-controls", "masterDataMiscReferencesDialog");
+        name.setAttribute("aria-label", `Show recipes referencing ${miscReviewDisplayName(row.ingredient)}`);
         const nameText = document.createElement("span");
         nameText.textContent = miscReviewDisplayName(row.ingredient);
         const indicator = document.createElement("span");
         indicator.className = "master-data-misc-ingredient-indicator";
         indicator.setAttribute("aria-hidden", "true");
-        indicator.textContent = row.referencesExpanded ? "−" : "+";
+        indicator.textContent = "↗";
         name.append(nameText, indicator);
-        name.addEventListener("click", () => toggleMiscReviewReferences(panel, row));
+        name.addEventListener("click", () => openMiscReviewReferences(panel, row, name));
         const current = document.createElement("span");
         current.className = "master-data-misc-current-label";
         current.textContent = "Currently: Misc";
@@ -4091,8 +4132,7 @@
                     miscReviewIngredientCell(panel, row),
                     miscReviewDeterministicCell(row),
                     miscReviewAiCell(panel, row),
-                    miscReviewDecisionSelect(panel, row),
-                    miscReviewReferencePanel(row)
+                    miscReviewDecisionSelect(panel, row)
                 );
                 list.appendChild(item);
             });
@@ -4348,7 +4388,6 @@
                         normalizedName: text(opinion.normalized_name),
                         imageUrl: text(opinion.image_url),
                         form: "",
-                        referencesExpanded: false,
                         referencesLoading: false,
                         referencesData: null,
                         referencesError: "",
@@ -4398,6 +4437,29 @@
         }
     }
 
+    function initMiscReviewReferenceDialog() {
+        const els = miscReviewReferenceElements();
+        if (!els.dialog) return;
+        els.closeButtons.forEach((button) => {
+            button.addEventListener("click", closeMiscReviewReferences);
+        });
+        els.dialog.addEventListener("click", (event) => {
+            if (event.target === els.dialog) closeMiscReviewReferences();
+        });
+        els.dialog.addEventListener("close", () => {
+            if (els.body) els.body.replaceChildren();
+            const returnFocus = masterDataMiscReferenceReturnFocus;
+            masterDataMiscReferenceReturnFocus = null;
+            if (returnFocus && returnFocus.isConnected) returnFocus.focus();
+        });
+        if (els.image) {
+            els.image.addEventListener("error", () => {
+                els.image.hidden = true;
+                if (els.imageFallback) els.imageFallback.hidden = false;
+            });
+        }
+    }
+
     function initMiscIngredientReclassification() {
         const panel = document.querySelector("[data-master-misc-reclassification]");
         if (!panel || !window.fetch) return;
@@ -4439,6 +4501,7 @@
         initMasterDataStoreSectionBatchSave();
         initMasterDataIngredientMerge();
         initMasterDataDuplicateReview();
+        initMiscReviewReferenceDialog();
         initMiscIngredientReclassification();
 
         const form = document.querySelector("[data-master-backfill-form]");

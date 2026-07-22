@@ -25953,31 +25953,9 @@ img[data-deferred-src] {
             line-height: 1.2;
         }
 
-        .master-data-misc-ingredient-name[aria-expanded="true"] .master-data-misc-ingredient-indicator {
-            color: #4dcc91;
-        }
-
         .master-data-misc-thumbnail,
         .master-data-misc-no-image {
             grid-column: 1;
-        }
-
-        .master-data-misc-reference-panel {
-            grid-column: 1 / -1;
-            padding: 12px;
-            border: 1px solid #31566f;
-            border-radius: 8px;
-            background: #071521;
-        }
-
-        .master-data-misc-reference-panel[hidden] {
-            display: none;
-        }
-
-        .master-data-misc-reference-panel .master-data-reference-list {
-            max-height: 420px;
-            overflow-y: auto;
-            overscroll-behavior: contain;
         }
 
         .master-data-misc-current-label,
@@ -28481,6 +28459,11 @@ img[data-deferred-src] {
             box-shadow: 0 24px 80px rgba(0, 0, 0, .58);
         }
 
+        .master-data-misc-reference-dialog {
+            width: min(880px, calc(100vw - 24px));
+            max-width: 880px;
+        }
+
         .master-data-reference-dialog::backdrop {
             background: rgba(2, 8, 12, .72);
             backdrop-filter: blur(2px);
@@ -28550,6 +28533,53 @@ img[data-deferred-src] {
             color: #aebdca;
             font-size: 11px;
             font-weight: 750;
+        }
+
+        .master-data-misc-reference-heading {
+            display: grid;
+            grid-template-columns: 58px minmax(0, 1fr);
+            align-items: center;
+            gap: 11px;
+            margin-top: 4px;
+        }
+
+        .master-data-misc-reference-heading > img,
+        .master-data-misc-reference-heading > span {
+            display: grid;
+            width: 56px;
+            height: 56px;
+            place-items: center;
+            border: 1px solid #36546b;
+            border-radius: 9px;
+            background: #0b1724;
+        }
+
+        .master-data-misc-reference-heading > img {
+            object-fit: cover;
+        }
+
+        .master-data-misc-reference-heading > img[hidden],
+        .master-data-misc-reference-heading > span[hidden] {
+            display: none;
+        }
+
+        .master-data-misc-reference-heading > div {
+            display: grid;
+            min-width: 0;
+            gap: 3px;
+        }
+
+        .master-data-misc-reference-dialog-content {
+            display: grid;
+            align-content: start;
+            gap: 10px;
+            min-height: 100px;
+        }
+
+        .master-data-misc-reference-dialog-content .master-data-reference-list {
+            max-height: min(520px, calc(100dvh - 260px));
+            overflow-y: auto;
+            overscroll-behavior: contain;
         }
 
         .master-data-reference-dialog-close {
@@ -29210,6 +29240,11 @@ img[data-deferred-src] {
             .master-data-merge-form {
                 width: calc(100vw - 12px);
                 max-height: calc(100dvh - 12px);
+            }
+
+            .master-data-misc-reference-dialog,
+            .master-data-misc-reference-dialog .master-data-reference-dialog-shell {
+                height: calc(100dvh - 12px);
             }
 
             .master-data-undo-dialog-header,

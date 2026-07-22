@@ -270,6 +270,45 @@
                     </div>
                 </div>
             </section>
+
+            <dialog id="masterDataMiscReferencesDialog"
+                    class="master-data-reference-dialog master-data-misc-reference-dialog"
+                    data-master-misc-reference-dialog
+                    aria-labelledby="masterDataMiscReferencesTitle"
+                    aria-describedby="masterDataMiscReferencesContext">
+                <div class="master-data-reference-dialog-shell">
+                    <header class="master-data-reference-dialog-header">
+                        <div>
+                            <span>Ingredient recipe usage</span>
+                            <div class="master-data-misc-reference-heading">
+                                <img data-master-misc-reference-image alt="" hidden>
+                                <span data-master-misc-reference-image-fallback aria-hidden="true">&#127859;</span>
+                                <div>
+                                    <h2 id="masterDataMiscReferencesTitle"
+                                        data-master-misc-reference-title>Recipes using this ingredient</h2>
+                                    <p id="masterDataMiscReferencesContext"
+                                       data-master-misc-reference-context>
+                                        Review connected recipes without leaving your classification decisions.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button"
+                                class="master-data-reference-dialog-close"
+                                data-master-misc-reference-close
+                                aria-label="Close recipe usage dialog">&times;</button>
+                    </header>
+                    <div class="master-data-reference-dialog-body">
+                        <div class="master-data-misc-reference-dialog-content"
+                             data-master-misc-reference-body
+                             aria-live="polite"></div>
+                    </div>
+                    <footer class="master-data-reference-dialog-footer">
+                        <span>Your store-section choices remain unchanged.</span>
+                        <button type="button" data-master-misc-reference-close>Close</button>
+                    </footer>
+                </div>
+            </dialog>
         {% endif %}
 
         {% if master_data.is_admin %}
