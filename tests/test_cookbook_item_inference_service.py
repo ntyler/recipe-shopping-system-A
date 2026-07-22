@@ -284,6 +284,26 @@ def test_regenerate_ingredients_preview_uses_current_editor_context_without_savi
     assert '"current_ingredients_role": "stale_rows_to_replace"' in calls[0]["prompt"]
     assert '"preserve_current_ingredients_by_default": false' in calls[0]["prompt"]
     assert "Preserve clearly useful current ingredient details" not in calls[0]["prompt"]
+    assert '"store_section_classification"' in calls[0]["prompt"]
+
+
+def test_normalize_ai_ingredients_accepts_structured_store_section_classification():
+    ingredients = inference.normalize_ai_ingredients([
+        {
+            "name": "mystery crunch",
+            "store_section_classification": {
+                "store_section": "Spices",
+                "confidence": 0.97,
+                "reason": "The item is a dried seasoning.",
+                "normalized_name": "mystery crunch",
+            },
+        }
+    ])
+
+    assert ingredients[0]["store_section"] == "SPICES & SEASONINGS"
+    assert ingredients[0]["store_section_source"] == "ai"
+    assert ingredients[0]["store_section_confidence"] == 0.97
+    assert ingredients[0]["store_section_reason"] == "The item is a dried seasoning."
 
 
 def test_regenerate_ingredients_normalizes_link_as_canonical_count_unit(monkeypatch, tmp_path):

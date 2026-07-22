@@ -33,7 +33,9 @@ from PushShoppingList.services.recipe_extract_service import normalize_recipe_no
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
-from PushShoppingList.services.recipe_master_data_service import resolve_ingredient_store_section
+from PushShoppingList.services.recipe_master_data_service import classify_ingredient_store_section_result
+from PushShoppingList.services.recipe_master_data_service import ingredient_store_section_confidence
+from PushShoppingList.services.recipe_master_data_service import ingredient_master_records_for_items
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import active_user_id
@@ -700,6 +702,9 @@ Conservative rules:
 - Difficulty must be Easy, Medium, or Hard.
 - Time estimates should be realistic for home cooking.
 - Ingredients should be inferred from the menu description and common restaurant preparation knowledge.
+- Classify each store section using the ingredient's form (for example, ground ginger is Spices while fresh ginger is Produce).
+- store_section must be exactly one of: Produce, Meat & Seafood, Dairy, Frozen, Dry Goods, Pasta, Rice & Grains, Baking, Canned Goods, Sauces & Condiments, Snacks, Beverages, Spices, Oils & Vinegars, Bakery, Deli, Household, Personal Care, Pet Supplies, Misc.
+- For every ingredient return store_section_classification as structured JSON with store_section, numeric confidence from 0 to 1, a short reason, and normalized_name.
 - Put ingredient-specific swaps in the matching ingredient row's substitutions array, such as potatoes -> sweet potatoes or chicken broth -> vegetable broth.
 - Each substitution must be an ingredient-like object with ingredient, quantity, unit, purchasable_item, store_section, optional, original_text, and preparation when known.
 - Use the same practical food swaps you mention in "Substitutions & Variations"; if a note says "Use sweet potatoes..." then the potatoes ingredient should include sweet potatoes as a substitution option.
@@ -736,6 +741,12 @@ Required response shape:
       "notes": "",
       "parsed_name": "",
       "normalized_name": "",
+      "store_section_classification": {{
+        "store_section": "Spices",
+        "confidence": 0.97,
+        "reason": "Ground ginger is a dried powdered seasoning.",
+        "normalized_name": "ground ginger"
+      }},
       "confidence": "medium",
       "inferred": true,
       "warning": "",
@@ -810,6 +821,9 @@ Conservative rules:
 - Do not regenerate recipe title, equipment, instructions, nutrition, categories, or PDFs.
 - Do not claim this is an exact restaurant recipe.
 - Prefer grocery-friendly ingredient names and put prep details in notes.
+- Classify each store section using the ingredient's form (for example, ground ginger is Spices while fresh ginger is Produce).
+- store_section must be exactly one of: Produce, Meat & Seafood, Dairy, Frozen, Dry Goods, Pasta, Rice & Grains, Baking, Canned Goods, Sauces & Condiments, Snacks, Beverages, Spices, Oils & Vinegars, Bakery, Deli, Household, Personal Care, Pet Supplies, Misc.
+- For every ingredient return store_section_classification as structured JSON with store_section, numeric confidence from 0 to 1, a short reason, and normalized_name.
 - Put ingredient-specific swaps in substitutions as ingredient-like objects with ingredient, quantity, unit, purchasable_item, store_section, optional, original_text, and preparation when known.
 - Use any useful "Substitutions & Variations" context to populate the matching ingredient row's substitutions.
 - Quantities and units must be strings.
@@ -833,7 +847,12 @@ Required response shape:
       "optional": false,
       "purchasable_item": "",
       "purchase_group": "",
-      "store_section": "",
+      "store_section_classification": {{
+        "store_section": "Spices",
+        "confidence": 0.97,
+        "reason": "Ground ginger is a dried powdered seasoning.",
+        "normalized_name": "ground ginger"
+      }},
       "parsed_name": "",
       "normalized_name": "",
       "confidence": "medium",
@@ -1183,12 +1202,15 @@ def build_original_ingredient_text(row):
     return clean_text(" ".join(part for part in parts if part))
 
 
-def normalize_ai_ingredients(value, recipe_context=None):
+def normalize_ai_ingredients(value, recipe_context=None, user_id=None):
     if isinstance(value, str):
         value = value.splitlines()
     if not isinstance(value, list):
         return []
 
+    master_lookup = ingredient_master_records_for_items(value, user_id=user_id) if user_id else {
+        "by_normalized_name": {},
+    }
     ingredients = []
     for item in value:
         if isinstance(item, str):
@@ -1207,15 +1229,62 @@ def normalize_ai_ingredients(value, recipe_context=None):
         original_text = build_original_ingredient_text(item)
         if not name and not original_text:
             continue
-        store_section = resolve_ingredient_store_section(
-            " ".join(part for part in (name, original_text, item.get("purchasable_item"), item.get("buy_as")) if part),
-            item.get("store_section"),
+        master_record = None
+        for candidate in (
+            item.get("normalized_name"),
+            name,
+            item.get("purchasable_item"),
+            item.get("buy_as"),
+        ):
+            candidate_key = clean_text(candidate).lower()
+            if candidate_key:
+                master_record = (master_lookup.get("by_normalized_name") or {}).get(candidate_key)
+            if master_record:
+                break
+        trusted_master = bool(
+            master_record
+            and (
+                master_record.get("store_section_user_confirmed")
+                or str(master_record.get("store_section_source") or "").strip().lower()
+                in {"manual", "user_master_data"}
+            )
         )
+        ai_store_section = (
+            item.get("store_section_classification")
+            if isinstance(item.get("store_section_classification"), dict)
+            else {}
+        )
+        store_section_result = classify_ingredient_store_section_result(
+            {
+                **item,
+                "raw_name": item.get("raw_name") or original_text or name,
+                "normalized_name": item.get("normalized_name") or name,
+                "preparation": item.get("notes") or item.get("preparation"),
+            },
+            user_master_data=master_record if trusted_master else None,
+            legacy_section=(master_record or {}).get("store_section") if master_record and not trusted_master else None,
+            ai_result={
+                "store_section": ai_store_section.get("store_section") or item.get("store_section"),
+                "confidence": ai_store_section.get("confidence") or item.get("store_section_confidence"),
+                "reason": (
+                    ai_store_section.get("reason")
+                    or item.get("store_section_reason")
+                    or item.get("reason")
+                ),
+                "normalized_name": (
+                    ai_store_section.get("normalized_name")
+                    or item.get("normalized_name")
+                    or name
+                ),
+            },
+        )
+        store_section = store_section_result["store_section"]
         if store_section not in STORE_SECTION_ORDER:
             store_section = classify_store_section(name or original_text)
         row = {
             "section": clean_text(item.get("section")),
             "original_text": original_text or name,
+            "raw_name": store_section_result.get("raw_name") or original_text or name,
             "quantity": clean_text(item.get("quantity")),
             "recipe_qty": clean_text(item.get("recipe_qty") or item.get("quantity")),
             "unit": clean_text(item.get("unit")),
@@ -1223,13 +1292,25 @@ def normalize_ai_ingredients(value, recipe_context=None):
             "base_unit": clean_text(item.get("base_unit") or item.get("unit")),
             "ingredient": name or original_text,
             "parsed_name": clean_text(item.get("parsed_name")),
-            "normalized_name": clean_text(item.get("normalized_name")),
+            "normalized_name": clean_text(
+                item.get("normalized_name") or store_section_result.get("normalized_name")
+            ),
+            "canonical_ingredient": clean_text(store_section_result.get("canonical_ingredient")),
+            "form": clean_text(store_section_result.get("form")),
             "preparation": clean_text(item.get("notes") or item.get("preparation")),
             "confidence": clean_text(item.get("confidence")),
             "inferred": truthy(item.get("inferred")),
             "warning": clean_text(item.get("warning")),
             "optional": bool(item.get("optional")),
             "store_section": store_section,
+            "store_section_source": store_section_result.get("store_section_source") or "fallback",
+            "store_section_confidence": ingredient_store_section_confidence(
+                store_section_result.get("store_section_confidence")
+            ),
+            "store_section_user_confirmed": False,
+            "classifier_version": store_section_result.get("classifier_version") or "",
+            "store_section_reason": store_section_result.get("store_section_reason") or "",
+            "store_section_rule": store_section_result.get("store_section_rule") or "",
             "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),
             "purchasable_item": clean_text(item.get("purchasable_item") or item.get("buy_as")),
             "buy_as": clean_text(item.get("buy_as") or item.get("purchasable_item")),
@@ -1269,7 +1350,7 @@ def normalize_ai_recipe_notes(parsed):
     )
 
 
-def normalize_ai_payload(parsed, recipe_context=None):
+def normalize_ai_payload(parsed, recipe_context=None, user_id=None):
     parsed = parsed if isinstance(parsed, dict) else {}
     confidence = clean_text(parsed.get("confidence")).lower()
     if confidence not in {"low", "medium", "high"}:
@@ -1283,7 +1364,11 @@ def normalize_ai_payload(parsed, recipe_context=None):
         "prep_time": clean_text(parsed.get("prep_time")),
         "inactive_time": clean_text(parsed.get("inactive_time")),
         "cook_time": clean_text(parsed.get("cook_time")),
-        "ingredients": normalize_ai_ingredients(parsed.get("ingredients"), recipe_context=recipe_context),
+        "ingredients": normalize_ai_ingredients(
+            parsed.get("ingredients"),
+            recipe_context=recipe_context,
+            user_id=user_id,
+        ),
         "equipment": normalize_ai_equipment(parsed.get("equipment")),
         "instructions": normalize_ai_instructions(parsed.get("instructions")),
         "recipe_notes": normalize_ai_recipe_notes(parsed),
@@ -1527,6 +1612,7 @@ def regenerate_ingredients_for_recipe(
         or parsed.get("regenerated_ingredients")
         or parsed.get("recipe_ingredients"),
         recipe_context=recipe_data,
+        user_id=user_id,
     )
     if not generated_ingredients:
         return {
@@ -2165,7 +2251,7 @@ def infer_missing_details_for_recipe(
             "model_source": model_source,
         }
 
-    normalized = normalize_ai_payload(parsed, recipe_context=recipe_data)
+    normalized = normalize_ai_payload(parsed, recipe_context=recipe_data, user_id=user_id)
     fields_to_fill = [
         field
         for field in missing_fields

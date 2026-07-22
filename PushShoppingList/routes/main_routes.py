@@ -1242,6 +1242,17 @@ def ingredient_master_options_route():
     })
 
 
+@main_bp.route("/api/master-data/ingredients/reclassify-misc", methods=["POST"])
+def reclassify_misc_ingredient_master_data_route():
+    payload = request.get_json(silent=True) or {}
+    result = recipe_master_data.review_misc_ingredient_store_sections(
+        user_id=active_user_id(),
+        apply=bool(payload.get("apply")),
+    )
+    status = 200 if result.get("ok") else 400
+    return jsonify({**result, "success": result.get("ok", False)}), status
+
+
 @main_bp.route("/api/master-data/ingredients/duplicate-scan", methods=["POST"])
 def ingredient_duplicate_scan_route():
     active_public_user = current_public_user()

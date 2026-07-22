@@ -53,7 +53,7 @@ def test_sync_recipe_master_records_keeps_same_name_separate_per_user(monkeypatc
 
     assert user_a_ingredient["id"] != user_b_ingredient["id"]
     assert user_a_ingredient["store_section"] == "PRODUCE"
-    assert user_b_ingredient["store_section"] == "DAIRY & EGGS"
+    assert user_b_ingredient["store_section"] == "PRODUCE"
     assert user_a_equipment["id"] != user_b_equipment["id"]
     assert "store_section" not in user_a_equipment
     assert user_a_equipment["equipment_section"] == "COOKWARE"
@@ -250,7 +250,7 @@ def test_backfill_ingredient_store_sections_choose_most_common_per_user(monkeypa
     output = capsys.readouterr().out
 
     assert user_a_onion["store_section"] == "PRODUCE"
-    assert user_b_onion["store_section"] == "DAIRY & EGGS"
+    assert user_b_onion["store_section"] == "PRODUCE"
     assert user_a_mystery["store_section"] == "MISC"
     assert "[IngredientMaster] action=store_section_backfill_start user_id=user-a" in output
     assert 'action=store_section_set' in output
@@ -274,6 +274,159 @@ def test_resolve_ingredient_store_section_repairs_generic_or_conflicting_values(
     assert master_data.resolve_ingredient_store_section("aji amarillo paste", "SPICES & SEASONINGS") == "SAUCES & CONDIMENTS"
     assert master_data.resolve_ingredient_store_section("inca pepper sauce", "PRODUCE") == "SAUCES & CONDIMENTS"
     assert master_data.resolve_ingredient_store_section("mystery crunch", "MISC") == "MISC"
+
+
+def test_layered_store_section_classifier_is_form_aware_and_uses_allowed_sections():
+    expected = {
+        "ground ginger": "SPICES & SEASONINGS",
+        "ginger powder": "SPICES & SEASONINGS",
+        "powdered ginger": "SPICES & SEASONINGS",
+        "fresh ginger": "PRODUCE",
+        "ginger root": "PRODUCE",
+        "garlic powder": "SPICES & SEASONINGS",
+        "fresh garlic": "PRODUCE",
+        "ground cinnamon": "SPICES & SEASONINGS",
+        "paprika": "SPICES & SEASONINGS",
+        "cumin": "SPICES & SEASONINGS",
+        "turmeric": "SPICES & SEASONINGS",
+        "frozen mixed vegetables": "FROZEN",
+        "canned vegetables": "CANNED",
+        "long-grain rice": "PASTA, RICE & GRAINS",
+        "vegetable oil": "OILS & VINEGARS",
+        "soy sauce": "SAUCES & CONDIMENTS",
+        "Peruvian chorizo": "MEAT & SEAFOOD",
+    }
+
+    results = {
+        name: master_data.classify_ingredient_store_section_result(name, log_result=False)
+        for name in expected
+    }
+
+    assert {name: result["store_section"] for name, result in results.items()} == expected
+    assert results["ground ginger"]["canonical_ingredient"] == "ginger"
+    assert results["ground ginger"]["form"] == "ground"
+    assert results["fresh ginger"]["form"] == "fresh"
+    assert all(
+        result["store_section"] in master_data.ingredient_store_section_options()
+        for result in results.values()
+    )
+
+
+def test_layered_store_section_classifier_respects_priority_and_validates_ai():
+    recipe_override = master_data.classify_ingredient_store_section_result(
+        "ground ginger",
+        recipe_override="DRY GOODS",
+        recipe_override_confirmed=True,
+        user_master_data={"store_section": "PRODUCE"},
+        ai_result={"store_section": "Spices", "confidence": 0.97},
+        log_result=False,
+    )
+    user_master = master_data.classify_ingredient_store_section_result(
+        "ground ginger",
+        user_master_data={"store_section": "PRODUCE", "store_section_confidence": 1},
+        ai_result={"store_section": "Spices", "confidence": 0.97},
+        log_result=False,
+    )
+    ai = master_data.classify_ingredient_store_section_result(
+        "mystery crunch",
+        ai_result={
+            "store_section": "Spices",
+            "confidence": 0.97,
+            "reason": "AI identified a seasoning.",
+            "normalized_name": "mystery crunch",
+        },
+        log_result=False,
+    )
+    invalid_ai = master_data.classify_ingredient_store_section_result(
+        "mystery crunch",
+        ai_result={"store_section": "Hardware", "confidence": 0.99},
+        log_result=False,
+    )
+    corrected_ground_ginger = master_data.classify_ingredient_store_section_result(
+        "ground ginger",
+        legacy_section="Produce",
+        log_result=False,
+    )
+    corrected_fresh_ginger = master_data.classify_ingredient_store_section_result(
+        "fresh ginger",
+        legacy_section="Spices",
+        log_result=False,
+    )
+
+    assert recipe_override["store_section"] == "DRY GOODS"
+    assert recipe_override["store_section_source"] == "recipe_override"
+    assert recipe_override["store_section_user_confirmed"] is True
+    assert user_master["store_section"] == "PRODUCE"
+    assert user_master["store_section_source"] == "user_master_data"
+    assert ai["store_section"] == "SPICES & SEASONINGS"
+    assert ai["store_section_source"] == "ai"
+    assert ai["store_section_confidence"] == 0.97
+    assert invalid_ai["store_section"] == "MISC"
+    assert invalid_ai["store_section_source"] == "fallback"
+    assert corrected_ground_ginger["store_section"] == "SPICES & SEASONINGS"
+    assert corrected_fresh_ginger["store_section"] == "PRODUCE"
+
+
+def test_misc_reclassification_previews_then_applies_only_unconfirmed_rows(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/ginger",
+        recipe_data={"ingredients": [
+            {"ingredient": "Ground ginger", "store_section": "MISC"},
+            {"ingredient": "Fresh ginger", "store_section": "MISC"},
+        ]},
+        user_id="user-a",
+    )
+    ground = master_data.master_record_for_name("ingredients", "user-a", "ground ginger")
+    fresh = master_data.master_record_for_name("ingredients", "user-a", "ginger")
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "UPDATE ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE id = ?",
+            (ground["id"],),
+        )
+        connection.execute(
+            "UPDATE ingredients SET store_section = 'MISC', store_section_user_confirmed = 1 WHERE id = ?",
+            (fresh["id"],),
+        )
+        connection.execute(
+            "UPDATE recipe_ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE ingredient_id = ?",
+            (ground["id"],),
+        )
+
+    preview = master_data.review_misc_ingredient_store_sections("user-a", apply=False)
+
+    assert preview["applied"] is False
+    assert preview["changed_count"] == 1
+    assert preview["changes"][0]["ingredient"] == "Ground ginger"
+    assert preview["changes"][0]["proposed_store_section"] == "SPICES & SEASONINGS"
+    assert master_data.master_record_for_name("ingredients", "user-a", "ground ginger")["store_section"] == "MISC"
+    recipe_rows = master_data.recipe_master_rows(
+        "recipe_ingredients", "https://example.com/ginger", user_id="user-a"
+    )
+    assert recipe_rows[1]["raw_name"] == "Fresh ginger"
+    assert recipe_rows[1]["normalized_name"] == "ginger"
+    assert recipe_rows[1]["canonical_ingredient"] == "ginger"
+    assert recipe_rows[1]["form"] == "fresh"
+    assert recipe_rows[1]["preparation"] == "fresh"
+
+    applied = master_data.review_misc_ingredient_store_sections("user-a", apply=True)
+
+    assert applied["applied"] is True
+    assert applied["changed_count"] == 1
+    assert master_data.master_record_for_name("ingredients", "user-a", "ground ginger")["store_section"] == "SPICES & SEASONINGS"
+    assert master_data.master_record_for_name("ingredients", "user-a", "ginger")["store_section"] == "MISC"
+
+
+def test_store_section_classifier_logs_source_confidence_version_and_rule(capsys):
+    result = master_data.classify_ingredient_store_section_result("ground ginger")
+    output = capsys.readouterr().out
+
+    assert result["store_section"] == "SPICES & SEASONINGS"
+    assert '[StoreSectionClassifier] section="SPICES & SEASONINGS"' in output
+    assert "source=global_master_data" in output
+    assert "confidence=1.00" in output
+    assert "classifier_version=2.0" in output
+    assert 'rule="global.ground_ginger"' in output
 
 
 def test_resolve_equipment_section_classifies_common_equipment():

@@ -66,6 +66,12 @@ def test_ingredients_header_has_image_overflow_menu():
     assert 'data-field="confidence"' in script
     assert 'data-field="inferred"' in script
     assert 'data-field="warning"' in script
+    assert "Use this section for all future occurrences" in script
+    assert 'data-field="store_section_source"' in script
+    assert 'data-field="store_section_confidence"' in script
+    assert 'data-field="store_section_user_confirmed"' in script
+    assert 'data-field="classifier_version"' in script
+    assert "function useRecipeIngredientStoreSectionForFuture(button)" in script
     assert "data-ingredient-warning-message" in script
     assert "recipeIngredientFoodReviewPayload(row)" in script
     assert "Accept Fix" in script
@@ -411,10 +417,11 @@ def test_recipe_editor_ingredient_row_menu_is_grouped():
     row_block = script[row_start:row_end]
 
     assert 'class="recipe-edit-row-menu recipe-edit-ingredient-row-menu"' in row_block
-    assert row_block.count('class="recipe-edit-menu-group"') == 4
+    assert row_block.count('class="recipe-edit-menu-group"') == 5
     assert 'class="recipe-edit-menu-group recipe-edit-menu-group-danger"' in row_block
-    for label in ("Review", "Images", "Row", "Move"):
+    for label in ("Review", "Store Section", "Images", "Row", "Move"):
         assert f'<div class="recipe-edit-menu-group-label">{label}</div>' in row_block
+    assert "Use this section for all future occurrences" in row_block
     row_menu = row_block[
         row_block.index('<div class="recipe-edit-menu-group-label">Row</div>'):
         row_block.index('<div class="recipe-edit-menu-group-label">Move</div>')

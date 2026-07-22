@@ -76,7 +76,13 @@ def seed_master_records():
     master_data.sync_recipe_master_records(
         "https://example.com/user-b-soup",
         recipe_data={
-            "ingredients": [{"ingredient": "Garlic", "store_section": "Spices & Seasonings"}],
+            "ingredients": [{
+                "ingredient": "Garlic",
+                "store_section": "Spices & Seasonings",
+                "store_section_source": "manual",
+                "store_section_user_confirmed": True,
+                "store_section_save_to_master": True,
+            }],
             "equipment": [{"equipment": "Whisk"}],
         },
         user_id="user-b",
@@ -121,6 +127,45 @@ def test_master_data_pages_scope_normal_users_to_their_records(monkeypatch, tmp_
     assert "Whisk" not in equipment_html
 
 
+def test_misc_reclassification_route_requires_previewable_unconfirmed_rows(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/ginger",
+        recipe_data={"ingredients": [{"ingredient": "Ground ginger", "store_section": "MISC"}]},
+        user_id="user-a",
+    )
+    ground = master_data.master_record_for_name("ingredients", "user-a", "ground ginger")
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "UPDATE ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE id = ?",
+            (ground["id"],),
+        )
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        preview_response = client.post(
+            "/api/master-data/ingredients/reclassify-misc",
+            json={"apply": False},
+        )
+        apply_response = client.post(
+            "/api/master-data/ingredients/reclassify-misc",
+            json={"apply": True},
+        )
+
+    preview = preview_response.get_json()
+    applied = apply_response.get_json()
+    assert preview_response.status_code == 200
+    assert preview["applied"] is False
+    assert preview["changes"][0]["proposed_store_section"] == "SPICES & SEASONINGS"
+    assert apply_response.status_code == 200
+    assert applied["applied"] is True
+    assert master_data.master_record_for_name(
+        "ingredients",
+        "user-a",
+        "ground ginger",
+    )["store_section"] == "SPICES & SEASONINGS"
+
+
 def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     seed_master_records()
@@ -162,6 +207,9 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "data-master-store-section-panel" in all_html
     assert "data-master-store-section-save" in all_html
     assert "data-master-store-section-form" in all_html
+    assert "Reclassify unconfirmed Misc ingredients" in all_html
+    assert "data-master-misc-reclassification" in all_html
+    assert "/api/master-data/ingredients/reclassify-misc" in all_html
     assert 'data-original-store-section="PRODUCE"' in all_html
     assert '<button type="submit">Save</button>' not in all_html
     assert "All sections" in all_html
@@ -194,6 +242,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "COOKWARE" in equipment_html
     assert "PREP TOOLS" in equipment_html
     assert "data-master-store-section-panel" not in equipment_html
+    assert "data-master-misc-reclassification" not in equipment_html
     assert "data-master-image-form" in equipment_html
     assert "Creates equipment thumbnails" in equipment_html
     assert 'name="record_type" value="equipment"' in equipment_html

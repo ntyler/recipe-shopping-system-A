@@ -126,6 +126,9 @@ def test_recipe_editor_save_updates_only_active_users_master_store_section(monke
             "ingredient": "Chicken broth",
             "normalized_name": "chicken broth",
             "store_section": "DRY GOODS",
+            "store_section_source": "manual",
+            "store_section_user_confirmed": True,
+            "store_section_save_to_master": True,
         }]),
     )
     output = capsys.readouterr().out
@@ -173,6 +176,9 @@ def test_recipe_editor_save_matches_master_by_normalized_name_without_id(monkeyp
             "ingredient": "Broth",
             "normalized_name": "chicken broth",
             "store_section": "DRY GOODS",
+            "store_section_source": "manual",
+            "store_section_user_confirmed": True,
+            "store_section_save_to_master": True,
         }]),
     )
 
@@ -183,6 +189,48 @@ def test_recipe_editor_save_matches_master_by_normalized_name_without_id(monkeyp
         "chicken broth",
     )["store_section"] == "DRY GOODS"
     assert master_data.master_record_for_name("ingredients", master_data.LOCAL_USER_ID, "broth") is None
+
+
+def test_recipe_override_does_not_update_master_without_future_occurrences_choice(monkeypatch, tmp_path):
+    configure_editor_master_sync(monkeypatch, tmp_path)
+    url = "https://example.com/recipe-only-broth-section"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Recipe-only Broth",
+        "ingredients": [{"ingredient": "Chicken broth", "store_section": "CANNED"}],
+        "instructions": [{"instruction": "Simmer."}],
+    })
+    master_data.sync_recipe_master_records(
+        url,
+        recipe_data={"ingredients": [{"ingredient": "Chicken broth", "store_section": "CANNED"}]},
+        user_id=master_data.LOCAL_USER_ID,
+    )
+    master = master_data.master_record_for_name(
+        "ingredients",
+        master_data.LOCAL_USER_ID,
+        "chicken broth",
+    )
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        recipe_payload(url, [{
+            "ingredient_id": str(master["id"]),
+            "ingredient": "Chicken broth",
+            "normalized_name": "chicken broth",
+            "store_section": "DRY GOODS",
+            "store_section_source": "recipe_override",
+            "store_section_user_confirmed": True,
+            "store_section_save_to_master": False,
+        }]),
+    )
+
+    assert result["ok"] is True
+    assert recipe_edit_service.load_recipe_output(url)["ingredients"][0]["store_section"] == "DRY GOODS"
+    assert master_data.master_record_for_name(
+        "ingredients",
+        master_data.LOCAL_USER_ID,
+        "chicken broth",
+    )["store_section"] == "CANNED"
 
 
 def test_recipe_editor_custom_store_section_round_trips_without_overwriting_master(monkeypatch, tmp_path):

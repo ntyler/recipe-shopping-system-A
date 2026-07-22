@@ -190,6 +190,21 @@
             </div>
         {% endif %}
 
+        {% if master_data.record_type == 'ingredients' and master_data.db_status.exists %}
+            <section class="master-data-backfill-form master-data-misc-reclassification"
+                     data-master-misc-reclassification
+                     data-reclassify-url="{{ url_for('main_bp.reclassify_misc_ingredient_master_data_route') }}"
+                     aria-live="polite">
+                <div>
+                    <strong>Reclassify unconfirmed Misc ingredients</strong>
+                    <span data-master-misc-reclassification-summary>Preview deterministic changes before applying them to Ingredient Master Data.</span>
+                </div>
+                <button type="button" data-master-misc-reclassification-preview>Preview Changes</button>
+                <button type="button" data-master-misc-reclassification-apply disabled>Apply Preview</button>
+                <ol class="master-data-backfill-item-list" data-master-misc-reclassification-list hidden></ol>
+            </section>
+        {% endif %}
+
         {% if master_data.is_admin %}
             <form class="master-data-backfill-form"
                   data-master-backfill-form

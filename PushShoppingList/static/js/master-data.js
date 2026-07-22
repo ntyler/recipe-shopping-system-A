@@ -3693,6 +3693,96 @@
         }
     }
 
+    function renderMiscReclassification(panel, data) {
+        const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
+        const list = panel.querySelector("[data-master-misc-reclassification-list]");
+        const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
+        const changes = Array.isArray(data && data.changes) ? data.changes : [];
+        const reviewedCount = Number(data && data.reviewed_count) || 0;
+        const changedCount = Number(data && data.changed_count) || changes.length;
+
+        if (summary) {
+            summary.textContent = data && data.applied
+                ? `Applied ${changedCount} change${changedCount === 1 ? "" : "s"}; ${reviewedCount} unconfirmed Misc ingredient${reviewedCount === 1 ? " was" : "s were"} reviewed.`
+                : `Preview: ${changedCount} of ${reviewedCount} unconfirmed Misc ingredient${reviewedCount === 1 ? "" : "s"} can be reclassified.`;
+        }
+        if (list) {
+            list.replaceChildren();
+            changes.slice(0, 20).forEach((change) => {
+                const item = document.createElement("li");
+                const name = text(change.ingredient || change.normalized_name || "Ingredient");
+                const section = text(change.proposed_store_section || "MISC");
+                const rule = text(change.rule || change.store_section_source || "classifier");
+                item.textContent = `${name}: Misc → ${section} (${rule})`;
+                list.appendChild(item);
+            });
+            if (changes.length > 20) {
+                const more = document.createElement("li");
+                more.textContent = `+${changes.length - 20} more proposed changes`;
+                list.appendChild(more);
+            }
+            list.hidden = !changes.length;
+        }
+        panel.dataset.miscPreviewReady = data && !data.applied && changedCount > 0 ? "true" : "false";
+        if (applyButton) {
+            applyButton.disabled = panel.dataset.miscPreviewReady !== "true";
+        }
+    }
+
+    async function requestMiscReclassification(panel, apply) {
+        const previewButton = panel.querySelector("[data-master-misc-reclassification-preview]");
+        const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
+        const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
+        [previewButton, applyButton].forEach((button) => {
+            if (button) button.disabled = true;
+        });
+        panel.setAttribute("aria-busy", "true");
+        if (summary) summary.textContent = apply ? "Applying reviewed changes…" : "Reviewing unconfirmed Misc ingredients…";
+        try {
+            const response = await fetch(panel.dataset.reclassifyUrl, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({ apply }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || "Misc ingredient reclassification failed.");
+            }
+            renderMiscReclassification(panel, data);
+            if (data.applied && data.changed_count) {
+                window.setTimeout(() => window.location.reload(), REFRESH_DELAY_MS);
+            }
+        } catch (error) {
+            panel.dataset.miscPreviewReady = "false";
+            if (summary) summary.textContent = error && error.message ? error.message : "Misc ingredient reclassification failed.";
+        } finally {
+            panel.setAttribute("aria-busy", "false");
+            if (previewButton) previewButton.disabled = false;
+            if (applyButton) applyButton.disabled = panel.dataset.miscPreviewReady !== "true";
+        }
+    }
+
+    function initMiscIngredientReclassification() {
+        const panel = document.querySelector("[data-master-misc-reclassification]");
+        if (!panel || !window.fetch) return;
+        const previewButton = panel.querySelector("[data-master-misc-reclassification-preview]");
+        const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
+        if (previewButton) {
+            previewButton.addEventListener("click", () => requestMiscReclassification(panel, false));
+        }
+        if (applyButton) {
+            applyButton.addEventListener("click", () => {
+                if (panel.dataset.miscPreviewReady === "true") {
+                    requestMiscReclassification(panel, true);
+                }
+            });
+        }
+    }
+
     function initMasterDataPage() {
         initMasterDataReferences();
         initMasterDataThumbnailSizeControls();
@@ -3700,6 +3790,7 @@
         initMasterDataStoreSectionBatchSave();
         initMasterDataIngredientMerge();
         initMasterDataDuplicateReview();
+        initMiscIngredientReclassification();
 
         const form = document.querySelector("[data-master-backfill-form]");
         if (form && window.fetch && window.FormData) {

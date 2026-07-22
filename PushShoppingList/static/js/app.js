@@ -36810,6 +36810,23 @@ function syncRecipeIngredientStoreSectionControl(select) {
     triggers.forEach(trigger => syncRecipeIngredientStoreSectionTrigger(trigger, selectedValue));
 }
 
+function markRecipeIngredientStoreSectionOverride(select) {
+    const row = select ? select.closest(".recipe-edit-ingredient-row") : null;
+    if (!row) return;
+    setRowFieldValue(row, "store_section_source", "recipe_override");
+    setRowFieldValue(row, "store_section_confidence", "1");
+    setRowFieldValue(row, "store_section_user_confirmed", "true");
+    setRowFieldValue(row, "store_section_save_to_master", "false");
+    setRowFieldValue(row, "classifier_version", "2.0");
+    setRowFieldValue(row, "store_section_reason", "User selected this section for the current recipe.");
+    setRowFieldValue(row, "store_section_rule", "recipe.user_confirmed");
+    const futureButton = row.querySelector("[data-recipe-store-section-future]");
+    if (futureButton) {
+        futureButton.disabled = false;
+        futureButton.textContent = "Use this section for all future occurrences";
+    }
+}
+
 function ensureRecipeIngredientStoreSectionMenu() {
     let menu = document.getElementById("recipeIngredientStoreSectionMenu");
     if (menu) {
@@ -36950,6 +36967,7 @@ function chooseRecipeIngredientStoreSection(button) {
 
     select.value = button.dataset.storeSectionValue || "";
     select.dispatchEvent(new Event("change", { bubbles: true }));
+    markRecipeIngredientStoreSectionOverride(select);
     closeRecipeEditRowMenus();
     if (trigger) {
         trigger.focus({ preventScroll: true });
@@ -36978,6 +36996,7 @@ function addRecipeIngredientCustomStoreSection(button) {
 
     select.value = saveRecipeIngredientCustomStoreSectionName(name);
     select.dispatchEvent(new Event("change", { bubbles: true }));
+    markRecipeIngredientStoreSectionOverride(select);
     closeRecipeEditRowMenus();
     if (trigger) trigger.focus({ preventScroll: true });
     return false;
@@ -37109,6 +37128,27 @@ function bindRecipeIngredientStoreSectionControls(scope) {
         select.insertAdjacentElement("beforebegin", trigger);
         syncRecipeIngredientStoreSectionControl(select);
     });
+}
+
+function useRecipeIngredientStoreSectionForFuture(button) {
+    const row = button ? button.closest(".recipe-edit-ingredient-row") : null;
+    if (!row) return false;
+    const values = fieldValuesFromRow(row);
+    const ingredientName = String(values.ingredient || values.normalized_name || "this ingredient").trim();
+    const section = String(values.store_section || "MISC").trim();
+    setRowFieldValue(row, "store_section_source", "manual");
+    setRowFieldValue(row, "store_section_confidence", "1");
+    setRowFieldValue(row, "store_section_user_confirmed", "true");
+    setRowFieldValue(row, "store_section_save_to_master", "true");
+    setRowFieldValue(row, "classifier_version", "2.0");
+    setRowFieldValue(row, "store_section_reason", "User confirmed this section for future occurrences.");
+    setRowFieldValue(row, "store_section_rule", "manual.master_data");
+    button.textContent = "Will use for future occurrences";
+    button.disabled = true;
+    updateRecipeEditorDirtyState(row.closest("#recipeEditForm"));
+    closeRecipeEditRowMenus();
+    setRecipeEditStatus(`Will use ${recipeStoreSectionDisplayLabel(section)} for future occurrences of ${ingredientName} after Save Recipe.`);
+    return false;
 }
 
 const RECIPE_INGREDIENT_CUSTOM_TYPES_KEY = "recipeIngredientCustomTypes";
@@ -38908,6 +38948,13 @@ function chooseRecipeIngredientMasterOption(button) {
     setRowFieldValue(row, "master_normalized_name", normalizedName);
     setRowFieldValue(row, "store_section", storeSection);
     setRowFieldValue(row, "store_section_custom", "false");
+    setRowFieldValue(row, "store_section_source", "user_master_data");
+    setRowFieldValue(row, "store_section_confidence", "1");
+    setRowFieldValue(row, "store_section_user_confirmed", "true");
+    setRowFieldValue(row, "store_section_save_to_master", "false");
+    setRowFieldValue(row, "classifier_version", "2.0");
+    setRowFieldValue(row, "store_section_reason", "Selected from Ingredient Master Data.");
+    setRowFieldValue(row, "store_section_rule", "master.user_exact");
     setRowFieldValue(row, "ingredient_image_url", imageUrl);
     setRowFieldValue(row, "match_status", "Matched");
     setRowFieldValue(row, "confidence", "high");
@@ -39269,6 +39316,17 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                     <button type="button" onclick="return reapplyFoodRulesForIngredient(this)">Re-apply Food Rules</button>
                 </div>
                 <div class="recipe-edit-menu-group">
+                    <div class="recipe-edit-menu-group-label">Store Section</div>
+                    <button type="button"
+                            data-recipe-store-section-future
+                            onclick="return useRecipeIngredientStoreSectionForFuture(this)"
+                            ${recipeIngredientMatchFlag(item.store_section_save_to_master) ? "disabled" : ""}>
+                        ${recipeIngredientMatchFlag(item.store_section_save_to_master)
+                            ? "Will use for future occurrences"
+                            : "Use this section for all future occurrences"}
+                    </button>
+                </div>
+                <div class="recipe-edit-menu-group">
                     <div class="recipe-edit-menu-group-label">Images</div>
                     <button type="button"
                             data-recipe-edit-row-image-generate
@@ -39315,6 +39373,16 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         <input type="hidden" data-field="unit_review_value" value="${escapeAttribute(item.unit_review_value || "")}">
         <input type="hidden" data-field="unit_custom" value="${escapeAttribute(recipeIngredientMatchFlag(item.unit_custom) ? "true" : "false")}">
         <input type="hidden" data-field="store_section_custom" value="${escapeAttribute(recipeIngredientMatchFlag(item.store_section_custom) ? "true" : "false")}">
+        <input type="hidden" data-field="raw_name" value="${escapeAttribute(item.raw_name || item.original_text || item.ingredient || "")}">
+        <input type="hidden" data-field="canonical_ingredient" value="${escapeAttribute(item.canonical_ingredient || "")}">
+        <input type="hidden" data-field="form" value="${escapeAttribute(item.form || "")}">
+        <input type="hidden" data-field="store_section_source" value="${escapeAttribute(item.store_section_source || "legacy")}">
+        <input type="hidden" data-field="store_section_confidence" value="${escapeAttribute(item.store_section_confidence ?? "")}">
+        <input type="hidden" data-field="store_section_user_confirmed" value="${escapeAttribute(recipeIngredientMatchFlag(item.store_section_user_confirmed) ? "true" : "false")}">
+        <input type="hidden" data-field="store_section_save_to_master" value="${escapeAttribute(recipeIngredientMatchFlag(item.store_section_save_to_master) ? "true" : "false")}">
+        <input type="hidden" data-field="classifier_version" value="${escapeAttribute(item.classifier_version || "")}">
+        <input type="hidden" data-field="store_section_reason" value="${escapeAttribute(item.store_section_reason || "")}">
+        <input type="hidden" data-field="store_section_rule" value="${escapeAttribute(item.store_section_rule || "")}">
         <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
         <input type="hidden" data-field="purchase_group" value="${escapeAttribute(item.purchase_group || "")}">
         <input type="hidden" data-field="parsed_name" value="${escapeAttribute(item.parsed_name || "")}">
@@ -42650,6 +42718,14 @@ function applyRecipeStoreSectionReviewToEditor(changes) {
         }
 
         select.value = section;
+        setRowFieldValue(row, "store_section_source", change.store_section_source || "deterministic_rule");
+        setRowFieldValue(row, "store_section_confidence", String(change.store_section_confidence ?? ""));
+        setRowFieldValue(row, "store_section_user_confirmed", "false");
+        setRowFieldValue(row, "store_section_save_to_master", "false");
+        setRowFieldValue(row, "classifier_version", change.classifier_version || "2.0");
+        setRowFieldValue(row, "store_section_reason", change.reason || "");
+        setRowFieldValue(row, "store_section_rule", change.rule || "");
+        syncRecipeIngredientStoreSectionControl(select);
         updateRecipeIngredientSummary(row);
     });
 }
