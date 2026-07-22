@@ -450,7 +450,7 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "miscReviewDecisionPayload" in script
     assert "requestMiscReclassificationUndo" in script
     assert "panel.dataset.undoBatchId" in script
-    assert "AI review is optional and never changes the final decision automatically." in script
+    assert "AI suggestions for unresolved ingredients are preselected and remain editable." in script
     assert ".master-data-misc-reclassification-header" in css
     assert ".master-data-misc-reclassification-list" in css
     assert ".master-data-section-pill.is-proposed" in css
@@ -471,6 +471,12 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     accept_block = script[accept_start:accept_end]
     assert "row.decisionSection = row.ai.storeSection" in accept_block
     assert "row.requiresDecision = false" in accept_block
+    ai_request_start = script.index("async function requestMiscAiSecondOpinions")
+    ai_request_end = script.index("function initMiscIngredientReclassification", ai_request_start)
+    ai_request_block = script[ai_request_start:ai_request_end]
+    assert "else if (!row.deterministic)" in ai_request_block
+    assert "row.decisionSection = row.ai.storeSection" in ai_request_block
+    assert "row.decisionSource = miscReviewDecisionSource" in ai_request_block
 
 
 def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch, tmp_path):

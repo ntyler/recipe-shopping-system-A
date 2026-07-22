@@ -3991,7 +3991,7 @@
         if (summary && panel.dataset.miscApplied !== "true") {
             summary.textContent = unresolvedDecisions.length
                 ? `${unresolvedDecisions.length} AI disagreement${unresolvedDecisions.length === 1 ? " requires" : "s require"} a final decision before applying.`
-                : `${selectedDecisions.length} decision${selectedDecisions.length === 1 ? " is" : "s are"} selected. AI review is optional and never changes the final decision automatically.`;
+                : `${selectedDecisions.length} decision${selectedDecisions.length === 1 ? " is" : "s are"} selected. AI suggestions for unresolved ingredients are preselected and remain editable.`;
         }
     }
 
@@ -4235,6 +4235,10 @@
                     row.decisionSection = "";
                     row.decisionSource = "";
                     row.requiresDecision = true;
+                } else if (!row.deterministic) {
+                    row.decisionSection = row.ai.storeSection;
+                    row.decisionSource = miscReviewDecisionSource(row, row.ai.storeSection);
+                    row.requiresDecision = false;
                 }
             });
             panel.miscReclassificationRows = rows;
