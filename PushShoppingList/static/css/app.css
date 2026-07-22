@@ -25627,6 +25627,17 @@ img[data-deferred-src] {
             background: #203b66;
         }
 
+        .master-data-misc-reclassification-ai-actions .is-accept-ai {
+            border-color: #248b69;
+            background: #0d4938;
+            color: #d5ffef;
+        }
+
+        .master-data-misc-reclassification-ai-actions .is-accept-ai:is(:hover, :focus-visible) {
+            border-color: #48c49a;
+            background: #126148;
+        }
+
         .master-data-misc-reclassification-ai-actions button:disabled,
         .master-data-misc-row-ai-button:disabled {
             cursor: not-allowed;
@@ -25773,6 +25784,11 @@ img[data-deferred-src] {
             color: #eef5fa;
             font-size: 12px;
             font-weight: 800;
+        }
+
+        .master-data-misc-decision-control {
+            display: block;
+            width: 100%;
         }
 
         .master-data-misc-decision small {

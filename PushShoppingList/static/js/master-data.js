@@ -3802,8 +3802,10 @@
         const wrap = document.createElement("div");
         wrap.className = "master-data-misc-review-cell master-data-misc-decision is-decision";
         const label = document.createElement("label");
-        label.className = "sr-only";
-        label.textContent = `Final store section for ${miscReviewDisplayName(row.ingredient)}`;
+        label.className = "master-data-misc-decision-control";
+        const labelText = document.createElement("span");
+        labelText.className = "sr-only";
+        labelText.textContent = `Final store section for ${miscReviewDisplayName(row.ingredient)}`;
         const select = document.createElement("select");
         select.dataset.masterMiscDecision = String(row.ingredientId);
         const placeholder = document.createElement("option");
@@ -3853,7 +3855,7 @@
             row.requiresDecision = false;
             renderMiscReclassificationRows(panel);
         });
-        label.appendChild(select);
+        label.append(labelText, select);
         wrap.appendChild(label);
         if (row.requiresDecision && !row.decisionSection) {
             const warning = document.createElement("small");
@@ -3943,6 +3945,7 @@
         const count = panel.querySelector("[data-master-misc-reclassification-count]");
         const empty = panel.querySelector("[data-master-misc-reclassification-empty]");
         const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
+        const acceptAiButton = panel.querySelector("[data-master-misc-ai-accept]");
         const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
         const rows = Array.isArray(panel.miscReclassificationRows) ? panel.miscReclassificationRows : [];
         if (list) {
@@ -3965,6 +3968,7 @@
         if (empty) empty.hidden = Boolean(rows.length);
         const selectedDecisions = rows.filter((row) => row.decisionSection);
         const unresolvedDecisions = rows.filter((row) => row.requiresDecision && !row.decisionSection);
+        const unselectedAiSuggestions = rows.filter((row) => row.ai && !row.decisionSection);
         if (count) {
             const unresolvedLabel = panel.miscUnresolvedCount
                 ? ` · ${panel.miscUnresolvedCount} without a rule match`
@@ -3978,6 +3982,12 @@
                 ? `Apply ${selectedDecisions.length} Decision${selectedDecisions.length === 1 ? "" : "s"}`
                 : "Apply Changes";
         }
+        if (acceptAiButton) {
+            acceptAiButton.disabled = !unselectedAiSuggestions.length;
+            acceptAiButton.textContent = unselectedAiSuggestions.length
+                ? `Accept ${unselectedAiSuggestions.length} AI Suggestion${unselectedAiSuggestions.length === 1 ? "" : "s"}`
+                : "AI Suggestions Selected";
+        }
         if (summary && panel.dataset.miscApplied !== "true") {
             summary.textContent = unresolvedDecisions.length
                 ? `${unresolvedDecisions.length} AI disagreement${unresolvedDecisions.length === 1 ? " requires" : "s require"} a final decision before applying.`
@@ -3988,6 +3998,7 @@
     function renderMiscReclassification(panel, data) {
         const previewPanel = panel.querySelector("[data-master-misc-reclassification-preview-panel]");
         const suggestedAiButton = panel.querySelector("[data-master-misc-ai-review-suggested]");
+        const acceptAiButton = panel.querySelector("[data-master-misc-ai-accept]");
         const unresolvedAiButton = panel.querySelector("[data-master-misc-ai-review-unresolved]");
         panel.miscReclassificationRows = miscReviewRowsFromPreview(data);
         panel.miscUnresolvedCount = Number(data && data.unresolved_count) || 0;
@@ -3997,6 +4008,10 @@
         if (suggestedAiButton) {
             suggestedAiButton.disabled = !panel.miscReclassificationRows.length;
             suggestedAiButton.textContent = "Get AI Second Opinions";
+        }
+        if (acceptAiButton) {
+            acceptAiButton.disabled = true;
+            acceptAiButton.textContent = "Accept AI Suggestions";
         }
         if (unresolvedAiButton) {
             unresolvedAiButton.disabled = !panel.miscUnresolvedCount;
@@ -4041,12 +4056,18 @@
         const previewButton = panel.querySelector("[data-master-misc-reclassification-preview]");
         const undoButton = panel.querySelector("[data-master-misc-reclassification-undo]");
         const suggestedAiButton = panel.querySelector("[data-master-misc-ai-review-suggested]");
+        const acceptAiButton = panel.querySelector("[data-master-misc-ai-accept]");
         const unresolvedAiButton = panel.querySelector("[data-master-misc-ai-review-unresolved]");
         panel.setAttribute("aria-busy", "false");
         if (previewButton) previewButton.disabled = false;
         if (undoButton) undoButton.disabled = panel.dataset.undoAvailable !== "true";
         if (suggestedAiButton) {
             suggestedAiButton.disabled = !(panel.miscReclassificationRows || []).some((row) => row.deterministic);
+        }
+        if (acceptAiButton) {
+            acceptAiButton.disabled = !(panel.miscReclassificationRows || []).some(
+                (row) => row.ai && !row.decisionSection
+            );
         }
         if (unresolvedAiButton) unresolvedAiButton.disabled = !panel.miscUnresolvedCount;
         renderMiscReclassificationRows(panel);
@@ -4147,6 +4168,22 @@
         }
     }
 
+    function acceptMiscAiSuggestions(panel) {
+        let acceptedCount = 0;
+        (panel.miscReclassificationRows || []).forEach((row) => {
+            if (!row.ai || row.decisionSection) return;
+            row.decisionSection = row.ai.storeSection;
+            row.decisionSource = miscReviewDecisionSource(row, row.ai.storeSection);
+            row.requiresDecision = false;
+            acceptedCount += 1;
+        });
+        renderMiscReclassificationRows(panel);
+        const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
+        if (summary && acceptedCount) {
+            summary.textContent = `${acceptedCount} AI suggestion${acceptedCount === 1 ? "" : "s"} accepted as final decisions. Review them, then apply the changes.`;
+        }
+    }
+
     async function requestMiscAiSecondOpinions(panel, scope, ingredientIds, trigger) {
         const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
         const originalLabel = trigger ? trigger.textContent : "";
@@ -4225,6 +4262,7 @@
         const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
         const undoButton = panel.querySelector("[data-master-misc-reclassification-undo]");
         const suggestedAiButton = panel.querySelector("[data-master-misc-ai-review-suggested]");
+        const acceptAiButton = panel.querySelector("[data-master-misc-ai-accept]");
         const unresolvedAiButton = panel.querySelector("[data-master-misc-ai-review-unresolved]");
         if (previewButton) previewButton.addEventListener("click", () => requestMiscReclassification(panel, false));
         if (undoButton) undoButton.addEventListener("click", () => requestMiscReclassificationUndo(panel));
@@ -4240,6 +4278,9 @@
                     .map((row) => row.ingredientId);
                 requestMiscAiSecondOpinions(panel, "suggested", ingredientIds, suggestedAiButton);
             });
+        }
+        if (acceptAiButton) {
+            acceptAiButton.addEventListener("click", () => acceptMiscAiSuggestions(panel));
         }
         if (unresolvedAiButton) {
             unresolvedAiButton.addEventListener("click", () => {

@@ -309,6 +309,8 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "data-master-misc-reclassification-count" in all_html
     assert "data-master-misc-reclassification-empty" in all_html
     assert "Get AI Second Opinions" in all_html
+    assert "Accept AI Suggestions" in all_html
+    assert "data-master-misc-ai-accept" in all_html
     assert "AI second opinion" in all_html
     assert "Final decision" in all_html
     assert "data-ai-second-opinion-url" in all_html
@@ -444,6 +446,7 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "Classification details" in script
     assert "MISC_REVIEW_STORE_SECTIONS" in script
     assert "requestMiscAiSecondOpinions" in script
+    assert "acceptMiscAiSuggestions" in script
     assert "miscReviewDecisionPayload" in script
     assert "requestMiscReclassificationUndo" in script
     assert "panel.dataset.undoBatchId" in script
@@ -454,7 +457,20 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert ".master-data-misc-reclassification-actions" in css
     assert ".master-data-misc-ai-status" in css
     assert ".master-data-misc-decision" in css
+    assert ".master-data-misc-decision-control" in css
+    assert ".is-accept-ai" in css
     assert ".master-data-action-undo" in css
+    decision_start = script.index("function miscReviewDecisionSelect")
+    decision_end = script.index("function miscReviewIngredientCell", decision_start)
+    decision_block = script[decision_start:decision_end]
+    assert 'label.className = "master-data-misc-decision-control"' in decision_block
+    assert 'labelText.className = "sr-only"' in decision_block
+    assert 'label.className = "sr-only"' not in decision_block
+    accept_start = script.index("function acceptMiscAiSuggestions")
+    accept_end = script.index("async function requestMiscAiSecondOpinions", accept_start)
+    accept_block = script[accept_start:accept_end]
+    assert "row.decisionSection = row.ai.storeSection" in accept_block
+    assert "row.requiresDecision = false" in accept_block
 
 
 def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch, tmp_path):
