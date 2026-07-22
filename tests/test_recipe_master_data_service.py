@@ -474,6 +474,11 @@ def test_misc_reclassification_applies_reviewed_rule_ai_and_keep_misc_decisions(
     assert applied["ok"] is True
     assert applied["changed_count"] == 3
     assert applied["kept_misc_count"] == 1
+    assert applied["batch_id"] > 0
+    assert applied["undo_available"] is True
+    assert master_data.latest_undoable_ingredient_store_section_reclassification(
+        "user-a"
+    )["batch_id"] == applied["batch_id"]
     assert ground_after["store_section"] == "SPICES & SEASONINGS"
     assert ground_after["store_section_user_confirmed"] == 0
     assert mystery_after["store_section"] == "SAUCES & CONDIMENTS"
@@ -482,6 +487,26 @@ def test_misc_reclassification_applies_reviewed_rule_ai_and_keep_misc_decisions(
     assert unknown_after["store_section"] == "MISC"
     assert unknown_after["store_section_source"] == "manual"
     assert unknown_after["store_section_user_confirmed"] == 1
+
+    undone = master_data.undo_last_ingredient_store_section_reclassification(
+        "user-a",
+        expected_batch_id=applied["batch_id"],
+    )
+
+    assert undone["ok"] is True
+    assert undone["restored_ingredient_count"] == 3
+    assert undone["restored_recipe_count"] == 3
+    assert undone["next_batch"] is None
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "ground ginger"
+    )["store_section"] == "MISC"
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "mystery crunch"
+    )["store_section_user_confirmed"] == 0
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "unknown morsels"
+    )["store_section_user_confirmed"] == 0
+    assert master_data.latest_undoable_ingredient_store_section_reclassification("user-a") is None
 
 
 def test_misc_reclassification_rejects_stale_rule_batch_before_writing(monkeypatch, tmp_path):
@@ -525,6 +550,42 @@ def test_misc_reclassification_rejects_stale_rule_batch_before_writing(monkeypat
     assert master_data.master_record_for_name(
         "ingredients", "user-a", "mystery crunch"
     )["store_section"] == "MISC"
+
+
+def test_store_section_reclassification_undo_refuses_to_overwrite_later_edits(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/undo-conflict",
+        recipe_data={"ingredients": [{"ingredient": "Mystery crunch", "store_section": "MISC"}]},
+        user_id="user-a",
+    )
+    mystery = master_data.master_record_for_name("ingredients", "user-a", "mystery crunch")
+    applied = master_data.apply_misc_ingredient_store_section_decisions(
+        "user-a",
+        [{
+            "ingredient_id": mystery["id"],
+            "store_section": "Snacks",
+            "decision_source": "ai",
+            "confidence": 0.8,
+        }],
+    )
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "UPDATE ingredients SET store_section = 'PRODUCE', updated_at = ? WHERE id = ?",
+            ("2099-01-01T00:00:00Z", mystery["id"]),
+        )
+
+    result = master_data.undo_last_ingredient_store_section_reclassification(
+        "user-a",
+        expected_batch_id=applied["batch_id"],
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == 409
+    assert "changed after this reclassification" in result["error"]
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "mystery crunch"
+    )["store_section"] == "PRODUCE"
 
 
 def test_store_section_classifier_logs_source_confidence_version_and_rule(capsys):

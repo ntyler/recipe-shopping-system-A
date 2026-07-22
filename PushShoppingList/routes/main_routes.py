@@ -983,6 +983,7 @@ def master_data_context(record_type):
             available_user_ids = recipe_master_data.recipe_master_user_ids()
 
     latest_ingredient_merge = None
+    latest_store_section_reclassification = None
     if (
         status["exists"]
         and record_type == "ingredients"
@@ -991,6 +992,11 @@ def master_data_context(record_type):
     ):
         latest_ingredient_merge = recipe_master_data.latest_undoable_ingredient_merge(
             scope_info["user_id"]
+        )
+        latest_store_section_reclassification = (
+            recipe_master_data.latest_undoable_ingredient_store_section_reclassification(
+                scope_info["user_id"]
+            )
         )
 
     total_pages = max(1, (total_count + limit - 1) // limit)
@@ -1171,6 +1177,10 @@ def master_data_context(record_type):
             "main_bp.preview_ingredient_master_merge_undo_route"
         ),
         "latest_ingredient_merge": latest_ingredient_merge,
+        "ingredient_store_section_undo_url": url_for(
+            "main_bp.undo_misc_ingredient_reclassification_route"
+        ),
+        "latest_store_section_reclassification": latest_store_section_reclassification,
         "ingredient_reference_url": url_for(
             "main_bp.master_data_record_references_route",
             record_type="ingredients",
@@ -1272,6 +1282,29 @@ def reclassify_misc_ingredient_ai_second_opinion_route():
     )
     status = 200 if result.get("ok") else int(result.get("status") or 400)
     return jsonify({**result, "success": result.get("ok", False)}), status
+
+
+@main_bp.route("/api/master-data/ingredients/reclassify-misc/undo", methods=["POST"])
+def undo_misc_ingredient_reclassification_route():
+    payload = request.get_json(silent=True) or {}
+    result = recipe_master_data.undo_last_ingredient_store_section_reclassification(
+        user_id=active_user_id(),
+        expected_batch_id=payload.get("batch_id"),
+    )
+    status = 200 if result.get("ok") else int(result.get("status") or 400)
+    restored_count = int(result.get("restored_ingredient_count") or 0)
+    message = (
+        f"Restored {restored_count} ingredient store-section "
+        f"decision{'s' if restored_count != 1 else ''}."
+        if result.get("ok")
+        else result.get("error")
+    )
+    return jsonify({
+        **result,
+        "success": result.get("ok", False),
+        "message": message,
+        "undo_available": bool(result.get("next_batch")),
+    }), status
 
 
 @main_bp.route("/api/master-data/ingredients/duplicate-scan", methods=["POST"])

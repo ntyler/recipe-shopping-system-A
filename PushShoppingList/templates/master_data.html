@@ -195,6 +195,9 @@
                      data-master-misc-reclassification
                      data-reclassify-url="{{ url_for('main_bp.reclassify_misc_ingredient_master_data_route') }}"
                      data-ai-second-opinion-url="{{ url_for('main_bp.reclassify_misc_ingredient_ai_second_opinion_route') }}"
+                     data-undo-url="{{ master_data.ingredient_store_section_undo_url }}"
+                     data-undo-available="{{ 'true' if master_data.latest_store_section_reclassification else 'false' }}"
+                     data-undo-batch-id="{{ master_data.latest_store_section_reclassification.batch_id if master_data.latest_store_section_reclassification else '' }}"
                      aria-live="polite">
                 <div class="master-data-misc-reclassification-header">
                     <div class="master-data-misc-reclassification-copy">
@@ -203,6 +206,12 @@
                         <span data-master-misc-reclassification-summary>Preview suggested changes before updating Ingredient Master Data.</span>
                     </div>
                     <div class="master-data-misc-reclassification-actions">
+                        <button type="button"
+                                class="master-data-action-secondary master-data-action-undo"
+                                data-master-misc-reclassification-undo
+                                {% if not master_data.latest_store_section_reclassification %}disabled{% endif %}>
+                            Undo Last Apply{% if master_data.latest_store_section_reclassification %} ({{ master_data.latest_store_section_reclassification.change_count }}){% endif %}
+                        </button>
                         <button type="button"
                                 class="master-data-action-secondary"
                                 data-master-misc-reclassification-preview>

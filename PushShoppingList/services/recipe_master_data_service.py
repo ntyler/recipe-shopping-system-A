@@ -738,6 +738,18 @@ def ensure_recipe_master_schema(connection=None):
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS ingredient_store_section_reclassification_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            snapshot_json TEXT NOT NULL,
+            change_count INTEGER NOT NULL DEFAULT 0,
+            applied_at TEXT NOT NULL,
+            undone_at TEXT DEFAULT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS equipment (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -918,6 +930,7 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_duplicate_reviews_user_status ON ingredient_duplicate_reviews(user_id, status)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_duplicate_reviews_pair ON ingredient_duplicate_reviews(left_ingredient_id, right_ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_merge_history_user_undo ON ingredient_merge_history(user_id, undone_at, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_store_section_reclassification_history_user_undo ON ingredient_store_section_reclassification_history(user_id, undone_at, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_section ON ingredients(user_id, store_section)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_name ON equipment(user_id, normalized_name)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_section ON equipment(user_id, equipment_section)")
@@ -2208,6 +2221,68 @@ def review_misc_ingredient_store_sections(user_id=None, apply=False):
     }
 
 
+INGREDIENT_STORE_SECTION_HISTORY_FIELDS = (
+    "id",
+    "user_id",
+    "canonical_ingredient",
+    "form",
+    "store_section",
+    "store_section_source",
+    "store_section_confidence",
+    "store_section_user_confirmed",
+    "classifier_version",
+    "store_section_reason",
+    "store_section_rule",
+    "updated_at",
+)
+RECIPE_INGREDIENT_STORE_SECTION_HISTORY_FIELDS = (
+    "id",
+    "user_id",
+    "ingredient_id",
+    "store_section",
+    "store_section_source",
+    "store_section_confidence",
+    "store_section_user_confirmed",
+    "classifier_version",
+    "store_section_reason",
+    "store_section_rule",
+)
+
+
+def store_section_history_snapshot(row, fields):
+    row_data = dict(row) if row is not None else {}
+    return {field: row_data.get(field) for field in fields}
+
+
+def ingredient_store_section_reclassification_history_summary(row):
+    if not row:
+        return None
+    return {
+        "batch_id": int(row["id"]),
+        "user_id": clean_text(row["user_id"]),
+        "change_count": int(row["change_count"] or 0),
+        "applied_at": clean_text(row["applied_at"]),
+    }
+
+
+def latest_undoable_ingredient_store_section_reclassification(user_id=None):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return None
+        row = connection.execute(
+            """
+            SELECT id, user_id, change_count, applied_at
+              FROM ingredient_store_section_reclassification_history
+             WHERE user_id = ? AND undone_at IS NULL
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (scoped_user_id,),
+        ).fetchone()
+    return ingredient_store_section_reclassification_history_summary(row)
+
+
 def misc_ingredient_store_section_review_candidates(
     user_id=None,
     scope="all",
@@ -2452,15 +2527,42 @@ def apply_misc_ingredient_store_section_decisions(user_id=None, decisions=None):
                 }
                 user_confirmed = True
 
+            recipe_rows_before = connection.execute(
+                """
+                SELECT id, user_id, ingredient_id, store_section,
+                       store_section_source, store_section_confidence,
+                       store_section_user_confirmed, classifier_version,
+                       store_section_reason, store_section_rule
+                  FROM recipe_ingredients
+                 WHERE ingredient_id = ?
+                   AND user_id = ?
+                   AND COALESCE(store_section_user_confirmed, 0) = 0
+                   AND COALESCE(NULLIF(TRIM(store_section), ''), 'MISC') = 'MISC'
+                 ORDER BY id ASC
+                """,
+                (decision["ingredient_id"], scoped_user_id),
+            ).fetchall()
             prepared_decisions.append({
                 "decision": decision,
                 "row_data": row_data,
                 "metadata": metadata,
                 "user_confirmed": user_confirmed,
+                "ingredient_before": store_section_history_snapshot(
+                    row,
+                    INGREDIENT_STORE_SECTION_HISTORY_FIELDS,
+                ),
+                "recipe_ingredients_before": [
+                    store_section_history_snapshot(
+                        recipe_row,
+                        RECIPE_INGREDIENT_STORE_SECTION_HISTORY_FIELDS,
+                    )
+                    for recipe_row in recipe_rows_before
+                ],
             })
 
         # Validate the entire batch before writing so a stale rule-based choice
         # cannot leave earlier decisions partially applied.
+        history_changes = []
         for prepared in prepared_decisions:
             decision = prepared["decision"]
             row_data = prepared["row_data"]
@@ -2514,6 +2616,52 @@ def apply_misc_ingredient_store_section_decisions(user_id=None, decisions=None):
                     scoped_user_id,
                 ),
             )
+            ingredient_after = connection.execute(
+                """
+                SELECT id, user_id, canonical_ingredient, form, store_section,
+                       store_section_source, store_section_confidence,
+                       store_section_user_confirmed, classifier_version,
+                       store_section_reason, store_section_rule, updated_at
+                  FROM ingredients
+                 WHERE id = ? AND user_id = ?
+                """,
+                (decision["ingredient_id"], scoped_user_id),
+            ).fetchone()
+            recipe_ids = [
+                int(recipe_row["id"])
+                for recipe_row in prepared["recipe_ingredients_before"]
+            ]
+            recipe_rows_after = []
+            if recipe_ids:
+                placeholders = ", ".join("?" for _value in recipe_ids)
+                recipe_rows_after = connection.execute(
+                    f"""
+                    SELECT id, user_id, ingredient_id, store_section,
+                           store_section_source, store_section_confidence,
+                           store_section_user_confirmed, classifier_version,
+                           store_section_reason, store_section_rule
+                      FROM recipe_ingredients
+                     WHERE user_id = ? AND id IN ({placeholders})
+                     ORDER BY id ASC
+                    """,
+                    (scoped_user_id, *recipe_ids),
+                ).fetchall()
+            history_changes.append({
+                "ingredient_name": clean_text(row_data.get("name")),
+                "ingredient_before": prepared["ingredient_before"],
+                "ingredient_after": store_section_history_snapshot(
+                    ingredient_after,
+                    INGREDIENT_STORE_SECTION_HISTORY_FIELDS,
+                ),
+                "recipe_ingredients_before": prepared["recipe_ingredients_before"],
+                "recipe_ingredients_after": [
+                    store_section_history_snapshot(
+                        recipe_row,
+                        RECIPE_INGREDIENT_STORE_SECTION_HISTORY_FIELDS,
+                    )
+                    for recipe_row in recipe_rows_after
+                ],
+            })
             log_ingredient_store_section_result({
                 **metadata,
                 "store_section": decision["store_section"],
@@ -2526,6 +2674,30 @@ def apply_misc_ingredient_store_section_decisions(user_id=None, decisions=None):
                 "decision_source": decision["decision_source"] or "manual",
             })
 
+        batch_id = 0
+        applied_at = ""
+        if history_changes:
+            applied_at = utc_now_iso()
+            history_cursor = connection.execute(
+                """
+                INSERT INTO ingredient_store_section_reclassification_history (
+                    user_id, snapshot_json, change_count, applied_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    scoped_user_id,
+                    json.dumps(
+                        {"version": 1, "changes": history_changes},
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ),
+                    len(history_changes),
+                    applied_at,
+                ),
+            )
+            batch_id = int(history_cursor.lastrowid)
+
     return {
         "ok": True,
         "applied": True,
@@ -2533,7 +2705,244 @@ def apply_misc_ingredient_store_section_decisions(user_id=None, decisions=None):
         "changed_count": len(changed),
         "kept_misc_count": kept_misc,
         "changes": changed,
+        "batch_id": batch_id,
+        "applied_at": applied_at,
+        "undo_available": batch_id > 0,
     }
+
+
+def undo_last_ingredient_store_section_reclassification(user_id=None, expected_batch_id=None):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    try:
+        expected_batch_id = int(expected_batch_id or 0)
+    except (TypeError, ValueError):
+        expected_batch_id = 0
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {
+                "ok": False,
+                "status": 404,
+                "error": "No store-section reclassification is available to undo.",
+            }
+        history = connection.execute(
+            """
+            SELECT id, user_id, snapshot_json, change_count, applied_at
+              FROM ingredient_store_section_reclassification_history
+             WHERE user_id = ? AND undone_at IS NULL
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (scoped_user_id,),
+        ).fetchone()
+        if not history:
+            return {
+                "ok": False,
+                "status": 404,
+                "error": "No store-section reclassification is available to undo.",
+            }
+        if expected_batch_id > 0 and expected_batch_id != int(history["id"]):
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "A newer reclassification was applied. Refresh before undoing.",
+            }
+        try:
+            snapshot = json.loads(history["snapshot_json"])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            snapshot = None
+        changes = snapshot.get("changes") if isinstance(snapshot, dict) else None
+        if not isinstance(changes, list) or not changes:
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "This reclassification cannot be undone because its restore data is unavailable.",
+            }
+
+        validated_changes = []
+        for change in changes:
+            change = change if isinstance(change, dict) else {}
+            ingredient_before = change.get("ingredient_before")
+            ingredient_after = change.get("ingredient_after")
+            recipe_before = change.get("recipe_ingredients_before")
+            recipe_after = change.get("recipe_ingredients_after")
+            if not (
+                isinstance(ingredient_before, dict)
+                and isinstance(ingredient_after, dict)
+                and isinstance(recipe_before, list)
+                and isinstance(recipe_after, list)
+            ):
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": "This reclassification cannot be undone because its restore data is incomplete.",
+                }
+            ingredient_id = int(ingredient_after.get("id") or 0)
+            ingredient_name = clean_text(change.get("ingredient_name")) or "An ingredient"
+            if (
+                ingredient_id <= 0
+                or int(ingredient_before.get("id") or 0) != ingredient_id
+                or clean_text(ingredient_before.get("user_id")) != scoped_user_id
+                or clean_text(ingredient_after.get("user_id")) != scoped_user_id
+            ):
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": "This reclassification does not match the current workspace.",
+                }
+            current_ingredient = connection.execute(
+                """
+                SELECT id, user_id, canonical_ingredient, form, store_section,
+                       store_section_source, store_section_confidence,
+                       store_section_user_confirmed, classifier_version,
+                       store_section_reason, store_section_rule, updated_at
+                  FROM ingredients
+                 WHERE id = ? AND user_id = ?
+                """,
+                (ingredient_id, scoped_user_id),
+            ).fetchone()
+            current_ingredient = store_section_history_snapshot(
+                current_ingredient,
+                INGREDIENT_STORE_SECTION_HISTORY_FIELDS,
+            )
+            if current_ingredient != ingredient_after:
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": f"{ingredient_name} changed after this reclassification, so it cannot be safely undone.",
+                }
+
+            recipe_before_by_id = {
+                int(row.get("id") or 0): row
+                for row in recipe_before
+                if isinstance(row, dict) and int(row.get("id") or 0) > 0
+            }
+            recipe_after_by_id = {
+                int(row.get("id") or 0): row
+                for row in recipe_after
+                if isinstance(row, dict) and int(row.get("id") or 0) > 0
+            }
+            if set(recipe_before_by_id) != set(recipe_after_by_id):
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": "This reclassification cannot be undone because its recipe restore data is incomplete.",
+                }
+            current_recipe_by_id = {}
+            if recipe_after_by_id:
+                recipe_ids = sorted(recipe_after_by_id)
+                placeholders = ", ".join("?" for _value in recipe_ids)
+                current_recipe_rows = connection.execute(
+                    f"""
+                    SELECT id, user_id, ingredient_id, store_section,
+                           store_section_source, store_section_confidence,
+                           store_section_user_confirmed, classifier_version,
+                           store_section_reason, store_section_rule
+                      FROM recipe_ingredients
+                     WHERE user_id = ? AND id IN ({placeholders})
+                    """,
+                    (scoped_user_id, *recipe_ids),
+                ).fetchall()
+                current_recipe_by_id = {
+                    int(row["id"]): store_section_history_snapshot(
+                        row,
+                        RECIPE_INGREDIENT_STORE_SECTION_HISTORY_FIELDS,
+                    )
+                    for row in current_recipe_rows
+                }
+            if current_recipe_by_id != recipe_after_by_id:
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": f"A recipe using {ingredient_name} changed after this reclassification, so it cannot be safely undone.",
+                }
+            validated_changes.append({
+                "ingredient_before": ingredient_before,
+                "recipe_before_by_id": recipe_before_by_id,
+            })
+
+        restored_recipe_count = 0
+        for change in validated_changes:
+            ingredient = change["ingredient_before"]
+            connection.execute(
+                """
+                UPDATE ingredients
+                   SET canonical_ingredient = ?, form = ?, store_section = ?,
+                       store_section_source = ?, store_section_confidence = ?,
+                       store_section_user_confirmed = ?, classifier_version = ?,
+                       store_section_reason = ?, store_section_rule = ?, updated_at = ?
+                 WHERE id = ? AND user_id = ?
+                """,
+                (
+                    ingredient.get("canonical_ingredient"),
+                    ingredient.get("form"),
+                    ingredient.get("store_section"),
+                    ingredient.get("store_section_source"),
+                    ingredient.get("store_section_confidence"),
+                    ingredient.get("store_section_user_confirmed"),
+                    ingredient.get("classifier_version"),
+                    ingredient.get("store_section_reason"),
+                    ingredient.get("store_section_rule"),
+                    ingredient.get("updated_at"),
+                    ingredient.get("id"),
+                    scoped_user_id,
+                ),
+            )
+            for recipe in change["recipe_before_by_id"].values():
+                cursor = connection.execute(
+                    """
+                    UPDATE recipe_ingredients
+                       SET store_section = ?, store_section_source = ?,
+                           store_section_confidence = ?, store_section_user_confirmed = ?,
+                           classifier_version = ?, store_section_reason = ?,
+                           store_section_rule = ?
+                     WHERE id = ? AND user_id = ? AND ingredient_id = ?
+                    """,
+                    (
+                        recipe.get("store_section"),
+                        recipe.get("store_section_source"),
+                        recipe.get("store_section_confidence"),
+                        recipe.get("store_section_user_confirmed"),
+                        recipe.get("classifier_version"),
+                        recipe.get("store_section_reason"),
+                        recipe.get("store_section_rule"),
+                        recipe.get("id"),
+                        scoped_user_id,
+                        recipe.get("ingredient_id"),
+                    ),
+                )
+                restored_recipe_count += max(0, int(cursor.rowcount or 0))
+
+        undone_at = utc_now_iso()
+        connection.execute(
+            """
+            UPDATE ingredient_store_section_reclassification_history
+               SET undone_at = ?
+             WHERE id = ? AND user_id = ? AND undone_at IS NULL
+            """,
+            (undone_at, int(history["id"]), scoped_user_id),
+        )
+        next_history = connection.execute(
+            """
+            SELECT id, user_id, change_count, applied_at
+              FROM ingredient_store_section_reclassification_history
+             WHERE user_id = ? AND undone_at IS NULL
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (scoped_user_id,),
+        ).fetchone()
+
+        return {
+            "ok": True,
+            "changed": True,
+            "batch_id": int(history["id"]),
+            "user_id": scoped_user_id,
+            "restored_ingredient_count": len(validated_changes),
+            "restored_recipe_count": restored_recipe_count,
+            "undone_at": undone_at,
+            "next_batch": ingredient_store_section_reclassification_history_summary(next_history),
+        }
 
 
 def update_ingredient_master_record(

@@ -205,6 +205,62 @@ def test_misc_reclassification_ai_second_opinion_route_is_user_scoped(monkeypatc
     }
 
 
+def test_misc_reclassification_undo_route_and_button_restore_last_apply(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/undo-store-sections",
+        recipe_data={"ingredients": [{"ingredient": "Ground ginger", "store_section": "MISC"}]},
+        user_id="user-a",
+    )
+    ground = master_data.master_record_for_name("ingredients", "user-a", "ground ginger")
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "UPDATE ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE id = ?",
+            (ground["id"],),
+        )
+        connection.execute(
+            "UPDATE recipe_ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE ingredient_id = ?",
+            (ground["id"],),
+        )
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        apply_response = client.post(
+            "/api/master-data/ingredients/reclassify-misc",
+            json={
+                "apply": True,
+                "decisions": [{
+                    "ingredient_id": ground["id"],
+                    "store_section": "Spices",
+                    "decision_source": "deterministic",
+                    "confidence": 1,
+                }],
+            },
+        )
+        batch_id = apply_response.get_json()["batch_id"]
+        applied_page = client.get("/admin/master-data/ingredients")
+        undo_response = client.post(
+            "/api/master-data/ingredients/reclassify-misc/undo",
+            json={"batch_id": batch_id},
+        )
+        restored_page = client.get("/admin/master-data/ingredients")
+
+    applied_html = applied_page.get_data(as_text=True)
+    restored_html = restored_page.get_data(as_text=True)
+    assert apply_response.status_code == 200
+    assert apply_response.get_json()["undo_available"] is True
+    assert f'data-undo-batch-id="{batch_id}"' in applied_html
+    assert 'data-undo-available="true"' in applied_html
+    assert "Undo Last Apply (1)" in applied_html
+    assert undo_response.status_code == 200
+    assert undo_response.get_json()["restored_ingredient_count"] == 1
+    assert undo_response.get_json()["restored_recipe_count"] == 1
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "ground ginger"
+    )["store_section"] == "MISC"
+    assert 'data-undo-available="false"' in restored_html
+
+
 def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     seed_master_records()
@@ -256,6 +312,8 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "AI second opinion" in all_html
     assert "Final decision" in all_html
     assert "data-ai-second-opinion-url" in all_html
+    assert "data-master-misc-reclassification-undo" in all_html
+    assert "Undo Last Apply" in all_html
     assert "Apply Changes" in all_html
     assert "/api/master-data/ingredients/reclassify-misc" in all_html
     assert 'data-original-store-section="PRODUCE"' in all_html
@@ -387,6 +445,8 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "MISC_REVIEW_STORE_SECTIONS" in script
     assert "requestMiscAiSecondOpinions" in script
     assert "miscReviewDecisionPayload" in script
+    assert "requestMiscReclassificationUndo" in script
+    assert "panel.dataset.undoBatchId" in script
     assert "AI review is optional and never changes the final decision automatically." in script
     assert ".master-data-misc-reclassification-header" in css
     assert ".master-data-misc-reclassification-list" in css
@@ -394,6 +454,7 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert ".master-data-misc-reclassification-actions" in css
     assert ".master-data-misc-ai-status" in css
     assert ".master-data-misc-decision" in css
+    assert ".master-data-action-undo" in css
 
 
 def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch, tmp_path):

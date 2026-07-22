@@ -4039,10 +4039,12 @@
 
     function restoreMiscReviewControls(panel) {
         const previewButton = panel.querySelector("[data-master-misc-reclassification-preview]");
+        const undoButton = panel.querySelector("[data-master-misc-reclassification-undo]");
         const suggestedAiButton = panel.querySelector("[data-master-misc-ai-review-suggested]");
         const unresolvedAiButton = panel.querySelector("[data-master-misc-ai-review-unresolved]");
         panel.setAttribute("aria-busy", "false");
         if (previewButton) previewButton.disabled = false;
+        if (undoButton) undoButton.disabled = panel.dataset.undoAvailable !== "true";
         if (suggestedAiButton) {
             suggestedAiButton.disabled = !(panel.miscReclassificationRows || []).some((row) => row.deterministic);
         }
@@ -4077,6 +4079,8 @@
             }
             if (data.applied) {
                 panel.dataset.miscApplied = "true";
+                panel.dataset.undoAvailable = data.undo_available ? "true" : panel.dataset.undoAvailable;
+                if (data.batch_id) panel.dataset.undoBatchId = String(data.batch_id);
                 panel.classList.add("is-applied");
                 if (summary) summary.textContent = `Applied ${Number(data.changed_count) || 0} reviewed change${Number(data.changed_count) === 1 ? "" : "s"} to Ingredient Master Data.`;
                 if (applyButton) {
@@ -4095,6 +4099,51 @@
                 previewButton.textContent = "Preview Changes";
             }
             if (panel.dataset.miscApplied !== "true") restoreMiscReviewControls(panel);
+        }
+    }
+
+    async function requestMiscReclassificationUndo(panel) {
+        const undoButton = panel.querySelector("[data-master-misc-reclassification-undo]");
+        const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
+        if (!undoButton || panel.dataset.undoAvailable !== "true") return;
+        const originalLabel = undoButton.textContent;
+        setMiscReviewBusy(panel, true);
+        undoButton.textContent = "Undoing…";
+        if (summary) summary.textContent = "Restoring the previous store-section assignments…";
+        try {
+            const response = await fetch(panel.dataset.undoUrl, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({
+                    batch_id: Number(panel.dataset.undoBatchId) || 0,
+                }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || "The last store-section apply could not be undone.");
+            }
+            panel.dataset.miscUndoComplete = "true";
+            panel.dataset.undoAvailable = data.undo_available ? "true" : "false";
+            panel.dataset.undoBatchId = data.next_batch && data.next_batch.batch_id
+                ? String(data.next_batch.batch_id)
+                : "";
+            undoButton.textContent = "Undone";
+            undoButton.disabled = true;
+            if (summary) summary.textContent = data.message || "The previous store-section assignments were restored.";
+            window.setTimeout(() => window.location.reload(), REFRESH_DELAY_MS);
+        } catch (error) {
+            if (summary) {
+                summary.textContent = error && error.message
+                    ? error.message
+                    : "The last store-section apply could not be undone.";
+            }
+            undoButton.textContent = originalLabel;
+        } finally {
+            if (panel.dataset.miscUndoComplete !== "true") restoreMiscReviewControls(panel);
         }
     }
 
@@ -4174,9 +4223,11 @@
         if (!panel || !window.fetch) return;
         const previewButton = panel.querySelector("[data-master-misc-reclassification-preview]");
         const applyButton = panel.querySelector("[data-master-misc-reclassification-apply]");
+        const undoButton = panel.querySelector("[data-master-misc-reclassification-undo]");
         const suggestedAiButton = panel.querySelector("[data-master-misc-ai-review-suggested]");
         const unresolvedAiButton = panel.querySelector("[data-master-misc-ai-review-unresolved]");
         if (previewButton) previewButton.addEventListener("click", () => requestMiscReclassification(panel, false));
+        if (undoButton) undoButton.addEventListener("click", () => requestMiscReclassificationUndo(panel));
         if (applyButton) {
             applyButton.addEventListener("click", () => {
                 if (panel.dataset.miscPreviewReady === "true") requestMiscReclassification(panel, true);
