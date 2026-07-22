@@ -167,6 +167,58 @@ def test_misc_reclassification_route_requires_previewable_unconfirmed_rows(monke
     )["store_section"] == "SPICES & SEASONINGS"
 
 
+def test_misc_reclassification_route_applies_only_the_selected_row(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/one-row-store-section",
+        recipe_data={"ingredients": [
+            {"ingredient": "Ground ginger", "store_section": "MISC"},
+            {"ingredient": "Banana", "store_section": "MISC"},
+        ]},
+        user_id="user-a",
+    )
+    ground = master_data.master_record_for_name("ingredients", "user-a", "ground ginger")
+    banana = master_data.master_record_for_name("ingredients", "user-a", "banana")
+    ingredient_ids = [ground["id"], banana["id"]]
+    with master_data.recipe_master_connection() as connection:
+        placeholders = ", ".join("?" for _value in ingredient_ids)
+        connection.execute(
+            f"UPDATE ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE id IN ({placeholders})",
+            ingredient_ids,
+        )
+        connection.execute(
+            f"UPDATE recipe_ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE ingredient_id IN ({placeholders})",
+            ingredient_ids,
+        )
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.post(
+            "/api/master-data/ingredients/reclassify-misc",
+            json={
+                "apply": True,
+                "decisions": [{
+                    "ingredient_id": ground["id"],
+                    "store_section": "Spices",
+                    "decision_source": "deterministic",
+                    "confidence": 1,
+                }],
+            },
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["changed_count"] == 1
+    assert payload["undo_available"] is True
+    assert payload["changes"][0]["ingredient_id"] == ground["id"]
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "ground ginger"
+    )["store_section"] == "SPICES & SEASONINGS"
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "banana"
+    )["store_section"] == "MISC"
+
+
 def test_misc_reclassification_ai_second_opinion_route_is_user_scoped(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     captured = {}
@@ -458,6 +510,8 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "requestMiscAiSecondOpinions" in script
     assert "acceptMiscAiSuggestions" in script
     assert "miscReviewDecisionPayload" in script
+    assert "miscReviewDecisionForRow" in script
+    assert "requestMiscRowReclassification" in script
     assert "function miscReviewIngredientImage(row)" in script
     assert "function miscReviewReferenceUrl(panel, ingredientId)" in script
     assert "function miscReviewReferenceElements()" in script
@@ -489,6 +543,8 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert ".master-data-misc-ai-status" in css
     assert ".master-data-misc-decision" in css
     assert ".master-data-misc-decision-control" in css
+    assert ".master-data-misc-decision-actions" in css
+    assert ".master-data-misc-row-apply-button" in css
     assert ".master-data-misc-ingredient-copy" in css
     assert ".master-data-misc-thumbnail" in css
     assert ".master-data-misc-ingredient-name" in css
@@ -504,6 +560,8 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     decision_end = script.index("function miscReviewIngredientCell", decision_start)
     decision_block = script[decision_start:decision_end]
     assert 'label.className = "master-data-misc-decision-control"' in decision_block
+    assert 'applyRowButton.textContent = row.applying ? "Applying..." : "Apply Row"' in decision_block
+    assert "requestMiscRowReclassification(panel, row)" in decision_block
     assert 'labelText.className = "sr-only"' in decision_block
     assert 'label.className = "sr-only"' not in decision_block
     accept_start = script.index("function acceptMiscAiSuggestions")

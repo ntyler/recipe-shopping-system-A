@@ -25851,7 +25851,7 @@ img[data-deferred-src] {
         .master-data-misc-reclassification-columns,
         .master-data-misc-reclassification-item {
             display: grid;
-            grid-template-columns: minmax(210px, .95fr) minmax(210px, 1.3fr) minmax(210px, 1.3fr) minmax(170px, .9fr);
+            grid-template-columns: minmax(210px, .95fr) minmax(210px, 1.3fr) minmax(210px, 1.3fr) minmax(230px, .9fr);
             gap: 14px;
         }
 
@@ -26046,11 +26046,46 @@ img[data-deferred-src] {
             width: 100%;
         }
 
+        .master-data-misc-decision-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: stretch;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .master-data-misc-row-apply-button {
+            min-height: 38px;
+            padding: 7px 12px;
+            border: 1px solid #1ea877;
+            border-radius: 7px;
+            background: #08744c;
+            color: #f1fff9;
+            font-size: 12px;
+            font-weight: 900;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .master-data-misc-row-apply-button:is(:hover, :focus-visible) {
+            border-color: #58d4aa;
+            background: #0b9362;
+        }
+
+        .master-data-misc-row-apply-button:disabled {
+            cursor: not-allowed;
+            opacity: .46;
+        }
+
         .master-data-misc-decision small {
             color: #f2c16d;
             font-size: 11px;
             font-weight: 800;
             line-height: 1.35;
+        }
+
+        .master-data-misc-decision .master-data-misc-row-apply-error {
+            color: #ffaaa5;
         }
 
         .master-data-misc-reclassification-result {
@@ -29198,6 +29233,10 @@ img[data-deferred-src] {
 
             .master-data-misc-reclassification-ai-actions button {
                 width: 100%;
+            }
+
+            .master-data-misc-decision-actions {
+                grid-template-columns: 1fr;
             }
 
             .master-data-backfill-metrics {

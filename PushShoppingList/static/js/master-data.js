@@ -3806,6 +3806,9 @@
             decisionSection: text(change.proposed_store_section || "MISC"),
             decisionSource: "deterministic",
             requiresDecision: false,
+            wasUnresolved: false,
+            applying: false,
+            applyError: "",
         }));
     }
 
@@ -3813,6 +3816,26 @@
         if (row.deterministic && section === row.deterministic.storeSection) return "deterministic";
         if (row.ai && section === row.ai.storeSection) return "ai";
         return section === "MISC" ? "keep_misc" : "manual";
+    }
+
+    function miscReviewDecisionForRow(row) {
+        if (!row || !row.decisionSection) return null;
+        const opinion = row.decisionSource === "ai"
+            ? row.ai
+            : row.decisionSource === "deterministic"
+                ? row.deterministic
+                : null;
+        return {
+            ingredient_id: row.ingredientId,
+            store_section: row.decisionSection,
+            decision_source: row.decisionSource,
+            confidence: opinion ? opinion.confidence : 1,
+            reason: opinion
+                ? opinion.reason
+                : row.decisionSection === "MISC"
+                    ? "User confirmed that this ingredient should remain in Misc."
+                    : "User selected the final store section during maintenance.",
+        };
     }
 
     function miscReviewDecisionSelect(panel, row) {
@@ -3870,14 +3893,36 @@
             row.decisionSection = select.value;
             row.decisionSource = miscReviewDecisionSource(row, select.value);
             row.requiresDecision = false;
+            row.applyError = "";
             renderMiscReclassificationRows(panel);
         });
         label.append(labelText, select);
-        wrap.appendChild(label);
+        const controls = document.createElement("div");
+        controls.className = "master-data-misc-decision-actions";
+        const applyRowButton = document.createElement("button");
+        applyRowButton.type = "button";
+        applyRowButton.className = "master-data-misc-row-apply-button";
+        applyRowButton.dataset.masterMiscRowApply = String(row.ingredientId);
+        applyRowButton.textContent = row.applying ? "Applying..." : "Apply Row";
+        applyRowButton.disabled = Boolean(row.applying || row.requiresDecision || !row.decisionSection);
+        applyRowButton.setAttribute(
+            "aria-label",
+            `Apply store-section decision for ${miscReviewDisplayName(row.ingredient)}`
+        );
+        applyRowButton.addEventListener("click", () => requestMiscRowReclassification(panel, row));
+        controls.append(label, applyRowButton);
+        wrap.appendChild(controls);
         if (row.requiresDecision && !row.decisionSection) {
             const warning = document.createElement("small");
             warning.textContent = "AI disagrees—choose the final section.";
             wrap.appendChild(warning);
+        }
+        if (row.applyError) {
+            const error = document.createElement("small");
+            error.className = "master-data-misc-row-apply-error";
+            error.setAttribute("role", "alert");
+            error.textContent = row.applyError;
+            wrap.appendChild(error);
         }
         return wrap;
     }
@@ -4198,24 +4243,8 @@
     function miscReviewDecisionPayload(panel) {
         return (panel.miscReclassificationRows || [])
             .filter((row) => row.decisionSection)
-            .map((row) => {
-                const opinion = row.decisionSource === "ai"
-                    ? row.ai
-                    : row.decisionSource === "deterministic"
-                        ? row.deterministic
-                        : null;
-                return {
-                    ingredient_id: row.ingredientId,
-                    store_section: row.decisionSection,
-                    decision_source: row.decisionSource,
-                    confidence: opinion ? opinion.confidence : 1,
-                    reason: opinion
-                        ? opinion.reason
-                        : row.decisionSection === "MISC"
-                            ? "User confirmed that this ingredient should remain in Misc."
-                            : "User selected the final store section during maintenance.",
-                };
-            });
+            .map(miscReviewDecisionForRow)
+            .filter(Boolean);
     }
 
     function setMiscReviewBusy(panel, busy) {
@@ -4244,6 +4273,61 @@
         }
         if (unresolvedAiButton) unresolvedAiButton.disabled = !panel.miscUnresolvedCount;
         renderMiscReclassificationRows(panel);
+    }
+
+    async function requestMiscRowReclassification(panel, row) {
+        const decision = miscReviewDecisionForRow(row);
+        if (!decision || row.requiresDecision || row.applying) return;
+        const summary = panel.querySelector("[data-master-misc-reclassification-summary]");
+        const undoButton = panel.querySelector("[data-master-misc-reclassification-undo]");
+        const ingredientName = miscReviewDisplayName(row.ingredient);
+        let finalMessage = "";
+        row.applying = true;
+        row.applyError = "";
+        renderMiscReclassificationRows(panel);
+        setMiscReviewBusy(panel, true);
+        if (summary) summary.textContent = `Applying the decision for ${ingredientName}…`;
+        try {
+            const response = await fetch(panel.dataset.reclassifyUrl, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({ apply: true, decisions: [decision] }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || `The decision for ${ingredientName} could not be applied.`);
+            }
+            if (!data.applied || Number(data.changed_count) < 1) {
+                throw new Error(`${ingredientName} is no longer eligible for reclassification. Preview the list again.`);
+            }
+            row.applying = false;
+            panel.miscReclassificationRows = (panel.miscReclassificationRows || []).filter(
+                (candidate) => candidate.ingredientId !== row.ingredientId
+            );
+            if (row.wasUnresolved && panel.miscUnresolvedCount > 0) {
+                panel.miscUnresolvedCount -= 1;
+            }
+            panel.dataset.undoAvailable = data.undo_available ? "true" : panel.dataset.undoAvailable;
+            if (data.batch_id) panel.dataset.undoBatchId = String(data.batch_id);
+            if (undoButton && data.undo_available) {
+                undoButton.disabled = false;
+                undoButton.textContent = `Undo Last Apply (${Number(data.changed_count) || 1})`;
+            }
+            finalMessage = `Applied ${ingredientName} to ${friendlyIngredientStoreSection(decision.store_section)}. The other review rows were not changed.`;
+        } catch (error) {
+            row.applying = false;
+            row.applyError = error && error.message
+                ? error.message
+                : `The decision for ${ingredientName} could not be applied.`;
+            finalMessage = row.applyError;
+        } finally {
+            restoreMiscReviewControls(panel);
+            if (summary) summary.textContent = finalMessage;
+        }
     }
 
     async function requestMiscReclassification(panel, apply) {
@@ -4396,6 +4480,9 @@
                         decisionSection: "",
                         decisionSource: "",
                         requiresDecision: false,
+                        wasUnresolved: true,
+                        applying: false,
+                        applyError: "",
                     };
                     rows.push(row);
                 }
