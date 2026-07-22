@@ -25851,7 +25851,7 @@ img[data-deferred-src] {
         .master-data-misc-reclassification-columns,
         .master-data-misc-reclassification-item {
             display: grid;
-            grid-template-columns: minmax(150px, .9fr) minmax(210px, 1.3fr) minmax(210px, 1.3fr) minmax(170px, .9fr);
+            grid-template-columns: minmax(210px, .95fr) minmax(210px, 1.3fr) minmax(210px, 1.3fr) minmax(170px, .9fr);
             gap: 14px;
         }
 
@@ -25900,11 +25900,29 @@ img[data-deferred-src] {
             display: none;
         }
 
-        .master-data-misc-review-cell.is-ingredient > strong {
+        .master-data-misc-review-cell.is-ingredient {
+            grid-template-columns: var(--master-data-thumbnail-slot, 66px) minmax(0, 1fr);
+            align-items: start;
+            gap: 10px;
+        }
+
+        .master-data-misc-ingredient-copy {
+            display: grid;
+            align-content: start;
+            gap: 5px;
+            min-width: 0;
+        }
+
+        .master-data-misc-ingredient-copy > strong {
             color: #f8fafc;
             font-size: 14px;
             line-height: 1.3;
             overflow-wrap: anywhere;
+        }
+
+        .master-data-misc-thumbnail,
+        .master-data-misc-no-image {
+            grid-column: 1;
         }
 
         .master-data-misc-current-label,
@@ -28909,6 +28927,7 @@ img[data-deferred-src] {
 
             .master-data-misc-review-cell.is-ingredient::before {
                 content: "Ingredient";
+                grid-column: 1 / -1;
             }
 
             .master-data-misc-review-cell.is-classification::before {

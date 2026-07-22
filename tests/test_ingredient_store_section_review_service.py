@@ -8,6 +8,7 @@ def candidate(deterministic_section="SPICES & SEASONINGS"):
         "normalized_name": "ground ginger",
         "canonical_ingredient": "ginger",
         "form": "ground",
+        "image_url": "/static/generated/ingredients/ground-ginger.png",
         "recipe_context": [{"source_text": "1 tsp ground ginger"}],
         "deterministic": (
             {
@@ -61,6 +62,7 @@ def test_validate_ai_store_section_opinion_reports_agreement_and_disagreement():
 
     assert agrees["store_section"] == "SPICES & SEASONINGS"
     assert agrees["agreement"] == "agree"
+    assert agrees["image_url"] == "/static/generated/ingredients/ground-ginger.png"
     assert disagrees["store_section"] == "PRODUCE"
     assert disagrees["agreement"] == "disagree"
     assert invalid is None

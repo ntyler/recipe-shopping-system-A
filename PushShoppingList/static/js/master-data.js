@@ -3777,6 +3777,7 @@
             ingredientId: Number(change.ingredient_id) || 0,
             ingredient: text(change.ingredient || change.normalized_name || "Ingredient"),
             normalizedName: text(change.normalized_name),
+            imageUrl: text(change.image_url),
             form: text(change.form),
             deterministic: {
                 storeSection: text(change.proposed_store_section || "MISC"),
@@ -3865,15 +3866,42 @@
         return wrap;
     }
 
+    function miscReviewMissingImage() {
+        const missing = document.createElement("span");
+        missing.className = "master-data-no-image master-data-misc-no-image";
+        missing.textContent = "No image";
+        return missing;
+    }
+
+    function miscReviewIngredientImage(row) {
+        const imageUrl = text(row.imageUrl).trim();
+        if (!imageUrl) return miscReviewMissingImage();
+        const image = document.createElement("img");
+        image.className = "master-data-thumbnail master-data-misc-thumbnail";
+        image.src = imageUrl;
+        image.dataset.fullSrc = imageUrl;
+        image.alt = `${miscReviewDisplayName(row.ingredient)} image`;
+        image.loading = "lazy";
+        image.decoding = "async";
+        image.tabIndex = 0;
+        image.setAttribute("role", "button");
+        image.setAttribute("aria-label", `Enlarge ${image.alt}`);
+        image.addEventListener("error", () => image.replaceWith(miscReviewMissingImage()), { once: true });
+        return image;
+    }
+
     function miscReviewIngredientCell(row) {
         const cell = document.createElement("div");
         cell.className = "master-data-misc-review-cell is-ingredient";
+        const copy = document.createElement("div");
+        copy.className = "master-data-misc-ingredient-copy";
         const name = document.createElement("strong");
         name.textContent = miscReviewDisplayName(row.ingredient);
         const current = document.createElement("span");
         current.className = "master-data-misc-current-label";
         current.textContent = "Currently: Misc";
-        cell.append(name, current);
+        copy.append(name, current);
+        cell.append(miscReviewIngredientImage(row), copy);
         return cell;
     }
 
@@ -4213,6 +4241,7 @@
                         ingredientId,
                         ingredient: text(opinion.ingredient || opinion.normalized_name || "Ingredient"),
                         normalizedName: text(opinion.normalized_name),
+                        imageUrl: text(opinion.image_url),
                         form: "",
                         deterministic: null,
                         ai: null,
@@ -4223,6 +4252,7 @@
                     rows.push(row);
                 }
                 if (!row) return;
+                if (!row.imageUrl) row.imageUrl = text(opinion.image_url);
                 row.ai = {
                     storeSection: text(opinion.store_section),
                     confidence: Number(opinion.confidence),

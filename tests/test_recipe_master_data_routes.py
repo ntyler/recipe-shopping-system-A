@@ -448,6 +448,10 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "requestMiscAiSecondOpinions" in script
     assert "acceptMiscAiSuggestions" in script
     assert "miscReviewDecisionPayload" in script
+    assert "function miscReviewIngredientImage(row)" in script
+    assert "imageUrl: text(change.image_url)" in script
+    assert "imageUrl: text(opinion.image_url)" in script
+    assert 'image.className = "master-data-thumbnail master-data-misc-thumbnail"' in script
     assert "requestMiscReclassificationUndo" in script
     assert "panel.dataset.undoBatchId" in script
     assert "AI suggestions for unresolved ingredients are preselected and remain editable." in script
@@ -458,6 +462,8 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert ".master-data-misc-ai-status" in css
     assert ".master-data-misc-decision" in css
     assert ".master-data-misc-decision-control" in css
+    assert ".master-data-misc-ingredient-copy" in css
+    assert ".master-data-misc-thumbnail" in css
     assert ".is-accept-ai" in css
     assert ".master-data-action-undo" in css
     decision_start = script.index("function miscReviewDecisionSelect")

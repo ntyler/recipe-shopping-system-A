@@ -381,7 +381,13 @@ def test_misc_reclassification_previews_then_applies_only_unconfirmed_rows(monke
     fresh = master_data.master_record_for_name("ingredients", "user-a", "ginger")
     with master_data.recipe_master_connection() as connection:
         connection.execute(
-            "UPDATE ingredients SET store_section = 'MISC', store_section_user_confirmed = 0 WHERE id = ?",
+            """
+            UPDATE ingredients
+               SET store_section = 'MISC',
+                   store_section_user_confirmed = 0,
+                   image_url = '/static/generated/ingredients/ground-ginger.png'
+             WHERE id = ?
+            """,
             (ground["id"],),
         )
         connection.execute(
@@ -398,6 +404,7 @@ def test_misc_reclassification_previews_then_applies_only_unconfirmed_rows(monke
     assert preview["applied"] is False
     assert preview["changed_count"] == 1
     assert preview["changes"][0]["ingredient"] == "Ground ginger"
+    assert preview["changes"][0]["image_url"] == "/static/generated/ingredients/ground-ginger.png"
     assert preview["changes"][0]["proposed_store_section"] == "SPICES & SEASONINGS"
     assert master_data.master_record_for_name("ingredients", "user-a", "ground ginger")["store_section"] == "MISC"
     recipe_rows = master_data.recipe_master_rows(

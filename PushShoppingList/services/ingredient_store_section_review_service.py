@@ -157,6 +157,7 @@ def validate_ai_store_section_opinion(raw_opinion, candidate):
         "ingredient_id": ingredient_id,
         "ingredient": master_data.clean_text(candidate.get("ingredient")),
         "normalized_name": validated.get("normalized_name") or candidate.get("normalized_name") or "",
+        "image_url": master_data.clean_text(candidate.get("image_url")),
         "store_section": ai_section,
         "confidence": validated["confidence"],
         "reason": validated["reason"],
