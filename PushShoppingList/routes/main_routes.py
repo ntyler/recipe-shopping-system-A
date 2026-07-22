@@ -1307,6 +1307,23 @@ def undo_misc_ingredient_reclassification_route():
     }), status
 
 
+@main_bp.route("/api/master-data/ingredients/reclassify-misc/undo-preview")
+def preview_misc_ingredient_reclassification_undo_route():
+    result = recipe_master_data.ingredient_store_section_reclassification_undo_preview(
+        user_id=active_user_id(),
+        batch_id=request.args.get("batch_id"),
+    )
+    status = 200 if result.get("ok") else int(result.get("status") or 400)
+    if not result.get("ok"):
+        return jsonify({**result, "success": False}), status
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "preview": result,
+        "batches": result.get("undoable_batches", []),
+    }), status
+
+
 @main_bp.route("/api/master-data/ingredients/duplicate-scan", methods=["POST"])
 def ingredient_duplicate_scan_route():
     active_public_user = current_public_user()

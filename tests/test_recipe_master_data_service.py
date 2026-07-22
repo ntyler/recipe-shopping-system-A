@@ -495,6 +495,30 @@ def test_misc_reclassification_applies_reviewed_rule_ai_and_keep_misc_decisions(
     assert unknown_after["store_section_source"] == "manual"
     assert unknown_after["store_section_user_confirmed"] == 1
 
+    undo_preview = master_data.ingredient_store_section_reclassification_undo_preview(
+        "user-a",
+        batch_id=applied["batch_id"],
+    )
+
+    assert undo_preview["ok"] is True
+    assert undo_preview["batch_id"] == applied["batch_id"]
+    assert undo_preview["change_count"] == 3
+    assert undo_preview["recipe_reference_count"] == 3
+    assert undo_preview["is_next_undo"] is True
+    assert undo_preview["can_undo_now"] is True
+    assert undo_preview["newer_undo_count"] == 0
+    assert undo_preview["older_undo_count"] == 0
+    assert [change["ingredient"] for change in undo_preview["changes"]] == [
+        "Ground ginger",
+        "Mystery crunch",
+        "Unknown morsels",
+    ]
+    assert undo_preview["changes"][0]["applied_store_section"] == "SPICES & SEASONINGS"
+    assert undo_preview["changes"][0]["restored_store_section"] == "MISC"
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "ground ginger"
+    )["store_section"] == "SPICES & SEASONINGS"
+
     undone = master_data.undo_last_ingredient_store_section_reclassification(
         "user-a",
         expected_batch_id=applied["batch_id"],
@@ -557,6 +581,62 @@ def test_misc_reclassification_rejects_stale_rule_batch_before_writing(monkeypat
     assert master_data.master_record_for_name(
         "ingredients", "user-a", "mystery crunch"
     )["store_section"] == "MISC"
+
+
+def test_store_section_undo_preview_exposes_history_and_blocks_older_batches(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/store-section-history",
+        recipe_data={"ingredients": [
+            {"ingredient": "Mystery crunch", "store_section": "MISC"},
+            {"ingredient": "Unknown morsels", "store_section": "MISC"},
+        ]},
+        user_id="user-a",
+    )
+    mystery = master_data.master_record_for_name("ingredients", "user-a", "mystery crunch")
+    unknown = master_data.master_record_for_name("ingredients", "user-a", "unknown morsels")
+    first = master_data.apply_misc_ingredient_store_section_decisions(
+        "user-a",
+        [{
+            "ingredient_id": mystery["id"],
+            "store_section": "Snacks",
+            "decision_source": "ai",
+            "confidence": 0.8,
+        }],
+    )
+    second = master_data.apply_misc_ingredient_store_section_decisions(
+        "user-a",
+        [{
+            "ingredient_id": unknown["id"],
+            "store_section": "Dry Goods",
+            "decision_source": "manual",
+            "confidence": 1,
+        }],
+    )
+
+    latest_preview = master_data.ingredient_store_section_reclassification_undo_preview("user-a")
+    older_preview = master_data.ingredient_store_section_reclassification_undo_preview(
+        "user-a",
+        batch_id=first["batch_id"],
+    )
+
+    assert latest_preview["batch_id"] == second["batch_id"]
+    assert latest_preview["can_undo_now"] is True
+    assert latest_preview["older_undo_count"] == 1
+    assert [batch["batch_id"] for batch in latest_preview["undoable_batches"]] == [
+        second["batch_id"],
+        first["batch_id"],
+    ]
+    assert older_preview["batch_id"] == first["batch_id"]
+    assert older_preview["can_undo_now"] is False
+    assert older_preview["newer_undo_count"] == 1
+    assert "Undo 1 newer store-section apply batch first" in older_preview["blocked_reason"]
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "mystery crunch"
+    )["store_section"] == "SNACKS"
+    assert master_data.master_record_for_name(
+        "ingredients", "user-a", "unknown morsels"
+    )["store_section"] == "DRY GOODS"
 
 
 def test_store_section_reclassification_undo_refuses_to_overwrite_later_edits(monkeypatch, tmp_path):

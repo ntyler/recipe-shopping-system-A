@@ -291,6 +291,12 @@ def test_misc_reclassification_undo_route_and_button_restore_last_apply(monkeypa
         )
         batch_id = apply_response.get_json()["batch_id"]
         applied_page = client.get("/admin/master-data/ingredients")
+        preview_response = client.get(
+            "/api/master-data/ingredients/reclassify-misc/undo-preview"
+        )
+        section_after_preview = master_data.master_record_for_name(
+            "ingredients", "user-a", "ground ginger"
+        )["store_section"]
         undo_response = client.post(
             "/api/master-data/ingredients/reclassify-misc/undo",
             json={"batch_id": batch_id},
@@ -303,7 +309,22 @@ def test_misc_reclassification_undo_route_and_button_restore_last_apply(monkeypa
     assert apply_response.get_json()["undo_available"] is True
     assert f'data-undo-batch-id="{batch_id}"' in applied_html
     assert 'data-undo-available="true"' in applied_html
-    assert "Undo Last Apply (1)" in applied_html
+    assert "Review Undo (1)" in applied_html
+    assert 'id="masterDataStoreSectionUndoDialog"' in applied_html
+    assert "Store-section history" in applied_html
+    assert preview_response.status_code == 200
+    preview_payload = preview_response.get_json()
+    assert preview_payload["preview"]["batch_id"] == batch_id
+    assert preview_payload["preview"]["change_count"] == 1
+    assert preview_payload["preview"]["recipe_reference_count"] == 1
+    assert preview_payload["preview"]["can_undo_now"] is True
+    preview_change = preview_payload["preview"]["changes"][0]
+    assert preview_change["ingredient"] == "Ground ginger"
+    assert preview_change["ingredient_id"] == ground["id"]
+    assert preview_change["applied_store_section"] == "SPICES & SEASONINGS"
+    assert preview_change["restored_store_section"] == "MISC"
+    assert preview_change["recipe_reference_count"] == 1
+    assert section_after_preview == "SPICES & SEASONINGS"
     assert undo_response.status_code == 200
     assert undo_response.get_json()["restored_ingredient_count"] == 1
     assert undo_response.get_json()["restored_recipe_count"] == 1
@@ -369,7 +390,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Final decision" in all_html
     assert "data-ai-second-opinion-url" in all_html
     assert "data-master-misc-reclassification-undo" in all_html
-    assert "Undo Last Apply" in all_html
+    assert "Review Undo" in all_html
     assert "Apply Changes" in all_html
     assert "/api/master-data/ingredients/reclassify-misc" in all_html
     assert 'data-original-store-section="PRODUCE"' in all_html
@@ -533,8 +554,20 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "data-master-misc-reference-dialog" in template
     assert "data-master-misc-reference-close" in template
     assert "data-master-misc-reference-body" in template
+    assert 'id="masterDataStoreSectionUndoDialog"' in template
+    assert "data-master-store-section-undo-history-list" in template
+    assert "data-master-store-section-undo-change-list" in template
+    assert "data-master-store-section-undo-confirm" in template
+    assert "data-undo-preview-url" in template
     assert "requestMiscReclassificationUndo" in script
     assert "panel.dataset.undoBatchId" in script
+    assert "function miscStoreSectionUndoElements()" in script
+    assert "async function openMiscStoreSectionUndoPreview(panel, trigger)" in script
+    assert "async function loadMiscStoreSectionUndoPreview(panel, batchId = 0)" in script
+    assert "function renderMiscStoreSectionUndoPreview(panel, preview, batches)" in script
+    assert "openMiscStoreSectionUndoPreview(panel, undoButton)" in script
+    assert "requestMiscReclassificationUndo(panel)" in script
+    assert "batch_id: Number(preview.batch_id) || 0" in script
     assert "AI suggestions for unresolved ingredients are preselected and remain editable." in script
     assert ".master-data-misc-reclassification-header" in css
     assert ".master-data-misc-reclassification-list" in css
@@ -551,6 +584,10 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert ".master-data-misc-reference-dialog" in css
     assert ".master-data-misc-reference-heading" in css
     assert ".master-data-misc-reference-dialog-content" in css
+    assert ".master-data-store-section-undo-overview" in css
+    assert ".master-data-store-section-undo-change-list" in css
+    assert ".master-data-store-section-undo-transition" in css
+    assert ".master-data-section-pill.is-restored" in css
     assert "height: calc(100dvh - 12px);" in css
     assert "miscReviewReferencePanel" not in script
     assert "referencesExpanded" not in script

@@ -199,6 +199,7 @@
                      data-scope="{{ master_data.scope }}"
                      data-user-id="{{ master_data.scope_user_id }}"
                      data-undo-url="{{ master_data.ingredient_store_section_undo_url }}"
+                     data-undo-preview-url="{{ url_for('main_bp.preview_misc_ingredient_reclassification_undo_route') }}"
                      data-undo-available="{{ 'true' if master_data.latest_store_section_reclassification else 'false' }}"
                      data-undo-batch-id="{{ master_data.latest_store_section_reclassification.batch_id if master_data.latest_store_section_reclassification else '' }}"
                      aria-live="polite">
@@ -213,7 +214,7 @@
                                 class="master-data-action-secondary master-data-action-undo"
                                 data-master-misc-reclassification-undo
                                 {% if not master_data.latest_store_section_reclassification %}disabled{% endif %}>
-                            Undo Last Apply{% if master_data.latest_store_section_reclassification %} ({{ master_data.latest_store_section_reclassification.change_count }}){% endif %}
+                            Review Undo{% if master_data.latest_store_section_reclassification %} ({{ master_data.latest_store_section_reclassification.change_count }}){% endif %}
                         </button>
                         <button type="button"
                                 class="master-data-action-secondary"
@@ -306,6 +307,106 @@
                     <footer class="master-data-reference-dialog-footer">
                         <span>Your store-section choices remain unchanged.</span>
                         <button type="button" data-master-misc-reference-close>Close</button>
+                    </footer>
+                </div>
+            </dialog>
+
+            <dialog id="masterDataStoreSectionUndoDialog"
+                    class="master-data-undo-dialog master-data-store-section-undo-dialog"
+                    data-master-store-section-undo-dialog
+                    aria-labelledby="masterDataStoreSectionUndoTitle"
+                    aria-describedby="masterDataStoreSectionUndoSummary">
+                <div class="master-data-undo-dialog-shell">
+                    <header class="master-data-undo-dialog-header">
+                        <div>
+                            <span>Store-section history</span>
+                            <h2 id="masterDataStoreSectionUndoTitle">Review undo</h2>
+                            <p id="masterDataStoreSectionUndoSummary"
+                               data-master-store-section-undo-summary>
+                                Loading the latest restorable apply&hellip;
+                            </p>
+                        </div>
+                        <button type="button"
+                                class="master-data-undo-dialog-close"
+                                data-master-store-section-undo-close
+                                aria-label="Close store-section undo review">&times;</button>
+                    </header>
+                    <div class="master-data-undo-dialog-body">
+                        <div class="master-data-undo-history-layout">
+                            <aside class="master-data-undo-history">
+                                <header>
+                                    <div>
+                                        <span>Undo stack</span>
+                                        <h3>Restorable applies</h3>
+                                    </div>
+                                    <strong data-master-store-section-undo-history-count>0</strong>
+                                </header>
+                                <div class="master-data-undo-history-list"
+                                     data-master-store-section-undo-history-list
+                                     aria-label="Restorable store-section applies"></div>
+                            </aside>
+                            <div class="master-data-undo-preview-detail">
+                                <p class="master-data-undo-preview-status"
+                                   data-master-store-section-undo-status
+                                   role="status"
+                                   aria-live="polite">
+                                    Loading undo details&hellip;
+                                </p>
+                                <div class="master-data-undo-preview"
+                                     data-master-store-section-undo-preview
+                                     hidden>
+                                    <div class="master-data-undo-preview-meta">
+                                        <strong data-master-store-section-undo-position>Newest store-section apply</strong>
+                                        <time data-master-store-section-undo-time></time>
+                                    </div>
+                                    <div class="master-data-store-section-undo-overview">
+                                        <article>
+                                            <span>Ingredient decisions</span>
+                                            <strong data-master-store-section-undo-change-count>0</strong>
+                                        </article>
+                                        <article>
+                                            <span>Recipe references</span>
+                                            <strong data-master-store-section-undo-reference-count>0</strong>
+                                        </article>
+                                        <article>
+                                            <span>Action</span>
+                                            <strong>Restore prior sections</strong>
+                                        </article>
+                                    </div>
+                                    <section class="master-data-store-section-undo-changes">
+                                        <header>
+                                            <div>
+                                                <span>Restore preview</span>
+                                                <h3>Store-section decisions</h3>
+                                            </div>
+                                            <strong data-master-store-section-undo-list-count>0 changes</strong>
+                                        </header>
+                                        <div class="master-data-store-section-undo-change-list"
+                                             data-master-store-section-undo-change-list></div>
+                                    </section>
+                                    <section class="master-data-undo-preview-impact">
+                                        <h3>What will be restored</h3>
+                                        <ul data-master-store-section-undo-impact></ul>
+                                    </section>
+                                    <p class="master-data-undo-preview-next"
+                                       data-master-store-section-undo-next></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <footer class="master-data-undo-dialog-footer">
+                        <span data-master-store-section-undo-footer>
+                            Review the complete batch before restoring it.
+                        </span>
+                        <div>
+                            <button type="button" data-master-store-section-undo-close>Cancel</button>
+                            <button type="button"
+                                    class="danger"
+                                    data-master-store-section-undo-confirm
+                                    disabled>
+                                Undo this apply
+                            </button>
+                        </div>
                     </footer>
                 </div>
             </dialog>
