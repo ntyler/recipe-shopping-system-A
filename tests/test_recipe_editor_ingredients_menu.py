@@ -722,10 +722,17 @@ def test_recipe_editor_store_section_menu_can_group_rows_without_reordering_row_
     assert 'list.insertAdjacentElement("beforeend", header);' in view
     assert "list.appendChild(entry.row)" not in view
     assert "Group rows by Store Section" in view
-    assert "Keeps manual ingredient order within each section." in view
+    assert "Ingredients keep their manual order within each section." in view
     assert "[data-recipe-ingredient-column-view-group-store]" in view
     assert "recipeEditIngredientColumnView.groupByStoreSection = false;" in view
     assert "renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows);" in view
+    assert "function recipeIngredientColumnViewDescription()" in view
+    assert "function recipeIngredientColumnViewCompare(left, right, storeOrder, manualStoreOrder)" in view
+    assert 'mode === "az" || mode === "za"' in view
+    assert 'if (columnKey !== "store") {' in view
+    assert 'recipeEditIngredientColumnView.sortColumn !== "store"' in view
+    assert 'data-recipe-ingredient-column-view-sort-legend' in view
+    assert '"Sort groups"' in view
 
     assert ".recipe-edit-ingredient-column-view-group-note" in css
     assert ".recipe-edit-ingredient-column-group-header" in css

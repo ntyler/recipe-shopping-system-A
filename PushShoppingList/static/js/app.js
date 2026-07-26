@@ -26584,9 +26584,6 @@ function recipeIngredientColumnViewIsActive(columnKey = "") {
 }
 
 function recipeIngredientColumnViewSortLabel() {
-    if (recipeEditIngredientColumnView.groupByStoreSection) {
-        return "Grouped by Store Section";
-    }
     const columnKey = recipeEditIngredientColumnView.sortColumn;
     const definition = recipeIngredientColumnViewDefinition(columnKey);
     if (!definition || recipeEditIngredientColumnView.sortMode === "manual") {
@@ -26597,6 +26594,17 @@ function recipeIngredientColumnViewSortLabel() {
         az: `${definition.label} A\u2013Z`,
         za: `${definition.label} Z\u2013A`,
     }[recipeEditIngredientColumnView.sortMode] || "Manual recipe order";
+}
+
+function recipeIngredientColumnViewDescription() {
+    if (!recipeEditIngredientColumnView.groupByStoreSection) {
+        return recipeIngredientColumnViewSortLabel();
+    }
+    const hasStoreSort = recipeEditIngredientColumnView.sortColumn === "store"
+        && recipeEditIngredientColumnView.sortMode !== "manual";
+    return hasStoreSort
+        ? `Grouped by Store Section. ${recipeIngredientColumnViewSortLabel()}`
+        : "Grouped by Store Section in manual recipe order";
 }
 
 function ensureRecipeIngredientColumnViewEmptyState() {
@@ -26626,17 +26634,37 @@ function ensureRecipeIngredientColumnViewEmptyState() {
     return emptyState;
 }
 
-function recipeIngredientColumnViewCompare(left, right, storeOrder) {
+function recipeIngredientColumnViewCompare(left, right, storeOrder, manualStoreOrder) {
     if (recipeEditIngredientColumnView.groupByStoreSection) {
         const leftEntry = recipeIngredientColumnViewEntry(left.row, "store");
         const rightEntry = recipeIngredientColumnViewEntry(right.row, "store");
-        const leftOrder = storeOrder.has(leftEntry.key)
-            ? storeOrder.get(leftEntry.key)
-            : Number.MAX_SAFE_INTEGER;
-        const rightOrder = storeOrder.has(rightEntry.key)
-            ? storeOrder.get(rightEntry.key)
-            : Number.MAX_SAFE_INTEGER;
-        if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+        const mode = recipeEditIngredientColumnView.sortColumn === "store"
+            ? recipeEditIngredientColumnView.sortMode
+            : "manual";
+        let groupComparison = 0;
+        if (mode === "store") {
+            const leftOrder = storeOrder.has(leftEntry.key)
+                ? storeOrder.get(leftEntry.key)
+                : Number.MAX_SAFE_INTEGER;
+            const rightOrder = storeOrder.has(rightEntry.key)
+                ? storeOrder.get(rightEntry.key)
+                : Number.MAX_SAFE_INTEGER;
+            groupComparison = leftOrder - rightOrder;
+        } else if (mode === "az" || mode === "za") {
+            groupComparison = leftEntry.label.localeCompare(
+                rightEntry.label,
+                undefined,
+                { numeric: true, sensitivity: "base" },
+            );
+            if (mode === "za") groupComparison *= -1;
+        } else {
+            const leftOrder = manualStoreOrder.get(leftEntry.key)
+                ?? Number.MAX_SAFE_INTEGER;
+            const rightOrder = manualStoreOrder.get(rightEntry.key)
+                ?? Number.MAX_SAFE_INTEGER;
+            groupComparison = leftOrder - rightOrder;
+        }
+        if (groupComparison) return groupComparison;
         if (leftEntry.key !== rightEntry.key) {
             const labelComparison = leftEntry.label.localeCompare(
                 rightEntry.label,
@@ -26797,6 +26825,11 @@ function applyRecipeIngredientColumnView(options = {}) {
             index,
         ]),
     );
+    const manualStoreOrder = new Map();
+    rows.forEach((row, index) => {
+        const key = recipeIngredientColumnViewEntry(row, "store").key;
+        if (!manualStoreOrder.has(key)) manualStoreOrder.set(key, index);
+    });
     const sortedRows = rows
         .map((row, index) => ({
             index,
@@ -26805,7 +26838,12 @@ function applyRecipeIngredientColumnView(options = {}) {
                 !selectedKeys.has(recipeIngredientColumnViewEntry(row, columnKey).key)
             )),
         }))
-        .sort((left, right) => recipeIngredientColumnViewCompare(left, right, storeOrder));
+        .sort((left, right) => recipeIngredientColumnViewCompare(
+            left,
+            right,
+            storeOrder,
+            manualStoreOrder,
+        ));
     sortedRows.forEach(entry => {
         entry.row.classList.toggle("is-ingredient-column-filtered", entry.filtered);
     });
@@ -26835,7 +26873,9 @@ function applyRecipeIngredientColumnView(options = {}) {
     if (options.announce) {
         setRecipeEditIngredientColumnStatus(
             active
-                ? `Showing ${visibleCount} of ${rows.length} ingredients. ${recipeIngredientColumnViewSortLabel()}.`
+                ? `Showing ${visibleCount} of ${rows.length} ingredients. ${
+                    recipeIngredientColumnViewDescription()
+                }.`
                 : `Showing all ${rows.length} ingredients in manual recipe order.`,
         );
     }
@@ -26881,6 +26921,15 @@ function syncRecipeIngredientColumnViewMenuState(menu) {
     menu.querySelectorAll("[data-recipe-ingredient-column-view-sort]").forEach(input => {
         input.checked = input.value === currentSortMode;
     });
+    const sortLegend = menu.querySelector("[data-recipe-ingredient-column-view-sort-legend]");
+    if (sortLegend) {
+        sortLegend.textContent = (
+            columnKey === "store"
+            && recipeEditIngredientColumnView.groupByStoreSection
+        )
+            ? "Sort groups"
+            : "Sort rows";
+    }
     const groupStore = menu.querySelector(
         "[data-recipe-ingredient-column-view-group-store]",
     );
@@ -26944,12 +26993,16 @@ function renderRecipeIngredientColumnViewMenu(menu) {
                     <span>Group rows by Store Section</span>
                 </label>
                 <p class="recipe-edit-ingredient-column-view-group-note">
-                    View only. Keeps manual ingredient order within each section.
+                    Sort options order the sections. Ingredients keep their manual order within each section.
                 </p>
             </fieldset>
         ` : ""}
         <fieldset class="recipe-edit-ingredient-column-view-group">
-            <legend>Sort rows</legend>
+            <legend data-recipe-ingredient-column-view-sort-legend>${
+                columnKey === "store" && recipeEditIngredientColumnView.groupByStoreSection
+                    ? "Sort groups"
+                    : "Sort rows"
+            }</legend>
             ${sortOptions.map(([value, label]) => `
                 <label class="recipe-edit-ingredient-column-view-option">
                     <input type="radio"
@@ -27001,7 +27054,9 @@ function renderRecipeIngredientColumnViewMenu(menu) {
                     recipeEditIngredientColumnView.sortMode = "manual";
                 }
             } else {
-                recipeEditIngredientColumnView.groupByStoreSection = false;
+                if (columnKey !== "store") {
+                    recipeEditIngredientColumnView.groupByStoreSection = false;
+                }
                 recipeEditIngredientColumnView.sortColumn = columnKey;
                 recipeEditIngredientColumnView.sortMode = mode;
             }
@@ -27014,7 +27069,10 @@ function renderRecipeIngredientColumnViewMenu(menu) {
             recipeEditIngredientColumnView.groupByStoreSection = Boolean(
                 event.currentTarget.checked,
             );
-            if (recipeEditIngredientColumnView.groupByStoreSection) {
+            if (
+                recipeEditIngredientColumnView.groupByStoreSection
+                && recipeEditIngredientColumnView.sortColumn !== "store"
+            ) {
                 recipeEditIngredientColumnView.sortColumn = "";
                 recipeEditIngredientColumnView.sortMode = "manual";
             }
