@@ -36848,7 +36848,10 @@ function renderRecipeIngredientStoreSectionMenu(menu, select) {
         return;
     }
 
-    refreshRecipeIngredientStoreSectionSelectOptions(select);
+    const allowCustomSections = select.dataset.storeSectionAllowCustom !== "false";
+    if (allowCustomSections) {
+        refreshRecipeIngredientStoreSectionSelectOptions(select);
+    }
     const selectedValue = recipeIngredientStoreSectionKey(select.value);
     const optionMarkup = [...select.options].map((option, index) => {
         const value = String(option.value || "");
@@ -36900,22 +36903,27 @@ function renderRecipeIngredientStoreSectionMenu(menu, select) {
             </div>
         `;
     }).join("");
+    const customSectionFooter = allowCustomSections
+        ? `
+            <div class="recipe-edit-store-section-menu-footer">
+                <button type="button"
+                        id="recipeIngredientStoreSectionAddCustom"
+                        role="option"
+                        aria-selected="false"
+                        class="recipe-edit-store-section-option recipe-edit-store-section-add-option"
+                        data-store-section-action="add-custom"
+                        onclick="return addRecipeIngredientCustomStoreSection(this)">
+                    ${recipeEditSvgIcon("plus")}
+                    <span class="recipe-edit-store-section-option-label">Add custom section…</span>
+                </button>
+            </div>
+        `
+        : "";
     menu.innerHTML = `
         <div class="recipe-edit-store-section-menu-list" data-store-section-menu-list>
             ${optionMarkup}
         </div>
-        <div class="recipe-edit-store-section-menu-footer">
-            <button type="button"
-                    id="recipeIngredientStoreSectionAddCustom"
-                    role="option"
-                    aria-selected="false"
-                    class="recipe-edit-store-section-option recipe-edit-store-section-add-option"
-                    data-store-section-action="add-custom"
-                    onclick="return addRecipeIngredientCustomStoreSection(this)">
-                ${recipeEditSvgIcon("plus")}
-                <span class="recipe-edit-store-section-option-label">Add custom section…</span>
-            </button>
-        </div>
+        ${customSectionFooter}
     `;
 
     const options = recipeEditListboxOptions(menu);

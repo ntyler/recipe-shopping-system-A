@@ -1027,6 +1027,40 @@
         updateStoreSectionSavePanel();
     }
 
+    function initMasterDataStoreSectionIconPickers() {
+        if (
+            typeof createRecipeIngredientStoreSectionTrigger !== "function"
+            || typeof syncRecipeIngredientStoreSectionControl !== "function"
+        ) {
+            return;
+        }
+
+        document.querySelectorAll("[data-master-store-section-select]").forEach((select) => {
+            if (select.dataset.masterStoreSectionPickerBound === "true") {
+                return;
+            }
+            select.dataset.masterStoreSectionPickerBound = "true";
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "recipe-edit-store-section-label master-data-store-section-picker";
+            select.parentNode.insertBefore(wrapper, select);
+            wrapper.appendChild(select);
+
+            const trigger = createRecipeIngredientStoreSectionTrigger(select);
+            trigger.classList.add("master-data-store-section-trigger");
+            trigger.setAttribute(
+                "aria-label",
+                select.getAttribute("aria-label") || "Choose a store section"
+            );
+            select.addEventListener("change", () => {
+                syncRecipeIngredientStoreSectionControl(select);
+            });
+            select.hidden = true;
+            wrapper.insertBefore(trigger, select);
+            syncRecipeIngredientStoreSectionControl(select);
+        });
+    }
+
     function masterDataMergeElements() {
         const dialog = document.querySelector("[data-master-merge-dialog]");
         const form = dialog && dialog.querySelector("[data-master-merge-form]");
@@ -5160,6 +5194,7 @@
         initMasterDataReferences();
         initMasterDataThumbnailSizeControls();
         initMasterDataImageLightbox();
+        initMasterDataStoreSectionIconPickers();
         initMasterDataStoreSectionBatchSave();
         initMasterDataIngredientMerge();
         initMasterDataDuplicateReview();

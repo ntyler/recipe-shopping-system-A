@@ -27029,6 +27029,69 @@ img[data-deferred-src] {
             font-weight: 800;
         }
 
+        .master-data-store-section-picker {
+            display: block;
+            min-width: 0;
+        }
+
+        .master-data-store-section-picker .master-data-store-section-trigger {
+            display: grid;
+            width: 100%;
+            min-width: 0;
+            min-height: 36px;
+            grid-template-columns: 17px minmax(0, 1fr) 14px;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            padding: 7px 8px;
+            overflow: hidden;
+            border: 1px solid #655f50;
+            border-radius: 7px;
+            background: #1b1f1f;
+            color: #f5f7f7;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 800;
+            text-align: left;
+        }
+
+        .master-data-store-section-picker
+        .master-data-store-section-trigger:is(:hover, :focus-visible, [aria-expanded="true"]) {
+            outline: none;
+            border-color: #2d8f70;
+            background: #15231e;
+            box-shadow: 0 0 0 2px rgba(45, 143, 112, .16);
+        }
+
+        .master-data-store-section-trigger > [data-store-section-trigger-label] {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .master-data-store-section-trigger .recipe-edit-store-section-icon,
+        .master-data-store-section-trigger .recipe-edit-store-section-chevron {
+            position: static;
+            display: inline-flex;
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            padding: 0;
+            transform: none;
+        }
+
+        .master-data-store-section-trigger
+        :is(.recipe-edit-store-section-icon, .recipe-edit-store-section-chevron)
+        :is(.recipe-edit-inline-icon, svg) {
+            width: 16px;
+            height: 16px;
+        }
+
+        .master-data-store-section-trigger .recipe-edit-store-section-chevron {
+            color: #9fb3c8;
+        }
+
         .master-data-record-row-dirty td {
             background: rgba(45, 143, 112, 0.11);
         }

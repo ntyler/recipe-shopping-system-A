@@ -1684,6 +1684,7 @@ def test_master_data_duplicate_review_ui_is_wired():
 def test_master_data_reference_expander_is_wired():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
+    app_script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     assert '<th scope="col">Item</th>' in template
@@ -1709,6 +1710,8 @@ def test_master_data_reference_expander_is_wired():
     assert "data-master-thumbnail-size-increase" in template
     assert "data-master-thumbnail-size-value>64px" in template
     assert "data-full-src=\"{{ row.image_url }}\"" in template
+    assert "data-master-store-section-select" in template
+    assert 'data-store-section-allow-custom="false"' in template
     assert ".master-data-record-row-unused td" in css
     assert ".master-data-record-row-unused td:first-child" in css
     assert ".master-data-usage-empty strong" in css
@@ -1716,6 +1719,11 @@ def test_master_data_reference_expander_is_wired():
     assert "function toggleReferenceRow" in script
     assert "function renderReferences" in script
     assert "[data-master-reference-toggle]" in script
+    assert "function initMasterDataStoreSectionIconPickers()" in script
+    assert "createRecipeIngredientStoreSectionTrigger(select)" in script
+    assert "initMasterDataStoreSectionIconPickers();" in script
+    assert 'select.dataset.storeSectionAllowCustom !== "false"' in app_script
+    assert ".master-data-store-section-trigger .recipe-edit-store-section-icon" in css
     assert "data-master-reference-panel" in script
     assert "recipe_image_url" in script
     assert "recipe_image_full_url" in script
