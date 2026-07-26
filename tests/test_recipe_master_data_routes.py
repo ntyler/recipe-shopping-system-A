@@ -1820,6 +1820,9 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert "Produce" in html
         assert "/admin/master-data/ingredients" in html
         assert "/admin/master-data/equipment" in html
+        assert "data-store-section-master-icon-picker" in html
+        assert 'data-store-section-master-icon-option="leaf"' in html
+        assert "recipe-edit-store-section-icon is-leaf" in html
 
         created = client.post(
             "/admin/master-data/store-sections",
@@ -1857,6 +1860,7 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
 
 def test_recipe_editor_store_section_menu_links_to_management_page():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     page = Path("PushShoppingList/templates/store_sections.html").read_text(encoding="utf-8")
 
@@ -1866,3 +1870,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "store_section_url" in template
     assert "Store Sections" in page
     assert "Add Store Section" in page
+    assert "data-store-section-master-icon-picker" in page
+    assert "data-store-section-master-icon-option" in page
+    assert "function initStoreSectionMasterIconPickers()" in script
+    assert "renderStoreSectionMasterIconVisual" in script
+    assert '["initStoreSectionMasterIconPickers", initStoreSectionMasterIconPickers]' in script
+    assert ".store-section-master-icon-menu" in css
+    assert ".store-section-master-icon-option.is-selected" in css

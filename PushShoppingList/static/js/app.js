@@ -37386,6 +37386,200 @@ function recipeIngredientStoreSectionIconHtml(section) {
                   aria-hidden="true">${recipeEditSvgIcon(iconName)}</span>`;
 }
 
+function storeSectionMasterIconLabel(iconName) {
+    return String(iconName || "basket")
+        .trim()
+        .replace(/[_-]+/g, " ")
+        .replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function renderStoreSectionMasterIconVisual(visual, iconName) {
+    if (!visual) return;
+    const normalizedIcon = String(iconName || "basket").trim().toLowerCase() || "basket";
+    [...visual.classList]
+        .filter(className => className.startsWith("is-"))
+        .forEach(className => visual.classList.remove(className));
+    visual.classList.add("recipe-edit-store-section-icon", `is-${normalizedIcon}`);
+    visual.dataset.icon = normalizedIcon;
+    visual.innerHTML = recipeEditSvgIcon(normalizedIcon);
+}
+
+function closeStoreSectionMasterIconPickers(options = {}) {
+    document.querySelectorAll("[data-store-section-master-icon-picker].is-open")
+        .forEach(picker => {
+            picker.classList.remove("is-open");
+            const trigger = picker.querySelector("[data-store-section-master-icon-trigger]");
+            const menu = picker.querySelector("[data-store-section-master-icon-menu]");
+            if (trigger) trigger.setAttribute("aria-expanded", "false");
+            if (menu) {
+                menu.hidden = true;
+                menu.style.removeProperty("left");
+                menu.style.removeProperty("top");
+                menu.style.removeProperty("bottom");
+                menu.style.removeProperty("width");
+                menu.style.removeProperty("max-height");
+            }
+            if (options.focusTrigger && trigger) trigger.focus({ preventScroll: true });
+        });
+}
+
+function positionStoreSectionMasterIconMenu(picker) {
+    const trigger = picker?.querySelector("[data-store-section-master-icon-trigger]");
+    const menu = picker?.querySelector("[data-store-section-master-icon-menu]");
+    if (!trigger || !menu) return;
+    const rect = trigger.getBoundingClientRect();
+    const gutter = 10;
+    const menuWidth = Math.max(230, rect.width);
+    const left = Math.max(
+        gutter,
+        Math.min(rect.left, window.innerWidth - menuWidth - gutter),
+    );
+    const below = window.innerHeight - rect.bottom - gutter;
+    const above = rect.top - gutter;
+    const openAbove = below < 260 && above > below;
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.width = `${Math.round(menuWidth)}px`;
+    menu.style.maxHeight = `${Math.max(150, Math.min(360, openAbove ? above : below))}px`;
+    if (openAbove) {
+        menu.style.top = "auto";
+        menu.style.bottom = `${Math.round(window.innerHeight - rect.top + 6)}px`;
+    } else {
+        menu.style.top = `${Math.round(rect.bottom + 6)}px`;
+        menu.style.bottom = "auto";
+    }
+}
+
+function openStoreSectionMasterIconPicker(picker, options = {}) {
+    if (!picker) return;
+    const menu = picker.querySelector("[data-store-section-master-icon-menu]");
+    const trigger = picker.querySelector("[data-store-section-master-icon-trigger]");
+    if (!menu || !trigger) return;
+    closeStoreSectionMasterIconPickers();
+    picker.classList.add("is-open");
+    menu.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    positionStoreSectionMasterIconMenu(picker);
+    if (options.focusOption) {
+        const selected = menu.querySelector('[role="option"][aria-selected="true"]');
+        (selected || menu.querySelector('[role="option"]'))?.focus({ preventScroll: true });
+    }
+}
+
+function syncStoreSectionMasterIconPicker(picker, iconName) {
+    if (!picker) return;
+    const select = picker.querySelector("[data-store-section-master-icon-select]");
+    const triggerVisual = picker.querySelector(
+        "[data-store-section-master-icon-trigger] [data-store-section-master-icon-visual]",
+    );
+    const label = picker.querySelector("[data-store-section-master-icon-label]");
+    const normalizedIcon = String(iconName || select?.value || "basket")
+        .trim()
+        .toLowerCase() || "basket";
+    if (select) {
+        select.value = normalizedIcon;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    renderStoreSectionMasterIconVisual(triggerVisual, normalizedIcon);
+    if (label) label.textContent = storeSectionMasterIconLabel(normalizedIcon);
+    picker.querySelectorAll("[data-store-section-master-icon-option]").forEach(option => {
+        const selected = option.dataset.storeSectionMasterIconOption === normalizedIcon;
+        option.classList.toggle("is-selected", selected);
+        option.setAttribute("aria-selected", String(selected));
+    });
+    const rowIcon = picker.closest(".store-section-master-row")
+        ?.querySelector("[data-store-section-master-row-icon]");
+    renderStoreSectionMasterIconVisual(rowIcon, normalizedIcon);
+}
+
+function initStoreSectionMasterIconPickers() {
+    const pickers = [...document.querySelectorAll("[data-store-section-master-icon-picker]")];
+    if (!pickers.length) return;
+    document.querySelectorAll("[data-store-section-master-icon-visual]").forEach(visual => {
+        renderStoreSectionMasterIconVisual(visual, visual.dataset.icon);
+    });
+    pickers.forEach((picker, index) => {
+        const select = picker.querySelector("[data-store-section-master-icon-select]");
+        const trigger = picker.querySelector("[data-store-section-master-icon-trigger]");
+        const menu = picker.querySelector("[data-store-section-master-icon-menu]");
+        if (!select || !trigger || !menu) return;
+        menu.id = menu.id || `storeSectionMasterIconMenu${index + 1}`;
+        trigger.setAttribute("aria-controls", menu.id);
+        select.tabIndex = -1;
+        select.setAttribute("aria-hidden", "true");
+        picker.classList.add("is-enhanced");
+        trigger.hidden = false;
+        syncStoreSectionMasterIconPicker(picker, select.value);
+    });
+    if (document.documentElement.dataset.storeSectionMasterIconPickerBound === "true") return;
+    document.documentElement.dataset.storeSectionMasterIconPickerBound = "true";
+    document.addEventListener("click", event => {
+        const option = event.target.closest("[data-store-section-master-icon-option]");
+        if (option) {
+            const picker = option.closest("[data-store-section-master-icon-picker]");
+            syncStoreSectionMasterIconPicker(
+                picker,
+                option.dataset.storeSectionMasterIconOption,
+            );
+            closeStoreSectionMasterIconPickers({ focusTrigger: true });
+            return;
+        }
+        const trigger = event.target.closest("[data-store-section-master-icon-trigger]");
+        if (trigger) {
+            const picker = trigger.closest("[data-store-section-master-icon-picker]");
+            if (picker?.classList.contains("is-open")) {
+                closeStoreSectionMasterIconPickers({ focusTrigger: true });
+            } else {
+                openStoreSectionMasterIconPicker(picker);
+            }
+            return;
+        }
+        if (!event.target.closest("[data-store-section-master-icon-picker]")) {
+            closeStoreSectionMasterIconPickers();
+        }
+    });
+    document.addEventListener("keydown", event => {
+        const trigger = event.target.closest("[data-store-section-master-icon-trigger]");
+        if (trigger && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+            event.preventDefault();
+            openStoreSectionMasterIconPicker(
+                trigger.closest("[data-store-section-master-icon-picker]"),
+                { focusOption: true },
+            );
+            return;
+        }
+        const option = event.target.closest("[data-store-section-master-icon-option]");
+        if (option && ["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+            event.preventDefault();
+            const options = [
+                ...option.closest("[data-store-section-master-icon-menu]")
+                    .querySelectorAll("[data-store-section-master-icon-option]"),
+            ];
+            const current = options.indexOf(option);
+            const next = event.key === "Home"
+                ? 0
+                : event.key === "End"
+                    ? options.length - 1
+                    : (current + (event.key === "ArrowDown" ? 1 : -1) + options.length)
+                        % options.length;
+            options[next]?.focus({ preventScroll: true });
+            return;
+        }
+        if (event.key === "Escape") {
+            closeStoreSectionMasterIconPickers({ focusTrigger: true });
+        }
+    });
+    window.addEventListener("resize", () => closeStoreSectionMasterIconPickers());
+    document.addEventListener(
+        "scroll",
+        event => {
+            const target = event.target instanceof Element ? event.target : null;
+            if (target?.closest("[data-store-section-master-icon-picker]")) return;
+            closeStoreSectionMasterIconPickers();
+        },
+        { passive: true, capture: true },
+    );
+}
+
 const RECIPE_INGREDIENT_CUSTOM_STORE_SECTIONS_KEY = "recipeIngredientCustomStoreSections";
 
 function recipeIngredientStoreSectionKey(value) {
@@ -52803,6 +52997,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initRecipeEditContextPanels", initRecipeEditContextPanels],
         ["initRecipeImageProviderSelector", initRecipeImageProviderSelector],
         ["initRecipeImageThumbnailSizeControls", initRecipeImageThumbnailSizeControls],
+        ["initStoreSectionMasterIconPickers", initStoreSectionMasterIconPickers],
     ].forEach(([name, callback]) => runStartupTask(name, callback));
 
     runIdleStartupTasks([

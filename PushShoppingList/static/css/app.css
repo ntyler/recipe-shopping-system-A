@@ -61761,6 +61761,120 @@ body.recipe-edit-standalone-page :is(
     line-height: 1;
 }
 
+.store-section-master-icon-picker {
+    position: relative;
+    min-width: 0;
+}
+
+.store-section-master-icon-picker.is-enhanced
+    > [data-store-section-master-icon-select] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.store-section-master-icon-trigger {
+    width: 100%;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 9px;
+    text-align: left;
+}
+
+.store-section-master-icon-trigger
+    .recipe-edit-store-section-icon,
+.store-section-master-icon-option
+    .recipe-edit-store-section-icon {
+    position: static;
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+}
+
+.store-section-master-icon-trigger
+    .recipe-edit-store-section-icon :is(.recipe-edit-inline-icon, svg),
+.store-section-master-icon-option
+    .recipe-edit-store-section-icon :is(.recipe-edit-inline-icon, svg) {
+    width: 18px;
+    height: 18px;
+}
+
+.store-section-master-icon-chevron {
+    margin-left: auto;
+    color: var(--app-muted);
+    font-size: 15px;
+    line-height: 1;
+    transition: transform 120ms ease;
+}
+
+.store-section-master-icon-picker.is-open
+    .store-section-master-icon-chevron {
+    transform: rotate(180deg);
+}
+
+.store-section-master-icon-menu {
+    position: fixed;
+    z-index: 1300;
+    display: grid;
+    gap: 2px;
+    min-width: 230px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 6px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 9px;
+    box-shadow: 0 16px 34px rgb(0 0 0 / 38%);
+    background: var(--app-surface);
+}
+
+.store-section-master-icon-menu[hidden] {
+    display: none;
+}
+
+.store-section-master-page
+    .store-section-master-icon-option {
+    display: grid;
+    width: 100%;
+    min-height: 34px;
+    grid-template-columns: 22px minmax(0, 1fr) 18px;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 0;
+    background: transparent;
+    color: var(--app-text);
+    font-weight: 700;
+    text-align: left;
+}
+
+.store-section-master-page
+    .store-section-master-icon-option:is(:hover, :focus-visible) {
+    outline: 0;
+    background: var(--app-surface-soft);
+}
+
+.store-section-master-page
+    .store-section-master-icon-option.is-selected {
+    background: var(--app-primary-soft);
+    color: var(--app-text-strong);
+}
+
+.store-section-master-icon-check {
+    color: var(--app-primary-hover);
+    font-size: 13px;
+    opacity: 0;
+}
+
+.store-section-master-icon-option.is-selected
+    .store-section-master-icon-check {
+    opacity: 1;
+}
+
 .store-section-master-identity {
     display: grid;
     min-width: 0;

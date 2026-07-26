@@ -24,6 +24,54 @@
     "paw": "♧",
     "basket": "⌑"
 } %}
+{% macro store_section_icon_picker(selected_icon, aria_label) %}
+    <div class="store-section-master-icon-picker" data-store-section-master-icon-picker>
+        <select name="icon"
+                aria-label="{{ aria_label }}"
+                data-store-section-master-icon-select>
+            {% for icon in master_data.icon_options %}
+                <option value="{{ icon }}" {% if icon == selected_icon %}selected{% endif %}>
+                    {{ icon|replace("_", " ")|title }}
+                </option>
+            {% endfor %}
+        </select>
+        <button type="button"
+                class="store-section-master-icon-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                data-store-section-master-icon-trigger
+                hidden>
+            <span class="recipe-edit-store-section-icon is-{{ selected_icon }}"
+                  data-store-section-master-icon-visual
+                  data-icon="{{ selected_icon }}"
+                  aria-hidden="true">{{ icon_glyphs.get(selected_icon, icon_glyphs["basket"]) }}</span>
+            <span data-store-section-master-icon-label>
+                {{ selected_icon|replace("_", " ")|title }}
+            </span>
+            <span class="store-section-master-icon-chevron" aria-hidden="true">⌄</span>
+        </button>
+        <div class="store-section-master-icon-menu"
+             role="listbox"
+             aria-label="{{ aria_label }}"
+             data-store-section-master-icon-menu
+             hidden>
+            {% for icon in master_data.icon_options %}
+                <button type="button"
+                        role="option"
+                        aria-selected="{% if icon == selected_icon %}true{% else %}false{% endif %}"
+                        class="store-section-master-icon-option{% if icon == selected_icon %} is-selected{% endif %}"
+                        data-store-section-master-icon-option="{{ icon }}">
+                    <span class="recipe-edit-store-section-icon is-{{ icon }}"
+                          data-store-section-master-icon-visual
+                          data-icon="{{ icon }}"
+                          aria-hidden="true">{{ icon_glyphs.get(icon, icon_glyphs["basket"]) }}</span>
+                    <span>{{ icon|replace("_", " ")|title }}</span>
+                    <span class="store-section-master-icon-check" aria-hidden="true">✓</span>
+                </button>
+            {% endfor %}
+        </div>
+    </div>
+{% endmacro %}
 
 {% block app_content %}
     <section class="master-data-page store-section-master-page" aria-labelledby="storeSectionsTitle">
@@ -86,16 +134,10 @@
                            placeholder="For example, International Foods"
                            required>
                 </label>
-                <label>
+                <div class="store-section-master-icon-field">
                     <span>Icon</span>
-                    <select name="icon">
-                        {% for icon in master_data.icon_options %}
-                            <option value="{{ icon }}" {% if icon == "basket" %}selected{% endif %}>
-                                {{ icon|replace("_", " ")|title }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </label>
+                    {{ store_section_icon_picker("basket", "Icon for the new Store Section") }}
+                </div>
                 <button type="submit">Add Store Section</button>
             </form>
         </section>
@@ -132,7 +174,10 @@
                                     {% if loop.last %}disabled{% endif %}>↓</button>
                         </div>
 
-                        <span class="store-section-master-icon is-{{ section.icon }}"
+                        <span class="store-section-master-icon recipe-edit-store-section-icon is-{{ section.icon }}"
+                              data-store-section-master-icon-visual
+                              data-store-section-master-row-icon
+                              data-icon="{{ section.icon }}"
                               aria-hidden="true">{{ icon_glyphs.get(section.icon, icon_glyphs["basket"]) }}</span>
 
                         <div class="store-section-master-identity">
@@ -150,16 +195,10 @@
                             </span>
                         </div>
 
-                        <label class="store-section-master-icon-field">
+                        <div class="store-section-master-icon-field">
                             <span>Icon</span>
-                            <select name="icon" aria-label="Icon for {{ section.display_name }}">
-                                {% for icon in master_data.icon_options %}
-                                    <option value="{{ icon }}" {% if icon == section.icon %}selected{% endif %}>
-                                        {{ icon|replace("_", " ")|title }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </label>
+                            {{ store_section_icon_picker(section.icon, "Icon for " ~ section.display_name) }}
+                        </div>
 
                         <div class="store-section-master-usage">
                             <span>
