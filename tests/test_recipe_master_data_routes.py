@@ -293,13 +293,14 @@ def test_misc_reclassification_undo_route_and_button_restore_last_apply(monkeypa
         applied_page = client.get("/admin/master-data/ingredients")
         preview_response = client.get(
             "/api/master-data/ingredients/reclassify-misc/undo-preview"
+            f"?ingredient_id={ground['id']}"
         )
         section_after_preview = master_data.master_record_for_name(
             "ingredients", "user-a", "ground ginger"
         )["store_section"]
         undo_response = client.post(
             "/api/master-data/ingredients/reclassify-misc/undo",
-            json={"batch_id": batch_id},
+            json={"batch_id": batch_id, "ingredient_id": ground["id"]},
         )
         restored_page = client.get("/admin/master-data/ingredients")
 
@@ -315,7 +316,9 @@ def test_misc_reclassification_undo_route_and_button_restore_last_apply(monkeypa
     assert preview_response.status_code == 200
     preview_payload = preview_response.get_json()
     assert preview_payload["preview"]["batch_id"] == batch_id
+    assert preview_payload["preview"]["ingredient_id"] == ground["id"]
     assert preview_payload["preview"]["change_count"] == 1
+    assert len(preview_payload["items"]) == 1
     assert preview_payload["preview"]["recipe_reference_count"] == 1
     assert preview_payload["preview"]["affected_recipe_count"] == 1
     assert len(preview_payload["preview"]["recipe_references"]) == 1
@@ -572,10 +575,16 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
     assert "panel.dataset.undoBatchId" in script
     assert "function miscStoreSectionUndoElements()" in script
     assert "async function openMiscStoreSectionUndoPreview(panel, trigger)" in script
-    assert "async function loadMiscStoreSectionUndoPreview(panel, batchId = 0)" in script
-    assert "function renderMiscStoreSectionUndoPreview(panel, preview, batches)" in script
+    assert "async function loadMiscStoreSectionUndoPreview(panel, batchId = 0, ingredientId = 0)" in script
+    assert "function renderMiscStoreSectionUndoPreview(panel, preview, items)" in script
     assert "function renderMiscStoreSectionUndoComparison(els, preview)" in script
     assert "function renderMiscStoreSectionUndoRecipes(els, preview)" in script
+    assert "function miscStoreSectionUndoHistoryKey(item)" in script
+    assert "function renderMiscStoreSectionUndoHistory(panel, items, selectedItemKey)" in script
+    assert "miscStoreSectionUndoCollapsedDateGroups" in script
+    assert "data.items" in script
+    assert "ingredient_id: Number(preview.ingredient_id) || 0" in script
+    assert "Restorable decisions" in template
     assert "openMiscStoreSectionUndoPreview(panel, undoButton)" in script
     assert "requestMiscReclassificationUndo(panel)" in script
     assert "batch_id: Number(preview.batch_id) || 0" in script

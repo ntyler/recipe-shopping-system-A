@@ -1290,6 +1290,7 @@ def undo_misc_ingredient_reclassification_route():
     result = recipe_master_data.undo_last_ingredient_store_section_reclassification(
         user_id=active_user_id(),
         expected_batch_id=payload.get("batch_id"),
+        expected_ingredient_id=payload.get("ingredient_id"),
     )
     status = 200 if result.get("ok") else int(result.get("status") or 400)
     restored_count = int(result.get("restored_ingredient_count") or 0)
@@ -1312,6 +1313,7 @@ def preview_misc_ingredient_reclassification_undo_route():
     result = recipe_master_data.ingredient_store_section_reclassification_undo_preview(
         user_id=active_user_id(),
         batch_id=request.args.get("batch_id"),
+        ingredient_id=request.args.get("ingredient_id"),
     )
     status = 200 if result.get("ok") else int(result.get("status") or 400)
     if not result.get("ok"):
@@ -1321,6 +1323,7 @@ def preview_misc_ingredient_reclassification_undo_route():
         "success": True,
         "preview": result,
         "batches": result.get("undoable_batches", []),
+        "items": result.get("history_items", []),
     }), status
 
 

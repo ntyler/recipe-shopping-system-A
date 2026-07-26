@@ -22,6 +22,8 @@
     let masterDataMiscReferenceReturnFocus = null;
     let activeMiscStoreSectionUndoPreview = null;
     let miscStoreSectionUndoReturnFocus = null;
+    const miscStoreSectionUndoCollapsedDateGroups = new Set();
+    let miscStoreSectionUndoHistoryGroupsInitialized = false;
 
     function text(value) {
         return String(value == null ? "" : value);
@@ -4424,58 +4426,129 @@
         if (els.confirm) els.confirm.disabled = true;
     }
 
-    function miscStoreSectionUndoHistoryItem(panel, batch, selectedBatchId) {
-        const batchId = Number(batch && batch.batch_id) || 0;
-        const changeCount = Math.max(0, Number(batch && batch.change_count) || 0);
-        const referenceCount = Math.max(0, Number(batch && batch.recipe_reference_count) || 0);
-        const canUndoNow = Boolean(batch && batch.can_undo_now);
+    function miscStoreSectionUndoHistoryKey(item) {
+        return `${Number(item && item.batch_id) || 0}:${Number(item && item.ingredient_id) || 0}`;
+    }
+
+    function miscStoreSectionUndoHistoryItem(panel, item, selectedItemKey) {
+        const batchId = Number(item && item.batch_id) || 0;
+        const ingredientId = Number(item && item.ingredient_id) || 0;
+        const referenceCount = Math.max(0, Number(item && item.recipe_reference_count) || 0);
+        const newerCount = Math.max(0, Number(item && item.newer_undo_count) || 0);
+        const canUndoNow = Boolean(item && item.can_undo_now);
+        const itemKey = miscStoreSectionUndoHistoryKey(item);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "master-data-undo-history-item master-data-store-section-undo-history-item";
         button.classList.toggle("is-blocked", !canUndoNow);
-        button.setAttribute("aria-current", batchId === Number(selectedBatchId) ? "true" : "false");
+        button.dataset.masterStoreSectionUndoHistoryItemId = itemKey;
+        button.setAttribute("aria-current", itemKey === selectedItemKey ? "true" : "false");
         button.title = canUndoNow
-            ? "This is the next store-section apply that can be undone."
-            : text(batch && batch.blocked_reason).trim();
+            ? (newerCount
+                ? "This decision can be safely restored out of order."
+                : "This store-section decision can be restored now.")
+            : text(item && item.blocked_reason).trim();
 
         const header = document.createElement("span");
         header.className = "master-data-undo-history-item-header";
         const name = document.createElement("strong");
-        name.textContent = `${changeCount} decision${changeCount === 1 ? "" : "s"}`;
+        name.textContent = miscReviewDisplayName(item && item.ingredient);
         const badge = document.createElement("span");
         badge.className = "master-data-undo-history-item-badge";
-        badge.textContent = canUndoNow ? "Next" : "Blocked";
+        badge.textContent = canUndoNow ? (newerCount ? "Safe" : "Next") : "Blocked";
         header.append(name, badge);
 
         const label = document.createElement("span");
         label.className = "master-data-undo-history-item-target";
-        label.textContent = "Store-section apply batch";
+        const appliedSection = friendlyIngredientStoreSection(
+            item && item.applied_store_section
+        );
+        const restoredSection = friendlyIngredientStoreSection(
+            item && item.restored_store_section
+        );
+        label.textContent = `${appliedSection} \u2192 restore ${restoredSection}`;
+
         const meta = document.createElement("span");
         meta.className = "master-data-undo-history-item-meta";
         const time = document.createElement("span");
-        time.textContent = masterDataUndoHistoryDateInfo(batch && batch.applied_at).time;
+        time.textContent = masterDataUndoHistoryDateInfo(item && item.applied_at).time;
         const references = document.createElement("span");
         references.textContent = `${referenceCount} recipe ref${referenceCount === 1 ? "" : "s"}`;
         meta.append(time, references);
         button.append(header, label, meta);
         button.addEventListener("click", () => {
-            if (batchId && batchId !== Number(activeMiscStoreSectionUndoPreview && activeMiscStoreSectionUndoPreview.batch_id)) {
-                void loadMiscStoreSectionUndoPreview(panel, batchId);
+            const activeKey = miscStoreSectionUndoHistoryKey(activeMiscStoreSectionUndoPreview);
+            if (batchId && ingredientId && itemKey !== activeKey) {
+                void loadMiscStoreSectionUndoPreview(panel, batchId, ingredientId);
             }
         });
         return button;
     }
 
-    function renderMiscStoreSectionUndoHistory(panel, batches, selectedBatchId) {
+    function renderMiscStoreSectionUndoHistory(panel, items, selectedItemKey) {
         const els = miscStoreSectionUndoElements();
-        const rows = Array.isArray(batches) ? batches : [];
+        const rows = Array.isArray(items) ? items : [];
         if (els.historyCount) els.historyCount.textContent = String(rows.length);
         if (!els.historyList) return;
         els.historyList.replaceChildren();
-        rows.forEach((batch) => {
-            els.historyList.appendChild(
-                miscStoreSectionUndoHistoryItem(panel, batch, selectedBatchId)
-            );
+
+        const groups = [];
+        const groupsByKey = new Map();
+        rows.forEach((item) => {
+            const date = masterDataUndoHistoryDateInfo(item && item.applied_at);
+            let group = groupsByKey.get(date.key);
+            if (!group) {
+                group = { ...date, items: [] };
+                groupsByKey.set(date.key, group);
+                groups.push(group);
+            }
+            group.items.push(item);
+        });
+
+        const selectedGroup = groups.find((group) => group.items.some(
+            (item) => miscStoreSectionUndoHistoryKey(item) === selectedItemKey
+        ));
+        if (!miscStoreSectionUndoHistoryGroupsInitialized) {
+            miscStoreSectionUndoCollapsedDateGroups.clear();
+            groups.slice(1).forEach((group) => {
+                miscStoreSectionUndoCollapsedDateGroups.add(group.key);
+            });
+            miscStoreSectionUndoHistoryGroupsInitialized = true;
+        }
+        if (selectedGroup) {
+            miscStoreSectionUndoCollapsedDateGroups.delete(selectedGroup.key);
+        }
+
+        groups.forEach((group) => {
+            const dateGroup = document.createElement("details");
+            dateGroup.className = "master-data-undo-history-date-group";
+            dateGroup.dataset.undoHistoryDate = group.key;
+            dateGroup.open = !miscStoreSectionUndoCollapsedDateGroups.has(group.key);
+
+            const summary = document.createElement("summary");
+            summary.className = "master-data-undo-history-date-summary";
+            const label = document.createElement("strong");
+            label.textContent = group.label;
+            const count = document.createElement("span");
+            count.textContent = String(group.items.length);
+            summary.append(label, count);
+
+            const dateItems = document.createElement("div");
+            dateItems.className = "master-data-undo-history-date-items";
+            group.items.forEach((item) => {
+                dateItems.appendChild(
+                    miscStoreSectionUndoHistoryItem(panel, item, selectedItemKey)
+                );
+            });
+            dateGroup.append(summary, dateItems);
+            dateGroup.addEventListener("toggle", () => {
+                if (dateGroup.open) {
+                    miscStoreSectionUndoCollapsedDateGroups.delete(group.key);
+                } else {
+                    miscStoreSectionUndoCollapsedDateGroups.add(group.key);
+                }
+            });
+            els.historyList.appendChild(dateGroup);
         });
     }
 
@@ -4678,23 +4751,32 @@
         }
     }
 
-    function renderMiscStoreSectionUndoPreview(panel, preview, batches) {
+    function renderMiscStoreSectionUndoPreview(panel, preview, items) {
         const els = miscStoreSectionUndoElements();
         if (!els.dialog || !preview) return;
         activeMiscStoreSectionUndoPreview = preview;
         const changeCount = Math.max(0, Number(preview.change_count) || 0);
         const referenceCount = Math.max(0, Number(preview.recipe_reference_count) || 0);
-        const newerCount = Math.max(0, Number(preview.newer_undo_count) || 0);
-        const olderCount = Math.max(0, Number(preview.older_undo_count) || 0);
+        const newerCount = Math.max(
+            0,
+            Number(preview.newer_undo_item_count ?? preview.newer_undo_count) || 0
+        );
+        const otherCount = Math.max(0, Number(preview.other_undo_count) || 0);
         const canUndoNow = Boolean(preview.can_undo_now);
         const isNextUndo = Boolean(preview.is_next_undo) && newerCount === 0;
+        const selectedChange = Array.isArray(preview.changes) ? preview.changes[0] : null;
+        const ingredientName = miscReviewDisplayName(
+            selectedChange && selectedChange.ingredient
+        );
         if (els.summary) {
-            els.summary.textContent = `Review ${changeCount} store-section decision${changeCount === 1 ? "" : "s"} before restoring the previous assignments.`;
+            els.summary.textContent = `Restore ${ingredientName} to its previous store-section assignment.`;
         }
         if (els.position) {
-            els.position.textContent = isNextUndo
-                ? "Undo next • newest apply"
-                : `Blocked by ${newerCount} newer apply batch${newerCount === 1 ? "" : "es"}`;
+            els.position.textContent = canUndoNow
+                ? (isNextUndo
+                    ? "Undo next \u2022 newest decision"
+                    : "Safe out-of-order undo")
+                : `Blocked by ${newerCount} newer decision${newerCount === 1 ? "" : "s"}`;
         }
         if (els.time) {
             els.time.textContent = formatMasterDataDuplicateScanTime(preview.applied_at)
@@ -4726,15 +4808,15 @@
         if (els.next) {
             els.next.classList.toggle("is-blocked", !canUndoNow);
             els.next.textContent = !canUndoNow
-                ? text(preview.blocked_reason).trim() || "Undo newer store-section applies first."
-                : olderCount
-                ? `${olderCount} older apply batch${olderCount === 1 ? "" : "es"} will remain available after this undo.`
-                : "This is the oldest remaining store-section apply in the undo history.";
+                ? text(preview.blocked_reason).trim() || "Undo newer store-section decisions first."
+                : otherCount
+                ? `${otherCount} other store-section decision${otherCount === 1 ? "" : "s"} will remain available after this undo.`
+                : "This is the last remaining store-section decision in the undo history.";
         }
         if (els.footer) {
             els.footer.textContent = canUndoNow
-                ? "Undoing this apply will automatically advance the store-section history stack."
-                : "This apply is read-only until newer batches have been undone.";
+                ? "Undoing this decision will automatically advance the store-section history stack."
+                : "This decision is read-only until newer decisions have been undone.";
         }
         if (els.status) {
             els.status.hidden = true;
@@ -4744,17 +4826,17 @@
         if (els.confirm) {
             els.confirm.disabled = !canUndoNow;
             els.confirm.textContent = canUndoNow
-                ? `Undo ${changeCount} Decision${changeCount === 1 ? "" : "s"}`
-                : "Cannot undo this apply yet";
+                ? `Undo and restore ${ingredientName}`
+                : "Cannot undo this decision yet";
         }
         renderMiscStoreSectionUndoHistory(
             panel,
-            batches || preview.undoable_batches,
-            preview.batch_id
+            items || preview.history_items,
+            miscStoreSectionUndoHistoryKey(preview)
         );
     }
 
-    async function loadMiscStoreSectionUndoPreview(panel, batchId = 0) {
+    async function loadMiscStoreSectionUndoPreview(panel, batchId = 0, ingredientId = 0) {
         const els = miscStoreSectionUndoElements();
         if (!panel || !els.dialog || !panel.dataset.undoPreviewUrl) return false;
         activeMiscStoreSectionUndoPreview = null;
@@ -4767,25 +4849,28 @@
         }
         if (els.confirm) {
             els.confirm.disabled = true;
-            els.confirm.textContent = "Undo this apply";
+            els.confirm.textContent = "Undo this decision";
         }
         try {
             const url = new URL(panel.dataset.undoPreviewUrl, window.location.origin);
             if (Number(batchId) > 0) url.searchParams.set("batch_id", String(Number(batchId)));
+            if (Number(ingredientId) > 0) {
+                url.searchParams.set("ingredient_id", String(Number(ingredientId)));
+            }
             const response = await fetch(url.toString(), {
                 headers: { Accept: "application/json", "X-Requested-With": "fetch" },
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || data.ok === false || !data.preview) {
-                throw new Error(data.error || "The latest store-section apply could not be previewed.");
+                throw new Error(data.error || "The latest store-section decision could not be previewed.");
             }
-            renderMiscStoreSectionUndoPreview(panel, data.preview, data.batches);
+            renderMiscStoreSectionUndoPreview(panel, data.preview, data.items);
             return true;
         } catch (error) {
             setMiscStoreSectionUndoError(
                 error && error.message
                     ? error.message
-                    : "The latest store-section apply could not be previewed."
+                    : "The latest store-section decision could not be previewed."
             );
             return false;
         }
@@ -4800,6 +4885,8 @@
             return;
         }
         miscStoreSectionUndoReturnFocus = trigger || null;
+        miscStoreSectionUndoCollapsedDateGroups.clear();
+        miscStoreSectionUndoHistoryGroupsInitialized = false;
         if (els.historyList) els.historyList.replaceChildren();
         if (els.historyCount) els.historyCount.textContent = "0";
         if (!els.dialog.open) els.dialog.showModal();
@@ -4847,11 +4934,12 @@
                 },
                 body: JSON.stringify({
                     batch_id: Number(preview.batch_id) || 0,
+                    ingredient_id: Number(preview.ingredient_id) || 0,
                 }),
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || data.ok === false) {
-                throw new Error(data.error || "The last store-section apply could not be undone.");
+                throw new Error(data.error || "The store-section decision could not be undone.");
             }
             panel.dataset.miscUndoComplete = "true";
             panel.dataset.undoAvailable = data.undo_available ? "true" : "false";
@@ -4870,7 +4958,7 @@
         } catch (error) {
             const errorMessage = error && error.message
                 ? error.message
-                : "The last store-section apply could not be undone.";
+                : "The store-section decision could not be undone.";
             if (summary) {
                 summary.textContent = errorMessage;
             }

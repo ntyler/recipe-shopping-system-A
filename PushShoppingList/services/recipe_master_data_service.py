@@ -2716,6 +2716,7 @@ def apply_misc_ingredient_store_section_decisions(user_id=None, decisions=None):
 def undo_last_ingredient_store_section_reclassification(
     user_id=None,
     expected_batch_id=None,
+    expected_ingredient_id=None,
     preview_only=False,
 ):
     scoped_user_id = scoped_recipe_user_id(user_id)
@@ -2723,6 +2724,10 @@ def undo_last_ingredient_store_section_reclassification(
         expected_batch_id = int(expected_batch_id or 0)
     except (TypeError, ValueError):
         expected_batch_id = 0
+    try:
+        expected_ingredient_id = int(expected_ingredient_id or 0)
+    except (TypeError, ValueError):
+        expected_ingredient_id = 0
 
     with existing_recipe_master_connection() as connection:
         if connection is None:
@@ -2765,8 +2770,30 @@ def undo_last_ingredient_store_section_reclassification(
                 "error": "This reclassification cannot be undone because its restore data is unavailable.",
             }
 
+        changes_to_restore = changes
+        remaining_changes = []
+        if expected_ingredient_id > 0:
+            changes_to_restore = [
+                change
+                for change in changes
+                if isinstance(change, dict)
+                and int((change.get("ingredient_after") or {}).get("id") or 0)
+                == expected_ingredient_id
+            ]
+            if not changes_to_restore:
+                return {
+                    "ok": False,
+                    "status": 404,
+                    "error": "That store-section decision is no longer available in the undo history.",
+                }
+            remaining_changes = [
+                change
+                for change in changes
+                if change not in changes_to_restore
+            ]
+
         validated_changes = []
-        for change in changes:
+        for change in changes_to_restore:
             change = change if isinstance(change, dict) else {}
             ingredient_before = change.get("ingredient_before")
             ingredient_after = change.get("ingredient_after")
@@ -2873,7 +2900,9 @@ def undo_last_ingredient_store_section_reclassification(
                 "preview": True,
                 "batch_id": int(history["id"]),
                 "user_id": scoped_user_id,
+                "ingredient_id": expected_ingredient_id,
                 "change_count": len(validated_changes),
+                "remaining_change_count": len(remaining_changes),
                 "recipe_reference_count": sum(
                     len(change["recipe_before_by_id"])
                     for change in validated_changes
@@ -2932,15 +2961,35 @@ def undo_last_ingredient_store_section_reclassification(
                 )
                 restored_recipe_count += max(0, int(cursor.rowcount or 0))
 
-        undone_at = utc_now_iso()
-        connection.execute(
-            """
-            UPDATE ingredient_store_section_reclassification_history
-               SET undone_at = ?
-             WHERE id = ? AND user_id = ? AND undone_at IS NULL
-            """,
-            (undone_at, int(history["id"]), scoped_user_id),
-        )
+        undone_at = ""
+        if remaining_changes:
+            connection.execute(
+                """
+                UPDATE ingredient_store_section_reclassification_history
+                   SET snapshot_json = ?, change_count = ?
+                 WHERE id = ? AND user_id = ? AND undone_at IS NULL
+                """,
+                (
+                    json.dumps(
+                        {"version": 1, "changes": remaining_changes},
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ),
+                    len(remaining_changes),
+                    int(history["id"]),
+                    scoped_user_id,
+                ),
+            )
+        else:
+            undone_at = utc_now_iso()
+            connection.execute(
+                """
+                UPDATE ingredient_store_section_reclassification_history
+                   SET undone_at = ?
+                 WHERE id = ? AND user_id = ? AND undone_at IS NULL
+                """,
+                (undone_at, int(history["id"]), scoped_user_id),
+            )
         next_history = connection.execute(
             """
             SELECT id, user_id, change_count, applied_at
@@ -2957,19 +3006,29 @@ def undo_last_ingredient_store_section_reclassification(
             "changed": True,
             "batch_id": int(history["id"]),
             "user_id": scoped_user_id,
+            "ingredient_id": expected_ingredient_id,
             "restored_ingredient_count": len(validated_changes),
             "restored_recipe_count": restored_recipe_count,
+            "remaining_change_count": len(remaining_changes),
             "undone_at": undone_at,
             "next_batch": ingredient_store_section_reclassification_history_summary(next_history),
         }
 
 
-def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_id=None):
+def ingredient_store_section_reclassification_undo_preview(
+    user_id=None,
+    batch_id=None,
+    ingredient_id=None,
+):
     scoped_user_id = scoped_recipe_user_id(user_id)
     try:
         batch_id = int(batch_id or 0)
     except (TypeError, ValueError):
         batch_id = 0
+    try:
+        ingredient_id = int(ingredient_id or 0)
+    except (TypeError, ValueError):
+        ingredient_id = 0
 
     with existing_recipe_master_connection() as connection:
         if connection is None:
@@ -3025,6 +3084,40 @@ def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_i
                 "status": 409,
                 "error": "This store-section apply cannot be previewed because its restore data is unavailable.",
             }
+        if ingredient_id > 0:
+            selected_changes = [
+                change
+                for change in selected_changes
+                if isinstance(change, dict)
+                and int((change.get("ingredient_after") or {}).get("id") or 0)
+                == ingredient_id
+            ]
+            if not selected_changes:
+                return {
+                    "ok": False,
+                    "status": 404,
+                    "error": "That store-section decision is no longer available in the undo history.",
+                }
+        else:
+            first_change = next(
+                (
+                    change
+                    for change in selected_changes
+                    if isinstance(change, dict)
+                    and int((change.get("ingredient_after") or {}).get("id") or 0) > 0
+                ),
+                None,
+            )
+            selected_changes = [first_change] if first_change else []
+            ingredient_id = int(
+                ((first_change or {}).get("ingredient_after") or {}).get("id") or 0
+            )
+            if not selected_changes or ingredient_id <= 0:
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": "This store-section apply cannot be previewed because its restore data is incomplete.",
+                }
 
         selected_recipe_row_ids = sorted({
             int(recipe_row.get("id") or 0)
@@ -3079,9 +3172,15 @@ def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_i
             ).fetchall()
 
     latest_batch_id = int(history_rows[0]["id"])
-    latest_validation = undo_last_ingredient_store_section_reclassification(
+    latest_batch_validation = undo_last_ingredient_store_section_reclassification(
         user_id=scoped_user_id,
         expected_batch_id=latest_batch_id,
+        preview_only=True,
+    )
+    selected_validation = undo_last_ingredient_store_section_reclassification(
+        user_id=scoped_user_id,
+        expected_batch_id=int(selected_history["id"]),
+        expected_ingredient_id=ingredient_id,
         preview_only=True,
     )
     recipe_metadata = recipe_reference_metadata(scoped_user_id)
@@ -3121,7 +3220,7 @@ def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_i
     for index, row in enumerate(history_rows):
         row_batch_id = int(row["id"])
         is_next = index == 0
-        can_undo_now = is_next and bool(latest_validation.get("ok"))
+        can_undo_now = is_next and bool(latest_batch_validation.get("ok"))
         undoable_batches.append({
             **ingredient_store_section_reclassification_history_summary(row),
             "undo_order": index + 1,
@@ -3133,11 +3232,60 @@ def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_i
             ),
             "can_undo_now": can_undo_now,
             "blocked_reason": "" if can_undo_now else (
-                clean_text(latest_validation.get("error"))
+                clean_text(latest_batch_validation.get("error"))
                 if is_next
                 else f"Undo {index} newer store-section apply batch{'es' if index != 1 else ''} first."
             ),
         })
+
+    history_items = []
+    newer_item_count = 0
+    for batch_index, row in enumerate(history_rows):
+        row_batch_id = int(row["id"])
+        row_changes = parsed_snapshots.get(row_batch_id, {}).get("changes")
+        row_changes = row_changes if isinstance(row_changes, list) else []
+        for change_index, change in enumerate(row_changes):
+            change = change if isinstance(change, dict) else {}
+            before = change.get("ingredient_before")
+            after = change.get("ingredient_after")
+            recipe_after = change.get("recipe_ingredients_after")
+            if not isinstance(before, dict) or not isinstance(after, dict):
+                continue
+            row_ingredient_id = int(after.get("id") or 0)
+            if row_ingredient_id <= 0:
+                continue
+            is_selected = (
+                row_batch_id == int(selected_history["id"])
+                and row_ingredient_id == ingredient_id
+            )
+            can_undo_now = batch_index == 0
+            if is_selected:
+                can_undo_now = bool(selected_validation.get("ok"))
+            history_items.append({
+                "history_item_id": f"{row_batch_id}:{row_ingredient_id}",
+                "batch_id": row_batch_id,
+                "ingredient_id": row_ingredient_id,
+                "ingredient": clean_text(change.get("ingredient_name")) or "Ingredient",
+                "applied_store_section": clean_ingredient_store_section(after.get("store_section"))
+                or "MISC",
+                "restored_store_section": clean_ingredient_store_section(before.get("store_section"))
+                or "MISC",
+                "recipe_reference_count": len(recipe_after)
+                if isinstance(recipe_after, list)
+                else 0,
+                "applied_at": clean_text(row["applied_at"]),
+                "batch_change_count": len(row_changes),
+                "batch_item_order": change_index + 1,
+                "newer_undo_count": newer_item_count + change_index,
+                "can_undo_now": can_undo_now,
+                "blocked_reason": "" if can_undo_now else (
+                    clean_text(selected_validation.get("error"))
+                    if is_selected and batch_index == 0
+                    else f"Undo the {newer_item_count} newer store-section decision"
+                    f"{'s' if newer_item_count != 1 else ''} first."
+                ),
+            })
+        newer_item_count += len(row_changes)
 
     change_previews = []
     for change in selected_changes:
@@ -3164,15 +3312,27 @@ def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_i
 
     newer_undo_count = selected_index
     selected_is_next = selected_index == 0
-    selected_can_undo = selected_is_next and bool(latest_validation.get("ok"))
+    selected_can_undo = selected_is_next and bool(selected_validation.get("ok"))
     selected_blocked_reason = "" if selected_can_undo else (
-        clean_text(latest_validation.get("error"))
+        clean_text(selected_validation.get("error"))
         if selected_is_next
         else f"Undo {selected_index} newer store-section apply batch{'es' if selected_index != 1 else ''} first."
+    )
+    selected_history_item = next(
+        (
+            item
+            for item in history_items
+            if int(item.get("batch_id") or 0) == int(selected_history["id"])
+            and int(item.get("ingredient_id") or 0) == ingredient_id
+        ),
+        {},
     )
     return {
         "ok": True,
         **ingredient_store_section_reclassification_history_summary(selected_history),
+        "ingredient_id": ingredient_id,
+        "batch_change_count": int(selected_history["change_count"] or 0),
+        "change_count": len(change_previews),
         "changes": change_previews,
         "recipe_reference_count": sum(
             int(change.get("recipe_reference_count") or 0)
@@ -3181,11 +3341,14 @@ def ingredient_store_section_reclassification_undo_preview(user_id=None, batch_i
         "affected_recipe_count": len(recipe_references),
         "recipe_references": recipe_references,
         "newer_undo_count": newer_undo_count,
+        "newer_undo_item_count": int(selected_history_item.get("newer_undo_count") or 0),
         "older_undo_count": max(0, len(history_rows) - selected_index - 1),
         "is_next_undo": selected_is_next,
         "can_undo_now": selected_can_undo,
         "blocked_reason": selected_blocked_reason,
         "undoable_batches": undoable_batches,
+        "history_items": history_items,
+        "other_undo_count": max(0, len(history_items) - 1),
     }
 
 
