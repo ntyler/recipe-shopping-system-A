@@ -61793,6 +61793,7 @@ body.recipe-edit-standalone-page :is(
     justify-content: flex-start;
     gap: 9px;
     text-align: left;
+    user-select: none;
 }
 
 .store-section-master-icon-trigger
@@ -61860,6 +61861,7 @@ body.recipe-edit-standalone-page :is(
     color: var(--app-text);
     font-weight: 700;
     text-align: left;
+    user-select: none;
 }
 
 .store-section-master-page

@@ -37459,9 +37459,11 @@ function openStoreSectionMasterIconPicker(picker, options = {}) {
     menu.hidden = false;
     trigger.setAttribute("aria-expanded", "true");
     positionStoreSectionMasterIconMenu(picker);
-    if (options.focusOption) {
-        const selected = menu.querySelector('[role="option"][aria-selected="true"]');
-        (selected || menu.querySelector('[role="option"]'))?.focus({ preventScroll: true });
+    const selected = menu.querySelector('[role="option"][aria-selected="true"]')
+        || menu.querySelector('[role="option"]');
+    selected?.scrollIntoView({ block: "nearest" });
+    if (options.focusOption && selected) {
+        selected.focus({ preventScroll: true });
     }
 }
 
@@ -37526,10 +37528,15 @@ function initStoreSectionMasterIconPickers() {
         const trigger = event.target.closest("[data-store-section-master-icon-trigger]");
         if (trigger) {
             const picker = trigger.closest("[data-store-section-master-icon-picker]");
-            if (picker?.classList.contains("is-open")) {
+            if (
+                picker?.classList.contains("is-open")
+                && Number(event.detail || 0) < 2
+            ) {
                 closeStoreSectionMasterIconPickers({ focusTrigger: true });
             } else {
-                openStoreSectionMasterIconPicker(picker);
+                openStoreSectionMasterIconPicker(picker, {
+                    focusOption: Number(event.detail || 0) >= 2,
+                });
             }
             return;
         }
