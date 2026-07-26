@@ -1423,12 +1423,16 @@ def test_recipe_editor_ingredient_image_lightbox_stays_above_the_modal_and_resto
     assert ".recipe-image-lightbox-content:focus-within .recipe-image-lightbox-actions" in css
     assert "@media (hover: none), (max-width: 760px)" in css
     assert ".recipe-image-lightbox-actions button.is-remove" in css
+    lightbox_image = css[css.index(".recipe-image-lightbox img {"):]
+    lightbox_image = lightbox_image[:lightbox_image.index("}")]
+    assert "max-width: calc(100vw - 32px);" in lightbox_image
+    assert "max-height: calc(100dvh - 32px);" in lightbox_image
 
     modal_lightbox = css[css.index(
         "dialog.recipe-edit-ingredient-edit-panel > .recipe-image-lightbox"
     ):]
     modal_lightbox = modal_lightbox[:modal_lightbox.index("}")]
-    assert "position: absolute;" in modal_lightbox
+    assert "position: fixed;" in modal_lightbox
     assert "inset: 0;" in modal_lightbox
     assert "z-index: 20000;" in modal_lightbox
 
