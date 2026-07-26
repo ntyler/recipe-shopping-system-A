@@ -1477,7 +1477,16 @@
                         </div>
                     </div>
                     <div class="recipe-edit-category-actions">
-                        <span id="recipeEditCategorySource" class="recipe-edit-category-source">Categories: Blank</span>
+                        <button type="button"
+                                class="recipe-edit-category-collapse-button"
+                                aria-label="Collapse recipe categories"
+                                title="Collapse recipe categories"
+                                aria-expanded="true"
+                                aria-controls="recipeEditCategoriesBody"
+                                data-recipe-edit-category-collapse
+                                onclick="return toggleRecipeEditCategories(this)">
+                            <span class="recipe-edit-category-chevron" aria-hidden="true"></span>
+                        </button>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-category-menu-wrap">
                             <button type="button"
                                     class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn recipe-edit-category-menu-btn"
@@ -1502,16 +1511,6 @@
                                 </div>
                             </div>
                         </div>
-                        <button type="button"
-                                class="recipe-edit-category-collapse-button"
-                                aria-label="Collapse recipe categories"
-                                title="Collapse recipe categories"
-                                aria-expanded="true"
-                                aria-controls="recipeEditCategoriesBody"
-                                data-recipe-edit-category-collapse
-                                onclick="return toggleRecipeEditCategories(this)">
-                            <span class="recipe-edit-category-chevron" aria-hidden="true"></span>
-                        </button>
                     </div>
                 </div>
                 <div id="recipeEditCategoriesBody"

@@ -560,10 +560,7 @@ def test_recipe_category_panel_uses_readable_visual_hierarchy():
     assert "font-size: 12px;" in subtitle_rule
     assert "font-weight: 650;" in subtitle_rule
 
-    source_start = category_styles.index(".recipe-edit-category-source {")
-    source_rule = category_styles[source_start:category_styles.index("}", source_start)]
-    assert "font-size: 11px;" in source_rule
-    assert "color: var(--app-text-strong);" in source_rule
+    assert ".recipe-edit-category-source {" not in category_styles
 
     label_start = category_styles.index(
         ".recipe-edit-category-grid label > span:first-child,"
@@ -601,11 +598,7 @@ def test_mobile_recipe_category_actions_share_the_heading_row():
     assert "margin-left: auto;" in actions_rule
     assert "justify-content: flex-end;" in actions_rule
 
-    source_start = mobile.index(".recipe-edit-category-source {")
-    source_rule = mobile[source_start:mobile.index("}", source_start)]
-    assert "flex: 0 1 112px;" in source_rule
-    assert "max-width: 112px;" in source_rule
-    assert "text-overflow: ellipsis;" in source_rule
+    assert ".recipe-edit-category-source {" not in mobile
 
 
 def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():

@@ -16282,20 +16282,6 @@ body {
     text-transform: none;
 }
 
-.recipe-edit-category-source {
-    flex: 0 0 auto;
-    max-width: 220px;
-    padding: 7px 10px;
-    border: 1px solid #263447;
-    border-radius: 999px;
-    background: rgba(13, 22, 34, 0.82);
-    color: #aab5c3;
-    font-size: 12px;
-    font-weight: 800;
-    line-height: 1.2;
-    text-align: right;
-}
-
 .recipe-edit-category-menu-wrap {
     align-self: center;
 }
@@ -17749,11 +17735,6 @@ body {
 
     .recipe-edit-categories-panel .recipe-edit-panel-heading {
         flex-direction: column;
-    }
-
-    .recipe-edit-category-source {
-        max-width: none;
-        text-align: left;
     }
 
     .recipe-edit-category-actions {
@@ -56870,23 +56851,6 @@ body.recipe-edit-standalone-page .recipe-edit-category-actions {
     gap: 7px;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-category-source {
-    display: inline-flex;
-    min-height: 28px;
-    max-width: min(240px, 28vw);
-    padding: 5px 9px;
-    align-items: center;
-    border: 1px solid color-mix(in srgb, var(--app-primary-hover) 42%, var(--recipe-editor-border));
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--app-primary-soft) 42%, transparent);
-    color: var(--app-text-strong);
-    font-size: 11px;
-    font-weight: 750;
-    line-height: 1.2;
-    text-align: left;
-    white-space: nowrap;
-}
-
 body.recipe-edit-standalone-page :is(
     .recipe-edit-category-menu-btn,
     .recipe-edit-category-collapse-button
@@ -57054,13 +57018,6 @@ body.recipe-edit-standalone-page .recipe-edit-category-custom-field {
         gap: 6px;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-category-source {
-        flex: 0 1 112px;
-        min-width: 0;
-        max-width: 112px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
 }
 
 /* Narrow recipe editor: render the mobile Recipe Image view directly below title and rating. */

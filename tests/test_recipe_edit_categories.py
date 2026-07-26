@@ -106,6 +106,11 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
         "recipeEditCategoryCustomCategories",
     ]
     category_markup = template[category_start:tabs_start]
+    assert "recipeEditCategorySource" not in category_markup
+    assert "Categories: Blank" not in category_markup
+    assert category_markup.index("data-recipe-edit-category-collapse") < category_markup.index(
+        "recipe-edit-category-menu-wrap"
+    )
     assert [category_markup.index(field_id) for field_id in target_field_order] == sorted(
         category_markup.index(field_id) for field_id in target_field_order
     )
