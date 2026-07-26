@@ -97,7 +97,7 @@
                         aria-label="Store section for {{ row.name }}">
                     {% for section in master_data.store_section_options %}
                         <option value="{{ section }}" {% if row.store_section == section %}selected{% endif %}>
-                            {{ section }}
+                            {{ master_data.store_section_labels.get(section, section) }}
                         </option>
                     {% endfor %}
                 </select>
@@ -171,6 +171,9 @@
                 <a href="{{ master_data.equipment_url }}"
                    class="{% if master_data.record_type == 'equipment' %}active{% endif %}">
                     Equipment
+                </a>
+                <a href="{{ master_data.store_section_url }}">
+                    Store Sections
                 </a>
             </nav>
         </header>
@@ -605,7 +608,7 @@
                         <option value="" {% if not master_data.store_section %}selected{% endif %}>All sections</option>
                         {% for section in master_data.store_section_options %}
                             <option value="{{ section }}" {% if master_data.store_section == section %}selected{% endif %}>
-                                {{ section }}
+                                {{ master_data.store_section_labels.get(section, section) }}
                             </option>
                         {% endfor %}
                     </select>

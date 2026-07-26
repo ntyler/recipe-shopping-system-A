@@ -948,9 +948,14 @@ def master_data_context(record_type):
     offset = (page - 1) * limit
     scope_info = master_data_scope(is_admin)
     store_section = ""
+    store_section_details = []
     if record_type == "ingredients":
+        store_section_details = recipe_master_data.ingredient_store_section_details(
+            user_id=scope_info["user_id"] or scope_info["current_scope_user_id"],
+        )
         store_section = recipe_master_data.ingredient_store_section_from_source(
-            request.args.get("store_section")
+            request.args.get("store_section"),
+            user_id=scope_info["user_id"] or scope_info["current_scope_user_id"],
         )
     equipment_section = ""
     if record_type == "equipment":
@@ -1079,15 +1084,28 @@ def master_data_context(record_type):
 
     row_groups = []
     if record_type == "ingredients" and rows and not store_section:
-        for section in recipe_master_data.ingredient_store_section_options():
+        for section_detail in store_section_details:
+            section = section_detail["section_key"]
             section_rows = [
                 row
                 for row in rows
-                if recipe_master_data.clean_ingredient_store_section(row.get("store_section")) == section
+                if recipe_master_data.clean_ingredient_store_section(
+                    row.get("store_section"),
+                    user_id=row.get("user_id"),
+                ) == section
             ]
             if section_rows:
+                default_display_name = (
+                    recipe_master_data.INGREDIENT_STORE_SECTION_DISPLAY_NAMES.get(section)
+                )
+                display_name = section_detail["display_name"]
                 row_groups.append({
-                    "section": section,
+                    "section": (
+                        section
+                        if display_name == default_display_name
+                        else display_name
+                    ),
+                    "section_key": section,
                     "rows": section_rows,
                 })
     elif record_type == "equipment" and rows and not equipment_section:
@@ -1119,9 +1137,14 @@ def master_data_context(record_type):
         "search": search,
         "sort": sort,
         "store_section": store_section,
-        "store_section_options": recipe_master_data.ingredient_store_section_options()
-        if record_type == "ingredients"
-        else [],
+        "store_section_options": [
+            section["section_key"]
+            for section in store_section_details
+        ],
+        "store_section_labels": {
+            section["section_key"]: section["display_name"]
+            for section in store_section_details
+        },
         "equipment_section": equipment_section,
         "equipment_section_options": recipe_master_data.equipment_section_options()
         if record_type == "equipment"
@@ -1147,6 +1170,7 @@ def master_data_context(record_type):
         "messages": session.pop("recipe_master_data_messages", []),
         "ingredient_url": url_for("main_bp.master_data_ingredients_route"),
         "equipment_url": url_for("main_bp.master_data_equipment_route"),
+        "store_section_url": url_for("main_bp.master_data_store_sections_route"),
         "backfill_status_url": url_for("main_bp.recipe_master_data_backfill_status_route"),
         "image_generation_url": url_for("main_bp.recipe_master_data_generate_missing_images_route"),
         "image_generation_status_url": url_for("main_bp.recipe_master_data_image_generation_status_route"),
@@ -1212,6 +1236,102 @@ def master_data_ingredients_route():
 @main_bp.route("/admin/master-data/equipment")
 def master_data_equipment_route():
     return render_master_data_page("equipment")
+
+
+def store_section_master_data_context():
+    user_id = recipe_master_data.scoped_recipe_user_id()
+    sections = recipe_master_data.ingredient_store_section_details(
+        user_id=user_id,
+        include_inactive=True,
+        create=True,
+    )
+    active_sections = [section for section in sections if section["is_active"]]
+    return {
+        "title": "Store Sections",
+        "record_type": "store_sections",
+        "sections": sections,
+        "active_count": len(active_sections),
+        "archived_count": len(sections) - len(active_sections),
+        "ingredient_count": sum(
+            int(section.get("ingredient_count") or 0)
+            for section in sections
+        ),
+        "recipe_reference_count": sum(
+            int(section.get("recipe_reference_count") or 0)
+            for section in sections
+        ),
+        "icon_options": recipe_master_data.INGREDIENT_STORE_SECTION_ICON_OPTIONS,
+        "messages": session.pop("recipe_master_data_messages", []),
+        "ingredient_url": url_for("main_bp.master_data_ingredients_route"),
+        "equipment_url": url_for("main_bp.master_data_equipment_route"),
+        "store_section_url": url_for("main_bp.master_data_store_sections_route"),
+        "create_url": url_for("main_bp.create_master_data_store_section_route"),
+    }
+
+
+@main_bp.route("/admin/master-data/store-sections")
+def master_data_store_sections_route():
+    return render_template(
+        "store_sections.html",
+        master_data=store_section_master_data_context(),
+        current_user=current_public_user(),
+        is_guest_demo=is_guest_session(),
+        app_css_version=static_asset_version("css/app.css"),
+        app_js_version=static_asset_version("js/app.js"),
+    )
+
+
+def set_store_section_master_data_message(result, *, success_prefix):
+    if result.get("ok"):
+        message = success_prefix.format(
+            name=result.get("display_name") or "Store Section"
+        )
+        category = "success"
+    else:
+        message = result.get("error") or "Store Section could not be updated."
+        category = "error"
+    session["recipe_master_data_messages"] = [{
+        "category": category,
+        "text": message,
+    }]
+
+
+@main_bp.route("/admin/master-data/store-sections", methods=["POST"])
+def create_master_data_store_section_route():
+    result = recipe_master_data.create_ingredient_store_section(
+        request.form.get("display_name"),
+        request.form.get("icon"),
+        user_id=active_user_id(),
+    )
+    set_store_section_master_data_message(
+        result,
+        success_prefix="Store Section created: {name}.",
+    )
+    return redirect(url_for("main_bp.master_data_store_sections_route"))
+
+
+@main_bp.route("/admin/master-data/store-sections/<int:section_id>", methods=["POST"])
+def update_master_data_store_section_route(section_id):
+    action = recipe_master_data.clean_text(request.form.get("action")).lower() or "save"
+    result = recipe_master_data.update_ingredient_store_section_definition(
+        section_id,
+        action=action,
+        display_name=request.form.get("display_name"),
+        icon=request.form.get("icon"),
+        user_id=active_user_id(),
+    )
+    action_messages = {
+        "save": "Store Section updated: {name}.",
+        "move_up": "Store Section moved up: {name}.",
+        "move_down": "Store Section moved down: {name}.",
+        "archive": "Store Section archived: {name}.",
+        "restore": "Store Section restored: {name}.",
+    }
+    set_store_section_master_data_message(
+        result,
+        success_prefix=action_messages.get(action, "Store Section updated: {name}."),
+    )
+    return redirect(url_for("main_bp.master_data_store_sections_route"))
 
 
 @main_bp.route("/api/master-data/ingredients/options")

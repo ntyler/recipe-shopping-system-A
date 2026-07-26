@@ -22600,6 +22600,7 @@ function escapeAttribute(value) {
 }
 
 let recipeEditStoreSections = [];
+let recipeEditStoreSectionDetails = new Map();
 let recipeEditFoodRules = { require: [], avoid: [] };
 let recipeEditOriginalSnapshot = null;
 let recipeEditAiInsightSource = {};
@@ -22824,6 +22825,9 @@ function rememberRecipeEditorData(url, data) {
         savedAt: Date.now(),
         recipe,
         storeSections: Array.isArray(data && data.store_sections) ? data.store_sections : recipeEditStoreSections,
+        storeSectionDetails: Array.isArray(data && data.store_section_details)
+            ? data.store_section_details
+            : [...recipeEditStoreSectionDetails.values()],
         foodRules: data && data.food_rules ? data.food_rules : recipeEditFoodRules,
     });
 
@@ -22873,6 +22877,14 @@ function applyRecipeEditorDataContext(entry) {
     }
 
     recipeEditStoreSections = Array.isArray(entry.storeSections) ? entry.storeSections : [];
+    recipeEditStoreSectionDetails = new Map(
+        (Array.isArray(entry.storeSectionDetails) ? entry.storeSectionDetails : [])
+            .map(section => [
+                recipeIngredientStoreSectionKey(section && section.section_key),
+                section,
+            ])
+            .filter(([key]) => Boolean(key)),
+    );
     recipeEditFoodRules = entry.foodRules || { require: [], avoid: [] };
 }
 
@@ -27038,6 +27050,12 @@ function renderRecipeIngredientColumnViewMenu(menu) {
             </div>
         </fieldset>
         <div class="recipe-edit-ingredient-column-view-footer">
+            ${columnKey === "store" ? `
+                <a href="/admin/master-data/store-sections"
+                   class="recipe-edit-ingredient-column-view-manage">
+                    Manage Store Sections
+                </a>
+            ` : ""}
             <button type="button"
                     data-recipe-ingredient-column-view-clear
                     ${recipeIngredientColumnViewIsActive(columnKey) ? "" : "disabled"}>
@@ -37300,6 +37318,12 @@ function recipeIngredientBadgesHtml(item = {}, options = {}) {
 }
 
 function recipeIngredientStoreSectionIconName(section) {
+    const configured = recipeEditStoreSectionDetails.get(
+        recipeIngredientStoreSectionKey(section),
+    );
+    if (configured && configured.icon) {
+        return String(configured.icon).trim().toLowerCase();
+    }
     const value = String(section || "").trim().toUpperCase();
     if (value.includes("PRODUCE")) {
         return "leaf";
@@ -43713,6 +43737,12 @@ function setRecipeImageElementSource(image, originalUrl, displayVariant = "card"
 
 function recipeStoreSectionDisplayLabel(section) {
     const value = String(section || "").trim();
+    const configured = recipeEditStoreSectionDetails.get(
+        recipeIngredientStoreSectionKey(value),
+    );
+    if (configured && configured.display_name) {
+        return String(configured.display_name).trim();
+    }
     const normalized = value.toUpperCase();
     const mockupLabels = {
         "DAIRY & EGGS": "Dairy",
@@ -43733,7 +43763,11 @@ function recipeStoreSectionOptions(selected) {
         value = String(value || "");
         const key = recipeIngredientStoreSectionKey(value);
         if (key && !seen.has(key)) {
-            values.push({ value, custom: false });
+            const configured = recipeEditStoreSectionDetails.get(key);
+            values.push({
+                value,
+                custom: configured ? !Boolean(configured.is_builtin) : false,
+            });
             seen.add(key);
         }
     });

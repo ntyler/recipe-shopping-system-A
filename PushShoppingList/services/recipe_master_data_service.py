@@ -49,6 +49,68 @@ INGREDIENT_STORE_SECTION_ORDER = {
     "PET SUPPLIES": 18,
     "MISC": 19,
 }
+INGREDIENT_STORE_SECTION_DISPLAY_NAMES = {
+    "PRODUCE": "Produce",
+    "MEAT & SEAFOOD": "Meat & Seafood",
+    "DAIRY & EGGS": "Dairy & Eggs",
+    "FROZEN": "Frozen",
+    "DRY GOODS": "Dry Goods",
+    "PASTA, RICE & GRAINS": "Pasta, Rice & Grains",
+    "BAKING": "Baking",
+    "CANNED": "Canned Goods",
+    "SAUCES & CONDIMENTS": "Sauces & Condiments",
+    "SNACKS": "Snacks",
+    "BEVERAGES": "Beverages",
+    "SPICES & SEASONINGS": "Spices",
+    "OILS & VINEGARS": "Oils & Vinegars",
+    "BAKERY": "Bakery",
+    "DELI": "Deli",
+    "HOUSEHOLD": "Household",
+    "PERSONAL CARE": "Personal Care",
+    "PET SUPPLIES": "Pet Supplies",
+    "MISC": "Misc",
+}
+INGREDIENT_STORE_SECTION_ICONS = {
+    "PRODUCE": "leaf",
+    "MEAT & SEAFOOD": "fish",
+    "DAIRY & EGGS": "dairy",
+    "FROZEN": "snowflake",
+    "DRY GOODS": "package",
+    "PASTA, RICE & GRAINS": "wheat",
+    "BAKING": "wheat",
+    "CANNED": "can",
+    "SAUCES & CONDIMENTS": "sauce",
+    "SNACKS": "cookie",
+    "BEVERAGES": "cup",
+    "SPICES & SEASONINGS": "jar",
+    "OILS & VINEGARS": "oil",
+    "BAKERY": "bread",
+    "DELI": "sandwich",
+    "HOUSEHOLD": "home",
+    "PERSONAL CARE": "heart",
+    "PET SUPPLIES": "paw",
+    "MISC": "basket",
+}
+INGREDIENT_STORE_SECTION_ICON_OPTIONS = (
+    "leaf",
+    "fish",
+    "dairy",
+    "snowflake",
+    "package",
+    "wheat",
+    "can",
+    "sauce",
+    "cookie",
+    "cup",
+    "jar",
+    "oil",
+    "bread",
+    "sandwich",
+    "home",
+    "heart",
+    "paw",
+    "basket",
+)
 INGREDIENT_STORE_SECTION_ALIASES = {
     "DAIRY": "DAIRY & EGGS",
     "MEAT AND SEAFOOD": "MEAT & SEAFOOD",
@@ -750,6 +812,23 @@ def ensure_recipe_master_schema(connection=None):
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS ingredient_store_sections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            section_key TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            icon TEXT NOT NULL DEFAULT 'basket',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_builtin INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(user_id, section_key)
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS equipment (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -931,6 +1010,7 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_duplicate_reviews_pair ON ingredient_duplicate_reviews(left_ingredient_id, right_ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_merge_history_user_undo ON ingredient_merge_history(user_id, undone_at, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_store_section_reclassification_history_user_undo ON ingredient_store_section_reclassification_history(user_id, undone_at, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_store_sections_user_order ON ingredient_store_sections(user_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_section ON ingredients(user_id, store_section)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_name ON equipment(user_id, normalized_name)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_user_section ON equipment(user_id, equipment_section)")
@@ -1035,20 +1115,420 @@ def migrate_existing_recipe_ingredient_units(connection):
     return summary
 
 
-def ingredient_store_section_options():
-    return list(INGREDIENT_STORE_SECTION_ORDER.keys())
-
-
-def ingredient_store_section_from_source(value):
+def normalize_ingredient_store_section_key(value):
     section = re.sub(r"\s+", " ", str(value or "").strip().upper())
     if not section:
         return ""
-    section = INGREDIENT_STORE_SECTION_ALIASES.get(section, section)
-    return section if section in INGREDIENT_STORE_SECTION_ORDER else ""
+    return INGREDIENT_STORE_SECTION_ALIASES.get(section, section)[:80]
 
 
-def clean_ingredient_store_section(value, default="MISC"):
-    return ingredient_store_section_from_source(value) or default
+def default_ingredient_store_section_details():
+    return [
+        {
+            "id": 0,
+            "section_key": section_key,
+            "display_name": INGREDIENT_STORE_SECTION_DISPLAY_NAMES.get(
+                section_key,
+                section_key.title(),
+            ),
+            "icon": INGREDIENT_STORE_SECTION_ICONS.get(section_key, "basket"),
+            "sort_order": int(sort_order),
+            "is_builtin": True,
+            "is_active": True,
+            "ingredient_count": 0,
+            "recipe_reference_count": 0,
+        }
+        for section_key, sort_order in INGREDIENT_STORE_SECTION_ORDER.items()
+    ]
+
+
+def ensure_ingredient_store_sections_for_user(connection, user_id):
+    user_id = scoped_recipe_user_id(user_id)
+    timestamp = utc_now_iso()
+    for section in default_ingredient_store_section_details():
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO ingredient_store_sections (
+                user_id,
+                section_key,
+                display_name,
+                icon,
+                sort_order,
+                is_builtin,
+                is_active,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)
+            """,
+            (
+                user_id,
+                section["section_key"],
+                section["display_name"],
+                section["icon"],
+                section["sort_order"],
+                timestamp,
+                timestamp,
+            ),
+        )
+    return user_id
+
+
+def ingredient_store_section_details(user_id=None, include_inactive=False, create=False):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    db_path = recipe_master_db_path()
+    if not create and not db_path.is_file():
+        return default_ingredient_store_section_details()
+
+    connection_manager = recipe_master_connection if create else existing_recipe_master_connection
+    with connection_manager() as connection:
+        if connection is None:
+            return default_ingredient_store_section_details()
+        ensure_ingredient_store_sections_for_user(connection, scoped_user_id)
+        active_clause = "" if include_inactive else "AND s.is_active = 1"
+        rows = connection.execute(
+            f"""
+            SELECT
+                s.id,
+                s.user_id,
+                s.section_key,
+                s.display_name,
+                s.icon,
+                s.sort_order,
+                s.is_builtin,
+                s.is_active,
+                s.created_at,
+                s.updated_at,
+                (
+                    SELECT COUNT(*)
+                      FROM ingredients i
+                     WHERE i.user_id = s.user_id
+                       AND i.store_section = s.section_key
+                ) AS ingredient_count,
+                (
+                    SELECT COUNT(*)
+                      FROM recipe_ingredients ri
+                     WHERE ri.user_id = s.user_id
+                       AND ri.store_section = s.section_key
+                ) AS recipe_reference_count
+              FROM ingredient_store_sections s
+             WHERE s.user_id = ?
+               {active_clause}
+             ORDER BY s.sort_order ASC, LOWER(s.display_name) ASC, s.id ASC
+            """,
+            (scoped_user_id,),
+        ).fetchall()
+        return [
+            {
+                **dict(row),
+                "is_builtin": bool(row["is_builtin"]),
+                "is_active": bool(row["is_active"]),
+                "ingredient_count": int(row["ingredient_count"] or 0),
+                "recipe_reference_count": int(row["recipe_reference_count"] or 0),
+            }
+            for row in rows
+        ]
+
+
+def ingredient_store_section_options(user_id=None, include_inactive=False):
+    return [
+        section["section_key"]
+        for section in ingredient_store_section_details(
+            user_id=user_id,
+            include_inactive=include_inactive,
+        )
+    ]
+
+
+def ingredient_store_section_from_source(value, user_id=None, connection=None):
+    section = normalize_ingredient_store_section_key(value)
+    if not section:
+        return ""
+    if section in INGREDIENT_STORE_SECTION_ORDER:
+        return section
+
+    scoped_user_id = clean_text(user_id)
+    if not scoped_user_id:
+        return ""
+    if connection is not None:
+        row = connection.execute(
+            """
+            SELECT section_key
+              FROM ingredient_store_sections
+             WHERE user_id = ?
+               AND (
+                    section_key = ?
+                    OR UPPER(display_name) = ?
+               )
+             LIMIT 1
+            """,
+            (scoped_recipe_user_id(scoped_user_id), section, section),
+        ).fetchone()
+        return clean_text(row["section_key"]) if row else ""
+    if not recipe_master_db_path().is_file():
+        return ""
+    with existing_recipe_master_connection() as existing_connection:
+        if existing_connection is None:
+            return ""
+        return ingredient_store_section_from_source(
+            section,
+            user_id=scoped_user_id,
+            connection=existing_connection,
+        )
+
+
+def clean_ingredient_store_section(value, default="MISC", user_id=None, connection=None):
+    return ingredient_store_section_from_source(
+        value,
+        user_id=user_id,
+        connection=connection,
+    ) or default
+
+
+def clean_ingredient_store_section_icon(value):
+    icon = clean_text(value).lower()
+    return icon if icon in INGREDIENT_STORE_SECTION_ICON_OPTIONS else "basket"
+
+
+def create_ingredient_store_section(display_name, icon="basket", user_id=None):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    display_name = re.sub(r"\s+", " ", clean_text(display_name))[:80]
+    section_key = normalize_ingredient_store_section_key(display_name)
+    if not display_name or not section_key:
+        return {"ok": False, "status": 400, "error": "Store Section name is required."}
+
+    with recipe_master_connection() as connection:
+        ensure_ingredient_store_sections_for_user(connection, scoped_user_id)
+        duplicate = connection.execute(
+            """
+            SELECT id
+              FROM ingredient_store_sections
+             WHERE user_id = ?
+               AND (
+                    section_key = ?
+                    OR LOWER(display_name) = LOWER(?)
+               )
+             LIMIT 1
+            """,
+            (scoped_user_id, section_key, display_name),
+        ).fetchone()
+        if duplicate:
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "That Store Section already exists in this workspace.",
+            }
+        row = connection.execute(
+            """
+            SELECT COALESCE(MAX(sort_order), 0) AS max_sort_order
+              FROM ingredient_store_sections
+             WHERE user_id = ?
+            """,
+            (scoped_user_id,),
+        ).fetchone()
+        sort_order = int(row["max_sort_order"] or 0) + 1
+        timestamp = utc_now_iso()
+        cursor = connection.execute(
+            """
+            INSERT INTO ingredient_store_sections (
+                user_id,
+                section_key,
+                display_name,
+                icon,
+                sort_order,
+                is_builtin,
+                is_active,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?)
+            """,
+            (
+                scoped_user_id,
+                section_key,
+                display_name,
+                clean_ingredient_store_section_icon(icon),
+                sort_order,
+                timestamp,
+                timestamp,
+            ),
+        )
+        return {
+            "ok": True,
+            "status": 201,
+            "id": int(cursor.lastrowid),
+            "section_key": section_key,
+            "display_name": display_name,
+        }
+
+
+def update_ingredient_store_section_definition(
+    section_id,
+    *,
+    action="save",
+    display_name="",
+    icon="basket",
+    user_id=None,
+):
+    try:
+        section_id = int(section_id or 0)
+    except (TypeError, ValueError):
+        section_id = 0
+    if section_id <= 0:
+        return {"ok": False, "status": 400, "error": "Store Section is required."}
+
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    action = clean_text(action).lower() or "save"
+    with recipe_master_connection() as connection:
+        ensure_ingredient_store_sections_for_user(connection, scoped_user_id)
+        row = connection.execute(
+            """
+            SELECT *
+              FROM ingredient_store_sections
+             WHERE id = ?
+               AND user_id = ?
+            """,
+            (section_id, scoped_user_id),
+        ).fetchone()
+        if not row:
+            return {"ok": False, "status": 404, "error": "Store Section was not found."}
+
+        if action in {"move_up", "move_down"}:
+            comparator = "<" if action == "move_up" else ">"
+            direction = "DESC" if action == "move_up" else "ASC"
+            adjacent = connection.execute(
+                f"""
+                SELECT id, sort_order
+                  FROM ingredient_store_sections
+                 WHERE user_id = ?
+                   AND sort_order {comparator} ?
+                 ORDER BY sort_order {direction}, id {direction}
+                 LIMIT 1
+                """,
+                (scoped_user_id, int(row["sort_order"] or 0)),
+            ).fetchone()
+            if adjacent:
+                connection.execute(
+                    "UPDATE ingredient_store_sections SET sort_order = ?, updated_at = ? WHERE id = ?",
+                    (int(adjacent["sort_order"]), utc_now_iso(), section_id),
+                )
+                connection.execute(
+                    "UPDATE ingredient_store_sections SET sort_order = ?, updated_at = ? WHERE id = ?",
+                    (int(row["sort_order"]), utc_now_iso(), int(adjacent["id"])),
+                )
+            return {
+                "ok": True,
+                "status": 200,
+                "changed": bool(adjacent),
+                "display_name": row["display_name"],
+            }
+
+        if action == "archive":
+            usage = connection.execute(
+                """
+                SELECT
+                    (
+                        SELECT COUNT(*)
+                          FROM ingredients
+                         WHERE user_id = ?
+                           AND store_section = ?
+                    )
+                    +
+                    (
+                        SELECT COUNT(*)
+                          FROM recipe_ingredients
+                         WHERE user_id = ?
+                           AND store_section = ?
+                    ) AS usage_count
+                """,
+                (
+                    scoped_user_id,
+                    row["section_key"],
+                    scoped_user_id,
+                    row["section_key"],
+                ),
+            ).fetchone()
+            if int(usage["usage_count"] or 0) > 0:
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": "Reassign this Store Section's ingredients before archiving it.",
+                }
+            connection.execute(
+                """
+                UPDATE ingredient_store_sections
+                   SET is_active = 0,
+                       updated_at = ?
+                 WHERE id = ?
+                """,
+                (utc_now_iso(), section_id),
+            )
+            return {
+                "ok": True,
+                "status": 200,
+                "changed": bool(row["is_active"]),
+                "display_name": row["display_name"],
+            }
+
+        if action == "restore":
+            connection.execute(
+                """
+                UPDATE ingredient_store_sections
+                   SET is_active = 1,
+                       updated_at = ?
+                 WHERE id = ?
+                """,
+                (utc_now_iso(), section_id),
+            )
+            return {
+                "ok": True,
+                "status": 200,
+                "changed": not bool(row["is_active"]),
+                "display_name": row["display_name"],
+            }
+
+        if action != "save":
+            return {"ok": False, "status": 400, "error": "Unsupported Store Section action."}
+
+        display_name = re.sub(r"\s+", " ", clean_text(display_name))[:80]
+        if not display_name:
+            return {"ok": False, "status": 400, "error": "Store Section name is required."}
+        duplicate = connection.execute(
+            """
+            SELECT id
+              FROM ingredient_store_sections
+             WHERE user_id = ?
+               AND LOWER(display_name) = LOWER(?)
+               AND id != ?
+             LIMIT 1
+            """,
+            (scoped_user_id, display_name, section_id),
+        ).fetchone()
+        if duplicate:
+            return {
+                "ok": False,
+                "status": 409,
+                "error": "That Store Section name already exists in this workspace.",
+            }
+        clean_icon = clean_ingredient_store_section_icon(icon)
+        changed = (
+            display_name != row["display_name"]
+            or clean_icon != row["icon"]
+        )
+        connection.execute(
+            """
+            UPDATE ingredient_store_sections
+               SET display_name = ?,
+                   icon = ?,
+                   updated_at = ?
+             WHERE id = ?
+            """,
+            (display_name, clean_icon, utc_now_iso(), section_id),
+        )
+        return {
+            "ok": True,
+            "status": 200,
+            "changed": changed,
+            "display_name": display_name,
+        }
 
 
 def ingredient_store_section_sort_key(section):
@@ -1457,13 +1937,19 @@ def resolve_ingredient_store_section(value, source_section=None, default="MISC")
 
 def normalize_existing_ingredient_store_sections(connection):
     try:
-        rows = connection.execute("SELECT id, store_section FROM ingredients").fetchall()
+        rows = connection.execute(
+            "SELECT id, user_id, store_section FROM ingredients"
+        ).fetchall()
     except sqlite3.OperationalError:
         return
 
     for row in rows:
         raw_section = str(row["store_section"] or "")
-        section = clean_ingredient_store_section(raw_section)
+        section = clean_ingredient_store_section(
+            raw_section,
+            user_id=row["user_id"],
+            connection=connection,
+        )
         if section != raw_section:
             connection.execute(
                 "UPDATE ingredients SET store_section = ? WHERE id = ?",
@@ -1568,7 +2054,10 @@ def master_record_filters(
             params.extend([search_like, search_like])
 
     if table_name == "ingredients":
-        section = ingredient_store_section_from_source(store_section)
+        section = ingredient_store_section_from_source(
+            store_section,
+            user_id=user_id,
+        )
         if section:
             where.append("m.store_section = ?")
             params.append(section)
@@ -3367,15 +3856,15 @@ def update_ingredient_master_record(
     if ingredient_id <= 0:
         return {"ok": False, "status": 400, "error": "Ingredient record is required."}
 
+    scoped_user_id = scoped_recipe_user_id(user_id)
     name = clean_text(name)[:160]
     normalized_name = normalized_master_name(normalized_name or name)[:160]
-    section = clean_ingredient_store_section(store_section)
+    section_input = store_section
     if not name:
         return {"ok": False, "status": 400, "error": "Ingredient name is required."}
     if not normalized_name:
         return {"ok": False, "status": 400, "error": "Normalized name is required."}
 
-    scoped_user_id = scoped_recipe_user_id(user_id)
     with existing_recipe_master_connection() as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "Recipe master database was not found."}
@@ -3397,6 +3886,11 @@ def update_ingredient_master_record(
         ).fetchone()
         if not row:
             return {"ok": False, "status": 404, "error": "Ingredient record was not found."}
+        section = clean_ingredient_store_section(
+            section_input,
+            user_id=row["user_id"],
+            connection=connection,
+        )
 
         duplicate = connection.execute(
             """

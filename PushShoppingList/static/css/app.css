@@ -39866,7 +39866,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-column-view-trigger[ari
 
 .recipe-edit-ingredient-column-view-menu[data-recipe-ingredient-column-view-menu="store"]
     .recipe-edit-ingredient-column-view-filters {
-    max-height: 125px;
+    max-height: 86px;
 }
 
 .recipe-edit-ingredient-column-view-no-options {
@@ -39877,7 +39877,31 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-column-view-trigger[ari
 }
 
 .recipe-edit-ingredient-column-view-footer {
+    display: grid;
+    gap: 7px;
     padding: 9px 12px 11px;
+}
+
+.recipe-edit-ingredient-column-view-manage {
+    display: flex;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border: 1px solid var(--app-primary);
+    border-radius: 7px;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    font-size: 11px;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+}
+
+.recipe-edit-ingredient-column-view-manage:is(:hover, :focus-visible) {
+    border-color: var(--app-primary-hover);
+    background: color-mix(in srgb, var(--app-primary-soft) 72%, var(--app-surface-soft));
+    outline: none;
 }
 
 .recipe-edit-row-menu .recipe-edit-ingredient-column-view-footer > button {
@@ -61509,5 +61533,357 @@ body.recipe-edit-standalone-page :is(
 
     body.recipe-edit-standalone-page .recipe-edit-mobile-image-actions > .recipe-edit-cover-remove-button:not([hidden]) {
         grid-column: 1 / -1;
+    }
+}
+
+/* Store Section master data: workspace-scoped names, icons, order, and availability. */
+.store-section-master-page {
+    --store-section-card: color-mix(in srgb, var(--app-surface) 94%, var(--app-bg-soft));
+}
+
+.store-section-master-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.store-section-master-stats article {
+    display: grid;
+    min-height: 86px;
+    align-content: center;
+    gap: 5px;
+    padding: 14px 16px;
+    border: 1px solid var(--app-border);
+    border-radius: 9px;
+    background: var(--store-section-card);
+}
+
+.store-section-master-stats span,
+.store-section-master-create > div > span,
+.store-section-master-list-section > header > div > span {
+    color: var(--app-primary-hover);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.store-section-master-stats strong {
+    color: var(--app-text-strong);
+    font-size: 25px;
+    line-height: 1;
+}
+
+.store-section-master-create,
+.store-section-master-list-section {
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    background: var(--store-section-card);
+}
+
+.store-section-master-create {
+    display: grid;
+    grid-template-columns: minmax(220px, .7fr) minmax(520px, 1.3fr);
+    align-items: end;
+    gap: 22px;
+    padding: 16px;
+}
+
+.store-section-master-create h2,
+.store-section-master-list-section h2 {
+    margin: 3px 0 4px;
+    color: var(--app-text-strong);
+    font-size: 18px;
+}
+
+.store-section-master-create p,
+.store-section-master-list-section p {
+    margin: 0;
+    color: var(--app-muted);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.store-section-master-create-form {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(140px, .55fr) max-content;
+    align-items: end;
+    gap: 10px;
+}
+
+.store-section-master-create-form label,
+.store-section-master-identity label,
+.store-section-master-icon-field {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+}
+
+.store-section-master-create-form label > span,
+.store-section-master-identity label > span,
+.store-section-master-icon-field > span {
+    color: var(--app-muted);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.store-section-master-page :is(input, select) {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 38px;
+    margin: 0;
+    padding: 7px 10px;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-bg-soft);
+    color: var(--app-text);
+    font: inherit;
+    font-size: 12px;
+}
+
+.store-section-master-page :is(input, select):focus-visible {
+    border-color: var(--app-primary);
+    outline: 2px solid color-mix(in srgb, var(--app-primary) 28%, transparent);
+    outline-offset: 1px;
+}
+
+.store-section-master-page button {
+    min-height: 38px;
+    margin: 0;
+    padding: 7px 12px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 7px;
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.store-section-master-create-form > button,
+.store-section-master-actions > button:first-child {
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.store-section-master-page button.danger {
+    border-color: color-mix(in srgb, var(--app-danger) 70%, var(--app-border));
+    color: var(--app-danger);
+}
+
+.store-section-master-page button:disabled {
+    opacity: .42;
+    cursor: not-allowed;
+}
+
+.store-section-master-list-section {
+    overflow: hidden;
+}
+
+.store-section-master-list-section > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 15px 16px;
+    border-bottom: 1px solid var(--app-border);
+}
+
+.store-section-master-list-section > header > span {
+    flex: 0 0 auto;
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.store-section-master-list {
+    display: grid;
+}
+
+.store-section-master-row {
+    display: grid;
+    grid-template-columns: 72px 42px minmax(190px, 1.2fr) minmax(130px, .55fr) minmax(190px, .8fr) 86px minmax(150px, auto);
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--app-border);
+    background: transparent;
+}
+
+.store-section-master-row:last-child {
+    border-bottom: 0;
+}
+
+.store-section-master-row:hover {
+    background: color-mix(in srgb, var(--app-surface-soft) 66%, transparent);
+}
+
+.store-section-master-row.is-archived {
+    background: color-mix(in srgb, var(--app-bg-soft) 72%, transparent);
+    opacity: .72;
+}
+
+.store-section-master-order {
+    display: grid;
+    grid-template-columns: 24px 20px 24px;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+.store-section-master-order button {
+    width: 24px;
+    min-height: 28px;
+    padding: 0;
+}
+
+.store-section-master-order span {
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.store-section-master-icon {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 42%, var(--app-border));
+    border-radius: 9px;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    font-size: 20px;
+    line-height: 1;
+}
+
+.store-section-master-identity {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 4px 8px;
+}
+
+.store-section-master-identity label {
+    grid-column: 1 / -1;
+}
+
+.store-section-master-identity code {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--app-muted);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.store-section-master-kind {
+    color: var(--app-primary-hover);
+    font-size: 9px;
+    font-weight: 750;
+}
+
+.store-section-master-usage {
+    display: grid;
+    gap: 5px;
+    color: var(--app-muted);
+    font-size: 10px;
+}
+
+.store-section-master-usage strong {
+    color: var(--app-text-strong);
+}
+
+.store-section-master-state > span {
+    display: inline-flex;
+    min-height: 24px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 850;
+}
+
+.store-section-master-state > .is-active {
+    border-color: color-mix(in srgb, var(--app-primary) 60%, var(--app-border));
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.store-section-master-state > .is-archived {
+    color: var(--app-muted);
+}
+
+.store-section-master-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(68px, 1fr));
+    gap: 6px;
+}
+
+@media (max-width: 1180px) {
+    .store-section-master-create {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .store-section-master-row {
+        grid-template-columns: 72px 42px minmax(200px, 1fr) minmax(140px, .7fr);
+    }
+
+    .store-section-master-usage {
+        grid-column: 3 / 4;
+    }
+
+    .store-section-master-state {
+        grid-column: 4 / 5;
+    }
+
+    .store-section-master-actions {
+        grid-column: 3 / 5;
+    }
+}
+
+@media (max-width: 759px) {
+    .store-section-master-stats,
+    .store-section-master-create-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .store-section-master-create-form > button {
+        grid-column: 1 / -1;
+    }
+
+    .store-section-master-row {
+        grid-template-columns: 64px 42px minmax(0, 1fr);
+        align-items: start;
+    }
+
+    .store-section-master-identity {
+        grid-column: 3 / 4;
+    }
+
+    .store-section-master-icon-field,
+    .store-section-master-usage,
+    .store-section-master-state,
+    .store-section-master-actions {
+        grid-column: 2 / 4;
+    }
+}
+
+@media (max-width: 480px) {
+    .store-section-master-stats,
+    .store-section-master-create-form {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .store-section-master-list-section > header {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }

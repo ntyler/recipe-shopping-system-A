@@ -1,0 +1,204 @@
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = master_data.title %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "settings" %}
+{% set app_search_id = "storeSectionsGlobalSearch" %}
+{% set app_content_class = "master-data-app-content" %}
+{% set icon_glyphs = {
+    "leaf": "◒",
+    "fish": "◇",
+    "dairy": "▣",
+    "snowflake": "✣",
+    "package": "⬡",
+    "wheat": "⚘",
+    "can": "▥",
+    "sauce": "◫",
+    "cookie": "◉",
+    "cup": "◡",
+    "jar": "▤",
+    "oil": "♙",
+    "bread": "▰",
+    "sandwich": "▱",
+    "home": "⌂",
+    "heart": "♡",
+    "paw": "♧",
+    "basket": "⌑"
+} %}
+
+{% block app_content %}
+    <section class="master-data-page store-section-master-page" aria-labelledby="storeSectionsTitle">
+        <header class="master-data-header">
+            <div>
+                <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
+                <h1 id="storeSectionsTitle">Store Sections</h1>
+                <p>Manage the names, icons, availability, and shopping order used by this workspace.</p>
+            </div>
+            <nav class="master-data-tabs" aria-label="Master data">
+                <a href="{{ master_data.ingredient_url }}">Ingredients</a>
+                <a href="{{ master_data.equipment_url }}">Equipment</a>
+                <a href="{{ master_data.store_section_url }}" class="active" aria-current="page">
+                    Store Sections
+                </a>
+            </nav>
+        </header>
+
+        {% if master_data.messages %}
+            <div class="master-data-messages" aria-live="polite">
+                {% for message in master_data.messages %}
+                    <div class="master-data-message {{ message.category }}">{{ message.text }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="store-section-master-stats" aria-label="Store Section summary">
+            <article>
+                <span>Active sections</span>
+                <strong>{{ master_data.active_count }}</strong>
+            </article>
+            <article>
+                <span>Archived sections</span>
+                <strong>{{ master_data.archived_count }}</strong>
+            </article>
+            <article>
+                <span>Master ingredients</span>
+                <strong>{{ master_data.ingredient_count }}</strong>
+            </article>
+            <article>
+                <span>Recipe references</span>
+                <strong>{{ master_data.recipe_reference_count }}</strong>
+            </article>
+        </div>
+
+        <section class="store-section-master-create" aria-labelledby="addStoreSectionTitle">
+            <div>
+                <span>Workspace setup</span>
+                <h2 id="addStoreSectionTitle">Add a Store Section</h2>
+                <p>New sections are added to the end of the current store order.</p>
+            </div>
+            <form method="POST"
+                  action="{{ master_data.create_url }}"
+                  class="store-section-master-create-form">
+                <label>
+                    <span>Name</span>
+                    <input type="text"
+                           name="display_name"
+                           maxlength="80"
+                           placeholder="For example, International Foods"
+                           required>
+                </label>
+                <label>
+                    <span>Icon</span>
+                    <select name="icon">
+                        {% for icon in master_data.icon_options %}
+                            <option value="{{ icon }}" {% if icon == "basket" %}selected{% endif %}>
+                                {{ icon|replace("_", " ")|title }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button type="submit">Add Store Section</button>
+            </form>
+        </section>
+
+        <section class="store-section-master-list-section" aria-labelledby="storeSectionOrderTitle">
+            <header>
+                <div>
+                    <span>Shopping order</span>
+                    <h2 id="storeSectionOrderTitle">Store Section order</h2>
+                    <p>Move sections to match the order you normally walk through the store.</p>
+                </div>
+                <span>{{ master_data.sections|length }} total</span>
+            </header>
+
+            <div class="store-section-master-list">
+                {% for section in master_data.sections %}
+                    {% set usage_total = section.ingredient_count + section.recipe_reference_count %}
+                    <form method="POST"
+                          action="{{ url_for('main_bp.update_master_data_store_section_route', section_id=section.id) }}"
+                          class="store-section-master-row{% if not section.is_active %} is-archived{% endif %}">
+                        <div class="store-section-master-order">
+                            <button type="submit"
+                                    name="action"
+                                    value="move_up"
+                                    title="Move {{ section.display_name }} up"
+                                    aria-label="Move {{ section.display_name }} up"
+                                    {% if loop.first %}disabled{% endif %}>↑</button>
+                            <span>{{ loop.index }}</span>
+                            <button type="submit"
+                                    name="action"
+                                    value="move_down"
+                                    title="Move {{ section.display_name }} down"
+                                    aria-label="Move {{ section.display_name }} down"
+                                    {% if loop.last %}disabled{% endif %}>↓</button>
+                        </div>
+
+                        <span class="store-section-master-icon is-{{ section.icon }}"
+                              aria-hidden="true">{{ icon_glyphs.get(section.icon, icon_glyphs["basket"]) }}</span>
+
+                        <div class="store-section-master-identity">
+                            <label>
+                                <span>Display name</span>
+                                <input type="text"
+                                       name="display_name"
+                                       value="{{ section.display_name }}"
+                                       maxlength="80"
+                                       required>
+                            </label>
+                            <code>{{ section.section_key }}</code>
+                            <span class="store-section-master-kind">
+                                {% if section.is_builtin %}Built in{% else %}Custom{% endif %}
+                            </span>
+                        </div>
+
+                        <label class="store-section-master-icon-field">
+                            <span>Icon</span>
+                            <select name="icon" aria-label="Icon for {{ section.display_name }}">
+                                {% for icon in master_data.icon_options %}
+                                    <option value="{{ icon }}" {% if icon == section.icon %}selected{% endif %}>
+                                        {{ icon|replace("_", " ")|title }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </label>
+
+                        <div class="store-section-master-usage">
+                            <span>
+                                <strong>{{ section.ingredient_count }}</strong>
+                                master ingredient{% if section.ingredient_count != 1 %}s{% endif %}
+                            </span>
+                            <span>
+                                <strong>{{ section.recipe_reference_count }}</strong>
+                                recipe reference{% if section.recipe_reference_count != 1 %}s{% endif %}
+                            </span>
+                        </div>
+
+                        <div class="store-section-master-state">
+                            <span class="{% if section.is_active %}is-active{% else %}is-archived{% endif %}">
+                                {% if section.is_active %}Active{% else %}Archived{% endif %}
+                            </span>
+                        </div>
+
+                        <div class="store-section-master-actions">
+                            <button type="submit" name="action" value="save">Save</button>
+                            {% if section.is_active %}
+                                <button type="submit"
+                                        name="action"
+                                        value="archive"
+                                        class="danger"
+                                        {% if usage_total %}disabled
+                                            title="Reassign the ingredients using this section before archiving it."
+                                        {% endif %}>
+                                    Archive
+                                </button>
+                            {% else %}
+                                <button type="submit" name="action" value="restore">Restore</button>
+                            {% endif %}
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="master-data-empty-state">No Store Sections are configured.</div>
+                {% endfor %}
+            </div>
+        </section>
+    </section>
+{% endblock %}

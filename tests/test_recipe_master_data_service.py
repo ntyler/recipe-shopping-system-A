@@ -72,6 +72,113 @@ def test_sync_recipe_master_records_keeps_same_name_separate_per_user(monkeypatc
     assert user_b_rows[0]["quantity"] == "2"
 
 
+def test_store_section_definitions_are_workspace_scoped_and_manageable(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+
+    user_a_defaults = master_data.ingredient_store_section_details(
+        "user-a",
+        include_inactive=True,
+        create=True,
+    )
+    user_b_defaults = master_data.ingredient_store_section_details(
+        "user-b",
+        include_inactive=True,
+        create=True,
+    )
+    assert [section["section_key"] for section in user_a_defaults] == [
+        section["section_key"] for section in user_b_defaults
+    ]
+
+    created = master_data.create_ingredient_store_section(
+        "International Foods",
+        "basket",
+        user_id="user-a",
+    )
+    assert created["ok"] is True
+    assert created["section_key"] == "INTERNATIONAL FOODS"
+    assert "INTERNATIONAL FOODS" in master_data.ingredient_store_section_options("user-a")
+    assert "INTERNATIONAL FOODS" not in master_data.ingredient_store_section_options("user-b")
+    foreign_update = master_data.update_ingredient_store_section_definition(
+        created["id"],
+        action="save",
+        display_name="Not Mine",
+        icon="basket",
+        user_id="user-b",
+    )
+    assert foreign_update["ok"] is False
+    assert foreign_update["status"] == 404
+
+    updated = master_data.update_ingredient_store_section_definition(
+        created["id"],
+        action="save",
+        display_name="Global Foods",
+        icon="heart",
+        user_id="user-a",
+    )
+    assert updated["ok"] is True
+    custom = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+        )
+        if section["id"] == created["id"]
+    )
+    assert custom["section_key"] == "INTERNATIONAL FOODS"
+    assert custom["display_name"] == "Global Foods"
+    assert custom["icon"] == "heart"
+
+    moved = master_data.update_ingredient_store_section_definition(
+        created["id"],
+        action="move_up",
+        user_id="user-a",
+    )
+    assert moved["ok"] is True
+    assert moved["changed"] is True
+
+    archived = master_data.update_ingredient_store_section_definition(
+        created["id"],
+        action="archive",
+        user_id="user-a",
+    )
+    assert archived["ok"] is True
+    assert "INTERNATIONAL FOODS" not in master_data.ingredient_store_section_options("user-a")
+    restored = master_data.update_ingredient_store_section_definition(
+        created["id"],
+        action="restore",
+        user_id="user-a",
+    )
+    assert restored["ok"] is True
+    assert "INTERNATIONAL FOODS" in master_data.ingredient_store_section_options("user-a")
+
+
+def test_store_section_definition_cannot_be_archived_while_in_use(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/produce-usage",
+        recipe_data={"ingredients": [{"ingredient": "Tomato", "store_section": "Produce"}]},
+        user_id="user-a",
+    )
+    produce = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+        )
+        if section["section_key"] == "PRODUCE"
+    )
+
+    result = master_data.update_ingredient_store_section_definition(
+        produce["id"],
+        action="archive",
+        user_id="user-a",
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == 409
+    assert "Reassign" in result["error"]
+
+
 def test_sync_recipe_master_records_replaces_only_current_users_recipe_links(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     recipe_url = "https://example.com/same-recipe-url"

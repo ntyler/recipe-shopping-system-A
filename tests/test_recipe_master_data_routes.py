@@ -426,7 +426,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="rowgroup" colspan="6">COOKWARE</th>' in equipment_html
     assert '<th scope="rowgroup" colspan="6">PREP TOOLS</th>' in equipment_html
     assert "Generate Missing Images" in equipment_html
-    assert "Store Section" not in equipment_html
+    assert "Store Sections" in equipment_html
     assert 'name="store_section"' not in equipment_html
     assert 'name="equipment_section"' in equipment_html
     assert "All types" in equipment_html
@@ -1801,5 +1801,68 @@ def test_account_menu_links_to_master_data_pages(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert "Ingredient Master Data" in html
     assert "Equipment Master Data" in html
+    assert "Store Sections" in html
     assert "/admin/master-data/ingredients" in html
     assert "/admin/master-data/equipment" in html
+    assert "/admin/master-data/store-sections" in html
+
+
+def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.get("/admin/master-data/store-sections")
+        html = response.get_data(as_text=True)
+        assert response.status_code == 200
+        assert "Store Sections" in html
+        assert "Add Store Section" in html
+        assert "Produce" in html
+        assert "/admin/master-data/ingredients" in html
+        assert "/admin/master-data/equipment" in html
+
+        created = client.post(
+            "/admin/master-data/store-sections",
+            data={"display_name": "International Foods", "icon": "basket"},
+            follow_redirects=True,
+        )
+        assert created.status_code == 200
+        assert "Store Section created: International Foods." in created.get_data(as_text=True)
+        section = next(
+            item
+            for item in master_data.ingredient_store_section_details(
+                "user-a",
+                include_inactive=True,
+            )
+            if item["section_key"] == "INTERNATIONAL FOODS"
+        )
+
+        updated = client.post(
+            f"/admin/master-data/store-sections/{section['id']}",
+            data={
+                "action": "save",
+                "display_name": "Global Foods",
+                "icon": "heart",
+            },
+            follow_redirects=True,
+        )
+        assert updated.status_code == 200
+        assert "Store Section updated: Global Foods." in updated.get_data(as_text=True)
+
+        sign_in(client, "user-b")
+        other_workspace = client.get("/admin/master-data/store-sections")
+        assert other_workspace.status_code == 200
+        assert "Global Foods" not in other_workspace.get_data(as_text=True)
+
+
+def test_recipe_editor_store_section_menu_links_to_management_page():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
+    page = Path("PushShoppingList/templates/store_sections.html").read_text(encoding="utf-8")
+
+    assert "Manage Store Sections" in script
+    assert 'href="/admin/master-data/store-sections"' in script
+    assert "Store Sections" in template
+    assert "store_section_url" in template
+    assert "Store Sections" in page
+    assert "Add Store Section" in page

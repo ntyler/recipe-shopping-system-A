@@ -90,6 +90,12 @@ def test_recipe_editor_load_uses_user_master_store_section(monkeypatch, tmp_path
     assert ingredient["ingredient_image_url"] == "/static/generated/master/chicken-broth.png"
     assert ingredient["ingredient_id"]
     assert loaded["store_sections"] == master_data.ingredient_store_section_options()
+    assert [
+        section["section_key"]
+        for section in loaded["store_section_details"]
+    ] == loaded["store_sections"]
+    assert loaded["store_section_details"][0]["display_name"] == "Produce"
+    assert loaded["store_section_details"][0]["icon"] == "leaf"
     assert (
         '[IngredientMaster] action=store_section_loaded_from_master '
         'recipe_id=https://example.com/chicken-broth-soup '

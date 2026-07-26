@@ -98,6 +98,7 @@ from PushShoppingList.services.recipe_master_data_service import INGREDIENT_STOR
 from PushShoppingList.services.recipe_master_data_service import ingredient_master_records_for_items
 from PushShoppingList.services.recipe_master_data_service import ingredient_store_section_sort_key
 from PushShoppingList.services.recipe_master_data_service import ingredient_store_section_options
+from PushShoppingList.services.recipe_master_data_service import ingredient_store_section_details
 from PushShoppingList.services.recipe_master_data_service import normalized_master_name
 from PushShoppingList.services.recipe_master_data_service import recipe_master_rows
 from PushShoppingList.services.recipe_master_data_service import remove_recipe_master_records_for_recipe
@@ -4799,6 +4800,7 @@ def load_editable_recipe(url):
         },
         "food_rules": load_food_rules(),
         "store_sections": ingredient_store_section_options(),
+        "store_section_details": ingredient_store_section_details(),
     }
 
 
