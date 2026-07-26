@@ -8,7 +8,9 @@
 {% macro render_master_data_row(row, master_data) -%}
     {% set reference_row_id = 'masterDataReferences-' ~ master_data.record_type ~ '-' ~ row.id %}
     {% set ingredient_form_id = 'masterDataIngredientForm-' ~ row.id %}
-    <tr class="master-data-record-row" data-master-record-id="{{ row.id }}">
+    <tr class="master-data-record-row{% if not row.usage_count %} master-data-record-row-unused{% endif %}"
+        data-master-record-id="{{ row.id }}"
+        {% if not row.usage_count %}data-master-record-unused="true"{% endif %}>
         <td class="master-data-item-cell">
             <div class="master-data-item">
                 {% if row.image_url %}
@@ -112,7 +114,7 @@
                 <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
             </div>
         </td>
-        <td>
+        <td class="master-data-usage-cell">
             {% if row.usage_count %}
                 <button type="button"
                         class="master-data-usage-button"
@@ -125,7 +127,12 @@
                     <span aria-hidden="true">{{ row.usage_count }}</span>
                 </button>
             {% else %}
-                <span class="master-data-usage-empty">0</span>
+                <span class="master-data-usage-empty"
+                      aria-label="{{ row.name }} is unused; no recipes currently reference it"
+                      title="No recipes currently reference {{ row.name }}">
+                    <strong>Unused</strong>
+                    <small>0 uses</small>
+                </span>
             {% endif %}
         </td>
         <td>{{ row.updated_at }}</td>

@@ -1696,6 +1696,10 @@ def test_master_data_reference_expander_is_wired():
     assert "master_data_record_references_route" in template
     assert "aria-expanded=\"false\"" in template
     assert "aria-label=\"Show {{ row.usage_count }} recipe" in template
+    assert "master-data-record-row-unused" in template
+    assert 'data-master-record-unused="true"' in template
+    assert "<strong>Unused</strong>" in template
+    assert "<small>0 uses</small>" in template
     assert "View recipes" not in template
     assert "master-data-usage-chevron" not in template
     assert "data-reference-url" in template
@@ -1705,6 +1709,9 @@ def test_master_data_reference_expander_is_wired():
     assert "data-master-thumbnail-size-increase" in template
     assert "data-master-thumbnail-size-value>64px" in template
     assert "data-full-src=\"{{ row.image_url }}\"" in template
+    assert ".master-data-record-row-unused td" in css
+    assert ".master-data-record-row-unused td:first-child" in css
+    assert ".master-data-usage-empty strong" in css
 
     assert "function toggleReferenceRow" in script
     assert "function renderReferences" in script
