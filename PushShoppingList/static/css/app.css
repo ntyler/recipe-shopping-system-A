@@ -9485,6 +9485,14 @@ body {
             min-width: 0;
         }
 
+        .recipe-image-lightbox-media {
+            position: relative;
+            display: grid;
+            max-width: 100%;
+            max-height: 100%;
+            place-items: center;
+        }
+
         .recipe-image-lightbox img {
             display: block;
             max-width: 100%;
@@ -9496,6 +9504,78 @@ body {
             border-radius: 10px;
             background: #050808;
             box-shadow: 0 18px 70px rgba(0,0,0,0.72);
+        }
+
+        .recipe-image-lightbox-actions {
+            position: absolute;
+            bottom: 18px;
+            left: 50%;
+            z-index: 2;
+            display: flex;
+            max-width: calc(100% - 24px);
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: rgba(10,14,15,0.9);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.42);
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, 8px);
+            transition: opacity 140ms ease, transform 140ms ease;
+        }
+
+        .recipe-image-lightbox-actions[hidden] {
+            display: none;
+        }
+
+        .recipe-image-lightbox.has-image-actions .recipe-image-lightbox-media:hover .recipe-image-lightbox-actions,
+        .recipe-image-lightbox.has-image-actions .recipe-image-lightbox-content:focus-within .recipe-image-lightbox-actions {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, 0);
+        }
+
+        .recipe-image-lightbox-actions button {
+            display: inline-flex;
+            width: auto;
+            min-width: 104px;
+            min-height: 38px;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 8px 12px;
+            border: 1px solid #4f8f77;
+            border-radius: 7px;
+            background: rgba(20,28,28,0.96);
+            color: #f7fbf9;
+            font-size: 12px;
+            font-weight: 750;
+            white-space: nowrap;
+        }
+
+        .recipe-image-lightbox-actions button:hover,
+        .recipe-image-lightbox-actions button:focus-visible {
+            border-color: #55d89b;
+            background: #123f2d;
+            outline: none;
+        }
+
+        .recipe-image-lightbox-actions button.is-remove {
+            border-color: #b95b65;
+        }
+
+        .recipe-image-lightbox-actions button.is-remove:hover,
+        .recipe-image-lightbox-actions button.is-remove:focus-visible {
+            border-color: #fb7185;
+            background: #4a1f27;
+        }
+
+        .recipe-image-lightbox-actions button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .recipe-image-lightbox-close {
@@ -9511,6 +9591,23 @@ body {
             color: #fff;
             font-size: 14px;
             font-weight: 800;
+        }
+
+        @media (hover: none), (max-width: 760px) {
+            .recipe-image-lightbox.has-image-actions .recipe-image-lightbox-actions {
+                opacity: 1;
+                pointer-events: auto;
+                transform: translate(-50%, 0);
+            }
+
+            .recipe-image-lightbox-actions {
+                bottom: 10px;
+                flex-wrap: wrap;
+            }
+
+            .recipe-image-lightbox-actions button {
+                min-width: 92px;
+            }
         }
 
         .recipe-url-summary-cover {

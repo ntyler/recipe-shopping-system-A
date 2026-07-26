@@ -51708,7 +51708,25 @@ function ensureRecipeImageLightbox() {
             <button type="button"
                     class="recipe-image-lightbox-close"
                     onclick="closeRecipeImageLightbox()">Close</button>
-            <img id="recipeImageLightboxImage" alt="">
+            <div class="recipe-image-lightbox-media">
+                <img id="recipeImageLightboxImage" alt="">
+                <div class="recipe-image-lightbox-actions"
+                     data-recipe-image-lightbox-actions
+                     role="toolbar"
+                     aria-label="Ingredient image options"
+                     hidden>
+                    <button type="button"
+                            data-recipe-image-lightbox-action="generate"
+                            onclick="return runRecipeImageLightboxAction(this)">Generate Image</button>
+                    <button type="button"
+                            class="is-remove"
+                            data-recipe-image-lightbox-action="remove"
+                            onclick="return runRecipeImageLightboxAction(this)">Remove</button>
+                    <button type="button"
+                            data-recipe-image-lightbox-action="change"
+                            onclick="return runRecipeImageLightboxAction(this)">Change Image</button>
+                </div>
+            </div>
         </div>
     `;
     lightbox.addEventListener("click", event => {
@@ -51722,6 +51740,53 @@ function ensureRecipeImageLightbox() {
     document.body.appendChild(lightbox);
 
     return lightbox;
+}
+
+function recipeImageLightboxIngredientActionTargets(image) {
+    const panel = image && image.matches(".recipe-ingredient-image")
+        ? image.closest("[data-ingredient-image-panel]")
+        : null;
+    if (!panel) {
+        return {};
+    }
+    return {
+        generate: panel.querySelector("[data-ingredient-image-generate]"),
+        change: panel.querySelector("[data-recipe-image-upload-button]"),
+        remove: panel.querySelector("[data-ingredient-image-remove]"),
+    };
+}
+
+function syncRecipeImageLightboxActions(lightbox, image) {
+    const toolbar = lightbox
+        ? lightbox.querySelector("[data-recipe-image-lightbox-actions]")
+        : null;
+    if (!lightbox || !toolbar) {
+        return;
+    }
+
+    const targets = recipeImageLightboxIngredientActionTargets(image);
+    const hasIngredientActions = Object.values(targets).some(Boolean);
+    lightbox.recipeImageLightboxActionTargets = hasIngredientActions ? targets : null;
+    lightbox.classList.toggle("has-image-actions", hasIngredientActions);
+    toolbar.hidden = !hasIngredientActions;
+
+    toolbar.querySelectorAll("[data-recipe-image-lightbox-action]").forEach(button => {
+        const target = targets[button.dataset.recipeImageLightboxAction];
+        button.disabled = !target || target.disabled || target.hidden;
+    });
+}
+
+function runRecipeImageLightboxAction(button) {
+    const lightbox = button ? button.closest(".recipe-image-lightbox") : null;
+    const action = button ? button.dataset.recipeImageLightboxAction : "";
+    const target = lightbox?.recipeImageLightboxActionTargets?.[action];
+    if (!lightbox || !target || target.disabled || target.hidden) {
+        return false;
+    }
+
+    closeRecipeImageLightbox({ restoreFocus: false });
+    target.click();
+    return false;
 }
 
 function openRecipeImageLightbox(image) {
@@ -51745,6 +51810,7 @@ function openRecipeImageLightbox(image) {
     lightbox.recipeImageLightboxTrigger = image;
     lightboxImage.src = image.dataset.fullSrc || image.currentSrc || image.src;
     lightboxImage.alt = image.alt || "Recipe image";
+    syncRecipeImageLightboxActions(lightbox, image);
     lightbox.classList.add("open");
     lightbox.setAttribute("aria-hidden", "false");
     document.body.classList.add("image-lightbox-open");
@@ -51755,7 +51821,7 @@ function openRecipeImageLightbox(image) {
     }
 }
 
-function closeRecipeImageLightbox() {
+function closeRecipeImageLightbox(options = {}) {
     const lightbox = document.getElementById("recipeImageLightbox");
     const lightboxImage = document.getElementById("recipeImageLightboxImage");
 
@@ -51765,9 +51831,15 @@ function closeRecipeImageLightbox() {
 
     const trigger = lightbox.recipeImageLightboxTrigger;
     delete lightbox.recipeImageLightboxTrigger;
+    delete lightbox.recipeImageLightboxActionTargets;
     lightbox.classList.remove("open");
+    lightbox.classList.remove("has-image-actions");
     lightbox.setAttribute("aria-hidden", "true");
     document.body.classList.remove("image-lightbox-open");
+    const toolbar = lightbox.querySelector("[data-recipe-image-lightbox-actions]");
+    if (toolbar) {
+        toolbar.hidden = true;
+    }
 
     if (lightboxImage) {
         lightboxImage.removeAttribute("src");
@@ -51776,7 +51848,7 @@ function closeRecipeImageLightbox() {
     if (lightbox.parentNode !== document.body) {
         document.body.appendChild(lightbox);
     }
-    if (trigger && trigger.isConnected) {
+    if (options.restoreFocus !== false && trigger && trigger.isConnected) {
         trigger.focus({ preventScroll: true });
     }
 }

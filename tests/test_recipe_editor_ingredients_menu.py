@@ -1407,6 +1407,22 @@ def test_recipe_editor_ingredient_image_lightbox_stays_above_the_modal_and_resto
     assert "document.body.appendChild(lightbox);" in lightbox
     assert "trigger.focus({ preventScroll: true });" in lightbox
     assert "event.stopImmediatePropagation();" in lightbox
+    assert 'data-recipe-image-lightbox-action="generate"' in lightbox
+    assert 'data-recipe-image-lightbox-action="remove"' in lightbox
+    assert 'data-recipe-image-lightbox-action="change"' in lightbox
+    assert "function recipeImageLightboxIngredientActionTargets" in lightbox
+    assert 'image.closest("[data-ingredient-image-panel]")' in lightbox
+    assert "function syncRecipeImageLightboxActions" in lightbox
+    assert "syncRecipeImageLightboxActions(lightbox, image);" in lightbox
+    assert "function runRecipeImageLightboxAction" in lightbox
+    assert "closeRecipeImageLightbox({ restoreFocus: false });" in lightbox
+    assert "target.click();" in lightbox
+
+    assert ".recipe-image-lightbox-actions {" in css
+    assert ".recipe-image-lightbox-media:hover .recipe-image-lightbox-actions" in css
+    assert ".recipe-image-lightbox-content:focus-within .recipe-image-lightbox-actions" in css
+    assert "@media (hover: none), (max-width: 760px)" in css
+    assert ".recipe-image-lightbox-actions button.is-remove" in css
 
     modal_lightbox = css[css.index(
         "dialog.recipe-edit-ingredient-edit-panel > .recipe-image-lightbox"
