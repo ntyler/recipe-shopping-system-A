@@ -336,7 +336,7 @@ data-app-initial-page="{{ initial_app_page|default('') }}"
                        data-app-page-target="mealPlannerPage"
                        data-app-nav-target="mealPlannerPage">View full meal plan <span aria-hidden="true">&rarr;</span></a>
                 {% else %}
-                    <div class="app-home-empty-state">
+                    <div class="app-home-empty-state app-home-empty-state-centered">
                         <strong>No meals planned for this week.</strong>
                         <span>Open Meal Planner to add recipes to breakfast, lunch, dinner, or snacks.</span>
                         <button type="button" onclick="return openMealPlannerPageAndDialog()">Add a meal</button>
@@ -394,7 +394,7 @@ data-app-initial-page="{{ initial_app_page|default('') }}"
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <div class="app-home-empty-state"><strong>No recent import jobs.</strong><span>Recipe and menu imports will appear here when they run.</span><a href="#importPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="importPage">Start an import</a></div>
+                    <div class="app-home-empty-state app-home-empty-state-centered"><strong>No recent import jobs.</strong><span>Recipe and menu imports will appear here when they run.</span><a href="#importPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="importPage" data-app-nav-target="importPage">Start an import</a></div>
                 {% endif %}
             </section>
         </div>

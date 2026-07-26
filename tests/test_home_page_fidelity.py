@@ -500,6 +500,9 @@ def test_home_dashboard_uses_common_grid_and_stronger_sidebar_collapse():
     template = read_text("PushShoppingList/templates/index.html")
     css = read_text("PushShoppingList/static/css/app.css")
 
+    assert template.count("app-home-empty-state app-home-empty-state-centered") == 2
+    assert ".app-home-empty-state.app-home-empty-state-centered {\n    align-content: center;\n    justify-items: center;\n    text-align: center;" in css
+    assert ".app-home-empty-state.app-home-empty-state-centered > :is(a, button) {\n    display: inline-flex;\n    align-items: center;\n    justify-content: center;\n    justify-self: center;" in css
     assert "--app-dashboard-gap: clamp(12px, 1.2vw, 20px);" in css
     assert "--app-dashboard-card-padding: clamp(14px, 1vw, 18px);" in css
     assert ".app-home-dashboard {\n    display: grid;" in css

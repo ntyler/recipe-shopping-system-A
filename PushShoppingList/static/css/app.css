@@ -32350,6 +32350,19 @@ img[data-deferred-src] {
     align-content: start;
 }
 
+.app-home-empty-state.app-home-empty-state-centered {
+    align-content: center;
+    justify-items: center;
+    text-align: center;
+}
+
+.app-home-empty-state.app-home-empty-state-centered > :is(a, button) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+}
+
 .app-home-mini-grid,
 .settings-summary-grid {
     display: grid;
