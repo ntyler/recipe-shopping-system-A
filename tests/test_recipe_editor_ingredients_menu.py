@@ -675,6 +675,7 @@ def test_recipe_editor_requested_headers_filter_and_sort_as_combined_view_only_m
     assert "filterKeys: new Map()" in script
     assert 'sortColumn: ""' in script
     assert 'sortMode: "manual"' in view
+    assert "groupByStoreSection: false" in script
 
     assert "function ensureRecipeIngredientColumnViewTrigger(header)" in view
     assert 'trigger.setAttribute("aria-haspopup", "dialog");' in view
@@ -703,6 +704,32 @@ def test_recipe_editor_requested_headers_filter_and_sort_as_combined_view_only_m
     assert ".recipe-edit-ingredient-row:is(" in css
     assert ".is-ingredient-column-filtered" in css
     assert '[data-recipe-ingredient-column-view-active="true"]' in css
+
+
+def test_recipe_editor_store_section_menu_can_group_rows_without_reordering_row_nodes():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    view_start = script.index("function recipeIngredientColumnViewDefinition")
+    view_end = script.index("function clearRecipeEditIngredientColumnDropTargets", view_start)
+    view = script[view_start:view_end]
+
+    assert "function clearRecipeIngredientColumnViewGroupHeaders(list)" in view
+    assert "function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows)" in view
+    assert 'recipeIngredientColumnViewEntry(left.row, "store")' in view
+    assert "return left.index - right.index;" in view
+    assert 'header.dataset.recipeIngredientColumnGroupHeader = section.key || "__unassigned__";' in view
+    assert 'list.insertAdjacentElement("beforeend", header);' in view
+    assert "list.appendChild(entry.row)" not in view
+    assert "Group rows by Store Section" in view
+    assert "Keeps manual ingredient order within each section." in view
+    assert "[data-recipe-ingredient-column-view-group-store]" in view
+    assert "recipeEditIngredientColumnView.groupByStoreSection = false;" in view
+    assert "renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows);" in view
+
+    assert ".recipe-edit-ingredient-column-view-group-note" in css
+    assert ".recipe-edit-ingredient-column-group-header" in css
+    assert "data-recipe-ingredient-column-view-menu=\"store\"" in css
 
 
 def test_recipe_editor_ingredient_modal_requires_pencil_and_preserves_dirty_close_state():

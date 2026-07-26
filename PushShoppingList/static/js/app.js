@@ -22628,6 +22628,7 @@ let recipeEditIngredientColumnView = {
     filterKeys: new Map(),
     sortColumn: "",
     sortMode: "manual",
+    groupByStoreSection: false,
 };
 let recipeEditIngredientMasterSearchTimer = null;
 let recipeEditIngredientMasterRequestId = 0;
@@ -26566,11 +26567,16 @@ function recipeIngredientColumnViewIsActive(columnKey = "") {
     if (columnKey) {
         return recipeEditIngredientColumnView.filterKeys.has(columnKey)
             || (
+                columnKey === "store"
+                && recipeEditIngredientColumnView.groupByStoreSection
+            )
+            || (
                 recipeEditIngredientColumnView.sortColumn === columnKey
                 && recipeEditIngredientColumnView.sortMode !== "manual"
             );
     }
     return recipeEditIngredientColumnView.filterKeys.size > 0
+        || recipeEditIngredientColumnView.groupByStoreSection
         || (
             Boolean(recipeEditIngredientColumnView.sortColumn)
             && recipeEditIngredientColumnView.sortMode !== "manual"
@@ -26578,6 +26584,9 @@ function recipeIngredientColumnViewIsActive(columnKey = "") {
 }
 
 function recipeIngredientColumnViewSortLabel() {
+    if (recipeEditIngredientColumnView.groupByStoreSection) {
+        return "Grouped by Store Section";
+    }
     const columnKey = recipeEditIngredientColumnView.sortColumn;
     const definition = recipeIngredientColumnViewDefinition(columnKey);
     if (!definition || recipeEditIngredientColumnView.sortMode === "manual") {
@@ -26618,6 +26627,26 @@ function ensureRecipeIngredientColumnViewEmptyState() {
 }
 
 function recipeIngredientColumnViewCompare(left, right, storeOrder) {
+    if (recipeEditIngredientColumnView.groupByStoreSection) {
+        const leftEntry = recipeIngredientColumnViewEntry(left.row, "store");
+        const rightEntry = recipeIngredientColumnViewEntry(right.row, "store");
+        const leftOrder = storeOrder.has(leftEntry.key)
+            ? storeOrder.get(leftEntry.key)
+            : Number.MAX_SAFE_INTEGER;
+        const rightOrder = storeOrder.has(rightEntry.key)
+            ? storeOrder.get(rightEntry.key)
+            : Number.MAX_SAFE_INTEGER;
+        if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+        if (leftEntry.key !== rightEntry.key) {
+            const labelComparison = leftEntry.label.localeCompare(
+                rightEntry.label,
+                undefined,
+                { numeric: true, sensitivity: "base" },
+            );
+            if (labelComparison) return labelComparison;
+        }
+        return left.index - right.index;
+    }
     const columnKey = recipeEditIngredientColumnView.sortColumn;
     const mode = recipeEditIngredientColumnView.sortMode;
     if (!columnKey || mode === "manual") return left.index - right.index;
@@ -26648,6 +26677,55 @@ function recipeIngredientColumnViewCompare(left, right, storeOrder) {
     return comparison || left.index - right.index;
 }
 
+function clearRecipeIngredientColumnViewGroupHeaders(list) {
+    list?.querySelectorAll(":scope > [data-recipe-ingredient-column-group-header]")
+        .forEach(header => header.remove());
+}
+
+function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows) {
+    if (!list || !recipeEditIngredientColumnView.groupByStoreSection) return;
+    const visibleRows = sortedRows.filter(entry => !entry.filtered);
+    const counts = new Map();
+    visibleRows.forEach(entry => {
+        const section = recipeIngredientColumnViewEntry(entry.row, "store");
+        counts.set(section.key, (counts.get(section.key) || 0) + 1);
+    });
+
+    let currentKey = null;
+    let displayOrder = 0;
+    visibleRows.forEach(entry => {
+        const section = recipeIngredientColumnViewEntry(entry.row, "store");
+        if (section.key !== currentKey) {
+            currentKey = section.key;
+            const count = counts.get(section.key) || 0;
+            const header = document.createElement("div");
+            header.className = "recipe-edit-ingredient-column-group-header";
+            header.dataset.recipeIngredientColumnGroupHeader = section.key || "__unassigned__";
+            header.setAttribute("role", "row");
+            header.setAttribute(
+                "aria-label",
+                `${section.label}, ${count} ingredient${count === 1 ? "" : "s"}`,
+            );
+            header.innerHTML = `
+                <div role="cell">
+                    ${recipeIngredientStoreSectionIconHtml(section.value)}
+                    <strong>${escapeHtml(section.label)}</strong>
+                    <span>${count} ingredient${count === 1 ? "" : "s"}</span>
+                </div>
+            `;
+            header.style.order = String(displayOrder);
+            displayOrder += 1;
+            list.insertAdjacentElement("beforeend", header);
+        }
+        entry.row.style.order = String(displayOrder);
+        displayOrder += 1;
+    });
+    sortedRows.filter(entry => entry.filtered).forEach(entry => {
+        entry.row.style.order = String(displayOrder);
+        displayOrder += 1;
+    });
+}
+
 function syncRecipeIngredientColumnViewHeaders() {
     document.querySelectorAll("[data-recipe-ingredient-column-view-trigger]").forEach(trigger => {
         const columnKey = trigger.dataset.recipeIngredientColumnViewTrigger;
@@ -26657,9 +26735,12 @@ function syncRecipeIngredientColumnViewHeaders() {
         const filterCount = filterKeys?.size || 0;
         const sorted = recipeEditIngredientColumnView.sortColumn === columnKey
             && recipeEditIngredientColumnView.sortMode !== "manual";
-        const active = Boolean(filterKeys) || sorted;
+        const grouped = columnKey === "store"
+            && recipeEditIngredientColumnView.groupByStoreSection;
+        const active = Boolean(filterKeys) || sorted || grouped;
         const stateParts = [];
         if (sorted) stateParts.push(`sorted by ${recipeIngredientColumnViewSortLabel()}`);
+        if (grouped) stateParts.push("grouped by Store Section");
         if (filterKeys) {
             stateParts.push(`${filterCount} value${filterCount === 1 ? "" : "s"} selected`);
         }
@@ -26667,7 +26748,9 @@ function syncRecipeIngredientColumnViewHeaders() {
         trigger.dataset.recipeIngredientColumnViewActive = String(active);
         trigger.setAttribute(
             "aria-label",
-            `${definition.label} filter and sort${stateParts.length ? `, ${stateParts.join(", ")}` : ""}`,
+            `${definition.label} filter, sort${columnKey === "store" ? ", and group" : ""}${
+                stateParts.length ? `, ${stateParts.join(", ")}` : ""
+            }`,
         );
         const status = trigger.querySelector("[data-recipe-ingredient-column-view-status]");
         if (status) {
@@ -26697,7 +26780,7 @@ function syncRecipeIngredientColumnViewReorderAvailability(rows) {
         handle.draggable = !active;
         handle.setAttribute("aria-disabled", String(active));
         handle.title = active
-            ? "Clear the ingredient column filters and sorting before reordering ingredients."
+            ? "Clear the ingredient view controls before reordering ingredients."
             : "Drag to reorder";
     });
 }
@@ -26707,6 +26790,7 @@ function applyRecipeIngredientColumnView(options = {}) {
     if (!list) return false;
     const rows = recipeEditIngredientRows();
     const filters = [...recipeEditIngredientColumnView.filterKeys.entries()];
+    clearRecipeIngredientColumnViewGroupHeaders(list);
     const storeOrder = new Map(
         (recipeEditStoreSections || []).map((section, index) => [
             recipeIngredientStoreSectionKey(section),
@@ -26714,22 +26798,31 @@ function applyRecipeIngredientColumnView(options = {}) {
         ]),
     );
     const sortedRows = rows
-        .map((row, index) => ({ index, row }))
+        .map((row, index) => ({
+            index,
+            row,
+            filtered: filters.some(([columnKey, selectedKeys]) => (
+                !selectedKeys.has(recipeIngredientColumnViewEntry(row, columnKey).key)
+            )),
+        }))
         .sort((left, right) => recipeIngredientColumnViewCompare(left, right, storeOrder));
-    sortedRows.forEach((entry, order) => {
-        if (
-            !recipeEditIngredientColumnView.sortColumn
-            || recipeEditIngredientColumnView.sortMode === "manual"
-        ) {
-            entry.row.style.removeProperty("order");
-        } else {
-            entry.row.style.order = String(order);
-        }
-        const filtered = filters.some(([columnKey, selectedKeys]) => (
-            !selectedKeys.has(recipeIngredientColumnViewEntry(entry.row, columnKey).key)
-        ));
-        entry.row.classList.toggle("is-ingredient-column-filtered", filtered);
+    sortedRows.forEach(entry => {
+        entry.row.classList.toggle("is-ingredient-column-filtered", entry.filtered);
     });
+    if (recipeEditIngredientColumnView.groupByStoreSection) {
+        renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows);
+    } else {
+        sortedRows.forEach((entry, order) => {
+            if (
+                !recipeEditIngredientColumnView.sortColumn
+                || recipeEditIngredientColumnView.sortMode === "manual"
+            ) {
+                entry.row.style.removeProperty("order");
+            } else {
+                entry.row.style.order = String(order);
+            }
+        });
+    }
     const visibleCount = rows.filter(row => (
         !row.classList.contains("is-ingredient-column-filtered")
     )).length;
@@ -26752,6 +26845,9 @@ function applyRecipeIngredientColumnView(options = {}) {
 function clearRecipeIngredientColumnView(columnKey = "", options = {}) {
     if (columnKey) {
         recipeEditIngredientColumnView.filterKeys.delete(columnKey);
+        if (columnKey === "store") {
+            recipeEditIngredientColumnView.groupByStoreSection = false;
+        }
         if (recipeEditIngredientColumnView.sortColumn === columnKey) {
             recipeEditIngredientColumnView.sortColumn = "";
             recipeEditIngredientColumnView.sortMode = "manual";
@@ -26761,6 +26857,7 @@ function clearRecipeIngredientColumnView(columnKey = "", options = {}) {
             filterKeys: new Map(),
             sortColumn: "",
             sortMode: "manual",
+            groupByStoreSection: false,
         };
     }
     applyRecipeIngredientColumnView({ announce: options.announce !== false });
@@ -26784,6 +26881,12 @@ function syncRecipeIngredientColumnViewMenuState(menu) {
     menu.querySelectorAll("[data-recipe-ingredient-column-view-sort]").forEach(input => {
         input.checked = input.value === currentSortMode;
     });
+    const groupStore = menu.querySelector(
+        "[data-recipe-ingredient-column-view-group-store]",
+    );
+    if (groupStore) {
+        groupStore.checked = recipeEditIngredientColumnView.groupByStoreSection;
+    }
     menu.querySelectorAll("[data-recipe-ingredient-column-view-filter]").forEach(input => {
         input.checked = filterKeys === null || filterKeys.has(input.value);
     });
@@ -26831,6 +26934,20 @@ function renderRecipeIngredientColumnViewMenu(menu) {
             </div>
             <span data-recipe-ingredient-column-view-summary>${visibleCount} of ${totalCount}</span>
         </div>
+        ${columnKey === "store" ? `
+            <fieldset class="recipe-edit-ingredient-column-view-group is-store-grouping">
+                <legend>Group rows</legend>
+                <label class="recipe-edit-ingredient-column-view-option">
+                    <input type="checkbox"
+                           data-recipe-ingredient-column-view-group-store
+                           ${recipeEditIngredientColumnView.groupByStoreSection ? "checked" : ""}>
+                    <span>Group rows by Store Section</span>
+                </label>
+                <p class="recipe-edit-ingredient-column-view-group-note">
+                    View only. Keeps manual ingredient order within each section.
+                </p>
+            </fieldset>
+        ` : ""}
         <fieldset class="recipe-edit-ingredient-column-view-group">
             <legend>Sort rows</legend>
             ${sortOptions.map(([value, label]) => `
@@ -26884,6 +27001,7 @@ function renderRecipeIngredientColumnViewMenu(menu) {
                     recipeEditIngredientColumnView.sortMode = "manual";
                 }
             } else {
+                recipeEditIngredientColumnView.groupByStoreSection = false;
                 recipeEditIngredientColumnView.sortColumn = columnKey;
                 recipeEditIngredientColumnView.sortMode = mode;
             }
@@ -26891,6 +27009,18 @@ function renderRecipeIngredientColumnViewMenu(menu) {
             syncRecipeIngredientColumnViewMenuState(menu);
         });
     });
+    menu.querySelector("[data-recipe-ingredient-column-view-group-store]")
+        ?.addEventListener("change", event => {
+            recipeEditIngredientColumnView.groupByStoreSection = Boolean(
+                event.currentTarget.checked,
+            );
+            if (recipeEditIngredientColumnView.groupByStoreSection) {
+                recipeEditIngredientColumnView.sortColumn = "";
+                recipeEditIngredientColumnView.sortMode = "manual";
+            }
+            applyRecipeIngredientColumnView({ announce: true });
+            syncRecipeIngredientColumnViewMenuState(menu);
+        });
     menu.querySelectorAll("[data-recipe-ingredient-column-view-filter]").forEach(input => {
         input.addEventListener("change", () => {
             const availableKeys = new Set(filterOptions.map(option => option.key));
@@ -26928,7 +27058,12 @@ function ensureRecipeIngredientColumnViewMenu(header) {
         menu.className = "recipe-edit-row-menu recipe-edit-ingredient-column-view-menu";
         menu.dataset.recipeIngredientColumnViewMenu = columnKey;
         menu.setAttribute("role", "dialog");
-        menu.setAttribute("aria-label", `Filter and sort ingredients by ${definition.label}`);
+        menu.setAttribute(
+            "aria-label",
+            columnKey === "store"
+                ? `Group, filter, and sort ingredients by ${definition.label}`
+                : `Filter and sort ingredients by ${definition.label}`,
+        );
         menu.hidden = true;
         menu.addEventListener("click", event => event.stopPropagation());
         header.appendChild(menu);
@@ -41671,7 +41806,7 @@ function bindRecipeEditDragAndDrop(row) {
         if (handle.getAttribute("aria-disabled") === "true") {
             event.preventDefault();
             setRecipeEditIngredientColumnStatus(
-                "Clear the ingredient column filters and sorting before reordering ingredients.",
+                "Clear the ingredient view controls before reordering ingredients.",
             );
             return;
         }
@@ -42392,7 +42527,7 @@ function moveRecipeEditRow(button, direction) {
     }
     if (row.classList.contains("recipe-edit-ingredient-row") && recipeIngredientColumnViewIsActive()) {
         setRecipeEditIngredientColumnStatus(
-            "Clear the ingredient column filters and sorting before reordering ingredients.",
+            "Clear the ingredient view controls before reordering ingredients.",
         );
         return false;
     }
