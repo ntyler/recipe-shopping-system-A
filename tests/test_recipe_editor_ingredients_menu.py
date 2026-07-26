@@ -650,52 +650,59 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert "display: none;" in edit_panel_rule
 
 
-def test_recipe_editor_store_section_header_filters_and_sorts_as_a_view_only_menu():
+def test_recipe_editor_requested_headers_filter_and_sort_as_combined_view_only_menus():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
-    view_start = script.index("function normalizeRecipeIngredientStoreSectionViewSortMode")
+    supported_start = script.index("const RECIPE_EDIT_INGREDIENT_VIEW_COLUMN_KEYS")
+    supported_end = script.index("]);", supported_start)
+    supported = script[supported_start:supported_end]
+    for column_key in ("ingredient", "status", "unit", "store", "type"):
+        assert f'"{column_key}"' in supported
+
+    view_start = script.index("function recipeIngredientColumnViewDefinition")
     view_end = script.index("function clearRecipeEditIngredientColumnDropTargets", view_start)
     view = script[view_start:view_end]
     assert '["manual", "store", "az", "za"]' in view
-    assert "function recipeIngredientStoreSectionViewOptions()" in view
-    assert "function applyRecipeIngredientStoreSectionView(options = {})" in view
+    assert "function recipeIngredientColumnViewOptions(columnKey)" in view
+    assert "function applyRecipeIngredientColumnView(options = {})" in view
+    assert "recipeEditIngredientColumnView.filterKeys.entries()" in view
     assert 'entry.row.style.order = String(order);' in view
     assert 'entry.row.style.removeProperty("order");' in view
-    assert '"is-store-section-filtered"' in view
+    assert '"is-ingredient-column-filtered"' in view
     assert "list.appendChild" not in view
-    assert "function clearRecipeIngredientStoreSectionView(options = {})" in view
-    assert 'filterKeys: null' in view
+    assert 'function clearRecipeIngredientColumnView(columnKey = "", options = {})' in view
+    assert "filterKeys: new Map()" in script
+    assert 'sortColumn: ""' in script
     assert 'sortMode: "manual"' in view
 
-    assert "function ensureRecipeIngredientStoreSectionViewTrigger(header)" in view
+    assert "function ensureRecipeIngredientColumnViewTrigger(header)" in view
     assert 'trigger.setAttribute("aria-haspopup", "dialog");' in view
-    assert "Store Section filter and sort" in view
+    assert "Filter and sort ingredients by" in view
     assert "View-only controls" in view
-    for label in (
-        "Manual recipe order",
-        "Store order",
-        "Section A–Z",
-        "Section Z–A",
-        "Filter sections",
-        "Clear sort and filters",
-    ):
+    for label in ("Manual recipe order", "Store order", "Clear this column"):
         assert label in view
 
     decorate_start = script.index("function decorateRecipeEditIngredientColumnHeaders")
     decorate_end = script.index("function resetRecipeEditIngredientColumnLayout", decorate_start)
     decorate = script[decorate_start:decorate_end]
-    assert 'if (key === "store")' in decorate
-    assert "ensureRecipeIngredientStoreSectionViewTrigger(header);" in decorate
-    assert 'event.target.closest("[data-recipe-store-section-view-trigger]")' in script
-    assert "[data-recipe-store-section-view-trigger][aria-expanded]" in script
+    assert "recipeIngredientColumnViewDefinition(key)" in decorate
+    assert "ensureRecipeIngredientColumnViewTrigger(header);" in decorate
+    assert 'event.target.closest("[data-recipe-ingredient-column-view-trigger]")' in script
+    assert "[data-recipe-ingredient-column-view-trigger][aria-expanded]" in script
+    summary_start = script.index("function updateRecipeIngredientSummary(row)")
+    summary_end = script.index("function recipeEditIngredientRows()", summary_start)
+    summary = script[summary_start:summary_end]
+    assert "applyRecipeIngredientColumnView();" in summary
+    assert "syncRecipeIngredientColumnViewOpenMenu({ render: true });" in summary
 
-    assert ".recipe-edit-store-section-view-trigger" in css
-    assert ".recipe-edit-row-menu.recipe-edit-store-section-view-menu" in css
-    assert ".recipe-edit-store-section-view-option" in css
-    assert ".recipe-edit-store-section-view-empty" in css
-    assert ".recipe-edit-ingredient-row.is-store-section-filtered" in css
-    assert '[data-recipe-store-section-view-active="true"]' in css
+    assert ".recipe-edit-ingredient-column-view-trigger" in css
+    assert ".recipe-edit-row-menu.recipe-edit-ingredient-column-view-menu" in css
+    assert ".recipe-edit-ingredient-column-view-option" in css
+    assert ".recipe-edit-ingredient-column-view-empty" in css
+    assert ".recipe-edit-ingredient-row:is(" in css
+    assert ".is-ingredient-column-filtered" in css
+    assert '[data-recipe-ingredient-column-view-active="true"]' in css
 
 
 def test_recipe_editor_ingredient_modal_requires_pencil_and_preserves_dirty_close_state():
