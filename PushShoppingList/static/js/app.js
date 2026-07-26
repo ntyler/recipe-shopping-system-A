@@ -37869,6 +37869,16 @@ function renderRecipeIngredientStoreSectionMenu(menu, select) {
                     ${recipeEditSvgIcon("plus")}
                     <span class="recipe-edit-store-section-option-label">Add custom section…</span>
                 </button>
+                <a href="/admin/master-data/store-sections"
+                   target="_blank"
+                   rel="noopener"
+                   class="recipe-edit-store-section-option recipe-edit-store-section-manage-option"
+                   aria-label="Manage Store Sections in a new tab"
+                   onclick="event.stopPropagation()">
+                    ${recipeEditSvgIcon("edit")}
+                    <span class="recipe-edit-store-section-option-label">Manage Store Sections…</span>
+                    ${recipeEditSvgIcon("arrow-right")}
+                </a>
             </div>
         `
         : "";

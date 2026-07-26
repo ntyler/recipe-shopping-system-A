@@ -42566,6 +42566,24 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-column-view-empty > but
     height: 15px;
 }
 
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-manage-option {
+    width: 100%;
+    margin-top: 4px;
+    border-top: 1px solid var(--submenu-divider);
+    border-radius: 0 0 6px 6px;
+    color: var(--app-text);
+    text-decoration: none;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-manage-option > :is(.recipe-edit-inline-icon, svg) {
+    width: 15px;
+    height: 15px;
+}
+
+.recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-manage-option > .recipe-edit-inline-icon-arrow-right {
+    color: var(--app-muted);
+}
+
 .recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-custom-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 34px 34px;

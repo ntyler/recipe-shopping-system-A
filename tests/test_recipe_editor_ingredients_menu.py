@@ -3263,6 +3263,11 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert "recipe-edit-store-section-menu-list" in script
     assert "recipe-edit-store-section-menu-footer" in script
     assert "Add custom section…" in script
+    assert "Manage Store Sections…" in script
+    assert 'href="/admin/master-data/store-sections"' in script
+    assert 'target="_blank"' in script
+    assert 'rel="noopener"' in script
+    assert 'aria-label="Manage Store Sections in a new tab"' in script
     assert "if (!custom)" in script
     assert "function bindRecipeIngredientStoreSectionControls(scope)" in script
     assert "function createRecipeIngredientStoreSectionTrigger(select)" in script
@@ -3290,6 +3295,7 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert ".recipe-edit-store-section-edit-button" in css
     assert ".recipe-edit-store-section-delete-button" in css
     assert ".recipe-edit-store-section-menu-footer" in css
+    assert ".recipe-edit-store-section-manage-option" in css
     assert ".recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger" in css
     assert ".recipe-edit-store-section-menu-list {\n    flex: 1 1 auto;" in css
     assert ".recipe-edit-store-section-icon.is-fish" in css
