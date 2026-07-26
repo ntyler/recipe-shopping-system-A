@@ -1877,3 +1877,8 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert '["initStoreSectionMasterIconPickers", initStoreSectionMasterIconPickers]' in script
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css
+    assert (
+        ".store-section-master-row\n"
+        "    :is(.store-section-master-identity, .store-section-master-icon-field)"
+    ) in css
+    assert "align-self: start;" in css

@@ -61619,12 +61619,21 @@ body.recipe-edit-standalone-page :is(
     gap: 5px;
 }
 
+.store-section-master-row
+    :is(.store-section-master-identity, .store-section-master-icon-field) {
+    align-self: start;
+}
+
 .store-section-master-create-form label > span,
 .store-section-master-identity label > span,
 .store-section-master-icon-field > span {
+    display: flex;
+    min-height: 12px;
+    align-items: center;
     color: var(--app-muted);
     font-size: 9px;
     font-weight: 800;
+    line-height: 12px;
     letter-spacing: .04em;
     text-transform: uppercase;
 }
@@ -61779,6 +61788,7 @@ body.recipe-edit-standalone-page :is(
 
 .store-section-master-icon-trigger {
     width: 100%;
+    min-height: 38px;
     align-items: center;
     justify-content: flex-start;
     gap: 9px;
@@ -61891,6 +61901,7 @@ body.recipe-edit-standalone-page :is(
     overflow: hidden;
     color: var(--app-muted);
     font-size: 9px;
+    line-height: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -61899,6 +61910,7 @@ body.recipe-edit-standalone-page :is(
     color: var(--app-primary-hover);
     font-size: 9px;
     font-weight: 750;
+    line-height: 12px;
 }
 
 .store-section-master-usage {
