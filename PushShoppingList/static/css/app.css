@@ -19047,7 +19047,7 @@ body {
 }
 
 .recipe-edit-row-menu[hidden] {
-    display: none;
+    display: none !important;
 }
 
 .recipe-edit-row-menu [hidden] {

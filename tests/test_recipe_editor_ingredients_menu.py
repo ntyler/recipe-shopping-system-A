@@ -3260,6 +3260,9 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert ".recipe-edit-store-section-menu-list {\n    flex: 1 1 auto;" in css
     assert ".recipe-edit-store-section-icon.is-fish" in css
     assert ".recipe-edit-store-section-icon.is-paw" in css
+    hidden_menu_start = css.index(".recipe-edit-row-menu[hidden] {")
+    hidden_menu_rule = css[hidden_menu_start:css.index("}", hidden_menu_start)]
+    assert "display: none !important;" in hidden_menu_rule
 
     chevron_start = css.index(
         ".recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-store-section-chevron {"
