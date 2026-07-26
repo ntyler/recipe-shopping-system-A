@@ -514,6 +514,8 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         "recipe-edit-ingredient-modal-footer",
     ):
         assert class_name in organize
+
+
     section_labels = (
         ">Identity</h3>",
         ">Quantity &amp; Details</h3>",
@@ -646,6 +648,54 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     edit_panel_rule = modal_css[modal_css.index("dialog.recipe-edit-ingredient-edit-panel {"):]
     edit_panel_rule = edit_panel_rule[:edit_panel_rule.index("}")]
     assert "display: none;" in edit_panel_rule
+
+
+def test_recipe_editor_store_section_header_filters_and_sorts_as_a_view_only_menu():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    view_start = script.index("function normalizeRecipeIngredientStoreSectionViewSortMode")
+    view_end = script.index("function clearRecipeEditIngredientColumnDropTargets", view_start)
+    view = script[view_start:view_end]
+    assert '["manual", "store", "az", "za"]' in view
+    assert "function recipeIngredientStoreSectionViewOptions()" in view
+    assert "function applyRecipeIngredientStoreSectionView(options = {})" in view
+    assert 'entry.row.style.order = String(order);' in view
+    assert 'entry.row.style.removeProperty("order");' in view
+    assert '"is-store-section-filtered"' in view
+    assert "list.appendChild" not in view
+    assert "function clearRecipeIngredientStoreSectionView(options = {})" in view
+    assert 'filterKeys: null' in view
+    assert 'sortMode: "manual"' in view
+
+    assert "function ensureRecipeIngredientStoreSectionViewTrigger(header)" in view
+    assert 'trigger.setAttribute("aria-haspopup", "dialog");' in view
+    assert "Store Section filter and sort" in view
+    assert "View-only controls" in view
+    for label in (
+        "Manual recipe order",
+        "Store order",
+        "Section A–Z",
+        "Section Z–A",
+        "Filter sections",
+        "Clear sort and filters",
+    ):
+        assert label in view
+
+    decorate_start = script.index("function decorateRecipeEditIngredientColumnHeaders")
+    decorate_end = script.index("function resetRecipeEditIngredientColumnLayout", decorate_start)
+    decorate = script[decorate_start:decorate_end]
+    assert 'if (key === "store")' in decorate
+    assert "ensureRecipeIngredientStoreSectionViewTrigger(header);" in decorate
+    assert 'event.target.closest("[data-recipe-store-section-view-trigger]")' in script
+    assert "[data-recipe-store-section-view-trigger][aria-expanded]" in script
+
+    assert ".recipe-edit-store-section-view-trigger" in css
+    assert ".recipe-edit-row-menu.recipe-edit-store-section-view-menu" in css
+    assert ".recipe-edit-store-section-view-option" in css
+    assert ".recipe-edit-store-section-view-empty" in css
+    assert ".recipe-edit-ingredient-row.is-store-section-filtered" in css
+    assert '[data-recipe-store-section-view-active="true"]' in css
 
 
 def test_recipe_editor_ingredient_modal_requires_pencil_and_preserves_dirty_close_state():
