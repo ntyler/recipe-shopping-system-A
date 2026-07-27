@@ -1366,6 +1366,7 @@ def update_ingredient_store_section_definition(
     action="save",
     display_name="",
     icon="basket",
+    position=None,
     user_id=None,
 ):
     try:
@@ -1390,6 +1391,53 @@ def update_ingredient_store_section_definition(
         ).fetchone()
         if not row:
             return {"ok": False, "status": 404, "error": "Store Section was not found."}
+
+        if action == "move_to":
+            try:
+                requested_position = int(position)
+            except (TypeError, ValueError):
+                return {
+                    "ok": False,
+                    "status": 400,
+                    "error": "A valid Store Section position is required.",
+                }
+            ordered_rows = connection.execute(
+                """
+                SELECT id
+                  FROM ingredient_store_sections
+                 WHERE user_id = ?
+                 ORDER BY sort_order ASC, id ASC
+                """,
+                (scoped_user_id,),
+            ).fetchall()
+            ordered_ids = [int(item["id"]) for item in ordered_rows]
+            current_index = ordered_ids.index(section_id)
+            target_index = max(0, min(len(ordered_ids) - 1, requested_position - 1))
+            changed = current_index != target_index
+            if changed:
+                ordered_ids.pop(current_index)
+                ordered_ids.insert(target_index, section_id)
+                timestamp = utc_now_iso()
+                connection.executemany(
+                    """
+                    UPDATE ingredient_store_sections
+                       SET sort_order = ?,
+                           updated_at = ?
+                     WHERE id = ?
+                       AND user_id = ?
+                    """,
+                    [
+                        (index, timestamp, ordered_id, scoped_user_id)
+                        for index, ordered_id in enumerate(ordered_ids, start=1)
+                    ],
+                )
+            return {
+                "ok": True,
+                "status": 200,
+                "changed": changed,
+                "position": target_index + 1,
+                "display_name": row["display_name"],
+            }
 
         if action in {"move_up", "move_down"}:
             comparator = "<" if action == "move_up" else ">"

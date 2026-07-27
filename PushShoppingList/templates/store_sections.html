@@ -73,6 +73,10 @@
     </div>
 {% endmacro %}
 
+{% block app_body_attributes %}
+data-user-id="{{ master_data.scope_user_id }}"
+{% endblock %}
+
 {% block app_content %}
     <section class="master-data-page store-section-master-page" aria-labelledby="storeSectionsTitle">
         <header class="master-data-header">
@@ -98,16 +102,62 @@
             </div>
         {% endif %}
 
+        <div class="store-section-master-stats" aria-label="Store Section summary">
+            <article>
+                <span>Active sections</span>
+                <strong>{{ master_data.active_count }}</strong>
+            </article>
+            <article>
+                <span>Archived sections</span>
+                <strong>{{ master_data.archived_count }}</strong>
+            </article>
+            <article>
+                <span>Master ingredients</span>
+                <strong>{{ master_data.ingredient_count }}</strong>
+            </article>
+            <article>
+                <span>Recipe references</span>
+                <strong>{{ master_data.recipe_reference_count }}</strong>
+            </article>
+        </div>
+
+        <section class="store-section-master-create" aria-labelledby="addStoreSectionTitle">
+            <div>
+                <span>Workspace setup</span>
+                <h2 id="addStoreSectionTitle">Add a Store Section</h2>
+                <p>New sections are added to the end of the current store order.</p>
+            </div>
+            <form method="POST"
+                  action="{{ master_data.create_url }}"
+                  class="store-section-master-create-form">
+                <label>
+                    <span>Name</span>
+                    <input type="text"
+                           name="display_name"
+                           maxlength="80"
+                           placeholder="For example, International Foods"
+                           required>
+                </label>
+                <div class="store-section-master-icon-field">
+                    <span>Icon</span>
+                    {{ store_section_icon_picker("basket", "Icon for the new Store Section") }}
+                </div>
+                <button type="submit">Add Store Section</button>
+            </form>
+        </section>
+
         <section class="store-section-master-list-section" aria-labelledby="storeSectionOrderTitle">
             <header class="store-section-master-table-toolbar">
                 <div>
-                    <h2 id="storeSectionOrderTitle">
-                        Store Sections
-                        <span>({{ master_data.sections|length }})</span>
-                    </h2>
+                    <span>Shopping order</span>
+                    <h2 id="storeSectionOrderTitle">Store Section order</h2>
                     <p>Move sections to match the order you normally walk through the store.</p>
                 </div>
                 <div class="store-section-master-table-actions">
+                    <span class="store-section-master-visible-count"
+                          data-store-section-master-visible-count>
+                        {{ master_data.sections|length }} of {{ master_data.sections|length }} shown
+                    </span>
                     <label class="store-section-master-search">
                         <span class="sr-only">Search Store Sections</span>
                         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -127,76 +177,56 @@
                             <option value="archived">Archived</option>
                         </select>
                     </label>
-                    <button type="button"
-                            class="store-section-master-add-toggle"
-                            aria-controls="storeSectionMasterCreatePanel"
-                            aria-expanded="false"
-                            data-store-section-master-create-toggle
-                            hidden>
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 5v14"></path>
-                            <path d="M5 12h14"></path>
-                        </svg>
-                        Add Store Section
-                    </button>
+                    <div class="store-section-master-columns">
+                        <button type="button"
+                                class="store-section-master-columns-trigger"
+                                aria-controls="storeSectionMasterColumnsMenu"
+                                aria-expanded="false"
+                                data-store-section-master-columns-trigger>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 7h16M4 17h16"></path>
+                                <circle cx="9" cy="7" r="2"></circle>
+                                <circle cx="15" cy="17" r="2"></circle>
+                            </svg>
+                            Columns
+                            <span aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="store-section-master-columns-menu"
+                             id="storeSectionMasterColumnsMenu"
+                             data-store-section-master-columns-menu
+                             hidden>
+                            <strong>Table columns</strong>
+                            <p>Choose visible columns. Drag a header grip to move it; drag a divider to resize it.</p>
+                            <div class="store-section-master-column-options"
+                                 data-store-section-master-column-options></div>
+                            <div class="store-section-master-column-menu-actions">
+                                <button type="button" data-store-section-master-columns-fit>
+                                    Fit columns
+                                </button>
+                                <button type="button" data-store-section-master-columns-reset>
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </header>
 
-            <div class="store-section-master-summary" aria-label="Store Section summary">
-                <span><strong>{{ master_data.active_count }}</strong> active</span>
-                <span><strong>{{ master_data.archived_count }}</strong> archived</span>
-                <span><strong>{{ master_data.ingredient_count }}</strong> master ingredients</span>
-                <span><strong>{{ master_data.recipe_reference_count }}</strong> recipe references</span>
-                <span class="store-section-master-visible-count"
-                      data-store-section-master-visible-count>
-                    {{ master_data.sections|length }} shown
-                </span>
-            </div>
-
-            <section class="store-section-master-create"
-                     id="storeSectionMasterCreatePanel"
-                     aria-labelledby="addStoreSectionTitle"
-                     data-store-section-master-create-panel>
-                <div>
-                    <h3 id="addStoreSectionTitle">Add a Store Section</h3>
-                    <p>New sections are added to the end of the current store order.</p>
-                </div>
-                <form method="POST"
-                      action="{{ master_data.create_url }}"
-                      class="store-section-master-create-form">
-                    <label>
-                        <span>Name</span>
-                        <input type="text"
-                               name="display_name"
-                               maxlength="80"
-                               placeholder="For example, International Foods"
-                               required>
-                    </label>
-                    <div class="store-section-master-icon-field">
-                        <span>Icon</span>
-                        {{ store_section_icon_picker("basket", "Icon for the new Store Section") }}
-                    </div>
-                    <div class="store-section-master-create-actions">
-                        <button type="button"
-                                data-store-section-master-create-cancel
-                                hidden>
-                            Cancel
-                        </button>
-                        <button type="submit">Add Store Section</button>
-                    </div>
-                </form>
-            </section>
+            <p class="sr-only"
+               role="status"
+               aria-live="polite"
+               data-store-section-master-column-status></p>
 
             <div class="store-section-master-table"
                  role="table"
                  aria-label="Store Sections">
                 <div class="store-section-master-table-head" role="row">
-                    <div role="columnheader">Order / Icon</div>
-                    <div role="columnheader">Store Section</div>
-                    <div role="columnheader">Icon</div>
-                    <div role="columnheader">Usage</div>
-                    <div role="columnheader">Status</div>
-                    <div role="columnheader">Actions</div>
+                    <div role="columnheader" data-store-section-master-column="order">Order / Icon</div>
+                    <div role="columnheader" data-store-section-master-column="section">Store Section</div>
+                    <div role="columnheader" data-store-section-master-column="icon">Icon</div>
+                    <div role="columnheader" data-store-section-master-column="usage">Usage</div>
+                    <div role="columnheader" data-store-section-master-column="status">Status</div>
+                    <div role="columnheader" data-store-section-master-column="actions">Actions</div>
                 </div>
 
                 <div class="store-section-master-list" role="rowgroup">
@@ -207,11 +237,28 @@
                           role="row"
                           class="store-section-master-row{% if not section.is_active %} is-archived{% endif %}"
                           data-store-section-master-row
+                          data-store-section-id="{{ section.id }}"
                           data-store-section-name="{{ section.display_name|lower }}"
                           data-store-section-key="{{ section.section_key|lower }}"
                           data-store-section-status="{% if section.is_active %}active{% else %}archived{% endif %}">
-                        <div class="store-section-master-order-icon" role="cell">
+                        <div class="store-section-master-order-icon"
+                             role="cell"
+                             data-store-section-master-cell="order">
                             <div class="store-section-master-order">
+                                <button type="button"
+                                        class="store-section-master-drag-handle"
+                                        aria-label="Drag {{ section.display_name }} to reorder"
+                                        title="Drag to reorder Store Sections"
+                                        data-store-section-master-drag-handle>
+                                    <svg viewBox="0 0 16 20" aria-hidden="true">
+                                        <circle cx="5" cy="4" r="1.4"></circle>
+                                        <circle cx="11" cy="4" r="1.4"></circle>
+                                        <circle cx="5" cy="10" r="1.4"></circle>
+                                        <circle cx="11" cy="10" r="1.4"></circle>
+                                        <circle cx="5" cy="16" r="1.4"></circle>
+                                        <circle cx="11" cy="16" r="1.4"></circle>
+                                    </svg>
+                                </button>
                                 <button type="submit"
                                         name="action"
                                         value="move_up"
@@ -244,7 +291,9 @@
                                   aria-hidden="true">{{ icon_glyphs.get(section.icon, icon_glyphs["basket"]) }}</span>
                         </div>
 
-                        <div class="store-section-master-identity" role="cell">
+                        <div class="store-section-master-identity"
+                             role="cell"
+                             data-store-section-master-cell="section">
                             <label>
                                 <input type="text"
                                        name="display_name"
@@ -258,11 +307,15 @@
                             </span>
                         </div>
 
-                        <div class="store-section-master-icon-field" role="cell">
+                        <div class="store-section-master-icon-field"
+                             role="cell"
+                             data-store-section-master-cell="icon">
                             {{ store_section_icon_picker(section.icon, "Icon for " ~ section.display_name) }}
                         </div>
 
-                        <div class="store-section-master-usage" role="cell">
+                        <div class="store-section-master-usage"
+                             role="cell"
+                             data-store-section-master-cell="usage">
                             <span>
                                 <strong>{{ section.ingredient_count }}</strong>
                                 master ingredient{% if section.ingredient_count != 1 %}s{% endif %}
@@ -273,13 +326,17 @@
                             </span>
                         </div>
 
-                        <div class="store-section-master-state" role="cell">
+                        <div class="store-section-master-state"
+                             role="cell"
+                             data-store-section-master-cell="status">
                             <span class="{% if section.is_active %}is-active{% else %}is-archived{% endif %}">
                                 {% if section.is_active %}Active{% else %}Archived{% endif %}
                             </span>
                         </div>
 
-                        <div class="store-section-master-actions" role="cell">
+                        <div class="store-section-master-actions"
+                             role="cell"
+                             data-store-section-master-cell="actions">
                             <button type="submit" name="action" value="save">Save</button>
                             {% if section.is_active %}
                                 <button type="submit"

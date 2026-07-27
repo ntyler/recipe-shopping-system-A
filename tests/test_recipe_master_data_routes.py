@@ -1852,6 +1852,23 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert updated.status_code == 200
         assert "Store Section updated: Global Foods." in updated.get_data(as_text=True)
 
+        moved = client.post(
+            f"/admin/master-data/store-sections/{section['id']}",
+            data={"action": "move_to", "position": "1"},
+            headers={
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        )
+        assert moved.status_code == 200
+        assert moved.get_json()["ok"] is True
+        assert moved.get_json()["position"] == 1
+        reordered = master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+        )
+        assert reordered[0]["id"] == section["id"]
+
         sign_in(client, "user-b")
         other_workspace = client.get("/admin/master-data/store-sections")
         assert other_workspace.status_code == 200
@@ -1870,9 +1887,15 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "store_section_url" in template
     assert "Store Sections" in page
     assert "Add Store Section" in page
+    assert "Active sections" in page
+    assert "Archived sections" in page
+    assert "Master ingredients" in page
+    assert "Recipe references" in page
     assert "data-store-section-master-search" in page
     assert "data-store-section-master-status-filter" in page
-    assert "data-store-section-master-create-toggle" in page
+    assert "data-store-section-master-columns-trigger" in page
+    assert 'data-store-section-master-column="order"' in page
+    assert "data-store-section-master-drag-handle" in page
     assert "store-section-master-table-head" in page
     assert "Order / Icon" in page
     assert "Store Section" in page
@@ -1882,6 +1905,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "data-store-section-master-icon-option" in page
     assert "function initStoreSectionMasterTable()" in script
     assert "function initStoreSectionMasterIconPickers()" in script
+    assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
+    assert "storeSectionMasterColumnResize" in script
+    assert 'action: "move_to"' in script
+    assert "persistRowPosition" in script
     assert "renderStoreSectionMasterIconVisual" in script
     assert 'selected?.scrollIntoView({ block: "nearest" });' in script
     assert "Number(event.detail || 0) < 2" in script
@@ -1891,6 +1918,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-table-toolbar" in css
     assert ".store-section-master-table-head" in css
     assert ".store-section-master-row[hidden]" in css
+    assert ".store-section-master-column-resize" in css
+    assert ".store-section-master-drag-handle" in css
+    assert ".is-row-drop-before" in css
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css
     assert (

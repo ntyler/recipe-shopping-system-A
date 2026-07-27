@@ -1249,6 +1249,7 @@ def store_section_master_data_context():
     return {
         "title": "Store Sections",
         "record_type": "store_sections",
+        "scope_user_id": user_id,
         "sections": sections,
         "active_count": len(active_sections),
         "archived_count": len(sections) - len(active_sections),
@@ -1318,15 +1319,22 @@ def update_master_data_store_section_route(section_id):
         action=action,
         display_name=request.form.get("display_name"),
         icon=request.form.get("icon"),
+        position=request.form.get("position"),
         user_id=active_user_id(),
     )
     action_messages = {
         "save": "Store Section updated: {name}.",
         "move_up": "Store Section moved up: {name}.",
         "move_down": "Store Section moved down: {name}.",
+        "move_to": "Store Section moved: {name}.",
         "archive": "Store Section archived: {name}.",
         "restore": "Store Section restored: {name}.",
     }
+    if (
+        request.headers.get("X-Requested-With") == "fetch"
+        or request.accept_mimetypes.best == "application/json"
+    ):
+        return jsonify(result), int(result.get("status") or 200)
     set_store_section_master_data_message(
         result,
         success_prefix=action_messages.get(action, "Store Section updated: {name}."),

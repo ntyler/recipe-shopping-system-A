@@ -37663,52 +37663,574 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
     renderStoreSectionMasterIconVisual(rowIcon, normalizedIcon);
 }
 
+const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV1";
+const STORE_SECTION_MASTER_COLUMN_ORDER = [
+    "order",
+    "section",
+    "icon",
+    "usage",
+    "status",
+    "actions",
+];
+const STORE_SECTION_MASTER_COLUMNS = {
+    order: {
+        label: "Order / Icon",
+        fallbackWidth: 140,
+        minWidth: 126,
+        maxWidth: 260,
+    },
+    section: {
+        label: "Store Section",
+        fallbackWidth: 360,
+        minWidth: 190,
+        maxWidth: 640,
+    },
+    icon: {
+        label: "Icon",
+        fallbackWidth: 250,
+        minWidth: 150,
+        maxWidth: 420,
+    },
+    usage: {
+        label: "Usage",
+        fallbackWidth: 250,
+        minWidth: 150,
+        maxWidth: 380,
+    },
+    status: {
+        label: "Status",
+        fallbackWidth: 100,
+        minWidth: 82,
+        maxWidth: 200,
+    },
+    actions: {
+        label: "Actions",
+        fallbackWidth: 170,
+        minWidth: 150,
+        maxWidth: 280,
+    },
+};
+
 function initStoreSectionMasterTable() {
     const page = document.querySelector(".store-section-master-page");
     if (!page) return;
 
-    const createPanel = page.querySelector("[data-store-section-master-create-panel]");
-    const createToggle = page.querySelector("[data-store-section-master-create-toggle]");
-    const createCancel = page.querySelector("[data-store-section-master-create-cancel]");
-    const createNameInput = createPanel?.querySelector('input[name="display_name"]');
-    const setCreatePanelOpen = open => {
-        if (!createPanel || !createToggle) return;
-        createPanel.hidden = !open;
-        createToggle.setAttribute("aria-expanded", String(open));
-        createToggle.classList.toggle("is-open", open);
-        if (open) {
-            createNameInput?.focus({ preventScroll: true });
-        } else {
-            createToggle.focus({ preventScroll: true });
-        }
-    };
-
-    if (createPanel && createToggle) {
-        createPanel.hidden = true;
-        createToggle.hidden = false;
-        if (createCancel) createCancel.hidden = false;
-        createToggle.addEventListener("click", () => {
-            setCreatePanelOpen(createPanel.hidden);
-        });
-        createCancel?.addEventListener("click", () => setCreatePanelOpen(false));
-        createPanel.addEventListener("keydown", event => {
-            if (event.key !== "Escape") return;
-            if (event.target.closest("[data-store-section-master-icon-menu]")) return;
-            event.preventDefault();
-            setCreatePanelOpen(false);
-        });
-    }
-
+    const table = page.querySelector(".store-section-master-table");
+    const tableHead = table?.querySelector(".store-section-master-table-head");
+    const list = table?.querySelector(".store-section-master-list");
     const search = page.querySelector("[data-store-section-master-search]");
     const statusFilter = page.querySelector("[data-store-section-master-status-filter]");
-    const rows = [...page.querySelectorAll("[data-store-section-master-row]")];
     const visibleCount = page.querySelector("[data-store-section-master-visible-count]");
     const filterEmpty = page.querySelector("[data-store-section-master-filter-empty]");
+    const columnStatus = page.querySelector("[data-store-section-master-column-status]");
+    const columnsTrigger = page.querySelector("[data-store-section-master-columns-trigger]");
+    const columnsMenu = page.querySelector("[data-store-section-master-columns-menu]");
+    const columnOptions = page.querySelector("[data-store-section-master-column-options]");
+    const fitColumnsButton = page.querySelector("[data-store-section-master-columns-fit]");
+    const resetColumnsButton = page.querySelector("[data-store-section-master-columns-reset]");
+    if (!table || !tableHead || !list) return;
+
+    const storageKey = (() => {
+        const userId = String(document.body?.dataset.userId || "workspace").trim();
+        return `${STORE_SECTION_MASTER_COLUMN_STORAGE_KEY}:${userId || "workspace"}`;
+    })();
+    const clampColumnWidth = (key, value) => {
+        const config = STORE_SECTION_MASTER_COLUMNS[key];
+        const numericValue = Number(value);
+        if (!config || !Number.isFinite(numericValue)) {
+            return config?.fallbackWidth || 160;
+        }
+        return Math.round(Math.max(config.minWidth, Math.min(config.maxWidth, numericValue)));
+    };
+    const defaultLayout = () => ({
+        order: [...STORE_SECTION_MASTER_COLUMN_ORDER],
+        widths: Object.fromEntries(
+            STORE_SECTION_MASTER_COLUMN_ORDER.map(key => [
+                key,
+                STORE_SECTION_MASTER_COLUMNS[key].fallbackWidth,
+            ]),
+        ),
+        hidden: [],
+    });
+    const normalizeLayout = value => {
+        const fallback = defaultLayout();
+        const savedOrder = Array.isArray(value?.order) ? value.order : [];
+        const order = [
+            ...savedOrder.filter(
+                key => STORE_SECTION_MASTER_COLUMN_ORDER.includes(key),
+            ),
+            ...STORE_SECTION_MASTER_COLUMN_ORDER.filter(
+                key => !savedOrder.includes(key),
+            ),
+        ];
+        return {
+            order,
+            widths: Object.fromEntries(order.map(key => [
+                key,
+                clampColumnWidth(key, value?.widths?.[key] ?? fallback.widths[key]),
+            ])),
+            hidden: Array.isArray(value?.hidden)
+                ? value.hidden.filter(
+                    key => STORE_SECTION_MASTER_COLUMN_ORDER.includes(key)
+                        && key !== "order",
+                )
+                : [],
+        };
+    };
+    const loadLayout = () => {
+        try {
+            return normalizeLayout(JSON.parse(localStorage.getItem(storageKey) || "null"));
+        } catch (_error) {
+            return defaultLayout();
+        }
+    };
+    let columnLayout = loadLayout();
+    let columnMoveState = null;
+    let columnResizeState = null;
+    let draggedRow = null;
+    let rowDropTarget = null;
+    let rowDropAfter = false;
+
+    const rows = () => [...list.querySelectorAll("[data-store-section-master-row]")];
+    const desktopColumnsEnabled = () => window.matchMedia("(min-width: 760px)").matches;
+    const announce = message => {
+        if (columnStatus) columnStatus.textContent = message;
+    };
+    const saveLayout = () => {
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(columnLayout));
+        } catch (_error) {
+            // The table remains usable when storage is unavailable.
+        }
+    };
+    const headerFor = key => tableHead.querySelector(
+        `[data-store-section-master-column="${key}"]`,
+    );
+    const cellFor = (row, key) => row.querySelector(
+        `[data-store-section-master-cell="${key}"]`,
+    );
+    const clearColumnDropState = () => {
+        tableHead.querySelectorAll(
+            ".is-column-drop-before, .is-column-drop-after",
+        ).forEach(header => {
+            header.classList.remove("is-column-drop-before", "is-column-drop-after");
+        });
+    };
+    const updateColumnMenu = () => {
+        if (!columnOptions) return;
+        columnOptions.innerHTML = "";
+        columnLayout.order.forEach(key => {
+            const config = STORE_SECTION_MASTER_COLUMNS[key];
+            const label = document.createElement("label");
+            const input = document.createElement("input");
+            const text = document.createElement("span");
+            input.type = "checkbox";
+            input.checked = !columnLayout.hidden.includes(key);
+            input.disabled = key === "order";
+            input.dataset.storeSectionMasterColumnToggle = key;
+            text.textContent = config.label;
+            label.append(input, text);
+            columnOptions.append(label);
+        });
+    };
+    const applyColumnLayout = () => {
+        const desktop = desktopColumnsEnabled();
+        const displayOrder = desktop
+            ? columnLayout.order
+            : STORE_SECTION_MASTER_COLUMN_ORDER;
+        const visibleOrder = displayOrder.filter(
+            key => !desktop || !columnLayout.hidden.includes(key),
+        );
+
+        displayOrder.forEach(key => {
+            const header = headerFor(key);
+            if (header) tableHead.append(header);
+        });
+        rows().forEach(row => {
+            displayOrder.forEach(key => {
+                const cell = cellFor(row, key);
+                if (cell) row.append(cell);
+            });
+        });
+
+        STORE_SECTION_MASTER_COLUMN_ORDER.forEach(key => {
+            const hidden = desktop && columnLayout.hidden.includes(key);
+            const header = headerFor(key);
+            if (header) header.hidden = hidden;
+            rows().forEach(row => {
+                const cell = cellFor(row, key);
+                if (cell) cell.hidden = hidden;
+            });
+        });
+
+        if (desktop) {
+            const grid = visibleOrder
+                .map(key => `${clampColumnWidth(key, columnLayout.widths[key])}px`)
+                .join(" ");
+            const gridWidth = visibleOrder.reduce(
+                (total, key) => total + clampColumnWidth(key, columnLayout.widths[key]),
+                0,
+            ) + Math.max(0, visibleOrder.length - 1) * 12 + 28;
+            table.style.setProperty("--store-section-master-grid", grid);
+            table.style.setProperty("--store-section-master-grid-width", `${gridWidth}px`);
+            table.setAttribute("aria-colcount", String(visibleOrder.length));
+            visibleOrder.forEach((key, index) => {
+                headerFor(key)?.setAttribute("aria-colindex", String(index + 1));
+                rows().forEach(row => {
+                    cellFor(row, key)?.setAttribute("aria-colindex", String(index + 1));
+                });
+            });
+        } else {
+            table.style.removeProperty("--store-section-master-grid");
+            table.style.removeProperty("--store-section-master-grid-width");
+            table.removeAttribute("aria-colcount");
+        }
+        updateColumnMenu();
+    };
+    const moveColumn = (key, targetKey, after = false) => {
+        if (!key || !targetKey || key === targetKey) return false;
+        const nextOrder = columnLayout.order.filter(item => item !== key);
+        let targetIndex = nextOrder.indexOf(targetKey);
+        if (targetIndex < 0) return false;
+        if (after) targetIndex += 1;
+        nextOrder.splice(targetIndex, 0, key);
+        columnLayout.order = nextOrder;
+        saveLayout();
+        applyColumnLayout();
+        announce(`${STORE_SECTION_MASTER_COLUMNS[key].label} column moved.`);
+        return true;
+    };
+    const autoFitColumn = key => {
+        const config = STORE_SECTION_MASTER_COLUMNS[key];
+        if (!config) return;
+        const measurements = [headerFor(key), ...rows().map(row => cellFor(row, key))]
+            .filter(Boolean)
+            .map(element => {
+                const clone = element.cloneNode(true);
+                clone.style.position = "absolute";
+                clone.style.visibility = "hidden";
+                clone.style.width = "max-content";
+                clone.style.maxWidth = "none";
+                clone.style.inset = "auto";
+                document.body.append(clone);
+                const width = Math.ceil(clone.scrollWidth + 30);
+                clone.remove();
+                return width;
+            });
+        columnLayout.widths[key] = clampColumnWidth(
+            key,
+            Math.max(config.minWidth, ...measurements),
+        );
+        saveLayout();
+        applyColumnLayout();
+        announce(`${config.label} column fitted to its content.`);
+    };
+    const fitAllColumns = () => {
+        columnLayout.order
+            .filter(key => !columnLayout.hidden.includes(key))
+            .forEach(autoFitColumn);
+        announce("Visible Store Section columns fitted to their content.");
+    };
+    const decorateHeaders = () => {
+        STORE_SECTION_MASTER_COLUMN_ORDER.forEach(key => {
+            const header = headerFor(key);
+            if (!header || header.dataset.storeSectionMasterColumnReady === "true") return;
+            header.dataset.storeSectionMasterColumnReady = "true";
+            header.tabIndex = 0;
+            header.title = `${STORE_SECTION_MASTER_COLUMNS[key].label}: drag the grip to move; drag the divider to resize; double-click the divider to auto-fit. Alt+Arrow moves; Alt+Shift+Arrow resizes.`;
+
+            const moveHandle = document.createElement("span");
+            moveHandle.className = "store-section-master-column-move";
+            moveHandle.setAttribute("aria-hidden", "true");
+            moveHandle.dataset.storeSectionMasterColumnMove = key;
+
+            const resizeHandle = document.createElement("span");
+            resizeHandle.className = "store-section-master-column-resize";
+            resizeHandle.setAttribute("aria-hidden", "true");
+            resizeHandle.dataset.storeSectionMasterColumnResize = key;
+            header.prepend(moveHandle);
+            header.append(resizeHandle);
+
+            moveHandle.addEventListener("pointerdown", event => {
+                if (!desktopColumnsEnabled() || event.button !== 0) return;
+                event.preventDefault();
+                moveHandle.setPointerCapture?.(event.pointerId);
+                columnMoveState = {
+                    key,
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    pointerId: event.pointerId,
+                    active: false,
+                    targetKey: null,
+                    after: false,
+                };
+            });
+            resizeHandle.addEventListener("pointerdown", event => {
+                if (!desktopColumnsEnabled() || event.button !== 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                resizeHandle.setPointerCapture?.(event.pointerId);
+                columnResizeState = {
+                    key,
+                    startX: event.clientX,
+                    startWidth: clampColumnWidth(key, columnLayout.widths[key]),
+                    pointerId: event.pointerId,
+                };
+                document.body.classList.add("is-resizing-store-section-master-column");
+                header.classList.add("is-column-resizing");
+            });
+            resizeHandle.addEventListener("dblclick", event => {
+                event.preventDefault();
+                event.stopPropagation();
+                autoFitColumn(key);
+            });
+            header.addEventListener("keydown", event => {
+                if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) {
+                    return;
+                }
+                event.preventDefault();
+                const direction = event.key === "ArrowLeft" ? -1 : 1;
+                if (event.shiftKey) {
+                    columnLayout.widths[key] = clampColumnWidth(
+                        key,
+                        columnLayout.widths[key] + direction * 16,
+                    );
+                    saveLayout();
+                    applyColumnLayout();
+                    announce(`${STORE_SECTION_MASTER_COLUMNS[key].label} column resized.`);
+                    return;
+                }
+                const currentIndex = columnLayout.order.indexOf(key);
+                const targetKey = columnLayout.order[currentIndex + direction];
+                if (targetKey) moveColumn(key, targetKey, direction > 0);
+            });
+        });
+    };
+
+    window.addEventListener("pointermove", event => {
+        if (columnResizeState) {
+            const { key, startX, startWidth } = columnResizeState;
+            columnLayout.widths[key] = clampColumnWidth(
+                key,
+                startWidth + event.clientX - startX,
+            );
+            applyColumnLayout();
+            return;
+        }
+        if (!columnMoveState) return;
+        const distance = Math.hypot(
+            event.clientX - columnMoveState.startX,
+            event.clientY - columnMoveState.startY,
+        );
+        if (!columnMoveState.active && distance < 6) return;
+        columnMoveState.active = true;
+        document.body.classList.add("is-moving-store-section-master-column");
+        headerFor(columnMoveState.key)?.classList.add("is-column-moving");
+        clearColumnDropState();
+        const target = document.elementFromPoint(event.clientX, event.clientY)
+            ?.closest("[data-store-section-master-column]");
+        if (!target || !tableHead.contains(target)) {
+            columnMoveState.targetKey = null;
+            return;
+        }
+        const targetKey = target.dataset.storeSectionMasterColumn;
+        const rect = target.getBoundingClientRect();
+        const after = event.clientX > rect.left + rect.width / 2;
+        columnMoveState.targetKey = targetKey;
+        columnMoveState.after = after;
+        if (targetKey !== columnMoveState.key) {
+            target.classList.add(after ? "is-column-drop-after" : "is-column-drop-before");
+        }
+    });
+    window.addEventListener("pointerup", () => {
+        if (columnResizeState) {
+            const key = columnResizeState.key;
+            columnResizeState = null;
+            document.body.classList.remove("is-resizing-store-section-master-column");
+            headerFor(key)?.classList.remove("is-column-resizing");
+            saveLayout();
+            announce(`${STORE_SECTION_MASTER_COLUMNS[key].label} column resized.`);
+        }
+        if (columnMoveState) {
+            const state = columnMoveState;
+            columnMoveState = null;
+            document.body.classList.remove("is-moving-store-section-master-column");
+            headerFor(state.key)?.classList.remove("is-column-moving");
+            clearColumnDropState();
+            if (state.active) moveColumn(state.key, state.targetKey, state.after);
+        }
+    });
+
+    const closeColumnsMenu = options => {
+        if (!columnsMenu || !columnsTrigger) return;
+        columnsMenu.hidden = true;
+        columnsTrigger.setAttribute("aria-expanded", "false");
+        if (options?.focusTrigger) columnsTrigger.focus({ preventScroll: true });
+    };
+    columnsTrigger?.addEventListener("click", () => {
+        if (!columnsMenu) return;
+        const open = columnsMenu.hidden;
+        columnsMenu.hidden = !open;
+        columnsTrigger.setAttribute("aria-expanded", String(open));
+        if (open) updateColumnMenu();
+    });
+    columnOptions?.addEventListener("change", event => {
+        const input = event.target.closest("[data-store-section-master-column-toggle]");
+        if (!input) return;
+        const key = input.dataset.storeSectionMasterColumnToggle;
+        if (input.checked) {
+            columnLayout.hidden = columnLayout.hidden.filter(item => item !== key);
+        } else {
+            columnLayout.hidden = [...new Set([...columnLayout.hidden, key])];
+        }
+        saveLayout();
+        applyColumnLayout();
+        announce(`${STORE_SECTION_MASTER_COLUMNS[key].label} column ${input.checked ? "shown" : "hidden"}.`);
+    });
+    fitColumnsButton?.addEventListener("click", fitAllColumns);
+    resetColumnsButton?.addEventListener("click", () => {
+        columnLayout = defaultLayout();
+        saveLayout();
+        applyColumnLayout();
+        announce("Store Section columns reset.");
+    });
+    document.addEventListener("click", event => {
+        if (
+            !columnsMenu?.hidden
+            && !event.target.closest(".store-section-master-columns")
+        ) {
+            closeColumnsMenu();
+        }
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && !columnsMenu?.hidden) {
+            closeColumnsMenu({ focusTrigger: true });
+        }
+    });
+
+    const updateRowOrderControls = () => {
+        const currentRows = rows();
+        currentRows.forEach((row, index) => {
+            const order = row.querySelector(".store-section-master-order");
+            const number = order?.querySelector("span");
+            const up = order?.querySelector('button[value="move_up"]');
+            const down = order?.querySelector('button[value="move_down"]');
+            if (number) number.textContent = String(index + 1);
+            if (up) up.disabled = index === 0;
+            if (down) down.disabled = index === currentRows.length - 1;
+        });
+    };
+    const reorderIsFiltered = () => (
+        Boolean(String(search?.value || "").trim())
+        || String(statusFilter?.value || "all") !== "all"
+    );
+    const updateDragAvailability = () => {
+        const disabled = reorderIsFiltered();
+        rows().forEach(row => {
+            const handle = row.querySelector("[data-store-section-master-drag-handle]");
+            if (!handle) return;
+            handle.draggable = !disabled;
+            handle.setAttribute("aria-disabled", String(disabled));
+            handle.title = disabled
+                ? "Clear the search and show all sections before reordering."
+                : "Drag to reorder Store Sections";
+        });
+    };
+    const persistRowPosition = async (row, position, rollback) => {
+        const body = new URLSearchParams({
+            action: "move_to",
+            position: String(position),
+        });
+        try {
+            const response = await fetch(row.getAttribute("action"), {
+                method: "POST",
+                body,
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "fetch",
+                },
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.ok === false) {
+                throw new Error(result.error || "The new Store Section order could not be saved.");
+            }
+            const displayName = row.querySelector('input[name="display_name"]')?.value
+                || "Store Section";
+            announce(`${displayName} moved to position ${position}.`);
+        } catch (error) {
+            rollback();
+            updateRowOrderControls();
+            announce(error.message || "The new Store Section order could not be saved.");
+        }
+    };
+    const clearRowDropState = () => {
+        rows().forEach(row => row.classList.remove(
+            "is-row-drop-before",
+            "is-row-drop-after",
+            "is-row-dragging",
+        ));
+        rowDropTarget = null;
+        rowDropAfter = false;
+    };
+    list.addEventListener("dragstart", event => {
+        const handle = event.target.closest("[data-store-section-master-drag-handle]");
+        if (!handle || reorderIsFiltered()) {
+            event.preventDefault();
+            return;
+        }
+        draggedRow = handle.closest("[data-store-section-master-row]");
+        if (!draggedRow) return;
+        draggedRow.classList.add("is-row-dragging");
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(
+            "text/plain",
+            draggedRow.dataset.storeSectionId || "",
+        );
+    });
+    list.addEventListener("dragover", event => {
+        if (!draggedRow) return;
+        const target = event.target.closest("[data-store-section-master-row]");
+        if (!target || target === draggedRow || !list.contains(target)) return;
+        event.preventDefault();
+        clearRowDropState();
+        draggedRow.classList.add("is-row-dragging");
+        const rect = target.getBoundingClientRect();
+        rowDropAfter = event.clientY > rect.top + rect.height / 2;
+        rowDropTarget = target;
+        target.classList.add(rowDropAfter ? "is-row-drop-after" : "is-row-drop-before");
+    });
+    list.addEventListener("drop", event => {
+        if (!draggedRow || !rowDropTarget) return;
+        event.preventDefault();
+        const movingRow = draggedRow;
+        const originalNextSibling = movingRow.nextElementSibling;
+        const target = rowDropTarget;
+        const placeAfter = rowDropAfter;
+        clearRowDropState();
+        target.insertAdjacentElement(placeAfter ? "afterend" : "beforebegin", movingRow);
+        const position = rows().indexOf(movingRow) + 1;
+        updateRowOrderControls();
+        const rollback = () => {
+            if (originalNextSibling?.parentElement === list) {
+                list.insertBefore(movingRow, originalNextSibling);
+            } else {
+                list.append(movingRow);
+            }
+        };
+        persistRowPosition(movingRow, position, rollback);
+        draggedRow = null;
+    });
+    list.addEventListener("dragend", () => {
+        clearRowDropState();
+        draggedRow = null;
+    });
+
     const applyFilters = () => {
         const query = String(search?.value || "").trim().toLocaleLowerCase();
         const status = String(statusFilter?.value || "all");
+        const currentRows = rows();
         let count = 0;
-        rows.forEach(row => {
+        currentRows.forEach(row => {
             const name = String(row.dataset.storeSectionName || "");
             const key = String(row.dataset.storeSectionKey || "");
             const matchesQuery = !query || `${name} ${key}`.includes(query);
@@ -37719,14 +38241,14 @@ function initStoreSectionMasterTable() {
             if (visible) count += 1;
         });
         if (visibleCount) {
-            visibleCount.textContent = `${count} of ${rows.length} shown`;
+            visibleCount.textContent = `${count} of ${currentRows.length} shown`;
         }
         if (filterEmpty) {
-            filterEmpty.hidden = count > 0 || rows.length === 0;
+            filterEmpty.hidden = count > 0 || currentRows.length === 0;
         }
+        updateDragAvailability();
     };
-
-    rows.forEach(row => {
+    rows().forEach(row => {
         const nameInput = row.querySelector('input[name="display_name"]');
         nameInput?.addEventListener("input", () => {
             row.dataset.storeSectionName = String(nameInput.value || "")
@@ -37737,6 +38259,10 @@ function initStoreSectionMasterTable() {
     });
     search?.addEventListener("input", applyFilters);
     statusFilter?.addEventListener("change", applyFilters);
+    window.addEventListener("resize", applyColumnLayout);
+    decorateHeaders();
+    applyColumnLayout();
+    updateRowOrderControls();
     applyFilters();
 }
 

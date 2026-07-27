@@ -128,6 +128,21 @@ def test_store_section_definitions_are_workspace_scoped_and_manageable(monkeypat
     assert custom["display_name"] == "Global Foods"
     assert custom["icon"] == "heart"
 
+    moved_to = master_data.update_ingredient_store_section_definition(
+        created["id"],
+        action="move_to",
+        position=2,
+        user_id="user-a",
+    )
+    assert moved_to["ok"] is True
+    assert moved_to["changed"] is True
+    assert moved_to["position"] == 2
+    reordered = master_data.ingredient_store_section_details(
+        "user-a",
+        include_inactive=True,
+    )
+    assert reordered[1]["id"] == created["id"]
+
     moved = master_data.update_ingredient_store_section_definition(
         created["id"],
         action="move_up",
