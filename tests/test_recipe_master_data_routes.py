@@ -1899,6 +1899,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "store-section-master-table-head" in page
     assert "Order / Icon" in page
     assert "Store Section" in page
+    assert "Section Type" in page
+    assert "Built in" in page
+    assert "Custom" in page
     assert "Usage" in page
     assert "Actions" in page
     assert "data-store-section-master-icon-picker" in page
@@ -1908,6 +1911,8 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "function initStoreSectionMasterTable()" in script
     assert "function initStoreSectionMasterIconPickers()" in script
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
+    assert '"type",' in script
+    assert 'label: "Section Type"' in script
     assert "storeSectionMasterColumnResize" in script
     assert 'action: "move_to"' in script
     assert "persistRowPosition" in script

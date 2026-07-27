@@ -224,6 +224,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                     <div role="columnheader" data-store-section-master-column="order">Order / Icon</div>
                     <div role="columnheader" data-store-section-master-column="section">Store Section</div>
                     <div role="columnheader" data-store-section-master-column="icon">Icon</div>
+                    <div role="columnheader" data-store-section-master-column="type">Section Type</div>
                     <div role="columnheader" data-store-section-master-column="usage">Usage</div>
                     <div role="columnheader" data-store-section-master-column="status">Status</div>
                     <div role="columnheader" data-store-section-master-column="actions">Actions</div>
@@ -308,6 +309,14 @@ data-user-id="{{ master_data.scope_user_id }}"
                              role="cell"
                              data-store-section-master-cell="icon">
                             {{ store_section_icon_picker(section.icon, "Icon for " ~ section.display_name) }}
+                        </div>
+
+                        <div class="store-section-master-type"
+                             role="cell"
+                             data-store-section-master-cell="type">
+                            <span class="{% if section.is_builtin %}is-built-in{% else %}is-custom{% endif %}">
+                                {% if section.is_builtin %}Built in{% else %}Custom{% endif %}
+                            </span>
                         </div>
 
                         <div class="store-section-master-usage"

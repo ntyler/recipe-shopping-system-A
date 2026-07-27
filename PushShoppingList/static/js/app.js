@@ -37668,6 +37668,7 @@ const STORE_SECTION_MASTER_COLUMN_ORDER = [
     "order",
     "section",
     "icon",
+    "type",
     "usage",
     "status",
     "actions",
@@ -37690,6 +37691,12 @@ const STORE_SECTION_MASTER_COLUMNS = {
         fallbackWidth: 250,
         minWidth: 150,
         maxWidth: 420,
+    },
+    type: {
+        label: "Section Type",
+        fallbackWidth: 130,
+        minWidth: 108,
+        maxWidth: 220,
     },
     usage: {
         label: "Usage",
