@@ -37663,6 +37663,83 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
     renderStoreSectionMasterIconVisual(rowIcon, normalizedIcon);
 }
 
+function initStoreSectionMasterTable() {
+    const page = document.querySelector(".store-section-master-page");
+    if (!page) return;
+
+    const createPanel = page.querySelector("[data-store-section-master-create-panel]");
+    const createToggle = page.querySelector("[data-store-section-master-create-toggle]");
+    const createCancel = page.querySelector("[data-store-section-master-create-cancel]");
+    const createNameInput = createPanel?.querySelector('input[name="display_name"]');
+    const setCreatePanelOpen = open => {
+        if (!createPanel || !createToggle) return;
+        createPanel.hidden = !open;
+        createToggle.setAttribute("aria-expanded", String(open));
+        createToggle.classList.toggle("is-open", open);
+        if (open) {
+            createNameInput?.focus({ preventScroll: true });
+        } else {
+            createToggle.focus({ preventScroll: true });
+        }
+    };
+
+    if (createPanel && createToggle) {
+        createPanel.hidden = true;
+        createToggle.hidden = false;
+        if (createCancel) createCancel.hidden = false;
+        createToggle.addEventListener("click", () => {
+            setCreatePanelOpen(createPanel.hidden);
+        });
+        createCancel?.addEventListener("click", () => setCreatePanelOpen(false));
+        createPanel.addEventListener("keydown", event => {
+            if (event.key !== "Escape") return;
+            if (event.target.closest("[data-store-section-master-icon-menu]")) return;
+            event.preventDefault();
+            setCreatePanelOpen(false);
+        });
+    }
+
+    const search = page.querySelector("[data-store-section-master-search]");
+    const statusFilter = page.querySelector("[data-store-section-master-status-filter]");
+    const rows = [...page.querySelectorAll("[data-store-section-master-row]")];
+    const visibleCount = page.querySelector("[data-store-section-master-visible-count]");
+    const filterEmpty = page.querySelector("[data-store-section-master-filter-empty]");
+    const applyFilters = () => {
+        const query = String(search?.value || "").trim().toLocaleLowerCase();
+        const status = String(statusFilter?.value || "all");
+        let count = 0;
+        rows.forEach(row => {
+            const name = String(row.dataset.storeSectionName || "");
+            const key = String(row.dataset.storeSectionKey || "");
+            const matchesQuery = !query || `${name} ${key}`.includes(query);
+            const matchesStatus = status === "all"
+                || row.dataset.storeSectionStatus === status;
+            const visible = matchesQuery && matchesStatus;
+            row.hidden = !visible;
+            if (visible) count += 1;
+        });
+        if (visibleCount) {
+            visibleCount.textContent = `${count} of ${rows.length} shown`;
+        }
+        if (filterEmpty) {
+            filterEmpty.hidden = count > 0 || rows.length === 0;
+        }
+    };
+
+    rows.forEach(row => {
+        const nameInput = row.querySelector('input[name="display_name"]');
+        nameInput?.addEventListener("input", () => {
+            row.dataset.storeSectionName = String(nameInput.value || "")
+                .trim()
+                .toLocaleLowerCase();
+            applyFilters();
+        });
+    });
+    search?.addEventListener("input", applyFilters);
+    statusFilter?.addEventListener("change", applyFilters);
+    applyFilters();
+}
+
 function initStoreSectionMasterIconPickers() {
     const pickers = [...document.querySelectorAll("[data-store-section-master-icon-picker]")];
     if (!pickers.length) return;
@@ -53184,6 +53261,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initRecipeEditContextPanels", initRecipeEditContextPanels],
         ["initRecipeImageProviderSelector", initRecipeImageProviderSelector],
         ["initRecipeImageThumbnailSizeControls", initRecipeImageThumbnailSizeControls],
+        ["initStoreSectionMasterTable", initStoreSectionMasterTable],
         ["initStoreSectionMasterIconPickers", initStoreSectionMasterIconPickers],
     ].forEach(([name, callback]) => runStartupTask(name, callback));
 

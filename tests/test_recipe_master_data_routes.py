@@ -1870,18 +1870,31 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "store_section_url" in template
     assert "Store Sections" in page
     assert "Add Store Section" in page
+    assert "data-store-section-master-search" in page
+    assert "data-store-section-master-status-filter" in page
+    assert "data-store-section-master-create-toggle" in page
+    assert "store-section-master-table-head" in page
+    assert "Order / Icon" in page
+    assert "Store Section" in page
+    assert "Usage" in page
+    assert "Actions" in page
     assert "data-store-section-master-icon-picker" in page
     assert "data-store-section-master-icon-option" in page
+    assert "function initStoreSectionMasterTable()" in script
     assert "function initStoreSectionMasterIconPickers()" in script
     assert "renderStoreSectionMasterIconVisual" in script
     assert 'selected?.scrollIntoView({ block: "nearest" });' in script
     assert "Number(event.detail || 0) < 2" in script
     assert "focusOption: Number(event.detail || 0) >= 2" in script
+    assert '["initStoreSectionMasterTable", initStoreSectionMasterTable]' in script
     assert '["initStoreSectionMasterIconPickers", initStoreSectionMasterIconPickers]' in script
+    assert ".store-section-master-table-toolbar" in css
+    assert ".store-section-master-table-head" in css
+    assert ".store-section-master-row[hidden]" in css
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css
     assert (
         ".store-section-master-row\n"
         "    :is(.store-section-master-identity, .store-section-master-icon-field)"
     ) in css
-    assert "align-self: start;" in css
+    assert "align-self: center;" in css
