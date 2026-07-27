@@ -1932,6 +1932,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert 'action: "move_to"' in script
     assert "persistRowPosition" in script
     assert "renderStoreSectionMasterIconVisual" in script
+    assert "const updateRowDirtyState = () => {" in script
+    assert "nameInput?.classList.toggle(\"is-dirty\", nameIsDirty)" in script
+    assert "iconPicker?.classList.toggle(\"is-dirty\", iconIsDirty)" in script
+    assert "button.disabled = !rowIsDirty" in script
     assert 'selected?.scrollIntoView({ block: "nearest" });' in script
     assert "Number(event.detail || 0) < 2" in script
     assert "focusOption: Number(event.detail || 0) >= 2" in script
@@ -1946,6 +1950,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".is-row-drop-before" in css
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css
+    assert ".store-section-master-identity input:hover" in css
+    assert ".store-section-master-icon-picker.is-open" in css
+    assert ".store-section-master-icon-picker.is-dirty" in css
+    assert ".store-section-master-row.is-dirty" in css
     assert (
         ".store-section-master-row\n"
         "    :is(.store-section-master-identity, .store-section-master-icon-field)"

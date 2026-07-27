@@ -38268,11 +38268,34 @@ function initStoreSectionMasterTable() {
     };
     rows().forEach(row => {
         const nameInput = row.querySelector('input[name="display_name"]');
+        const iconSelect = row.querySelector(
+            "[data-store-section-master-icon-select]",
+        );
+        const iconPicker = row.querySelector(
+            "[data-store-section-master-icon-picker]",
+        );
+        const saveButtons = [
+            ...row.querySelectorAll('button[name="action"][value="save"]'),
+        ];
+        const initialName = String(nameInput?.value || "");
+        const initialIcon = String(iconSelect?.value || "");
+        const updateRowDirtyState = () => {
+            const nameIsDirty = String(nameInput?.value || "") !== initialName;
+            const iconIsDirty = String(iconSelect?.value || "") !== initialIcon;
+            const rowIsDirty = nameIsDirty || iconIsDirty;
+            nameInput?.classList.toggle("is-dirty", nameIsDirty);
+            iconPicker?.classList.toggle("is-dirty", iconIsDirty);
+            row.classList.toggle("is-dirty", rowIsDirty);
+            saveButtons.forEach(button => {
+                button.disabled = !rowIsDirty;
+            });
+        };
         nameInput?.addEventListener("input", () => {
             row.dataset.storeSectionName = String(nameInput.value || "")
                 .trim()
                 .toLocaleLowerCase();
             applyFilters();
+            updateRowDirtyState();
         });
         nameInput?.addEventListener("keydown", event => {
             if (event.key !== "Enter" || event.isComposing) return;
@@ -38282,6 +38305,8 @@ function initStoreSectionMasterTable() {
             ) || row.querySelector('button[name="action"][value="save"]');
             if (saveButton) row.requestSubmit(saveButton);
         });
+        iconSelect?.addEventListener("change", updateRowDirtyState);
+        updateRowDirtyState();
     });
     search?.addEventListener("input", applyFilters);
     statusFilter?.addEventListener("change", applyFilters);
