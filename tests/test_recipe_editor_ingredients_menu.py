@@ -673,8 +673,11 @@ def test_recipe_editor_requested_headers_filter_and_sort_as_combined_view_only_m
     assert "list.appendChild" not in view
     assert 'function clearRecipeIngredientColumnView(columnKey = "", options = {})' in view
     assert "filterKeys: new Map()" in script
-    assert 'sortColumn: ""' in script
-    assert 'sortMode: "manual"' in view
+    assert "sorts: []" in script
+    assert "function recipeIngredientColumnViewSorts()" in view
+    assert "function setRecipeIngredientColumnViewSort(columnKey, requestedMode)" in view
+    assert "function moveRecipeIngredientColumnViewSort(columnKey, direction)" in view
+    assert "sorts.push({ columnKey, mode });" in view
     assert "groupByStoreSection: false" in script
 
     assert "function ensureRecipeIngredientColumnViewTrigger(header)" in view
@@ -700,6 +703,8 @@ def test_recipe_editor_requested_headers_filter_and_sort_as_combined_view_only_m
     assert ".recipe-edit-ingredient-column-view-trigger" in css
     assert ".recipe-edit-row-menu.recipe-edit-ingredient-column-view-menu" in css
     assert ".recipe-edit-ingredient-column-view-option" in css
+    assert ".recipe-edit-ingredient-column-view-sort-badge" in css
+    assert ".recipe-edit-ingredient-column-view-sort-priority" in css
     assert ".recipe-edit-ingredient-column-view-empty" in css
     assert ".recipe-edit-ingredient-row:is(" in css
     assert ".is-ingredient-column-filtered" in css
@@ -722,17 +727,26 @@ def test_recipe_editor_store_section_menu_can_group_rows_without_reordering_row_
     assert 'list.insertAdjacentElement("beforeend", header);' in view
     assert "list.appendChild(entry.row)" not in view
     assert "Group rows by Store Section" in view
-    assert "Ingredients keep their manual order within each section." in view
+    assert "Sort other columns to order ingredients within each section." in view
     assert "[data-recipe-ingredient-column-view-group-store]" in view
     assert "recipeEditIngredientColumnView.groupByStoreSection = false;" in view
     assert "renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows);" in view
     assert "function recipeIngredientColumnViewDescription()" in view
+    assert "function compareRecipeIngredientColumnViewSort(left, right, sort, storeOrder)" in view
     assert "function recipeIngredientColumnViewCompare(left, right, storeOrder, manualStoreOrder)" in view
-    assert 'mode === "az" || mode === "za"' in view
-    assert 'if (columnKey !== "store") {' in view
-    assert 'recipeEditIngredientColumnView.sortColumn !== "store"' in view
+    assert "for (const sort of sorts)" in view
+    assert 'if (sort.columnKey === "store") continue;' in view
+    assert "setRecipeIngredientColumnViewSort(columnKey, mode);" in view
+    assert "recipeEditIngredientColumnView.groupByStoreSection = false;" not in view[
+        view.index('menu.querySelectorAll("[data-recipe-ingredient-column-view-sort]")'):
+        view.index('menu.querySelector("[data-recipe-ingredient-column-view-group-store]")')
+    ]
     assert 'data-recipe-ingredient-column-view-sort-legend' in view
     assert '"Sort groups"' in view
+    assert '"Sort within groups"' in view
+    assert "Column sorts combine in priority order." in view
+    assert "data-recipe-ingredient-column-view-sort-move" in view
+    assert "data-recipe-ingredient-column-view-sort-priority" in view
 
     assert ".recipe-edit-ingredient-column-view-group-note" in css
     assert ".recipe-edit-ingredient-column-group-header" in css
