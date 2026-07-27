@@ -1905,6 +1905,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "data-store-section-master-search" in page
     assert "data-store-section-master-status-filter" in page
     assert "data-store-section-master-columns-trigger" in page
+    assert "data-store-section-master-mobile-save" in page
     assert 'data-store-section-master-column="order"' in page
     assert "data-store-section-master-drag-handle" in page
     assert "store-section-master-table-head" in page
@@ -1922,6 +1923,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "function initStoreSectionMasterTable()" in script
     assert "function initStoreSectionMasterIconPickers()" in script
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
+    assert "STORE_SECTION_MASTER_MOBILE_COLUMNS" in script
+    assert '!STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key)' in script
+    assert "row.requestSubmit(saveButton)" in script
     assert '"type",' in script
     assert 'label: "Section Type"' in script
     assert "storeSectionMasterColumnResize" in script
@@ -1938,6 +1942,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-row[hidden]" in css
     assert ".store-section-master-column-resize" in css
     assert ".store-section-master-drag-handle" in css
+    assert ".store-section-master-mobile-save" in css
     assert ".is-row-drop-before" in css
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css

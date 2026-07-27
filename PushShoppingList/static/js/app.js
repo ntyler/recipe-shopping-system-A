@@ -37673,6 +37673,10 @@ const STORE_SECTION_MASTER_COLUMN_ORDER = [
     "status",
     "actions",
 ];
+const STORE_SECTION_MASTER_MOBILE_COLUMNS = [
+    "order",
+    "section",
+];
 const STORE_SECTION_MASTER_COLUMNS = {
     order: {
         label: "Order / Icon",
@@ -37845,9 +37849,9 @@ function initStoreSectionMasterTable() {
         const displayOrder = desktop
             ? columnLayout.order
             : STORE_SECTION_MASTER_COLUMN_ORDER;
-        const visibleOrder = displayOrder.filter(
-            key => !desktop || !columnLayout.hidden.includes(key),
-        );
+        const visibleOrder = desktop
+            ? displayOrder.filter(key => !columnLayout.hidden.includes(key))
+            : STORE_SECTION_MASTER_MOBILE_COLUMNS;
 
         displayOrder.forEach(key => {
             const header = headerFor(key);
@@ -37861,12 +37865,20 @@ function initStoreSectionMasterTable() {
         });
 
         STORE_SECTION_MASTER_COLUMN_ORDER.forEach(key => {
-            const hidden = desktop && columnLayout.hidden.includes(key);
+            const hidden = desktop
+                ? columnLayout.hidden.includes(key)
+                : !STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key);
             const header = headerFor(key);
-            if (header) header.hidden = hidden;
+            if (header) {
+                header.hidden = hidden;
+                if (hidden) header.removeAttribute("aria-colindex");
+            }
             rows().forEach(row => {
                 const cell = cellFor(row, key);
-                if (cell) cell.hidden = hidden;
+                if (cell) {
+                    cell.hidden = hidden;
+                    if (hidden) cell.removeAttribute("aria-colindex");
+                }
             });
         });
 
@@ -37880,18 +37892,17 @@ function initStoreSectionMasterTable() {
             ) + Math.max(0, visibleOrder.length - 1) * 12 + 28;
             table.style.setProperty("--store-section-master-grid", grid);
             table.style.setProperty("--store-section-master-grid-width", `${gridWidth}px`);
-            table.setAttribute("aria-colcount", String(visibleOrder.length));
-            visibleOrder.forEach((key, index) => {
-                headerFor(key)?.setAttribute("aria-colindex", String(index + 1));
-                rows().forEach(row => {
-                    cellFor(row, key)?.setAttribute("aria-colindex", String(index + 1));
-                });
-            });
         } else {
             table.style.removeProperty("--store-section-master-grid");
             table.style.removeProperty("--store-section-master-grid-width");
-            table.removeAttribute("aria-colcount");
         }
+        table.setAttribute("aria-colcount", String(visibleOrder.length));
+        visibleOrder.forEach((key, index) => {
+            headerFor(key)?.setAttribute("aria-colindex", String(index + 1));
+            rows().forEach(row => {
+                cellFor(row, key)?.setAttribute("aria-colindex", String(index + 1));
+            });
+        });
         updateColumnMenu();
     };
     const moveColumn = (key, targetKey, after = false) => {
@@ -38262,6 +38273,14 @@ function initStoreSectionMasterTable() {
                 .trim()
                 .toLocaleLowerCase();
             applyFilters();
+        });
+        nameInput?.addEventListener("keydown", event => {
+            if (event.key !== "Enter" || event.isComposing) return;
+            event.preventDefault();
+            const saveButton = row.querySelector(
+                '[data-store-section-master-mobile-save]',
+            ) || row.querySelector('button[name="action"][value="save"]');
+            if (saveButton) row.requestSubmit(saveButton);
         });
     });
     search?.addEventListener("input", applyFilters);
