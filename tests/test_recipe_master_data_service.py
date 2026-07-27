@@ -169,22 +169,38 @@ def test_store_section_definitions_are_workspace_scoped_and_manageable(monkeypat
 
 def test_store_section_definition_cannot_be_archived_while_in_use(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
-    master_data.sync_recipe_master_records(
-        "https://example.com/produce-usage",
-        recipe_data={"ingredients": [{"ingredient": "Tomato", "store_section": "Produce"}]},
+    created = master_data.create_ingredient_store_section(
+        "Market Produce",
+        "leaf",
         user_id="user-a",
     )
-    produce = next(
+    assert created["ok"] is True
+    master_data.sync_recipe_master_records(
+        "https://example.com/produce-usage",
+        recipe_data={"ingredients": [{"ingredient": "Tomato", "store_section": "Market Produce"}]},
+        user_id="user-a",
+    )
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "UPDATE ingredients SET store_section = ? WHERE user_id = ? AND normalized_name = ?",
+            (created["section_key"], "user-a", "tomato"),
+        )
+        connection.execute(
+            "UPDATE recipe_ingredients SET store_section = ? WHERE user_id = ? AND normalized_name = ?",
+            (created["section_key"], "user-a", "tomato"),
+        )
+    custom_section = next(
         section
         for section in master_data.ingredient_store_section_details(
             "user-a",
             include_inactive=True,
+            create=True,
         )
-        if section["section_key"] == "PRODUCE"
+        if section["id"] == created["id"]
     )
 
     result = master_data.update_ingredient_store_section_definition(
-        produce["id"],
+        custom_section["id"],
         action="archive",
         user_id="user-a",
     )
@@ -192,6 +208,42 @@ def test_store_section_definition_cannot_be_archived_while_in_use(monkeypatch, t
     assert result["ok"] is False
     assert result["status"] == 409
     assert "Reassign" in result["error"]
+
+
+def test_builtin_store_section_cannot_be_archived_when_unused(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    bakery = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+            create=True,
+        )
+        if section["section_key"] == "BAKERY"
+    )
+    assert bakery["is_builtin"] is True
+    assert bakery["ingredient_count"] == 0
+    assert bakery["recipe_reference_count"] == 0
+
+    result = master_data.update_ingredient_store_section_definition(
+        bakery["id"],
+        action="archive",
+        user_id="user-a",
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == 409
+    assert result["error"] == "Built-in Store Sections cannot be archived."
+    refreshed = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+            create=True,
+        )
+        if section["id"] == bakery["id"]
+    )
+    assert refreshed["is_active"] is True
 
 
 def test_sync_recipe_master_records_replaces_only_current_users_recipe_links(monkeypatch, tmp_path):

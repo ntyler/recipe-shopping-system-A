@@ -1470,6 +1470,12 @@ def update_ingredient_store_section_definition(
             }
 
         if action == "archive":
+            if bool(row["is_builtin"]):
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": "Built-in Store Sections cannot be archived.",
+                }
             usage = connection.execute(
                 """
                 SELECT

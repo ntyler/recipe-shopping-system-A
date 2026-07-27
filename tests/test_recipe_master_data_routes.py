@@ -1823,6 +1823,10 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert "data-store-section-master-icon-picker" in html
         assert 'data-store-section-master-icon-option="leaf"' in html
         assert "recipe-edit-store-section-icon is-leaf" in html
+        bakery_row = html.split('data-store-section-key="bakery"', 1)[1].split("</form>", 1)[0]
+        bakery_archive_attributes = bakery_row.split('value="archive"', 1)[1].split(">", 1)[0]
+        assert "disabled" in bakery_archive_attributes
+        assert "Built-in Store Sections cannot be archived." in bakery_archive_attributes
 
         created = client.post(
             "/admin/master-data/store-sections",
@@ -1830,7 +1834,14 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
             follow_redirects=True,
         )
         assert created.status_code == 200
-        assert "Store Section created: International Foods." in created.get_data(as_text=True)
+        created_html = created.get_data(as_text=True)
+        assert "Store Section created: International Foods." in created_html
+        custom_row = created_html.split(
+            'data-store-section-key="international foods"',
+            1,
+        )[1].split("</form>", 1)[0]
+        custom_archive_attributes = custom_row.split('value="archive"', 1)[1].split(">", 1)[0]
+        assert "disabled" not in custom_archive_attributes
         section = next(
             item
             for item in master_data.ingredient_store_section_details(

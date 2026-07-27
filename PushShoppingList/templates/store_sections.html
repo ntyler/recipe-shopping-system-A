@@ -349,8 +349,14 @@ data-user-id="{{ master_data.scope_user_id }}"
                                         name="action"
                                         value="archive"
                                         class="danger"
-                                        {% if usage_total %}disabled
+                                        {% if section.is_builtin or usage_total %}disabled
+                                        {% endif %}
+                                        {% if section.is_builtin %}
+                                            title="Built-in Store Sections cannot be archived."
+                                            aria-label="Archive unavailable for {{ section.display_name }}: built-in Store Sections cannot be archived."
+                                        {% elif usage_total %}
                                             title="Reassign the ingredients using this section before archiving it."
+                                            aria-label="Archive unavailable for {{ section.display_name }}: reassign its ingredients first."
                                         {% endif %}>
                                     Archive
                                 </button>
