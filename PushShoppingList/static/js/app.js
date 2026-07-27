@@ -37599,7 +37599,7 @@ function positionStoreSectionMasterIconMenu(picker) {
     if (!trigger || !menu) return;
     const rect = trigger.getBoundingClientRect();
     const gutter = 10;
-    const menuWidth = Math.max(230, rect.width);
+    const menuWidth = Math.max(220, rect.width);
     const left = Math.max(
         gutter,
         Math.min(rect.left, window.innerWidth - menuWidth - gutter),

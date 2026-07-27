@@ -2131,3 +2131,26 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "align-self: center;" in css
     assert ".store-section-master-row .store-section-master-icon-field" in css
     assert ".store-section-master-row .store-section-master-icon-picker" in css
+
+
+def test_store_section_icon_picker_matches_recipe_table_dropdown_chrome():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    page = Path("PushShoppingList/templates/store_sections.html").read_text(
+        encoding="utf-8",
+    )
+
+    assert '{% import "includes/app_shell_macros.html" as shell %}' in page
+    assert 'role="combobox"' in page
+    assert 'shell.svg_icon("chevron-down")' in page
+    assert 'shell.svg_icon("check")' in page
+    assert "grid-template-columns: 16px minmax(0, 1fr) 14px;" in css
+    assert "> [data-store-section-master-icon-label]" in css
+    assert ".store-section-master-row .store-section-master-icon-chevron" in css
+    assert "opacity: 0;" in css
+    assert (
+        ".store-section-master-icon-trigger:is(:hover, :focus-visible)"
+        in css
+    )
+    assert "grid-template-columns: 17px minmax(0, 1fr) 16px;" in css
+    assert "const menuWidth = Math.max(220, rect.width);" in script

@@ -1,4 +1,5 @@
 {% extends "layouts/app_layout.html" %}
+{% import "includes/app_shell_macros.html" as shell %}
 {% set app_page_title = master_data.title %}
 {% set app_shell_mode = "route" %}
 {% set app_active_nav_item = "settings" %}
@@ -37,6 +38,7 @@
         </select>
         <button type="button"
                 class="store-section-master-icon-trigger"
+                role="combobox"
                 aria-haspopup="listbox"
                 aria-expanded="false"
                 data-store-section-master-icon-trigger
@@ -48,7 +50,9 @@
             <span data-store-section-master-icon-label>
                 {{ selected_icon|replace("_", " ")|title }}
             </span>
-            <span class="store-section-master-icon-chevron" aria-hidden="true">⌄</span>
+            <span class="store-section-master-icon-chevron" aria-hidden="true">
+                {{ shell.svg_icon("chevron-down") }}
+            </span>
         </button>
         <div class="store-section-master-icon-menu"
              role="listbox"
@@ -66,7 +70,9 @@
                           data-icon="{{ icon }}"
                           aria-hidden="true">{{ icon_glyphs.get(icon, icon_glyphs["basket"]) }}</span>
                     <span>{{ icon|replace("_", " ")|title }}</span>
-                    <span class="store-section-master-icon-check" aria-hidden="true">✓</span>
+                    <span class="store-section-master-icon-check" aria-hidden="true">
+                        {{ shell.svg_icon("check") }}
+                    </span>
                 </button>
             {% endfor %}
         </div>
