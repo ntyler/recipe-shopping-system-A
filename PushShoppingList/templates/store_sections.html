@@ -424,7 +424,13 @@ data-user-id="{{ master_data.scope_user_id }}"
                         <span>Usage details</span>
                         <h2 id="storeSectionMasterUsageTitle"
                             data-store-section-master-usage-title>
-                            Store Section usage
+                            <span class="store-section-master-usage-title-icon recipe-edit-store-section-icon is-basket"
+                                  data-store-section-master-usage-icon
+                                  data-icon="basket"
+                                  aria-hidden="true">{{ icon_glyphs["basket"] }}</span>
+                            <span data-store-section-master-usage-title-text>
+                                Store Section usage
+                            </span>
                         </h2>
                         <p data-store-section-master-usage-summary>
                             Select a usage count to see its records.

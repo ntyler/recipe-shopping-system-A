@@ -2179,3 +2179,24 @@ def test_store_section_order_column_uses_step_badges_without_duplicate_icons():
     assert 'label: "Order"' in script
     assert '"[data-store-section-master-order-number]"' in script
     assert 'number.setAttribute("aria-label", `Step ${index + 1}`);' in script
+
+
+def test_store_section_usage_dialog_title_uses_the_selected_section_icon():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    page = Path("PushShoppingList/templates/store_sections.html").read_text(
+        encoding="utf-8",
+    )
+
+    assert "data-store-section-master-usage-icon" in page
+    assert "data-store-section-master-usage-title-text" in page
+    assert "store-section-master-usage-title-icon" in page
+    assert ".store-section-master-usage-title-icon {" in css
+    assert "flex: 0 0 20px;" in css
+    assert (
+        'const titleIcon = dialog.querySelector("[data-store-section-master-usage-icon]");'
+        in script
+    )
+    assert '"[data-store-section-master-icon-select]"' in script
+    assert "renderStoreSectionMasterIconVisual(titleIcon, sectionIcon);" in script
+    assert "titleText.textContent = `${sectionName} usage`;" in script

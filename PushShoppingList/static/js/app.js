@@ -38401,6 +38401,10 @@ function initStoreSectionMasterUsageDialog() {
     if (!page || !dialog || typeof dialog.showModal !== "function") return;
 
     const title = dialog.querySelector("[data-store-section-master-usage-title]");
+    const titleIcon = dialog.querySelector("[data-store-section-master-usage-icon]");
+    const titleText = dialog.querySelector(
+        "[data-store-section-master-usage-title-text]",
+    );
     const summary = dialog.querySelector("[data-store-section-master-usage-summary]");
     const search = dialog.querySelector("[data-store-section-master-usage-search]");
     const visibleCount = dialog.querySelector(
@@ -38658,11 +38662,19 @@ function initStoreSectionMasterUsageDialog() {
         const row = trigger.closest("[data-store-section-master-row]");
         const sectionName = row?.querySelector('input[name="display_name"]')?.value
             || "Store Section";
+        const sectionIcon = row?.querySelector(
+            "[data-store-section-master-icon-select]",
+        )?.value || "basket";
         const usageUrl = String(
             trigger.dataset.storeSectionMasterUsageUrl || "",
         );
         const requestedKind = trigger.dataset.storeSectionMasterUsageKind;
-        if (title) title.textContent = `${sectionName} usage`;
+        renderStoreSectionMasterIconVisual(titleIcon, sectionIcon);
+        if (titleText) {
+            titleText.textContent = `${sectionName} usage`;
+        } else if (title) {
+            title.textContent = `${sectionName} usage`;
+        }
         if (summary) summary.textContent = "Loading usage details…";
         if (search) search.value = "";
         Object.values(tabCounts).forEach(element => {
