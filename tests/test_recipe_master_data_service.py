@@ -210,6 +210,72 @@ def test_store_section_definition_cannot_be_archived_while_in_use(monkeypatch, t
     assert "Reassign" in result["error"]
 
 
+def test_store_section_usage_groups_references_by_recipe_and_workspace(
+    monkeypatch,
+    tmp_path,
+):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/produce-salad",
+        recipe_data={
+            "ingredients": [
+                {"ingredient": "Tomato", "store_section": "Produce"},
+                {"ingredient": "Basil", "store_section": "Produce"},
+            ],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/tomato-soup",
+        recipe_data={
+            "ingredients": [
+                {"ingredient": "Tomato", "store_section": "Produce"},
+            ],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/other-workspace",
+        recipe_data={
+            "ingredients": [
+                {"ingredient": "Garlic", "store_section": "Produce"},
+            ],
+        },
+        user_id="user-b",
+    )
+    produce = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+            create=True,
+        )
+        if section["section_key"] == "PRODUCE"
+    )
+
+    usage = master_data.ingredient_store_section_usage(
+        produce["id"],
+        user_id="user-a",
+    )
+
+    assert usage["section"]["display_name"] == "Produce"
+    assert usage["ingredient_total"] == 2
+    assert usage["recipe_reference_total"] == 3
+    assert usage["recipe_total"] == 2
+    assert {item["name"] for item in usage["ingredients"]} == {"Basil", "Tomato"}
+    salad = next(
+        recipe
+        for recipe in usage["recipes"]
+        if recipe["recipe_id"] == "https://example.com/produce-salad"
+    )
+    assert salad["reference_count"] == 2
+    assert set(salad["ingredients"]) == {"Basil", "Tomato"}
+    assert master_data.ingredient_store_section_usage(
+        produce["id"],
+        user_id="user-b",
+    ) is None
+
+
 def test_builtin_store_section_cannot_be_archived_when_unused(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     bakery = next(

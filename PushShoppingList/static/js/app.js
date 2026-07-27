@@ -38317,6 +38317,306 @@ function initStoreSectionMasterTable() {
     applyFilters();
 }
 
+function initStoreSectionMasterUsageDialog() {
+    const page = document.querySelector(".store-section-master-page");
+    const dialog = page?.querySelector("[data-store-section-master-usage-dialog]");
+    if (!page || !dialog || typeof dialog.showModal !== "function") return;
+
+    const title = dialog.querySelector("[data-store-section-master-usage-title]");
+    const summary = dialog.querySelector("[data-store-section-master-usage-summary]");
+    const search = dialog.querySelector("[data-store-section-master-usage-search]");
+    const visibleCount = dialog.querySelector(
+        "[data-store-section-master-usage-visible-count]",
+    );
+    const results = dialog.querySelector("[data-store-section-master-usage-results]");
+    const tabs = [
+        ...dialog.querySelectorAll("[data-store-section-master-usage-tab]"),
+    ];
+    const tabCounts = {
+        ingredients: dialog.querySelector(
+            '[data-store-section-master-usage-tab-count="ingredients"]',
+        ),
+        recipes: dialog.querySelector(
+            '[data-store-section-master-usage-tab-count="recipes"]',
+        ),
+    };
+    let activeKind = "ingredients";
+    let usagePayload = null;
+    let lastTrigger = null;
+    let requestSequence = 0;
+
+    const pluralize = (count, singular, plural = `${singular}s`) => (
+        `${count} ${Number(count) === 1 ? singular : plural}`
+    );
+    const setLoadingState = message => {
+        if (results) {
+            results.innerHTML = `
+                <div class="store-section-master-usage-state is-loading">
+                    <span aria-hidden="true"></span>
+                    <strong>${escapeHtml(message)}</strong>
+                </div>
+            `;
+        }
+        if (visibleCount) visibleCount.textContent = "";
+        if (search) search.disabled = true;
+    };
+    const setErrorState = message => {
+        if (results) {
+            results.innerHTML = `
+                <div class="store-section-master-usage-state is-error">
+                    <strong>Usage details could not be loaded.</strong>
+                    <span>${escapeHtml(message)}</span>
+                    <button type="button" data-store-section-master-usage-retry>
+                        Try again
+                    </button>
+                </div>
+            `;
+        }
+        if (visibleCount) visibleCount.textContent = "";
+        if (search) search.disabled = true;
+    };
+    const ingredientResultHtml = item => {
+        const name = String(item?.name || "Ingredient");
+        const normalizedName = String(item?.normalized_name || "");
+        const references = Math.max(
+            0,
+            Number(item?.recipe_reference_count) || 0,
+        );
+        const manageUrl = String(item?.manage_url || "");
+        const content = `
+            <span class="store-section-master-usage-result-icon" aria-hidden="true">
+                ${escapeHtml(name.slice(0, 1).toUpperCase() || "I")}
+            </span>
+            <span class="store-section-master-usage-result-copy">
+                <strong>${escapeHtml(name)}</strong>
+                <small>${escapeHtml(normalizedName || "No normalized name")}</small>
+            </span>
+            <span class="store-section-master-usage-result-meta">
+                ${escapeHtml(pluralize(references, "recipe reference"))}
+                <span aria-hidden="true">›</span>
+            </span>
+        `;
+        return manageUrl
+            ? `<a class="store-section-master-usage-result"
+                  href="${escapeAttribute(manageUrl)}">${content}</a>`
+            : `<div class="store-section-master-usage-result">${content}</div>`;
+    };
+    const recipeResultHtml = item => {
+        const recipeTitle = String(item?.recipe_title || "Recipe");
+        const referenceCount = Math.max(0, Number(item?.reference_count) || 0);
+        const ingredientNames = Array.isArray(item?.ingredients)
+            ? item.ingredients.map(value => String(value || "")).filter(Boolean)
+            : [];
+        const visibleIngredients = ingredientNames.slice(0, 4);
+        const remaining = Math.max(0, ingredientNames.length - visibleIngredients.length);
+        const ingredientSummary = visibleIngredients.join(", ")
+            + (remaining ? ` +${remaining} more` : "");
+        const editUrl = String(item?.edit_url || "");
+        const content = `
+            <span class="store-section-master-usage-result-icon is-recipe"
+                  aria-hidden="true">${escapeHtml(recipeTitle.slice(0, 1).toUpperCase() || "R")}</span>
+            <span class="store-section-master-usage-result-copy">
+                <strong>${escapeHtml(recipeTitle)}</strong>
+                <small>${escapeHtml(ingredientSummary || "Matching ingredient reference")}</small>
+            </span>
+            <span class="store-section-master-usage-result-meta">
+                ${escapeHtml(pluralize(referenceCount, "reference"))}
+                <span aria-hidden="true">›</span>
+            </span>
+        `;
+        return editUrl
+            ? `<a class="store-section-master-usage-result"
+                  href="${escapeAttribute(editUrl)}">${content}</a>`
+            : `<div class="store-section-master-usage-result">${content}</div>`;
+    };
+    const renderUsageResults = () => {
+        if (!usagePayload || !results) return;
+        const query = String(search?.value || "").trim().toLocaleLowerCase();
+        const source = activeKind === "recipes"
+            ? usagePayload.recipes
+            : usagePayload.ingredients;
+        const items = (Array.isArray(source) ? source : []).filter(item => {
+            if (!query) return true;
+            const searchable = activeKind === "recipes"
+                ? [
+                    item?.recipe_title,
+                    item?.recipe_url,
+                    ...(Array.isArray(item?.ingredients) ? item.ingredients : []),
+                ]
+                : [item?.name, item?.normalized_name];
+            return searchable
+                .map(value => String(value || "").toLocaleLowerCase())
+                .some(value => value.includes(query));
+        });
+        const total = Array.isArray(source) ? source.length : 0;
+        if (visibleCount) {
+            visibleCount.textContent = query
+                ? `${items.length} of ${total} shown`
+                : pluralize(
+                    total,
+                    activeKind === "recipes" ? "recipe" : "ingredient",
+                );
+        }
+        if (!items.length) {
+            results.innerHTML = `
+                <div class="store-section-master-usage-state">
+                    <strong>${query ? "No matching records." : "No records use this Store Section."}</strong>
+                    <span>${query ? "Try a different search." : "There is nothing to review here yet."}</span>
+                </div>
+            `;
+            return;
+        }
+        const renderer = activeKind === "recipes"
+            ? recipeResultHtml
+            : ingredientResultHtml;
+        results.innerHTML = `
+            <div class="store-section-master-usage-result-list">
+                ${items.map(renderer).join("")}
+            </div>
+        `;
+    };
+    const selectUsageKind = (kind, options = {}) => {
+        activeKind = kind === "recipes" ? "recipes" : "ingredients";
+        tabs.forEach(tab => {
+            const selected = tab.dataset.storeSectionMasterUsageTab === activeKind;
+            tab.setAttribute("aria-selected", String(selected));
+            tab.tabIndex = selected ? 0 : -1;
+            if (selected && results && tab.id) {
+                results.setAttribute("aria-labelledby", tab.id);
+            }
+            if (selected && options.focusTab) {
+                tab.focus({ preventScroll: true });
+            }
+        });
+        if (search) {
+            search.placeholder = activeKind === "recipes"
+                ? "Filter recipes or ingredients"
+                : "Filter ingredients";
+        }
+        renderUsageResults();
+    };
+    const updateUsageSummary = payload => {
+        const ingredientTotal = Math.max(
+            0,
+            Number(payload?.ingredient_total) || 0,
+        );
+        const referenceTotal = Math.max(
+            0,
+            Number(payload?.recipe_reference_total) || 0,
+        );
+        const recipeTotal = Math.max(0, Number(payload?.recipe_total) || 0);
+        if (tabCounts.ingredients) {
+            tabCounts.ingredients.textContent = String(ingredientTotal);
+        }
+        if (tabCounts.recipes) {
+            tabCounts.recipes.textContent = String(recipeTotal);
+        }
+        if (summary) {
+            summary.textContent = [
+                pluralize(ingredientTotal, "master ingredient"),
+                `${pluralize(referenceTotal, "reference")} across ${pluralize(recipeTotal, "recipe")}`,
+            ].join(" · ");
+        }
+    };
+    const loadUsage = async trigger => {
+        if (!trigger) return;
+        lastTrigger = trigger;
+        usagePayload = null;
+        const row = trigger.closest("[data-store-section-master-row]");
+        const sectionName = row?.querySelector('input[name="display_name"]')?.value
+            || "Store Section";
+        const usageUrl = String(
+            trigger.dataset.storeSectionMasterUsageUrl || "",
+        );
+        const requestedKind = trigger.dataset.storeSectionMasterUsageKind;
+        if (title) title.textContent = `${sectionName} usage`;
+        if (summary) summary.textContent = "Loading usage details…";
+        if (search) search.value = "";
+        Object.values(tabCounts).forEach(element => {
+            if (element) element.textContent = "0";
+        });
+        selectUsageKind(requestedKind);
+        setLoadingState(`Loading ${sectionName} usage…`);
+        if (!dialog.open) dialog.showModal();
+        document.body.classList.add("is-store-section-master-usage-dialog-open");
+        const currentRequest = ++requestSequence;
+        try {
+            const response = await fetch(usageUrl, {
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "fetch",
+                },
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.ok === false) {
+                throw new Error(payload.error || "The server returned an error.");
+            }
+            if (currentRequest !== requestSequence || !dialog.open) return;
+            usagePayload = payload;
+            updateUsageSummary(payload);
+            if (search) {
+                search.disabled = false;
+                search.focus({ preventScroll: true });
+            }
+            renderUsageResults();
+        } catch (error) {
+            if (currentRequest !== requestSequence || !dialog.open) return;
+            setErrorState(error.message || "Please try again.");
+        }
+    };
+    const closeUsage = () => {
+        requestSequence += 1;
+        if (dialog.open) dialog.close();
+    };
+
+    page.addEventListener("click", event => {
+        const trigger = event.target.closest(
+            "[data-store-section-master-usage-open]",
+        );
+        if (trigger) loadUsage(trigger);
+    });
+    tabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => {
+            selectUsageKind(tab.dataset.storeSectionMasterUsageTab);
+        });
+        tab.addEventListener("keydown", event => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+                return;
+            }
+            event.preventDefault();
+            const nextIndex = event.key === "Home"
+                ? 0
+                : event.key === "End"
+                    ? tabs.length - 1
+                    : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length)
+                        % tabs.length;
+            selectUsageKind(
+                tabs[nextIndex]?.dataset.storeSectionMasterUsageTab,
+                { focusTab: true },
+            );
+        });
+    });
+    search?.addEventListener("input", renderUsageResults);
+    dialog.querySelectorAll("[data-store-section-master-usage-close]")
+        .forEach(button => button.addEventListener("click", closeUsage));
+    results?.addEventListener("click", event => {
+        if (event.target.closest("[data-store-section-master-usage-retry]")) {
+            loadUsage(lastTrigger);
+        }
+    });
+    dialog.addEventListener("cancel", event => {
+        event.preventDefault();
+        closeUsage();
+    });
+    dialog.addEventListener("click", event => {
+        if (event.target === dialog) closeUsage();
+    });
+    dialog.addEventListener("close", () => {
+        document.body.classList.remove("is-store-section-master-usage-dialog-open");
+        lastTrigger?.focus({ preventScroll: true });
+    });
+}
+
 function initStoreSectionMasterIconPickers() {
     const pickers = [...document.querySelectorAll("[data-store-section-master-icon-picker]")];
     if (!pickers.length) return;
@@ -53840,6 +54140,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initRecipeImageThumbnailSizeControls", initRecipeImageThumbnailSizeControls],
         ["initStoreSectionMasterTable", initStoreSectionMasterTable],
         ["initStoreSectionMasterIconPickers", initStoreSectionMasterIconPickers],
+        ["initStoreSectionMasterUsageDialog", initStoreSectionMasterUsageDialog],
     ].forEach(([name, callback]) => runStartupTask(name, callback));
 
     runIdleStartupTasks([

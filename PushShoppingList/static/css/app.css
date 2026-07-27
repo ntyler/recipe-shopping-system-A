@@ -62438,6 +62438,41 @@ body.recipe-edit-standalone-page :is(
     line-height: 1.25;
 }
 
+.store-section-master-page .store-section-master-usage-button {
+    display: flex;
+    width: max-content;
+    min-height: 22px;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 3px;
+    margin-left: -4px;
+    padding: 2px 4px;
+    border-color: transparent;
+    background: transparent;
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 650;
+    text-align: left;
+}
+
+.store-section-master-usage-button strong {
+    color: var(--app-text-strong);
+}
+
+.store-section-master-page
+    .store-section-master-usage-button:is(:hover, :focus-visible):not(:disabled) {
+    border-color: color-mix(in srgb, var(--app-primary) 42%, var(--app-border));
+    outline: 0;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.store-section-master-page
+    .store-section-master-usage-button:is(:hover, :focus-visible):not(:disabled)
+    strong {
+    color: var(--app-primary-hover);
+}
+
 .store-section-master-row .store-section-master-type,
 .store-section-master-row .store-section-master-state {
     justify-self: start;
@@ -62486,6 +62521,384 @@ body.recipe-edit-standalone-page :is(
 
 .store-section-master-page .store-section-master-mobile-save {
     display: none;
+}
+
+.store-section-master-usage-dialog {
+    width: min(780px, calc(100vw - 32px));
+    max-width: none;
+    max-height: calc(100vh - 32px);
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 12px;
+    box-shadow: 0 24px 70px rgb(0 0 0 / 54%);
+    background: var(--app-surface);
+    color: var(--app-text);
+}
+
+.store-section-master-usage-dialog:not([open]) {
+    display: none;
+}
+
+.store-section-master-usage-dialog::backdrop {
+    background: rgb(2 7 8 / 72%);
+    backdrop-filter: blur(2px);
+}
+
+.store-section-master-usage-dialog-shell {
+    display: grid;
+    max-height: calc(100vh - 34px);
+    grid-template-rows: auto auto auto minmax(160px, 1fr) auto;
+}
+
+.store-section-master-usage-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 20px 15px;
+    border-bottom: 1px solid var(--app-border);
+}
+
+.store-section-master-usage-dialog-header > div {
+    min-width: 0;
+}
+
+.store-section-master-usage-dialog-header > div > span {
+    color: var(--app-primary-hover);
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: .055em;
+    text-transform: uppercase;
+}
+
+.store-section-master-usage-dialog-header h2 {
+    margin: 4px 0;
+    color: var(--app-text-strong);
+    font-size: 19px;
+}
+
+.store-section-master-usage-dialog-header p {
+    margin: 0;
+    color: var(--app-muted);
+    font-size: 11px;
+}
+
+.store-section-master-page
+    .store-section-master-usage-dialog-close {
+    display: grid;
+    width: 36px;
+    min-height: 36px;
+    flex: 0 0 36px;
+    place-items: center;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--app-muted);
+}
+
+.store-section-master-usage-dialog-close > svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
+}
+
+.store-section-master-usage-dialog-close:is(:hover, :focus-visible) {
+    border-color: var(--app-border);
+    outline: 0;
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
+}
+
+.store-section-master-usage-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0 20px;
+    border-bottom: 1px solid var(--app-border);
+}
+
+.store-section-master-page
+    .store-section-master-usage-tabs > button {
+    display: flex;
+    min-height: 43px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 7px 12px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--app-muted);
+}
+
+.store-section-master-usage-tabs > button > span {
+    display: inline-flex;
+    min-width: 22px;
+    min-height: 20px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--app-bg-soft);
+    color: var(--app-muted);
+    font-size: 9px;
+}
+
+.store-section-master-page
+    .store-section-master-usage-tabs > button[aria-selected="true"] {
+    border-bottom-color: var(--app-primary);
+    color: var(--app-text-strong);
+}
+
+.store-section-master-usage-tabs
+    > button[aria-selected="true"]
+    > span {
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.store-section-master-usage-tabs > button:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-primary) 42%, transparent);
+    outline-offset: -3px;
+}
+
+.store-section-master-usage-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-bg-soft);
+}
+
+.store-section-master-usage-toolbar > label {
+    position: relative;
+    width: min(360px, 100%);
+}
+
+.store-section-master-usage-toolbar > label > svg {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 11px;
+    width: 15px;
+    height: 15px;
+    transform: translateY(-50%);
+    fill: none;
+    stroke: var(--app-muted);
+    stroke-linecap: round;
+    stroke-width: 1.8;
+}
+
+.store-section-master-page
+    .store-section-master-usage-toolbar input {
+    min-height: 36px;
+    padding-left: 34px;
+    background: var(--app-surface);
+}
+
+.store-section-master-usage-toolbar > span {
+    flex: 0 0 auto;
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 750;
+}
+
+.store-section-master-usage-results {
+    min-height: 160px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 10px 20px 16px;
+}
+
+.store-section-master-usage-result-list {
+    display: grid;
+    gap: 5px;
+}
+
+.store-section-master-usage-result {
+    display: grid;
+    min-width: 0;
+    min-height: 52px;
+    grid-template-columns: 34px minmax(0, 1fr) max-content;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--app-text);
+    text-decoration: none;
+}
+
+.store-section-master-usage-result:is(:hover, :focus-visible) {
+    border-color: color-mix(in srgb, var(--app-primary) 42%, var(--app-border));
+    outline: 0;
+    background: var(--app-primary-soft);
+}
+
+.store-section-master-usage-result-icon {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 52%, var(--app-border));
+    border-radius: 8px;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    font-size: 12px;
+    font-weight: 850;
+}
+
+.store-section-master-usage-result-icon.is-recipe {
+    border-color: color-mix(in srgb, var(--app-focus) 52%, var(--app-border));
+    background: color-mix(in srgb, var(--app-focus) 10%, transparent);
+    color: var(--app-focus);
+}
+
+.store-section-master-usage-result-copy {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+}
+
+.store-section-master-usage-result-copy strong,
+.store-section-master-usage-result-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.store-section-master-usage-result-copy strong {
+    color: var(--app-text-strong);
+    font-size: 12px;
+}
+
+.store-section-master-usage-result-copy small {
+    color: var(--app-muted);
+    font-size: 10px;
+}
+
+.store-section-master-usage-result-meta {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 750;
+}
+
+.store-section-master-usage-result:is(:hover, :focus-visible)
+    .store-section-master-usage-result-meta {
+    color: var(--app-primary-hover);
+}
+
+.store-section-master-usage-state {
+    display: grid;
+    min-height: 190px;
+    place-content: center;
+    justify-items: center;
+    gap: 6px;
+    color: var(--app-muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+.store-section-master-usage-state strong {
+    color: var(--app-text-strong);
+    font-size: 12px;
+}
+
+.store-section-master-usage-state.is-loading > span {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--app-border);
+    border-top-color: var(--app-primary);
+    border-radius: 999px;
+    animation: store-section-master-usage-spin 700ms linear infinite;
+}
+
+.store-section-master-usage-state.is-error {
+    color: var(--app-danger);
+}
+
+.store-section-master-usage-state.is-error > button {
+    margin-top: 5px;
+    border-color: var(--app-primary);
+    color: var(--app-primary-hover);
+}
+
+.store-section-master-usage-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 20px;
+    border-top: 1px solid var(--app-border);
+    background: var(--app-bg-soft);
+}
+
+.store-section-master-usage-dialog-footer > span {
+    color: var(--app-muted);
+    font-size: 10px;
+}
+
+body.is-store-section-master-usage-dialog-open {
+    overflow: hidden;
+}
+
+@keyframes store-section-master-usage-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 759px) {
+    .store-section-master-usage-dialog {
+        width: calc(100vw - 16px);
+        max-height: calc(100vh - 16px);
+    }
+
+    .store-section-master-usage-dialog-shell {
+        max-height: calc(100vh - 18px);
+    }
+
+    .store-section-master-usage-dialog-header,
+    .store-section-master-usage-toolbar,
+    .store-section-master-usage-dialog-footer {
+        padding-inline: 13px;
+    }
+
+    .store-section-master-usage-tabs {
+        padding-inline: 13px;
+    }
+
+    .store-section-master-usage-results {
+        padding-inline: 10px;
+    }
+
+    .store-section-master-usage-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 7px;
+    }
+
+    .store-section-master-usage-toolbar > label {
+        width: 100%;
+    }
+
+    .store-section-master-usage-result {
+        grid-template-columns: 34px minmax(0, 1fr);
+    }
+
+    .store-section-master-usage-result-meta {
+        grid-column: 2;
+        margin-top: -4px;
+    }
 }
 
 .store-section-master-filter-empty {

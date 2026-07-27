@@ -1229,6 +1229,130 @@ def ingredient_store_section_details(user_id=None, include_inactive=False, creat
         ]
 
 
+def ingredient_store_section_usage(section_id, user_id=None):
+    try:
+        section_id = int(section_id or 0)
+    except (TypeError, ValueError):
+        section_id = 0
+    if section_id <= 0:
+        return None
+
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return None
+
+        section_row = connection.execute(
+            """
+            SELECT id, section_key, display_name, icon, is_active
+              FROM ingredient_store_sections
+             WHERE id = ?
+               AND user_id = ?
+            """,
+            (section_id, scoped_user_id),
+        ).fetchone()
+        if not section_row:
+            return None
+
+        section = dict(section_row)
+        section["is_active"] = bool(section["is_active"])
+        ingredient_rows = connection.execute(
+            """
+            SELECT
+                i.id,
+                i.name,
+                i.normalized_name,
+                i.image_url,
+                COUNT(ri.id) AS recipe_reference_count
+              FROM ingredients i
+              LEFT JOIN recipe_ingredients ri
+                ON ri.user_id = i.user_id
+               AND ri.ingredient_id = i.id
+             WHERE i.user_id = ?
+               AND i.store_section = ?
+             GROUP BY i.id, i.name, i.normalized_name, i.image_url
+             ORDER BY LOWER(i.name) ASC, i.id ASC
+            """,
+            (scoped_user_id, section["section_key"]),
+        ).fetchall()
+        reference_rows = connection.execute(
+            """
+            SELECT
+                ri.id,
+                ri.recipe_id,
+                ri.ingredient_id,
+                ri.raw_name,
+                ri.canonical_ingredient,
+                ri.normalized_name,
+                ri.original_recipe_text,
+                i.name AS master_ingredient_name
+              FROM recipe_ingredients ri
+              LEFT JOIN ingredients i
+                ON i.id = ri.ingredient_id
+               AND i.user_id = ri.user_id
+             WHERE ri.user_id = ?
+               AND ri.store_section = ?
+             ORDER BY LOWER(ri.recipe_id) ASC, ri.sort_order ASC, ri.id ASC
+            """,
+            (scoped_user_id, section["section_key"]),
+        ).fetchall()
+
+    ingredients = [
+        {
+            "id": int(row["id"]),
+            "name": clean_text(row["name"]) or "Ingredient",
+            "normalized_name": clean_text(row["normalized_name"]),
+            "image_url": clean_text(row["image_url"]),
+            "recipe_reference_count": int(row["recipe_reference_count"] or 0),
+        }
+        for row in ingredient_rows
+    ]
+
+    metadata = recipe_reference_metadata(scoped_user_id)
+    recipes_by_id = {}
+    for row in reference_rows:
+        recipe_id = clean_text(row["recipe_id"])
+        metadata_record = metadata.get(recipe_id)
+        metadata_record = metadata_record if isinstance(metadata_record, dict) else {}
+        recipe = recipes_by_id.setdefault(
+            recipe_id,
+            {
+                "recipe_id": recipe_id,
+                "recipe_url": clean_text(metadata_record.get("url")) or recipe_id,
+                "recipe_title": recipe_reference_title(recipe_id, metadata_record),
+                "reference_count": 0,
+                "ingredients": [],
+            },
+        )
+        recipe["reference_count"] += 1
+        ingredient_name = (
+            clean_text(row["master_ingredient_name"])
+            or clean_text(row["raw_name"])
+            or clean_text(row["canonical_ingredient"])
+            or clean_text(row["normalized_name"])
+            or clean_text(row["original_recipe_text"])
+            or "Ingredient"
+        )
+        if ingredient_name not in recipe["ingredients"]:
+            recipe["ingredients"].append(ingredient_name)
+
+    recipes = sorted(
+        recipes_by_id.values(),
+        key=lambda item: (
+            clean_text(item.get("recipe_title")).lower(),
+            clean_text(item.get("recipe_id")).lower(),
+        ),
+    )
+    return {
+        "section": section,
+        "ingredients": ingredients,
+        "recipes": recipes,
+        "ingredient_total": len(ingredients),
+        "recipe_reference_total": len(reference_rows),
+        "recipe_total": len(recipes),
+    }
+
+
 def ingredient_store_section_options(user_id=None, include_inactive=False):
     return [
         section["section_key"]

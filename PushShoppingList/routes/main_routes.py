@@ -1282,6 +1282,53 @@ def master_data_store_sections_route():
     )
 
 
+@main_bp.route("/api/master-data/store-sections/<int:section_id>/usage")
+def master_data_store_section_usage_route(section_id):
+    usage = recipe_master_data.ingredient_store_section_usage(
+        section_id,
+        user_id=active_user_id(),
+    )
+    if not usage:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Store Section was not found for this workspace.",
+        }), 404
+
+    section_key = recipe_master_data.clean_text(
+        usage.get("section", {}).get("section_key")
+    )
+    ingredients = []
+    for ingredient in usage.get("ingredients", []):
+        item = dict(ingredient)
+        item["manage_url"] = url_for(
+            "main_bp.master_data_ingredients_route",
+            store_section=section_key,
+            search=item.get("name") or "",
+            sort="name_asc",
+        )
+        ingredients.append(item)
+
+    recipes = []
+    for recipe in usage.get("recipes", []):
+        item = dict(recipe)
+        recipe_url = recipe_master_data.clean_text(item.get("recipe_url"))
+        item["edit_url"] = (
+            url_for("recipe_bp.edit_recipe_page_route", url=recipe_url)
+            if recipe_url
+            else ""
+        )
+        recipes.append(item)
+
+    return jsonify({
+        "ok": True,
+        "success": True,
+        **usage,
+        "ingredients": ingredients,
+        "recipes": recipes,
+    })
+
+
 def set_store_section_master_data_message(result, *, success_prefix):
     if result.get("ok"):
         message = success_prefix.format(

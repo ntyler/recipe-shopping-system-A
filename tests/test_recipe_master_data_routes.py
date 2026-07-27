@@ -1886,6 +1886,54 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert "Global Foods" not in other_workspace.get_data(as_text=True)
 
 
+def test_store_section_usage_route_lists_records_and_is_workspace_scoped(
+    monkeypatch,
+    tmp_path,
+):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/produce-salad",
+        recipe_data={
+            "ingredients": [
+                {"ingredient": "Tomato", "store_section": "Produce"},
+                {"ingredient": "Basil", "store_section": "Produce"},
+            ],
+        },
+        user_id="user-a",
+    )
+    produce = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+            create=True,
+        )
+        if section["section_key"] == "PRODUCE"
+    )
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.get(
+            f"/api/master-data/store-sections/{produce['id']}/usage"
+        )
+        sign_in(client, "user-b")
+        foreign_response = client.get(
+            f"/api/master-data/store-sections/{produce['id']}/usage"
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["section"]["section_key"] == "PRODUCE"
+    assert payload["ingredient_total"] == 2
+    assert payload["recipe_reference_total"] == 2
+    assert payload["recipe_total"] == 1
+    assert all(item["manage_url"] for item in payload["ingredients"])
+    assert payload["recipes"][0]["edit_url"]
+    assert payload["recipes"][0]["reference_count"] == 2
+    assert foreign_response.status_code == 404
+
+
 def test_recipe_editor_store_section_menu_links_to_management_page():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -1906,6 +1954,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "data-store-section-master-status-filter" in page
     assert "data-store-section-master-columns-trigger" in page
     assert "data-store-section-master-mobile-save" in page
+    assert "data-store-section-master-usage-open" in page
+    assert "data-store-section-master-usage-dialog" in page
+    assert "data-store-section-master-usage-tab" in page
+    assert "data-store-section-master-usage-search" in page
     assert 'data-store-section-master-column="order"' in page
     assert "data-store-section-master-drag-handle" in page
     assert "store-section-master-table-head" in page
@@ -1922,6 +1974,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "store-section-master-kind" not in page
     assert "function initStoreSectionMasterTable()" in script
     assert "function initStoreSectionMasterIconPickers()" in script
+    assert "function initStoreSectionMasterUsageDialog()" in script
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
     assert "STORE_SECTION_MASTER_MOBILE_COLUMNS" in script
     assert '!STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key)' in script
@@ -1941,6 +1994,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "focusOption: Number(event.detail || 0) >= 2" in script
     assert '["initStoreSectionMasterTable", initStoreSectionMasterTable]' in script
     assert '["initStoreSectionMasterIconPickers", initStoreSectionMasterIconPickers]' in script
+    assert (
+        '["initStoreSectionMasterUsageDialog", initStoreSectionMasterUsageDialog]'
+        in script
+    )
     assert ".store-section-master-table-toolbar" in css
     assert ".store-section-master-table-head" in css
     assert ".store-section-master-row[hidden]" in css
@@ -1950,6 +2007,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".is-row-drop-before" in css
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css
+    assert ".store-section-master-usage-button" in css
+    assert ".store-section-master-usage-dialog" in css
+    assert ".store-section-master-usage-result" in css
     assert ".store-section-master-identity input:hover" in css
     assert ".store-section-master-icon-picker.is-open" in css
     assert ".store-section-master-icon-picker.is-dirty" in css

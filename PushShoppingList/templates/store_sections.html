@@ -334,14 +334,30 @@ data-user-id="{{ master_data.scope_user_id }}"
                         <div class="store-section-master-usage"
                              role="cell"
                              data-store-section-master-cell="usage">
-                            <span>
+                            <button type="button"
+                                    class="store-section-master-usage-button"
+                                    data-store-section-master-usage-open
+                                    data-store-section-master-usage-kind="ingredients"
+                                    data-store-section-master-usage-url="{{ url_for('main_bp.master_data_store_section_usage_route', section_id=section.id) }}"
+                                    aria-haspopup="dialog"
+                                    aria-controls="storeSectionMasterUsageDialog"
+                                    {% if not section.ingredient_count %}disabled{% endif %}
+                                    aria-label="Show {{ section.ingredient_count }} master ingredient{% if section.ingredient_count != 1 %}s{% endif %} in {{ section.display_name }}">
                                 <strong>{{ section.ingredient_count }}</strong>
-                                master ingredient{% if section.ingredient_count != 1 %}s{% endif %}
-                            </span>
-                            <span>
+                                <span>master ingredient{% if section.ingredient_count != 1 %}s{% endif %}</span>
+                            </button>
+                            <button type="button"
+                                    class="store-section-master-usage-button"
+                                    data-store-section-master-usage-open
+                                    data-store-section-master-usage-kind="recipes"
+                                    data-store-section-master-usage-url="{{ url_for('main_bp.master_data_store_section_usage_route', section_id=section.id) }}"
+                                    aria-haspopup="dialog"
+                                    aria-controls="storeSectionMasterUsageDialog"
+                                    {% if not section.recipe_reference_count %}disabled{% endif %}
+                                    aria-label="Show {{ section.recipe_reference_count }} recipe reference{% if section.recipe_reference_count != 1 %}s{% endif %} in {{ section.display_name }}">
                                 <strong>{{ section.recipe_reference_count }}</strong>
-                                recipe reference{% if section.recipe_reference_count != 1 %}s{% endif %}
-                            </span>
+                                <span>recipe reference{% if section.recipe_reference_count != 1 %}s{% endif %}</span>
+                            </button>
                         </div>
 
                         <div class="store-section-master-state"
@@ -391,5 +407,91 @@ data-user-id="{{ master_data.scope_user_id }}"
                 </div>
             </div>
         </section>
+
+        <dialog class="store-section-master-usage-dialog"
+                id="storeSectionMasterUsageDialog"
+                aria-labelledby="storeSectionMasterUsageTitle"
+                data-store-section-master-usage-dialog>
+            <div class="store-section-master-usage-dialog-shell">
+                <header class="store-section-master-usage-dialog-header">
+                    <div>
+                        <span>Usage details</span>
+                        <h2 id="storeSectionMasterUsageTitle"
+                            data-store-section-master-usage-title>
+                            Store Section usage
+                        </h2>
+                        <p data-store-section-master-usage-summary>
+                            Select a usage count to see its records.
+                        </p>
+                    </div>
+                    <button type="button"
+                            class="store-section-master-usage-dialog-close"
+                            data-store-section-master-usage-close
+                            aria-label="Close usage details">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m6 6 12 12M18 6 6 18"></path>
+                        </svg>
+                    </button>
+                </header>
+
+                <div class="store-section-master-usage-tabs"
+                     role="tablist"
+                     aria-label="Usage detail type">
+                    <button type="button"
+                            id="storeSectionMasterUsageIngredientsTab"
+                            role="tab"
+                            aria-controls="storeSectionMasterUsageResults"
+                            aria-selected="true"
+                            data-store-section-master-usage-tab="ingredients">
+                        Master ingredients
+                        <span data-store-section-master-usage-tab-count="ingredients">0</span>
+                    </button>
+                    <button type="button"
+                            id="storeSectionMasterUsageRecipesTab"
+                            role="tab"
+                            aria-controls="storeSectionMasterUsageResults"
+                            aria-selected="false"
+                            tabindex="-1"
+                            data-store-section-master-usage-tab="recipes">
+                        Recipes
+                        <span data-store-section-master-usage-tab-count="recipes">0</span>
+                    </button>
+                </div>
+
+                <div class="store-section-master-usage-toolbar">
+                    <label>
+                        <span class="sr-only">Filter usage details</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="11" cy="11" r="6.5"></circle>
+                            <path d="m16 16 4 4"></path>
+                        </svg>
+                        <input type="search"
+                               placeholder="Filter ingredients"
+                               autocomplete="off"
+                               data-store-section-master-usage-search>
+                    </label>
+                    <span data-store-section-master-usage-visible-count></span>
+                </div>
+
+                <div class="store-section-master-usage-results"
+                     id="storeSectionMasterUsageResults"
+                     role="tabpanel"
+                     aria-labelledby="storeSectionMasterUsageIngredientsTab"
+                     aria-live="polite"
+                     data-store-section-master-usage-results>
+                    <div class="store-section-master-usage-state">
+                        Select a usage count to load details.
+                    </div>
+                </div>
+
+                <footer class="store-section-master-usage-dialog-footer">
+                    <span>Open a record to review or edit it.</span>
+                    <button type="button"
+                            data-store-section-master-usage-close>
+                        Close
+                    </button>
+                </footer>
+            </div>
+        </dialog>
     </section>
 {% endblock %}
