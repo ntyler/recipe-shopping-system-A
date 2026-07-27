@@ -1314,12 +1314,18 @@ def ingredient_store_section_usage(section_id, user_id=None):
         recipe_id = clean_text(row["recipe_id"])
         metadata_record = metadata.get(recipe_id)
         metadata_record = metadata_record if isinstance(metadata_record, dict) else {}
+        cover_image = metadata_record.get("cover_image")
         recipe = recipes_by_id.setdefault(
             recipe_id,
             {
                 "recipe_id": recipe_id,
                 "recipe_url": clean_text(metadata_record.get("url")) or recipe_id,
                 "recipe_title": recipe_reference_title(recipe_id, metadata_record),
+                "cover_image": (
+                    dict(cover_image)
+                    if isinstance(cover_image, dict)
+                    else {}
+                ),
                 "reference_count": 0,
                 "ingredients": [],
             },

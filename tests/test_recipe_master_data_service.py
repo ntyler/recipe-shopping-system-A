@@ -215,6 +215,17 @@ def test_store_section_usage_groups_references_by_recipe_and_workspace(
     tmp_path,
 ):
     configure_master_db(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        master_data,
+        "recipe_reference_metadata",
+        lambda _user_id: {
+            "https://example.com/produce-salad": {
+                "name": "Produce Salad",
+                "url": "https://example.com/produce-salad",
+                "cover_image": {"src": "/static/generated/produce-salad.jpg"},
+            },
+        },
+    )
     master_data.sync_recipe_master_records(
         "https://example.com/produce-salad",
         recipe_data={
@@ -270,6 +281,10 @@ def test_store_section_usage_groups_references_by_recipe_and_workspace(
     )
     assert salad["reference_count"] == 2
     assert set(salad["ingredients"]) == {"Basil", "Tomato"}
+    assert salad["recipe_title"] == "Produce Salad"
+    assert salad["cover_image"] == {
+        "src": "/static/generated/produce-salad.jpg"
+    }
     assert master_data.ingredient_store_section_usage(
         produce["id"],
         user_id="user-b",

@@ -62378,8 +62378,8 @@ body.recipe-edit-standalone-page :is(
 .store-section-master-row .store-section-master-icon-trigger {
     height: 38px;
     min-height: 38px;
-    border-color: color-mix(in srgb, var(--app-border) 58%, transparent);
-    background: color-mix(in srgb, var(--app-bg-soft) 58%, transparent);
+    border-color: transparent;
+    background: transparent;
     transition:
         border-color 140ms ease,
         background-color 140ms ease,
@@ -62745,6 +62745,7 @@ body.recipe-edit-standalone-page :is(
     display: grid;
     width: 32px;
     height: 32px;
+    overflow: hidden;
     place-items: center;
     border: 1px solid color-mix(in srgb, var(--app-primary) 52%, var(--app-border));
     border-radius: 8px;
@@ -62752,6 +62753,48 @@ body.recipe-edit-standalone-page :is(
     color: var(--app-primary-hover);
     font-size: 12px;
     font-weight: 850;
+}
+
+.store-section-master-usage-result-icon.has-image {
+    border-color: var(--app-border);
+    background: var(--app-bg-soft);
+}
+
+.store-section-master-usage-result-icon > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.store-section-master-usage-result-icon
+    > [data-store-section-master-usage-image-fallback] {
+    display: grid;
+    place-items: center;
+}
+
+.store-section-master-usage-result-icon
+    > [data-store-section-master-usage-image-fallback][hidden] {
+    display: none !important;
+}
+
+.store-section-master-usage-result-icon
+    .recipe-edit-inline-icon {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+}
+
+.store-section-master-usage-result-icon
+    .recipe-edit-inline-icon > svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
 }
 
 .store-section-master-usage-result-icon.is-recipe {

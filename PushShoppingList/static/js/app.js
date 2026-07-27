@@ -38375,6 +38375,59 @@ function initStoreSectionMasterUsageDialog() {
         if (visibleCount) visibleCount.textContent = "";
         if (search) search.disabled = true;
     };
+    const usageResultVisualHtml = ({
+        imageUrl = "",
+        imageSrcset = "",
+        recipe = false,
+    } = {}) => {
+        const normalizedUrl = String(imageUrl || "");
+        const normalizedSrcset = String(imageSrcset || "");
+        const iconName = recipe ? "document" : "basket";
+        const modifier = recipe ? " is-recipe" : "";
+        if (!normalizedUrl) {
+            return `
+                <span class="store-section-master-usage-result-icon${modifier}"
+                      aria-hidden="true">
+                    ${recipeEditSvgIcon(iconName)}
+                </span>
+            `;
+        }
+        return `
+            <span class="store-section-master-usage-result-icon${modifier} has-image"
+                  aria-hidden="true">
+                <img src="${escapeAttribute(normalizedUrl)}"
+                     ${normalizedSrcset
+                        ? `srcset="${escapeAttribute(normalizedSrcset)}" sizes="32px"`
+                        : ""}
+                     alt=""
+                     loading="lazy"
+                     decoding="async"
+                     data-store-section-master-usage-image>
+                <span data-store-section-master-usage-image-fallback hidden>
+                    ${recipeEditSvgIcon(iconName)}
+                </span>
+            </span>
+        `;
+    };
+    const bindUsageResultImages = () => {
+        results?.querySelectorAll("[data-store-section-master-usage-image]")
+            .forEach(image => {
+                const revealFallback = () => {
+                    image.hidden = true;
+                    image.removeAttribute("srcset");
+                    const visual = image.closest(
+                        ".store-section-master-usage-result-icon",
+                    );
+                    visual?.classList.remove("has-image");
+                    const fallback = visual?.querySelector(
+                        "[data-store-section-master-usage-image-fallback]",
+                    );
+                    if (fallback) fallback.hidden = false;
+                };
+                image.addEventListener("error", revealFallback, { once: true });
+                if (image.complete && !image.naturalWidth) revealFallback();
+            });
+    };
     const ingredientResultHtml = item => {
         const name = String(item?.name || "Ingredient");
         const normalizedName = String(item?.normalized_name || "");
@@ -38384,9 +38437,7 @@ function initStoreSectionMasterUsageDialog() {
         );
         const manageUrl = String(item?.manage_url || "");
         const content = `
-            <span class="store-section-master-usage-result-icon" aria-hidden="true">
-                ${escapeHtml(name.slice(0, 1).toUpperCase() || "I")}
-            </span>
+            ${usageResultVisualHtml({ imageUrl: item?.image_url })}
             <span class="store-section-master-usage-result-copy">
                 <strong>${escapeHtml(name)}</strong>
                 <small>${escapeHtml(normalizedName || "No normalized name")}</small>
@@ -38413,8 +38464,11 @@ function initStoreSectionMasterUsageDialog() {
             + (remaining ? ` +${remaining} more` : "");
         const editUrl = String(item?.edit_url || "");
         const content = `
-            <span class="store-section-master-usage-result-icon is-recipe"
-                  aria-hidden="true">${escapeHtml(recipeTitle.slice(0, 1).toUpperCase() || "R")}</span>
+            ${usageResultVisualHtml({
+                imageUrl: item?.recipe_image_url,
+                imageSrcset: item?.recipe_image_srcset,
+                recipe: true,
+            })}
             <span class="store-section-master-usage-result-copy">
                 <strong>${escapeHtml(recipeTitle)}</strong>
                 <small>${escapeHtml(ingredientSummary || "Matching ingredient reference")}</small>
@@ -38474,6 +38528,7 @@ function initStoreSectionMasterUsageDialog() {
                 ${items.map(renderer).join("")}
             </div>
         `;
+        bindUsageResultImages();
     };
     const selectUsageKind = (kind, options = {}) => {
         activeKind = kind === "recipes" ? "recipes" : "ingredients";

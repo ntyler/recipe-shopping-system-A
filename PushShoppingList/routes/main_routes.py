@@ -1318,6 +1318,38 @@ def master_data_store_section_usage_route(section_id):
             if recipe_url
             else ""
         )
+        cover_image = (
+            item.get("cover_image")
+            if isinstance(item.get("cover_image"), dict)
+            else {}
+        )
+        rendered_cover_image = recipe_cover_image_for_view(
+            recipe_url,
+            {
+                "recipe_title": item.get("recipe_title"),
+                "cover_image": cover_image,
+            },
+            {"cover_image": cover_image},
+            variants=("thumb", "detail"),
+        )
+        item["recipe_image_url"] = (
+            rendered_cover_image.get("thumb_url")
+            or rendered_cover_image.get("display_url")
+            or rendered_cover_image.get("src")
+            or ""
+        )
+        item["recipe_image_full_url"] = (
+            rendered_cover_image.get("full_url")
+            or rendered_cover_image.get("detail_url")
+            or rendered_cover_image.get("display_url")
+            or rendered_cover_image.get("src")
+            or ""
+        )
+        item["recipe_image_srcset"] = rendered_cover_image.get("srcset") or ""
+        item["recipe_image_alt"] = (
+            rendered_cover_image.get("alt")
+            or f"{item.get('recipe_title') or 'Recipe'} image"
+        )
         recipes.append(item)
 
     return jsonify({

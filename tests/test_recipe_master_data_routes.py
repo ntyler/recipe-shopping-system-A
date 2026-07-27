@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from PushShoppingList.app import create_app
+from PushShoppingList.routes import main_routes
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import ingredient_duplicate_review_service as duplicate_reviews
 from PushShoppingList.services import ingredient_store_section_review_service as store_section_reviews
@@ -1891,11 +1892,39 @@ def test_store_section_usage_route_lists_records_and_is_workspace_scoped(
     tmp_path,
 ):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        master_data,
+        "recipe_reference_metadata",
+        lambda _user_id: {
+            "https://example.com/produce-salad": {
+                "name": "Produce Salad",
+                "url": "https://example.com/produce-salad",
+                "cover_image": {"src": "/static/generated/produce-salad.jpg"},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        main_routes,
+        "recipe_cover_image_for_view",
+        lambda *_args, **_kwargs: {
+            "thumb_url": "/static/generated/produce-salad-thumb.jpg",
+            "detail_url": "/static/generated/produce-salad-detail.jpg",
+            "srcset": (
+                "/static/generated/produce-salad-thumb.jpg 320w, "
+                "/static/generated/produce-salad-detail.jpg 960w"
+            ),
+            "alt": "Produce Salad cover",
+        },
+    )
     master_data.sync_recipe_master_records(
         "https://example.com/produce-salad",
         recipe_data={
             "ingredients": [
-                {"ingredient": "Tomato", "store_section": "Produce"},
+                {
+                    "ingredient": "Tomato",
+                    "ingredient_image_url": "/static/generated/tomato.jpg",
+                    "store_section": "Produce",
+                },
                 {"ingredient": "Basil", "store_section": "Produce"},
             ],
         },
@@ -1929,8 +1958,22 @@ def test_store_section_usage_route_lists_records_and_is_workspace_scoped(
     assert payload["recipe_reference_total"] == 2
     assert payload["recipe_total"] == 1
     assert all(item["manage_url"] for item in payload["ingredients"])
+    tomato = next(
+        item for item in payload["ingredients"] if item["name"] == "Tomato"
+    )
+    assert tomato["image_url"] == "/static/generated/tomato.jpg"
     assert payload["recipes"][0]["edit_url"]
     assert payload["recipes"][0]["reference_count"] == 2
+    assert payload["recipes"][0]["recipe_title"] == "Produce Salad"
+    assert (
+        payload["recipes"][0]["recipe_image_url"]
+        == "/static/generated/produce-salad-thumb.jpg"
+    )
+    assert (
+        payload["recipes"][0]["recipe_image_full_url"]
+        == "/static/generated/produce-salad-detail.jpg"
+    )
+    assert payload["recipes"][0]["recipe_image_alt"] == "Produce Salad cover"
     assert foreign_response.status_code == 404
 
 
@@ -1975,6 +2018,8 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "function initStoreSectionMasterTable()" in script
     assert "function initStoreSectionMasterIconPickers()" in script
     assert "function initStoreSectionMasterUsageDialog()" in script
+    assert "data-store-section-master-usage-image" in script
+    assert "recipe_image_url" in script
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
     assert "STORE_SECTION_MASTER_MOBILE_COLUMNS" in script
     assert '!STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key)' in script
@@ -2010,6 +2055,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-usage-button" in css
     assert ".store-section-master-usage-dialog" in css
     assert ".store-section-master-usage-result" in css
+    assert ".store-section-master-usage-result-icon > img" in css
     assert ".store-section-master-identity input:hover" in css
     assert ".store-section-master-icon-picker.is-open" in css
     assert ".store-section-master-icon-picker.is-dirty" in css
