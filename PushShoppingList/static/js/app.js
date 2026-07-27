@@ -37739,6 +37739,8 @@ function initStoreSectionMasterTable() {
     const columnOptions = page.querySelector("[data-store-section-master-column-options]");
     const fitColumnsButton = page.querySelector("[data-store-section-master-columns-fit]");
     const resetColumnsButton = page.querySelector("[data-store-section-master-columns-reset]");
+    const activeCount = page.querySelector("[data-store-section-master-active-count]");
+    const archivedCount = page.querySelector("[data-store-section-master-archived-count]");
     if (!table || !tableHead || !list) return;
 
     const storageKey = (() => {
@@ -38341,12 +38343,38 @@ function initStoreSectionMasterTable() {
                     || `Store Section could not be ${action === "archive" ? "archived" : "restored"}.`,
                 );
             }
-            const scrollRegion = appMainScrollRegion();
-            localStorage.setItem(
-                "scrollY",
-                String(scrollRegion ? scrollRegion.scrollTop : window.scrollY),
+            const isActive = action === "restore";
+            const nextAction = isActive ? "archive" : "restore";
+            const statusBadge = row.querySelector(
+                ".store-section-master-state > span",
             );
-            window.location.reload();
+            row.dataset.storeSectionStatus = isActive ? "active" : "archived";
+            row.classList.toggle("is-archived", !isActive);
+            if (statusBadge) {
+                statusBadge.classList.toggle("is-active", isActive);
+                statusBadge.classList.toggle("is-archived", !isActive);
+                statusBadge.textContent = isActive ? "Active" : "Archived";
+            }
+            submitter.value = nextAction;
+            submitter.textContent = isActive ? "Archive" : "Restore";
+            submitter.classList.toggle("danger", isActive);
+            submitter.removeAttribute("title");
+            submitter.removeAttribute("aria-label");
+            submitter.disabled = false;
+            delete row.dataset.storeSectionMasterActionPending;
+            row.removeAttribute("aria-busy");
+
+            const adjustCount = (element, delta) => {
+                if (!element) return;
+                const current = Number.parseInt(element.textContent, 10) || 0;
+                element.textContent = String(Math.max(0, current + delta));
+            };
+            adjustCount(activeCount, isActive ? 1 : -1);
+            adjustCount(archivedCount, isActive ? -1 : 1);
+            applyFilters();
+            const displayName = row.querySelector('input[name="display_name"]')?.value
+                || "Store Section";
+            announce(`${displayName} ${isActive ? "restored" : "archived"}.`);
         } catch (error) {
             delete row.dataset.storeSectionMasterActionPending;
             row.removeAttribute("aria-busy");

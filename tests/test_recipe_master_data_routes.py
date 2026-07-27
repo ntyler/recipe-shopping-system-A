@@ -2030,6 +2030,10 @@ def test_store_section_archive_restore_fetch_is_json_without_flash_message(
 
 def test_recipe_editor_store_section_menu_links_to_management_page():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    store_section_table_script = script.split(
+        "function initStoreSectionMasterTable()",
+        1,
+    )[1].split("function initStoreSectionMasterUsageDialog()", 1)[0]
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     page = Path("PushShoppingList/templates/store_sections.html").read_text(encoding="utf-8")
@@ -2042,6 +2046,8 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "Add Store Section" in page
     assert "Active sections" in page
     assert "Archived sections" in page
+    assert "data-store-section-master-active-count" in page
+    assert "data-store-section-master-archived-count" in page
     assert "Master ingredients" in page
     assert "Recipe references" in page
     assert "data-store-section-master-search" in page
@@ -2087,8 +2093,11 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "button.disabled = !rowIsDirty" in script
     assert 'if (![\"archive\", \"restore\"].includes(action)) return;' in script
     assert '\"X-Requested-With\": \"fetch\"' in script
-    assert 'localStorage.setItem(' in script
-    assert "window.location.reload()" in script
+    assert "row.dataset.storeSectionStatus" in store_section_table_script
+    assert 'statusBadge.textContent = isActive ? "Active" : "Archived"' in script
+    assert "adjustCount(activeCount, isActive ? 1 : -1)" in script
+    assert "applyFilters()" in store_section_table_script
+    assert "window.location.reload()" not in store_section_table_script
     assert 'selected?.scrollIntoView({ block: "nearest" });' in script
     assert "Number(event.detail || 0) < 2" in script
     assert "focusOption: Number(event.detail || 0) >= 2" in script

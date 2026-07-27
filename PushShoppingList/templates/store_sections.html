@@ -105,11 +105,15 @@ data-user-id="{{ master_data.scope_user_id }}"
         <div class="store-section-master-stats" aria-label="Store Section summary">
             <article>
                 <span>Active sections</span>
-                <strong>{{ master_data.active_count }}</strong>
+                <strong data-store-section-master-active-count>
+                    {{ master_data.active_count }}
+                </strong>
             </article>
             <article>
                 <span>Archived sections</span>
-                <strong>{{ master_data.archived_count }}</strong>
+                <strong data-store-section-master-archived-count>
+                    {{ master_data.archived_count }}
+                </strong>
             </article>
             <article>
                 <span>Master ingredients</span>
