@@ -38308,6 +38308,54 @@ function initStoreSectionMasterTable() {
         iconSelect?.addEventListener("change", updateRowDirtyState);
         updateRowDirtyState();
     });
+    list.addEventListener("submit", async event => {
+        const submitter = event.submitter;
+        const action = String(submitter?.value || "").trim().toLowerCase();
+        if (!["archive", "restore"].includes(action)) return;
+
+        event.preventDefault();
+        const row = submitter.closest("[data-store-section-master-row]");
+        if (!row || row.dataset.storeSectionMasterActionPending === "true") return;
+        row.dataset.storeSectionMasterActionPending = "true";
+        row.setAttribute("aria-busy", "true");
+        const originalLabel = submitter.textContent;
+        const originalTitle = submitter.title;
+        submitter.disabled = true;
+        submitter.textContent = action === "archive" ? "Archiving…" : "Restoring…";
+
+        const body = new URLSearchParams(new FormData(row));
+        body.set("action", action);
+        try {
+            const response = await fetch(row.getAttribute("action"), {
+                method: "POST",
+                body,
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "fetch",
+                },
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.ok === false) {
+                throw new Error(
+                    result.error
+                    || `Store Section could not be ${action === "archive" ? "archived" : "restored"}.`,
+                );
+            }
+            const scrollRegion = appMainScrollRegion();
+            localStorage.setItem(
+                "scrollY",
+                String(scrollRegion ? scrollRegion.scrollTop : window.scrollY),
+            );
+            window.location.reload();
+        } catch (error) {
+            delete row.dataset.storeSectionMasterActionPending;
+            row.removeAttribute("aria-busy");
+            submitter.disabled = false;
+            submitter.textContent = originalLabel;
+            submitter.title = error.message || originalTitle;
+            announce(error.message || "Store Section could not be updated.");
+        }
+    });
     search?.addEventListener("input", applyFilters);
     statusFilter?.addEventListener("change", applyFilters);
     window.addEventListener("resize", applyColumnLayout);

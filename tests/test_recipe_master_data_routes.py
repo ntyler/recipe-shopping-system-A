@@ -1977,6 +1977,57 @@ def test_store_section_usage_route_lists_records_and_is_workspace_scoped(
     assert foreign_response.status_code == 404
 
 
+def test_store_section_archive_restore_fetch_is_json_without_flash_message(
+    monkeypatch,
+    tmp_path,
+):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    created = master_data.create_ingredient_store_section(
+        "Seasonal",
+        "basket",
+        user_id="user-a",
+    )
+    assert created["ok"] is True
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        archive_response = client.post(
+            f"/admin/master-data/store-sections/{created['id']}",
+            data={"action": "archive"},
+            headers={
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        )
+        with client.session_transaction() as session:
+            assert "recipe_master_data_messages" not in session
+        restore_response = client.post(
+            f"/admin/master-data/store-sections/{created['id']}",
+            data={"action": "restore"},
+            headers={
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        )
+        with client.session_transaction() as session:
+            assert "recipe_master_data_messages" not in session
+
+    assert archive_response.status_code == 200
+    assert archive_response.get_json()["ok"] is True
+    assert restore_response.status_code == 200
+    assert restore_response.get_json()["ok"] is True
+    restored = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+            create=True,
+        )
+        if section["id"] == created["id"]
+    )
+    assert restored["is_active"] is True
+
+
 def test_recipe_editor_store_section_menu_links_to_management_page():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -2034,6 +2085,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "nameInput?.classList.toggle(\"is-dirty\", nameIsDirty)" in script
     assert "iconPicker?.classList.toggle(\"is-dirty\", iconIsDirty)" in script
     assert "button.disabled = !rowIsDirty" in script
+    assert 'if (![\"archive\", \"restore\"].includes(action)) return;' in script
+    assert '\"X-Requested-With\": \"fetch\"' in script
+    assert 'localStorage.setItem(' in script
+    assert "window.location.reload()" in script
     assert 'selected?.scrollIntoView({ block: "nearest" });' in script
     assert "Number(event.detail || 0) < 2" in script
     assert "focusOption: Number(event.detail || 0) >= 2" in script
