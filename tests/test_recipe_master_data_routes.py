@@ -1903,6 +1903,8 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "Actions" in page
     assert "data-store-section-master-icon-picker" in page
     assert "data-store-section-master-icon-option" in page
+    assert "<code>{{ section.section_key }}</code>" not in page
+    assert "store-section-master-kind" not in page
     assert "function initStoreSectionMasterTable()" in script
     assert "function initStoreSectionMasterIconPickers()" in script
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
@@ -1928,3 +1930,5 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
         "    :is(.store-section-master-identity, .store-section-master-icon-field)"
     ) in css
     assert "align-self: center;" in css
+    assert ".store-section-master-row .store-section-master-icon-field" in css
+    assert ".store-section-master-row .store-section-master-icon-picker" in css

@@ -298,13 +298,10 @@ data-user-id="{{ master_data.scope_user_id }}"
                                 <input type="text"
                                        name="display_name"
                                        value="{{ section.display_name }}"
+                                       aria-label="Store Section name for {{ section.display_name }}"
                                        maxlength="80"
                                        required>
                             </label>
-                            <code>{{ section.section_key }}</code>
-                            <span class="store-section-master-kind">
-                                {% if section.is_builtin %}Built in{% else %}Custom{% endif %}
-                            </span>
                         </div>
 
                         <div class="store-section-master-icon-field"

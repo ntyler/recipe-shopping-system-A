@@ -61989,31 +61989,13 @@ body.recipe-edit-standalone-page :is(
 }
 
 .store-section-master-identity {
-    display: grid;
+    display: flex;
     min-width: 0;
-    grid-template-columns: minmax(0, 1fr) max-content;
-    gap: 4px 8px;
+    align-items: center;
 }
 
 .store-section-master-identity label {
-    grid-column: 1 / -1;
-}
-
-.store-section-master-identity code {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--app-muted);
-    font-size: 9px;
-    line-height: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.store-section-master-kind {
-    color: var(--app-primary-hover);
-    font-size: 9px;
-    font-weight: 750;
-    line-height: 12px;
+    width: 100%;
 }
 
 .store-section-master-usage {
@@ -62374,17 +62356,23 @@ body.recipe-edit-standalone-page :is(
 }
 
 .store-section-master-row .store-section-master-identity {
-    grid-template-columns: minmax(0, 1fr) max-content;
     align-items: center;
-}
-
-.store-section-master-row .store-section-master-identity label {
-    grid-column: 1 / -1;
 }
 
 .store-section-master-row .store-section-master-identity input,
 .store-section-master-row .store-section-master-icon-trigger {
-    min-height: 36px;
+    height: 38px;
+    min-height: 38px;
+}
+
+.store-section-master-row .store-section-master-icon-field {
+    display: flex;
+    min-height: 38px;
+    align-items: center;
+}
+
+.store-section-master-row .store-section-master-icon-picker {
+    width: 100%;
 }
 
 .store-section-master-row .store-section-master-usage {
