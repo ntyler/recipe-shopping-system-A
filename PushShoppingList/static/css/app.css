@@ -61839,10 +61839,10 @@ body.recipe-edit-standalone-page :is(
 
 .store-section-master-order {
     display: grid;
-    grid-template-columns: 24px 20px 24px;
+    grid-template-columns: 24px 22px 36px 22px;
     align-items: center;
-    justify-content: center;
-    gap: 2px;
+    justify-content: start;
+    gap: 3px;
 }
 
 .store-section-master-order button {
@@ -61851,24 +61851,23 @@ body.recipe-edit-standalone-page :is(
     padding: 0;
 }
 
-.store-section-master-order span {
-    color: var(--app-muted);
-    font-size: 10px;
-    font-weight: 800;
-    text-align: center;
-}
-
-.store-section-master-icon {
+.store-section-master-order-step {
     display: grid;
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     place-items: center;
-    border: 1px solid color-mix(in srgb, var(--app-primary) 42%, var(--app-border));
-    border-radius: 9px;
-    background: var(--app-primary-soft);
+    border: 1px solid color-mix(in srgb, var(--app-primary-hover) 68%, var(--app-border));
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--app-primary-soft) 42%, transparent);
     color: var(--app-primary-hover);
-    font-size: 20px;
+    font-size: 12px;
+    font-weight: 850;
     line-height: 1;
+    text-align: center;
+    transition:
+        border-color 140ms ease,
+        background-color 140ms ease,
+        box-shadow 140ms ease;
 }
 
 .store-section-master-icon-picker {
@@ -62360,15 +62359,14 @@ body.recipe-edit-standalone-page :is(
     align-self: center;
 }
 
-.store-section-master-order-icon {
-    display: grid;
-    grid-template-columns: 66px 38px;
+.store-section-master-order-cell {
+    display: flex;
+    min-width: 0;
     align-items: center;
-    gap: 8px;
 }
 
 .store-section-master-order {
-    grid-template-columns: 22px 18px 22px;
+    grid-template-columns: 22px 20px 34px 20px;
 }
 
 .store-section-master-order button {
@@ -62391,9 +62389,39 @@ body.recipe-edit-standalone-page :is(
     height: 13px;
 }
 
-.store-section-master-row .store-section-master-icon {
-    width: 38px;
-    height: 38px;
+.store-section-master-order > button:not(.store-section-master-drag-handle) {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(.88);
+    transition:
+        opacity 120ms ease,
+        transform 120ms ease,
+        border-color 120ms ease,
+        background-color 120ms ease,
+        color 120ms ease;
+}
+
+.store-section-master-row:is(:hover, :focus-within)
+    .store-section-master-order
+    > button:not(.store-section-master-drag-handle),
+.store-section-master-order
+    > button:not(.store-section-master-drag-handle):focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+}
+
+.store-section-master-row:is(:hover, :focus-within)
+    .store-section-master-order
+    > button:not(.store-section-master-drag-handle):disabled {
+    opacity: .28;
+}
+
+.store-section-master-row:is(:hover, :focus-within)
+    .store-section-master-order-step {
+    border-color: var(--app-primary-hover);
+    background: var(--app-primary-soft);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 10%, transparent);
 }
 
 .store-section-master-row .store-section-master-identity {
@@ -63080,7 +63108,7 @@ body.is-store-section-master-usage-dialog-open {
         padding: 12px;
     }
 
-    .store-section-master-order-icon {
+    .store-section-master-order-cell {
         grid-row: 1 / span 2;
         align-self: start;
     }
@@ -63120,7 +63148,7 @@ body.is-store-section-master-usage-dialog-open {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .store-section-master-order-icon,
+    .store-section-master-order-cell,
     .store-section-master-identity,
     .store-section-master-icon-field,
     .store-section-master-type,
@@ -63130,9 +63158,8 @@ body.is-store-section-master-usage-dialog-open {
         grid-column: 1;
     }
 
-    .store-section-master-order-icon {
+    .store-section-master-order-cell {
         grid-row: auto;
-        grid-template-columns: 66px 38px;
     }
 }
 
@@ -63335,12 +63362,8 @@ body.is-resizing-store-section-master-column * {
     cursor: col-resize !important;
 }
 
-.store-section-master-order-icon {
-    grid-template-columns: 90px 38px;
-}
-
 .store-section-master-order {
-    grid-template-columns: 24px 22px 18px 22px;
+    grid-template-columns: 24px 22px 36px 22px;
 }
 
 .store-section-master-page
@@ -63433,12 +63456,15 @@ body.is-resizing-store-section-master-column * {
         min-width: 0;
     }
 
-    .store-section-master-order-icon {
-        grid-template-columns: 80px 38px;
+    .store-section-master-order {
+        grid-template-columns: 22px 20px 34px 20px;
     }
 
-    .store-section-master-order {
-        grid-template-columns: 22px 20px 18px 20px;
+    .store-section-master-order
+        > button:not(.store-section-master-drag-handle) {
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
     }
 
     .store-section-master-row .store-section-master-identity {
@@ -63484,7 +63510,7 @@ body.is-resizing-store-section-master-column * {
         grid-template-columns: 126px minmax(0, 1fr);
     }
 
-    .store-section-master-order-icon {
+    .store-section-master-order-cell {
         grid-column: 1;
     }
 

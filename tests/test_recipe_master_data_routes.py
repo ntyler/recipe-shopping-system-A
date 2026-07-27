@@ -2061,7 +2061,8 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert 'data-store-section-master-column="order"' in page
     assert "data-store-section-master-drag-handle" in page
     assert "store-section-master-table-head" in page
-    assert "Order / Icon" in page
+    assert ">Order</div>" in page
+    assert "Order / Icon" not in page
     assert "Store Section" in page
     assert "Section Type" in page
     assert "Built in" in page
@@ -2154,3 +2155,27 @@ def test_store_section_icon_picker_matches_recipe_table_dropdown_chrome():
     )
     assert "grid-template-columns: 17px minmax(0, 1fr) 16px;" in css
     assert "const menuWidth = Math.max(220, rect.width);" in script
+
+
+def test_store_section_order_column_uses_step_badges_without_duplicate_icons():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    page = Path("PushShoppingList/templates/store_sections.html").read_text(
+        encoding="utf-8",
+    )
+
+    assert 'class="store-section-master-order-cell"' in page
+    assert 'class="store-section-master-order-step"' in page
+    assert "data-store-section-master-order-number" in page
+    assert 'aria-label="Step {{ loop.index }}"' in page
+    assert "data-store-section-master-row-icon" not in page
+    assert ".store-section-master-order-step {" in css
+    assert "border-radius: 50%;" in css
+    assert (
+        "> button:not(.store-section-master-drag-handle)"
+        in css
+    )
+    assert ".store-section-master-row:is(:hover, :focus-within)" in css
+    assert 'label: "Order"' in script
+    assert '"[data-store-section-master-order-number]"' in script
+    assert 'number.setAttribute("aria-label", `Step ${index + 1}`);' in script

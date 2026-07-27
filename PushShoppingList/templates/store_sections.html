@@ -231,7 +231,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                  role="table"
                  aria-label="Store Sections">
                 <div class="store-section-master-table-head" role="row">
-                    <div role="columnheader" data-store-section-master-column="order">Order / Icon</div>
+                    <div role="columnheader" data-store-section-master-column="order">Order</div>
                     <div role="columnheader" data-store-section-master-column="section">Store Section</div>
                     <div role="columnheader" data-store-section-master-column="icon">Icon</div>
                     <div role="columnheader" data-store-section-master-column="type">Section Type</div>
@@ -252,7 +252,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                           data-store-section-name="{{ section.display_name|lower }}"
                           data-store-section-key="{{ section.section_key|lower }}"
                           data-store-section-status="{% if section.is_active %}active{% else %}archived{% endif %}">
-                        <div class="store-section-master-order-icon"
+                        <div class="store-section-master-order-cell"
                              role="cell"
                              data-store-section-master-cell="order">
                             <div class="store-section-master-order">
@@ -281,7 +281,9 @@ data-user-id="{{ master_data.scope_user_id }}"
                                         <path d="m6 11 6-6 6 6"></path>
                                     </svg>
                                 </button>
-                                <span>{{ loop.index }}</span>
+                                <span class="store-section-master-order-step"
+                                      data-store-section-master-order-number
+                                      aria-label="Step {{ loop.index }}">{{ loop.index }}</span>
                                 <button type="submit"
                                         name="action"
                                         value="move_down"
@@ -294,12 +296,6 @@ data-user-id="{{ master_data.scope_user_id }}"
                                     </svg>
                                 </button>
                             </div>
-
-                            <span class="store-section-master-icon recipe-edit-store-section-icon is-{{ section.icon }}"
-                                  data-store-section-master-icon-visual
-                                  data-store-section-master-row-icon
-                                  data-icon="{{ section.icon }}"
-                                  aria-hidden="true">{{ icon_glyphs.get(section.icon, icon_glyphs["basket"]) }}</span>
                         </div>
 
                         <div class="store-section-master-identity"

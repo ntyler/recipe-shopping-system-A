@@ -37658,9 +37658,6 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
         option.classList.toggle("is-selected", selected);
         option.setAttribute("aria-selected", String(selected));
     });
-    const rowIcon = picker.closest(".store-section-master-row")
-        ?.querySelector("[data-store-section-master-row-icon]");
-    renderStoreSectionMasterIconVisual(rowIcon, normalizedIcon);
 }
 
 const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV1";
@@ -37679,7 +37676,7 @@ const STORE_SECTION_MASTER_MOBILE_COLUMNS = [
 ];
 const STORE_SECTION_MASTER_COLUMNS = {
     order: {
-        label: "Order / Icon",
+        label: "Order",
         fallbackWidth: 140,
         minWidth: 126,
         maxWidth: 260,
@@ -38132,10 +38129,15 @@ function initStoreSectionMasterTable() {
         const currentRows = rows();
         currentRows.forEach((row, index) => {
             const order = row.querySelector(".store-section-master-order");
-            const number = order?.querySelector("span");
+            const number = order?.querySelector(
+                "[data-store-section-master-order-number]",
+            );
             const up = order?.querySelector('button[value="move_up"]');
             const down = order?.querySelector('button[value="move_down"]');
-            if (number) number.textContent = String(index + 1);
+            if (number) {
+                number.textContent = String(index + 1);
+                number.setAttribute("aria-label", `Step ${index + 1}`);
+            }
             if (up) up.disabled = index === 0;
             if (down) down.disabled = index === currentRows.length - 1;
         });
