@@ -1513,10 +1513,11 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     filter_position = template.index('class="master-data-filter-form')
-    maintenance_position = template.index('data-master-maintenance open')
     results_position = template.index('data-master-results-header')
+    pagination_position = template.index('data-master-pagination')
 
-    assert filter_position < maintenance_position < results_position
+    assert filter_position < results_position < pagination_position
+    assert "data-master-maintenance open" not in template
     assert "<span>Maintenance tools</span>" in template
     assert 'data-label="Store section"' in template
     assert 'class="master-data-mobile-usage-label"' in template
@@ -1528,6 +1529,9 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "data-master-mobile-reference-panel" in template
     assert "data-master-mobile-reference-close" in template
     assert "function initMasterDataMaintenance()" in script
+    assert 'const pagination = document.querySelector("[data-master-pagination]");' in script
+    assert 'pagination.insertAdjacentElement("afterend", maintenance);' in script
+    assert "maintenance.open = false;" in script
     assert "function initMasterDataMobileRecords()" in script
     assert "function setMasterDataMobileRecordExpanded(row, expanded)" in script
     assert "function syncMasterDataMobileSectionSummary(select)" in script
@@ -1543,6 +1547,8 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "initMasterDataMobileRecords();" in script
     assert "@media (max-width: 760px)" in css
     assert ".master-data-maintenance:not([open]) > .master-data-maintenance-content" in css
+    assert ".master-data-maintenance {" in css
+    assert "order: 100;" in css
     assert ".master-data-ingredients-table .master-data-record-row" in css
     assert ".master-data-mobile-record-toggle[aria-expanded=\"true\"] svg" in css
     assert ".master-data-record-row.master-data-record-row-expanded" in css

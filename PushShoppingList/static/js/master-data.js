@@ -5370,19 +5370,13 @@
 
     function initMasterDataMaintenance() {
         const maintenance = document.querySelector("[data-master-maintenance]");
-        if (!maintenance || typeof window.matchMedia !== "function") return;
+        if (!maintenance) return;
 
-        const mobileViewport = window.matchMedia("(max-width: 760px)");
-        const syncMaintenanceState = (event) => {
-            maintenance.open = !event.matches;
-        };
-
-        syncMaintenanceState(mobileViewport);
-        if (typeof mobileViewport.addEventListener === "function") {
-            mobileViewport.addEventListener("change", syncMaintenanceState);
-        } else if (typeof mobileViewport.addListener === "function") {
-            mobileViewport.addListener(syncMaintenanceState);
+        const pagination = document.querySelector("[data-master-pagination]");
+        if (pagination && pagination.parentElement === maintenance.parentElement) {
+            pagination.insertAdjacentElement("afterend", maintenance);
         }
+        maintenance.open = false;
     }
 
     function initMasterDataPage() {

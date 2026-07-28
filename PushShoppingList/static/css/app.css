@@ -25530,17 +25530,62 @@ img[data-deferred-src] {
             color: #eef2f3;
         }
 
-        .master-data-maintenance,
-        .master-data-maintenance-content {
-            display: contents;
+        .master-data-maintenance {
+            order: 100;
+            display: block;
+            overflow: hidden;
+            border: 1px solid #3a5470;
+            border-radius: 8px;
+            background: #101820;
         }
 
         .master-data-maintenance > summary {
+            display: flex;
+            min-height: 54px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 0 14px;
+            color: #f8fafc;
+            font-size: 15px;
+            font-weight: 900;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        .master-data-maintenance > summary::-webkit-details-marker {
             display: none;
         }
 
-        .master-data-maintenance > .master-data-maintenance-content {
-            display: contents !important;
+        .master-data-maintenance-chevron {
+            width: 9px;
+            height: 9px;
+            flex: 0 0 auto;
+            border-right: 2px solid #cbd5e1;
+            border-bottom: 2px solid #cbd5e1;
+            transform: rotate(45deg) translateY(-2px);
+            transition: transform 140ms ease;
+        }
+
+        .master-data-maintenance[open] .master-data-maintenance-chevron {
+            transform: rotate(225deg) translate(-2px, -2px);
+        }
+
+        .master-data-maintenance:not([open]) > .master-data-maintenance-content {
+            display: none !important;
+        }
+
+        .master-data-maintenance[open] > .master-data-maintenance-content {
+            display: grid !important;
+            gap: 12px;
+            min-width: 0;
+            padding: 0 12px 12px;
+        }
+
+        .master-data-maintenance-content > * {
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
         }
 
         .master-data-header {
@@ -30074,7 +30119,7 @@ img[data-deferred-src] {
             }
 
             .master-data-maintenance {
-                order: 7;
+                order: 100;
                 display: block;
                 overflow: hidden;
                 border: 1px solid #3a5470;
