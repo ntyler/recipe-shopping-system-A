@@ -38648,6 +38648,18 @@ function initStoreSectionMasterTable() {
                 statusBadge.classList.toggle("is-archived", !isActive);
                 statusBadge.textContent = isActive ? "Active" : "Archived";
             }
+            const mobileKind = row.querySelector(
+                ".store-section-master-mobile-kind",
+            );
+            const mobileArchivedBadge = mobileKind?.querySelector(".is-archived");
+            if (isActive) {
+                mobileArchivedBadge?.remove();
+            } else if (mobileKind && !mobileArchivedBadge) {
+                const archivedBadge = document.createElement("span");
+                archivedBadge.className = "is-archived";
+                archivedBadge.textContent = "Archived";
+                mobileKind.append(archivedBadge);
+            }
             submitter.value = nextAction;
             submitter.textContent = isActive ? "Archive" : "Restore";
             submitter.classList.toggle("danger", isActive);

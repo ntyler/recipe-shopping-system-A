@@ -2415,6 +2415,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert '\"X-Requested-With\": \"fetch\"' in script
     assert "row.dataset.storeSectionStatus" in store_section_table_script
     assert 'statusBadge.textContent = isActive ? "Active" : "Archived"' in script
+    assert 'row.querySelector(\n                ".store-section-master-mobile-kind"' in script
+    assert 'mobileArchivedBadge?.remove()' in script
+    assert 'mobileKind.append(archivedBadge)' in script
     assert "adjustCount(activeCount, isActive ? 1 : -1)" in script
     assert "applyFilters()" in store_section_table_script
     assert "window.location.reload()" not in store_section_table_script
