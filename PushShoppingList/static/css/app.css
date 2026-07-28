@@ -63602,7 +63602,7 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-row {
-        grid-template-columns: 62px 38px minmax(0, 1fr);
+        grid-template-columns: 24px 38px minmax(0, 1fr);
         gap: 8px;
         min-width: 0;
     }
@@ -63613,11 +63613,15 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-order {
-        grid-template-columns: 22px 34px;
+        grid-template-columns: 24px;
     }
 
     .store-section-master-order
         > button:not(.store-section-master-drag-handle) {
+        display: none;
+    }
+
+    .store-section-master-order-step {
         display: none;
     }
 
