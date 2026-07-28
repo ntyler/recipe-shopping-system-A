@@ -37672,6 +37672,7 @@ const STORE_SECTION_MASTER_COLUMN_ORDER = [
 ];
 const STORE_SECTION_MASTER_MOBILE_COLUMNS = [
     "order",
+    "icon",
     "section",
 ];
 const STORE_SECTION_MASTER_COLUMNS = {
@@ -37847,7 +37848,12 @@ function initStoreSectionMasterTable() {
         const desktop = desktopColumnsEnabled();
         const displayOrder = desktop
             ? columnLayout.order
-            : STORE_SECTION_MASTER_COLUMN_ORDER;
+            : [
+                ...STORE_SECTION_MASTER_MOBILE_COLUMNS,
+                ...STORE_SECTION_MASTER_COLUMN_ORDER.filter(
+                    key => !STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key),
+                ),
+            ];
         const visibleOrder = desktop
             ? displayOrder.filter(key => !columnLayout.hidden.includes(key))
             : STORE_SECTION_MASTER_MOBILE_COLUMNS;

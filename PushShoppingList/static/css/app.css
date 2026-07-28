@@ -63478,23 +63478,61 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-row {
-        grid-template-columns: 126px minmax(0, 1fr);
+        grid-template-columns: 62px 38px minmax(0, 1fr);
+        gap: 8px;
         min-width: 0;
     }
 
+    .store-section-master-order-cell {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
     .store-section-master-order {
-        grid-template-columns: 22px 20px 34px 20px;
+        grid-template-columns: 22px 34px;
     }
 
     .store-section-master-order
         > button:not(.store-section-master-drag-handle) {
-        opacity: 1;
-        pointer-events: auto;
-        transform: none;
+        display: none;
+    }
+
+    .store-section-master-row .store-section-master-icon-field {
+        display: flex;
+        grid-column: 2;
+        min-width: 0;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .store-section-master-row .store-section-master-icon-picker {
+        width: 38px;
+    }
+
+    .store-section-master-row .store-section-master-icon-trigger {
+        grid-template-columns: 1fr;
+        width: 38px;
+        min-width: 38px;
+        height: 38px;
+        min-height: 38px;
+        justify-items: center;
+        padding: 0;
+        border-color: var(--app-border);
+        background: color-mix(in srgb, var(--app-primary-soft) 42%, transparent);
+    }
+
+    .store-section-master-row
+        .store-section-master-icon-trigger
+        > [data-store-section-master-icon-label],
+    .store-section-master-row
+        .store-section-master-icon-trigger
+        > .store-section-master-icon-chevron {
+        display: none;
     }
 
     .store-section-master-row .store-section-master-identity {
         display: grid;
+        grid-column: 3;
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
         gap: 7px;
@@ -63533,15 +63571,19 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-row {
-        grid-template-columns: 126px minmax(0, 1fr);
+        grid-template-columns: 62px 38px minmax(0, 1fr);
     }
 
     .store-section-master-order-cell {
         grid-column: 1;
     }
 
-    .store-section-master-identity {
+    .store-section-master-icon-field {
         grid-column: 2;
+    }
+
+    .store-section-master-identity {
+        grid-column: 3;
     }
 }
 

@@ -2080,7 +2080,15 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "recipe_image_url" in script
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
     assert "STORE_SECTION_MASTER_MOBILE_COLUMNS" in script
+    assert (
+        'const STORE_SECTION_MASTER_MOBILE_COLUMNS = [\n'
+        '    "order",\n'
+        '    "icon",\n'
+        '    "section",\n'
+        "];"
+    ) in script
     assert '!STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key)' in script
+    assert "...STORE_SECTION_MASTER_MOBILE_COLUMNS," in script
     assert "row.requestSubmit(saveButton)" in script
     assert '"type",' in script
     assert 'label: "Section Type"' in script
@@ -2119,6 +2127,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-column-resize" in css
     assert ".store-section-master-drag-handle" in css
     assert ".store-section-master-mobile-save" in css
+    assert "grid-template-columns: 62px 38px minmax(0, 1fr);" in css
+    assert "grid-template-columns: 22px 34px;" in css
+    assert "> [data-store-section-master-icon-label]," in css
     assert ".is-row-drop-before" in css
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css
