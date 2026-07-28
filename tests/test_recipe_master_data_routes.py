@@ -2441,11 +2441,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-mobile-details[hidden]" in css
     assert ".store-section-master-row.is-mobile-expanded" in css
     assert "content: attr(data-mobile-label);" in css
-    assert (
-        ".store-section-master-mobile-details > .store-section-master-usage {"
-        in css
-    )
-    assert "grid-template-columns: max-content minmax(0, 1fr);" in css
+    assert "> .store-section-master-usage {" in css
+    assert 'data-store-section-is-built-in="true"' in css
+    assert 'content: "ingredients";' in css
+    assert 'content: "recipe refs";' in css
     assert "white-space: nowrap;" in css
     assert (
         ".store-section-master-order-step {\n"

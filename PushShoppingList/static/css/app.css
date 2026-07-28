@@ -63735,9 +63735,8 @@ body.is-resizing-store-section-master-column * {
         display: grid;
         grid-column: 1 / -1;
         grid-row: 2;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0;
-        column-gap: 16px;
+        grid-template-columns: repeat(3, max-content) minmax(0, 1fr);
+        gap: 0 8px;
         margin: 8px -14px -9px;
         padding: 4px 14px 8px;
         border-top: 1px solid var(--app-border);
@@ -63773,18 +63772,35 @@ body.is-resizing-store-section-master-column * {
         );
     }
 
-    .store-section-master-mobile-details > .store-section-master-type,
-    .store-section-master-mobile-details > .store-section-master-state {
+    .store-section-master-mobile-details > .store-section-master-type {
         grid-column: 1;
     }
 
-    .store-section-master-mobile-details > .store-section-master-routing,
-    .store-section-master-mobile-details > .store-section-master-actions {
+    .store-section-master-mobile-details > .store-section-master-routing {
         grid-column: 2;
     }
 
-    .store-section-master-mobile-details > .store-section-master-usage {
+    .store-section-master-mobile-details > .store-section-master-state {
+        grid-column: 3;
+    }
+
+    .store-section-master-mobile-details
+        > :is(.store-section-master-usage, .store-section-master-actions) {
         grid-column: 1 / -1;
+    }
+
+    .store-section-master-mobile-details
+        > :is(
+            .store-section-master-type,
+            .store-section-master-routing,
+            .store-section-master-state
+        ) {
+        display: flex;
+        grid-template-columns: none;
+        align-items: center;
+        gap: 0;
+        padding: 9px 0 4px;
+        border-bottom: 0;
     }
 
     .store-section-master-mobile-details
@@ -63817,6 +63833,15 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-mobile-details
+        > :is(
+            .store-section-master-type,
+            .store-section-master-routing,
+            .store-section-master-state
+        )::before {
+        display: none;
+    }
+
+    .store-section-master-mobile-details
         > .store-section-master-type
         > span,
     .store-section-master-mobile-details
@@ -63834,37 +63859,41 @@ body.is-resizing-store-section-master-column * {
     .store-section-master-mobile-details
         > .store-section-master-routing
         > small {
-        max-width: none;
+        display: none;
     }
 
     .store-section-master-mobile-details
         > .store-section-master-usage
         > .store-section-master-usage-button {
-        display: grid;
+        display: inline-flex;
         grid-column: auto;
-        grid-template-columns: max-content minmax(0, 1fr);
-        width: 100%;
-        min-height: 44px;
+        width: auto;
+        min-height: 30px;
+        flex: 0 0 auto;
         align-items: center;
-        gap: 6px;
+        gap: 4px;
         margin: 0;
-        padding: 7px 9px;
+        padding: 4px 8px;
         border-color: var(--app-border);
-        border-radius: 7px;
-        background: color-mix(in srgb, var(--app-surface) 64%, transparent);
+        border-radius: 999px;
+        background: transparent;
     }
 
     .store-section-master-mobile-details
         > .store-section-master-usage {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
+        display: flex;
+        grid-template-columns: none;
+        flex-wrap: wrap;
+        gap: 5px;
+        padding: 4px 0 9px;
+        border-bottom: 0;
     }
 
     .store-section-master-mobile-details
         > .store-section-master-usage
         > .store-section-master-usage-button
         > strong {
-        font-size: 14px;
+        font-size: 12px;
         line-height: 1;
     }
 
@@ -63872,18 +63901,47 @@ body.is-resizing-store-section-master-column * {
         > .store-section-master-usage
         > .store-section-master-usage-button
         > span {
-        min-width: 0;
+        display: none;
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-usage
+        > .store-section-master-usage-button::after {
+        color: var(--app-muted);
         font-size: 10px;
-        line-height: 1.2;
+        font-weight: 650;
+        line-height: 1;
         white-space: nowrap;
     }
 
     .store-section-master-mobile-details
+        > .store-section-master-usage
+        > .store-section-master-usage-button[
+            data-store-section-master-usage-kind="ingredients"
+        ]::after {
+        content: "ingredients";
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-usage
+        > .store-section-master-usage-button[
+            data-store-section-master-usage-kind="recipes"
+        ]::after {
+        content: "recipe refs";
+    }
+
+    .store-section-master-mobile-details
         > .store-section-master-usage::before {
-        grid-column: 1 / -1;
-        grid-row: auto;
-        margin-bottom: 2px;
-        line-height: 1.2;
+        display: block;
+        flex: 0 0 100%;
+        margin-bottom: 1px;
+        line-height: 1;
+    }
+
+    .store-section-master-row[data-store-section-is-built-in="true"]
+        .store-section-master-mobile-details
+        > .store-section-master-actions {
+        display: none;
     }
 
     .store-section-master-mobile-details
