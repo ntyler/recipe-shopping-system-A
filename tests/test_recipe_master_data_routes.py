@@ -2091,7 +2091,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
     assert (
         'const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = '
-        '"storeSectionMasterColumnsV2";'
+        '"storeSectionMasterColumnsV3";'
     ) in script
     assert (
         'const STORE_SECTION_MASTER_COLUMN_ORDER = [\n'
@@ -2152,8 +2152,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "> [data-store-section-master-icon-label]," in css
     assert '[data-store-section-master-column="icon"]' in css
     assert '[data-store-section-master-cell="icon"]' in css
-    assert "width: min(100%, 160px);" in css
-    assert "grid-template-columns: 16px max-content 14px;" in css
+    assert ".store-section-master-row .store-section-master-icon-picker" in css
+    assert "width: 38px;" in css
+    assert "grid-template-columns: 1fr;" in css
     assert "place-items: center;" in css
     assert ".is-row-drop-before" in css
     assert ".store-section-master-icon-menu" in css

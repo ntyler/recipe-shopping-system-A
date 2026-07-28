@@ -37660,7 +37660,7 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
     });
 }
 
-const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV2";
+const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV3";
 const STORE_SECTION_MASTER_COLUMN_ORDER = [
     "order",
     "icon",
@@ -37690,9 +37690,9 @@ const STORE_SECTION_MASTER_COLUMNS = {
     },
     icon: {
         label: "Icon",
-        fallbackWidth: 180,
-        minWidth: 120,
-        maxWidth: 280,
+        fallbackWidth: 96,
+        minWidth: 76,
+        maxWidth: 160,
     },
     type: {
         label: "Section Type",
