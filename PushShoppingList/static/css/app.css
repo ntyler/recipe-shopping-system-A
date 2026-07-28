@@ -62666,8 +62666,13 @@ body.recipe-edit-standalone-page :is(
 }
 
 .store-section-master-mobile-details-toggle,
-.store-section-master-mobile-details,
-.store-section-master-mobile-kind {
+.store-section-master-mobile-details {
+    display: none;
+}
+
+.store-section-master-identity
+    label
+    > .store-section-master-mobile-kind {
     display: none;
 }
 
@@ -63683,7 +63688,9 @@ body.is-resizing-store-section-master-column * {
         gap: 7px;
     }
 
-    .store-section-master-mobile-kind {
+    .store-section-master-identity
+        label
+        > .store-section-master-mobile-kind {
         display: flex;
         min-height: 18px;
         align-items: center;

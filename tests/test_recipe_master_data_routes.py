@@ -2458,6 +2458,18 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "flex-wrap: wrap;" in css
     assert "order: 4;" in css
     assert ".store-section-master-mobile-kind" in css
+    assert (
+        ".store-section-master-identity\n"
+        "    label\n"
+        "    > .store-section-master-mobile-kind {\n"
+        "    display: none;"
+    ) in css
+    assert (
+        ".store-section-master-identity\n"
+        "        label\n"
+        "        > .store-section-master-mobile-kind {\n"
+        "        display: flex;"
+    ) in css
     assert 'data-store-section-is-built-in="false"' in css
     assert 'data-store-section-status="archived"' in css
     assert 'data-store-section-is-built-in="true"' in css
