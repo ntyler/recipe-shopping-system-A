@@ -37660,12 +37660,13 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
     });
 }
 
-const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV3";
+const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV4";
 const STORE_SECTION_MASTER_COLUMN_ORDER = [
     "order",
     "icon",
     "section",
     "type",
+    "routing",
     "usage",
     "status",
     "actions",
@@ -37699,6 +37700,12 @@ const STORE_SECTION_MASTER_COLUMNS = {
         fallbackWidth: 130,
         minWidth: 108,
         maxWidth: 220,
+    },
+    routing: {
+        label: "Routing",
+        fallbackWidth: 240,
+        minWidth: 190,
+        maxWidth: 380,
     },
     usage: {
         label: "Usage",

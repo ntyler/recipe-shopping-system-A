@@ -62515,6 +62515,56 @@ body.recipe-edit-standalone-page :is(
     line-height: 1.25;
 }
 
+.store-section-master-routing {
+    display: grid;
+    min-width: 0;
+    align-content: center;
+    justify-items: start;
+    gap: 4px;
+    line-height: 1.25;
+}
+
+.store-section-master-routing-badge {
+    display: inline-flex;
+    width: max-content;
+    min-height: 22px;
+    align-items: center;
+    padding: 2px 7px;
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+.store-section-master-routing-badge.is-automatic {
+    border-color: color-mix(
+        in srgb,
+        var(--app-primary-hover) 55%,
+        var(--app-border)
+    );
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.store-section-master-routing-badge.is-manual {
+    border-color: color-mix(
+        in srgb,
+        var(--app-warning) 55%,
+        var(--app-border)
+    );
+    background: var(--app-warning-soft);
+    color: var(--app-warning);
+}
+
+.store-section-master-routing > small {
+    max-width: 30ch;
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
 .store-section-master-page .store-section-master-usage-button {
     display: flex;
     width: max-content;
@@ -63004,6 +63054,10 @@ body.is-store-section-master-usage-dialog-open {
 }
 
 @media (max-width: 759px) {
+    .store-section-master-routing {
+        display: none;
+    }
+
     .store-section-master-usage-dialog {
         width: calc(100vw - 16px);
         max-height: calc(100vh - 16px);
@@ -63297,9 +63351,9 @@ body.is-store-section-master-usage-dialog-open {
     grid-template-columns:
         var(
             --store-section-master-grid,
-            140px 360px 250px 130px 250px 100px 170px
+            140px 96px 360px 130px 240px 250px 100px 170px
         );
-    min-width: var(--store-section-master-grid-width, 1500px);
+    min-width: var(--store-section-master-grid-width, 1700px);
 }
 
 .store-section-master-table-head > [data-store-section-master-column] {

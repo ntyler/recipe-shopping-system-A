@@ -2063,11 +2063,17 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
         page.index('data-store-section-master-column="order"')
         < page.index('data-store-section-master-column="icon"')
         < page.index('data-store-section-master-column="section"')
+        < page.index('data-store-section-master-column="type"')
+        < page.index('data-store-section-master-column="routing"')
+        < page.index('data-store-section-master-column="usage"')
     )
     assert (
         page.index('data-store-section-master-cell="order"')
         < page.index('data-store-section-master-cell="icon"')
         < page.index('data-store-section-master-cell="section"')
+        < page.index('data-store-section-master-cell="type"')
+        < page.index('data-store-section-master-cell="routing"')
+        < page.index('data-store-section-master-cell="usage"')
     )
     assert "data-store-section-master-drag-handle" in page
     assert "store-section-master-table-head" in page
@@ -2077,6 +2083,11 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "Section Type" in page
     assert "Built in" in page
     assert "Custom" in page
+    assert "Routing" in page
+    assert "Automatic" in page
+    assert "Manual only" in page
+    assert "Saved assignments, routing rules, then AI fallback." in page
+    assert "Ingredient Master Data or recipe overrides." in page
     assert "Usage" in page
     assert "Actions" in page
     assert "data-store-section-master-icon-picker" in page
@@ -2091,7 +2102,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
     assert (
         'const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = '
-        '"storeSectionMasterColumnsV3";'
+        '"storeSectionMasterColumnsV4";'
     ) in script
     assert (
         'const STORE_SECTION_MASTER_COLUMN_ORDER = [\n'
@@ -2112,6 +2123,8 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "row.requestSubmit(saveButton)" in script
     assert '"type",' in script
     assert 'label: "Section Type"' in script
+    assert '"routing",' in script
+    assert 'label: "Routing"' in script
     assert "storeSectionMasterColumnResize" in script
     assert 'action: "move_to"' in script
     assert "persistRowPosition" in script
@@ -2166,6 +2179,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".is-row-drop-before" in css
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css
+    assert ".store-section-master-routing" in css
+    assert ".store-section-master-routing-badge.is-automatic" in css
+    assert ".store-section-master-routing-badge.is-manual" in css
+    assert "var(--app-warning-soft)" in css
     assert ".store-section-master-usage-button" in css
     assert ".store-section-master-usage-dialog" in css
     assert ".store-section-master-usage-result" in css

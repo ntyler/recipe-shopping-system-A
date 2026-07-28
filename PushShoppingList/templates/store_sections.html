@@ -235,6 +235,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                     <div role="columnheader" data-store-section-master-column="icon">Icon</div>
                     <div role="columnheader" data-store-section-master-column="section">Store Section</div>
                     <div role="columnheader" data-store-section-master-column="type">Section Type</div>
+                    <div role="columnheader" data-store-section-master-column="routing">Routing</div>
                     <div role="columnheader" data-store-section-master-column="usage">Usage</div>
                     <div role="columnheader" data-store-section-master-column="status">Status</div>
                     <div role="columnheader" data-store-section-master-column="actions">Actions</div>
@@ -335,6 +336,22 @@ data-user-id="{{ master_data.scope_user_id }}"
                             <span class="{% if section.is_builtin %}is-built-in{% else %}is-custom{% endif %}">
                                 {% if section.is_builtin %}Built in{% else %}Custom{% endif %}
                             </span>
+                        </div>
+
+                        <div class="store-section-master-routing"
+                             role="cell"
+                             data-store-section-master-cell="routing"
+                             title="{% if section.is_builtin %}Items enter through user-confirmed recipe choices, Ingredient Master Data, deterministic mappings and rules, existing assignments, then validated AI fallback.{% else %}AI does not automatically route items to custom sections. Assign them through Ingredient Master Data or a recipe override.{% endif %}">
+                            <span class="store-section-master-routing-badge {% if section.is_builtin %}is-automatic{% else %}is-manual{% endif %}">
+                                {% if section.is_builtin %}Automatic{% else %}Manual only{% endif %}
+                            </span>
+                            <small>
+                                {% if section.is_builtin %}
+                                    Saved assignments, routing rules, then AI fallback.
+                                {% else %}
+                                    Ingredient Master Data or recipe overrides.
+                                {% endif %}
+                            </small>
                         </div>
 
                         <div class="store-section-master-usage"
