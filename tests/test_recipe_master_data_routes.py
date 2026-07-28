@@ -2330,6 +2330,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-column-resize" in css
     assert ".store-section-master-drag-handle" in css
     assert ".store-section-master-mobile-save" in css
+    assert ".store-section-master-mobile-save:disabled" in css
     assert "grid-template-columns: 62px 38px minmax(0, 1fr);" in css
     assert "grid-template-columns: 22px 34px;" in css
     assert "> [data-store-section-master-icon-label]," in css

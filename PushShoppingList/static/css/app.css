@@ -63675,6 +63675,10 @@ body.is-resizing-store-section-master-column * {
         color: var(--app-primary-hover);
     }
 
+    .store-section-master-page .store-section-master-mobile-save:disabled {
+        display: none;
+    }
+
     .store-section-master-mobile-save > svg {
         width: 15px;
         height: 15px;
