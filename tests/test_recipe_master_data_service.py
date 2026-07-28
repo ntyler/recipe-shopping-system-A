@@ -167,7 +167,7 @@ def test_store_section_definitions_are_workspace_scoped_and_manageable(monkeypat
     assert "INTERNATIONAL FOODS" in master_data.ingredient_store_section_options("user-a")
 
 
-def test_store_section_definition_cannot_be_archived_while_in_use(monkeypatch, tmp_path):
+def test_store_section_definition_can_be_archived_while_in_use(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     created = master_data.create_ingredient_store_section(
         "Market Produce",
@@ -205,9 +205,23 @@ def test_store_section_definition_cannot_be_archived_while_in_use(monkeypatch, t
         user_id="user-a",
     )
 
-    assert result["ok"] is False
-    assert result["status"] == 409
-    assert "Reassign" in result["error"]
+    assert result["ok"] is True
+    assert result["status"] == 200
+    archived = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+            create=True,
+        )
+        if section["id"] == custom_section["id"]
+    )
+    assert archived["is_active"] is False
+    assert archived["ingredient_count"] == 1
+    assert archived["recipe_reference_count"] == 1
+    assert created["section_key"] not in master_data.ingredient_store_section_options(
+        "user-a"
+    )
 
 
 def test_store_section_delete_requires_both_usage_counts_to_be_zero(monkeypatch, tmp_path):

@@ -2084,6 +2084,17 @@ def test_store_section_archive_restore_fetch_is_json_without_flash_message(
         user_id="user-a",
     )
     assert created["ok"] is True
+    master_data.sync_recipe_master_records(
+        "https://example.com/seasonal-cider",
+        recipe_data={
+            "ingredients": [{
+                "ingredient": "Seasonal cider",
+                "store_section": "Seasonal",
+                "store_section_custom": True,
+            }]
+        },
+        user_id="user-a",
+    )
 
     with app.test_client() as client:
         sign_in(client, "user-a")
@@ -2097,6 +2108,15 @@ def test_store_section_archive_restore_fetch_is_json_without_flash_message(
         )
         with client.session_transaction() as session:
             assert "recipe_master_data_messages" not in session
+        archived_snapshot = next(
+            section
+            for section in master_data.ingredient_store_section_details(
+                "user-a",
+                include_inactive=True,
+                create=True,
+            )
+            if section["id"] == created["id"]
+        )
         restore_response = client.post(
             f"/admin/master-data/store-sections/{created['id']}",
             data={"action": "restore"},
@@ -2110,6 +2130,8 @@ def test_store_section_archive_restore_fetch_is_json_without_flash_message(
 
     assert archive_response.status_code == 200
     assert archive_response.get_json()["ok"] is True
+    assert archived_snapshot["is_active"] is False
+    assert archived_snapshot["recipe_reference_count"] == 1
     assert restore_response.status_code == 200
     assert restore_response.get_json()["ok"] is True
     restored = next(
@@ -2202,6 +2224,10 @@ def test_store_section_delete_is_custom_only_and_requires_no_usage(
             'value="delete"',
             1,
         )[1].split(">", 1)[0]
+        used_archive_attributes = used_row.split(
+            'value="archive"',
+            1,
+        )[1].split(">", 1)[0]
         built_in_response = client.post(
             f"/admin/master-data/store-sections/{produce['id']}",
             data={"action": "delete"},
@@ -2218,6 +2244,8 @@ def test_store_section_delete_is_custom_only_and_requires_no_usage(
             headers=headers,
         )
 
+    assert "disabled" not in used_archive_attributes
+    assert "Existing assignments will remain." in used_archive_attributes
     assert "disabled" in used_delete_attributes
     assert built_in_response.status_code == 409
     assert (

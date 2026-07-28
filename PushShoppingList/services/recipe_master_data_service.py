@@ -1606,36 +1606,6 @@ def update_ingredient_store_section_definition(
                     "status": 409,
                     "error": "Built-in Store Sections cannot be archived.",
                 }
-            usage = connection.execute(
-                """
-                SELECT
-                    (
-                        SELECT COUNT(*)
-                          FROM ingredients
-                         WHERE user_id = ?
-                           AND store_section = ?
-                    )
-                    +
-                    (
-                        SELECT COUNT(*)
-                          FROM recipe_ingredients
-                         WHERE user_id = ?
-                           AND store_section = ?
-                    ) AS usage_count
-                """,
-                (
-                    scoped_user_id,
-                    row["section_key"],
-                    scoped_user_id,
-                    row["section_key"],
-                ),
-            ).fetchone()
-            if int(usage["usage_count"] or 0) > 0:
-                return {
-                    "ok": False,
-                    "status": 409,
-                    "error": "Reassign this Store Section's ingredients before archiving it.",
-                }
             connection.execute(
                 """
                 UPDATE ingredient_store_sections

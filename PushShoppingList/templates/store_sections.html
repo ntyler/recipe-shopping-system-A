@@ -248,7 +248,6 @@ data-user-id="{{ master_data.scope_user_id }}"
 
                 <div class="store-section-master-list" role="rowgroup">
                 {% for section in master_data.sections %}
-                    {% set usage_total = section.ingredient_count + section.recipe_reference_count %}
                     {% set can_delete = (
                         not section.is_builtin
                         and section.ingredient_count == 0
@@ -444,14 +443,14 @@ data-user-id="{{ master_data.scope_user_id }}"
                                         name="action"
                                         value="archive"
                                         class="danger"
-                                        {% if section.is_builtin or usage_total %}disabled
+                                        {% if section.is_builtin %}disabled
                                         {% endif %}
                                         {% if section.is_builtin %}
                                             title="Built-in Store Sections cannot be archived."
                                             aria-label="Archive unavailable for {{ section.display_name }}: built-in Store Sections cannot be archived."
-                                        {% elif usage_total %}
-                                            title="Reassign the ingredients using this section before archiving it."
-                                            aria-label="Archive unavailable for {{ section.display_name }}: reassign its ingredients first."
+                                        {% else %}
+                                            title="Archive this Store Section. Existing assignments will remain."
+                                            aria-label="Archive custom Store Section {{ section.display_name }}. Existing assignments will remain."
                                         {% endif %}>
                                     Archive
                                 </button>
