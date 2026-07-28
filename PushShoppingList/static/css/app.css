@@ -27569,6 +27569,59 @@ img[data-deferred-src] {
                 width: 100%;
                 max-width: 240px;
             }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            > td {
+                background: rgba(45, 143, 112, .045);
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            > td:first-child {
+                box-shadow: inset 3px 0 0 #2d8f70;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-item-copy {
+                grid-template-columns: minmax(0, 1fr) auto;
+                align-items: end;
+                column-gap: 8px;
+                row-gap: 6px;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-record-form {
+                grid-column: 1;
+                grid-row: 1;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-record-field input {
+                min-height: 36px;
+                border-color: #655f50;
+                background: #1b1f1f;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-merge-open {
+                min-height: 36px;
+                grid-column: 2;
+                grid-row: 1;
+                align-self: end;
+                padding-inline: 10px;
+                white-space: nowrap;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-aliases {
+                grid-column: 1 / -1;
+            }
         }
 
         .master-data-ingredients-table
@@ -27579,13 +27632,13 @@ img[data-deferred-src] {
         }
 
         .master-data-ingredients-table .master-data-record-row-expanded td {
-            vertical-align: top;
+            vertical-align: middle;
         }
 
         .master-data-ingredients-table
         .master-data-record-row-expanded
         .master-data-item {
-            align-items: start;
+            align-items: center;
         }
 
         .master-data-ingredients-table

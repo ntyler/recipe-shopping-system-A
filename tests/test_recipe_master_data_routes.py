@@ -1576,6 +1576,10 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "@media (min-width: 761px)" in css
     assert "grid-template-columns: 17px minmax(0, 1fr);" in css
     assert "max-width: 240px;" in css
+    assert "background: rgba(45, 143, 112, .045);" in css
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in css
+    assert "box-shadow: inset 3px 0 0 #2d8f70;" in css
+    assert "white-space: nowrap;" in css
     assert ".master-data-table--show-user" in css
     assert ".master-data-mobile-reference-dialog" in css
     assert ".master-data-mobile-reference-dialog::backdrop" in css
