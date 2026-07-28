@@ -2156,6 +2156,13 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "width: 38px;" in css
     assert "grid-template-columns: 1fr;" in css
     assert "place-items: center;" in css
+    assert (
+        ".store-section-master-row\n"
+        "    .store-section-master-icon-trigger\n"
+        "    .recipe-edit-store-section-icon {"
+    ) in css
+    assert "font-size: 20px;" in css
+    assert ":is(.recipe-edit-inline-icon, svg) {" in css
     assert ".is-row-drop-before" in css
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css
