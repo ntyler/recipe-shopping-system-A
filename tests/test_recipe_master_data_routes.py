@@ -2331,8 +2331,13 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-drag-handle" in css
     assert ".store-section-master-mobile-save" in css
     assert ".store-section-master-mobile-save:disabled" in css
-    assert "grid-template-columns: 24px 38px minmax(0, 1fr);" in css
+    assert css.count(
+        "grid-template-columns: 36px 46px minmax(0, 1fr);"
+    ) == 2
     assert "grid-template-columns: 24px;" in css
+    assert "24px handle + 12px breathing room" in css
+    assert "min-height: 44px;" in css
+    assert "justify-content: flex-start;" in css
     assert (
         ".store-section-master-order-step {\n"
         "        display: none;\n"

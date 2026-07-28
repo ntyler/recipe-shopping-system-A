@@ -63602,23 +63602,33 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-row {
-        grid-template-columns: 24px 38px minmax(0, 1fr);
-        gap: 8px;
+        /* 24px handle + 12px breathing room; 38px icon + 8px before the name. */
+        grid-template-columns: 36px 46px minmax(0, 1fr);
+        gap: 0;
         min-width: 0;
     }
 
     .store-section-master-order-cell {
         grid-column: 1;
         grid-row: 1;
+        align-self: stretch;
     }
 
     .store-section-master-order {
         grid-template-columns: 24px;
+        height: 100%;
     }
 
     .store-section-master-order
         > button:not(.store-section-master-drag-handle) {
         display: none;
+    }
+
+    .store-section-master-page
+        .store-section-master-order
+        .store-section-master-drag-handle {
+        height: 100%;
+        min-height: 44px;
     }
 
     .store-section-master-order-step {
@@ -63630,7 +63640,7 @@ body.is-resizing-store-section-master-column * {
         grid-column: 2;
         min-width: 0;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
     }
 
     .store-section-master-row .store-section-master-icon-picker {
@@ -63704,7 +63714,7 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-row {
-        grid-template-columns: 62px 38px minmax(0, 1fr);
+        grid-template-columns: 36px 46px minmax(0, 1fr);
     }
 
     .store-section-master-order-cell {
