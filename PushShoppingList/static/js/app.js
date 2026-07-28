@@ -37694,7 +37694,7 @@ const STORE_SECTION_MASTER_COLUMNS = {
         maxWidth: 260,
     },
     section: {
-        label: "Store Section",
+        label: "Display Name",
         fallbackWidth: 360,
         minWidth: 190,
         maxWidth: 640,

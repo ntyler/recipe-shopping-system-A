@@ -1839,10 +1839,15 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert details_count == toggle_count
         assert 'aria-controls="storeSectionMobileDetails-' in html
         assert 'id="storeSectionMobileDetails-' in html
+        assert "Change display names, icons, and order for this workspace." in html
+        assert "Built-in identity and automatic routing stay protected" in html
+        assert ">Display Name</div>" in html
         bakery_row = html.split('data-store-section-key="bakery"', 1)[1].split("</form>", 1)[0]
         bakery_archive_attributes = bakery_row.split('value="archive"', 1)[1].split(">", 1)[0]
         assert "disabled" in bakery_archive_attributes
         assert "Built-in Store Sections cannot be archived." in bakery_archive_attributes
+        assert 'data-store-section-is-built-in="true"' in bakery_row
+        assert "The built-in section identity and automatic routing stay unchanged." in bakery_row
         assert 'value="delete"' not in bakery_row
 
         created = client.post(
@@ -1904,6 +1909,74 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         other_workspace = client.get("/admin/master-data/store-sections")
         assert other_workspace.status_code == 200
         assert "Global Foods" not in other_workspace.get_data(as_text=True)
+
+
+def test_builtin_store_section_edit_preserves_identity_and_routing(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    produce = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+            create=True,
+        )
+        if section["section_key"] == "PRODUCE"
+    )
+    original_sort_order = produce["sort_order"]
+    original_classification = master_data.classify_ingredient_store_section("fresh carrots")
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.post(
+            f"/admin/master-data/store-sections/{produce['id']}",
+            data={
+                "action": "save",
+                "display_name": "Fresh Produce",
+                "icon": "heart",
+                "section_key": "HACKED",
+                "is_builtin": "0",
+                "is_active": "0",
+                "routing": "manual",
+            },
+            follow_redirects=True,
+        )
+        archive_response = client.post(
+            f"/admin/master-data/store-sections/{produce['id']}",
+            data={"action": "archive"},
+            headers={
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        )
+
+    assert response.status_code == 200
+    assert "Store Section updated: Fresh Produce." in response.get_data(as_text=True)
+    updated = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+        )
+        if section["id"] == produce["id"]
+    )
+    assert updated["display_name"] == "Fresh Produce"
+    assert updated["icon"] == "heart"
+    assert updated["section_key"] == "PRODUCE"
+    assert updated["is_builtin"] is True
+    assert updated["is_active"] is True
+    assert updated["sort_order"] == original_sort_order
+    assert master_data.clean_ingredient_store_section(
+        "Fresh Produce",
+        user_id="user-a",
+    ) == "PRODUCE"
+    assert master_data.classify_ingredient_store_section("fresh carrots") == (
+        original_classification
+    )
+    assert archive_response.status_code == 409
+    assert (
+        archive_response.get_json()["error"]
+        == "Built-in Store Sections cannot be archived."
+    )
 
 
 def test_store_section_usage_route_lists_records_and_is_workspace_scoped(
@@ -2184,10 +2257,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "store_section_url" in template
     assert "Store Sections" in page
     assert "Add Store Section" in page
-    assert (
-        "Built-in sections route automatically; custom sections are assigned manually."
-        in page
-    )
+    assert "Built-in identity and automatic routing stay protected" in page
     assert "Active sections" in page
     assert "Archived sections" in page
     assert "data-store-section-master-active-count" in page

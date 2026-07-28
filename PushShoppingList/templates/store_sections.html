@@ -161,7 +161,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                 <div>
                     <span>Shopping order</span>
                     <h2 id="storeSectionOrderTitle">Store Section order</h2>
-                    <p>Move sections to match your store route. Built-in sections route automatically; custom sections are assigned manually.</p>
+                    <p>Change display names, icons, and order for this workspace. Built-in identity and automatic routing stay protected; custom sections are assigned manually.</p>
                 </div>
                 <div class="store-section-master-table-actions">
                     <span class="store-section-master-visible-count"
@@ -236,7 +236,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                 <div class="store-section-master-table-head" role="row">
                     <div role="columnheader" data-store-section-master-column="order">Order</div>
                     <div role="columnheader" data-store-section-master-column="icon">Icon</div>
-                    <div role="columnheader" data-store-section-master-column="section">Store Section</div>
+                    <div role="columnheader" data-store-section-master-column="section">Display Name</div>
                     <div role="columnheader" data-store-section-master-column="type">Section Type</div>
                     <div role="columnheader"
                          data-store-section-master-column="routing"
@@ -257,6 +257,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                           data-store-section-id="{{ section.id }}"
                           data-store-section-name="{{ section.display_name|lower }}"
                           data-store-section-key="{{ section.section_key|lower }}"
+                          data-store-section-is-built-in="{{ 'true' if section.is_builtin else 'false' }}"
                           data-store-section-status="{% if section.is_active %}active{% else %}archived{% endif %}">
                         <div class="store-section-master-order-cell"
                              role="cell"
@@ -315,11 +316,16 @@ data-user-id="{{ master_data.scope_user_id }}"
                              data-store-section-master-cell="section">
                             <label>
                                 <input type="text"
-                                       name="display_name"
-                                       value="{{ section.display_name }}"
-                                       aria-label="Store Section name for {{ section.display_name }}"
-                                       maxlength="80"
-                                       required>
+                                        name="display_name"
+                                        value="{{ section.display_name }}"
+                                        aria-label="Display name for {{ section.display_name }}"
+                                        {% if section.is_builtin %}
+                                        title="Change the label shown in this workspace. The built-in section identity and automatic routing stay unchanged."
+                                        {% else %}
+                                        title="Change the name shown for this custom Store Section."
+                                        {% endif %}
+                                        maxlength="80"
+                                        required>
                             </label>
                             <button type="submit"
                                     name="action"
@@ -350,7 +356,10 @@ data-user-id="{{ master_data.scope_user_id }}"
                              role="cell"
                              data-mobile-label="Section type"
                              data-store-section-master-cell="type">
-                            <span class="{% if section.is_builtin %}is-built-in{% else %}is-custom{% endif %}">
+                            <span class="{% if section.is_builtin %}is-built-in{% else %}is-custom{% endif %}"
+                                  {% if section.is_builtin %}
+                                  title="Built-in identity and automatic routing are protected."
+                                  {% endif %}>
                                 {% if section.is_builtin %}Built in{% else %}Custom{% endif %}
                             </span>
                         </div>
