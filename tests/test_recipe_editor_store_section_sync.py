@@ -242,6 +242,10 @@ def test_recipe_override_does_not_update_master_without_future_occurrences_choic
 def test_recipe_editor_custom_store_section_round_trips_without_overwriting_master(monkeypatch, tmp_path):
     configure_editor_master_sync(monkeypatch, tmp_path)
     url = "https://example.com/international-broth-soup"
+    custom_section = master_data.create_ingredient_store_section(
+        "International Foods",
+        user_id=master_data.LOCAL_USER_ID,
+    )
     recipe_edit_service.save_recipe_output(url, {
         "source_url": url,
         "recipe_title": "International Broth Soup",
@@ -292,6 +296,15 @@ def test_recipe_editor_custom_store_section_round_trips_without_overwriting_mast
         master_data.LOCAL_USER_ID,
         "chicken broth",
     )["store_section"] == "CANNED"
+    section_usage = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            user_id=master_data.LOCAL_USER_ID,
+        )
+        if section["id"] == custom_section["id"]
+    )
+    assert section_usage["ingredient_count"] == 0
+    assert section_usage["recipe_reference_count"] == 1
 
 
 def test_recipe_editor_missing_store_section_defaults_to_misc(monkeypatch, tmp_path, capsys):

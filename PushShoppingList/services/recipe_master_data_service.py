@@ -5320,7 +5320,7 @@ def equipment_name_from_item(item):
     return clean_text(item)
 
 
-def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
+def ingredient_rows_from_sources(ingredients=None, recipe_data=None, user_id=None):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     raw_data = recipe_data.get("raw") if isinstance(recipe_data.get("raw"), dict) else {}
     candidates = None
@@ -5375,11 +5375,18 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None):
             )
             store_section_custom = truthy(item.get("store_section_custom"))
             if store_section_custom:
-                store_section = re.sub(
+                custom_store_section = re.sub(
                     r"\s+",
                     " ",
                     str(item.get("store_section") or "").strip(),
                 )[:60]
+                store_section = (
+                    ingredient_store_section_from_source(
+                        custom_store_section,
+                        user_id=user_id,
+                    )
+                    or custom_store_section
+                )
                 classification = {
                     **normalize_ingredient_classification_context(item),
                     "store_section": store_section,
@@ -6012,7 +6019,11 @@ def sync_recipe_master_records(
     if not user_id or not recipe_id:
         return {"ok": False, "error": "Recipe URL and user id are required."}
 
-    ingredient_rows = ingredient_rows_from_sources(ingredients=ingredients, recipe_data=recipe_data)
+    ingredient_rows = ingredient_rows_from_sources(
+        ingredients=ingredients,
+        recipe_data=recipe_data,
+        user_id=user_id,
+    )
     equipment_rows = equipment_rows_from_recipe_data(recipe_data)
 
     with recipe_master_connection() as connection:

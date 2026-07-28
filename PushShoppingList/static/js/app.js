@@ -39167,10 +39167,20 @@ function recipeIngredientBuiltInStoreSectionValue(value) {
     if (!key) {
         return "";
     }
-    return (recipeEditStoreSections || []).find(section => {
+    const match = (recipeEditStoreSections || []).find(section => {
         return recipeIngredientStoreSectionKey(section) === key
             || recipeIngredientStoreSectionKey(recipeStoreSectionDisplayLabel(section)) === key;
     }) || "";
+    if (!match) {
+        return "";
+    }
+    const configured = recipeEditStoreSectionDetails.get(
+        recipeIngredientStoreSectionKey(match),
+    );
+    if (configured && !recipeIngredientMatchFlag(configured.is_builtin)) {
+        return "";
+    }
+    return match;
 }
 
 function recipeIngredientCustomStoreSectionNames() {

@@ -3267,6 +3267,8 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert "function chooseRecipeIngredientStoreSection(button)" in script
     assert 'select.value = button.dataset.storeSectionValue || "";' in script
     assert 'select.dispatchEvent(new Event("change", { bubbles: true }));' in script
+    assert "const configured = recipeEditStoreSectionDetails.get(" in script
+    assert "if (configured && !recipeIngredientMatchFlag(configured.is_builtin))" in script
     assert 'const RECIPE_INGREDIENT_CUSTOM_STORE_SECTIONS_KEY = "recipeIngredientCustomStoreSections";' in script
     assert "function saveRecipeIngredientCustomStoreSectionName(value)" in script
     assert "function addRecipeIngredientCustomStoreSection(button)" in script
