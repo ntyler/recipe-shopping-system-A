@@ -26860,17 +26860,6 @@ img[data-deferred-src] {
             white-space: nowrap;
         }
 
-        .master-data-record-normalized-summary {
-            display: block;
-            overflow: hidden;
-            color: #9fb3c8;
-            font-size: 11px;
-            font-weight: 750;
-            line-height: 1.2;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
         .master-data-mobile-record-toggle {
             display: inline-grid;
             width: 36px;
@@ -27579,7 +27568,7 @@ img[data-deferred-src] {
 
         .master-data-ingredients-table
         .master-data-record-row-expanded
-        :is(.master-data-mobile-record-name, .master-data-record-normalized-summary) {
+        .master-data-mobile-record-name {
             display: none;
         }
 
@@ -30469,7 +30458,6 @@ img[data-deferred-src] {
                 display: none;
             }
 
-            .master-data-ingredients-table .master-data-record-normalized-summary,
             .master-data-ingredients-table
             .master-data-record-row-expanded
             .master-data-aliases {

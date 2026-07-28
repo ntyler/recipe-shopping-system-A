@@ -26,8 +26,6 @@
                     <div class="master-data-item-copy">
                         <strong class="master-data-mobile-record-name"
                                 data-master-mobile-record-name>{{ row.name }}</strong>
-                        <code class="master-data-record-normalized-summary"
-                              data-master-record-normalized-summary>{{ row.normalized_name }}</code>
                         <span class="master-data-mobile-section-summary"
                               data-master-mobile-section-summary>
                             {{ master_data.store_section_labels.get(row.store_section, row.store_section) }}
@@ -50,18 +48,12 @@
                                        data-original-value="{{ row.name }}"
                                        aria-label="Ingredient name for {{ row.name }}">
                             </label>
-                            <label class="master-data-record-field is-normalized">
-                                <span>Normalized name</span>
-                                <input type="text"
-                                       name="normalized_name"
-                                       value="{{ row.normalized_name }}"
-                                       maxlength="160"
-                                       required
-                                       spellcheck="false"
-                                       data-master-record-field
-                                       data-original-value="{{ row.normalized_name }}"
-                                       aria-label="Normalized name for {{ row.name }}">
-                            </label>
+                            <input type="hidden"
+                                   name="normalized_name"
+                                   value="{{ row.normalized_name }}"
+                                   data-master-auto-normalized-name
+                                   data-master-record-field
+                                   data-original-value="{{ row.normalized_name }}">
                         </form>
                         {% if row.aliases %}
                             <div class="master-data-aliases" aria-label="Aliases for {{ row.name }}">
@@ -1060,7 +1052,7 @@
                      aria-live="polite">
                 <div>
                     <strong data-master-store-section-summary data-master-record-save-summary>No ingredient changes</strong>
-                    <span data-master-store-section-detail data-master-record-save-detail>Edit ingredient names, normalized names, or store sections, then save all pending changes here.</span>
+                    <span data-master-store-section-detail data-master-record-save-detail>Edit ingredient names or store sections, then save all pending changes here.</span>
                 </div>
                 <button type="button"
                         data-master-store-section-save

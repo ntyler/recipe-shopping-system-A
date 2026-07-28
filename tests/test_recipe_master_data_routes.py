@@ -371,7 +371,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="col">User</th>' in all_html
     assert "master-data-table--show-user" in all_html
     assert 'class="master-data-user-data-cell"' in all_html
-    assert 'data-master-record-normalized-summary' in all_html
+    assert 'data-master-auto-normalized-name' in all_html
     assert 'data-master-desktop-section-summary' in all_html
     assert '<th scope="col">Created At</th>' not in all_html
     assert 'class="master-data-created-cell"' not in all_html
@@ -1465,6 +1465,7 @@ def test_master_data_store_section_batch_save_is_wired():
     assert "data-master-record-field" in template
     assert 'name="name"' in template
     assert 'name="normalized_name"' in template
+    assert "data-master-auto-normalized-name" in template
     assert "update_ingredient_master_record_route" in template
     assert '<button type="submit">Save</button>' not in template
 
@@ -1473,6 +1474,9 @@ def test_master_data_store_section_batch_save_is_wired():
     assert "function saveChangedStoreSections" in script
     assert "function submitStoreSectionForm" in script
     assert "function masterDataRecordFields" in script
+    assert "function normalizeMasterDataIngredientName(value)" in script
+    assert '.replace(/\\s+/g, " ").trim().toLowerCase()' in script
+    assert "normalizedInput.value = normalizeMasterDataIngredientName(nameInput.value);" in script
     assert "currentMasterRecordFieldValue(field) !== originalMasterRecordFieldValue(field)" in script
     assert "initMasterDataStoreSectionBatchSave();" in script
     assert '"X-Requested-With": "fetch"' in script
@@ -1536,7 +1540,7 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "data-master-mobile-record-name" in template
     assert "data-master-mobile-section-summary" in template
     assert "data-master-mobile-record-toggle" in template
-    assert "data-master-record-normalized-summary" in template
+    assert "data-master-auto-normalized-name" in template
     assert "data-master-desktop-section-summary" in template
     assert "data-master-mobile-reference-dialog" in template
     assert "data-master-mobile-reference-title" in template
@@ -1568,7 +1572,6 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert ".master-data-ingredients-table .master-data-record-row" in css
     assert ".master-data-mobile-record-toggle[aria-expanded=\"true\"] svg" in css
     assert ".master-data-record-row.master-data-record-row-expanded" in css
-    assert ".master-data-record-normalized-summary" in css
     assert ".master-data-desktop-section-summary" in css
     assert ".master-data-table--show-user" in css
     assert ".master-data-mobile-reference-dialog" in css

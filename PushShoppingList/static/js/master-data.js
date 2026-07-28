@@ -961,12 +961,12 @@
         if (count > 0) {
             setStoreSectionPanelMessage(
                 `${count} unsaved ingredient change${count === 1 ? "" : "s"}`,
-                "Save once after editing names, normalized names, or store sections on this page."
+                "Save once after editing ingredient names or store sections on this page."
             );
         } else {
             setStoreSectionPanelMessage(
                 "No ingredient changes",
-                "Edit ingredient names, normalized names, or store sections, then save all pending changes here."
+                "Edit ingredient names or store sections, then save all pending changes here."
             );
         }
     }
@@ -995,7 +995,7 @@
 
     async function submitStoreSectionForm(form) {
         if (typeof form.reportValidity === "function" && !form.reportValidity()) {
-            throw new Error("Complete the ingredient name and normalized name before saving.");
+            throw new Error("Complete the ingredient name before saving.");
         }
         const response = await fetch(form.action, {
             method: form.method || "POST",
@@ -1034,8 +1034,8 @@
         if (invalidForm) {
             if (typeof invalidForm.reportValidity === "function") invalidForm.reportValidity();
             setStoreSectionPanelMessage(
-                "Complete required ingredient fields",
-                "Every changed record needs an ingredient name and normalized name."
+                "Complete the ingredient name",
+                "Every changed record needs an ingredient name."
             );
             return;
         }
@@ -1187,6 +1187,10 @@
         });
     }
 
+    function normalizeMasterDataIngredientName(value) {
+        return text(value).replace(/\s+/g, " ").trim().toLowerCase();
+    }
+
     function setMasterDataMobileRecordExpanded(row, expanded) {
         if (!row) return;
         const toggle = row.querySelector("[data-master-mobile-record-toggle]");
@@ -1222,7 +1226,6 @@
             const nameInput = row.querySelector('input[name="name"]');
             const nameSummary = row.querySelector("[data-master-mobile-record-name]");
             const normalizedInput = row.querySelector('input[name="normalized_name"]');
-            const normalizedSummary = row.querySelector("[data-master-record-normalized-summary]");
             const sectionSelect = row.querySelector("[data-master-store-section-select]");
 
             setMasterDataMobileRecordExpanded(row, false);
@@ -1231,11 +1234,9 @@
             if (nameInput && nameSummary) {
                 nameInput.addEventListener("input", () => {
                     nameSummary.textContent = nameInput.value.trim() || "Unnamed ingredient";
-                });
-            }
-            if (normalizedInput && normalizedSummary) {
-                normalizedInput.addEventListener("input", () => {
-                    normalizedSummary.textContent = normalizedInput.value.trim() || "No normalized name";
+                    if (normalizedInput) {
+                        normalizedInput.value = normalizeMasterDataIngredientName(nameInput.value);
+                    }
                 });
             }
 
