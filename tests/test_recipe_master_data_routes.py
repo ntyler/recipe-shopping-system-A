@@ -2442,6 +2442,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-row.is-mobile-expanded" in css
     assert "content: attr(data-mobile-label);" in css
     assert "> .store-section-master-usage {" in css
+    assert "display: contents;" in css
+    assert "flex-wrap: wrap;" in css
+    assert "order: 4;" in css
     assert 'data-store-section-is-built-in="true"' in css
     assert 'content: "ingredients";' in css
     assert 'content: "recipe refs";' in css
