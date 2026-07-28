@@ -1824,6 +1824,21 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert "data-store-section-master-icon-picker" in html
         assert 'data-store-section-master-icon-option="leaf"' in html
         assert "recipe-edit-store-section-icon is-leaf" in html
+        toggle_count = html.count(
+            "data-store-section-master-mobile-details-toggle"
+        )
+        details_count = html.count(
+            "data-store-section-master-mobile-details"
+        ) - toggle_count
+        assert toggle_count == len(
+            master_data.ingredient_store_section_details(
+                "user-a",
+                include_inactive=True,
+            )
+        )
+        assert details_count == toggle_count
+        assert 'aria-controls="storeSectionMobileDetails-' in html
+        assert 'id="storeSectionMobileDetails-' in html
         bakery_row = html.split('data-store-section-key="bakery"', 1)[1].split("</form>", 1)[0]
         bakery_archive_attributes = bakery_row.split('value="archive"', 1)[1].split(">", 1)[0]
         assert "disabled" in bakery_archive_attributes
@@ -2187,6 +2202,14 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "Fit columns" not in page
     assert "within the available table width." in page
     assert "data-store-section-master-mobile-save" in page
+    assert "data-store-section-master-mobile-details-toggle" in page
+    assert "data-store-section-master-mobile-details" in page
+    assert 'aria-expanded="false"' in page
+    assert 'data-mobile-label="Section type"' in page
+    assert 'data-mobile-label="Routing"' in page
+    assert 'data-mobile-label="Usage"' in page
+    assert 'data-mobile-label="Status"' in page
+    assert 'data-mobile-label="Actions"' in page
     assert "data-store-section-master-usage-open" in page
     assert "data-store-section-master-usage-dialog" in page
     assert "data-store-section-master-usage-tab" in page
@@ -2257,6 +2280,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
         '    "section",\n'
     ) in script
     assert "STORE_SECTION_MASTER_MOBILE_COLUMNS" in script
+    assert "STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS" in script
     assert "STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS" in script
     assert (
         'const STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS = [\n'
@@ -2296,6 +2320,11 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert 'const direction = action === "move_up" ? -1 : 1;' in script
     assert "storeSectionMasterOrderPending" in script
     assert "submitter.focus({ preventScroll: true });" in script
+    assert "const setMobileDetailsExpanded = (row, expanded, options = {}) => {" in script
+    assert "const closeOtherMobileDetails = activeRow => {" in script
+    assert "detailsPanel.append(cell)" in script
+    assert "setMobileDetailsExpanded(row, false, { focusToggle: true })" in script
+    assert '`${displayName} details ${expanded ? "expanded" : "collapsed"}.`' in script
     assert "renderStoreSectionMasterIconVisual" in script
     assert "const updateRowDirtyState = () => {" in script
     assert "nameInput?.classList.toggle(\"is-dirty\", nameIsDirty)" in script
@@ -2332,12 +2361,16 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-mobile-save" in css
     assert ".store-section-master-mobile-save:disabled" in css
     assert css.count(
-        "grid-template-columns: 36px 46px minmax(0, 1fr);"
+        "grid-template-columns: 36px 46px minmax(0, 1fr) 44px;"
     ) == 2
     assert "grid-template-columns: 24px;" in css
     assert "24px handle + 12px breathing room" in css
     assert "min-height: 44px;" in css
     assert "justify-content: flex-start;" in css
+    assert ".store-section-master-mobile-details-toggle[aria-expanded=\"true\"]" in css
+    assert ".store-section-master-mobile-details[hidden]" in css
+    assert ".store-section-master-row.is-mobile-expanded" in css
+    assert "content: attr(data-mobile-label);" in css
     assert (
         ".store-section-master-order-step {\n"
         "        display: none;\n"

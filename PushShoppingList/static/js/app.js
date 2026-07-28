@@ -37676,6 +37676,13 @@ const STORE_SECTION_MASTER_MOBILE_COLUMNS = [
     "icon",
     "section",
 ];
+const STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS = [
+    "type",
+    "routing",
+    "usage",
+    "status",
+    "actions",
+];
 const STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS = [
     "routing",
 ];
@@ -37817,6 +37824,34 @@ function initStoreSectionMasterTable() {
     const announce = message => {
         if (columnStatus) columnStatus.textContent = message;
     };
+    const setMobileDetailsExpanded = (row, expanded, options = {}) => {
+        if (!row) return;
+        const toggle = row.querySelector(
+            "[data-store-section-master-mobile-details-toggle]",
+        );
+        const details = row.querySelector(
+            "[data-store-section-master-mobile-details]",
+        );
+        if (!toggle || !details) return;
+        const open = Boolean(expanded) && !desktopColumnsEnabled();
+        const displayName = row.querySelector('input[name="display_name"]')?.value
+            || "Store Section";
+        row.classList.toggle("is-mobile-expanded", open);
+        toggle.setAttribute("aria-expanded", String(open));
+        toggle.setAttribute(
+            "aria-label",
+            `${open ? "Hide" : "Show"} details for ${displayName}`,
+        );
+        details.hidden = !open;
+        if (!open && options.focusToggle) {
+            toggle.focus({ preventScroll: true });
+        }
+    };
+    const closeOtherMobileDetails = activeRow => {
+        rows().forEach(row => {
+            if (row !== activeRow) setMobileDetailsExpanded(row, false);
+        });
+    };
     const saveLayout = () => {
         try {
             localStorage.setItem(storageKey, JSON.stringify(columnLayout));
@@ -37873,26 +37908,65 @@ function initStoreSectionMasterTable() {
             if (header) tableHead.append(header);
         });
         rows().forEach(row => {
-            displayOrder.forEach(key => {
+            const detailsToggle = row.querySelector(
+                "[data-store-section-master-mobile-details-toggle]",
+            );
+            const detailsPanel = row.querySelector(
+                "[data-store-section-master-mobile-details]",
+            );
+            if (desktop) {
+                setMobileDetailsExpanded(row, false);
+                displayOrder.forEach(key => {
+                    const cell = cellFor(row, key);
+                    if (cell) row.append(cell);
+                });
+                if (detailsToggle) row.append(detailsToggle);
+                if (detailsPanel) row.append(detailsPanel);
+                return;
+            }
+
+            STORE_SECTION_MASTER_MOBILE_COLUMNS.forEach(key => {
                 const cell = cellFor(row, key);
                 if (cell) row.append(cell);
             });
+            if (detailsToggle) row.append(detailsToggle);
+            if (detailsPanel) {
+                STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS.forEach(key => {
+                    const cell = cellFor(row, key);
+                    if (cell) detailsPanel.append(cell);
+                });
+                row.append(detailsPanel);
+            }
         });
 
         STORE_SECTION_MASTER_COLUMN_ORDER.forEach(key => {
-            const hidden = desktop
+            const headerHidden = desktop
                 ? columnLayout.hidden.includes(key)
                 : !STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key);
             const header = headerFor(key);
             if (header) {
-                header.hidden = hidden;
-                if (hidden) header.removeAttribute("aria-colindex");
+                header.hidden = headerHidden;
+                if (headerHidden) header.removeAttribute("aria-colindex");
             }
             rows().forEach(row => {
                 const cell = cellFor(row, key);
                 if (cell) {
-                    cell.hidden = hidden;
-                    if (hidden) cell.removeAttribute("aria-colindex");
+                    const cellHidden = desktop
+                        ? columnLayout.hidden.includes(key)
+                        : !(
+                            STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key)
+                            || STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS.includes(key)
+                        );
+                    cell.hidden = cellHidden;
+                    if (
+                        cellHidden
+                        || (
+                            !desktop
+                            && STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS.includes(key)
+                        )
+                    ) {
+                        cell.removeAttribute("aria-colindex");
+                    }
                 }
             });
         });
@@ -38223,6 +38297,29 @@ function initStoreSectionMasterTable() {
             closeColumnsMenu({ focusTrigger: true });
         }
     });
+    list.addEventListener("click", event => {
+        const toggle = event.target.closest(
+            "[data-store-section-master-mobile-details-toggle]",
+        );
+        if (!toggle || !list.contains(toggle)) return;
+        const row = toggle.closest("[data-store-section-master-row]");
+        if (!row) return;
+        const expanded = toggle.getAttribute("aria-expanded") !== "true";
+        if (expanded) closeOtherMobileDetails(row);
+        setMobileDetailsExpanded(row, expanded);
+        const displayName = row.querySelector('input[name="display_name"]')?.value
+            || "Store Section";
+        announce(`${displayName} details ${expanded ? "expanded" : "collapsed"}.`);
+    });
+    list.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+        const row = event.target.closest(
+            "[data-store-section-master-row].is-mobile-expanded",
+        );
+        if (!row) return;
+        event.preventDefault();
+        setMobileDetailsExpanded(row, false, { focusToggle: true });
+    });
 
     const updateRowOrderControls = () => {
         const currentRows = rows();
@@ -38393,6 +38490,7 @@ function initStoreSectionMasterTable() {
                 || row.dataset.storeSectionStatus === status;
             const visible = matchesQuery && matchesStatus;
             row.hidden = !visible;
+            if (!visible) setMobileDetailsExpanded(row, false);
             if (visible) count += 1;
         });
         if (visibleCount) {
@@ -38431,6 +38529,14 @@ function initStoreSectionMasterTable() {
             row.dataset.storeSectionName = String(nameInput.value || "")
                 .trim()
                 .toLocaleLowerCase();
+            const detailsToggle = row.querySelector(
+                "[data-store-section-master-mobile-details-toggle]",
+            );
+            const detailsAreOpen = detailsToggle?.getAttribute("aria-expanded") === "true";
+            detailsToggle?.setAttribute(
+                "aria-label",
+                `${detailsAreOpen ? "Hide" : "Show"} details for ${nameInput.value}`,
+            );
             applyFilters();
             updateRowDirtyState();
         });

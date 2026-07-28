@@ -335,8 +335,20 @@ data-user-id="{{ master_data.scope_user_id }}"
                             </button>
                         </div>
 
+                        <button type="button"
+                                class="store-section-master-mobile-details-toggle"
+                                aria-expanded="false"
+                                aria-controls="storeSectionMobileDetails-{{ section.id }}"
+                                aria-label="Show details for {{ section.display_name }}"
+                                data-store-section-master-mobile-details-toggle>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m7 9 5 5 5-5"></path>
+                            </svg>
+                        </button>
+
                         <div class="store-section-master-type"
                              role="cell"
+                             data-mobile-label="Section type"
                              data-store-section-master-cell="type">
                             <span class="{% if section.is_builtin %}is-built-in{% else %}is-custom{% endif %}">
                                 {% if section.is_builtin %}Built in{% else %}Custom{% endif %}
@@ -345,6 +357,7 @@ data-user-id="{{ master_data.scope_user_id }}"
 
                         <div class="store-section-master-routing"
                              role="cell"
+                             data-mobile-label="Routing"
                              data-store-section-master-cell="routing"
                              hidden
                              title="{% if section.is_builtin %}Items enter through user-confirmed recipe choices, Ingredient Master Data, deterministic mappings and rules, existing assignments, then validated AI fallback.{% else %}AI does not automatically route items to custom sections. Assign them through Ingredient Master Data or a recipe override.{% endif %}">
@@ -362,6 +375,7 @@ data-user-id="{{ master_data.scope_user_id }}"
 
                         <div class="store-section-master-usage"
                              role="cell"
+                             data-mobile-label="Usage"
                              data-store-section-master-cell="usage">
                             <button type="button"
                                     class="store-section-master-usage-button"
@@ -391,6 +405,7 @@ data-user-id="{{ master_data.scope_user_id }}"
 
                         <div class="store-section-master-state"
                              role="cell"
+                             data-mobile-label="Status"
                              data-store-section-master-cell="status">
                             <span class="{% if section.is_active %}is-active{% else %}is-archived{% endif %}">
                                 {% if section.is_active %}Active{% else %}Archived{% endif %}
@@ -399,6 +414,7 @@ data-user-id="{{ master_data.scope_user_id }}"
 
                         <div class="store-section-master-actions"
                              role="cell"
+                             data-mobile-label="Actions"
                              data-store-section-master-cell="actions">
                             <button type="submit" name="action" value="save">Save</button>
                             {% if section.is_active %}
@@ -437,6 +453,12 @@ data-user-id="{{ master_data.scope_user_id }}"
                                 </button>
                             {% endif %}
                         </div>
+
+                        <div class="store-section-master-mobile-details"
+                             id="storeSectionMobileDetails-{{ section.id }}"
+                             role="presentation"
+                             data-store-section-master-mobile-details
+                             hidden></div>
                     </form>
                 {% else %}
                     <div class="master-data-empty-state">No Store Sections are configured.</div>

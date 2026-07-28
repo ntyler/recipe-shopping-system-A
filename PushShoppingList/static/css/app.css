@@ -62665,6 +62665,11 @@ body.recipe-edit-standalone-page :is(
     display: none;
 }
 
+.store-section-master-mobile-details-toggle,
+.store-section-master-mobile-details {
+    display: none;
+}
+
 .store-section-master-usage-dialog {
     width: min(780px, calc(100vw - 32px));
     max-width: none;
@@ -63603,7 +63608,7 @@ body.is-resizing-store-section-master-column * {
 
     .store-section-master-row {
         /* 24px handle + 12px breathing room; 38px icon + 8px before the name. */
-        grid-template-columns: 36px 46px minmax(0, 1fr);
+        grid-template-columns: 36px 46px minmax(0, 1fr) 44px;
         gap: 0;
         min-width: 0;
     }
@@ -63677,6 +63682,176 @@ body.is-resizing-store-section-master-column * {
         gap: 7px;
     }
 
+    .store-section-master-page
+        .store-section-master-mobile-details-toggle {
+        display: grid;
+        grid-column: 4;
+        grid-row: 1;
+        width: 44px;
+        min-height: 44px;
+        place-items: center;
+        justify-self: end;
+        padding: 0;
+        border-color: transparent;
+        background: transparent;
+        color: var(--app-muted);
+    }
+
+    .store-section-master-page
+        .store-section-master-mobile-details-toggle:is(:hover, :focus-visible) {
+        border-color: var(--app-border);
+        outline: 0;
+        background: var(--app-surface-soft);
+        color: var(--app-primary-hover);
+    }
+
+    .store-section-master-mobile-details-toggle > svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2;
+        transition: transform 140ms ease;
+    }
+
+    .store-section-master-mobile-details-toggle[aria-expanded="true"] > svg {
+        transform: rotate(180deg);
+    }
+
+    .store-section-master-row
+        > :is(
+            .store-section-master-type,
+            .store-section-master-routing,
+            .store-section-master-usage,
+            .store-section-master-state,
+            .store-section-master-actions
+        ) {
+        display: none;
+    }
+
+    .store-section-master-mobile-details {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        gap: 0;
+        margin: 8px -14px -9px;
+        padding: 4px 14px 8px;
+        border-top: 1px solid var(--app-border);
+        background: color-mix(in srgb, var(--app-bg-soft) 76%, transparent);
+    }
+
+    .store-section-master-mobile-details[hidden] {
+        display: none;
+    }
+
+    .store-section-master-row.is-mobile-expanded {
+        background: color-mix(in srgb, var(--app-surface-soft) 54%, transparent);
+    }
+
+    .store-section-master-mobile-details
+        > :is(
+            .store-section-master-type,
+            .store-section-master-routing,
+            .store-section-master-usage,
+            .store-section-master-state,
+            .store-section-master-actions
+        ) {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        grid-auto-flow: row;
+        align-items: start;
+        gap: 5px 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid color-mix(
+            in srgb,
+            var(--app-border) 72%,
+            transparent
+        );
+    }
+
+    .store-section-master-mobile-details
+        > :is(
+            .store-section-master-type,
+            .store-section-master-routing,
+            .store-section-master-usage,
+            .store-section-master-state,
+            .store-section-master-actions
+        ):last-child {
+        border-bottom: 0;
+    }
+
+    .store-section-master-mobile-details
+        > :is(
+            .store-section-master-type,
+            .store-section-master-routing,
+            .store-section-master-usage,
+            .store-section-master-state,
+            .store-section-master-actions
+        )::before {
+        grid-column: 1;
+        color: var(--app-muted);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: .045em;
+        line-height: 22px;
+        text-transform: uppercase;
+        content: attr(data-mobile-label);
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-type
+        > span,
+    .store-section-master-mobile-details
+        > .store-section-master-state
+        > span,
+    .store-section-master-mobile-details
+        > .store-section-master-routing
+        > :is(.store-section-master-routing-badge, small),
+    .store-section-master-mobile-details
+        > .store-section-master-usage
+        > .store-section-master-usage-button {
+        grid-column: 2;
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-routing
+        > small {
+        max-width: none;
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-usage
+        > .store-section-master-usage-button {
+        width: 100%;
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-usage::before {
+        grid-row: 1 / span 2;
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-actions {
+        grid-template-columns: 92px repeat(2, minmax(0, 1fr));
+        grid-auto-columns: auto;
+        grid-auto-flow: row;
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-actions
+        > button[value="save"] {
+        display: none;
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-actions
+        > button:not([value="save"]) {
+        grid-row: 1;
+        min-height: 38px;
+    }
+
     .store-section-master-page .store-section-master-mobile-save {
         display: inline-flex;
         min-width: 62px;
@@ -63714,7 +63889,7 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-row {
-        grid-template-columns: 36px 46px minmax(0, 1fr);
+        grid-template-columns: 36px 46px minmax(0, 1fr) 44px;
     }
 
     .store-section-master-order-cell {
