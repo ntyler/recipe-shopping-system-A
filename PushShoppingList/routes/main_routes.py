@@ -1408,6 +1408,7 @@ def update_master_data_store_section_route(section_id):
         "move_to": "Store Section moved: {name}.",
         "archive": "Store Section archived: {name}.",
         "restore": "Store Section restored: {name}.",
+        "delete": "Store Section deleted: {name}.",
     }
     if (
         request.headers.get("X-Requested-With") == "fetch"

@@ -414,6 +414,22 @@ data-user-id="{{ master_data.scope_user_id }}"
                             {% else %}
                                 <button type="submit" name="action" value="restore">Restore</button>
                             {% endif %}
+                            {% if not section.is_builtin %}
+                                <button type="submit"
+                                        name="action"
+                                        value="delete"
+                                        class="danger store-section-master-delete"
+                                        {% if usage_total %}
+                                            disabled
+                                            title="Reassign this section's ingredients and recipe references before deleting it."
+                                            aria-label="Delete unavailable for {{ section.display_name }}: reassign its ingredients and recipe references first."
+                                        {% else %}
+                                            title="Permanently delete {{ section.display_name }}"
+                                            aria-label="Permanently delete custom Store Section {{ section.display_name }}"
+                                        {% endif %}>
+                                    Delete
+                                </button>
+                            {% endif %}
                         </div>
                     </form>
                 {% else %}

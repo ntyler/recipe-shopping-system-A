@@ -38374,17 +38374,31 @@ function initStoreSectionMasterTable() {
             await moveRowByOrderControl(row, direction, submitter);
             return;
         }
-        if (!["archive", "restore"].includes(action)) return;
+        if (!["archive", "restore", "delete"].includes(action)) return;
 
         event.preventDefault();
         const row = submitter.closest("[data-store-section-master-row]");
         if (!row || row.dataset.storeSectionMasterActionPending === "true") return;
+        const displayName = row.querySelector('input[name="display_name"]')?.value
+            || "Store Section";
+        if (
+            action === "delete"
+            && !window.confirm(
+                `Permanently delete "${displayName}"?\n\nThis cannot be undone.`,
+            )
+        ) {
+            return;
+        }
         row.dataset.storeSectionMasterActionPending = "true";
         row.setAttribute("aria-busy", "true");
         const originalLabel = submitter.textContent;
         const originalTitle = submitter.title;
         submitter.disabled = true;
-        submitter.textContent = action === "archive" ? "Archiving…" : "Restoring…";
+        submitter.textContent = action === "archive"
+            ? "Archiving…"
+            : action === "restore"
+                ? "Restoring…"
+                : "Deleting…";
 
         const body = new URLSearchParams(new FormData(row));
         body.set("action", action);
@@ -38401,8 +38415,34 @@ function initStoreSectionMasterTable() {
             if (!response.ok || result.ok === false) {
                 throw new Error(
                     result.error
-                    || `Store Section could not be ${action === "archive" ? "archived" : "restored"}.`,
+                    || `Store Section could not be ${
+                        action === "archive"
+                            ? "archived"
+                            : action === "restore"
+                                ? "restored"
+                                : "deleted"
+                    }.`,
                 );
+            }
+            const adjustCount = (element, delta) => {
+                if (!element) return;
+                const current = Number.parseInt(element.textContent, 10) || 0;
+                element.textContent = String(Math.max(0, current + delta));
+            };
+            if (action === "delete") {
+                const wasActive = row.dataset.storeSectionStatus !== "archived";
+                const nextRow = row.nextElementSibling || row.previousElementSibling;
+                delete row.dataset.storeSectionMasterActionPending;
+                row.removeAttribute("aria-busy");
+                row.remove();
+                adjustCount(activeCount, wasActive ? -1 : 0);
+                adjustCount(archivedCount, wasActive ? 0 : -1);
+                updateRowOrderControls();
+                applyFilters();
+                nextRow?.querySelector('input[name="display_name"]')
+                    ?.focus({ preventScroll: true });
+                announce(`${displayName} deleted.`);
+                return;
             }
             const isActive = action === "restore";
             const nextAction = isActive ? "archive" : "restore";
@@ -38425,16 +38465,9 @@ function initStoreSectionMasterTable() {
             delete row.dataset.storeSectionMasterActionPending;
             row.removeAttribute("aria-busy");
 
-            const adjustCount = (element, delta) => {
-                if (!element) return;
-                const current = Number.parseInt(element.textContent, 10) || 0;
-                element.textContent = String(Math.max(0, current + delta));
-            };
             adjustCount(activeCount, isActive ? 1 : -1);
             adjustCount(archivedCount, isActive ? -1 : 1);
             applyFilters();
-            const displayName = row.querySelector('input[name="display_name"]')?.value
-                || "Store Section";
             announce(`${displayName} ${isActive ? "restored" : "archived"}.`);
         } catch (error) {
             delete row.dataset.storeSectionMasterActionPending;

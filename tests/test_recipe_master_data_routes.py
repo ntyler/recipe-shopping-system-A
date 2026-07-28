@@ -1828,6 +1828,7 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         bakery_archive_attributes = bakery_row.split('value="archive"', 1)[1].split(">", 1)[0]
         assert "disabled" in bakery_archive_attributes
         assert "Built-in Store Sections cannot be archived." in bakery_archive_attributes
+        assert 'value="delete"' not in bakery_row
 
         created = client.post(
             "/admin/master-data/store-sections",
@@ -1843,6 +1844,9 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         )[1].split("</form>", 1)[0]
         custom_archive_attributes = custom_row.split('value="archive"', 1)[1].split(">", 1)[0]
         assert "disabled" not in custom_archive_attributes
+        custom_delete_attributes = custom_row.split('value="delete"', 1)[1].split(">", 1)[0]
+        assert "disabled" not in custom_delete_attributes
+        assert "Permanently delete International Foods" in custom_delete_attributes
         section = next(
             item
             for item in master_data.ingredient_store_section_details(
@@ -2028,6 +2032,127 @@ def test_store_section_archive_restore_fetch_is_json_without_flash_message(
     assert restored["is_active"] is True
 
 
+def test_store_section_delete_is_custom_only_and_requires_no_usage(
+    monkeypatch,
+    tmp_path,
+):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    unused = master_data.create_ingredient_store_section(
+        "Unused Seasonal",
+        "basket",
+        user_id="user-a",
+    )
+    used = master_data.create_ingredient_store_section(
+        "Used Seasonal",
+        "basket",
+        user_id="user-a",
+    )
+    assert unused["ok"] is True
+    assert used["ok"] is True
+    master_data.sync_recipe_master_records(
+        "https://example.com/seasonal-cider",
+        recipe_data={
+            "ingredients": [
+                {
+                    "ingredient": "Seasonal cider",
+                    "store_section": "Used Seasonal",
+                },
+            ],
+        },
+        user_id="user-a",
+    )
+    used_section_key = master_data.clean_ingredient_store_section(
+        "Used Seasonal",
+        user_id="user-a",
+    )
+    assert used_section_key == "USED SEASONAL"
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            """
+            UPDATE ingredients
+               SET store_section = ?
+             WHERE user_id = ?
+               AND normalized_name = ?
+            """,
+            (used_section_key, "user-a", "seasonal cider"),
+        )
+        connection.execute(
+            """
+            UPDATE recipe_ingredients
+               SET store_section = ?
+             WHERE user_id = ?
+               AND normalized_name = ?
+            """,
+            (used_section_key, "user-a", "seasonal cider"),
+        )
+    produce = next(
+        section
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+            create=True,
+        )
+        if section["section_key"] == "PRODUCE"
+    )
+    headers = {
+        "Accept": "application/json",
+        "X-Requested-With": "fetch",
+    }
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        page = client.get("/admin/master-data/store-sections").get_data(as_text=True)
+        used_row = page.split(
+            'data-store-section-key="used seasonal"',
+            1,
+        )[1].split("</form>", 1)[0]
+        used_delete_attributes = used_row.split(
+            'value="delete"',
+            1,
+        )[1].split(">", 1)[0]
+        built_in_response = client.post(
+            f"/admin/master-data/store-sections/{produce['id']}",
+            data={"action": "delete"},
+            headers=headers,
+        )
+        used_response = client.post(
+            f"/admin/master-data/store-sections/{used['id']}",
+            data={"action": "delete"},
+            headers=headers,
+        )
+        delete_response = client.post(
+            f"/admin/master-data/store-sections/{unused['id']}",
+            data={"action": "delete"},
+            headers=headers,
+        )
+
+    assert "disabled" in used_delete_attributes
+    assert built_in_response.status_code == 409
+    assert (
+        built_in_response.get_json()["error"]
+        == "Built-in Store Sections cannot be deleted."
+    )
+    assert used_response.status_code == 409
+    assert (
+        used_response.get_json()["error"]
+        == "Reassign this Store Section's ingredients before deleting it."
+    )
+    assert delete_response.status_code == 200
+    assert delete_response.get_json()["ok"] is True
+    assert delete_response.get_json()["deleted"] is True
+    remaining_ids = {
+        section["id"]
+        for section in master_data.ingredient_store_section_details(
+            "user-a",
+            include_inactive=True,
+            create=True,
+        )
+    }
+    assert unused["id"] not in remaining_ids
+    assert used["id"] in remaining_ids
+    assert produce["id"] in remaining_ids
+
+
 def test_recipe_editor_store_section_menu_links_to_management_page():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     store_section_table_script = script.split(
@@ -2090,6 +2215,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "Ingredient Master Data or recipe overrides." in page
     assert "Usage" in page
     assert "Actions" in page
+    assert 'value="delete"' in page
+    assert "store-section-master-delete" in page
+    assert "{% if not section.is_builtin %}" in page
     assert "data-store-section-master-icon-picker" in page
     assert "data-store-section-master-icon-option" in page
     assert "<code>{{ section.section_key }}</code>" not in page
@@ -2138,7 +2266,14 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "nameInput?.classList.toggle(\"is-dirty\", nameIsDirty)" in script
     assert "iconPicker?.classList.toggle(\"is-dirty\", iconIsDirty)" in script
     assert "button.disabled = !rowIsDirty" in script
-    assert 'if (![\"archive\", \"restore\"].includes(action)) return;' in script
+    assert (
+        'if (![\"archive\", \"restore\", \"delete\"].includes(action)) return;'
+        in script
+    )
+    assert 'action === "delete"' in script
+    assert 'Permanently delete "${displayName}"?' in script
+    assert "row.remove()" in script
+    assert "announce(`${displayName} deleted.`)" in script
     assert '\"X-Requested-With\": \"fetch\"' in script
     assert "row.dataset.storeSectionStatus" in store_section_table_script
     assert 'statusBadge.textContent = isActive ? "Active" : "Archived"' in script
@@ -2191,6 +2326,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert ".store-section-master-icon-picker.is-open" in css
     assert ".store-section-master-icon-picker.is-dirty" in css
     assert ".store-section-master-row.is-dirty" in css
+    assert "grid-auto-flow: column;" in css
+    assert "grid-auto-columns: minmax(0, 1fr);" in css
+    assert "padding-inline: 6px;" in css
     assert (
         ".store-section-master-row\n"
         "    :is(.store-section-master-identity, .store-section-master-icon-field)"

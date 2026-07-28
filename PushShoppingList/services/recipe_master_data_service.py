@@ -1652,6 +1652,83 @@ def update_ingredient_store_section_definition(
                 "display_name": row["display_name"],
             }
 
+        if action == "delete":
+            if bool(row["is_builtin"]):
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": "Built-in Store Sections cannot be deleted.",
+                }
+            usage = connection.execute(
+                """
+                SELECT
+                    (
+                        SELECT COUNT(*)
+                          FROM ingredients
+                         WHERE user_id = ?
+                           AND store_section = ?
+                    )
+                    +
+                    (
+                        SELECT COUNT(*)
+                          FROM recipe_ingredients
+                         WHERE user_id = ?
+                           AND store_section = ?
+                    ) AS usage_count
+                """,
+                (
+                    scoped_user_id,
+                    row["section_key"],
+                    scoped_user_id,
+                    row["section_key"],
+                ),
+            ).fetchone()
+            if int(usage["usage_count"] or 0) > 0:
+                return {
+                    "ok": False,
+                    "status": 409,
+                    "error": "Reassign this Store Section's ingredients before deleting it.",
+                }
+            connection.execute(
+                """
+                DELETE FROM ingredient_store_sections
+                 WHERE id = ?
+                   AND user_id = ?
+                   AND is_builtin = 0
+                """,
+                (section_id, scoped_user_id),
+            )
+            remaining_rows = connection.execute(
+                """
+                SELECT id
+                  FROM ingredient_store_sections
+                 WHERE user_id = ?
+                 ORDER BY sort_order ASC, id ASC
+                """,
+                (scoped_user_id,),
+            ).fetchall()
+            timestamp = utc_now_iso()
+            connection.executemany(
+                """
+                UPDATE ingredient_store_sections
+                   SET sort_order = ?,
+                       updated_at = ?
+                 WHERE id = ?
+                   AND user_id = ?
+                """,
+                [
+                    (index, timestamp, int(item["id"]), scoped_user_id)
+                    for index, item in enumerate(remaining_rows, start=1)
+                ],
+            )
+            return {
+                "ok": True,
+                "status": 200,
+                "changed": True,
+                "deleted": True,
+                "display_name": row["display_name"],
+            }
+
         if action == "restore":
             connection.execute(
                 """
