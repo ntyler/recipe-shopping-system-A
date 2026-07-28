@@ -62666,7 +62666,8 @@ body.recipe-edit-standalone-page :is(
 }
 
 .store-section-master-mobile-details-toggle,
-.store-section-master-mobile-details {
+.store-section-master-mobile-details,
+.store-section-master-mobile-kind {
     display: none;
 }
 
@@ -63682,6 +63683,40 @@ body.is-resizing-store-section-master-column * {
         gap: 7px;
     }
 
+    .store-section-master-mobile-kind {
+        display: flex;
+        min-height: 18px;
+        align-items: center;
+        gap: 4px;
+        margin-top: -3px;
+        padding-left: 10px;
+    }
+
+    .store-section-master-mobile-kind > span {
+        display: inline-flex;
+        min-height: 18px;
+        align-items: center;
+        justify-content: center;
+        padding: 1px 6px;
+        border: 1px solid var(--app-border);
+        border-radius: 999px;
+        font-size: 8px;
+        font-weight: 850;
+        line-height: 1;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+
+    .store-section-master-mobile-kind > .is-custom {
+        border-color: color-mix(in srgb, var(--app-primary) 55%, var(--app-border));
+        background: var(--app-primary-soft);
+        color: var(--app-primary-hover);
+    }
+
+    .store-section-master-mobile-kind > .is-archived {
+        color: var(--app-muted);
+    }
+
     .store-section-master-page
         .store-section-master-mobile-details-toggle {
         display: grid;
@@ -63938,6 +63973,15 @@ body.is-resizing-store-section-master-column * {
     .store-section-master-row[data-store-section-is-built-in="true"]
         .store-section-master-mobile-details
         > .store-section-master-actions {
+        display: none;
+    }
+
+    .store-section-master-row[data-store-section-is-built-in="false"]
+        .store-section-master-mobile-details
+        > .store-section-master-type,
+    .store-section-master-row[data-store-section-status="archived"]
+        .store-section-master-mobile-details
+        > .store-section-master-state {
         display: none;
     }
 

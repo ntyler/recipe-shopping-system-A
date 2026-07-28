@@ -326,6 +326,14 @@ data-user-id="{{ master_data.scope_user_id }}"
                                         {% endif %}
                                         maxlength="80"
                                         required>
+                                {% if not section.is_builtin %}
+                                    <span class="store-section-master-mobile-kind">
+                                        <span class="is-custom">Custom</span>
+                                        {% if not section.is_active %}
+                                            <span class="is-archived">Archived</span>
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
                             </label>
                             <button type="submit"
                                     name="action"

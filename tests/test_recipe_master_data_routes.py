@@ -1848,6 +1848,7 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert "Built-in Store Sections cannot be archived." in bakery_archive_attributes
         assert 'data-store-section-is-built-in="true"' in bakery_row
         assert "The built-in section identity and automatic routing stay unchanged." in bakery_row
+        assert "store-section-master-mobile-kind" not in bakery_row
         assert 'value="delete"' not in bakery_row
 
         created = client.post(
@@ -1867,6 +1868,9 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         custom_delete_attributes = custom_row.split('value="delete"', 1)[1].split(">", 1)[0]
         assert "disabled" not in custom_delete_attributes
         assert "Permanently delete International Foods" in custom_delete_attributes
+        assert 'data-store-section-is-built-in="false"' in custom_row
+        assert "store-section-master-mobile-kind" in custom_row
+        assert '<span class="is-custom">Custom</span>' in custom_row
         section = next(
             item
             for item in master_data.ingredient_store_section_details(
@@ -2445,6 +2449,9 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "display: contents;" in css
     assert "flex-wrap: wrap;" in css
     assert "order: 4;" in css
+    assert ".store-section-master-mobile-kind" in css
+    assert 'data-store-section-is-built-in="false"' in css
+    assert 'data-store-section-status="archived"' in css
     assert 'data-store-section-is-built-in="true"' in css
     assert 'content: "ingredients";' in css
     assert 'content: "recipe refs";' in css
