@@ -1573,6 +1573,9 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert ".master-data-mobile-record-toggle[aria-expanded=\"true\"] svg" in css
     assert ".master-data-record-row.master-data-record-row-expanded" in css
     assert ".master-data-desktop-section-summary" in css
+    assert "@media (min-width: 761px)" in css
+    assert "grid-template-columns: 17px minmax(0, 1fr);" in css
+    assert "max-width: 240px;" in css
     assert ".master-data-table--show-user" in css
     assert ".master-data-mobile-reference-dialog" in css
     assert ".master-data-mobile-reference-dialog::backdrop" in css

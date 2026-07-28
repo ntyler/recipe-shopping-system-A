@@ -27518,13 +27518,22 @@ img[data-deferred-src] {
         }
 
         .master-data-desktop-section-summary {
-            display: flex;
+            display: grid;
+            box-sizing: border-box;
+            width: 100%;
             min-width: 0;
+            min-height: 36px;
+            grid-template-columns: 17px minmax(0, 1fr);
             align-items: center;
-            gap: 7px;
-            color: #e5edf5;
+            gap: 8px;
+            padding: 7px 8px;
+            overflow: hidden;
+            border: 1px solid #655f50;
+            border-radius: 7px;
+            background: #1b1f1f;
+            color: #f5f7f7;
             font-size: 13px;
-            font-weight: 850;
+            font-weight: 800;
             line-height: 1.2;
         }
 
@@ -27547,6 +27556,19 @@ img[data-deferred-src] {
         .master-data-desktop-section-summary :is(svg, .recipe-edit-inline-icon) {
             width: 16px;
             height: 16px;
+        }
+
+        @media (min-width: 761px) {
+            .master-data-ingredients-table
+            .master-data-store-section-cell
+            > :is(
+                .master-data-desktop-section-summary,
+                select[name="store_section"],
+                .master-data-store-section-picker
+            ) {
+                width: 100%;
+                max-width: 240px;
+            }
         }
 
         .master-data-ingredients-table
