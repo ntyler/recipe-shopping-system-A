@@ -2185,7 +2185,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "data-store-section-master-columns-fit" in page
     assert "Fit to content" in page
     assert "Fit columns" not in page
-    assert "the table may become wider." in page
+    assert "within the available table width." in page
     assert "data-store-section-master-mobile-save" in page
     assert "data-store-section-master-usage-open" in page
     assert "data-store-section-master-usage-dialog" in page
@@ -2280,6 +2280,15 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert '"routing",' in script
     assert 'label: "Routing"' in script
     assert "storeSectionMasterColumnResize" in script
+    assert "const fitColumnWidthsToBudget = (keys, requestedWidths, budget) => {" in script
+    assert "const columnWidthBudget = visibleCount => {" in script
+    assert "Object.assign(columnLayout.widths, fittedWidths)" in script
+    assert (
+        "Visible Store Section columns fitted within the available table width."
+        in script
+    )
+    assert "grid-template-columns: minmax(0, 1fr);" in css
+    assert "overscroll-behavior-inline: contain;" in css
     assert 'action: "move_to"' in script
     assert "persistRowPosition" in script
     assert "moveRowByOrderControl" in script

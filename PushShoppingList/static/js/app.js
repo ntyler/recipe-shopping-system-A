@@ -37933,9 +37933,9 @@ function initStoreSectionMasterTable() {
         announce(`${STORE_SECTION_MASTER_COLUMNS[key].label} column moved.`);
         return true;
     };
-    const autoFitColumn = key => {
+    const measureColumnWidth = key => {
         const config = STORE_SECTION_MASTER_COLUMNS[key];
-        if (!config) return;
+        if (!config) return 0;
         const measurements = [headerFor(key), ...rows().map(row => cellFor(row, key))]
             .filter(Boolean)
             .map(element => {
@@ -37950,19 +37950,102 @@ function initStoreSectionMasterTable() {
                 clone.remove();
                 return width;
             });
-        columnLayout.widths[key] = clampColumnWidth(
+        return clampColumnWidth(
             key,
             Math.max(config.minWidth, ...measurements),
         );
+    };
+    const fitColumnWidthsToBudget = (keys, requestedWidths, budget) => {
+        const widths = {};
+        keys.forEach(key => {
+            widths[key] = clampColumnWidth(key, requestedWidths[key]);
+        });
+
+        const minimumTotal = keys.reduce(
+            (total, key) => total + STORE_SECTION_MASTER_COLUMNS[key].minWidth,
+            0,
+        );
+        const target = Math.max(minimumTotal, Math.floor(Number(budget) || 0));
+        const shrinkTiers = [
+            ["section", "routing", "usage"],
+            ["actions", "order", "type"],
+            ["icon", "status"],
+        ];
+        let remaining = Math.max(
+            0,
+            keys.reduce((total, key) => total + widths[key], 0) - target,
+        );
+
+        shrinkTiers.forEach(tier => {
+            if (!remaining) return;
+            const tierKeys = tier.filter(key => keys.includes(key));
+            const capacities = tierKeys.map(key => Math.max(
+                0,
+                widths[key] - STORE_SECTION_MASTER_COLUMNS[key].minWidth,
+            ));
+            const tierCapacity = capacities.reduce((total, capacity) => total + capacity, 0);
+            const tierReduction = Math.min(remaining, tierCapacity);
+            let tierRemaining = tierReduction;
+
+            capacities.forEach((capacity, index) => {
+                if (!capacity || !tierRemaining) return;
+                const proportional = Math.floor((tierReduction * capacity) / tierCapacity);
+                const reduction = Math.min(capacity, proportional, tierRemaining);
+                widths[tierKeys[index]] -= reduction;
+                tierRemaining -= reduction;
+            });
+            tierKeys.forEach(key => {
+                if (!tierRemaining) return;
+                const reduction = Math.min(
+                    tierRemaining,
+                    widths[key] - STORE_SECTION_MASTER_COLUMNS[key].minWidth,
+                );
+                widths[key] -= reduction;
+                tierRemaining -= reduction;
+            });
+            remaining -= tierReduction;
+        });
+
+        return widths;
+    };
+    const columnWidthBudget = visibleCount => {
+        const horizontalPadding = 28;
+        const columnGap = 12;
+        const overflowSafety = 2;
+        return Math.max(
+            0,
+            Math.floor(
+                table.clientWidth
+                - horizontalPadding
+                - overflowSafety
+                - (columnGap * Math.max(0, visibleCount - 1)),
+            ),
+        );
+    };
+    const autoFitColumn = key => {
+        const config = STORE_SECTION_MASTER_COLUMNS[key];
+        if (!config) return;
+        columnLayout.widths[key] = measureColumnWidth(key);
         saveLayout();
         applyColumnLayout();
         announce(`${config.label} column fitted to its content.`);
     };
     const fitAllColumns = () => {
-        columnLayout.order
-            .filter(key => !columnLayout.hidden.includes(key))
-            .forEach(autoFitColumn);
-        announce("Visible Store Section columns fitted to their content.");
+        const visibleKeys = columnLayout.order
+            .filter(key => !columnLayout.hidden.includes(key));
+        const measuredWidths = {};
+        visibleKeys.forEach(key => {
+            measuredWidths[key] = measureColumnWidth(key);
+        });
+        const fittedWidths = fitColumnWidthsToBudget(
+            visibleKeys,
+            measuredWidths,
+            columnWidthBudget(visibleKeys.length),
+        );
+        Object.assign(columnLayout.widths, fittedWidths);
+        saveLayout();
+        applyColumnLayout();
+        announce("Visible Store Section columns fitted within the available table width.");
     };
     const decorateHeaders = () => {
         STORE_SECTION_MASTER_COLUMN_ORDER.forEach(key => {

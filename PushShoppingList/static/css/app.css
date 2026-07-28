@@ -61640,6 +61640,9 @@ body.recipe-edit-standalone-page :is(
 /* Store Section master data: workspace-scoped names, icons, order, and availability. */
 .store-section-master-page {
     --store-section-card: color-mix(in srgb, var(--app-surface) 94%, var(--app-bg-soft));
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    max-width: 100%;
 }
 
 .store-section-master-stats {
@@ -62303,8 +62306,12 @@ body.recipe-edit-standalone-page :is(
 }
 
 .store-section-master-table {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
     overflow-x: auto;
+    overscroll-behavior-inline: contain;
     scrollbar-width: thin;
 }
 
@@ -63254,6 +63261,8 @@ body.is-store-section-master-usage-dialog-open {
 /* Store Section manager v3: full header plus Ingredients-style table controls. */
 .store-section-master-list-section {
     overflow: visible;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .store-section-master-table-toolbar > div:first-child > span {
