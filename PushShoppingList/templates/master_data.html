@@ -1098,6 +1098,38 @@
         </div>
 
         {% if master_data.record_type == 'ingredients' and master_data.rows %}
+            <dialog id="masterDataMobileReferencesDialog"
+                    class="master-data-mobile-reference-dialog"
+                    data-master-mobile-reference-dialog
+                    aria-labelledby="masterDataMobileReferencesTitle">
+                <div class="master-data-mobile-reference-shell">
+                    <header class="master-data-mobile-reference-header">
+                        <div>
+                            <span>Ingredient usage</span>
+                            <h2 id="masterDataMobileReferencesTitle"
+                                data-master-mobile-reference-title>
+                                Recipes using this ingredient
+                            </h2>
+                        </div>
+                        <button type="button"
+                                data-master-mobile-reference-close
+                                aria-label="Close recipe usage">
+                            &times;
+                        </button>
+                    </header>
+                    <div class="master-data-reference-panel master-data-mobile-reference-panel"
+                         data-master-mobile-reference-panel
+                         aria-live="polite">
+                        <div class="master-data-reference-placeholder">Recipe references will load when opened.</div>
+                    </div>
+                    <footer class="master-data-mobile-reference-footer">
+                        <button type="button" data-master-mobile-reference-close>Close</button>
+                    </footer>
+                </div>
+            </dialog>
+        {% endif %}
+
+        {% if master_data.record_type == 'ingredients' and master_data.rows %}
             <dialog id="masterDataIngredientMergeDialog"
                     class="master-data-merge-dialog"
                     data-master-merge-dialog

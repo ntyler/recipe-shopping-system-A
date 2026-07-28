@@ -12,6 +12,7 @@
     let activeImageJobId = "";
     let imagePollTimer = null;
     let imageRefreshTimer = null;
+    let masterDataMobileReferenceReturnFocus = null;
     let masterDataThumbnailSize = MASTER_DATA_THUMBNAIL_DEFAULT_SIZE;
     let masterDataThumbnailSizeEventsBound = false;
     let masterDataMergeSearchTimer = null;
@@ -649,7 +650,7 @@
         return item;
     }
 
-    function renderReferences(panel, data) {
+    function renderReferences(panel, data, options = {}) {
         if (!panel) {
             return;
         }
@@ -672,7 +673,9 @@
             header.appendChild(note);
         }
 
-        panel.appendChild(header);
+        if (!options.hideHeader) {
+            panel.appendChild(header);
+        }
 
         if (!references.length) {
             const empty = document.createElement("div");
@@ -691,6 +694,41 @@
         decorateMasterDataLightboxImages(panel);
     }
 
+    async function loadReferenceData(button, panel, options = {}) {
+        if (!button || !panel) return null;
+        if (button.masterDataReferenceData) {
+            renderReferences(panel, button.masterDataReferenceData, options);
+            return button.masterDataReferenceData;
+        }
+
+        const referenceUrl = button.dataset.referenceUrl;
+        if (!referenceUrl || !window.fetch) {
+            setReferenceError(panel, "Recipe references are not available in this browser.");
+            return null;
+        }
+
+        setReferenceLoading(panel);
+        try {
+            const response = await fetch(referenceUrl, {
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "fetch",
+                },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                setReferenceError(panel, data.error || data.message || "Recipe references could not be loaded.");
+                return null;
+            }
+            button.masterDataReferenceData = data;
+            renderReferences(panel, data, options);
+            return data;
+        } catch (error) {
+            setReferenceError(panel, error && error.message ? error.message : "Recipe references could not be loaded.");
+            return null;
+        }
+    }
+
     function closeOtherReferenceRows(activeButton) {
         document.querySelectorAll("[data-master-reference-toggle]").forEach((button) => {
             if (button === activeButton) {
@@ -704,8 +742,70 @@
         });
     }
 
+    function masterDataMobileReferenceElements() {
+        const dialog = document.querySelector("[data-master-mobile-reference-dialog]");
+        return {
+            dialog,
+            title: dialog && dialog.querySelector("[data-master-mobile-reference-title]"),
+            panel: dialog && dialog.querySelector("[data-master-mobile-reference-panel]"),
+            closeButtons: dialog
+                ? Array.from(dialog.querySelectorAll("[data-master-mobile-reference-close]"))
+                : [],
+        };
+    }
+
+    function restoreMasterDataMobileReferenceFocus() {
+        const returnFocus = masterDataMobileReferenceReturnFocus;
+        masterDataMobileReferenceReturnFocus = null;
+        if (returnFocus) returnFocus.setAttribute("aria-expanded", "false");
+        if (returnFocus && returnFocus.isConnected) returnFocus.focus();
+    }
+
+    function closeMasterDataMobileReferences() {
+        const els = masterDataMobileReferenceElements();
+        if (!els.dialog) return;
+
+        if (typeof els.dialog.close === "function" && els.dialog.open) {
+            els.dialog.close();
+        } else {
+            els.dialog.removeAttribute("open");
+            restoreMasterDataMobileReferenceFocus();
+        }
+    }
+
+    async function openMasterDataMobileReferences(button) {
+        const els = masterDataMobileReferenceElements();
+        if (!els.dialog || !els.panel) return false;
+
+        closeOtherReferenceRows(button);
+        button.setAttribute("aria-expanded", "true");
+        masterDataMobileReferenceReturnFocus = button;
+
+        const row = button.closest(".master-data-record-row");
+        const name = row && row.querySelector("[data-master-mobile-record-name]");
+        const resolvedName = name ? name.textContent.trim() : "this ingredient";
+        if (els.title) els.title.textContent = `Recipes using ${resolvedName}`;
+
+        if (typeof els.dialog.showModal === "function") {
+            if (!els.dialog.open) els.dialog.showModal();
+        } else {
+            els.dialog.setAttribute("open", "");
+        }
+
+        await loadReferenceData(button, els.panel, { hideHeader: true });
+        return true;
+    }
+
     async function toggleReferenceRow(button) {
         if (!button) {
+            return;
+        }
+
+        const useMobileDialog = (
+            typeof window.matchMedia === "function"
+            && window.matchMedia("(max-width: 760px)").matches
+        );
+        if (useMobileDialog && await openMasterDataMobileReferences(button)) {
             return;
         }
 
@@ -730,33 +830,30 @@
             return;
         }
 
-        const referenceUrl = button.dataset.referenceUrl;
-        if (!referenceUrl || !window.fetch) {
-            setReferenceError(panel, "Recipe references are not available in this browser.");
-            return;
-        }
-
-        setReferenceLoading(panel);
-        try {
-            const response = await fetch(referenceUrl, {
-                headers: {
-                    Accept: "application/json",
-                    "X-Requested-With": "fetch",
-                },
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || data.ok === false) {
-                setReferenceError(panel, data.error || data.message || "Recipe references could not be loaded.");
-                return;
-            }
-            renderReferences(panel, data);
+        const data = await loadReferenceData(button, panel);
+        if (data) {
             row.dataset.loaded = "true";
-        } catch (error) {
-            setReferenceError(panel, error && error.message ? error.message : "Recipe references could not be loaded.");
         }
     }
 
     function initMasterDataReferences() {
+        const mobileEls = masterDataMobileReferenceElements();
+        if (mobileEls.dialog) {
+            mobileEls.closeButtons.forEach((button) => {
+                button.addEventListener("click", closeMasterDataMobileReferences);
+            });
+            mobileEls.dialog.addEventListener("cancel", (event) => {
+                event.preventDefault();
+                closeMasterDataMobileReferences();
+            });
+            mobileEls.dialog.addEventListener("click", (event) => {
+                if (event.target === mobileEls.dialog) closeMasterDataMobileReferences();
+            });
+            mobileEls.dialog.addEventListener("close", () => {
+                restoreMasterDataMobileReferenceFocus();
+            });
+        }
+
         document.addEventListener("click", (event) => {
             const target = event.target && event.target.closest ? event.target : null;
             const button = target ? target.closest("[data-master-reference-toggle]") : null;
