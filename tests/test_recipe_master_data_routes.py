@@ -2087,6 +2087,11 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "storeSectionMasterColumnResize" in script
     assert 'action: "move_to"' in script
     assert "persistRowPosition" in script
+    assert "moveRowByOrderControl" in script
+    assert 'if (["move_up", "move_down"].includes(action)) {' in script
+    assert 'const direction = action === "move_up" ? -1 : 1;' in script
+    assert "storeSectionMasterOrderPending" in script
+    assert "submitter.focus({ preventScroll: true });" in script
     assert "renderStoreSectionMasterIconVisual" in script
     assert "const updateRowDirtyState = () => {" in script
     assert "nameInput?.classList.toggle(\"is-dirty\", nameIsDirty)" in script

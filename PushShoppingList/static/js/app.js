@@ -38134,12 +38134,13 @@ function initStoreSectionMasterTable() {
             );
             const up = order?.querySelector('button[value="move_up"]');
             const down = order?.querySelector('button[value="move_down"]');
+            const pending = row.dataset.storeSectionMasterOrderPending === "true";
             if (number) {
                 number.textContent = String(index + 1);
                 number.setAttribute("aria-label", `Step ${index + 1}`);
             }
-            if (up) up.disabled = index === 0;
-            if (down) down.disabled = index === currentRows.length - 1;
+            if (up) up.disabled = pending || index === 0;
+            if (down) down.disabled = pending || index === currentRows.length - 1;
         });
     };
     const reorderIsFiltered = () => (
@@ -38179,11 +38180,44 @@ function initStoreSectionMasterTable() {
             const displayName = row.querySelector('input[name="display_name"]')?.value
                 || "Store Section";
             announce(`${displayName} moved to position ${position}.`);
+            return true;
         } catch (error) {
             rollback();
             updateRowOrderControls();
             announce(error.message || "The new Store Section order could not be saved.");
+            return false;
         }
+    };
+    const moveRowByOrderControl = async (row, direction, submitter) => {
+        const currentRows = rows();
+        const currentIndex = currentRows.indexOf(row);
+        const targetIndex = currentIndex + direction;
+        const targetRow = currentRows[targetIndex];
+        if (currentIndex < 0 || !targetRow) return;
+
+        const originalNextSibling = row.nextElementSibling;
+        row.dataset.storeSectionMasterOrderPending = "true";
+        row.setAttribute("aria-busy", "true");
+        if (direction < 0) {
+            list.insertBefore(row, targetRow);
+        } else {
+            targetRow.insertAdjacentElement("afterend", row);
+        }
+        const position = rows().indexOf(row) + 1;
+        updateRowOrderControls();
+
+        const rollback = () => {
+            if (originalNextSibling?.parentElement === list) {
+                list.insertBefore(row, originalNextSibling);
+            } else {
+                list.append(row);
+            }
+        };
+        await persistRowPosition(row, position, rollback);
+        delete row.dataset.storeSectionMasterOrderPending;
+        row.removeAttribute("aria-busy");
+        updateRowOrderControls();
+        submitter.focus({ preventScroll: true });
     };
     const clearRowDropState = () => {
         rows().forEach(row => row.classList.remove(
@@ -38315,6 +38349,18 @@ function initStoreSectionMasterTable() {
     list.addEventListener("submit", async event => {
         const submitter = event.submitter;
         const action = String(submitter?.value || "").trim().toLowerCase();
+        if (["move_up", "move_down"].includes(action)) {
+            event.preventDefault();
+            const row = submitter?.closest("[data-store-section-master-row]");
+            if (
+                !row
+                || row.dataset.storeSectionMasterOrderPending === "true"
+                || row.dataset.storeSectionMasterActionPending === "true"
+            ) return;
+            const direction = action === "move_up" ? -1 : 1;
+            await moveRowByOrderControl(row, direction, submitter);
+            return;
+        }
         if (!["archive", "restore"].includes(action)) return;
 
         event.preventDefault();
