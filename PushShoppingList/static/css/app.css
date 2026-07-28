@@ -63450,6 +63450,27 @@ body.is-resizing-store-section-master-column * {
     display: none !important;
 }
 
+@media (min-width: 760px) {
+    .store-section-master-table-head
+        > [data-store-section-master-column="icon"] {
+        text-align: center;
+    }
+
+    .store-section-master-row
+        > [data-store-section-master-cell="icon"] {
+        justify-content: center;
+    }
+
+    .store-section-master-row .store-section-master-icon-picker {
+        width: min(100%, 160px);
+    }
+
+    .store-section-master-row .store-section-master-icon-trigger {
+        grid-template-columns: 16px max-content 14px;
+        justify-content: center;
+    }
+}
+
 @media (max-width: 1180px) {
     .store-section-master-table-actions {
         flex-wrap: wrap;
@@ -63515,6 +63536,7 @@ body.is-resizing-store-section-master-column * {
         min-width: 38px;
         height: 38px;
         min-height: 38px;
+        place-items: center;
         justify-items: center;
         padding: 0;
         border-color: var(--app-border);

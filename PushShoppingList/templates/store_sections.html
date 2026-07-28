@@ -232,8 +232,8 @@ data-user-id="{{ master_data.scope_user_id }}"
                  aria-label="Store Sections">
                 <div class="store-section-master-table-head" role="row">
                     <div role="columnheader" data-store-section-master-column="order">Order</div>
-                    <div role="columnheader" data-store-section-master-column="section">Store Section</div>
                     <div role="columnheader" data-store-section-master-column="icon">Icon</div>
+                    <div role="columnheader" data-store-section-master-column="section">Store Section</div>
                     <div role="columnheader" data-store-section-master-column="type">Section Type</div>
                     <div role="columnheader" data-store-section-master-column="usage">Usage</div>
                     <div role="columnheader" data-store-section-master-column="status">Status</div>
@@ -298,6 +298,12 @@ data-user-id="{{ master_data.scope_user_id }}"
                             </div>
                         </div>
 
+                        <div class="store-section-master-icon-field"
+                             role="cell"
+                             data-store-section-master-cell="icon">
+                            {{ store_section_icon_picker(section.icon, "Icon for " ~ section.display_name) }}
+                        </div>
+
                         <div class="store-section-master-identity"
                              role="cell"
                              data-store-section-master-cell="section">
@@ -321,12 +327,6 @@ data-user-id="{{ master_data.scope_user_id }}"
                                 </svg>
                                 <span>Save</span>
                             </button>
-                        </div>
-
-                        <div class="store-section-master-icon-field"
-                             role="cell"
-                             data-store-section-master-cell="icon">
-                            {{ store_section_icon_picker(section.icon, "Icon for " ~ section.display_name) }}
                         </div>
 
                         <div class="store-section-master-type"

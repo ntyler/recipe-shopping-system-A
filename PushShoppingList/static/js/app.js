@@ -37660,11 +37660,11 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
     });
 }
 
-const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV1";
+const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV2";
 const STORE_SECTION_MASTER_COLUMN_ORDER = [
     "order",
-    "section",
     "icon",
+    "section",
     "type",
     "usage",
     "status",
@@ -37690,9 +37690,9 @@ const STORE_SECTION_MASTER_COLUMNS = {
     },
     icon: {
         label: "Icon",
-        fallbackWidth: 250,
-        minWidth: 150,
-        maxWidth: 420,
+        fallbackWidth: 180,
+        minWidth: 120,
+        maxWidth: 280,
     },
     type: {
         label: "Section Type",

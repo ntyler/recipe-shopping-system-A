@@ -2059,6 +2059,16 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "data-store-section-master-usage-tab" in page
     assert "data-store-section-master-usage-search" in page
     assert 'data-store-section-master-column="order"' in page
+    assert (
+        page.index('data-store-section-master-column="order"')
+        < page.index('data-store-section-master-column="icon"')
+        < page.index('data-store-section-master-column="section"')
+    )
+    assert (
+        page.index('data-store-section-master-cell="order"')
+        < page.index('data-store-section-master-cell="icon"')
+        < page.index('data-store-section-master-cell="section"')
+    )
     assert "data-store-section-master-drag-handle" in page
     assert "store-section-master-table-head" in page
     assert ">Order</div>" in page
@@ -2079,6 +2089,16 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "data-store-section-master-usage-image" in script
     assert "recipe_image_url" in script
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
+    assert (
+        'const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = '
+        '"storeSectionMasterColumnsV2";'
+    ) in script
+    assert (
+        'const STORE_SECTION_MASTER_COLUMN_ORDER = [\n'
+        '    "order",\n'
+        '    "icon",\n'
+        '    "section",\n'
+    ) in script
     assert "STORE_SECTION_MASTER_MOBILE_COLUMNS" in script
     assert (
         'const STORE_SECTION_MASTER_MOBILE_COLUMNS = [\n'
@@ -2130,6 +2150,11 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "grid-template-columns: 62px 38px minmax(0, 1fr);" in css
     assert "grid-template-columns: 22px 34px;" in css
     assert "> [data-store-section-master-icon-label]," in css
+    assert '[data-store-section-master-column="icon"]' in css
+    assert '[data-store-section-master-cell="icon"]' in css
+    assert "width: min(100%, 160px);" in css
+    assert "grid-template-columns: 16px max-content 14px;" in css
+    assert "place-items: center;" in css
     assert ".is-row-drop-before" in css
     assert ".store-section-master-icon-menu" in css
     assert ".store-section-master-icon-option.is-selected" in css
