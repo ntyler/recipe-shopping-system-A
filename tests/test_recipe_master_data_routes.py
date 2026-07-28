@@ -1507,6 +1507,32 @@ def test_master_data_ingredient_merge_ui_is_wired():
     assert ".master-data-aliases" in css
 
 
+def test_master_data_mobile_layout_prioritizes_filters_and_results():
+    template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
+    script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    filter_position = template.index('class="master-data-filter-form')
+    maintenance_position = template.index('data-master-maintenance open')
+    results_position = template.index('data-master-results-header')
+
+    assert filter_position < maintenance_position < results_position
+    assert "<span>Maintenance tools</span>" in template
+    assert 'data-label="Store section"' in template
+    assert 'class="master-data-mobile-usage-label"' in template
+    assert "function initMasterDataMaintenance()" in script
+    assert 'window.matchMedia("(max-width: 760px)")' in script
+    assert "initMasterDataMaintenance();" in script
+    assert "@media (max-width: 760px)" in css
+    assert ".master-data-maintenance:not([open]) > .master-data-maintenance-content" in css
+    assert ".master-data-ingredients-table .master-data-record-row" in css
+    assert "master-data-table--section-filtered" in template
+    assert ".master-data-ingredients-table.master-data-table--section-filtered" in css
+    assert ".master-data-scope-filter-field" in css
+    assert "[data-master-record-results]" in css
+    assert "overflow-x: clip;" in css
+
+
 def test_master_data_duplicate_review_ui_is_wired():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")

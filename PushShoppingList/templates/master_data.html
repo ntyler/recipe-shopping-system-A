@@ -11,7 +11,7 @@
     <tr class="master-data-record-row{% if not row.usage_count %} master-data-record-row-unused{% endif %}"
         data-master-record-id="{{ row.id }}"
         {% if not row.usage_count %}data-master-record-unused="true"{% endif %}>
-        <td class="master-data-item-cell">
+        <td class="master-data-item-cell" data-label="Item">
             <div class="master-data-item">
                 {% if row.image_url %}
                     <img class="master-data-thumbnail"
@@ -86,7 +86,7 @@
             </div>
         </td>
         {% if master_data.record_type == 'ingredients' %}
-            <td>
+            <td class="master-data-store-section-cell" data-label="Store section">
                 <select name="store_section"
                         form="{{ ingredient_form_id }}"
                         data-master-record-field
@@ -103,11 +103,11 @@
                 </select>
             </td>
         {% elif master_data.record_type == 'equipment' %}
-            <td class="master-data-equipment-type-cell">
+            <td class="master-data-equipment-type-cell" data-label="Equipment type">
                 {{ row.equipment_section }}
             </td>
         {% endif %}
-        <td>
+        <td class="master-data-user-data-cell" data-label="User">
             <div class="master-data-user-cell">
                 <strong>{{ row.user_identity.display_name }}</strong>
                 {% if row.user_identity.email_detail %}
@@ -116,7 +116,7 @@
                 <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
             </div>
         </td>
-        <td class="master-data-usage-cell">
+        <td class="master-data-usage-cell" data-label="Usage">
             {% if row.usage_count %}
                 <button type="button"
                         class="master-data-usage-button"
@@ -127,6 +127,9 @@
                         aria-label="Show {{ row.usage_count }} recipe{% if row.usage_count != 1 %}s{% endif %} referencing {{ row.name }}"
                         title="Show recipes referencing {{ row.name }}">
                     <span aria-hidden="true">{{ row.usage_count }}</span>
+                    <span class="master-data-mobile-usage-label">
+                        recipe {% if row.usage_count == 1 %}use{% else %}uses{% endif %}
+                    </span>
                 </button>
             {% else %}
                 <span class="master-data-usage-empty"
@@ -137,8 +140,8 @@
                 </span>
             {% endif %}
         </td>
-        <td>{{ row.updated_at }}</td>
-        <td>{{ row.created_at }}</td>
+        <td class="master-data-updated-cell" data-label="Updated">{{ row.updated_at }}</td>
+        <td class="master-data-created-cell" data-label="Created">{{ row.created_at }}</td>
     </tr>
     {% if row.usage_count %}
         <tr class="master-data-reference-row"
@@ -186,6 +189,101 @@
             </div>
         {% endif %}
 
+        <form class="master-data-filter-form {% if master_data.record_type == 'ingredients' %}master-data-filter-form--ingredients{% endif %}"
+              method="GET"
+              action="{{ url_for(master_data.route_endpoint) }}">
+            <label class="master-data-search-field">
+                <span>Search</span>
+                <input type="search"
+                       name="search"
+                       value="{{ master_data.search }}"
+                       placeholder="Name or normalized name">
+            </label>
+            {% if master_data.is_admin %}
+                <label class="master-data-scope-filter-field">
+                    <span>Scope</span>
+                    <select name="scope">
+                        <option value="mine" {% if master_data.scope == 'mine' %}selected{% endif %}>My data</option>
+                        <option value="all" {% if master_data.scope == 'all' %}selected{% endif %}>All users</option>
+                        <option value="user" {% if master_data.scope == 'user' %}selected{% endif %}>Specific user</option>
+                    </select>
+                </label>
+                <label class="master-data-user-filter-field">
+                    <span>User</span>
+                    <input type="text"
+                           name="user_id"
+                           value="{% if master_data.scope == 'user' %}{{ master_data.scope_user_id }}{% endif %}"
+                           list="masterDataUserIds"
+                           placeholder="{{ master_data.current_scope_user.label }}"
+                           aria-describedby="masterDataUserHint">
+                    <datalist id="masterDataUserIds">
+                        {% for user in master_data.available_users %}
+                            <option value="{{ user.user_id }}" label="{{ user.label }}">{{ user.label }}</option>
+                        {% endfor %}
+                    </datalist>
+                </label>
+                <span id="masterDataUserHint" class="master-data-user-field-note master-data-user-filter-note">
+                    {% if master_data.scope == 'user' and master_data.scope_user.user_id %}
+                        {{ master_data.scope_user.label }}
+                    {% else %}
+                        {{ master_data.current_scope_user.label }}
+                    {% endif %}
+                </span>
+            {% endif %}
+            {% if master_data.record_type == 'ingredients' %}
+                <label class="master-data-store-section-filter-field">
+                    <span>Store Section</span>
+                    <select name="store_section">
+                        <option value="" {% if not master_data.store_section %}selected{% endif %}>All sections</option>
+                        {% for section in master_data.store_section_options %}
+                            <option value="{{ section }}" {% if master_data.store_section == section %}selected{% endif %}>
+                                {{ master_data.store_section_labels.get(section, section) }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+            {% elif master_data.record_type == 'equipment' %}
+                <label class="master-data-equipment-filter-field">
+                    <span>Equipment Type</span>
+                    <select name="equipment_section">
+                        <option value="" {% if not master_data.equipment_section %}selected{% endif %}>All types</option>
+                        {% for section in master_data.equipment_section_options %}
+                            <option value="{{ section }}" {% if master_data.equipment_section == section %}selected{% endif %}>
+                                {{ section }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+            {% endif %}
+            <label class="master-data-sort-filter-field">
+                <span>Sort</span>
+                <select name="sort">
+                    {% for option in master_data.sort_options %}
+                        <option value="{{ option.value }}" {% if master_data.sort == option.value %}selected{% endif %}>
+                            {{ option.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="master-data-limit-filter-field">
+                <span>Limit</span>
+                <select name="limit">
+                    {% for option in master_data.limit_options %}
+                        <option value="{{ option }}" {% if master_data.limit == option %}selected{% endif %}>
+                            {{ option }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit">Apply</button>
+        </form>
+
+        <details class="master-data-maintenance" data-master-maintenance open>
+            <summary>
+                <span>Maintenance tools</span>
+                <span class="master-data-maintenance-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="master-data-maintenance-content">
         <div class="master-data-status">
             <div>
                 <span>SQLite DB</span>
@@ -560,95 +658,6 @@
             {% endif %}
         {% endif %}
 
-        <form class="master-data-filter-form {% if master_data.record_type == 'ingredients' %}master-data-filter-form--ingredients{% endif %}"
-              method="GET"
-              action="{{ url_for(master_data.route_endpoint) }}">
-            <label class="master-data-search-field">
-                <span>Search</span>
-                <input type="search"
-                       name="search"
-                       value="{{ master_data.search }}"
-                       placeholder="Name or normalized name">
-            </label>
-            {% if master_data.is_admin %}
-                <label>
-                    <span>Scope</span>
-                    <select name="scope">
-                        <option value="mine" {% if master_data.scope == 'mine' %}selected{% endif %}>My data</option>
-                        <option value="all" {% if master_data.scope == 'all' %}selected{% endif %}>All users</option>
-                        <option value="user" {% if master_data.scope == 'user' %}selected{% endif %}>Specific user</option>
-                    </select>
-                </label>
-                <label class="master-data-user-filter-field">
-                    <span>User</span>
-                    <input type="text"
-                           name="user_id"
-                           value="{% if master_data.scope == 'user' %}{{ master_data.scope_user_id }}{% endif %}"
-                           list="masterDataUserIds"
-                           placeholder="{{ master_data.current_scope_user.label }}"
-                           aria-describedby="masterDataUserHint">
-                    <datalist id="masterDataUserIds">
-                        {% for user in master_data.available_users %}
-                            <option value="{{ user.user_id }}" label="{{ user.label }}">{{ user.label }}</option>
-                        {% endfor %}
-                    </datalist>
-                </label>
-                <span id="masterDataUserHint" class="master-data-user-field-note master-data-user-filter-note">
-                    {% if master_data.scope == 'user' and master_data.scope_user.user_id %}
-                        {{ master_data.scope_user.label }}
-                    {% else %}
-                        {{ master_data.current_scope_user.label }}
-                    {% endif %}
-                </span>
-            {% endif %}
-            {% if master_data.record_type == 'ingredients' %}
-                <label>
-                    <span>Store Section</span>
-                    <select name="store_section">
-                        <option value="" {% if not master_data.store_section %}selected{% endif %}>All sections</option>
-                        {% for section in master_data.store_section_options %}
-                            <option value="{{ section }}" {% if master_data.store_section == section %}selected{% endif %}>
-                                {{ master_data.store_section_labels.get(section, section) }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </label>
-            {% elif master_data.record_type == 'equipment' %}
-                <label>
-                    <span>Equipment Type</span>
-                    <select name="equipment_section">
-                        <option value="" {% if not master_data.equipment_section %}selected{% endif %}>All types</option>
-                        {% for section in master_data.equipment_section_options %}
-                            <option value="{{ section }}" {% if master_data.equipment_section == section %}selected{% endif %}>
-                                {{ section }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </label>
-            {% endif %}
-            <label>
-                <span>Sort</span>
-                <select name="sort">
-                    {% for option in master_data.sort_options %}
-                        <option value="{{ option.value }}" {% if master_data.sort == option.value %}selected{% endif %}>
-                            {{ option.label }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label>
-                <span>Limit</span>
-                <select name="limit">
-                    {% for option in master_data.limit_options %}
-                        <option value="{{ option }}" {% if master_data.limit == option %}selected{% endif %}>
-                            {{ option }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </label>
-            <button type="submit">Apply</button>
-        </form>
-
         {% if master_data.record_type == 'ingredients' and master_data.db_status.exists %}
             <section class="master-data-duplicate-review"
                      data-master-duplicate-review
@@ -973,6 +982,9 @@
             </dialog>
         {% endif %}
 
+            </div>
+        </details>
+
         <div class="master-data-results-header" data-master-results-header>
             <div class="master-data-results-summary" aria-live="polite">
                 {% if master_data.total_count %}
@@ -1028,7 +1040,7 @@
         <div data-master-record-results>
             {% if master_data.rows %}
                 <div class="master-data-table-wrap">
-                    <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}">
+                    <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}{% if master_data.store_section %} master-data-table--section-filtered{% endif %}">
                     <thead>
                         <tr>
                             <th scope="col">Item</th>
