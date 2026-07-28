@@ -1054,10 +1054,91 @@
             );
             select.addEventListener("change", () => {
                 syncRecipeIngredientStoreSectionControl(select);
+                syncMasterDataMobileSectionSummary(select);
             });
             select.hidden = true;
             wrapper.insertBefore(trigger, select);
             syncRecipeIngredientStoreSectionControl(select);
+            syncMasterDataMobileSectionSummary(select);
+        });
+    }
+
+    function syncMasterDataMobileSectionSummary(select) {
+        const row = select && select.closest(".master-data-record-row");
+        const summary = row && row.querySelector("[data-master-mobile-section-summary]");
+        if (!summary) return;
+
+        const selectedOption = select.options && select.options[select.selectedIndex];
+        const label = selectedOption ? selectedOption.textContent.trim() : select.value;
+        summary.replaceChildren();
+
+        if (typeof recipeIngredientStoreSectionIconHtml === "function") {
+            const icon = document.createElement("span");
+            icon.className = "master-data-mobile-section-icon";
+            icon.innerHTML = recipeIngredientStoreSectionIconHtml(select.value);
+            summary.appendChild(icon);
+        }
+
+        const textLabel = document.createElement("span");
+        textLabel.textContent = label;
+        summary.appendChild(textLabel);
+    }
+
+    function setMasterDataMobileRecordExpanded(row, expanded) {
+        if (!row) return;
+        const toggle = row.querySelector("[data-master-mobile-record-toggle]");
+        const name = row.querySelector("[data-master-mobile-record-name]");
+        const resolvedName = name ? name.textContent.trim() : "ingredient";
+
+        row.classList.toggle("master-data-record-row-expanded", expanded);
+        if (toggle) {
+            toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+            toggle.setAttribute(
+                "aria-label",
+                `${expanded ? "Hide" : "Show"} editing controls for ${resolvedName}`
+            );
+        }
+
+        if (!expanded) {
+            const usageToggle = row.querySelector("[data-master-reference-toggle]");
+            const referenceId = usageToggle && usageToggle.getAttribute("aria-controls");
+            const referenceRow = referenceId ? document.getElementById(referenceId) : null;
+            if (usageToggle) usageToggle.setAttribute("aria-expanded", "false");
+            if (referenceRow) referenceRow.hidden = true;
+        }
+    }
+
+    function initMasterDataMobileRecords() {
+        const rows = Array.from(
+            document.querySelectorAll(".master-data-ingredients-table .master-data-record-row")
+        );
+        if (!rows.length) return;
+
+        rows.forEach((row) => {
+            const toggle = row.querySelector("[data-master-mobile-record-toggle]");
+            const nameInput = row.querySelector('input[name="name"]');
+            const nameSummary = row.querySelector("[data-master-mobile-record-name]");
+            const sectionSelect = row.querySelector("[data-master-store-section-select]");
+
+            setMasterDataMobileRecordExpanded(row, false);
+            if (sectionSelect) syncMasterDataMobileSectionSummary(sectionSelect);
+
+            if (nameInput && nameSummary) {
+                nameInput.addEventListener("input", () => {
+                    nameSummary.textContent = nameInput.value.trim() || "Unnamed ingredient";
+                });
+            }
+
+            if (!toggle) return;
+            toggle.addEventListener("click", () => {
+                const shouldExpand = toggle.getAttribute("aria-expanded") !== "true";
+                if (shouldExpand) {
+                    rows.forEach((otherRow) => {
+                        if (otherRow !== row) setMasterDataMobileRecordExpanded(otherRow, false);
+                    });
+                }
+                setMasterDataMobileRecordExpanded(row, shouldExpand);
+            });
         });
     }
 
@@ -5213,6 +5294,7 @@
         initMasterDataThumbnailSizeControls();
         initMasterDataImageLightbox();
         initMasterDataStoreSectionIconPickers();
+        initMasterDataMobileRecords();
         initMasterDataStoreSectionBatchSave();
         initMasterDataIngredientMerge();
         initMasterDataDuplicateReview();

@@ -8,7 +8,8 @@
 {% macro render_master_data_row(row, master_data) -%}
     {% set reference_row_id = 'masterDataReferences-' ~ master_data.record_type ~ '-' ~ row.id %}
     {% set ingredient_form_id = 'masterDataIngredientForm-' ~ row.id %}
-    <tr class="master-data-record-row{% if not row.usage_count %} master-data-record-row-unused{% endif %}"
+    <tr id="masterDataRecord-{{ master_data.record_type }}-{{ row.id }}"
+        class="master-data-record-row{% if not row.usage_count %} master-data-record-row-unused{% endif %}"
         data-master-record-id="{{ row.id }}"
         {% if not row.usage_count %}data-master-record-unused="true"{% endif %}>
         <td class="master-data-item-cell" data-label="Item">
@@ -23,6 +24,12 @@
                 {% endif %}
                 {% if master_data.record_type == 'ingredients' %}
                     <div class="master-data-item-copy">
+                        <strong class="master-data-mobile-record-name"
+                                data-master-mobile-record-name>{{ row.name }}</strong>
+                        <span class="master-data-mobile-section-summary"
+                              data-master-mobile-section-summary>
+                            {{ master_data.store_section_labels.get(row.store_section, row.store_section) }}
+                        </span>
                         <form id="{{ ingredient_form_id }}"
                               class="master-data-record-form master-data-store-section-form"
                               data-master-record-form
@@ -77,6 +84,16 @@
                             Merge duplicate
                         </button>
                     </div>
+                    <button type="button"
+                            class="master-data-mobile-record-toggle"
+                            data-master-mobile-record-toggle
+                            aria-expanded="false"
+                            aria-controls="masterDataRecord-{{ master_data.record_type }}-{{ row.id }}"
+                            aria-label="Show editing controls for {{ row.name }}">
+                        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                            <path d="M3.5 6 8 10.5 12.5 6"></path>
+                        </svg>
+                    </button>
                 {% else %}
                     <div class="master-data-item-copy">
                         <strong>{{ row.name }}</strong>
@@ -128,7 +145,7 @@
                         title="Show recipes referencing {{ row.name }}">
                     <span aria-hidden="true">{{ row.usage_count }}</span>
                     <span class="master-data-mobile-usage-label">
-                        recipe {% if row.usage_count == 1 %}use{% else %}uses{% endif %}
+                        {% if row.usage_count == 1 %}use{% else %}uses{% endif %}
                     </span>
                 </button>
             {% else %}

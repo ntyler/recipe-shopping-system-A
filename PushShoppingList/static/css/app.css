@@ -26781,6 +26781,12 @@ img[data-deferred-src] {
             display: none;
         }
 
+        .master-data-mobile-record-name,
+        .master-data-mobile-section-summary,
+        .master-data-mobile-record-toggle {
+            display: none;
+        }
+
         .master-data-record-row-unused td {
             background: rgba(180, 83, 9, .07);
         }
@@ -30039,9 +30045,13 @@ img[data-deferred-src] {
             .master-data-ingredients-table .master-data-section-row th {
                 display: block;
                 width: auto;
-                padding: 8px 10px;
-                border: 1px solid #3a5470;
-                border-radius: 7px;
+                padding: 4px 2px 0;
+                border: 0;
+                border-radius: 0;
+                background: transparent;
+                color: #4adea3;
+                font-size: 10px;
+                letter-spacing: .045em;
             }
 
             .master-data-ingredients-table.master-data-table--section-filtered .master-data-section-row {
@@ -30069,25 +30079,110 @@ img[data-deferred-src] {
             }
 
             .master-data-ingredients-table .master-data-item-cell {
-                grid-column: 1 / -1;
-                border-bottom: 1px solid #263e53;
+                grid-column: 1;
+                align-self: center;
             }
 
             .master-data-ingredients-table .master-data-item {
-                grid-template-columns: 64px minmax(0, 1fr);
-                gap: 12px;
-                align-items: start;
+                grid-template-columns: 52px minmax(0, 1fr) 36px;
+                gap: 10px;
+                align-items: center;
             }
 
             .master-data-ingredients-table .master-data-thumbnail,
             .master-data-ingredients-table .master-data-no-image {
-                width: 64px;
-                height: 64px;
+                width: 52px;
+                height: 52px;
             }
 
-            .master-data-ingredients-table .master-data-record-field.is-normalized,
+            .master-data-ingredients-table .master-data-record-form,
+            .master-data-ingredients-table .master-data-merge-open,
             .master-data-ingredients-table .master-data-aliases {
                 display: none;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row
+            > .master-data-store-section-cell {
+                display: none !important;
+            }
+
+            .master-data-ingredients-table .master-data-mobile-record-name {
+                display: block;
+                color: #f8fafc;
+                font-size: 16px;
+                font-weight: 900;
+                line-height: 1.2;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .master-data-ingredients-table .master-data-mobile-section-summary {
+                display: flex;
+                min-width: 0;
+                align-items: center;
+                gap: 6px;
+                color: #b8c5cf;
+                font-size: 12px;
+                font-weight: 800;
+                line-height: 1.2;
+            }
+
+            .master-data-mobile-section-summary > span:last-child {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .master-data-mobile-section-icon,
+            .master-data-mobile-section-icon .recipe-edit-store-section-icon {
+                display: inline-flex;
+                width: 15px;
+                height: 15px;
+                flex: 0 0 15px;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .master-data-mobile-section-icon :is(svg, .recipe-edit-inline-icon) {
+                width: 15px;
+                height: 15px;
+            }
+
+            .master-data-ingredients-table .master-data-mobile-record-toggle {
+                display: inline-grid;
+                width: 36px;
+                height: 36px;
+                place-items: center;
+                align-self: center;
+                padding: 0;
+                border: 1px solid transparent;
+                border-radius: 7px;
+                background: transparent;
+                color: #cbd5e1;
+                cursor: pointer;
+            }
+
+            .master-data-mobile-record-toggle:is(:hover, :focus-visible) {
+                outline: none;
+                border-color: #2f5172;
+                background: #0b1420;
+            }
+
+            .master-data-mobile-record-toggle svg {
+                width: 16px;
+                height: 16px;
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 1.8;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                transition: transform 140ms ease;
+            }
+
+            .master-data-mobile-record-toggle[aria-expanded="true"] svg {
+                transform: rotate(180deg);
             }
 
             .master-data-ingredients-table .master-data-record-field > span {
@@ -30105,10 +30200,6 @@ img[data-deferred-src] {
                 min-height: 38px;
                 padding-inline: 0;
                 font-size: 16px;
-            }
-
-            .master-data-ingredients-table .master-data-merge-open {
-                justify-self: start;
             }
 
             .master-data-ingredients-table
@@ -30129,22 +30220,30 @@ img[data-deferred-src] {
 
             .master-data-ingredients-table .master-data-usage-cell {
                 grid-column: 2;
+                align-self: center;
                 justify-self: end;
                 text-align: right;
             }
 
             .master-data-ingredients-table
-            :is(.master-data-user-data-cell, .master-data-updated-cell, .master-data-created-cell) {
+            .master-data-record-row:not(.master-data-record-row-expanded)
+            .master-data-usage-cell::before {
                 display: none;
             }
 
+            .master-data-ingredients-table
+            .master-data-record-row
+            > :is(.master-data-user-data-cell, .master-data-updated-cell, .master-data-created-cell) {
+                display: none !important;
+            }
+
             .master-data-ingredients-table .master-data-usage-button {
-                min-height: 36px;
+                min-height: 32px;
                 gap: 4px;
-                padding: 0 10px;
+                padding: 0 8px;
                 border-color: #2f5172;
                 background: #0b1420;
-                font-size: 13px;
+                font-size: 12px;
                 white-space: nowrap;
             }
 
@@ -30155,8 +30254,57 @@ img[data-deferred-src] {
             }
 
             .master-data-ingredients-table .master-data-usage-empty {
-                min-height: 36px;
+                min-height: 32px;
                 box-sizing: border-box;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row.master-data-record-row-expanded {
+                border-color: #2d8f70;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-item-cell {
+                grid-column: 1 / -1;
+                border-bottom: 1px solid #263e53;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-item {
+                align-items: start;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            :is(.master-data-mobile-record-name, .master-data-mobile-section-summary) {
+                display: none;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-record-form {
+                display: grid;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            > .master-data-store-section-cell {
+                display: grid !important;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-record-field.is-normalized {
+                display: grid;
+            }
+
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-merge-open {
+                display: inline-flex;
+                justify-self: start;
             }
 
             .master-data-ingredients-table .master-data-reference-row {

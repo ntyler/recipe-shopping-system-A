@@ -1520,12 +1520,23 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "<span>Maintenance tools</span>" in template
     assert 'data-label="Store section"' in template
     assert 'class="master-data-mobile-usage-label"' in template
+    assert "data-master-mobile-record-name" in template
+    assert "data-master-mobile-section-summary" in template
+    assert "data-master-mobile-record-toggle" in template
     assert "function initMasterDataMaintenance()" in script
+    assert "function initMasterDataMobileRecords()" in script
+    assert "function setMasterDataMobileRecordExpanded(row, expanded)" in script
+    assert "function syncMasterDataMobileSectionSummary(select)" in script
+    assert "if (referenceRow) referenceRow.hidden = true;" in script
     assert 'window.matchMedia("(max-width: 760px)")' in script
     assert "initMasterDataMaintenance();" in script
+    assert "initMasterDataMobileRecords();" in script
     assert "@media (max-width: 760px)" in css
     assert ".master-data-maintenance:not([open]) > .master-data-maintenance-content" in css
     assert ".master-data-ingredients-table .master-data-record-row" in css
+    assert ".master-data-mobile-record-toggle[aria-expanded=\"true\"] svg" in css
+    assert ".master-data-record-row.master-data-record-row-expanded" in css
+    assert "> :is(.master-data-user-data-cell, .master-data-updated-cell, .master-data-created-cell)" in css
     assert "master-data-table--section-filtered" in template
     assert ".master-data-ingredients-table.master-data-table--section-filtered" in css
     assert ".master-data-scope-filter-field" in css
