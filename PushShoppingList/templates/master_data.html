@@ -26,6 +26,8 @@
                     <div class="master-data-item-copy">
                         <strong class="master-data-mobile-record-name"
                                 data-master-mobile-record-name>{{ row.name }}</strong>
+                        <code class="master-data-record-normalized-summary"
+                              data-master-record-normalized-summary>{{ row.normalized_name }}</code>
                         <span class="master-data-mobile-section-summary"
                               data-master-mobile-section-summary>
                             {{ master_data.store_section_labels.get(row.store_section, row.store_section) }}
@@ -104,6 +106,10 @@
         </td>
         {% if master_data.record_type == 'ingredients' %}
             <td class="master-data-store-section-cell" data-label="Store section">
+                <span class="master-data-desktop-section-summary"
+                      data-master-desktop-section-summary>
+                    {{ master_data.store_section_labels.get(row.store_section, row.store_section) }}
+                </span>
                 <select name="store_section"
                         form="{{ ingredient_form_id }}"
                         data-master-record-field
@@ -124,15 +130,17 @@
                 {{ row.equipment_section }}
             </td>
         {% endif %}
-        <td class="master-data-user-data-cell" data-label="User">
-            <div class="master-data-user-cell">
-                <strong>{{ row.user_identity.display_name }}</strong>
-                {% if row.user_identity.email_detail %}
-                    <span>{{ row.user_identity.email_detail }}</span>
-                {% endif %}
-                <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
-            </div>
-        </td>
+        {% if master_data.record_type != 'ingredients' or master_data.scope == 'all' %}
+            <td class="master-data-user-data-cell" data-label="User">
+                <div class="master-data-user-cell">
+                    <strong>{{ row.user_identity.display_name }}</strong>
+                    {% if row.user_identity.email_detail %}
+                        <span>{{ row.user_identity.email_detail }}</span>
+                    {% endif %}
+                    <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
+                </div>
+            </td>
+        {% endif %}
         <td class="master-data-usage-cell" data-label="Usage">
             {% if row.usage_count %}
                 <button type="button"
@@ -157,8 +165,16 @@
                 </span>
             {% endif %}
         </td>
-        <td class="master-data-updated-cell" data-label="Updated">{{ row.updated_at }}</td>
-        <td class="master-data-created-cell" data-label="Created">{{ row.created_at }}</td>
+        <td class="master-data-updated-cell" data-label="Updated">
+            {% if master_data.record_type == 'ingredients' %}
+                <time datetime="{{ row.updated_at }}" title="{{ row.updated_at }}">{{ row.updated_at[:10] }}</time>
+            {% else %}
+                {{ row.updated_at }}
+            {% endif %}
+        </td>
+        {% if master_data.record_type != 'ingredients' %}
+            <td class="master-data-created-cell" data-label="Created">{{ row.created_at }}</td>
+        {% endif %}
     </tr>
     {% if row.usage_count %}
         <tr class="master-data-reference-row"
@@ -1057,19 +1073,24 @@
         <div data-master-record-results>
             {% if master_data.rows %}
                 <div class="master-data-table-wrap">
-                    <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}{% if master_data.store_section %} master-data-table--section-filtered{% endif %}">
+                    <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}{% if master_data.store_section %} master-data-table--section-filtered{% endif %}">
                     <thead>
                         <tr>
                             <th scope="col">Item</th>
                             {% if master_data.record_type == 'ingredients' %}
                                 <th scope="col">Store Section</th>
+                                {% if master_data.scope == 'all' %}
+                                    <th scope="col">User</th>
+                                {% endif %}
+                                <th scope="col">Usage</th>
+                                <th scope="col">Last Updated</th>
                             {% elif master_data.record_type == 'equipment' %}
                                 <th scope="col">Equipment Type</th>
+                                <th scope="col">User</th>
+                                <th scope="col">Usage Count</th>
+                                <th scope="col">Updated At</th>
+                                <th scope="col">Created At</th>
                             {% endif %}
-                            <th scope="col">User</th>
-                            <th scope="col">Usage Count</th>
-                            <th scope="col">Updated At</th>
-                            <th scope="col">Created At</th>
                         </tr>
                     </thead>
                     <tbody>

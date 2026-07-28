@@ -1151,7 +1151,13 @@ def master_data_context(record_type):
         else [],
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
         "group_by_equipment_section": bool(record_type == "equipment" and not equipment_section),
-        "table_column_count": 6,
+        "table_column_count": (
+            5
+            if record_type == "ingredients" and scope_info["scope"] == "all"
+            else 4
+            if record_type == "ingredients"
+            else 6
+        ),
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},
             {"value": "usage_count_desc", "label": "Usage Count"},

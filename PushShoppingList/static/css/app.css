@@ -26695,9 +26695,12 @@ img[data-deferred-src] {
             table-layout: fixed;
         }
 
-        .master-data-ingredients-table,
         .master-data-equipment-table {
             min-width: 1080px;
+        }
+
+        .master-data-ingredients-table {
+            min-width: 760px;
         }
 
         .master-data-table th,
@@ -26744,27 +26747,43 @@ img[data-deferred-src] {
         }
 
         .master-data-ingredients-table th:nth-child(1) {
-            width: 34%;
+            width: 48%;
         }
 
         .master-data-ingredients-table th:nth-child(2) {
-            width: 180px;
+            width: 220px;
         }
 
         .master-data-ingredients-table th:nth-child(3) {
-            width: 18%;
+            width: 100px;
         }
 
         .master-data-ingredients-table th:nth-child(4) {
-            width: 92px;
+            width: 120px;
         }
 
-        .master-data-ingredients-table th:nth-child(5) {
-            width: 130px;
+        .master-data-ingredients-table.master-data-table--show-user {
+            min-width: 980px;
         }
 
-        .master-data-ingredients-table th:nth-child(6) {
-            width: 130px;
+        .master-data-ingredients-table.master-data-table--show-user th:nth-child(1) {
+            width: 37%;
+        }
+
+        .master-data-ingredients-table.master-data-table--show-user th:nth-child(2) {
+            width: 210px;
+        }
+
+        .master-data-ingredients-table.master-data-table--show-user th:nth-child(3) {
+            width: 18%;
+        }
+
+        .master-data-ingredients-table.master-data-table--show-user th:nth-child(4) {
+            width: 90px;
+        }
+
+        .master-data-ingredients-table.master-data-table--show-user th:nth-child(5) {
+            width: 120px;
         }
 
         .master-data-equipment-table th:nth-child(1) {
@@ -26826,10 +26845,65 @@ img[data-deferred-src] {
             display: none;
         }
 
-        .master-data-mobile-record-name,
-        .master-data-mobile-section-summary,
-        .master-data-mobile-record-toggle {
+        .master-data-mobile-section-summary {
             display: none;
+        }
+
+        .master-data-mobile-record-name {
+            display: block;
+            color: #f8fafc;
+            font-size: 14px;
+            font-weight: 900;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .master-data-record-normalized-summary {
+            display: block;
+            overflow: hidden;
+            color: #9fb3c8;
+            font-size: 11px;
+            font-weight: 750;
+            line-height: 1.2;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .master-data-mobile-record-toggle {
+            display: inline-grid;
+            width: 36px;
+            height: 36px;
+            place-items: center;
+            align-self: center;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            background: transparent;
+            color: #cbd5e1;
+            cursor: pointer;
+        }
+
+        .master-data-mobile-record-toggle:is(:hover, :focus-visible) {
+            outline: none;
+            border-color: #2f5172;
+            background: #0b1420;
+        }
+
+        .master-data-mobile-record-toggle svg {
+            width: 16px;
+            height: 16px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: transform 140ms ease;
+        }
+
+        .master-data-mobile-record-toggle[aria-expanded="true"] svg {
+            transform: rotate(180deg);
         }
 
         .master-data-record-row-unused td {
@@ -27430,6 +27504,117 @@ img[data-deferred-src] {
             border-color: #2d8f70;
             background: #0f3328;
             color: #d1fae5;
+        }
+
+        .master-data-ingredients-table .master-data-record-row > td {
+            padding-block: 9px;
+            vertical-align: middle;
+        }
+
+        .master-data-ingredients-table .master-data-item {
+            grid-template-columns: var(--master-data-thumbnail-slot, 66px) minmax(0, 1fr) 36px;
+            gap: 10px;
+        }
+
+        .master-data-ingredients-table .master-data-item-copy {
+            gap: 3px;
+        }
+
+        .master-data-ingredients-table :is(
+            .master-data-record-form,
+            .master-data-aliases,
+            .master-data-merge-open
+        ) {
+            display: none;
+        }
+
+        .master-data-desktop-section-summary {
+            display: flex;
+            min-width: 0;
+            align-items: center;
+            gap: 7px;
+            color: #e5edf5;
+            font-size: 13px;
+            font-weight: 850;
+            line-height: 1.2;
+        }
+
+        .master-data-desktop-section-summary > span:last-child {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .master-data-desktop-section-summary .master-data-mobile-section-icon,
+        .master-data-desktop-section-summary .recipe-edit-store-section-icon {
+            display: inline-flex;
+            width: 16px;
+            height: 16px;
+            flex: 0 0 16px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .master-data-desktop-section-summary :is(svg, .recipe-edit-inline-icon) {
+            width: 16px;
+            height: 16px;
+        }
+
+        .master-data-ingredients-table
+        .master-data-record-row:not(.master-data-record-row-expanded)
+        > .master-data-store-section-cell
+        > :is(select[name="store_section"], .master-data-store-section-picker) {
+            display: none !important;
+        }
+
+        .master-data-ingredients-table .master-data-record-row-expanded td {
+            vertical-align: top;
+        }
+
+        .master-data-ingredients-table
+        .master-data-record-row-expanded
+        .master-data-item {
+            align-items: start;
+        }
+
+        .master-data-ingredients-table
+        .master-data-record-row-expanded
+        :is(.master-data-mobile-record-name, .master-data-record-normalized-summary) {
+            display: none;
+        }
+
+        .master-data-ingredients-table
+        .master-data-record-row-expanded
+        :is(.master-data-record-form, .master-data-aliases) {
+            display: grid;
+        }
+
+        .master-data-ingredients-table
+        .master-data-record-row-expanded
+        .master-data-merge-open {
+            display: inline-flex;
+            width: auto;
+            max-width: max-content;
+        }
+
+        .master-data-ingredients-table
+        .master-data-record-row-expanded
+        .master-data-desktop-section-summary {
+            display: none;
+        }
+
+        .master-data-ingredients-table
+        .master-data-record-row-expanded
+        > .master-data-store-section-cell
+        > :is(select[name="store_section"], .master-data-store-section-picker) {
+            display: block;
+        }
+
+        .master-data-ingredients-table .master-data-updated-cell time {
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
         }
 
         .master-data-duplicate-review {
@@ -30281,6 +30466,13 @@ img[data-deferred-src] {
             .master-data-ingredients-table .master-data-record-form,
             .master-data-ingredients-table .master-data-merge-open,
             .master-data-ingredients-table .master-data-aliases {
+                display: none;
+            }
+
+            .master-data-ingredients-table .master-data-record-normalized-summary,
+            .master-data-ingredients-table
+            .master-data-record-row-expanded
+            .master-data-aliases {
                 display: none;
             }
 

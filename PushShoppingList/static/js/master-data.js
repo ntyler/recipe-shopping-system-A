@@ -1162,23 +1162,29 @@
 
     function syncMasterDataMobileSectionSummary(select) {
         const row = select && select.closest(".master-data-record-row");
-        const summary = row && row.querySelector("[data-master-mobile-section-summary]");
-        if (!summary) return;
+        const summaries = row
+            ? Array.from(row.querySelectorAll(
+                "[data-master-mobile-section-summary], [data-master-desktop-section-summary]"
+            ))
+            : [];
+        if (!summaries.length) return;
 
         const selectedOption = select.options && select.options[select.selectedIndex];
         const label = selectedOption ? selectedOption.textContent.trim() : select.value;
-        summary.replaceChildren();
+        summaries.forEach((summary) => {
+            summary.replaceChildren();
 
-        if (typeof recipeIngredientStoreSectionIconHtml === "function") {
-            const icon = document.createElement("span");
-            icon.className = "master-data-mobile-section-icon";
-            icon.innerHTML = recipeIngredientStoreSectionIconHtml(select.value);
-            summary.appendChild(icon);
-        }
+            if (typeof recipeIngredientStoreSectionIconHtml === "function") {
+                const icon = document.createElement("span");
+                icon.className = "master-data-mobile-section-icon";
+                icon.innerHTML = recipeIngredientStoreSectionIconHtml(select.value);
+                summary.appendChild(icon);
+            }
 
-        const textLabel = document.createElement("span");
-        textLabel.textContent = label;
-        summary.appendChild(textLabel);
+            const textLabel = document.createElement("span");
+            textLabel.textContent = label;
+            summary.appendChild(textLabel);
+        });
     }
 
     function setMasterDataMobileRecordExpanded(row, expanded) {
@@ -1215,6 +1221,8 @@
             const toggle = row.querySelector("[data-master-mobile-record-toggle]");
             const nameInput = row.querySelector('input[name="name"]');
             const nameSummary = row.querySelector("[data-master-mobile-record-name]");
+            const normalizedInput = row.querySelector('input[name="normalized_name"]');
+            const normalizedSummary = row.querySelector("[data-master-record-normalized-summary]");
             const sectionSelect = row.querySelector("[data-master-store-section-select]");
 
             setMasterDataMobileRecordExpanded(row, false);
@@ -1223,6 +1231,11 @@
             if (nameInput && nameSummary) {
                 nameInput.addEventListener("input", () => {
                     nameSummary.textContent = nameInput.value.trim() || "Unnamed ingredient";
+                });
+            }
+            if (normalizedInput && normalizedSummary) {
+                normalizedInput.addEventListener("input", () => {
+                    normalizedSummary.textContent = normalizedInput.value.trim() || "No normalized name";
                 });
             }
 

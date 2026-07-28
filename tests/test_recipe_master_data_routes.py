@@ -367,7 +367,14 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'class="master-data-item-copy"' in all_html
     assert 'data-full-src="/static/generated/tomato.png"' in all_html
     assert all_html.index('class="master-data-thumbnail"') < all_html.index('value="Tomato"')
-    assert '<th scope="rowgroup" colspan="6">PRODUCE</th>' in all_html
+    assert '<th scope="rowgroup" colspan="5">PRODUCE</th>' in all_html
+    assert '<th scope="col">User</th>' in all_html
+    assert "master-data-table--show-user" in all_html
+    assert 'class="master-data-user-data-cell"' in all_html
+    assert 'data-master-record-normalized-summary' in all_html
+    assert 'data-master-desktop-section-summary' in all_html
+    assert '<th scope="col">Created At</th>' not in all_html
+    assert 'class="master-data-created-cell"' not in all_html
     assert "Backfill progress" in all_html
     assert "data-master-backfill-form" in all_html
     assert "data-master-reference-toggle" in all_html
@@ -419,9 +426,14 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Tomato" not in filtered_html
     assert "User B" in filtered_html
     assert "user-b@example.com" in filtered_html
+    assert '<th scope="col">User</th>' not in filtered_html
+    assert "master-data-table--show-user" not in filtered_html
+    assert 'class="master-data-user-data-cell"' not in filtered_html
+    assert '<th scope="rowgroup" colspan="4">SPICES &amp; SEASONINGS</th>' in filtered_html
     assert equipment_response.status_code == 200
     assert '<th scope="col">Item</th>' in equipment_html
     assert '<th scope="col">Equipment Type</th>' in equipment_html
+    assert 'class="master-data-created-cell"' in equipment_html
     assert '<th scope="col">Normalized Name</th>' not in equipment_html
     assert '<th scope="col">Image</th>' not in equipment_html
     assert '<th scope="rowgroup" colspan="6">COOKWARE</th>' in equipment_html
@@ -1524,6 +1536,8 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "data-master-mobile-record-name" in template
     assert "data-master-mobile-section-summary" in template
     assert "data-master-mobile-record-toggle" in template
+    assert "data-master-record-normalized-summary" in template
+    assert "data-master-desktop-section-summary" in template
     assert "data-master-mobile-reference-dialog" in template
     assert "data-master-mobile-reference-title" in template
     assert "data-master-mobile-reference-panel" in template
@@ -1535,6 +1549,8 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "function initMasterDataMobileRecords()" in script
     assert "function setMasterDataMobileRecordExpanded(row, expanded)" in script
     assert "function syncMasterDataMobileSectionSummary(select)" in script
+    assert '"[data-master-mobile-section-summary], [data-master-desktop-section-summary]"' in script
+    assert 'row.querySelector(\'input[name="normalized_name"]\')' in script
     assert "async function loadReferenceData(button, panel, options = {})" in script
     assert "function masterDataMobileReferenceElements()" in script
     assert "async function openMasterDataMobileReferences(button)" in script
@@ -1552,6 +1568,9 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert ".master-data-ingredients-table .master-data-record-row" in css
     assert ".master-data-mobile-record-toggle[aria-expanded=\"true\"] svg" in css
     assert ".master-data-record-row.master-data-record-row-expanded" in css
+    assert ".master-data-record-normalized-summary" in css
+    assert ".master-data-desktop-section-summary" in css
+    assert ".master-data-table--show-user" in css
     assert ".master-data-mobile-reference-dialog" in css
     assert ".master-data-mobile-reference-dialog::backdrop" in css
     assert ".master-data-mobile-reference-panel" in css
