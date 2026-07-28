@@ -37660,7 +37660,7 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
     });
 }
 
-const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV4";
+const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV5";
 const STORE_SECTION_MASTER_COLUMN_ORDER = [
     "order",
     "icon",
@@ -37675,6 +37675,9 @@ const STORE_SECTION_MASTER_MOBILE_COLUMNS = [
     "order",
     "icon",
     "section",
+];
+const STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS = [
+    "routing",
 ];
 const STORE_SECTION_MASTER_COLUMNS = {
     order: {
@@ -37768,7 +37771,7 @@ function initStoreSectionMasterTable() {
                 STORE_SECTION_MASTER_COLUMNS[key].fallbackWidth,
             ]),
         ),
-        hidden: [],
+        hidden: [...STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS],
     });
     const normalizeLayout = value => {
         const fallback = defaultLayout();
@@ -37792,7 +37795,7 @@ function initStoreSectionMasterTable() {
                     key => STORE_SECTION_MASTER_COLUMN_ORDER.includes(key)
                         && key !== "order",
                 )
-                : [],
+                : [...fallback.hidden],
         };
     };
     const loadLayout = () => {

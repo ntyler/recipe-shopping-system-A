@@ -2169,6 +2169,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "store_section_url" in template
     assert "Store Sections" in page
     assert "Add Store Section" in page
+    assert (
+        "Built-in sections route automatically; custom sections are assigned manually."
+        in page
+    )
     assert "Active sections" in page
     assert "Archived sections" in page
     assert "data-store-section-master-active-count" in page
@@ -2213,6 +2217,16 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "Built in" in page
     assert "Custom" in page
     assert "Routing" in page
+    routing_header = page.split(
+        'data-store-section-master-column="routing"',
+        1,
+    )[1].split("</div>", 1)[0]
+    routing_cell = page.split(
+        'data-store-section-master-cell="routing"',
+        1,
+    )[1].split(">", 1)[0]
+    assert "hidden" in routing_header
+    assert "hidden" in routing_cell
     assert "Automatic" in page
     assert "Manual only" in page
     assert "Saved assignments, routing rules, then AI fallback." in page
@@ -2234,7 +2248,7 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
     assert (
         'const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = '
-        '"storeSectionMasterColumnsV4";'
+        '"storeSectionMasterColumnsV5";'
     ) in script
     assert (
         'const STORE_SECTION_MASTER_COLUMN_ORDER = [\n'
@@ -2243,6 +2257,14 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
         '    "section",\n'
     ) in script
     assert "STORE_SECTION_MASTER_MOBILE_COLUMNS" in script
+    assert "STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS" in script
+    assert (
+        'const STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS = [\n'
+        '    "routing",\n'
+        "];"
+    ) in script
+    assert "hidden: [...STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS]" in script
+    assert ": [...fallback.hidden]" in script
     assert (
         'const STORE_SECTION_MASTER_MOBILE_COLUMNS = [\n'
         '    "order",\n'

@@ -161,7 +161,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                 <div>
                     <span>Shopping order</span>
                     <h2 id="storeSectionOrderTitle">Store Section order</h2>
-                    <p>Move sections to match the order you normally walk through the store.</p>
+                    <p>Move sections to match your store route. Built-in sections route automatically; custom sections are assigned manually.</p>
                 </div>
                 <div class="store-section-master-table-actions">
                     <span class="store-section-master-visible-count"
@@ -238,7 +238,9 @@ data-user-id="{{ master_data.scope_user_id }}"
                     <div role="columnheader" data-store-section-master-column="icon">Icon</div>
                     <div role="columnheader" data-store-section-master-column="section">Store Section</div>
                     <div role="columnheader" data-store-section-master-column="type">Section Type</div>
-                    <div role="columnheader" data-store-section-master-column="routing">Routing</div>
+                    <div role="columnheader"
+                         data-store-section-master-column="routing"
+                         hidden>Routing</div>
                     <div role="columnheader" data-store-section-master-column="usage">Usage</div>
                     <div role="columnheader" data-store-section-master-column="status">Status</div>
                     <div role="columnheader" data-store-section-master-column="actions">Actions</div>
@@ -344,6 +346,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                         <div class="store-section-master-routing"
                              role="cell"
                              data-store-section-master-cell="routing"
+                             hidden
                              title="{% if section.is_builtin %}Items enter through user-confirmed recipe choices, Ingredient Master Data, deterministic mappings and rules, existing assignments, then validated AI fallback.{% else %}AI does not automatically route items to custom sections. Assign them through Ingredient Master Data or a recipe override.{% endif %}">
                             <span class="store-section-master-routing-badge {% if section.is_builtin %}is-automatic{% else %}is-manual{% endif %}">
                                 {% if section.is_builtin %}Automatic{% else %}Manual only{% endif %}
