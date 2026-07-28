@@ -2178,6 +2178,10 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     assert "data-store-section-master-search" in page
     assert "data-store-section-master-status-filter" in page
     assert "data-store-section-master-columns-trigger" in page
+    assert "data-store-section-master-columns-fit" in page
+    assert "Fit to content" in page
+    assert "Fit columns" not in page
+    assert "the table may become wider." in page
     assert "data-store-section-master-mobile-save" in page
     assert "data-store-section-master-usage-open" in page
     assert "data-store-section-master-usage-dialog" in page

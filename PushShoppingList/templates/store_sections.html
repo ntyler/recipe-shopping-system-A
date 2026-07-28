@@ -210,8 +210,11 @@ data-user-id="{{ master_data.scope_user_id }}"
                             <div class="store-section-master-column-options"
                                  data-store-section-master-column-options></div>
                             <div class="store-section-master-column-menu-actions">
-                                <button type="button" data-store-section-master-columns-fit>
-                                    Fit columns
+                                <button type="button"
+                                        data-store-section-master-columns-fit
+                                        title="Resize visible columns to fit their content; the table may become wider."
+                                        aria-label="Fit visible column widths to their content">
+                                    Fit to content
                                 </button>
                                 <button type="button" data-store-section-master-columns-reset>
                                     Reset
