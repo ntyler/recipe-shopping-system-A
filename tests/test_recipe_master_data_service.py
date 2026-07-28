@@ -210,6 +210,122 @@ def test_store_section_definition_cannot_be_archived_while_in_use(monkeypatch, t
     assert "Reassign" in result["error"]
 
 
+def test_store_section_delete_requires_both_usage_counts_to_be_zero(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    ingredient_only_name = master_data.normalized_master_name("Ingredient-only item")
+    recipe_only_name = master_data.normalized_master_name("Recipe-only item")
+    ingredient_only = master_data.create_ingredient_store_section(
+        "Ingredient Only",
+        "basket",
+        user_id="user-a",
+    )
+    recipe_only = master_data.create_ingredient_store_section(
+        "Recipe Only",
+        "basket",
+        user_id="user-a",
+    )
+    unused = master_data.create_ingredient_store_section(
+        "Unused",
+        "basket",
+        user_id="user-a",
+    )
+    assert ingredient_only["ok"] is True
+    assert recipe_only["ok"] is True
+    assert unused["ok"] is True
+
+    master_data.sync_recipe_master_records(
+        "https://example.com/ingredient-only",
+        recipe_data={
+            "ingredients": [{
+                "ingredient": "Ingredient-only item",
+                "store_section": "Ingredient Only",
+            }],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/recipe-only",
+        recipe_data={
+            "ingredients": [{
+                "ingredient": "Recipe-only item",
+                "store_section": "Recipe Only",
+            }],
+        },
+        user_id="user-a",
+    )
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            """
+            UPDATE ingredients
+               SET store_section = ?
+             WHERE user_id = ?
+               AND normalized_name = ?
+            """,
+            (ingredient_only["section_key"], "user-a", ingredient_only_name),
+        )
+        connection.execute(
+            """
+            UPDATE recipe_ingredients
+               SET store_section = 'MISC'
+            WHERE user_id = ?
+               AND recipe_id = ?
+            """,
+            (
+                "user-a",
+                master_data.recipe_id_for_url("https://example.com/ingredient-only"),
+            ),
+        )
+        connection.execute(
+            """
+            UPDATE ingredients
+               SET store_section = 'MISC'
+             WHERE user_id = ?
+               AND normalized_name = ?
+            """,
+            ("user-a", recipe_only_name),
+        )
+        connection.execute(
+            """
+            UPDATE recipe_ingredients
+               SET store_section = ?
+             WHERE user_id = ?
+               AND recipe_id = ?
+            """,
+            (
+                recipe_only["section_key"],
+                "user-a",
+                master_data.recipe_id_for_url("https://example.com/recipe-only"),
+            ),
+        )
+
+    ingredient_only_result = master_data.update_ingredient_store_section_definition(
+        ingredient_only["id"],
+        action="delete",
+        user_id="user-a",
+    )
+    recipe_only_result = master_data.update_ingredient_store_section_definition(
+        recipe_only["id"],
+        action="delete",
+        user_id="user-a",
+    )
+    unused_result = master_data.update_ingredient_store_section_definition(
+        unused["id"],
+        action="delete",
+        user_id="user-a",
+    )
+
+    assert ingredient_only_result["ok"] is False
+    assert ingredient_only_result["status"] == 409
+    assert ingredient_only_result["ingredient_count"] == 1
+    assert ingredient_only_result["recipe_reference_count"] == 0
+    assert recipe_only_result["ok"] is False
+    assert recipe_only_result["status"] == 409
+    assert recipe_only_result["ingredient_count"] == 0
+    assert recipe_only_result["recipe_reference_count"] == 1
+    assert unused_result["ok"] is True
+    assert unused_result["deleted"] is True
+
+
 def test_store_section_usage_groups_references_by_recipe_and_workspace(
     monkeypatch,
     tmp_path,

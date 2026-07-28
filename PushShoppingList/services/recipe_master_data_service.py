@@ -1667,14 +1667,13 @@ def update_ingredient_store_section_definition(
                           FROM ingredients
                          WHERE user_id = ?
                            AND store_section = ?
-                    )
-                    +
+                    ) AS ingredient_count,
                     (
                         SELECT COUNT(*)
                           FROM recipe_ingredients
                          WHERE user_id = ?
                            AND store_section = ?
-                    ) AS usage_count
+                    ) AS recipe_reference_count
                 """,
                 (
                     scoped_user_id,
@@ -1683,11 +1682,18 @@ def update_ingredient_store_section_definition(
                     row["section_key"],
                 ),
             ).fetchone()
-            if int(usage["usage_count"] or 0) > 0:
+            ingredient_count = int(usage["ingredient_count"] or 0)
+            recipe_reference_count = int(usage["recipe_reference_count"] or 0)
+            if ingredient_count > 0 or recipe_reference_count > 0:
                 return {
                     "ok": False,
                     "status": 409,
-                    "error": "Reassign this Store Section's ingredients before deleting it.",
+                    "error": (
+                        "Reassign this Store Section's master ingredients and "
+                        "recipe references before deleting it."
+                    ),
+                    "ingredient_count": ingredient_count,
+                    "recipe_reference_count": recipe_reference_count,
                 }
             connection.execute(
                 """

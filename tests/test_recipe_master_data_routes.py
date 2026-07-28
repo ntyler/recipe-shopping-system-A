@@ -2227,8 +2227,13 @@ def test_store_section_delete_is_custom_only_and_requires_no_usage(
     assert used_response.status_code == 409
     assert (
         used_response.get_json()["error"]
-        == "Reassign this Store Section's ingredients before deleting it."
+        == (
+            "Reassign this Store Section's master ingredients and "
+            "recipe references before deleting it."
+        )
     )
+    assert used_response.get_json()["ingredient_count"] == 1
+    assert used_response.get_json()["recipe_reference_count"] == 1
     assert delete_response.status_code == 200
     assert delete_response.get_json()["ok"] is True
     assert delete_response.get_json()["deleted"] is True

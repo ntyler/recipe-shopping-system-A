@@ -249,6 +249,11 @@ data-user-id="{{ master_data.scope_user_id }}"
                 <div class="store-section-master-list" role="rowgroup">
                 {% for section in master_data.sections %}
                     {% set usage_total = section.ingredient_count + section.recipe_reference_count %}
+                    {% set can_delete = (
+                        not section.is_builtin
+                        and section.ingredient_count == 0
+                        and section.recipe_reference_count == 0
+                    ) %}
                     <form method="POST"
                           action="{{ url_for('main_bp.update_master_data_store_section_route', section_id=section.id) }}"
                           role="row"
@@ -458,7 +463,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                                         name="action"
                                         value="delete"
                                         class="danger store-section-master-delete"
-                                        {% if usage_total %}
+                                        {% if not can_delete %}
                                             disabled
                                             title="Reassign this section's ingredients and recipe references before deleting it."
                                             aria-label="Delete unavailable for {{ section.display_name }}: reassign its ingredients and recipe references first."
