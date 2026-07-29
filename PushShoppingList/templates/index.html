@@ -381,12 +381,18 @@ data-app-initial-page="{{ initial_app_page|default('') }}"
                                     <span class="app-home-import-icon">{{ shell.app_icon(recent_import.source_icon) }}</span>
                                     <span class="app-home-import-copy">
                                         <strong>{{ recent_import.title }}</strong>
-                                        {% if recent_import.count_text %}<small>{{ recent_import.count_text }}</small>{% endif %}
+                                        {% if recent_import.count_text or recent_import.result_note %}
+                                            <small>
+                                                {% if recent_import.count_text %}{{ recent_import.count_text }}{% endif %}
+                                                {% if recent_import.count_text and recent_import.result_note %}<span aria-hidden="true"> · </span>{% endif %}
+                                                {% if recent_import.result_note %}<span class="app-home-import-result-note">{{ recent_import.result_note }}</span>{% endif %}
+                                            </small>
+                                        {% endif %}
                                     </span>
                                     <span class="app-home-import-meta">
                                         {% if recent_import.time_label %}<time>{{ recent_import.time_label }}</time>{% endif %}
                                         <span class="app-home-import-status is-{{ recent_import.status }}"
-                                              aria-label="{{ recent_import.status | replace('_', ' ') | title }}"
+                                              aria-label="{{ 'Completed; recipe deleted' if recent_import.status == 'completed_recipe_deleted' else recent_import.status | replace('_', ' ') | title }}"
                                               {% if recent_import.error_message %}title="{{ recent_import.error_message }}"{% endif %}></span>
                                     </span>
                                 </button>

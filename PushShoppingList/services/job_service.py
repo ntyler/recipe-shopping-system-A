@@ -12,6 +12,7 @@ from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 
+from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import PACKAGE_DIR
 
 
@@ -33,6 +34,21 @@ ACTIVE_LIMITS_BY_KEY = {
     "recipe-import": 2,
     "media-import": 1,
 }
+RECIPE_RESULT_JOB_TYPES = {
+    "recipe-import",
+    "doc-photo-import",
+    "menu-import",
+    "menu-generate-recipes",
+    "menu-deferred-heavy-tasks",
+}
+RECIPE_RESULT_URL_LIST_KEYS = (
+    "recipe_urls",
+    "created_urls",
+    "created_recipe_urls",
+    "generated_recipe_urls",
+    "committed_recipe_urls",
+    "successful_urls",
+)
 
 JOBS_DB_PATH = Path(
     os.getenv("SHOPPING_APP_JOBS_DB", PACKAGE_DIR / "user_data" / "jobs.sqlite3")
@@ -584,14 +600,124 @@ def job_duration_details(job, reference_time=None):
     }
 
 
-def job_for_client(job, include_input=False):
+def recipe_url_from_result_link(link):
+    if not isinstance(link, dict):
+        return ""
+
+    recipe_url = _first_text(
+        link.get("recipe_url"),
+        link.get("source_url"),
+    )
+    if recipe_url:
+        return recipe_url
+
+    href = str(link.get("url") or "").strip()
+    if not href:
+        return ""
+    parsed = urlparse(href)
+    if parsed.path.rstrip("/") != "/recipe/edit":
+        return ""
+    return _first_text(*(parse_qs(parsed.query or "").get("url") or []))
+
+
+def job_recipe_result_urls(job):
+    if normalize_job_type((job or {}).get("job_type")) not in RECIPE_RESULT_JOB_TYPES:
+        return []
+
+    result = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    candidates = []
+    for key in RECIPE_RESULT_URL_LIST_KEYS:
+        values = result.get(key)
+        if isinstance(values, list):
+            candidates.extend(values)
+
+    recipes = result.get("recipes")
+    if isinstance(recipes, list):
+        candidates.extend(
+            _first_text(
+                recipe.get("recipe_url"),
+                recipe.get("source_url"),
+                recipe.get("url"),
+            )
+            for recipe in recipes
+            if isinstance(recipe, dict)
+        )
+
+    links = result.get("links")
+    if isinstance(links, list):
+        candidates.extend(recipe_url_from_result_link(link) for link in links)
+
+    urls = []
+    seen = set()
+    for candidate in candidates:
+        value = str(candidate or "").strip()
+        key = normalize_recipe_url_key(value)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        urls.append(value)
+    return urls
+
+
+def recipe_result_payload_for_client(job, existing_recipe_urls=None):
+    result = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    if existing_recipe_urls is None:
+        return result
+
+    recipe_urls = job_recipe_result_urls(job)
+    if not recipe_urls:
+        return result
+
+    existing_keys = {
+        normalize_recipe_url_key(url)
+        for url in existing_recipe_urls
+        if normalize_recipe_url_key(url)
+    }
+    deleted_urls = [
+        url
+        for url in recipe_urls
+        if normalize_recipe_url_key(url) not in existing_keys
+    ]
+    deleted_keys = {
+        normalize_recipe_url_key(url)
+        for url in deleted_urls
+        if normalize_recipe_url_key(url)
+    }
+    payload = {
+        **result,
+        "recipe_result_count": len(recipe_urls),
+        "available_recipe_result_count": len(recipe_urls) - len(deleted_urls),
+        "deleted_recipe_count": len(deleted_urls),
+        "deleted_recipe_urls": deleted_urls,
+    }
+
+    links = result.get("links")
+    if isinstance(links, list):
+        payload["links"] = [
+            {
+                **link,
+                "recipe_deleted": (
+                    normalize_recipe_url_key(recipe_url_from_result_link(link)) in deleted_keys
+                ),
+            }
+            if isinstance(link, dict) and recipe_url_from_result_link(link)
+            else link
+            for link in links
+        ]
+    return payload
+
+
+def job_for_client(job, include_input=False, existing_recipe_urls=None):
     if not job:
         return None
 
     input_payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
     model_details = job_model_details(job)
     duration_details = job_duration_details(job)
-    result_payload = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    result_payload = recipe_result_payload_for_client(
+        job,
+        existing_recipe_urls=existing_recipe_urls,
+    )
     progress_percent = max(0, min(100, int(job.get("progress_percent") or 0)))
     status = normalize_status(job.get("status"))
     current_stage = str(result_payload.get("current_stage") or "").strip()

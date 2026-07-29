@@ -12762,12 +12762,24 @@ body {
             font-weight: 700;
         }
 
+        .bulk-progress-item.deleted {
+            border-left: 3px solid #d97706;
+            background: rgba(120, 53, 15, 0.16);
+        }
+
+        .bulk-progress-item.deleted .bulk-skip-reason,
+        .bulk-progress-text.deleted {
+            color: #fde68a;
+            font-weight: 700;
+        }
+
         .bulk-progress-text.failed {
             color: #fecaca;
         }
 
         .bulk-progress-source-detail,
-        .bulk-progress-failure-flag {
+        .bulk-progress-failure-flag,
+        .bulk-progress-deleted-flag {
             display: inline-flex;
             align-items: center;
             min-height: 20px;
@@ -12789,6 +12801,12 @@ body {
             border: 1px solid #ef4444;
             background: #450a0a;
             color: #fecaca;
+        }
+
+        .bulk-progress-deleted-flag {
+            border: 1px solid #d97706;
+            background: #451a03;
+            color: #fde68a;
         }
 
 
@@ -24882,6 +24900,46 @@ img[data-deferred-src] {
             color: #fecaca;
         }
 
+        .job-activity-deleted-result-summary {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 6px;
+            width: fit-content;
+            padding: 6px 9px;
+            border: 1px solid #a16207;
+            border-radius: 7px;
+            background: rgba(120, 53, 15, 0.22);
+            color: #fde68a;
+            font-size: 0.8rem;
+        }
+
+        .job-activity-deleted-result-summary strong {
+            color: #fef3c7;
+        }
+
+        .job-activity-result-deleted {
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            color: #94a3b8;
+        }
+
+        .job-activity-result-deleted > span {
+            text-decoration: line-through;
+            text-decoration-thickness: 1px;
+        }
+
+        .job-activity-result-deleted > strong {
+            padding: 2px 7px;
+            border: 1px solid #a16207;
+            border-radius: 999px;
+            color: #fde68a;
+            font-size: 0.75rem;
+            text-decoration: none;
+        }
+
         .job-activity-step,
         .job-activity-current-recipe,
         .job-activity-meta {
@@ -36823,6 +36881,11 @@ img[data-deferred-src] {
         line-height: 1.25;
     }
 
+    .app-home-import-copy .app-home-import-result-note {
+        color: var(--app-warning);
+        font-weight: 700;
+    }
+
     .app-home-import-meta {
         display: inline-flex;
         align-items: center;
@@ -36853,12 +36916,14 @@ img[data-deferred-src] {
     }
 
     .app-home-import-status.is-completed_with_warnings,
+    .app-home-import-status.is-completed_recipe_deleted,
     .app-home-import-status.is-failed,
     .app-home-import-status.is-cancelled {
         background: var(--app-warning-soft);
         color: var(--app-warning);
     }
 
+    .app-home-import-status.is-completed_recipe_deleted::before,
     .app-home-import-status.is-failed::before,
     .app-home-import-status.is-cancelled::before {
         content: "!";

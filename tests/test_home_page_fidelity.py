@@ -221,6 +221,7 @@ def test_home_recent_import_rows_use_real_counts_timestamps_and_statuses():
             "status": "completed",
             "source_icon": "link",
             "error_message": "",
+            "result_note": "",
         },
         {
             "job_id": "running-job",
@@ -230,8 +231,48 @@ def test_home_recent_import_rows_use_real_counts_timestamps_and_statuses():
             "status": "running",
             "source_icon": "document",
             "error_message": "",
+            "result_note": "",
         },
     ]
+
+
+def test_home_recent_import_rows_mark_deleted_results_without_changing_job_history():
+    rows = main_routes.home_recent_import_rows([{
+        "id": "deleted-recipe-job",
+        "job_type": "recipe-import",
+        "status": "completed",
+        "completed_items": 1,
+        "failed_items": 0,
+        "result_payload": {
+            "recipe_urls": ["https://example.test/corn-spoon-bread"],
+            "deleted_recipe_count": 1,
+            "deleted_recipe_urls": ["https://example.test/corn-spoon-bread"],
+        },
+        "source_items": [{"label": "https://example.test/corn-spoon-bread/"}],
+        "completed_at": "2026-07-10T10:00:00Z",
+    }], reference_time=datetime(2026, 7, 10, 12, 0, tzinfo=timezone.utc))
+
+    assert rows[0]["job_id"] == "deleted-recipe-job"
+    assert rows[0]["count_text"] == "1 recipe imported"
+    assert rows[0]["status"] == "completed_recipe_deleted"
+    assert rows[0]["result_note"] == "Recipe deleted"
+
+
+def test_deleted_import_result_ui_marks_history_and_disables_recipe_result_links():
+    template = read_text("PushShoppingList/templates/index.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert "app-home-import-result-note" in template
+    assert "completed_recipe_deleted" in template
+    assert "function renderJobDeletedRecipeSummary" in script
+    assert "function renderJobResultLink" in script
+    assert 'link.recipe_deleted' in script
+    assert "Imported successfully · Recipe deleted" in script
+    assert "bulk-progress-deleted-flag" in script
+    assert ".job-activity-result-deleted" in css
+    assert ".app-home-import-status.is-completed_recipe_deleted" in css
+    assert ".bulk-progress-item.deleted" in css
 
 
 def test_home_template_has_right_aligned_favorite_without_overflow_action():
@@ -246,6 +287,7 @@ def test_home_template_has_right_aligned_favorite_without_overflow_action():
     assert "app-home-recipe-menu" not in home
     assert "openHomeRecentImport" in home
     assert "home_recent_imports" in home
+    assert "app-home-import-result-note" in home
     assert "app-home-panel-title" in home
     assert 'recipe.rating_stars | default("☆☆☆☆☆", true)' in home
     assert "Unrated recipe" in home

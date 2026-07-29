@@ -36,6 +36,7 @@ from PushShoppingList.services.recipe_extract_service import resolve_menu_model
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
+from PushShoppingList.services.recipe_url_service import load_recipe_urls_for_owner
 from PushShoppingList.services.ollama_service import OLLAMA_BASE_URL_ENV_VAR
 from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_BATCH_SIZE_ENV_VAR
 from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_MODEL_ENV_VAR
@@ -69,6 +70,17 @@ def actor_context():
         "guest_session_id": guest_session_id,
         "is_admin": is_admin_user(user),
     }
+
+
+def job_for_request_client(job, include_input=False):
+    return job_for_client(
+        job,
+        include_input=include_input,
+        existing_recipe_urls=load_recipe_urls_for_owner(
+            user_id=(job or {}).get("user_id") or "",
+            guest_session_id=(job or {}).get("guest_session_id") or "",
+        ),
+    )
 
 
 def json_payload():
@@ -205,7 +217,7 @@ def create_and_enqueue(job_type, payload, total_items=0):
     response = {
         "ok": bool(queue_result.get("ok")),
         "job_id": job["id"],
-        "job": job_for_client(job),
+        "job": job_for_request_client(job),
         "queue": {
             key: value
             for key, value in queue_result.items()
@@ -556,7 +568,7 @@ def resume_job_route(job_id):
     return jsonify({
         "ok": bool(queue_result.get("ok")),
         "job_id": resumed["id"],
-        "job": job_for_client(resumed),
+        "job": job_for_request_client(resumed),
         "remaining_count": len(remaining_urls),
         "resumed_from_job_id": job_id,
         "queue": {
@@ -794,7 +806,10 @@ def job_status_route(job_id):
     job, error_response = job_access_or_404(job_id)
     if error_response:
         return error_response
-    return jsonify({"ok": True, "job": job_for_client(job, include_input=actor_context()["is_admin"])})
+    return jsonify({
+        "ok": True,
+        "job": job_for_request_client(job, include_input=actor_context()["is_admin"]),
+    })
 
 
 @job_bp.route("/api/jobs/recent", methods=["GET", "DELETE"])
@@ -822,7 +837,7 @@ def recent_jobs_route():
     )
     return jsonify({
         "ok": True,
-        "jobs": [job_for_client(job, include_input=include_all) for job in jobs],
+        "jobs": [job_for_request_client(job, include_input=include_all) for job in jobs],
         "scope": "all" if include_all else "mine",
         "is_admin": actor["is_admin"],
         "deleted_count": deleted_count,
@@ -837,7 +852,7 @@ def cancel_job_route(job_id):
 
     cancel_queued_rq_job(job.get("rq_job_id"))
     job = cancel_job(job_id)
-    return jsonify({"ok": True, "job": job_for_client(job)})
+    return jsonify({"ok": True, "job": job_for_request_client(job)})
 
 
 @job_bp.route("/api/jobs/<job_id>/retry", methods=["POST"])
@@ -862,7 +877,7 @@ def retry_job_route(job_id):
     return jsonify({
         "ok": bool(queue_result.get("ok")),
         "job_id": retry["id"],
-        "job": job_for_client(retry),
+        "job": job_for_request_client(retry),
         "queue": {
             key: value
             for key, value in queue_result.items()

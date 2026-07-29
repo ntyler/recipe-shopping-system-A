@@ -691,7 +691,14 @@ def shell_context(active_public_user=None):
     home_recent_imports = []
     if actor_user_id or actor_guest_session_id:
         home_recent_imports = home_recent_import_rows([
-            job_for_client(job)
+            job_for_client(
+                job,
+                existing_recipe_urls=[
+                    recipe.get("url")
+                    for recipe in recipe_urls
+                    if isinstance(recipe, dict) and recipe.get("url")
+                ],
+            )
             for job in recent_jobs(
                 user_id=actor_user_id,
                 guest_session_id=actor_guest_session_id,
@@ -2972,6 +2979,27 @@ def home_import_success_count(job):
     return max(0, int(job.get("completed_items") or 0))
 
 
+def home_import_deleted_count(job):
+    result = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    deleted_urls = result.get("deleted_recipe_urls")
+    if isinstance(deleted_urls, list):
+        return len(deleted_urls)
+    return max(0, int(result.get("deleted_recipe_count") or 0))
+
+
+def home_import_count_text(count, count_noun):
+    count = max(0, int(count or 0))
+    noun = str(count_noun or "").strip()
+    if count == 1:
+        singular_nouns = {
+            "recipes imported": "recipe imported",
+            "recipes extracted": "recipe extracted",
+            "menu items extracted": "menu item extracted",
+        }
+        noun = singular_nouns.get(noun, noun)
+    return f"{count} {noun}".strip()
+
+
 def home_recent_import_rows(jobs, limit=3, reference_time=None):
     rows = []
     for job in jobs or []:
@@ -2981,9 +3009,12 @@ def home_recent_import_rows(jobs, limit=3, reference_time=None):
             continue
         status = str(job.get("status") or "").strip().lower()
         completed_count = home_import_success_count(job)
+        deleted_count = home_import_deleted_count(job)
         failed_count = max(0, int(job.get("failed_items") or 0))
         if status == "completed" and failed_count:
             status = "failed" if not completed_count else "completed_with_warnings"
+        if status in {"completed", "completed_with_warnings"} and deleted_count:
+            status = "completed_recipe_deleted"
         timestamp = (
             job.get("completed_at")
             or job.get("finished_at")
@@ -2992,7 +3023,7 @@ def home_recent_import_rows(jobs, limit=3, reference_time=None):
         )
         count_text = ""
         if completed_count:
-            count_text = f"{completed_count} {config['count_noun']}"
+            count_text = home_import_count_text(completed_count, config["count_noun"])
         elif status in {"queued", "running", "cancel_requested"}:
             total_items = max(0, int(job.get("total_items") or 0))
             count_text = (
@@ -3002,6 +3033,11 @@ def home_recent_import_rows(jobs, limit=3, reference_time=None):
             )
         elif status in {"failed", "cancelled"}:
             count_text = "Import failed" if status == "failed" else "Import cancelled"
+        result_note = ""
+        if deleted_count == 1:
+            result_note = "Recipe deleted"
+        elif deleted_count > 1:
+            result_note = f"{deleted_count} imported recipes deleted"
         rows.append({
             "job_id": str(job.get("id") or job.get("job_id") or ""),
             "title": home_import_source_title(job, config["fallback_title"]),
@@ -3010,6 +3046,7 @@ def home_recent_import_rows(jobs, limit=3, reference_time=None):
             "status": status or "queued",
             "source_icon": config["icon"],
             "error_message": clean_display_text(job.get("error_message")),
+            "result_note": result_note,
         })
         if len(rows) >= max(1, int(limit or 3)):
             break

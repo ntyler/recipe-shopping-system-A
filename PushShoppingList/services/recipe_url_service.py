@@ -5,8 +5,10 @@ from threading import Lock
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
 
+from PushShoppingList.services.storage_service import guest_data_root
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.storage_service import scoped_package_path
+from PushShoppingList.services.storage_service import user_data_root
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,15 +22,30 @@ def load_recipe_urls():
     return read_recipe_urls()
 
 
-def read_recipe_urls():
-    if not URLS_FILE.exists():
+def read_recipe_urls_file(path):
+    if not path.exists():
         return []
 
     return [
         line.strip()
-        for line in URLS_FILE.read_text(encoding="utf-8").splitlines()
+        for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+
+
+def read_recipe_urls():
+    return read_recipe_urls_file(URLS_FILE)
+
+
+def load_recipe_urls_for_owner(user_id="", guest_session_id=""):
+    guest_session_id = str(guest_session_id or "").strip()
+    user_id = str(user_id or "").strip()
+
+    if guest_session_id:
+        return read_recipe_urls_file(guest_data_root(guest_session_id) / "urls.txt")
+    if user_id:
+        return read_recipe_urls_file(user_data_root(user_id) / "urls.txt")
+    return load_recipe_urls()
 
 
 def save_recipe_urls(urls):

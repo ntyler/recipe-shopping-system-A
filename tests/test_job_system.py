@@ -100,6 +100,55 @@ def test_job_routes_create_and_scope_jobs_to_owner(monkeypatch, tmp_path):
         assert hidden.status_code == 404
 
 
+def test_recent_job_route_marks_missing_recipe_result_for_its_owner(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    deleted_url = "https://example.com/corn-spoon-bread"
+    available_url = "https://example.com/still-available"
+    job = job_service.create_job(
+        "recipe-import",
+        input_payload={"urls": [deleted_url, available_url]},
+        user_id="owner",
+        total_items=2,
+    )
+    job_service.complete_job(
+        job["id"],
+        result_payload={
+            "recipe_urls": [deleted_url, available_url],
+            "links": [
+                {
+                    "label": "Corn Spoon Bread",
+                    "url": f"/recipe/edit?url={deleted_url}",
+                    "recipe_url": deleted_url,
+                },
+                {
+                    "label": "Still available",
+                    "url": f"/recipe/edit?url={available_url}",
+                    "recipe_url": available_url,
+                },
+            ],
+        },
+    )
+    urls_file = storage_service.user_data_root("owner") / "urls.txt"
+    urls_file.write_text(f"{available_url}\n", encoding="utf-8")
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner"
+        response = client.get(
+            "/api/jobs/recent",
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    returned_job = response.get_json()["jobs"][0]
+    assert returned_job["status"] == "completed"
+    assert returned_job["result_payload"]["deleted_recipe_urls"] == [deleted_url]
+    assert returned_job["result_payload"]["links"][0]["recipe_deleted"] is True
+    assert returned_job["result_payload"]["links"][1]["recipe_deleted"] is False
+
+
 def test_job_queue_debug_route_returns_readiness(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -257,6 +306,49 @@ def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_p
     ]
     assert "input_payload" not in payload
     assert str(upload_path) not in str(payload)
+
+
+def test_job_for_client_marks_deleted_recipe_results_without_rewriting_completed_job():
+    deleted_url = "https://example.com/corn-spoon-bread/"
+    available_url = "https://example.com/still-available"
+    job = {
+        "id": "completed-import",
+        "job_type": "recipe-import",
+        "status": "completed",
+        "current_step": "Completed",
+        "progress_percent": 100,
+        "completed_items": 2,
+        "result_payload": {
+            "recipe_urls": [deleted_url, available_url],
+            "links": [
+                {
+                    "label": "Corn Spoon Bread",
+                    "url": "/recipe/edit?url=https%3A%2F%2Fexample.com%2Fcorn-spoon-bread%2F",
+                    "recipe_url": deleted_url,
+                },
+                {
+                    "label": "Still available",
+                    "url": "/recipe/edit?url=https%3A%2F%2Fexample.com%2Fstill-available",
+                    "recipe_url": available_url,
+                },
+            ],
+        },
+    }
+
+    payload = job_service.job_for_client(
+        job,
+        existing_recipe_urls=[f"{available_url}/"],
+    )
+
+    assert payload["status"] == "completed"
+    assert payload["current_step"] == "Completed"
+    assert payload["result_payload"]["recipe_result_count"] == 2
+    assert payload["result_payload"]["available_recipe_result_count"] == 1
+    assert payload["result_payload"]["deleted_recipe_count"] == 1
+    assert payload["result_payload"]["deleted_recipe_urls"] == [deleted_url]
+    assert payload["result_payload"]["links"][0]["recipe_deleted"] is True
+    assert payload["result_payload"]["links"][1]["recipe_deleted"] is False
+    assert "deleted_recipe_urls" not in job["result_payload"]
 
 
 def test_job_for_client_includes_duration_details():

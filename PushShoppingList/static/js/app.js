@@ -2769,6 +2769,84 @@ function jobResultLinks(job) {
     return Array.isArray(result.links) ? result.links : [];
 }
 
+function normalizedJobRecipeResultUrl(value) {
+    return String(value || "").trim().replace(/\/+$/, "").toLowerCase();
+}
+
+function jobDeletedRecipeUrlSet(job) {
+    const result = jobResultPayload(job);
+    const urls = Array.isArray(result.deleted_recipe_urls)
+        ? result.deleted_recipe_urls
+        : [];
+    return new Set(urls.map(normalizedJobRecipeResultUrl).filter(Boolean));
+}
+
+function jobDeletedRecipeCount(job) {
+    const result = jobResultPayload(job);
+    const explicitCount = Number(result.deleted_recipe_count);
+    if (Number.isFinite(explicitCount) && explicitCount > 0) {
+        return Math.floor(explicitCount);
+    }
+    return jobDeletedRecipeUrlSet(job).size;
+}
+
+function jobRecipeResultIsDeleted(job, recipeUrl) {
+    const key = normalizedJobRecipeResultUrl(recipeUrl);
+    return Boolean(key && jobDeletedRecipeUrlSet(job).has(key));
+}
+
+function jobResultLinkIsDeleted(job, link) {
+    if (!link || typeof link !== "object") {
+        return false;
+    }
+    return Boolean(
+        link.recipe_deleted
+        || jobRecipeResultIsDeleted(job, link.recipe_url || link.source_url || "")
+    );
+}
+
+function renderJobResultLink(job, link, fallbackLabel = "Open result") {
+    if (!link || typeof link !== "object") {
+        return "";
+    }
+
+    const href = String(link.url || "").trim();
+    const label = String(link.label || href || fallbackLabel).trim();
+    if (jobResultLinkIsDeleted(job, link)) {
+        return `
+            <span class="job-activity-result-deleted" aria-label="${escapeAttribute(`${label}; recipe deleted`)}">
+                <span>${escapeHtml(label)}</span>
+                <strong>Recipe deleted</strong>
+            </span>
+        `;
+    }
+
+    if (!href) {
+        return `<span>${escapeHtml(label)}</span>`;
+    }
+
+    const external = /^https?:\/\//i.test(href);
+    return `<a href="${escapeAttribute(href)}"${external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${escapeHtml(label)}</a>`;
+}
+
+function renderJobDeletedRecipeSummary(job) {
+    const deletedCount = jobDeletedRecipeCount(job);
+    if (!deletedCount) {
+        return "";
+    }
+
+    const label = deletedCount === 1 ? "Recipe deleted" : `${deletedCount} recipes deleted`;
+    const detail = deletedCount === 1
+        ? "The imported recipe was deleted after this job completed."
+        : `${deletedCount} imported recipe results were deleted after this job completed.`;
+    return `
+        <div class="job-activity-deleted-result-summary" role="status">
+            <strong>${escapeHtml(label)}</strong>
+            <span>${escapeHtml(detail)}</span>
+        </div>
+    `;
+}
+
 function jobSourceItems(job) {
     return Array.isArray(job && job.source_items)
         ? job.source_items.filter(item => item && (item.label || item.url))
@@ -3468,12 +3546,7 @@ function renderJobPassedSummary(job, itemFilter = jobActivityItemFilter) {
         `;
     });
     const linkCards = linkFallbacks.map(link => {
-        const href = String(link.url || "").trim();
-        const external = /^https?:\/\//i.test(href);
-        const title = String(link.label || href || "Completed item").trim();
-        const titleHtml = href
-            ? `<a href="${escapeAttribute(href)}"${external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${escapeHtml(title)}</a>`
-            : `<span>${escapeHtml(title)}</span>`;
+        const titleHtml = renderJobResultLink(job, link, "Completed item");
         return `
             <div class="job-activity-passed-card">
                 <div class="job-activity-passed-heading">${titleHtml}</div>
@@ -3548,7 +3621,8 @@ function jobRecipePopupUrls(job) {
         ...links.map(link => link && (link.recipe_url || link.source_url || link.url)),
     ];
 
-    return uniqueRecipeUrls(candidates.map(jobRecipePopupCandidateUrl).filter(Boolean));
+    return uniqueRecipeUrls(candidates.map(jobRecipePopupCandidateUrl).filter(Boolean))
+        .filter(url => !jobRecipeResultIsDeleted(job, url));
 }
 
 function jobPopupRecipeUrl(job) {
@@ -3614,7 +3688,8 @@ function menuEnrichmentRecipeUrls(job) {
         result.committed_recipe_urls,
         jobResultLinks(job).map(link => link && link.recipe_url),
     ];
-    return uniqueRecipeUrls(candidates.flatMap(items => Array.isArray(items) ? items : []));
+    return uniqueRecipeUrls(candidates.flatMap(items => Array.isArray(items) ? items : []))
+        .filter(url => !jobRecipeResultIsDeleted(job, url));
 }
 
 function menuEnrichmentAlreadyQueuedForJob(job) {
@@ -4464,6 +4539,8 @@ function renderJobActivityRow(job, index = 0) {
     const workerHtml = renderJobWorkerDetails(job);
     const stageCountsHtml = renderJobStageCounts(job);
     const currentRecipeHtml = renderJobCurrentRecipe(job);
+    const deletedRecipeSummaryHtml = renderJobDeletedRecipeSummary(job);
+    const deletedRecipeCount = jobDeletedRecipeCount(job);
     const durationHtml = renderJobDuration(job);
     const timestampHtml = renderJobActivityTimestamps(job);
     const active = jobIsActive(job);
@@ -4476,6 +4553,7 @@ function renderJobActivityRow(job, index = 0) {
         active ? "job-activity-active" : "",
         index === 0 ? "job-activity-primary-row" : "",
         failureSummaryHtml ? "job-activity-has-failures" : "",
+        deletedRecipeSummaryHtml ? "job-activity-has-deleted-result" : "",
         itemFilter !== "all" ? `job-activity-item-filter-${escapeAttribute(itemFilter)}` : "",
         !detailsExpanded ? "job-activity-row-details-collapsed" : "",
     ].filter(Boolean).join(" ");
@@ -4507,13 +4585,9 @@ function renderJobActivityRow(job, index = 0) {
         ? `<button type="button" class="job-activity-row-action danger" onclick="return cancelJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Cancel</button>`
         : "";
     const linkHtml = links.length
-        ? `<div class="job-activity-links">${links.map(link => {
-            const href = String(link.url || "").trim();
-            const external = /^https?:\/\//i.test(href);
-            return href
-                ? `<a href="${escapeAttribute(href)}"${external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${escapeHtml(link.label || "Open result")}</a>`
-                : "";
-        }).join("")}</div>`
+        ? `<div class="job-activity-links">${links.map(link => (
+            renderJobResultLink(job, link)
+        )).join("")}</div>`
         : "";
     const displayedWarnings = failureSummaryHtml || itemFilter === "passed" ? nonItemWarnings : warnings;
     const warningHtml = displayedWarnings.length
@@ -4529,6 +4603,7 @@ function renderJobActivityRow(job, index = 0) {
                         <span class="job-activity-status">${escapeHtml(jobStatusLabel(job.status))}</span>
                     </div>
                     <div class="job-activity-step">${escapeHtml(job.current_step || "Queued")}</div>
+                    ${deletedRecipeSummaryHtml}
                     ${currentRecipeHtml}
                     ${modelHtml}
                     ${workerHtml}
@@ -4541,6 +4616,7 @@ function renderJobActivityRow(job, index = 0) {
                         ${countText ? `<span>${escapeHtml(countText)}</span>` : ""}
                         ${sourceCount ? `<span>${escapeHtml(String(sourceCount))} source${sourceCount === 1 ? "" : "s"}</span>` : ""}
                         ${links.length ? `<span>${escapeHtml(String(links.length))} result${links.length === 1 ? "" : "s"}</span>` : ""}
+                        ${deletedRecipeCount ? `<span>${escapeHtml(String(deletedRecipeCount))} recipe result${deletedRecipeCount === 1 ? "" : "s"} deleted</span>` : ""}
                     </div>
                     ${timestampHtml}
                     ${error ? `<div class="job-activity-error">${escapeHtml(error)}</div>` : ""}
@@ -54721,6 +54797,7 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
     const completed = jobStatus === "completed";
     const completedItems = Math.max(0, Number((job && job.completed_items) || 0));
     const failedItems = Math.max(0, Number((job && job.failed_items) || 0));
+    const deletedRecipeUrls = jobDeletedRecipeUrlSet(job || {});
     const sourceUrls = Array.isArray(urls) ? urls : [];
     const sourceItems = jobSourceItems(job || {});
     const sourceRecords = sourceItems.length
@@ -54741,10 +54818,13 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
         let state = "waiting";
         let message = job && job.current_step ? job.current_step : "Queued";
         const itemFailure = isMenuExtract ? menuFailureForSource(source, failureMap) : null;
+        const deleted = deletedRecipeUrls.has(
+            normalizedJobRecipeResultUrl(source.recipe_url || source.url)
+        );
 
         if (completed) {
             state = "done";
-            message = "Completed";
+            message = deleted ? "Imported successfully · Recipe deleted" : "Completed";
         } else if (failed) {
             state = "failed";
             message = (job && job.error_message) || "Import failed.";
@@ -54780,12 +54860,14 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
             state,
             message,
             failed: Boolean(itemFailure),
+            deleted,
             failed_step: itemFailure ? String(itemFailure.stage || "").trim() : "",
             failed_message: itemFailure ? menuFailureMessage(itemFailure) : "",
         };
     });
 
     const result = jobResultPayload(job || {});
+    const deletedRecipeCount = jobDeletedRecipeCount(job || {});
     const stubCount = Number(result.stubs_created || 0);
     const createdCount = Number(result.created_count || completedItems || 0);
     const megaSnapshotCount = Number(result.menu_mega_json_snapshots_created || (result.menu_mega_json_saved ? 1 : 0));
@@ -54805,7 +54887,7 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
     const totalItems = Math.max(sourceRecords.length, Number((job && job.total_items) || 0));
     const currentStage = String((job && job.current_stage) || result.current_stage || "").trim();
     const stageLabel = String((job && job.stage_label) || result.stage_label || (job && job.current_step) || "").trim();
-    const summary = completed
+    const baseSummary = completed
         ? (resultSummary || (
             followupLabel
                 ? `Menu basic import complete. Background ${followupLabel} queued.`
@@ -54817,6 +54899,13 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
         : failed
             ? ((job && job.error_message) || "Import finished with errors.")
             : (isMenuExtract && active ? runningSummary : ((job && job.current_step) || "Import is running in the background."));
+    const summary = completed && deletedRecipeCount
+        ? `${baseSummary} ${
+            deletedRecipeCount === 1
+                ? "The imported recipe was later deleted."
+                : `${deletedRecipeCount} imported recipes were later deleted.`
+        }`
+        : baseSummary;
 
     return {
         active,
@@ -55179,6 +55268,9 @@ function buildExtractionSourceProgressRow(item, index) {
     if (item.failed || item.state === "failed") {
         row.classList.add("failed");
     }
+    if (item.deleted) {
+        row.classList.add("deleted");
+    }
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
@@ -55214,6 +55306,10 @@ function buildExtractionSourceProgressRow(item, index) {
         text.classList.add("done");
     }
 
+    if (item.deleted) {
+        text.classList.add("deleted");
+    }
+
     if (item.state === "cancelled") {
         text.classList.add("cancelled");
     }
@@ -55231,6 +55327,14 @@ function buildExtractionSourceProgressRow(item, index) {
         detail.className = "bulk-progress-source-detail";
         detail.textContent = item.detail;
         titleLine.appendChild(detail);
+    }
+
+    if (item.deleted) {
+        const deletedFlag = document.createElement("span");
+        deletedFlag.className = "bulk-progress-deleted-flag";
+        deletedFlag.textContent = "Recipe deleted";
+        deletedFlag.title = "This recipe was deleted after the import completed.";
+        titleLine.appendChild(deletedFlag);
     }
 
     const failureMessage = item.failed_message || (item.failed || item.state === "failed" ? item.message : "");
