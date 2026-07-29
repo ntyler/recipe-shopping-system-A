@@ -270,6 +270,8 @@ def test_deleted_import_result_ui_marks_history_and_disables_recipe_result_links
     assert 'link.recipe_deleted' in script
     assert "Imported successfully · Recipe deleted" in script
     assert "bulk-progress-deleted-flag" in script
+    assert "PDF deleted with recipe" in script
+    assert "pdf_result_status" in script
     assert ".job-activity-result-deleted" in css
     assert ".app-home-import-status.is-completed_recipe_deleted" in css
     assert ".bulk-progress-item.deleted" in css

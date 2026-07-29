@@ -119,6 +119,7 @@ from PushShoppingList.services.recipe_edit_service import PDF_KIND_GENERATED_REC
 from PushShoppingList.services.recipe_edit_service import PDF_KIND_WEBPAGE_BACKUP
 from PushShoppingList.services.recipe_edit_service import normalize_recipe_pdf_storage_metadata
 from PushShoppingList.services.recipe_edit_service import save_recipe_output
+from PushShoppingList.services.recipe_edit_service import delete_generated_recipe_pdf_for_recipe_deletion
 from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.product_selection_service import store_price_cells_for_item
 from PushShoppingList.services.rules_display_service import load_rules_display
@@ -4580,13 +4581,28 @@ def delete_cookbook_route(cookbook_id):
     return jsonify({"ok": True})
 
 
+def generated_pdf_cleanup_warnings(recipe_urls):
+    warnings = []
+    for recipe_url in recipe_urls or []:
+        cleanup = delete_generated_recipe_pdf_for_recipe_deletion(recipe_url)
+        if cleanup.get("ok"):
+            continue
+        warnings.append(
+            cleanup.get("error")
+            or f"The generated PDF for {recipe_url} could not be fully removed."
+        )
+    return warnings
+
+
 @main_bp.route("/api/cookbooks/<cookbook_id>/purge", methods=["DELETE"])
 def purge_cookbook_route(cookbook_id):
+    cleanup_warnings = []
     try:
         recipe_urls = delete_cookbook_and_purge_recipe_urls(cookbook_id)
         for recipe_url in recipe_urls:
             remove_recipe_and_unused_ingredients(recipe_url)
             remove_recipe_url(recipe_url)
+        cleanup_warnings = generated_pdf_cleanup_warnings(recipe_urls)
     except ValueError as err:
         status = 400 if "cannot be purged" in str(err).lower() else 404
         return jsonify({"ok": False, "error": str(err)}), status
@@ -4596,10 +4612,13 @@ def purge_cookbook_route(cookbook_id):
             "error": str(exc) or "Unable to purge cookbook.",
         }), 500
 
-    return jsonify({
+    response = {
         "ok": True,
         "purged_recipe_count": len(recipe_urls),
-    })
+    }
+    if cleanup_warnings:
+        response["warnings"] = cleanup_warnings
+    return jsonify(response)
 
 
 @main_bp.route("/api/cookbooks/<cookbook_id>/purge_recipes", methods=["POST"])
@@ -4615,6 +4634,7 @@ def purge_cookbook_recipes_route(cookbook_id):
             "error": "Type PURGE to confirm purging cookbook recipes.",
         }), 400
 
+    cleanup_warnings = []
     try:
         cookbook = find_cookbook(load_cookbooks(), cookbook_id)
         unclassified_purge = is_unclassified_cookbook(cookbook)
@@ -4625,6 +4645,7 @@ def purge_cookbook_recipes_route(cookbook_id):
             for recipe_url in recipe_urls:
                 remove_recipe_and_unused_ingredients(recipe_url)
                 remove_recipe_url(recipe_url)
+            cleanup_warnings = generated_pdf_cleanup_warnings(recipe_urls)
     except ValueError as err:
         status = 400 if "unclassified" in str(err).lower() else 404
         return jsonify({"ok": False, "error": str(err)}), status
@@ -4634,10 +4655,13 @@ def purge_cookbook_recipes_route(cookbook_id):
             "error": str(exc) or "Unable to purge cookbook recipes.",
         }), 500
 
-    return jsonify({
+    response = {
         "ok": True,
         "purged_recipe_count": len(recipe_urls),
-    })
+    }
+    if cleanup_warnings:
+        response["warnings"] = cleanup_warnings
+    return jsonify(response)
 
 
 def selected_cookbook_recipe_urls_from_request():
@@ -4681,6 +4705,7 @@ def remove_selected_cookbook_recipes_route(cookbook_id):
 
 @main_bp.route("/api/cookbooks/<cookbook_id>/purge_selected_recipes", methods=["POST"])
 def purge_selected_cookbook_recipes_route(cookbook_id):
+    cleanup_warnings = []
     try:
         recipe_urls = purge_selected_cookbook_recipe_urls(
             cookbook_id,
@@ -4689,6 +4714,7 @@ def purge_selected_cookbook_recipes_route(cookbook_id):
         for recipe_url in recipe_urls:
             remove_recipe_and_unused_ingredients(recipe_url)
             remove_recipe_url(recipe_url)
+        cleanup_warnings = generated_pdf_cleanup_warnings(recipe_urls)
     except ValueError as err:
         return jsonify({"ok": False, "error": str(err)}), 400
     except Exception as exc:
@@ -4697,10 +4723,13 @@ def purge_selected_cookbook_recipes_route(cookbook_id):
             "error": str(exc) or "Unable to purge selected cookbook recipes.",
         }), 500
 
-    return jsonify({
+    response = {
         "ok": True,
         "purged_recipe_count": len(recipe_urls),
-    })
+    }
+    if cleanup_warnings:
+        response["warnings"] = cleanup_warnings
+    return jsonify(response)
 
 
 @main_bp.route("/api/cookbooks/<cookbook_id>/rename", methods=["POST"])

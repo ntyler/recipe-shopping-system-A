@@ -41,6 +41,13 @@ def test_fetch_remove_recipe_returns_json_without_redirect(monkeypatch, tmp_path
         "remove_recipe_url",
         lambda url: calls.append(("url", url)),
     )
+    monkeypatch.setattr(
+        recipe_routes,
+        "delete_generated_recipe_pdf_for_recipe_deletion",
+        lambda url: (_ for _ in ()).throw(
+            AssertionError("Removing from current recipes must retain the generated PDF.")
+        ),
+    )
 
     with app.test_client() as client:
         configure_signed_in_user(monkeypatch, tmp_path, client)
@@ -261,6 +268,11 @@ def test_fetch_purge_recipe_returns_json_without_redirect(monkeypatch, tmp_path)
         "remove_recipe_url",
         lambda url: calls.append(("url", url)),
     )
+    monkeypatch.setattr(
+        recipe_routes,
+        "delete_generated_recipe_pdf_for_recipe_deletion",
+        lambda url: calls.append(("generated_pdf", url)) or {"ok": True},
+    )
 
     with app.test_client() as client:
         configure_signed_in_user(monkeypatch, tmp_path, client)
@@ -276,7 +288,46 @@ def test_fetch_purge_recipe_returns_json_without_redirect(monkeypatch, tmp_path)
         ("cookbooks", "https://example.com/soup"),
         ("ingredients", "https://example.com/soup"),
         ("url", "https://example.com/soup"),
+        ("generated_pdf", "https://example.com/soup"),
     ]
+
+
+def test_fetch_purge_recipe_reports_generated_pdf_cleanup_warning(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    monkeypatch.setattr(recipe_routes, "purge_recipe_from_all_cookbooks", lambda url: None)
+    monkeypatch.setattr(recipe_routes, "remove_recipe_and_unused_ingredients", lambda url: None)
+    monkeypatch.setattr(recipe_routes, "remove_recipe_url", lambda url: None)
+    monkeypatch.setattr(
+        recipe_routes,
+        "delete_generated_recipe_pdf_for_recipe_deletion",
+        lambda url: {
+            "ok": False,
+            "had_pdf": True,
+            "error": "Cloudflare R2 delete failed.",
+        },
+    )
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.post(
+            "/purge_recipe",
+            data={"url": "https://example.com/soup"},
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "ok": True,
+        "redirect_url": "/",
+        "warnings": ["Cloudflare R2 delete failed."],
+        "pdf_cleanup": {
+            "ok": False,
+            "had_pdf": True,
+            "error": "Cloudflare R2 delete failed.",
+        },
+    }
 
 
 def test_fetch_purge_cookbook_reuses_recipe_cleanup(monkeypatch, tmp_path):
@@ -303,6 +354,11 @@ def test_fetch_purge_cookbook_reuses_recipe_cleanup(monkeypatch, tmp_path):
         "remove_recipe_url",
         lambda url: calls.append(("url", url)),
     )
+    monkeypatch.setattr(
+        main_routes,
+        "delete_generated_recipe_pdf_for_recipe_deletion",
+        lambda url: calls.append(("generated_pdf", url)) or {"ok": True},
+    )
 
     with app.test_client() as client:
         configure_signed_in_user(monkeypatch, tmp_path, client)
@@ -319,6 +375,8 @@ def test_fetch_purge_cookbook_reuses_recipe_cleanup(monkeypatch, tmp_path):
         ("url", "https://example.com/chili"),
         ("ingredients", "https://example.com/soup"),
         ("url", "https://example.com/soup"),
+        ("generated_pdf", "https://example.com/chili"),
+        ("generated_pdf", "https://example.com/soup"),
     ]
 
 

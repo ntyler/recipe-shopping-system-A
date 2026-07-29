@@ -24918,6 +24918,16 @@ img[data-deferred-src] {
             color: #fef3c7;
         }
 
+        .job-activity-deleted-result-summary.is-cleanup-failed {
+            border-color: #b91c1c;
+            background: rgba(127, 29, 29, 0.22);
+            color: #fecaca;
+        }
+
+        .job-activity-deleted-result-summary.is-cleanup-failed strong {
+            color: #fee2e2;
+        }
+
         .job-activity-result-deleted {
             display: inline-flex;
             flex-wrap: wrap;
@@ -24938,6 +24948,11 @@ img[data-deferred-src] {
             color: #fde68a;
             font-size: 0.75rem;
             text-decoration: none;
+        }
+
+        .job-activity-result-deleted.is-cleanup-failed > strong {
+            border-color: #b91c1c;
+            color: #fecaca;
         }
 
         .job-activity-step,

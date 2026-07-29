@@ -49,6 +49,10 @@ RECIPE_RESULT_URL_LIST_KEYS = (
     "committed_recipe_urls",
     "successful_urls",
 )
+RECIPE_PDF_JOB_TYPES = {
+    "create-recipe-pdf",
+    "upload-generated-pdf",
+}
 
 JOBS_DB_PATH = Path(
     os.getenv("SHOPPING_APP_JOBS_DB", PACKAGE_DIR / "user_data" / "jobs.sqlite3")
@@ -705,6 +709,94 @@ def recipe_result_payload_for_client(job, existing_recipe_urls=None):
             for link in links
         ]
     return payload
+
+
+def job_recipe_reference_url(job):
+    job = job if isinstance(job, dict) else {}
+    input_payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
+    result_payload = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    return _first_text(
+        input_payload.get("recipe_url"),
+        input_payload.get("url"),
+        input_payload.get("source_url"),
+        result_payload.get("recipe_url"),
+        result_payload.get("url"),
+        result_payload.get("source_url"),
+    )
+
+
+def mark_recipe_pdf_result_cleanup(
+    recipe_url,
+    cleanup_result,
+    user_id="",
+    guest_session_id="",
+):
+    recipe_key = normalize_recipe_url_key(recipe_url)
+    if not recipe_key:
+        return 0
+
+    cleanup_result = cleanup_result if isinstance(cleanup_result, dict) else {}
+    cleanup_ok = bool(cleanup_result.get("ok"))
+    cleanup_error = str(cleanup_result.get("error") or "").strip()
+    result_status = "deleted_with_recipe" if cleanup_ok else "cleanup_failed"
+    deleted_at = now_iso()
+    owner_clause, owner_args = owner_where_clause(
+        user_id=user_id,
+        guest_session_id=guest_session_id,
+    )
+    placeholders = ", ".join("?" for _ in RECIPE_PDF_JOB_TYPES)
+
+    with jobs_connection() as connection:
+        rows = connection.execute(
+            f"""
+            SELECT *
+              FROM jobs
+             WHERE {owner_clause}
+               AND job_type IN ({placeholders})
+            """,
+            (*owner_args, *sorted(RECIPE_PDF_JOB_TYPES)),
+        ).fetchall()
+        updated_count = 0
+
+        for row in rows:
+            job = row_to_job(row)
+            if normalize_recipe_url_key(job_recipe_reference_url(job)) != recipe_key:
+                continue
+
+            result_payload = (
+                job.get("result_payload")
+                if isinstance(job.get("result_payload"), dict)
+                else {}
+            )
+            next_payload = {
+                **result_payload,
+                "pdf_result_status": result_status,
+                "pdf_deleted_with_recipe": cleanup_ok,
+                "pdf_deleted_with_recipe_at": deleted_at if cleanup_ok else "",
+                "pdf_cleanup_error": cleanup_error if not cleanup_ok else "",
+                "pdf_cleanup_attempted_at": deleted_at,
+            }
+            links = result_payload.get("links")
+            if isinstance(links, list):
+                next_payload["links"] = [
+                    {
+                        **link,
+                        "pdf_result_status": result_status,
+                        "pdf_deleted_with_recipe": cleanup_ok,
+                        "pdf_cleanup_error": cleanup_error if not cleanup_ok else "",
+                    }
+                    if isinstance(link, dict)
+                    else link
+                    for link in links
+                ]
+
+            connection.execute(
+                "UPDATE jobs SET result_payload = ? WHERE id = ?",
+                (json_dumps(next_payload), job.get("id") or ""),
+            )
+            updated_count += 1
+
+    return updated_count
 
 
 def job_for_client(job, include_input=False, existing_recipe_urls=None):

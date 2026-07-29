@@ -109,6 +109,7 @@ from PushShoppingList.services.food_review_alternative_service import suggest_fo
 from PushShoppingList.services.recipe_edit_service import create_new_recipe
 from PushShoppingList.services.recipe_edit_service import create_editable_recipe_pdf
 from PushShoppingList.services.recipe_edit_service import delete_editable_recipe_pdf
+from PushShoppingList.services.recipe_edit_service import delete_generated_recipe_pdf_for_recipe_deletion
 from PushShoppingList.services.recipe_edit_service import decide_recipe_categories_with_chatgpt
 from PushShoppingList.services.recipe_edit_service import estimate_recipe_nutrition
 from PushShoppingList.services.recipe_edit_service import editable_recipe_ingredient_reference_name
@@ -4649,17 +4650,33 @@ def purge_recipe_route():
         flash(message, "error")
         return redirect("/")
 
+    pdf_cleanup = {}
     try:
         purge_recipe_from_all_cookbooks(url)
         remove_recipe_and_unused_ingredients(url)
         remove_recipe_url(url)
+        pdf_cleanup = delete_generated_recipe_pdf_for_recipe_deletion(url)
     except Exception as exc:
         if wants_json:
             return jsonify({"ok": False, "error": str(exc) or "Unable to purge recipe."}), 500
         raise
 
     if wants_json:
-        return jsonify({"ok": True, "redirect_url": "/"})
+        response = {"ok": True, "redirect_url": "/"}
+        if pdf_cleanup and not pdf_cleanup.get("ok"):
+            response["warnings"] = [
+                pdf_cleanup.get("error")
+                or "The recipe was deleted, but its generated PDF could not be fully removed."
+            ]
+            response["pdf_cleanup"] = pdf_cleanup
+        return jsonify(response)
+
+    if pdf_cleanup and not pdf_cleanup.get("ok"):
+        flash(
+            pdf_cleanup.get("error")
+            or "The recipe was deleted, but its generated PDF could not be fully removed.",
+            "warning",
+        )
 
     return redirect("/")
 

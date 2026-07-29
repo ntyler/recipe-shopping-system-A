@@ -2805,6 +2805,15 @@ function jobResultLinkIsDeleted(job, link) {
     );
 }
 
+function jobPdfResultStatus(job, link = null) {
+    const result = jobResultPayload(job);
+    return String(
+        (link && link.pdf_result_status)
+        || result.pdf_result_status
+        || ""
+    ).trim().toLowerCase();
+}
+
 function renderJobResultLink(job, link, fallbackLabel = "Open result") {
     if (!link || typeof link !== "object") {
         return "";
@@ -2812,6 +2821,19 @@ function renderJobResultLink(job, link, fallbackLabel = "Open result") {
 
     const href = String(link.url || "").trim();
     const label = String(link.label || href || fallbackLabel).trim();
+    const pdfResultStatus = jobPdfResultStatus(job, link);
+    if (pdfResultStatus === "deleted_with_recipe" || pdfResultStatus === "cleanup_failed") {
+        const deletedLabel = pdfResultStatus === "cleanup_failed"
+            ? "PDF cleanup failed"
+            : "PDF deleted with recipe";
+        return `
+            <span class="job-activity-result-deleted${pdfResultStatus === "cleanup_failed" ? " is-cleanup-failed" : ""}"
+                  aria-label="${escapeAttribute(`${label}; ${deletedLabel.toLowerCase()}`)}">
+                <span>${escapeHtml(label)}</span>
+                <strong>${escapeHtml(deletedLabel)}</strong>
+            </span>
+        `;
+    }
     if (jobResultLinkIsDeleted(job, link)) {
         return `
             <span class="job-activity-result-deleted" aria-label="${escapeAttribute(`${label}; recipe deleted`)}">
@@ -2830,6 +2852,26 @@ function renderJobResultLink(job, link, fallbackLabel = "Open result") {
 }
 
 function renderJobDeletedRecipeSummary(job) {
+    const pdfResultStatus = jobPdfResultStatus(job);
+    if (pdfResultStatus === "deleted_with_recipe") {
+        return `
+            <div class="job-activity-deleted-result-summary" role="status">
+                <strong>PDF deleted with recipe</strong>
+                <span>The completed PDF job is retained as history, but its generated file was removed.</span>
+            </div>
+        `;
+    }
+    if (pdfResultStatus === "cleanup_failed") {
+        const result = jobResultPayload(job);
+        const error = String(result.pdf_cleanup_error || "The generated PDF could not be fully removed.").trim();
+        return `
+            <div class="job-activity-deleted-result-summary is-cleanup-failed" role="alert">
+                <strong>PDF cleanup failed</strong>
+                <span>${escapeHtml(error)}</span>
+            </div>
+        `;
+    }
+
     const deletedCount = jobDeletedRecipeCount(job);
     if (!deletedCount) {
         return "";
@@ -3634,7 +3676,7 @@ function jobPopupRecipeUrl(job) {
 }
 
 function jobCanOpenRecipePopup(job) {
-    return Boolean(jobPopupRecipeUrl(job));
+    return !jobPdfResultStatus(job) && Boolean(jobPopupRecipeUrl(job));
 }
 
 function jobIsMenuProgressJob(job) {
@@ -44231,7 +44273,10 @@ async function confirmDeleteRecipeFromEditor(button, event = null) {
     }
 
     const label = title || "this recipe";
-    const shouldDelete = window.confirm(`Delete ${label}? This will remove it from the recipe log and shopping list.`);
+    const shouldDelete = window.confirm(
+        `Permanently delete ${label}? This removes it from current recipes and every cookbook, `
+        + "and deletes its generated PDF locally and from Cloudflare."
+    );
 
     if (!shouldDelete) {
         closeRecipeEditRowMenus();
@@ -44250,16 +44295,23 @@ async function confirmDeleteRecipeFromEditor(button, event = null) {
         const formData = new FormData();
         formData.append("url", url);
 
-        const response = await fetch("/remove_recipe", {
+        const response = await fetch("/purge_recipe", {
             method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
             body: formData,
         });
 
-        if (!response.ok) {
-            throw new Error("Unable to delete recipe.");
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to delete recipe.");
+        }
+        if (Array.isArray(data.warnings) && data.warnings.length) {
+            window.alert(data.warnings.join("\n"));
         }
 
-        window.location.href = "/";
+        window.location.href = data.redirect_url || "/";
     } catch (err) {
         console.warn("Unable to delete recipe from editor.", err);
         setRecipeEditStatus(err.message || "Unable to delete recipe.", true);
@@ -48359,7 +48411,7 @@ async function deleteRecipeEditorPdf(button) {
         return false;
     }
 
-    if (!confirm("Delete this recipe PDF?")) {
+    if (!confirm("Delete this recipe PDF locally and from Cloudflare?")) {
         return false;
     }
 
@@ -48390,8 +48442,8 @@ async function deleteRecipeEditorPdf(button) {
             generated_cloudflare_pdf_url: data.generated_cloudflare_pdf_url || "",
             pdf_available: false,
         });
-        setRecipeEditStatus("PDF deleted.");
-        showRecipeQuantityUpdatedMessage("", "", "", "Recipe PDF deleted.");
+        setRecipeEditStatus("PDF deleted locally and from Cloudflare.");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe PDF deleted locally and from Cloudflare.");
     } catch (err) {
         console.warn("Unable to delete recipe PDF.", err);
         setRecipeEditStatus(err.message || "Unable to delete PDF.", true);

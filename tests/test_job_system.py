@@ -351,6 +351,46 @@ def test_job_for_client_marks_deleted_recipe_results_without_rewriting_completed
     assert "deleted_recipe_urls" not in job["result_payload"]
 
 
+def test_pdf_cleanup_marks_completed_job_result_without_reordering_history(
+    monkeypatch,
+    tmp_path,
+):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://example.com/corn-spoon-bread"
+    job = job_service.create_job(
+        "create-recipe-pdf",
+        input_payload={"recipe_url": recipe_url},
+        user_id="owner",
+        total_items=1,
+    )
+    job = job_service.complete_job(
+        job["id"],
+        result_payload={
+            "url": recipe_url,
+            "links": [{
+                "label": "Open PDF",
+                "url": "https://public.example.com/corn-spoon-bread.pdf",
+            }],
+        },
+    )
+    original_updated_at = job["updated_at"]
+
+    updated_count = job_service.mark_recipe_pdf_result_cleanup(
+        recipe_url,
+        {"ok": True},
+        user_id="owner",
+    )
+    updated = job_service.get_job(job["id"])
+
+    assert updated_count == 1
+    assert updated["status"] == "completed"
+    assert updated["updated_at"] == original_updated_at
+    assert updated["result_payload"]["pdf_result_status"] == "deleted_with_recipe"
+    assert updated["result_payload"]["pdf_deleted_with_recipe"] is True
+    assert updated["result_payload"]["links"][0]["pdf_result_status"] == "deleted_with_recipe"
+    assert updated["result_payload"]["links"][0]["pdf_deleted_with_recipe"] is True
+
+
 def test_job_for_client_includes_duration_details():
     job = {
         "id": "job-duration",

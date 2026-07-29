@@ -6237,7 +6237,44 @@ def delete_editable_recipe_pdf(url):
     if not url:
         return {"ok": False, "error": "Recipe URL is required."}
 
+    recipe_data = load_recipe_output(url) or {}
     pdf_path = recipe_pdf_path(url, PDF_KIND_GENERATED_RECIPE)
+    pdf_info = editable_recipe_pdf_kind_info(
+        url,
+        recipe_data=recipe_data,
+        pdf_kind=PDF_KIND_GENERATED_RECIPE,
+    )
+    public_url = str(pdf_info.get("public_url") or "").strip()
+    object_key = str(pdf_info.get("object_key") or "").strip()
+    local_pdf_available = pdf_path.exists()
+    had_pdf = bool(local_pdf_available or public_url or object_key)
+
+    if not object_key and public_url:
+        try:
+            object_key = cloudflare_r2_storage.object_key_for_pdf(pdf_path)
+        except cloudflare_r2_storage.CloudflareR2StorageError:
+            object_key = ""
+
+    cloud_delete_result = {}
+    if object_key:
+        cloud_delete_result = cloudflare_r2_storage.delete_pdf(object_key)
+        if not cloud_delete_result.get("ok"):
+            return {
+                "ok": False,
+                "error": (
+                    cloud_delete_result.get("error")
+                    or "Unable to delete the generated PDF from Cloudflare R2."
+                ),
+                "url": url,
+                "had_pdf": had_pdf,
+                "pdf_path": str(pdf_path),
+                "pdf_available": bool(local_pdf_available or public_url),
+                "pdf_public_url": public_url,
+                "pdf_object_key": object_key,
+                "cloud_pdf_deleted": False,
+                "local_pdf_deleted": False,
+                "cloudflare_delete": cloud_delete_result,
+            }
 
     try:
         pdf_path.unlink(missing_ok=True)
@@ -6246,17 +6283,25 @@ def delete_editable_recipe_pdf(url):
             "ok": False,
             "error": "Close the PDF before deleting it.",
             "url": url,
+            "had_pdf": had_pdf,
             "pdf_path": str(pdf_path),
             "pdf_available": pdf_path.exists(),
+            "pdf_public_url": "",
+            "pdf_object_key": object_key,
+            "cloud_pdf_deleted": bool(object_key),
+            "local_pdf_deleted": False,
+            "cloudflare_delete": cloud_delete_result,
         }
 
-    recipe_data = load_recipe_output(url) or {}
     if recipe_data:
         recipe_data["generated_pdf_path"] = ""
         recipe_data["generated_cloudflare_pdf_url"] = ""
         recipe_data["generated_cloudflare_pdf_path"] = ""
         recipe_data["generated_recipe_pdf_path"] = ""
         recipe_data["generated_recipe_pdf_url"] = ""
+        recipe_data["generated_recipe_pdf_object_key"] = ""
+        recipe_data["generated_recipe_pdf_uploaded_at"] = ""
+        recipe_data["generated_recipe_pdf_status"] = ""
         pdf_metadata = recipe_data.get("pdf") if isinstance(recipe_data.get("pdf"), dict) else {}
         pdf_metadata.pop(PDF_KIND_GENERATED_RECIPE, None)
         recipe_data["pdf"] = pdf_metadata
@@ -6267,11 +6312,45 @@ def delete_editable_recipe_pdf(url):
     return {
         "ok": True,
         "url": url,
+        "had_pdf": had_pdf,
         "pdf_path": str(pdf_path),
         "pdf_available": False,
+        "pdf_public_url": "",
+        "pdf_object_key": object_key,
+        "cloud_pdf_deleted": bool(object_key),
+        "local_pdf_deleted": local_pdf_available,
+        "cloudflare_delete": cloud_delete_result,
         "generated_pdf_path": "",
         "generated_cloudflare_pdf_url": "",
         "generated_cloudflare_pdf_path": "",
+    }
+
+
+def delete_generated_recipe_pdf_for_recipe_deletion(
+    url,
+    user_id="",
+    guest_session_id="",
+):
+    result = delete_editable_recipe_pdf(url)
+    if not result.get("had_pdf"):
+        return {
+            **result,
+            "job_records_updated": 0,
+        }
+
+    from PushShoppingList.services.job_service import mark_recipe_pdf_result_cleanup
+
+    updated_count = mark_recipe_pdf_result_cleanup(
+        url,
+        result,
+        user_id=str(user_id or active_user_id() or "").strip(),
+        guest_session_id=str(
+            guest_session_id or active_guest_session_id() or ""
+        ).strip(),
+    )
+    return {
+        **result,
+        "job_records_updated": updated_count,
     }
 
 
