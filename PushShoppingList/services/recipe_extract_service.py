@@ -5090,6 +5090,52 @@ def is_forbidden_response(exc):
     return response is not None and response.status_code == 403
 
 
+def is_chrome_driver_version_mismatch(exc):
+    message = str(exc or "").strip().lower()
+    return (
+        "session not created" in message
+        and "chromedriver only supports chrome version" in message
+        and "current browser version is" in message
+    )
+
+
+def selenium_managed_chrome_service(force_refresh=False):
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.common.selenium_manager import SeleniumManager
+
+    manager_args = [
+        "--browser",
+        "chrome",
+        "--skip-driver-in-path",
+    ]
+    if force_refresh:
+        manager_args.append("--clear-metadata")
+
+    paths = SeleniumManager().binary_paths(manager_args)
+    driver_path = str(paths.get("driver_path") or "").strip()
+    if not driver_path:
+        raise RuntimeError("Selenium Manager did not return a ChromeDriver path.")
+    return Service(executable_path=driver_path)
+
+
+def create_selenium_managed_chrome_driver(options):
+    from selenium import webdriver
+
+    try:
+        service = selenium_managed_chrome_service()
+        return webdriver.Chrome(service=service, options=options)
+    except Exception as exc:
+        if not is_chrome_driver_version_mismatch(exc):
+            raise
+
+        print(
+            "[ChromeDriver] Version mismatch detected. "
+            "Refreshing Selenium driver metadata and retrying once."
+        )
+        refreshed_service = selenium_managed_chrome_service(force_refresh=True)
+        return webdriver.Chrome(service=refreshed_service, options=options)
+
+
 def create_headless_chrome_driver(
     window_size="1365,900",
     prefer_undetected=True,
@@ -5124,10 +5170,13 @@ def create_headless_chrome_driver(
             if not headless:
                 options.add_argument("--start-maximized")
             return uc.Chrome(options=options, use_subprocess=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            if is_chrome_driver_version_mismatch(exc):
+                print(
+                    "[ChromeDriver] Undetected ChromeDriver is stale. "
+                    "Falling back to Selenium's managed driver."
+                )
 
-    from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
 
     options = Options()
@@ -5144,7 +5193,7 @@ def create_headless_chrome_driver(
         options.add_argument("--no-default-browser-check")
     if not headless:
         options.add_argument("--start-maximized")
-    return webdriver.Chrome(options=options)
+    return create_selenium_managed_chrome_driver(options)
 
 
 def wait_for_browser_document(driver, timeout_seconds=8):
