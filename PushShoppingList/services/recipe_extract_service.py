@@ -2737,6 +2737,7 @@ def build_structured_ingredients(raw_ingredients):
             "optional": "optional" in original_text.lower(),
             "store_section": store_section,
             "store_section_order": STORE_SECTION_ORDER[store_section],
+            "substitutions": parsed.get("substitutions") or [],
         }
         normalize_ingredient_unit_fields(ingredient_row)
         ingredient_rows.append(ingredient_row)
@@ -2751,13 +2752,120 @@ def parse_structured_ingredient_line(original_text):
     preparation = extract_preparation(text)
     text_without_prep = remove_preparation_text(text, preparation)
     quantity, unit, remainder = split_quantity_unit(text_without_prep)
-    ingredient = normalize_ingredient_for_shopping_list(remainder or text_without_prep)
+    inline_form_choice = parse_inline_ingredient_form_choice(
+        remainder or text_without_prep,
+        quantity=quantity,
+        unit=unit,
+        original_text=text,
+    )
+    substitutions = []
+    if inline_form_choice:
+        ingredient = inline_form_choice["ingredient"]
+        preparation = clean_preparation_text(
+            ", ".join(
+                part
+                for part in (
+                    inline_form_choice["primary_preparation"],
+                    preparation,
+                )
+                if part
+            )
+        )
+        substitutions = [inline_form_choice["substitution"]]
+    else:
+        ingredient = normalize_ingredient_for_shopping_list(remainder or text_without_prep)
 
     return {
         "quantity": quantity,
         "unit": unit,
         "ingredient": ingredient,
         "preparation": preparation,
+        "substitutions": substitutions,
+    }
+
+
+INLINE_INGREDIENT_FORM_CHOICES = (
+    "fresh",
+    "frozen",
+)
+
+
+def parse_inline_ingredient_form_choice(value, quantity=None, unit=None, original_text=""):
+    """Parse a choice between forms of one grocery item.
+
+    A source line such as ``1 cup fresh or frozen corn`` describes one required
+    ingredient, not two grocery items named "fresh" and "frozen corn". Keep the
+    first form on the main row and expose the second form through the editor's
+    existing Alternatives UI.
+    """
+    text = clean_recipe_text(value)
+    if not text:
+        return None
+
+    form_pattern = "|".join(
+        re.escape(choice)
+        for choice in INLINE_INGREDIENT_FORM_CHOICES
+    )
+    match = re.match(
+        rf"^(?P<primary>{form_pattern})\s+or\s+"
+        rf"(?P<alternative>{form_pattern})\s+"
+        rf"(?P<ingredient>.+)$",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+
+    primary_preparation = clean_preparation_text(match.group("primary"))
+    alternative_preparation = clean_preparation_text(match.group("alternative"))
+    if (
+        not primary_preparation
+        or not alternative_preparation
+        or primary_preparation == alternative_preparation
+    ):
+        return None
+
+    ingredient = normalize_ingredient_for_shopping_list(match.group("ingredient"))
+    if not ingredient or re.search(r"\s+or\s+", ingredient, flags=re.IGNORECASE):
+        return None
+
+    alternative_label = f"{alternative_preparation} {ingredient}".strip()
+    alternative_slug = re.sub(
+        r"[^a-z0-9]+",
+        "-",
+        normalize_ingredient_key(alternative_label),
+    ).strip("-")
+    alternative_original_text = " ".join(
+        clean_recipe_text(part)
+        for part in (
+            quantity,
+            unit,
+            alternative_preparation,
+            ingredient,
+        )
+        if clean_recipe_text(part)
+    )
+    source_text = clean_recipe_text(original_text or text)
+
+    return {
+        "ingredient": ingredient,
+        "primary_preparation": primary_preparation,
+        "substitution": {
+            "alternative_id": f"inline-form-{alternative_slug}",
+            "alternative_order": 0,
+            "alternative_component_order": 0,
+            "alternative_label": alternative_label,
+            "ingredient": ingredient,
+            "quantity": clean_recipe_text(quantity),
+            "unit": clean_recipe_text(unit),
+            "preparation": alternative_preparation,
+            "original_text": alternative_original_text,
+            "source_note": source_text,
+            "optional": True,
+            "preferred": False,
+            "confidence": "high",
+            "inferred": False,
+        },
     }
 
 
@@ -7117,6 +7225,8 @@ ALTERNATIVE INGREDIENT RULES:
 - If one ingredient line gives a choice using "or", keep it as ONE ingredient object when the alternatives are substitutes for each other.
 - Do NOT put the second alternative's quantity or unit inside the ingredient name.
 - The ingredient field should contain only the alternative grocery item names joined by " OR ".
+- Exception for two forms of the SAME grocery item: for "1 cup fresh or frozen corn", use ingredient = "corn", quantity = "1", unit = "cup", and preparation = "fresh". Add one substitutions entry for ingredient = "corn", quantity = "1", unit = "cup", and preparation = "frozen".
+- Never return an ingredient name that begins with "OR".
 - If the alternatives have different quantities or units, put the complete quantity choices in quantity and set unit to null.
 - Preserve the full original line in original_text.
 - Assign the store_section for the best primary grocery placement.
@@ -9746,6 +9856,74 @@ def normalize_ingredient_substitutions(value, parent_item=None):
     return normalized
 
 
+def repair_inline_form_choice_ingredient(item, parsed=None):
+    """Repair a malformed inline form choice on an imported ingredient row."""
+    if not isinstance(item, dict):
+        return False
+
+    raw_ingredient = clean_recipe_text(
+        item.get("ingredient")
+        or item.get("name")
+        or item.get("parsed_name")
+        or ""
+    )
+    if not inline_form_choice_ingredient_needs_repair(raw_ingredient):
+        return False
+
+    parsed = parsed if isinstance(parsed, dict) else parse_structured_ingredient_line(
+        item.get("original_text") or ""
+    )
+    if not parsed.get("ingredient") or not parsed.get("substitutions"):
+        return False
+
+    item["ingredient"] = parsed["ingredient"]
+    item["parsed_name"] = parsed["ingredient"]
+    item["normalized_name"] = parsed["ingredient"]
+    item["preparation"] = parsed["preparation"]
+    for shopping_field in (
+        "purchasable_item",
+        "buy_as",
+        "purchase_group",
+    ):
+        item[shopping_field] = parsed["ingredient"]
+
+    existing_substitutions = (
+        item.get("substitutions")
+        or item.get("substitution_options")
+        or item.get("alternatives")
+        or []
+    )
+    existing_substitutions = flatten_ingredient_substitution_alternatives(
+        existing_substitutions
+    )
+    existing_substitution_keys = {
+        (
+            normalize_ingredient_key(
+                substitution_option_name(option)
+            ),
+            normalize_ingredient_key(
+                option.get("preparation") if isinstance(option, dict) else ""
+            ),
+        )
+        for option in existing_substitutions
+    }
+    item["substitutions"] = [
+        *existing_substitutions,
+        *[
+            option
+            for option in parsed["substitutions"]
+            if (
+                normalize_ingredient_key(
+                    substitution_option_name(option)
+                ),
+                normalize_ingredient_key(option.get("preparation")),
+            )
+            not in existing_substitution_keys
+        ],
+    ]
+    return True
+
+
 def substitution_note_sections(recipe_notes):
     sections = normalize_recipe_note_sections(recipe_notes)
     rows = []
@@ -9941,6 +10119,7 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
             "unit": None,
             "ingredient": "",
             "preparation": "",
+            "substitutions": [],
         }
 
         if not original_text:
@@ -9971,6 +10150,8 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
 
                 if not current_ingredient or current_ingredient == normalize_ingredient_for_shopping_list(original_text):
                     item["ingredient"] = parsed["ingredient"]
+
+            repair_inline_form_choice_ingredient(item, parsed=parsed)
 
         # Deterministic normalization is the final authority after source/AI
         # parsing. It never converts quantities or invents a missing unit.
@@ -16656,6 +16837,14 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation
 
 def normalize_ingredient_key(text):
     return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+
+def inline_form_choice_ingredient_needs_repair(value):
+    key = normalize_ingredient_key(value)
+    return bool(
+        key.startswith("or ")
+        or re.search(r"\s+or\s+", key, flags=re.IGNORECASE)
+    )
 
 
 def normalize_ingredient_for_shopping_list(text):

@@ -74,6 +74,127 @@ def test_field_placement_examples_are_deterministic(source, expected):
         assert row.get(key, "") == value
 
 
+def test_fresh_or_frozen_form_choice_parses_as_one_ingredient_with_an_alternative():
+    row = parse_structured_ingredient_line("1 cup fresh or frozen corn")
+
+    assert row["quantity"] == "1"
+    assert row["unit"] == "cup"
+    assert row["ingredient"] == "corn"
+    assert row["preparation"] == "fresh"
+    assert len(row["substitutions"]) == 1
+
+    alternative = row["substitutions"][0]
+    assert alternative["ingredient"] == "corn"
+    assert alternative["quantity"] == "1"
+    assert alternative["unit"] == "cup"
+    assert alternative["preparation"] == "frozen"
+    assert alternative["alternative_label"] == "frozen corn"
+    assert alternative["source_note"] == "1 cup fresh or frozen corn"
+
+
+def test_import_repairs_leading_or_form_choice_and_keeps_cream_style_corn_separate():
+    recipe = {
+        "ingredients": [
+            {
+                "original_text": "14 ounce canned cream-style corn",
+                "ingredient": "canned cream-style corn",
+                "quantity": "14",
+                "unit": "ounce",
+                "substitutions": [],
+            },
+            {
+                "original_text": "1 cup fresh or frozen corn",
+                "ingredient": "OR frozen corn",
+                "preparation": "fresh",
+                "quantity": "1",
+                "unit": "cup",
+                "substitutions": [],
+            },
+        ],
+    }
+
+    normalize_extracted_ingredient_fields(
+        recipe,
+        source_text="\n".join(
+            item["original_text"]
+            for item in recipe["ingredients"]
+        ),
+    )
+
+    assert len(recipe["ingredients"]) == 2
+    assert recipe["ingredients"][0]["ingredient"] == "canned cream-style corn"
+    assert recipe["ingredients"][0]["substitutions"] == []
+
+    corn = recipe["ingredients"][1]
+    assert corn["ingredient"] == "corn"
+    assert corn["parsed_name"] == "corn"
+    assert corn["normalized_name"] == "corn"
+    assert corn["preparation"] == "fresh"
+    assert corn["store_section"] == "PRODUCE"
+    assert len(corn["substitutions"]) == 1
+
+    frozen = corn["substitutions"][0]
+    assert frozen["ingredient"] == "corn"
+    assert frozen["quantity"] == "1"
+    assert frozen["unit"] == "cup"
+    assert frozen["preparation"] == "frozen"
+    assert frozen["store_section"] == "FROZEN"
+    assert frozen["alternative_label"] == "frozen corn"
+
+
+def test_import_does_not_duplicate_an_existing_frozen_form_alternative():
+    recipe = {
+        "ingredients": [{
+            "original_text": "1 cup fresh or frozen corn",
+            "ingredient": "fresh OR frozen corn",
+            "quantity": "1",
+            "unit": "cup",
+            "substitutions": [{
+                "alternative_id": "source-frozen-corn",
+                "ingredient": "corn",
+                "quantity": "1",
+                "unit": "cup",
+                "preparation": "frozen",
+            }],
+        }],
+    }
+
+    normalize_extracted_ingredient_fields(
+        recipe,
+        source_text="1 cup fresh or frozen corn",
+    )
+
+    corn = recipe["ingredients"][0]
+    assert corn["ingredient"] == "corn"
+    assert corn["preparation"] == "fresh"
+    assert len(corn["substitutions"]) == 1
+    assert corn["substitutions"][0]["alternative_id"] == "source-frozen-corn"
+
+
+def test_editor_display_repairs_an_already_saved_leading_or_form_choice(monkeypatch):
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "recipe_edit_ingredient_master_lookup",
+        lambda *args, **kwargs: {},
+    )
+
+    rows = recipe_edit_service.normalize_edit_ingredients([{
+        "original_text": "1 cup fresh or frozen corn",
+        "ingredient": "OR frozen corn",
+        "quantity": "1",
+        "unit": "cup",
+        "preparation": "fresh",
+        "substitutions": [],
+    }])
+
+    assert len(rows) == 1
+    assert rows[0]["ingredient"] == "corn"
+    assert rows[0]["preparation"] == "fresh"
+    assert len(rows[0]["substitutions"]) == 1
+    assert rows[0]["substitutions"][0]["ingredient"] == "corn"
+    assert rows[0]["substitutions"][0]["preparation"] == "frozen"
+
+
 def test_forbidden_values_are_relocated_and_unknown_units_are_preserved_for_review(caplog):
     size = normalize_ingredient_unit_fields({"quantity": "1", "unit": "large", "ingredient": "onion"})
     assert size["unit"] == "piece"

@@ -68,6 +68,7 @@ from PushShoppingList.services.recipe_extract_service import normalize_recipe_co
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
 from PushShoppingList.services.recipe_extract_service import normalize_ingredient_substitutions as normalize_ingredient_substitution_options
+from PushShoppingList.services.recipe_extract_service import repair_inline_form_choice_ingredient
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_note_sections
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_GENERATED_RECIPE
@@ -9849,7 +9850,9 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             continue
         # Normalize a copy for display so legacy rows whose unknown unit was
         # moved into review metadata regain their recipe-specific unit text.
-        item = normalize_ingredient_unit_fields(dict(item))
+        item = dict(item)
+        repair_inline_form_choice_ingredient(item)
+        item = normalize_ingredient_unit_fields(item)
 
         store_section, master_record, store_section_result = recipe_edit_store_section_for_ingredient(
             item,
