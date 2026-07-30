@@ -1,0 +1,422 @@
+- generic [ref=f3e1]:
+  - link "Skip to content" [ref=f3e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=f3e4]:
+    - banner "App toolbar" [ref=f3e5]:
+      - link [ref=f3e6] [cursor=pointer]:
+        - /url: /
+      - search [ref=f3e15]:
+        - generic [ref=f3e16]: Search AI Pantry
+        - combobox "Search AI Pantry" [ref=f3e17]
+        - button "Search" [ref=f3e18] [cursor=pointer]
+      - generic "Quick actions" [ref=f3e20]:
+        - link "Import" [ref=f3e21] [cursor=pointer]:
+          - /url: /#importPage
+        - link "Notifications" [ref=f3e24] [cursor=pointer]:
+          - /url: /#notificationsPage
+        - link "Help & Support" [ref=f3e29] [cursor=pointer]:
+          - /url: /#feedbackSupportSection
+      - link "Open Guest Demo account" [ref=f3e35] [cursor=pointer]:
+        - /url: /#userAccountSection
+        - generic [ref=f3e36]: G
+        - strong [ref=f3e38]: Guest Demo
+    - main "Recipe editor" [ref=f3e39]:
+      - dialog "Edit Recipe" [ref=f3e41]:
+        - generic [ref=f3e42]:
+          - generic [ref=f3e43]:
+            - navigation "Breadcrumb" [ref=f3e45]:
+              - link "Recipes" [ref=f3e50] [cursor=pointer]:
+                - /url: /#currentRecipeUrlLogCard
+              - generic [ref=f3e51]: /
+              - generic [ref=f3e52]: New Recipe
+              - generic [ref=f3e53]: /
+              - generic [ref=f3e54]: Edit Recipe
+            - generic [ref=f3e55]:
+              - button "Preview Recipe" [ref=f3e56] [cursor=pointer]
+              - text: ↓
+              - button "Create recipe PDF" [ref=f3e61] [cursor=pointer]:
+                - text: ↓
+                - generic [ref=f3e65]: Recipe PDF
+              - generic [ref=f3e66]:
+                - button "More actions" [ref=f3e67] [cursor=pointer]
+                - text: "> >"
+              - button "Cancel" [ref=f3e69] [cursor=pointer]
+              - button "Save Recipe" [ref=f3e70] [cursor=pointer]
+          - generic [ref=f3e74]:
+            - generic [ref=f3e75]:
+              - generic [ref=f3e77]:
+                - generic [ref=f3e78]:
+                  - generic [ref=f3e79]:
+                    - generic [ref=f3e80]:
+                      - generic [ref=f3e81]:
+                        - generic [ref=f3e82]: Recipe Name
+                        - textbox "Recipe Name" [ref=f3e83]:
+                          - /placeholder: Untitled Recipe
+                          - text: New Recipe
+                      - button "Edit recipe name" [ref=f3e84] [cursor=pointer]
+                    - radiogroup "Recipe rating" [ref=f3e90]:
+                      - radio "1 star. Click the selected star again to clear the rating." [ref=f3e91] [cursor=pointer]: ☆
+                      - radio "2 stars. Click the selected star again to clear the rating." [ref=f3e92] [cursor=pointer]: ☆
+                      - radio "3 stars. Click the selected star again to clear the rating." [ref=f3e93] [cursor=pointer]: ☆
+                      - radio "4 stars. Click the selected star again to clear the rating." [ref=f3e94] [cursor=pointer]: ☆
+                      - radio "5 stars. Click the selected star again to clear the rating." [ref=f3e95] [cursor=pointer]: ☆
+                    - region "Recipe Image" [ref=f3e97]:
+                      - generic [ref=f3e98]:
+                        - button "Add New Recipe to favorites" [ref=f3e99] [cursor=pointer]
+                        - generic [ref=f3e102]: No recipe image available
+                      - generic [ref=f3e109]:
+                        - button "Replace Image" [ref=f3e110] [cursor=pointer]
+                        - button "AI Generate" [ref=f3e117] [cursor=pointer]
+                    - generic [ref=f3e122]:
+                      - generic [ref=f3e123]:
+                        - combobox "No cuisine tags selected" [ref=f3e124]:
+                          - option "Use inferred" [selected]
+                          - option "🇺🇸 American"
+                          - option "🇲🇽 Mexican"
+                          - option "🇮🇹 Italian"
+                          - option "🇯🇵 Japanese"
+                          - option "🇹🇭 Thai"
+                          - option "🇨🇳 Chinese"
+                          - option "🇮🇳 Indian"
+                          - option "🇫🇷 French"
+                          - option "🌍 Other / Fusion"
+                        - generic [ref=f3e125]: No cuisine tags selected
+                      - button "Add Tag" [ref=f3e128] [cursor=pointer]
+                  - generic [ref=f3e131]:
+                    - generic [ref=f3e132]:
+                      - generic [ref=f3e133]: Cookbook
+                      - button "Cookbook actions" [ref=f3e135] [cursor=pointer]:
+                        - generic "unclassified" [ref=f3e136]
+                    - generic [ref=f3e137]:
+                      - generic [ref=f3e138]: Section
+                      - button "Menu section actions" [ref=f3e140] [cursor=pointer]:
+                        - generic [ref=f3e141]: No menu section
+                - generic [ref=f3e142]:
+                  - generic [ref=f3e143]:
+                    - generic [ref=f3e144]:
+                      - generic [ref=f3e150]: Servings
+                      - button "About Servings" [ref=f3e151]: "?"
+                    - generic [ref=f3e152]:
+                      - textbox "Servings About Servings people" [ref=f3e153]
+                      - generic [ref=f3e154]: people
+                  - generic [ref=f3e155]:
+                    - generic [ref=f3e156]:
+                      - generic [ref=f3e161]: Total Time
+                      - button "About Total Time" [ref=f3e162]: "?"
+                    - generic [ref=f3e163]:
+                      - textbox "Total Time About Total Time min" [ref=f3e164]
+                      - generic [ref=f3e165]: min
+                  - generic [ref=f3e166]:
+                    - generic [ref=f3e167]:
+                      - generic [ref=f3e171]: Prep Time
+                      - button "About Prep Time" [ref=f3e172]: "?"
+                    - generic [ref=f3e173]:
+                      - textbox "Prep Time About Prep Time min" [ref=f3e174]
+                      - generic [ref=f3e175]: min
+                  - generic [ref=f3e176]:
+                    - generic [ref=f3e177]:
+                      - generic [ref=f3e182]: Cook Time
+                      - button "About Cook Time" [ref=f3e183]: "?"
+                    - generic [ref=f3e184]:
+                      - textbox "Cook Time About Cook Time min" [ref=f3e185]
+                      - generic [ref=f3e186]: min
+                  - generic [ref=f3e187]:
+                    - generic [ref=f3e188]:
+                      - generic [ref=f3e192]: Inactive Time
+                      - button "About Inactive Time" [ref=f3e193]: "?"
+                    - generic [ref=f3e194]:
+                      - textbox "Inactive Time About Inactive Time min" [ref=f3e195]
+                      - generic [ref=f3e196]: min
+                  - generic [ref=f3e197]:
+                    - generic [ref=f3e198]:
+                      - generic [ref=f3e206]: Difficulty
+                      - button "About Difficulty" [ref=f3e207]: "?"
+                    - combobox "Difficulty About Difficulty" [ref=f3e209]:
+                      - option "Not set" [selected]
+                      - option "Easy"
+                      - option "Medium"
+                      - option "Hard"
+                      - option "Expert"
+                  - generic [ref=f3e210]:
+                    - generic [ref=f3e211]:
+                      - generic [ref=f3e216]: Scale
+                      - button "About Scale" [ref=f3e217]: "?"
+                    - combobox "Scale About Scale" [ref=f3e219]:
+                      - option "1/2x"
+                      - option "1x" [selected]
+                      - option "2x"
+                      - option "3x"
+                - generic [ref=f3e221]:
+                  - generic [ref=f3e222]: Description
+                  - textbox "Description 0 characters" [ref=f3e223]
+                  - generic: 0 characters
+                - group [ref=f3e224]:
+                  - generic "Technical Details" [ref=f3e225] [cursor=pointer]
+              - region [ref=f3e228]:
+                - generic [ref=f3e229]:
+                  - generic [ref=f3e232]:
+                    - heading "Edit Recipe Categories" [level=3] [ref=f3e233]
+                    - paragraph [ref=f3e234]: New Recipe
+                  - generic [ref=f3e235]:
+                    - button "Collapse recipe categories" [expanded] [ref=f3e236] [cursor=pointer]
+                    - button "Recipe category actions" [ref=f3e239] [cursor=pointer]
+                - generic [ref=f3e241]:
+                  - generic [ref=f3e242]:
+                    - generic [ref=f3e243]: Meal Type
+                    - combobox "Meal Type" [ref=f3e244]:
+                      - option "Use inferred" [selected]
+                      - option "🍳 Breakfast"
+                      - option "🥪 Lunch"
+                      - option "🍽️ Dinner"
+                      - option "🥗 Side Dish"
+                      - option "🍰 Dessert"
+                      - option "🍹 Drink"
+                      - option "🥣 Soup"
+                      - option "🍱 Meal Prep"
+                      - option "🍿 Snack"
+                  - generic [ref=f3e245]:
+                    - generic [ref=f3e246]: Main Ingredient
+                    - combobox "Main Ingredient" [ref=f3e247]:
+                      - option "Use inferred" [selected]
+                      - option "🐔 Chicken"
+                      - option "🥩 Beef"
+                      - option "🐷 Pork"
+                      - option "🐟 Seafood"
+                      - option "🥚 Eggs"
+                      - option "🫘 Beans"
+                      - option "🥬 Vegetarian"
+                      - option "🌱 Vegan"
+                      - option "🍝 Pasta"
+                      - option "🍚 Rice / Grains"
+                      - option "🥔 Potatoes"
+                      - option "🧀 Cheese"
+                  - generic [ref=f3e248]:
+                    - generic [ref=f3e249]: Cooking Method
+                    - combobox "Cooking Method" [ref=f3e250]:
+                      - option "Use inferred" [selected]
+                      - option "🔥 Grilled"
+                      - option "🍳 Skillet"
+                      - option "🥘 One Pot"
+                      - option "🍲 Slow Cooker"
+                      - option "♨️ Oven Baked"
+                      - option "🥗 No Cook"
+                      - option "🧊 Make Ahead"
+                      - option "⚡ Quick Meal"
+                  - generic [ref=f3e251]:
+                    - generic [ref=f3e252]: Occasion
+                    - combobox "Occasion" [ref=f3e253]:
+                      - option "Use inferred" [selected]
+                      - option "❤️ Date Night"
+                      - option "👨‍👩‍👧 Family Dinner"
+                      - option "🎉 Party Food"
+                      - option "🏈 Game Day"
+                      - option "🎄 Holiday"
+                      - option "☀️ Summer"
+                      - option "❄️ Winter"
+                      - option "🧺 Potluck"
+                  - generic [ref=f3e254]:
+                    - generic [ref=f3e255]: Dietary Preference
+                    - combobox "Dietary Preference" [ref=f3e256]:
+                      - option "Use inferred" [selected]
+                      - option "🥩 High Protein"
+                      - option "🥗 Low Carb"
+                      - option "🌱 Vegan"
+                      - option "🌱 Vegetarian"
+                      - option "🌾 Gluten Free"
+                      - option "🥛 Dairy Free"
+                      - option "🧂 Low Sodium"
+                      - option "🔥 Spicy"
+                      - option "🍬 Low Sugar"
+                  - generic [ref=f3e257]:
+                    - generic [ref=f3e258]: Prep Time
+                    - combobox "Prep Time" [ref=f3e259]:
+                      - option "Use inferred" [selected]
+                      - option "⚡ Under 15 Minutes"
+                      - option "⏱️ 15–30 Minutes"
+                      - option "🕐 30–60 Minutes"
+                      - option "⏳ Over 1 Hour"
+                      - option "🧊 Make Ahead"
+                  - generic [ref=f3e260]:
+                    - generic [ref=f3e261]: Custom Categories
+                    - textbox "Custom Categories" [ref=f3e262]:
+                      - /placeholder: Sophia's Favorites, Weeknight Dinners
+              - generic [ref=f3e263]:
+                - tablist "Recipe editor sections" [ref=f3e264]:
+                  - tab "Ingredients" [selected] [ref=f3e265] [cursor=pointer]
+                  - tab "Instructions" [ref=f3e266] [cursor=pointer]
+                  - tab "Equipment" [ref=f3e267] [cursor=pointer]
+                  - tab "Nutrition" [ref=f3e268] [cursor=pointer]
+                  - tab "Notes" [ref=f3e269] [cursor=pointer]
+                - generic [ref=f3e270]:
+                  - tabpanel "Ingredients" [ref=f3e271]:
+                    - generic [ref=f3e272]:
+                      - heading "Ingredients (1)" [level=3] [ref=f3e275]
+                      - generic [ref=f3e276]:
+                        - button "Add Ingredient" [ref=f3e277] [cursor=pointer]
+                        - button "Adjust ingredient columns" [ref=f3e282] [cursor=pointer]:
+                          - generic [ref=f3e290]: Columns
+                        - button "Ingredient actions" [ref=f3e295] [cursor=pointer]
+                    - table "Ingredients" [ref=f3e296]:
+                      - row [ref=f3e297]:
+                        - columnheader "Drag / Image" [ref=f3e298]
+                        - columnheader [ref=f3e300]:
+                          - button "Ingredient filter, sort" [ref=f3e302] [cursor=pointer]:
+                            - generic [ref=f3e303]: Ingredient
+                        - columnheader "Quantity" [ref=f3e308]
+                        - columnheader [ref=f3e310]:
+                          - button "Unit filter, sort" [ref=f3e312] [cursor=pointer]:
+                            - generic [ref=f3e313]: Unit
+                        - columnheader "Size" [ref=f3e318]
+                        - columnheader "Alternatives" [ref=f3e320]
+                        - columnheader "Row actions" [ref=f3e322]
+                      - rowgroup [ref=f3e324]:
+                        - row [ref=f3e1100]:
+                          - button "Drag to reorder" [ref=f3e326]
+                          - generic [ref=f3e335]: "1"
+                          - cell [ref=f3e674]:
+                            - combobox "Ingredient" [ref=f3e337]: Buttermilk
+                            - textbox "Preparation" [ref=f3e339]:
+                              - /placeholder: Add preparation
+                          - cell [ref=f3e737]:
+                            - textbox "Quantity" [ref=f3e341]: "1"
+                          - cell [ref=f3e801]:
+                            - combobox "Unit" [ref=f3e343]: cup
+                          - cell [ref=f3e344]:
+                            - textbox "Size" [ref=f3e345]
+                          - cell [ref=f3e1101]:
+                            - button "Hide 2 options for Buttermilk" [expanded] [ref=f3e1102] [cursor=pointer]:
+                              - generic [ref=f3e348]:
+                                - generic [ref=f3e349]: 2 options
+                                - generic [ref=f3e1103]: Buttermilk / Unnamed ingredient
+                          - text: …
+                          - cell [ref=f3e728]:
+                            - button "Edit Buttermilk" [ref=f3e729] [cursor=pointer]
+                            - button "Ingredient actions" [ref=f3e551] [cursor=pointer]
+                          - region "Ingredient choices" [ref=f3e1089]:
+                            - generic [ref=f3e1090]:
+                              - generic [ref=f3e1091]:
+                                - text: Ingredient choices for
+                                - strong [ref=f3e1104]: Buttermilk
+                              - button "Add another option" [ref=f3e1093] [cursor=pointer]
+                            - article "Custom Alternative:" [ref=f3e1106]:
+                              - generic [ref=f3e1108]:
+                                - strong [ref=f3e1115]: Custom Alternative
+                                - generic [ref=f3e1116]: 1 replacement ingredient
+                                - generic [ref=f3e1117]: Good
+                              - generic [ref=f3e1118]:
+                                - region "Original ingredient" [ref=f3e1119]:
+                                  - generic [ref=f3e1120]: Original
+                                  - strong [ref=f3e1121]: 1 cup Buttermilk
+                                - generic [ref=f3e1122]: replaces
+                                - region "Replacement ingredients" [ref=f3e1127]:
+                                  - generic [ref=f3e1128]: Replace With
+                                  - strong [ref=f3e1129]:
+                                    - generic [ref=f3e1130]: Unnamed replacement ingredient
+                              - region "Replacement ingredients" [ref=f3e1131]:
+                                - generic [ref=f3e1132]: Replacement details
+                                - row "Edit replacement ingredient Unnamed replacement ingredient Ingredient Optional Quantity Unit Store Section" [ref=f3e1134]:
+                                  - generic "Edit replacement ingredient Unnamed replacement ingredient" [ref=f3e1135]:
+                                    - cell [ref=f3e1136]:
+                                      - img "No image available for Alternative ingredient" [ref=f3e1137]
+                                    - text: ·
+                                    - cell [ref=f3e1143]:
+                                      - button "Replacement ingredient actions" [ref=f3e1145] [cursor=pointer]
+                                  - generic [ref=f3e1146]:
+                                    - generic [ref=f3e1148]:
+                                      - generic [ref=f3e1149]: Ingredient
+                                      - generic [ref=f3e1150]:
+                                        - combobox "Ingredient" [active] [ref=f3e1151]
+                                        - generic [ref=f3e1152]: Optional
+                                    - generic [ref=f3e1155]:
+                                      - generic [ref=f3e1156]: Quantity
+                                      - textbox "Quantity" [ref=f3e1157]
+                                    - generic [ref=f3e1158]:
+                                      - generic [ref=f3e1159]: Unit
+                                      - combobox "Unit" [ref=f3e1160]
+                                    - generic [ref=f3e1161]:
+                                      - generic [ref=f3e1162]: Store Section
+                                      - combobox "Store Section" [ref=f3e1163] [cursor=pointer]:
+                                        - generic [ref=f3e1169]: Produce
+                                    - group [ref=f3e1174]:
+                                      - generic "More details Purchasing, preparation, optional, and source" [ref=f3e1175] [cursor=pointer]:
+                                        - generic [ref=f3e1176]: More details
+                                        - generic [ref=f3e1177]: Purchasing, preparation, optional, and source
+                                - button "Add ingredient to this option" [ref=f3e1178] [cursor=pointer]
+                              - region "Replacement amount" [ref=f3e1182]:
+                                - generic [ref=f3e1183]: Equivalent result
+                                - generic [ref=f3e1184]:
+                                  - strong [ref=f3e1185]: 1 cup Buttermilk
+                                  - strong [ref=f3e1190]:
+                                    - generic [ref=f3e1191]: Unnamed replacement ingredient
+                              - group [ref=f3e1192]:
+                                - generic "Why It Works" [ref=f3e1193] [cursor=pointer]
+                              - button "Remove alternative" [ref=f3e1196] [cursor=pointer]
+                              - generic [ref=f3e1197]:
+                                - button "Save Group" [ref=f3e1198] [cursor=pointer]
+                                - button "Cancel" [ref=f3e1199] [cursor=pointer]
+                    - generic [ref=f3e553]:
+                      - button "Reorder" [ref=f3e554] [cursor=pointer]
+                      - button "Group" [ref=f3e560] [cursor=pointer]
+                  - text: No image No reflection notes yet. Add one after cooking to remember what worked or what to change next time.
+            - complementary "Recipe context" [ref=f3e565]:
+              - group [ref=f3e566]:
+                - generic "Restaurant Source Edit" [ref=f3e567] [cursor=pointer]:
+                  - generic [ref=f3e568]: Restaurant Source
+                  - button "Edit" [ref=f3e569]
+                - generic [ref=f3e570]:
+                  - generic [ref=f3e571]: R
+                  - strong [ref=f3e574]: No restaurant source
+              - region [ref=f3e577]:
+                - generic [ref=f3e578]:
+                  - heading "AI Assistant" [level=3] [ref=f3e579]
+                  - paragraph [ref=f3e584]: Complete missing recipe details with the existing AI workflow.
+                - generic [ref=f3e585]:
+                  - generic [ref=f3e1081]: "Missing or incomplete:"
+                  - strong [ref=f3e1082]: Description
+                  - strong [ref=f3e1083]: Instructions
+                  - strong [ref=f3e1084]: Equipment
+                  - strong [ref=f3e1085]: Recipe image
+                - generic [ref=f3e592]:
+                  - button "Infer Missing Details" [ref=f3e593] [cursor=pointer]
+                  - button "Regenerate Recipe" [ref=f3e599] [cursor=pointer]
+                  - button "Regenerate Ingredients" [ref=f3e600] [cursor=pointer]
+                  - group [ref=f3e601]:
+                    - generic "More AI Actions" [ref=f3e602] [cursor=pointer]
+              - group [ref=f3e603]:
+                - generic [ref=f3e604] [cursor=pointer]:
+                  - generic [ref=f3e605]:
+                    - text: Source & Documents
+                    - button "About Source and Documents" [ref=f3e606]
+                  - button "Edit" [ref=f3e610]
+                - generic [ref=f3e612]:
+                  - generic [ref=f3e618]:
+                    - strong [ref=f3e619]: Source URL
+                    - generic "manual://recipe/ac2128b27e9a409d8adce1cb008b53da (click to copy)" [ref=f3e620]: ac2128b27e9a409d8adce1cb008b53da
+                  - generic "This source is not currently openable" [ref=f3e621]: Open
+              - group [ref=f3e622]:
+                - generic "Ingredient Gallery" [ref=f3e623] [cursor=pointer]
+              - group [ref=f3e626]:
+                - generic "Recipe Health 4 items need attention" [ref=f3e735] [cursor=pointer]:
+                  - generic [ref=f3e628]: Recipe Health
+                  - generic [ref=f3e629]: 4 items need attention
+              - region "AI Confidence" [ref=f3e631]:
+                - generic [ref=f3e632]:
+                  - generic [ref=f3e633]: AI Confidence
+                  - strong [ref=f3e634]: Not available
+                - generic [ref=f3e635]:
+                  - progressbar "AI confidence" [ref=f3e636]
+                  - paragraph [ref=f3e637]: Confidence is calculated from source quality, extraction reliability, AI certainty, and user verification.
+                  - button "AI Quality Report" [ref=f3e638] [cursor=pointer]
+  - navigation "Mobile navigation" [ref=f3e639]:
+    - link "Home" [ref=f3e640] [cursor=pointer]:
+      - /url: /#appPageHeader
+    - link "Recipes" [ref=f3e647] [cursor=pointer]:
+      - /url: /#recipesPage
+    - link "Cookbooks" [ref=f3e653] [cursor=pointer]:
+      - /url: /#cookbooksCard
+    - link "Lists" [ref=f3e658] [cursor=pointer]:
+      - /url: /#shoppingViewsSection
+    - link "Pantry" [ref=f3e663] [cursor=pointer]:
+      - /url: /#aiPantrySection
+    - button "Open all navigation" [ref=f3e669] [cursor=pointer]:
+      - generic [ref=f3e672]: More

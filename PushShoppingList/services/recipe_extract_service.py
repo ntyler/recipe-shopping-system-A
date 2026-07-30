@@ -58,6 +58,7 @@ except Exception:  # pragma: no cover
         pass
 
 from PushShoppingList.services import cloudflare_r2_storage
+from PushShoppingList.services.ingredient_option_service import pdf_requirement_rows
 from PushShoppingList.services.ingredient_unit_service import canonical_unit_alias_pattern
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
@@ -6535,6 +6536,19 @@ def build_video_text_pdf_html(recipe_url, page_text, recipe_title="", recipe_dat
             font-weight: 700;
             padding-top: 10px;
         }}
+        .alternative-row td {{
+            background: #fafafa;
+            color: #444;
+            font-size: 0.94em;
+        }}
+        .alternative-row td:nth-child(2) {{
+            padding-left: 14px;
+        }}
+        .alternative-label {{
+            color: #555;
+            font-weight: 700;
+            white-space: nowrap;
+        }}
         ul,
         ol {{
             margin: 0;
@@ -6832,7 +6846,7 @@ def format_video_recipe_ingredients_for_pdf(ingredients):
     rows = []
     current_section = None
 
-    for item in ingredients:
+    for ingredient_index, item in enumerate(ingredients):
         if not isinstance(item, dict):
             value = clean_recipe_text(item)
             if value:
@@ -6855,25 +6869,40 @@ def format_video_recipe_ingredients_for_pdf(ingredients):
             )
             current_section = section
 
-        amount = format_video_ingredient_amount(item)
-        ingredient = clean_recipe_text(item.get("ingredient") or item.get("original_text") or "")
-        preparation = clean_recipe_text(item.get("preparation") or "")
+        for requirement_row in pdf_requirement_rows(item, ingredient_index):
+            amount = clean_recipe_text(requirement_row.get("amount") or "")
+            ingredient = clean_recipe_text(requirement_row.get("ingredient") or "")
+            preparation = clean_recipe_text(requirement_row.get("preparation") or "")
+            row_kind = clean_recipe_text(requirement_row.get("kind") or "ingredient")
 
-        if item.get("optional") and preparation:
-            preparation = f"{preparation}; optional"
-        elif item.get("optional"):
-            preparation = "optional"
+            if row_kind == "ingredient":
+                amount = format_video_ingredient_amount(item) or amount
+                if item.get("optional") and preparation:
+                    preparation = f"{preparation}; optional"
+                elif item.get("optional"):
+                    preparation = "optional"
 
-        if not ingredient and not amount and not preparation:
-            continue
+            if not ingredient and not amount and not preparation:
+                continue
 
-        rows.append(
-            "<tr>"
-            f"<td class=\"amount-cell\">{html.escape(amount)}</td>"
-            f"<td>{html.escape(ingredient)}</td>"
-            f"<td>{html.escape(preparation)}</td>"
-            "</tr>"
-        )
+            if row_kind == "alternative":
+                alternative_label = clean_recipe_text(
+                    requirement_row.get("label") or "Alternative"
+                )
+                rows.append(
+                    "<tr class=\"alternative-row\">"
+                    f"<td class=\"amount-cell\"><span class=\"alternative-label\">{html.escape(alternative_label)}:</span></td>"
+                    f"<td colspan=\"2\">{html.escape(ingredient)}</td>"
+                    "</tr>"
+                )
+            else:
+                rows.append(
+                    "<tr>"
+                    f"<td class=\"amount-cell\">{html.escape(amount)}</td>"
+                    f"<td>{html.escape(ingredient)}</td>"
+                    f"<td>{html.escape(preparation)}</td>"
+                    "</tr>"
+                )
 
     if not rows:
         return ""
@@ -9877,6 +9906,15 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
         alternative_label = clean_recipe_text(raw_option.get("alternative_label") or "")
         if alternative_label:
             row["alternative_label"] = alternative_label
+        option_type = clean_recipe_text(raw_option.get("option_type") or "")
+        if option_type in {"original", "recipe_choice", "substitution", "custom"}:
+            row["option_type"] = option_type
+        row["recipe_authored"] = str(
+            raw_option.get("recipe_authored") or ""
+        ).strip().lower() in {"1", "true", "yes", "y", "on"}
+        row["is_default"] = str(
+            raw_option.get("is_default") or ""
+        ).strip().lower() in {"1", "true", "yes", "y", "on"}
         normalize_ingredient_unit_fields(row)
         rows.append(row)
 

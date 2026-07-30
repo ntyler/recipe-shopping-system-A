@@ -71,6 +71,11 @@ from PushShoppingList.services.home_store_location_service import load_nearest_s
 from PushShoppingList.services.home_store_location_service import resolve_nearest_stores_for_home_address
 from PushShoppingList.services.ingredient_text_review_service import fallback_ingredient_text_review
 from PushShoppingList.services.ingredient_text_review_service import normalize_ingredient_text_review
+from PushShoppingList.services.ingredient_option_service import IngredientOptionSelectionRequired
+from PushShoppingList.services.ingredient_option_service import ingredient_requirements
+from PushShoppingList.services.ingredient_option_service import public_requirement
+from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
+from PushShoppingList.services.ingredient_option_service import shopping_item_name
 from PushShoppingList.services.ingredient_unit_service import unit_registry_payload
 from PushShoppingList.services.ingredient_unit_service import canonical_unit
 from PushShoppingList.services.ingredient_unit_service import display_unit
@@ -118,6 +123,7 @@ from PushShoppingList.services.recipe_edit_service import is_shareable_pdf_publi
 from PushShoppingList.services.recipe_edit_service import PDF_KIND_GENERATED_RECIPE
 from PushShoppingList.services.recipe_edit_service import PDF_KIND_WEBPAGE_BACKUP
 from PushShoppingList.services.recipe_edit_service import normalize_recipe_pdf_storage_metadata
+from PushShoppingList.services.recipe_edit_service import load_recipe_output
 from PushShoppingList.services.recipe_edit_service import save_recipe_output
 from PushShoppingList.services.recipe_edit_service import delete_generated_recipe_pdf_for_recipe_deletion
 from PushShoppingList.services.product_selection_service import product_choices_by_item
@@ -126,6 +132,7 @@ from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.shopping_list_service import save_items
+from PushShoppingList.services.shopping_list_service import save_recipe_option_selections
 from PushShoppingList.services.store_settings_service import clean_store_settings
 from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.firebase_auth_service import firebase_web_config
@@ -140,11 +147,13 @@ from PushShoppingList.services.menu_store_service import menu_pdf_logs_by_cookbo
 from PushShoppingList.services.menu_store_service import menus_by_cookbook
 from PushShoppingList.services.meal_plan_service import add_meal
 from PushShoppingList.services.meal_plan_service import delete_meal
+from PushShoppingList.services.meal_plan_service import load_meal_plan
 from PushShoppingList.services.meal_plan_service import meal_plan_yield_label
 from PushShoppingList.services.meal_plan_service import meal_plan_home_preview
 from PushShoppingList.services.meal_plan_service import meal_plan_for_week
 from PushShoppingList.services.meal_plan_service import normalize_planned_servings
 from PushShoppingList.services.meal_plan_service import planned_servings_from_yield
+from PushShoppingList.services.meal_plan_service import update_meal_ingredient_option_selections
 from PushShoppingList.services.global_search_service import global_search
 from PushShoppingList.services.global_search_service import ACTUAL_RECORD_GROUPS
 from PushShoppingList.services.global_search_service import recent_global_search
@@ -580,6 +589,11 @@ def meal_plan_recipe_option_rows(recipe_urls, recipe_ingredient_data=None):
             ).strip(),
             "default_servings": planned_servings_from_yield(recipe_yield) or 1,
             "yield_label": meal_plan_yield_label(recipe_yield),
+            "ingredient_requirements": [
+                public_requirement(requirement)
+                for requirement in ingredient_requirements(recipe_data)
+                if requirement["selection_required"]
+            ],
         })
 
     return options
@@ -4422,12 +4436,23 @@ def add_meal_plan_entry_route():
         return jsonify({"ok": False, "error": str(exc)}), 400
 
     try:
+        recipe_data = load_recipe_output(recipe_url) or {}
+        ingredient_resolution = resolve_ingredient_requirements(
+            recipe_data,
+            payload.get("ingredient_option_selections"),
+        )
         meal = add_meal({
             "date": payload.get("date"),
             "meal_type": payload.get("meal_type"),
             "recipe_url": recipe_url,
             "recipe_name": available_recipes[recipe_url]["name"],
             "planned_servings": planned_servings,
+            "ingredient_option_selections": ingredient_resolution["selected_options"],
+            "unresolved_ingredient_requirement_ids": [
+                requirement["id"]
+                for requirement in ingredient_resolution["unresolved_requirements"]
+            ],
+            "ingredient_selection_needed": ingredient_resolution["selection_needed"],
         })
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -4442,6 +4467,37 @@ def delete_meal_plan_entry_route(meal_id):
     if not delete_meal(meal_id):
         return jsonify({"ok": False, "error": "That planned meal was not found."}), 404
     return jsonify({"ok": True})
+
+
+@main_bp.route("/api/meal-plan/<meal_id>/ingredient-options", methods=["PATCH"])
+def update_meal_plan_ingredient_options_route(meal_id):
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to update meal plans."}), 403
+    meal = next(
+        (item for item in load_meal_plan()["meals"] if item["id"] == meal_id),
+        None,
+    )
+    if not meal:
+        return jsonify({"ok": False, "error": "That planned meal was not found."}), 404
+    payload = request.get_json(silent=True) or {}
+    resolution = resolve_ingredient_requirements(
+        load_recipe_output(meal["recipe_url"]) or {},
+        payload.get("ingredient_option_selections"),
+    )
+    updated = update_meal_ingredient_option_selections(
+        meal_id,
+        resolution["selected_options"],
+        [
+            requirement["id"]
+            for requirement in resolution["unresolved_requirements"]
+        ],
+    )
+    return jsonify({
+        "ok": True,
+        "meal": updated,
+        "selection_needed": resolution["selection_needed"],
+        "requirements": resolution["unresolved_requirements"],
+    })
 
 
 @main_bp.route("/sections/current-recipes")
@@ -4998,30 +5054,74 @@ def reapply_cookbook_food_rules_route(cookbook_id):
 
 @main_bp.route("/api/cookbooks/restore_recipes", methods=["POST"])
 def restore_cookbook_recipes_route():
+    raw_selections = request.form.get("option_selections") or ""
     try:
-        result = restore_cookbook_recipes_to_log(request.form.getlist("recipe_urls"))
+        option_selections = json.loads(raw_selections) if raw_selections else {}
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Ingredient option selections are invalid."}), 400
+    try:
+        result = restore_cookbook_recipes_to_log(
+            request.form.getlist("recipe_urls"),
+            option_selections=option_selections,
+        )
+    except IngredientOptionSelectionRequired as err:
+        return jsonify({
+            "ok": False,
+            "selection_required": True,
+            "error": str(err),
+            "requirements": err.requirements,
+        }), 409
     except ValueError as err:
         return jsonify({"ok": False, "error": str(err)}), 400
 
     return jsonify({"ok": True, **result})
 
 
-def restore_cookbook_recipes_to_log(recipe_urls):
+def restore_cookbook_recipes_to_log(recipe_urls, option_selections=None):
     recipes = cookbook_recipes_for_urls(recipe_urls)
     urls = []
     ingredients_by_recipe = {}
+    selected_options_by_recipe = {}
     all_ingredients = []
+    unresolved_requirements = []
+    option_selections = option_selections if isinstance(option_selections, dict) else {}
 
     for recipe in recipes:
         url = recipe.get("url")
-        ingredients = recipe_ingredients_for_record(recipe)
 
         if not url:
             continue
 
+        recipe_data = load_recipe_output(url)
+        if isinstance(recipe_data, dict) and recipe_data.get("ingredients"):
+            recipe_selections = option_selections.get(url)
+            if not isinstance(recipe_selections, dict) and len(recipes) == 1:
+                recipe_selections = option_selections
+            resolution = resolve_ingredient_requirements(
+                recipe_data,
+                recipe_selections,
+            )
+            if resolution["unresolved_requirements"]:
+                for requirement in resolution["unresolved_requirements"]:
+                    requirement["recipe_url"] = url
+                    requirement["recipe_name"] = recipe.get("name") or "Recipe"
+                    unresolved_requirements.append(requirement)
+                continue
+            ingredients = [
+                shopping_item_name(item)
+                for item in resolution["items"]
+                if shopping_item_name(item)
+            ]
+            selected_options_by_recipe[url] = resolution["selected_options"]
+        else:
+            ingredients = recipe_ingredients_for_record(recipe)
+
         urls.append(url)
         ingredients_by_recipe[url] = ingredients
         all_ingredients.extend(ingredients)
+
+    if unresolved_requirements:
+        raise IngredientOptionSelectionRequired(unresolved_requirements)
 
     if not urls:
         raise ValueError("Selected cookbook recipes were not found.")
@@ -5030,6 +5130,8 @@ def restore_cookbook_recipes_to_log(recipe_urls):
         raise ValueError("No ingredients were found for the selected cookbook recipes.")
 
     add_items(all_ingredients)
+    for url, selections in selected_options_by_recipe.items():
+        save_recipe_option_selections(url, selections)
 
     for recipe in recipes:
         url = recipe.get("url")

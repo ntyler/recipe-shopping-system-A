@@ -1,0 +1,113 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=e4]:
+    - banner [ref=e5]:
+      - link "AI Pantry home" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e14]:
+          - strong [ref=e15]: AI Pantry
+          - generic [ref=e16]: Recipe Shopping List
+      - generic [ref=e17]:
+        - link "Help & Support" [ref=e18] [cursor=pointer]:
+          - /url: mailto:support@recipeshoppinglist.com
+        - 'button "Color theme: System" [ref=e31] [cursor=pointer]':
+          - generic [ref=e32]: System
+    - main [ref=e36]:
+      - region [ref=e37]:
+        - generic [ref=e38]:
+          - heading "Your recipes. Smarter with AI." [level=1] [ref=e39]: Your recipes.Smarter with AI.
+          - paragraph [ref=e40]: Import from any website, menu, or photo. AI extracts, organizes, and helps you cook and shop with confidence.
+        - generic "AI Pantry capabilities" [ref=e41]:
+          - article [ref=e42]:
+            - generic [ref=e50]:
+              - strong [ref=e51]: Import Anything
+              - generic [ref=e52]: From recipe URLs, menus, documents, or photos.
+          - article [ref=e53]:
+            - generic [ref=e62]:
+              - strong [ref=e63]: AI-Powered
+              - generic [ref=e64]: AI extracts ingredients, instructions, nutrition, and more.
+          - article [ref=e65]:
+            - generic [ref=e71]:
+              - strong [ref=e72]: Smart Shopping
+              - generic [ref=e73]: Organized shopping lists with store links and prices.
+          - article [ref=e74]:
+            - generic [ref=e81]:
+              - strong [ref=e82]: Meal Planning
+              - generic [ref=e83]: Plan meals, manage cookbooks, and track your pantry.
+          - article [ref=e84]:
+            - generic [ref=e89]:
+              - strong [ref=e90]: Learn & Improve
+              - generic [ref=e91]: AI helps improve recipes, find substitutions, and more.
+          - article [ref=e92]:
+            - generic [ref=e97]:
+              - strong [ref=e98]: Private & Secure
+              - generic [ref=e99]: Your data is private and only accessible to you.
+        - article [ref=e100]:
+          - generic [ref=e105]:
+            - heading "Your privacy matters" [level=2] [ref=e106]
+            - paragraph [ref=e107]: Your sign-in is handled by Firebase Authentication. AI Pantry does not store or have access to your password.
+            - group [ref=e108]:
+              - generic "Learn more about privacy" [ref=e109] [cursor=pointer]: Learn more about privacy →
+      - generic [ref=e111]:
+        - generic [ref=e113]:
+          - generic [ref=e114]:
+            - heading "Welcome back" [level=3] [ref=e115]
+            - paragraph [ref=e116]: Sign in to your AI Pantry account
+          - button "Continue with Google" [ref=e117] [cursor=pointer]
+          - generic [ref=e123]: or
+          - generic [ref=e125]:
+            - generic [ref=e126]: Email address
+            - textbox "Email address" [ref=e128]:
+              - /placeholder: you@example.com
+          - generic [ref=e129]:
+            - generic [ref=e130]: Password
+            - generic [ref=e131]:
+              - textbox "Password Show password" [ref=e132]:
+                - /placeholder: Enter your password
+              - button "Show password" [ref=e133] [cursor=pointer]
+          - generic [ref=e137]:
+            - generic [ref=e138]:
+              - checkbox "Keep me signed in" [checked] [ref=e139]
+              - generic [ref=e140]: Keep me signed in
+            - button "Forgot password?" [ref=e141] [cursor=pointer]
+          - button "Sign in with Email" [ref=e142] [cursor=pointer]
+          - generic [ref=e146]:
+            - generic [ref=e147]: New to AI Pantry?
+            - button "Create an Account" [ref=e148] [cursor=pointer]
+        - paragraph [ref=e152]: Secure authentication is provided by Firebase.
+        - generic [ref=e156]: or explore first
+        - generic [ref=e158]:
+          - button "Start temporary guest demo session" [ref=e159] [cursor=pointer]: Continue as Guest
+          - paragraph [ref=e163]: Explore with temporary demo data.Nothing is saved permanently.
+        - paragraph [ref=e164]:
+          - text: By signing in, you agree to our
+          - link "Terms of Service" [ref=e165] [cursor=pointer]:
+            - /url: /terms
+          - text: and acknowledge our
+          - link "Privacy Policy" [ref=e166] [cursor=pointer]:
+            - /url: /privacy
+          - text: .
+    - contentinfo [ref=e167]:
+      - generic "Product capabilities" [ref=e168]:
+        - generic [ref=e169]:
+          - strong [ref=e174]: Recipe Imports
+          - generic [ref=e175]: Websites, menus, and photos
+        - generic [ref=e176]:
+          - strong [ref=e180]: Smart Shopping Lists
+          - generic [ref=e181]: Organized for every store
+        - generic [ref=e182]:
+          - strong [ref=e186]: Meal Planning
+          - generic [ref=e187]: Plan meals with confidence
+        - generic [ref=e188]:
+          - strong [ref=e193]: Private & Secure
+          - generic [ref=e194]: Protected personal workspace
+      - generic [ref=e195]:
+        - paragraph [ref=e196]: © 2026 AI Pantry
+        - navigation "Legal and support" [ref=e197]:
+          - link "Terms of Service" [ref=e198] [cursor=pointer]:
+            - /url: /terms
+          - link "Privacy Policy" [ref=e199] [cursor=pointer]:
+            - /url: /privacy
+          - link "Help & Support" [ref=e200] [cursor=pointer]:
+            - /url: mailto:support@recipeshoppinglist.com

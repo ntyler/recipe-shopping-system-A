@@ -1,0 +1,132 @@
+- generic [ref=f2e1]:
+  - link "Skip to content" [ref=f2e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=f2e4]:
+    - banner "App toolbar" [ref=f2e5]:
+      - link [ref=f2e6] [cursor=pointer]:
+        - /url: /
+      - search [ref=f2e15]:
+        - generic [ref=f2e16]: Search AI Pantry
+        - combobox "Search AI Pantry" [ref=f2e17]
+        - button "Search" [ref=f2e18] [cursor=pointer]
+      - generic "Quick actions" [ref=f2e20]:
+        - link "Import" [ref=f2e21] [cursor=pointer]:
+          - /url: "#importPage"
+        - link "Notifications" [ref=f2e24] [cursor=pointer]:
+          - /url: "#notificationsPage"
+        - button "Help & Support" [ref=f2e29] [cursor=pointer]
+      - link "Open Guest Demo account" [ref=f2e35] [cursor=pointer]:
+        - /url: "#userAccountSection"
+        - generic [ref=f2e36]: G
+        - strong [ref=f2e38]: Guest Demo
+    - main [ref=f2e39]:
+      - status [ref=f2e40]:
+        - generic [ref=f2e41]:
+          - strong [ref=f2e42]: Guest Demo Mode
+          - generic [ref=f2e43]: your data is temporary and will be deleted after 24 hours.
+          - generic [ref=f2e44]:
+            - text: "Expires in:"
+            - strong [ref=f2e45]: 23:59:34
+        - generic [ref=f2e46]:
+          - link "Create a full account from this guest demo" [ref=f2e47] [cursor=pointer]:
+            - /url: "#userAccountSection"
+            - text: Create Full Account
+          - link "Sign in to an existing account from this guest demo" [ref=f2e48] [cursor=pointer]:
+            - /url: "#userAccountSection"
+            - text: Sign In
+      - generic [ref=f2e106]:
+        - generic [ref=f2e107]:
+          - generic [ref=f2e108]:
+            - generic [ref=f2e110]:
+              - heading "Recipes" [level=2] [ref=f2e111]
+              - paragraph [ref=f2e112]: Browse, search, and manage all your recipes.
+            - generic [ref=f2e113]:
+              - generic "Recipe filters" [ref=f2e114]:
+                - generic [ref=f2e115]:
+                  - text: All Recipes
+                  - generic [ref=f2e116]: "0"
+              - generic "Recipe browse controls" [ref=f2e117]:
+                - button "Filter recipes" [ref=f2e118] [cursor=pointer]:
+                  - generic [ref=f2e121]: Filter
+                - button "Sort recipes by name" [ref=f2e122] [cursor=pointer]:
+                  - generic [ref=f2e126]: Sort
+                - button "Add Recipe" [ref=f2e127] [cursor=pointer]
+            - region "Recipe collection" [ref=f2e130]:
+              - generic [ref=f2e131]:
+                - strong [ref=f2e132]: No recipes yet
+                - generic [ref=f2e133]: Import recipe URLs, upload a document, or generate a recipe from an image.
+                - link "Import recipes" [ref=f2e134] [cursor=pointer]:
+                  - /url: "#recipeUrlsPage"
+            - generic [ref=f2e135]:
+              - generic [ref=f2e136]: Showing 0 of 0 recipes
+              - link "Manage full collection" [ref=f2e137] [cursor=pointer]:
+                - /url: "#currentRecipeUrlLogCard"
+                - text: Manage full collection →
+          - complementary "Recipe summary" [ref=f2e138]:
+            - article [ref=f2e139]:
+              - generic [ref=f2e146]:
+                - heading "Recipe Collection" [level=3] [ref=f2e147]
+                - strong [ref=f2e148]: "0"
+                - generic [ref=f2e149]: Total Recipes
+              - list [ref=f2e150]:
+                - listitem [ref=f2e151]:
+                  - generic [ref=f2e152]: Created by you
+                  - strong [ref=f2e153]: "0"
+                - listitem [ref=f2e154]:
+                  - generic [ref=f2e155]: AI Inferred
+                  - strong [ref=f2e156]: "0"
+                - listitem [ref=f2e157]:
+                  - generic [ref=f2e158]: Imported
+                  - strong [ref=f2e159]: "0"
+            - article [ref=f2e160]:
+              - heading "Quick Filters" [level=3] [ref=f2e161]
+              - list [ref=f2e162]:
+                - listitem [ref=f2e163]:
+                  - link [ref=f2e164] [cursor=pointer]:
+                    - /url: "#currentRecipeUrlLogCard"
+                    - generic [ref=f2e165]: Recently Added
+                    - strong [ref=f2e169]: "0"
+                - listitem [ref=f2e170]:
+                  - link [ref=f2e171] [cursor=pointer]:
+                    - /url: "#cookbooksCard"
+                    - generic [ref=f2e172]: Cookbook Recipes
+                    - strong [ref=f2e175]: "0"
+                - listitem [ref=f2e176]:
+                  - link [ref=f2e177] [cursor=pointer]:
+                    - /url: "#recipeUrlsTextarea"
+                    - generic [ref=f2e178]: Imported URLs
+                    - strong [ref=f2e183]: "0"
+        - article [ref=f2e184]:
+          - generic [ref=f2e189]:
+            - heading "AI Recipe Suggestions" [level=3] [ref=f2e190]
+            - paragraph [ref=f2e191]: Get personalized recipe ideas based on your pantry and preferences.
+          - link "View Suggestions" [ref=f2e192] [cursor=pointer]:
+            - /url: "#aiPantryCookWithWhatIHave"
+        - generic [ref=f2e196]:
+          - generic [ref=f2e197]:
+            - button "Current Recipes 0 recipes" [expanded] [ref=f2e198] [cursor=pointer]:
+              - generic [ref=f2e199]:
+                - text: Current Recipes
+                - generic [ref=f2e200]: 0 recipes
+            - button "Current Recipes actions" [ref=f2e202] [cursor=pointer]
+          - generic [ref=f2e203]:
+            - generic [ref=f2e204]: No current recipe URLs yet.
+            - button "Create New Recipe" [ref=f2e205] [cursor=pointer]
+      - text: "> >"
+      - button "💬 Feedback & Support 0 requests" [ref=f2e68] [cursor=pointer]:
+        - generic [ref=f2e69]:
+          - generic [ref=f2e70]: 💬 Feedback & Support
+          - generic [ref=f2e71]: 0 requests
+  - navigation "Mobile navigation" [ref=f2e72]:
+    - link "Home" [ref=f2e73] [cursor=pointer]:
+      - /url: "#appPageHeader"
+    - link "Recipes" [active] [ref=f2e80] [cursor=pointer]:
+      - /url: "#recipesPage"
+    - link "Cookbooks" [ref=f2e86] [cursor=pointer]:
+      - /url: "#cookbooksCard"
+    - link "Lists" [ref=f2e91] [cursor=pointer]:
+      - /url: "#shoppingViewsSection"
+    - link "Pantry" [ref=f2e96] [cursor=pointer]:
+      - /url: "#aiPantrySection"
+    - button "Open all navigation" [ref=f2e102] [cursor=pointer]:
+      - generic [ref=f2e105]: More

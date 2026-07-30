@@ -687,6 +687,9 @@
                                             <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
                                         {% endif %}
                                         <a href="#recipeView" data-recipe-url="{{ meal.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ meal.recipe_name }}</a>
+                                        {% if meal.ingredient_selection_needed %}
+                                            <span class="app-meal-selection-needed">Selection needed.</span>
+                                        {% endif %}
                                         <button type="button"
                                                 class="app-meal-remove"
                                                 aria-label="Remove {{ meal.recipe_name }} from {{ meal_type }}"
@@ -760,10 +763,21 @@
                     {% for recipe in meal_plan_recipe_options %}
                         <option value="{{ recipe.url }}"
                                 data-default-servings="{{ recipe.default_servings }}"
-                                data-yield-label="{{ recipe.yield_label }}">{{ recipe.name }}</option>
+                                data-yield-label="{{ recipe.yield_label }}"
+                                data-ingredient-requirements="{{ recipe.ingredient_requirements | tojson | forceescape }}">{{ recipe.name }}</option>
                     {% endfor %}
                 </select>
             </label>
+            <section class="app-meal-ingredient-options"
+                     data-meal-ingredient-options
+                     aria-live="polite"
+                     hidden>
+                <div class="app-meal-ingredient-options-heading">
+                    <strong>Ingredient choices</strong>
+                    <span>Choose now or leave unresolved and decide later.</span>
+                </div>
+                <div data-meal-ingredient-option-list></div>
+            </section>
             <div class="app-dialog-field app-meal-planner-servings-field">
                 <label for="mealPlannerPlannedServings">Planned Servings</label>
                 <div class="app-meal-planner-servings-stepper" role="group" aria-label="Planned servings controls">

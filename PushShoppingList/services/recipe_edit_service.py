@@ -42,6 +42,10 @@ from PushShoppingList.services.cookbook_service import recipe_category_metadata_
 from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
+from PushShoppingList.services.ingredient_option_service import migrate_ingredient_requirement
+from PushShoppingList.services.ingredient_option_service import migrate_recipe_ingredient_options
+from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
+from PushShoppingList.services.ingredient_option_service import shopping_item_name
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
 from PushShoppingList.services.ingredient_unit_service import normalize_recipe_unit_fields
 from PushShoppingList.services.image_variant_service import IMAGE_VARIANTS
@@ -4715,6 +4719,7 @@ def load_editable_recipe(url):
         recipe_data.get("ingredients", []),
         recipe_notes,
     )
+    recipe_data = migrate_recipe_ingredient_options(recipe_data)
 
     return {
         "ok": True,
@@ -6576,6 +6581,7 @@ def save_editable_recipe(original_url, payload, require_existing=False):
             existing_substitutions,
             parent_item=item,
         )
+    recipe_data = migrate_recipe_ingredient_options(recipe_data)
     normalize_extracted_equipment_fields(recipe_data)
     log_recipe_pdf_fields("save_editable_recipe:before_write", recipe_data)
     save_recipe_output(source_url, recipe_data)
@@ -6982,6 +6988,8 @@ def save_editable_recipe_ingredient(
     }
     if creating:
         result["created"] = True
+        for field in ("recipe_ingredient_id", "row_id", "id"):
+            result["ingredient"].pop(field, None)
     return result
 
 
@@ -9388,7 +9396,12 @@ def normalize_estimated_nutrition_value(key, value):
 
 
 def sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients):
-    ingredients = extract_ingredients_from_result(recipe_data)
+    resolution = resolve_ingredient_requirements(recipe_data)
+    ingredients = [
+        shopping_item_name(item)
+        for item in resolution["items"]
+        if shopping_item_name(item)
+    ]
 
     if ingredients:
         add_items(ingredients)
@@ -9924,12 +9937,12 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
     master_lookup = recipe_edit_ingredient_master_lookup(ingredients, recipe_url=recipe_url)
     recipe_id = normalize_recipe_url_key(recipe_url) if recipe_url else ""
     rows = []
-    for item in ingredients:
+    for index, item in enumerate(ingredients):
         if not isinstance(item, dict):
             continue
         # Normalize a copy for display so legacy rows whose unknown unit was
         # moved into review metadata regain their recipe-specific unit text.
-        item = dict(item)
+        item = migrate_ingredient_requirement(item, index)
         repair_inline_form_choice_ingredient(item)
         item = normalize_ingredient_unit_fields(item)
 
@@ -9947,9 +9960,15 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             ingredient_id = recipe_edit_ingredient_master_id(item)
         ingredient_image_url = recipe_edit_master_image_url(item, master_record)
         rows.append(apply_purchase_mapping_to_ingredient({
+            "id": item.get("id") or "",
+            "recipe_ingredient_id": item.get("recipe_ingredient_id") or "",
+            "row_id": item.get("row_id") or "",
             "ingredient_id": str(ingredient_id) if ingredient_id else "",
             "section": recipe_ingredient_type_value(item),
             "original_text": item.get("original_text") or "",
+            "source_text": item.get("source_text") or item.get("original_text") or "",
+            "default_option_id": item.get("default_option_id") or "",
+            "selection_required": truthy(item.get("selection_required")),
             "quantity": item.get("quantity") or "",
             "quantity_text": item.get("quantity_text") or "",
             "recipe_qty": item.get("recipe_qty") or item.get("quantity") or "",
@@ -10411,6 +10430,20 @@ def sanitize_ingredients(value, existing_value=None):
             ),
             "section": ingredient_type,
             "original_text": original_text,
+            "source_text": nullable_string(
+                item.get("source_text")
+                or existing.get("source_text")
+                or original_text
+            ),
+            "default_option_id": nullable_string(
+                item.get("default_option_id")
+                or existing.get("default_option_id")
+            ),
+            "selection_required": truthy(
+                item.get("selection_required")
+                if "selection_required" in item
+                else existing.get("selection_required")
+            ),
             "raw_name": nullable_string(
                 item.get("raw_name")
                 or store_section_result.get("raw_name")
@@ -10481,7 +10514,12 @@ def sanitize_ingredients(value, existing_value=None):
             "ingredient_image_prompt": ingredient_image_prompt,
         }
         normalize_ingredient_unit_fields(row)
-        ingredients.append(apply_purchase_mapping_to_ingredient(row))
+        ingredients.append(
+            migrate_ingredient_requirement(
+                apply_purchase_mapping_to_ingredient(row),
+                index,
+            )
+        )
 
     return ingredients
 

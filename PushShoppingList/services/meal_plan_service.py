@@ -8,6 +8,7 @@ from datetime import datetime
 from datetime import timedelta
 from fractions import Fraction
 
+from PushShoppingList.services.ingredient_option_service import normalize_selection_map
 from PushShoppingList.services.storage_service import scoped_package_path
 
 
@@ -134,6 +135,23 @@ def normalize_meal(meal):
             # Keep legacy/core meal data readable even if an optional serving
             # value in an older file is malformed.
             pass
+    selections = normalize_selection_map(meal.get("ingredient_option_selections"))
+    unresolved_ids = [
+        clean_text(value)
+        for value in (
+            meal.get("unresolved_ingredient_requirement_ids")
+            if isinstance(meal.get("unresolved_ingredient_requirement_ids"), list)
+            else []
+        )
+        if clean_text(value)
+    ]
+    if selections:
+        normalized["ingredient_option_selections"] = selections
+    if unresolved_ids:
+        normalized["unresolved_ingredient_requirement_ids"] = unresolved_ids
+    normalized["ingredient_selection_needed"] = bool(
+        meal.get("ingredient_selection_needed") or unresolved_ids
+    )
     return normalized
 
 
@@ -212,6 +230,37 @@ def delete_meal(meal_id):
             return False
         save_meal_plan({"meals": remaining})
     return True
+
+
+def update_meal_ingredient_option_selections(
+    meal_id,
+    selections,
+    unresolved_requirement_ids=None,
+):
+    meal_id = clean_text(meal_id)
+    selections = normalize_selection_map(selections)
+    unresolved_requirement_ids = [
+        clean_text(value)
+        for value in (
+            unresolved_requirement_ids
+            if isinstance(unresolved_requirement_ids, list)
+            else []
+        )
+        if clean_text(value)
+    ]
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        target = next(
+            (meal for meal in payload["meals"] if meal["id"] == meal_id),
+            None,
+        )
+        if not target:
+            return None
+        target["ingredient_option_selections"] = selections
+        target["unresolved_ingredient_requirement_ids"] = unresolved_requirement_ids
+        target["ingredient_selection_needed"] = bool(unresolved_requirement_ids)
+        save_meal_plan(payload)
+        return normalize_meal(target)
 
 
 def meal_plan_home_preview(

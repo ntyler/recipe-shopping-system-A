@@ -24,6 +24,8 @@ sugar
 vanilla extract
 semisweet chocolate
 Dutch-processed cocoa powder
+=== CANNED ===
+canned white beans
 === SAUCES & CONDIMENTS ===
 green enchilada sauce
 === SPICES & SEASONINGS ===
@@ -31,7 +33,6 @@ kosher salt
 Pretzel salt
 ground cumin
 === MISC ===
-canned white beans
 green chiles
 warm water
 water
