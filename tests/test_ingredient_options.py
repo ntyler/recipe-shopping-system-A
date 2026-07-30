@@ -522,6 +522,42 @@ def test_editor_option_selection_is_always_visible_and_directly_changeable():
     assert ".is-selected-option" in css
 
 
+def test_collapsed_group_summary_projects_the_selected_single_option():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    selected_choice = script[
+        script.index("function recipeIngredientSelectedChoice"):
+        script.index("function setRecipeIngredientDefaultOption")
+    ]
+    inline_source = script[
+        script.index("function recipeIngredientInlineEditorSourceRow"):
+        script.index("function syncRecipeIngredientInlineEditor")
+    ]
+    summary = script[
+        script.index("function updateRecipeIngredientSummary(row)"):
+        script.index("function recipeEditIngredientRows")
+    ]
+    substitution_state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
+
+    assert "defaultOptionId && group.alternativeId === defaultOptionId" in selected_choice
+    assert "recipeIngredientOptionItemDisplay(value)" in selected_choice
+    assert "fallbackRow?.recipeIngredientInlineSummarySourceRow" in inline_source
+    assert "row.recipeIngredientInlineSummarySourceRow = selectedSourceRow;" in summary
+    assert "...fieldValuesFromRow(selectedSourceRow)" in summary
+    assert 'label.textContent += " · Selected";' in substitution_state
+    assert "summary.textContent = selectedSummary;" in substitution_state
+    assert (
+        'optionsButton.classList.toggle(\n            "has-selected-option"'
+        in substitution_state
+    )
+    assert "Ingredient editor v55: collapsed group rows reflect the selected option." in css
+    assert ".recipe-edit-ingredient-options-button.has-selected-option" in css
+
+
 def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

@@ -67857,3 +67857,17 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     width: 14px;
     height: 14px;
 }
+
+/* Ingredient editor v55: collapsed group rows reflect the selected option. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-ingredient-options-button.has-selected-option
+    [data-ingredient-options-label] {
+    color: var(--app-primary);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-ingredient-options-button.has-selected-option
+    [data-ingredient-options-summary] {
+    color: var(--app-text);
+    font-weight: 650;
+}
