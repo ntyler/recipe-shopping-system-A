@@ -340,6 +340,27 @@ def test_editor_uses_nested_table_rows_instead_of_cards_or_radio_choices():
     assert ".recipe-edit-ingredient-option-group::before" in css
 
 
+def test_editor_option_selection_is_always_visible_and_directly_changeable():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    service = (
+        ROOT / "PushShoppingList/services/recipe_edit_service.py"
+    ).read_text(encoding="utf-8")
+
+    assert "function updateRecipeIngredientOptionSelectionState" in script
+    assert "function setRecipeIngredientOptionSelected" in script
+    assert script.count("data-ingredient-option-select") >= 4
+    assert 'label.textContent = isSelected ? "Selected" : "Use this option";' in script
+    assert 'control.setAttribute("aria-pressed", String(isSelected));' in script
+    assert 'option.classList.toggle("is-selected-option", isSelected);' in script
+    assert 'defaultInput.value = isSelected ? "true" : "false";' in script
+    assert 'data-original-option-id value="${escapeAttribute(item.original_option_id || "")}"' in script
+    assert '"original_option_id": original_option_id(item, index),' in service
+    assert "Ingredient editor v54: persistent, directly changeable option selection." in css
+    assert ".recipe-edit-option-selection.is-selected" in css
+    assert ".is-selected-option" in css
+
+
 def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

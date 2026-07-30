@@ -44,6 +44,7 @@ from PushShoppingList.services.cookbook_service import recipe_cookbook_assignmen
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
 from PushShoppingList.services.ingredient_option_service import migrate_ingredient_requirement
 from PushShoppingList.services.ingredient_option_service import migrate_recipe_ingredient_options
+from PushShoppingList.services.ingredient_option_service import original_option_id
 from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
 from PushShoppingList.services.ingredient_option_service import shopping_item_name
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
@@ -9968,6 +9969,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "original_text": item.get("original_text") or "",
             "source_text": item.get("source_text") or item.get("original_text") or "",
             "default_option_id": item.get("default_option_id") or "",
+            "original_option_id": original_option_id(item, index),
             "selection_required": truthy(item.get("selection_required")),
             "quantity": item.get("quantity") or "",
             "quantity_text": item.get("quantity_text") or "",

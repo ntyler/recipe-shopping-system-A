@@ -42873,6 +42873,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         <input type="hidden" data-field="recipe_ingredient_id" value="${escapeAttribute(item.recipe_ingredient_id || "")}">
         <input type="hidden" data-field="source_text" value="${escapeAttribute(item.source_text || item.original_text || "")}">
         <input type="hidden" data-field="default_option_id" value="${escapeAttribute(item.default_option_id || "")}">
+        <input type="hidden" data-original-option-id value="${escapeAttribute(item.original_option_id || "")}">
         <input type="hidden" data-field="selection_required" value="${escapeAttribute(recipeIngredientMatchFlag(item.selection_required) || substitutionOptions.length ? "true" : "false")}">
         <input type="hidden" data-field="ingredient_id" value="${escapeAttribute(item.ingredient_id || item.master_ingredient_id || "")}">
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
@@ -43290,6 +43291,27 @@ function recipeIngredientAlternativeExplanation(rows = []) {
     }).filter(Boolean))].join(" ");
 }
 
+function updateRecipeIngredientOptionSelectionState(option, selected) {
+    if (!option) return;
+    const isSelected = Boolean(selected);
+    const control = option.querySelector("[data-ingredient-option-select]");
+    option.classList.toggle("is-selected-option", isSelected);
+    if (!control) return;
+
+    const label = control.querySelector("[data-ingredient-option-select-label]");
+    control.classList.toggle("is-selected", isSelected);
+    control.setAttribute("aria-pressed", String(isSelected));
+    control.setAttribute(
+        "aria-label",
+        isSelected ? "Selected ingredient option" : "Use this ingredient option"
+    );
+    control.title = isSelected
+        ? "This ingredient option is selected"
+        : "Use this ingredient option";
+    control.disabled = isSelected;
+    if (label) label.textContent = isSelected ? "Selected" : "Use this option";
+}
+
 function updateRecipeIngredientAlternativeCard(card, groupIndex = 0) {
     const rows = card ? [...card.querySelectorAll("[data-substitution-option-row]")] : [];
     if (!rows.length) {
@@ -43346,9 +43368,10 @@ function updateRecipeIngredientAlternativeCard(card, groupIndex = 0) {
         quality.hidden = !matchQuality.label;
     }
     if (preferredAction) {
-        preferredAction.textContent = preferred ? "Preferred Group" : "Set as Preferred";
+        preferredAction.textContent = preferred ? "Selected option" : "Use this option";
         preferredAction.disabled = preferred;
     }
+    updateRecipeIngredientOptionSelectionState(card, preferred);
     if (replaceAction) {
         replaceAction.hidden = rows.length !== 1;
         replaceAction.disabled = rows.length !== 1;
@@ -43413,6 +43436,18 @@ function createRecipeIngredientAlternativeCard(group, groupIndex) {
                   role="heading"
                   aria-level="4"
                   data-ingredient-grid-column="ingredient">ALTERNATIVE OPTION</span>
+            <button type="button"
+                    class="recipe-edit-option-selection"
+                    data-ingredient-option-select
+                    aria-label="Use this ingredient option"
+                    aria-pressed="false"
+                    title="Use this ingredient option"
+                    onclick="return setRecipeIngredientOptionSelected(this)">
+                <span class="recipe-edit-option-selection-icon" aria-hidden="true">
+                    ${recipeEditSvgIcon("check")}
+                </span>
+                <span data-ingredient-option-select-label>Use this option</span>
+            </button>
             <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap"
                  data-ingredient-grid-column="actions">
                 <button type="button"
@@ -43431,7 +43466,7 @@ function createRecipeIngredientAlternativeCard(group, groupIndex) {
                         <button type="button" onclick="return duplicateRecipeIngredientAlternative(this)">Duplicate option</button>
                         <button type="button" onclick="return moveRecipeIngredientAlternative(this, -1)">Move option up</button>
                         <button type="button" onclick="return moveRecipeIngredientAlternative(this, 1)">Move option down</button>
-                        <button type="button" data-set-alternative-preferred onclick="return setRecipeIngredientAlternativePreferred(this)">Set as preferred</button>
+                        <button type="button" data-set-alternative-preferred onclick="return setRecipeIngredientAlternativePreferred(this)">Use this option</button>
                     </div>
                     <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
                         <button type="button" class="delete" onclick="return removeRecipeIngredientAlternative(this)">Remove option</button>
@@ -43634,32 +43669,49 @@ function editRecipeIngredientAlternativeNotes(button) {
     return false;
 }
 
-function setRecipeIngredientAlternativePreferred(button) {
+function setRecipeIngredientOptionSelected(button) {
     const card = recipeIngredientAlternativeCardFromControl(button);
-    const ingredientRow = card ? card.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])") : null;
-    const container = card ? card.closest("[data-ingredient-substitutions]") : null;
-    if (!card || !ingredientRow || !container) {
+    const overview = button && button.closest
+        ? button.closest("[data-ingredient-choice-overview]")
+        : null;
+    const option = card || overview;
+    const ingredientRow = option
+        ? option.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])")
+        : null;
+    const container = option ? option.closest("[data-ingredient-substitutions]") : null;
+    const list = container ? container.querySelector("[data-ingredient-substitution-list]") : null;
+    if (!option || !ingredientRow || !container || !list) {
         return false;
     }
-    container.querySelectorAll(".recipe-edit-alternative-card").forEach(candidate => {
-        const isPreferred = candidate === card;
-        candidate.querySelectorAll('[data-field="preferred"]').forEach(input => {
-            input.checked = isPreferred;
-        });
-        candidate.querySelectorAll('[data-field="is_default"]').forEach(input => {
-            input.value = isPreferred ? "true" : "false";
-        });
-        updateRecipeIngredientAlternativeCard(candidate, Number(candidate.dataset.alternativeGroupIndex || 0));
-    });
-    const defaultOption = ingredientRow.querySelector('[data-field="default_option_id"]');
-    if (defaultOption) {
-        defaultOption.value = String(card.dataset.alternativeId || "").trim();
+
+    const optionRows = [...list.querySelectorAll("[data-substitution-option-row]")];
+    const alternativeGroups = recipeIngredientSubstitutionDomGroups(optionRows);
+    let selectedGroupIndex = -1;
+    let optionId = "";
+    if (card) {
+        optionId = String(card.dataset.alternativeId || "").trim();
+        selectedGroupIndex = alternativeGroups.findIndex(group => group.alternativeId === optionId);
+    } else {
+        const originalOption = ingredientRow.querySelector("[data-original-option-id]");
+        optionId = String(originalOption ? originalOption.value : "").trim();
     }
+    if (!optionId) {
+        return false;
+    }
+
+    setRecipeIngredientDefaultOption(
+        ingredientRow,
+        alternativeGroups,
+        optionId,
+        selectedGroupIndex,
+    );
     closeRecipeEditRowMenus();
-    updateRecipeIngredientSummary(ingredientRow);
-    updateRecipeEditorDirtyState(card.closest("#recipeEditForm"));
-    setRecipeEditStatus("Preferred replacement group updated. Save Recipe to keep it.");
+    setRecipeEditStatus("Ingredient option selected. Save Recipe to keep it.");
     return false;
+}
+
+function setRecipeIngredientAlternativePreferred(button) {
+    return setRecipeIngredientOptionSelected(button);
 }
 
 function duplicateRecipeIngredientAlternative(button) {
@@ -43979,7 +44031,7 @@ function setRecipeIngredientDefaultOption(row, alternativeGroups, optionId, sele
             const isSelected = groupIndex === selectedGroupIndex;
             const defaultInput = optionRow.querySelector('[data-field="is_default"]');
             const preferredInput = optionRow.querySelector('[data-field="preferred"]');
-            if (defaultInput) defaultInput.checked = isSelected;
+            if (defaultInput) defaultInput.value = isSelected ? "true" : "false";
             if (preferredInput) preferredInput.checked = isSelected;
         });
     });
@@ -44081,6 +44133,18 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
                 <span role="heading"
                       aria-level="4"
                       data-ingredient-grid-column="ingredient">DEFAULT OPTION</span>
+                <button type="button"
+                        class="recipe-edit-option-selection"
+                        data-ingredient-option-select
+                        aria-label="Use this ingredient option"
+                        aria-pressed="false"
+                        title="Use this ingredient option"
+                        onclick="return setRecipeIngredientOptionSelected(this)">
+                    <span class="recipe-edit-option-selection-icon" aria-hidden="true">
+                        ${recipeEditSvgIcon("check")}
+                    </span>
+                    <span data-ingredient-option-select-label>Use this option</span>
+                </button>
             `;
             const optionBody = document.createElement("div");
             optionBody.className = "recipe-edit-ingredient-default-option-body";
@@ -44108,6 +44172,13 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
         }
         bindRecipeIngredientInlineEditor(row, overview);
         bindRecipeIngredientNameField(row);
+        const defaultOption = row.querySelector('[data-field="default_option_id"]');
+        const originalOption = row.querySelector("[data-original-option-id]");
+        const originalOptionId = String(originalOption ? originalOption.value : "").trim();
+        updateRecipeIngredientOptionSelectionState(
+            overview,
+            Boolean(originalOptionId && defaultOption && defaultOption.value === originalOptionId),
+        );
     }
 
     let alternativeNumber = 0;

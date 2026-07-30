@@ -2581,7 +2581,7 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
     assert "Edit option" in card_markup
     assert "Duplicate option" in card_markup
     assert "Move option up" in card_markup
-    assert "Set as preferred" in card_markup
+    assert "Use this option" in card_markup
     assert "Remove option" in card_markup
     assert "Save option" in card_markup
     assert ">Cancel</button>" in card_markup
