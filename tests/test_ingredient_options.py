@@ -522,7 +522,7 @@ def test_editor_option_selection_is_always_visible_and_directly_changeable():
     assert ".is-selected-option" in css
 
 
-def test_collapsed_group_summary_projects_the_selected_single_option():
+def test_collapsed_group_summary_projects_single_and_multi_item_selections():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -545,11 +545,17 @@ def test_collapsed_group_summary_projects_the_selected_single_option():
 
     assert "defaultOptionId && group.alternativeId === defaultOptionId" in selected_choice
     assert "recipeIngredientOptionItemDisplay(value)" in selected_choice
+    assert '.join(" + ");' in selected_choice
+    assert 'selectionLabel: "Default selected"' in selected_choice
+    assert '"Alternative selected"' in selected_choice
     assert "fallbackRow?.recipeIngredientInlineSummarySourceRow" in inline_source
     assert "row.recipeIngredientInlineSummarySourceRow = selectedSourceRow;" in summary
     assert "...fieldValuesFromRow(selectedSourceRow)" in summary
     assert 'label.textContent += " · Selected";' in substitution_state
+    assert "label.textContent = selectedLabel;" in substitution_state
+    assert "selectedChoice?.ingredientSummary || selectedDetails" in substitution_state
     assert "summary.textContent = selectedSummary;" in substitution_state
+    assert "summary.title = alternativeCount && selectedDetails" in substitution_state
     assert (
         'optionsButton.classList.toggle(\n            "has-selected-option"'
         in substitution_state

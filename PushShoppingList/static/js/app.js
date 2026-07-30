@@ -44045,11 +44045,16 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
         defaultOptionId && group.alternativeId === defaultOptionId
     ));
     if (!selectedGroup && originalOptionId && defaultOptionId === originalOptionId) {
+        const ingredientSummary = recipeIngredientSentenceCase(
+            originalValues.ingredient || "",
+        ) || "Unnamed ingredient";
         return {
             id: originalOptionId,
             rows: [],
             values: [originalValues],
             summary: recipeIngredientOptionItemDisplay(originalValues),
+            ingredientSummary,
+            selectionLabel: "Default selected",
         };
     }
     if (!selectedGroup) {
@@ -44059,6 +44064,15 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
     }
     if (selectedGroup) {
         const values = selectedGroup.rows.map(fieldValuesFromRow);
+        const isDefaultOption = values.some(value => (
+            String(value.option_type || "").trim() === "original"
+        ));
+        const ingredientSummary = values
+            .map(value => (
+                recipeIngredientSentenceCase(value.ingredient || "")
+                    || "Unnamed ingredient"
+            ))
+            .join(" + ");
         return {
             id: selectedGroup.alternativeId,
             rows: selectedGroup.rows,
@@ -44067,6 +44081,10 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
                 .map(value => recipeIngredientOptionItemDisplay(value))
                 .filter(Boolean)
                 .join(" + "),
+            ingredientSummary,
+            selectionLabel: isDefaultOption
+                ? "Default selected"
+                : "Alternative selected",
         };
     }
     return null;
@@ -44461,7 +44479,11 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         const summary = optionsButton.querySelector("[data-ingredient-options-summary]");
         const compactSummary = requirementChoiceSummary;
         const optionLabel = compactSummary.label;
-        const selectedSummary = String(selectedChoice?.summary || "").trim();
+        const selectedDetails = String(selectedChoice?.summary || "").trim();
+        const selectedSummary = String(
+            selectedChoice?.ingredientSummary || selectedDetails,
+        ).trim();
+        const selectedLabel = String(selectedChoice?.selectionLabel || "").trim();
         const groupSummaries = alternativeGroups.map(group => (
             group.rows
                 .map(optionRow => String(fieldValuesFromRow(optionRow).ingredient || "").trim())
@@ -44488,6 +44510,9 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
             label.textContent = alternativeCount ? optionLabel : "None";
             if (alternativeCount && selectedSummary) {
                 label.textContent += " · Selected";
+                if (selectedLabel) {
+                    label.textContent = selectedLabel;
+                }
             }
         }
         if (summary) {
@@ -44497,6 +44522,9 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
                 summary.textContent = selectedSummary;
                 summary.hidden = false;
             }
+            summary.title = alternativeCount && selectedDetails
+                ? selectedDetails
+                : compactSummary.summary;
         }
         optionsButton.classList.toggle("is-empty", alternativeCount === 0);
         optionsButton.classList.toggle(
@@ -44514,7 +44542,7 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         optionsButton.setAttribute(
             "aria-label",
             `${action} ${optionLabel.toLowerCase()} for ${ingredientName}`
-                + `${selectedSummary ? `. Selected: ${selectedSummary}` : ""}`,
+                + `${selectedDetails ? `. Selected: ${selectedDetails}` : ""}`,
         );
     }
     const tableScroll = row?.closest("[data-recipe-edit-ingredient-table-scroll]");
