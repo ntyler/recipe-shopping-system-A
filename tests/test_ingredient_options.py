@@ -153,6 +153,63 @@ def test_selected_replacement_option_resolves_as_one_atomic_group(
     assert resolution["selection_needed"] is False
 
 
+def test_explicit_multi_ingredient_default_option_uses_parent_only_as_summary():
+    ingredient = {
+        "id": "ingredient-flour-mixture",
+        "ingredient": "Flour mixture",
+        "original_text": "Flour + baking powder, or self-rising flour",
+        # Legacy rows may still point at the synthetic parent option.  Once an
+        # explicit original group exists, that group becomes the real default.
+        "default_option_id": "original:ingredient-flour-mixture",
+        "substitutions": [
+            {
+                "alternative_id": "flour-default",
+                "alternative_order": 0,
+                "alternative_component_order": 0,
+                "option_type": "original",
+                "is_default": True,
+                "ingredient": "All-purpose flour",
+                "quantity": "1",
+                "unit": "cup",
+            },
+            {
+                "alternative_id": "flour-default",
+                "alternative_order": 0,
+                "alternative_component_order": 1,
+                "option_type": "original",
+                "is_default": True,
+                "ingredient": "Baking powder",
+                "quantity": "1 1/2",
+                "unit": "teaspoons",
+            },
+            {
+                "alternative_id": "self-rising",
+                "alternative_order": 1,
+                "ingredient": "Self-rising flour",
+                "quantity": "1",
+                "unit": "cup",
+            },
+        ],
+    }
+
+    requirement = ingredient_requirement(ingredient)
+    migrated = migrate_ingredient_requirement(ingredient)
+    resolution = resolve_ingredient_requirements([ingredient], require_all=True)
+
+    assert [option["id"] for option in requirement["options"]] == [
+        "flour-default",
+        "self-rising",
+    ]
+    assert requirement["default_option_id"] == "flour-default"
+    assert migrated["default_option_id"] == "flour-default"
+    assert requirement["selection_required"] is True
+    assert [item["ingredient"] for item in resolution["items"]] == [
+        "All-purpose flour",
+        "Baking powder",
+    ]
+    assert "Flour mixture" not in [item["ingredient"] for item in resolution["items"]]
+
+
 def test_migration_keeps_existing_flat_rows_and_adds_stable_group_metadata():
     migrated = migrate_ingredient_requirement(buttermilk_requirement())
 
@@ -247,7 +304,7 @@ def test_meal_selection_is_saved_only_on_the_meal_instance(monkeypatch, tmp_path
     assert master_recipe == original_recipe
 
 
-def test_editor_uses_inline_option_detail_instead_of_an_alternative_dialog():
+def test_editor_uses_nested_table_rows_instead_of_cards_or_radio_choices():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -267,11 +324,17 @@ def test_editor_uses_inline_option_detail_instead_of_an_alternative_dialog():
     assert "Add another option" in script
     assert "function moveRecipeIngredientAlternative(control, direction)" in script
     assert "function moveRecipeIngredientAlternativeComponent(control, direction)" in script
-    assert "function setRecipeIngredientDefaultOption" in script
-    assert 'marker.type = "radio";' in script
+    assert "function addRecipeIngredientDefaultComponent" in script
+    assert 'marker.type = "radio";' not in script
+    assert "recipe-edit-ingredient-option-divider" in script
+    assert "recipe-edit-alternative-component-status" in script
+    assert "recipe-edit-alternative-component-size" in script
+    assert 'data-ingredient-column="store"' in script
+    assert 'data-ingredient-column="type"' in script
     assert "toggleRecipeIngredientSubstitutions(optionsButton, event)" in organizer
     assert "toggleRecipeIngredientSubstitutions(mobileAlternativesBadge, event)" in organizer
     assert "tableScroll.scrollLeft = inlineScrollLeft;" in script
     assert "grid-column: 1 / -1 !important;" in css
-    assert "position: sticky;" in css
-    assert "width: min(720px, calc(100cqi - 28px));" in css
+    assert "Ingredient editor v45: nested, table-native ingredient option groups." in css
+    assert "grid-template-columns: var(--recipe-edit-ingredient-grid);" in css
+    assert ".recipe-edit-ingredient-option-group::before" in css

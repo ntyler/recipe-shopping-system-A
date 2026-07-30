@@ -1075,7 +1075,7 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     assert "tableScroll.appendChild(ingredientList);" in tools_block
 
 
-def test_recipe_editor_ingredient_options_use_accessible_dialog_disclosure():
+def test_recipe_editor_ingredient_options_use_inline_nested_table_disclosure():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
 
@@ -1083,28 +1083,24 @@ def test_recipe_editor_ingredient_options_use_accessible_dialog_disclosure():
     organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
     organize = script[organize_start:organize_end]
     assert 'substitutions.classList.add("recipe-edit-ingredient-options-panel")' in organize
-    assert "row.appendChild(alternativesDialog);" in organize
-    assert 'alternativesDialog = document.createElement("dialog");' in organize
-    assert '?.appendChild(substitutions);' in organize
+    assert "row.appendChild(substitutions);" in organize
+    assert 'alternativesDialog = document.createElement("dialog");' not in organize
     assert "substitutions.hidden = true;" in organize
     assert 'optionsCell.className = "recipe-edit-ingredient-substitution-cell";' in organize
     assert 'optionsCell.setAttribute("role", "cell");' in organize
     assert 'optionsButton.className = "recipe-edit-ingredient-options-button";' in organize
-    assert 'optionsButton.setAttribute("aria-haspopup", "dialog");' in organize
-    assert 'optionsButton.setAttribute("aria-controls", alternativesDialog.id);' in organize
-    assert "openRecipeIngredientAlternativesDialog(optionsButton, event)" in organize
+    assert 'optionsButton.setAttribute("aria-haspopup", "dialog");' not in organize
+    assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organize
+    assert "toggleRecipeIngredientSubstitutions(optionsButton, event)" in organize
     assert "organizeRecipeEditSubstitutionOptionRow" in script
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in script
 
-    v10_css = css[css.index("/* Ingredient editor v10:"):]
-    assert ".recipe-edit-ingredient-substitution-cell" in v10_css
-    assert "grid-column: 7 !important;" in v10_css
-    assert "> .recipe-edit-ingredient-options-panel" in v10_css
-    assert "grid-column: 1 / -1 !important;" in v10_css
-    assert "grid-row: 2 !important;" in v10_css
-    assert ".recipe-edit-ingredient-options-panel[hidden]" in v10_css
-    assert "dialog.recipe-edit-ingredient-alternatives-dialog[open]" in css
-    assert ".recipe-edit-ingredient-alternatives-dialog::backdrop" in css
+    nested_css = css[css.index("/* Ingredient editor v45:"):]
+    assert "> .recipe-edit-ingredient-options-panel" in nested_css
+    assert "grid-template-columns: var(--recipe-edit-ingredient-grid);" in nested_css
+    assert ".recipe-edit-ingredient-option-divider" in nested_css
+    assert ".recipe-edit-alternative-component-summary" in nested_css
+    assert ".recipe-edit-ingredient-option-group::before" in nested_css
 
 
 def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls():
@@ -1135,22 +1131,25 @@ def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls()
     assert "Delete ${accessibleName}" in script
 
 
-def test_recipe_editor_substitution_popover_uses_mockup_summary_hierarchy():
+def test_recipe_editor_substitution_groups_use_mockup_table_hierarchy():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert 'document.createTextNode("Alternatives for ")' in script
-    assert 'title.appendChild(name);' in script
-    assert "Add Alternative" in script
+    assert "DEFAULT OPTION" in script
+    assert "ALTERNATIVE OPTION" in script
+    assert "Add ingredient to this option" in script
+    assert "Add another option to this ingredient group" in script
     assert 'class="recipe-edit-substitution-thumbnail"' in script
-    assert 'class="recipe-edit-substitution-ratio"' in script
-    assert 'class="recipe-edit-substitution-quality' in script
-    assert "Best match" in script
-    assert "Acceptable" in script
-    assert 'data-ingredient-substitution-view-all' in script
-    assert "optionRows.length === 0" in script
-    assert ".recipe-edit-substitution-option-row:nth-child(n + 4)" in css
-    assert ".recipe-edit-substitution-view-all" in css
+    assert 'data-ingredient-column="status"' in script
+    assert 'data-ingredient-column="quantity"' in script
+    assert 'data-ingredient-column="unit"' in script
+    assert 'data-ingredient-column="size"' in script
+    assert 'data-ingredient-column="store"' in script
+    assert 'data-ingredient-column="type"' in script
+    assert 'marker.type = "radio";' not in script
+    assert ".recipe-edit-alternative-component-status" in css
+    assert ".recipe-edit-alternative-component-size" in css
+    assert ".recipe-edit-alternative-component-actions" in css
 
 
 def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization():

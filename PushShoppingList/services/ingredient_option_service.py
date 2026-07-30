@@ -262,22 +262,42 @@ def ingredient_requirement(item, index=0):
     req_id = requirement_id(item, index)
     original_id = original_option_id(item, index)
     groups = grouped_substitution_rows(item, index)
+    explicit_original_group = next(
+        (group for group in groups if group["option_type"] == "original"),
+        None,
+    )
     default_option_id = clean_text(item.get("default_option_id"))
     if not default_option_id:
         default_group = next((group for group in groups if group["is_default"]), None)
         default_option_id = default_group["id"] if default_group else ""
     if truthy(item.get("original_is_default")):
-        default_option_id = original_id
+        default_option_id = (
+            explicit_original_group["id"]
+            if explicit_original_group
+            else original_id
+        )
+    elif (
+        explicit_original_group
+        and (not default_option_id or default_option_id == original_id)
+    ):
+        default_option_id = explicit_original_group["id"]
 
     original_label = clean_text(item.get("original_option_label")) or "Original"
-    options = [{
-        "id": original_id,
-        "label": original_label,
-        "option_type": "original",
-        "is_default": default_option_id == original_id,
-        "sort_order": 0,
-        "items": [option_item(item)],
-    }]
+    options = []
+    # A normal legacy ingredient row is itself the original option.  A grouped
+    # requirement can instead persist an explicit ``option_type=original``
+    # substitution group.  That shape supports default options made from two or
+    # more ingredients while keeping the top-level row as a non-purchasable
+    # summary/container.
+    if not explicit_original_group:
+        options.append({
+            "id": original_id,
+            "label": original_label,
+            "option_type": "original",
+            "is_default": default_option_id == original_id,
+            "sort_order": 0,
+            "items": [option_item(item)],
+        })
     for group in groups:
         options.append({
             "id": group["id"],
@@ -293,7 +313,7 @@ def ingredient_requirement(item, index=0):
         "label": clean_text(item.get("requirement_label") or ingredient_name(item)),
         "source_text": clean_text(item.get("source_text") or item.get("original_text")),
         "default_option_id": default_option_id or None,
-        "selection_required": bool(groups),
+        "selection_required": len(options) > 1,
         "sort_order": index,
         "options": options,
     }
@@ -425,11 +445,31 @@ def migrate_ingredient_requirement(item, index=0):
                 row["preferred"] = True
             flat_rows.append(row)
     migrated["substitutions"] = flat_rows
-    migrated["selection_required"] = bool(flat_rows)
+    explicit_original_group = next(
+        (group for group in groups if group["option_type"] == "original"),
+        None,
+    )
+    migrated["selection_required"] = (
+        len(groups) > 1 if explicit_original_group else bool(flat_rows)
+    )
     default_option_id = clean_text(migrated.get("default_option_id"))
-    if not default_option_id:
+    if (
+        explicit_original_group
+        and (
+            not default_option_id
+            or default_option_id == original_option_id(migrated, index)
+        )
+    ):
+        default_option_id = explicit_original_group["id"]
+    elif not default_option_id:
         default_group = next((group for group in groups if group["is_default"]), None)
-        default_option_id = default_group["id"] if default_group else ""
+        default_option_id = (
+            default_group["id"]
+            if default_group
+            else explicit_original_group["id"]
+            if explicit_original_group
+            else ""
+        )
     migrated["default_option_id"] = default_option_id
     return migrated
 
