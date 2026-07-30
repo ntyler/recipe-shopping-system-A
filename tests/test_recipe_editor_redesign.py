@@ -1214,6 +1214,7 @@ def test_recipe_editor_expanded_option_dividers_and_add_rows_are_compact_grid_ro
 
 def test_recipe_editor_nested_rows_keep_complete_columns_and_actions_at_the_far_right():
     script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
     summary_builder_start = script.index("function createRecipeIngredientOptionRowSummary(")
     summary_builder_end = script.index(
         "function updateRecipeIngredientOptionRowSummary",
@@ -1267,11 +1268,25 @@ def test_recipe_editor_nested_rows_keep_complete_columns_and_actions_at_the_far_
     assert 'class="recipe-edit-row-menu-btn"' in default_summary
     assert 'aria-expanded="false"' in default_summary
     assert 'recipeEditSvgIcon("trash")' not in default_summary
+    assert 'recipeEditSvgIcon("basket")' not in default_summary
 
     card_start = script.index("function createRecipeIngredientAlternativeCard(group, groupIndex)")
     card_end = script.index("function ensureRecipeIngredientAlternativeCards", card_start)
     card = script[card_start:card_end]
     assert "group.rows.forEach(optionRow => components.appendChild(optionRow));" in card
+
+    v47_css = css[css.index("/* Ingredient editor v47:"):]
+    summary_rule_start = v47_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-alternative-component-summary {"
+    )
+    summary_rule = v47_css[
+        summary_rule_start:v47_css.index("}", summary_rule_start)
+    ]
+    # This must beat the legacy display:contents rule; otherwise nested cells
+    # become implicit items in the option wrapper and collapse to the right.
+    assert "display: grid !important;" in summary_rule
+    assert "min-height: 64px;" in summary_rule
+    assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in v47_css
 
 
 def test_recipe_editor_expanded_groups_preserve_disclosure_and_option_heading_accessibility():

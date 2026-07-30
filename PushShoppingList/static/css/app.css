@@ -67034,6 +67034,7 @@ body.recipe-edit-standalone-page .recipe-edit-option-add-content {
     }
 
     body.recipe-edit-standalone-page .recipe-edit-alternative-component-summary {
+        display: grid !important;
         min-height: 64px;
         padding: 7px 0;
         border-bottom: 1px solid color-mix(in srgb, var(--app-border) 76%, transparent);

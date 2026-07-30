@@ -2437,20 +2437,24 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
     substitution_start = script.index("function organizeRecipeEditSubstitutionOptionRow")
     substitution_end = script.index("function organizeRecipeEditIngredientRow", substitution_start)
     substitution = script[substitution_start:substitution_end]
+    summary_start = script.index("function createRecipeIngredientOptionRowSummary(")
+    summary_end = script.index("function updateRecipeIngredientOptionRowSummary", summary_start)
+    summary = script[summary_start:summary_end]
     assert 'optionRow.classList.add("recipe-edit-alternative-component");' in substitution
-    assert 'summary.className = "recipe-edit-alternative-component-summary";' in substitution
-    assert "data-alternative-component-name" in substitution
-    assert "data-alternative-component-quantity" in substitution
-    assert "data-alternative-component-unit" in substitution
-    assert "data-alternative-component-store" in substitution
-    assert "data-alternative-component-status" in substitution
-    assert "data-alternative-component-size" in substitution
-    assert "data-alternative-component-type" in substitution
-    assert "data-alternative-component-metadata" in substitution
-    assert "data-alternative-component-buy-as" in substitution
-    assert 'data-ingredient-column="media"' in substitution
-    assert 'data-ingredient-column="ingredient"' in substitution
-    assert 'data-ingredient-column="actions"' in substitution
+    assert "const summary = createRecipeIngredientOptionRowSummary();" in substitution
+    assert '"recipe-edit-alternative-component-summary"' in summary
+    assert "data-alternative-component-name" in summary
+    assert "data-alternative-component-quantity" in summary
+    assert "data-alternative-component-unit" in summary
+    assert "data-alternative-component-store" in summary
+    assert "data-alternative-component-status" in summary
+    assert "data-alternative-component-size" in summary
+    assert "data-alternative-component-type" in summary
+    assert "data-alternative-component-metadata" in summary
+    assert "data-alternative-component-buy-as" in summary
+    assert 'data-ingredient-column="media"' in summary
+    assert 'data-ingredient-column="ingredient"' in summary
+    assert 'data-ingredient-column="actions"' in summary
     assert 'editGrid.className = "recipe-edit-alternative-component-edit-grid";' in substitution
     assert 'identity.className = "recipe-edit-alternative-edit-field field-ingredient";' in substitution
     assert 'compactMetadata.className = "recipe-edit-alternative-metadata-inputs";' in substitution

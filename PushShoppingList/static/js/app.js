@@ -41594,7 +41594,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
                       role="img"
                       aria-label="No image available for ${escapeAttribute(optionIngredientName)}"
                       ${optionImageUrl ? "hidden" : ""}>
-                    ${recipeEditSvgIcon("basket")}
+                    ${recipeEditSvgIcon(recipeIngredientStoreSectionIconName(option.store_section || ""))}
                 </span>
             </span>
             <div class="recipe-edit-ingredient-name-label">
@@ -43527,7 +43527,7 @@ function createRecipeIngredientDefaultOptionSummary(row) {
                     <span class="recipe-edit-substitution-image-fallback"
                           role="img"
                           aria-label="No image available for ${escapeAttribute(ingredientName)}">
-                        ${recipeEditSvgIcon("basket")}
+                        ${recipeEditSvgIcon(recipeIngredientStoreSectionIconName(values.store_section || ""))}
                     </span>`}
             </span>
         `;
