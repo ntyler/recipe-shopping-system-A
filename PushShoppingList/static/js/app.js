@@ -29502,11 +29502,25 @@ function createRecipeIngredientOptionRowSummary(className = "") {
         <div class="recipe-edit-alternative-component-status" data-alternative-component-status data-ingredient-column="status" role="cell"></div>
         <div class="recipe-edit-alternative-component-quantity" data-ingredient-column="quantity" role="cell">
             <span class="recipe-edit-alternative-column-label">Quantity</span>
-            <strong data-alternative-component-quantity></strong>
+            <input type="text"
+                   class="recipe-edit-ingredient-inline-control"
+                   data-alternative-component-quantity
+                   data-recipe-ingredient-inline-field="quantity"
+                   aria-label="Quantity"
+                   autocomplete="off">
         </div>
         <div class="recipe-edit-alternative-component-unit" data-ingredient-column="unit" role="cell">
             <span class="recipe-edit-alternative-column-label">Unit</span>
-            <span data-alternative-component-unit></span>
+            <input type="text"
+                   class="recipe-edit-ingredient-inline-control"
+                   data-alternative-component-unit
+                   data-recipe-ingredient-inline-field="unit"
+                   list="recipeIngredientUnitOptions"
+                   aria-label="Unit"
+                   autocomplete="off">
+            <span class="recipe-edit-unit-chevron recipe-edit-inline-picker-chevron" aria-hidden="true">
+                ${recipeEditSvgIcon("chevron-down")}
+            </span>
         </div>
         <div class="recipe-edit-alternative-component-size" data-ingredient-column="size" role="cell">
             <span class="recipe-edit-alternative-column-label">Size</span>
@@ -29566,8 +29580,8 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
             recipeIngredientMatchItemFromRow(sourceRow, values)
         );
     }
-    if (quantityElement) quantityElement.textContent = formatRecipeIngredientQuantityColumn(values);
-    if (unitElement) unitElement.textContent = formatRecipeIngredientUnitColumn(values);
+    if (quantityElement) quantityElement.value = String(values.quantity || "").trim();
+    if (unitElement) unitElement.value = String(values.unit || "").trim();
     if (sizeElement) sizeElement.textContent = String(values.size || "").trim() || "\u2014";
     if (storeElement) {
         storeElement.innerHTML = `<span class="recipe-edit-alternative-column-label">Store section</span>${recipeIngredientStoreSectionIconHtml(values.store_section || "")}<span>${escapeHtml(storeSection || "\u2014")}</span>`;
@@ -29986,11 +30000,16 @@ function ensureRecipeIngredientInlineTypeTrigger(control, source) {
     return trigger;
 }
 
-function syncRecipeIngredientInlineEditor(row) {
-    if (!row) return;
-    row.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
+function recipeIngredientInlineEditorSourceRow(control, fallbackRow) {
+    return control?.closest("[data-substitution-option-row]") || fallbackRow;
+}
+
+function syncRecipeIngredientInlineEditor(row, scope = row) {
+    if (!row || !scope) return;
+    scope.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
         const fieldName = control.dataset.recipeIngredientInlineField;
-        const source = recipeIngredientDirectField(row, fieldName);
+        const sourceRow = recipeIngredientInlineEditorSourceRow(control, row);
+        const source = recipeIngredientDirectField(sourceRow, fieldName);
         if (!source) return;
 
         if (control.tagName === "SELECT" && source.tagName === "SELECT") {
@@ -30022,13 +30041,14 @@ function syncRecipeIngredientInlineEditor(row) {
     });
 }
 
-function bindRecipeIngredientInlineEditor(row) {
-    if (!row) return;
-    row.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
+function bindRecipeIngredientInlineEditor(row, scope = row) {
+    if (!row || !scope) return;
+    scope.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
         if (control.dataset.recipeIngredientInlineBound === "true") return;
         control.dataset.recipeIngredientInlineBound = "true";
         const fieldName = control.dataset.recipeIngredientInlineField;
-        const source = recipeIngredientDirectField(row, fieldName);
+        const sourceRow = recipeIngredientInlineEditorSourceRow(control, row);
+        const source = recipeIngredientDirectField(sourceRow, fieldName);
         if (!source) return;
         if (fieldName === "store_section") {
             ensureRecipeIngredientInlineStoreSectionTrigger(control, source);
@@ -30041,7 +30061,7 @@ function bindRecipeIngredientInlineEditor(row) {
         const applyValue = eventName => {
             source.value = control.value;
             source.dispatchEvent(new Event(eventName, { bubbles: true }));
-            syncRecipeIngredientInlineEditor(row);
+            syncRecipeIngredientInlineEditor(row, scope);
         };
         const primaryEvent = control.tagName === "SELECT" ? "change" : "input";
         control.addEventListener(primaryEvent, () => applyValue(primaryEvent));
@@ -30049,13 +30069,13 @@ function bindRecipeIngredientInlineEditor(row) {
             control.addEventListener("change", () => applyValue("change"));
             control.addEventListener("blur", () => {
                 source.dispatchEvent(new Event("blur"));
-                syncRecipeIngredientInlineEditor(row);
+                syncRecipeIngredientInlineEditor(row, scope);
             });
         }
-        source.addEventListener("input", () => syncRecipeIngredientInlineEditor(row));
-        source.addEventListener("change", () => syncRecipeIngredientInlineEditor(row));
+        source.addEventListener("input", () => syncRecipeIngredientInlineEditor(row, scope));
+        source.addEventListener("change", () => syncRecipeIngredientInlineEditor(row, scope));
     });
-    syncRecipeIngredientInlineEditor(row);
+    syncRecipeIngredientInlineEditor(row, scope);
 }
 
 function addRecipeIngredientBuyAsTooltip(field, modalId) {
@@ -42571,6 +42591,7 @@ function bindRecipeIngredientSubstitutionRow(optionRow) {
 
     optionRow.dataset.substitutionBound = "true";
     bindRecipeIngredientNameField(optionRow);
+    bindRecipeIngredientInlineEditor(optionRow);
     bindRecipeIngredientUnitControls(optionRow);
     bindRecipeIngredientStoreSectionControls(optionRow);
     bindRecipeIngredientBaseTracking(optionRow);
@@ -43676,28 +43697,40 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
             const list = container.querySelector(":scope > [data-ingredient-substitution-list]");
             list?.insertAdjacentElement("beforebegin", overview);
         }
-        const divider = document.createElement("div");
-        divider.className = "recipe-edit-ingredient-option-divider";
-        divider.innerHTML = `
-            <span role="heading"
-                  aria-level="4"
-                  data-ingredient-grid-column="ingredient">DEFAULT OPTION</span>
-        `;
-        const optionBody = document.createElement("div");
-        optionBody.className = "recipe-edit-ingredient-default-option-body";
-        optionBody.appendChild(createRecipeIngredientDefaultOptionSummary(row));
-        const addIngredient = document.createElement("button");
-        addIngredient.type = "button";
-        addIngredient.className = "recipe-edit-alternative-add-component recipe-edit-default-option-add-component";
-        addIngredient.innerHTML = `
-            <span class="recipe-edit-option-add-content"
-                  data-ingredient-grid-column="ingredient">
-                ${recipeEditSvgIcon("plus")}<span>Add ingredient to this option</span>
-            </span>
-        `;
-        addIngredient.addEventListener("click", () => addRecipeIngredientDefaultComponent(addIngredient));
-        optionBody.appendChild(addIngredient);
-        overview.replaceChildren(divider, optionBody);
+        let summary = overview.querySelector(".recipe-edit-default-option-summary");
+        if (!summary) {
+            const divider = document.createElement("div");
+            divider.className = "recipe-edit-ingredient-option-divider";
+            divider.innerHTML = `
+                <span role="heading"
+                      aria-level="4"
+                      data-ingredient-grid-column="ingredient">DEFAULT OPTION</span>
+            `;
+            const optionBody = document.createElement("div");
+            optionBody.className = "recipe-edit-ingredient-default-option-body";
+            summary = createRecipeIngredientDefaultOptionSummary(row);
+            optionBody.appendChild(summary);
+            const addIngredient = document.createElement("button");
+            addIngredient.type = "button";
+            addIngredient.className = "recipe-edit-alternative-add-component recipe-edit-default-option-add-component";
+            addIngredient.innerHTML = `
+                <span class="recipe-edit-option-add-content"
+                      data-ingredient-grid-column="ingredient">
+                    ${recipeEditSvgIcon("plus")}<span>Add ingredient to this option</span>
+                </span>
+            `;
+            addIngredient.addEventListener("click", () => addRecipeIngredientDefaultComponent(addIngredient));
+            optionBody.appendChild(addIngredient);
+            overview.replaceChildren(divider, optionBody);
+        } else {
+            updateRecipeIngredientOptionRowSummary(summary, row, fieldValuesFromRow(row), {
+                accessiblePrefix: "Edit ingredient",
+                fallbackName: "Unnamed ingredient",
+                showBuyAs: false,
+                showMetadata: false,
+            });
+        }
+        bindRecipeIngredientInlineEditor(row, overview);
     }
 
     let alternativeNumber = 0;

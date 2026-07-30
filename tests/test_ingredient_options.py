@@ -408,3 +408,20 @@ def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows()
         "actions",
     ):
         assert f'[data-ingredient-column="{column}"]' in v48
+
+    v49 = css[css.index("/* Ingredient editor v49:"):]
+    assert "> .recipe-edit-ingredient-options-panel::before" in v49
+    assert "display: none !important;" in v49
+    assert "content: none !important;" in v49
+    assert ".recipe-edit-alternative-component-quantity" in v49
+    assert ".recipe-edit-alternative-component-unit" in v49
+    assert "> .recipe-edit-ingredient-inline-control" in v49
+    assert "padding-right: 22px;" in v49
+
+    assert "bindRecipeIngredientInlineEditor(optionRow);" in script
+    choice_overview = script[
+        script.index("function ensureRecipeIngredientChoiceOverview"):
+        script.index("function addRecipeIngredientDefaultComponent")
+    ]
+    assert 'let summary = overview.querySelector(".recipe-edit-default-option-summary");' in choice_overview
+    assert "bindRecipeIngredientInlineEditor(row, overview);" in choice_overview

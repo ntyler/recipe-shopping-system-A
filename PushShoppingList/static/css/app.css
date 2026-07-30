@@ -67466,3 +67466,45 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel
         content: none;
     }
 }
+
+/* Ingredient editor v49: unobstructed groups and standard inline amount controls. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-options-panel::before {
+    display: none !important;
+    content: none !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > :is(
+        .recipe-edit-alternative-component-quantity,
+        .recipe-edit-alternative-component-unit
+    ) {
+    position: relative;
+    display: block;
+    width: 100%;
+    overflow: visible;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > :is(
+        .recipe-edit-alternative-component-quantity,
+        .recipe-edit-alternative-component-unit
+    )
+    > .recipe-edit-ingredient-inline-control {
+    width: 100%;
+    height: 32px;
+    min-height: 32px;
+    padding-inline: 7px;
+    color: var(--app-text);
+    font: inherit;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-unit
+    > .recipe-edit-ingredient-inline-control {
+    padding-right: 22px;
+}

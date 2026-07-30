@@ -2446,6 +2446,10 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
     assert "data-alternative-component-name" in summary
     assert "data-alternative-component-quantity" in summary
     assert "data-alternative-component-unit" in summary
+    assert 'data-recipe-ingredient-inline-field="quantity"' in summary
+    assert 'data-recipe-ingredient-inline-field="unit"' in summary
+    assert summary.count('class="recipe-edit-ingredient-inline-control"') == 2
+    assert 'class="recipe-edit-unit-chevron recipe-edit-inline-picker-chevron"' in summary
     assert "data-alternative-component-store" in summary
     assert "data-alternative-component-status" in summary
     assert "data-alternative-component-size" in summary
@@ -2914,7 +2918,10 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-buy-as"' in organize
     assert 'placeholder="Add preparation"' in organize
     assert 'placeholder="Add buy as"' in organize
-    assert 'const source = recipeIngredientDirectField(row, fieldName);' in binding
+    assert "function recipeIngredientInlineEditorSourceRow(control, fallbackRow)" in script
+    assert 'control?.closest("[data-substitution-option-row]") || fallbackRow' in script
+    assert "const sourceRow = recipeIngredientInlineEditorSourceRow(control, row);" in binding
+    assert "const source = recipeIngredientDirectField(sourceRow, fieldName);" in binding
     assert 'source.dispatchEvent(new Event(eventName, { bubbles: true }));' in binding
     assert 'control.tagName === "SELECT"' in binding
     assert 'control.replaceChildren(...[...source.options].map(option => option.cloneNode(true)));' in script
