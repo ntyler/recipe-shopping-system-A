@@ -27819,6 +27819,9 @@ function clearRecipeEditIngredientColumnLayoutStyles() {
             cell.style.removeProperty("grid-column");
             cell.removeAttribute("aria-colindex");
         });
+        row.querySelectorAll("[data-ingredient-grid-column]").forEach(cell => {
+            cell.style.removeProperty("grid-column");
+        });
     });
 }
 
@@ -27868,6 +27871,25 @@ function applyRecipeEditIngredientColumnLayoutToRow(row, layout, positions, minW
         );
         cell.setAttribute("aria-colindex", String(position.logicalIndex + 1));
     });
+    const visiblePositions = layout.order
+        .map(key => positions[key])
+        .filter(Boolean);
+    const firstContentPosition = layout.order
+        .filter(key => key !== "media")
+        .map(key => positions[key])
+        .find(Boolean)
+        || visiblePositions[0];
+    const lastPosition = visiblePositions[visiblePositions.length - 1];
+    row.querySelectorAll("[data-ingredient-grid-column]").forEach(cell => {
+        const key = cell.dataset.ingredientGridColumn;
+        const position = positions[key]
+            || (key === "actions" ? lastPosition : firstContentPosition);
+        if (position) {
+            cell.style.setProperty("grid-column", String(position.track), "important");
+        } else {
+            cell.style.removeProperty("grid-column");
+        }
+    });
 }
 
 function applyRecipeEditIngredientColumnLayout() {
@@ -27884,13 +27906,28 @@ function applyRecipeEditIngredientColumnLayout() {
     const gap = Number.isFinite(computedGap) ? computedGap : 10;
     const positions = recipeEditIngredientColumnPositions(layout);
     const visibleOrder = recipeEditIngredientVisibleColumnOrder(layout);
+    const fittedWidths = fitRecipeEditIngredientColumnWidthsToBudget(
+        visibleOrder,
+        layout.widths,
+        recipeEditIngredientColumnWidthBudget(tableScroll, visibleOrder.length, gap),
+    );
+    const renderedLayout = {
+        ...layout,
+        widths: {
+            ...layout.widths,
+            ...fittedWidths,
+        },
+    };
     const tableWidth = Math.ceil(
-        visibleOrder.reduce((sum, key) => sum + layout.widths[key], 0)
+        visibleOrder.reduce((sum, key) => sum + renderedLayout.widths[key], 0)
         + (gap * Math.max(0, visibleOrder.length - 1))
         + 24,
     );
     tableScroll.dataset.recipeEditIngredientColumnsCustomized = "true";
-    tableScroll.style.setProperty("--recipe-edit-ingredient-grid", recipeEditIngredientColumnGrid(layout, gap));
+    tableScroll.style.setProperty(
+        "--recipe-edit-ingredient-grid",
+        recipeEditIngredientColumnGrid(renderedLayout, gap),
+    );
     tableHead.style.minWidth = `${tableWidth}px`;
     ingredientList.style.minWidth = `${tableWidth}px`;
     tableScroll.setAttribute("aria-colcount", String(visibleOrder.length));
@@ -27911,7 +27948,7 @@ function applyRecipeEditIngredientColumnLayout() {
         header.setAttribute("aria-colindex", String(position.logicalIndex + 1));
     });
     recipeEditIngredientRows().forEach(row => (
-        applyRecipeEditIngredientColumnLayoutToRow(row, layout, positions, tableWidth)
+        applyRecipeEditIngredientColumnLayoutToRow(row, renderedLayout, positions, tableWidth)
     ));
 }
 
@@ -29559,6 +29596,7 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     editGrid.hidden = true;
     const identity = document.createElement("div");
     identity.className = "recipe-edit-alternative-edit-field field-ingredient";
+    identity.dataset.ingredientGridColumn = "ingredient";
     if (name) identity.appendChild(name);
     if (buyAs) {
         buyAs.classList.add("recipe-edit-alternative-edit-field", "field-buy-as");
@@ -29571,17 +29609,19 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     });
     editGrid.appendChild(identity);
     [
-        [quantity, "field-amount"],
-        [unit, "field-unit"],
-        [storeSection, "field-store-section"],
-    ].forEach(([field, className]) => {
+        [quantity, "field-amount", "quantity"],
+        [unit, "field-unit", "unit"],
+        [storeSection, "field-store-section", "store"],
+    ].forEach(([field, className, column]) => {
         if (!field) return;
         field.classList.add("recipe-edit-alternative-edit-field", className);
+        field.dataset.ingredientGridColumn = column;
         editGrid.appendChild(field);
     });
 
     const sourceDetails = document.createElement("details");
     sourceDetails.className = "recipe-edit-alternative-source-details";
+    sourceDetails.dataset.ingredientGridColumn = "ingredient";
     sourceDetails.innerHTML = `
         <summary>
             <span>More details</span>
@@ -42182,8 +42222,11 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                     <span data-ingredient-substitution-title>Alternatives</span>
                     <span data-ingredient-substitution-count hidden>${escapeHtml(substitutionCountText)}</span>
                     <button type="button" onclick="return addRecipeIngredientSubstitutionRow(this)">
-                        ${recipeEditSvgIcon("plus")}
-                        <span data-ingredient-substitution-add-label>Add another option</span>
+                        <span class="recipe-edit-option-add-content"
+                              data-ingredient-grid-column="ingredient">
+                            ${recipeEditSvgIcon("plus")}
+                            <span data-ingredient-substitution-add-label>Add another option</span>
+                        </span>
                     </button>
                 </div>
                 <div class="recipe-edit-substitution-list" data-ingredient-substitution-list>
@@ -42840,8 +42883,10 @@ function createRecipeIngredientAlternativeCard(group, groupIndex) {
     card.dataset.alternativeId = group.alternativeId || "";
     card.innerHTML = `
         <div class="recipe-edit-ingredient-option-divider">
-            <span data-ingredient-option-divider-label>ALTERNATIVE OPTION</span>
-            <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap">
+            <span data-ingredient-option-divider-label
+                  data-ingredient-grid-column="ingredient">ALTERNATIVE OPTION</span>
+            <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap"
+                 data-ingredient-grid-column="actions">
                 <button type="button"
                         class="recipe-edit-row-menu-btn"
                         aria-label="Option actions"
@@ -42868,7 +42913,14 @@ function createRecipeIngredientAlternativeCard(group, groupIndex) {
         </div>
         <section class="recipe-edit-alternative-editor" aria-label="Ingredients in this option">
             <div class="recipe-edit-alternative-components"></div>
-            <button type="button" class="recipe-edit-alternative-add-component" onclick="return addRecipeIngredientAlternativeComponent(this)">${recipeEditSvgIcon("plus")}<span>Add ingredient to this option</span></button>
+            <button type="button"
+                    class="recipe-edit-alternative-add-component"
+                    onclick="return addRecipeIngredientAlternativeComponent(this)">
+                <span class="recipe-edit-option-add-content"
+                      data-ingredient-grid-column="ingredient">
+                    ${recipeEditSvgIcon("plus")}<span>Add ingredient to this option</span>
+                </span>
+            </button>
         </section>
         <div class="recipe-edit-alternative-edit-footer" hidden>
             <button type="button" class="recipe-edit-alternative-save" onclick="return saveRecipeIngredientAlternativeEdit(this)">Save option</button>
@@ -43547,14 +43599,19 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
         }
         const divider = document.createElement("div");
         divider.className = "recipe-edit-ingredient-option-divider";
-        divider.innerHTML = "<span>DEFAULT OPTION</span>";
+        divider.innerHTML = '<span data-ingredient-grid-column="ingredient">DEFAULT OPTION</span>';
         const optionBody = document.createElement("div");
         optionBody.className = "recipe-edit-ingredient-default-option-body";
         optionBody.appendChild(createRecipeIngredientDefaultOptionSummary(row));
         const addIngredient = document.createElement("button");
         addIngredient.type = "button";
         addIngredient.className = "recipe-edit-alternative-add-component recipe-edit-default-option-add-component";
-        addIngredient.innerHTML = `${recipeEditSvgIcon("plus")}<span>Add ingredient to this option</span>`;
+        addIngredient.innerHTML = `
+            <span class="recipe-edit-option-add-content"
+                  data-ingredient-grid-column="ingredient">
+                ${recipeEditSvgIcon("plus")}<span>Add ingredient to this option</span>
+            </span>
+        `;
         addIngredient.addEventListener("click", () => addRecipeIngredientDefaultComponent(addIngredient));
         optionBody.appendChild(addIngredient);
         overview.replaceChildren(divider, optionBody);
@@ -43814,6 +43871,13 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
             : "";
         optionsButton.title = `${action} alternative groups for ${ingredientName}${tooltip}`;
         optionsButton.setAttribute("aria-label", `${action} ${optionLabel.toLowerCase()} for ${ingredientName}`);
+    }
+    const tableScroll = row?.closest("[data-recipe-edit-ingredient-table-scroll]");
+    if (
+        recipeEditIngredientColumnLayout
+        && recipeEditIngredientColumnLayoutIsAvailable(tableScroll)
+    ) {
+        applyRecipeEditIngredientColumnLayout();
     }
 }
 

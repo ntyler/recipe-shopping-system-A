@@ -2536,6 +2536,38 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
     assert "@media (max-width: 767px)" in v45
 
 
+def test_recipe_editor_v46_aligns_expanded_options_to_the_shared_table_grid():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    v46 = css[css.index("/* Ingredient editor v46:"):]
+
+    assert css.index("/* Ingredient editor v46:") > css.index("/* Ingredient editor v45:")
+    assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in v46
+    assert ".recipe-edit-ingredient-option-divider," in v46
+    assert ".recipe-edit-alternative-component-summary," in v46
+    assert ".recipe-edit-alternative-component-edit-grid," in v46
+    assert "width: 100%;" in v46
+    assert "min-width: 0;" in v46
+    assert "max-width: 100%;" in v46
+    assert "overflow-x: visible;" in v46
+    assert "transform: none;" in v46
+    assert "padding-left: 14px;" in v46
+    assert "text-overflow: ellipsis;" in v46
+    assert "grid-column: 11;" in v46
+    assert "grid-column: 8 !important;" in v46
+    assert "@container recipe-ingredient-table (max-width: 859px)" in v46
+    assert "margin-left:" not in v46
+
+    assert 'data-ingredient-grid-column="ingredient"' in script
+    assert 'data-ingredient-grid-column="actions"' in script
+    assert 'identity.dataset.ingredientGridColumn = "ingredient";' in script
+    assert 'field.dataset.ingredientGridColumn = column;' in script
+    assert 'sourceDetails.dataset.ingredientGridColumn = "ingredient";' in script
+    assert "fitRecipeEditIngredientColumnWidthsToBudget(" in script
+    assert "recipeEditIngredientColumnWidthBudget(tableScroll" in script
+    assert "recipeEditIngredientColumnGrid(renderedLayout, gap)" in script
+
+
 def test_recipe_editor_v10_prioritizes_six_readable_groups_and_overflow_menu():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
