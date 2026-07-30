@@ -68367,3 +68367,75 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         display: none !important;
     }
 }
+
+/* Ingredient editor v62: selected choice source wording is directly editable. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-choice-group-title-editor {
+    display: inline-grid;
+    grid-template-columns: minmax(0, auto) 14px;
+    width: min(100%, 520px);
+    min-width: 0;
+    align-items: center;
+    justify-self: start;
+    gap: 6px;
+    margin-left: -6px;
+    padding: 2px 5px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    transition:
+        border-color 120ms ease,
+        background-color 120ms ease;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-choice-group-title-input {
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--app-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 740;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-choice-group-title-icon {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+    align-items: center;
+    justify-content: center;
+    color: var(--app-muted);
+    opacity: .68;
+    pointer-events: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-choice-group-title-icon
+    :is(.recipe-edit-inline-icon, svg) {
+    width: 14px;
+    height: 14px;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-choice-group-title-editor:is(:hover, :focus-within) {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 38%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary-soft) 34%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-choice-group-title-editor:focus-within
+    .recipe-edit-selected-choice-group-title-icon {
+    color: var(--app-primary-hover);
+    opacity: 1;
+}

@@ -2795,6 +2795,18 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert "[data-ingredient-options-summary]" in visible_count_css
     assert "display: none !important;" in visible_count_css
 
+    editable_title = script[
+        script.index("function resizeRecipeIngredientChoiceTitleInput"):
+        script.index("function syncRecipeIngredientSelectedOptionLineItems")
+    ]
+    assert 'aria-label="Ingredient choice wording"' in editable_title
+    assert 'recipeIngredientDirectField(row, "source_text")' in editable_title
+    assert 'input.addEventListener("input"' in editable_title
+    assert 'input.addEventListener("keydown"' in editable_title
+    assert 'input.addEventListener("blur"' in editable_title
+    assert "updateRecipeEditorDirtyState();" in editable_title
+    assert "updateRecipeIngredientSubstitutionState(row, input);" in editable_title
+
     v44 = css[css.index("/* Ingredient editor v44:"):]
     assert ".recipe-edit-ingredient-options-panel:not([hidden])" in v44
     open_rule = v44[v44.index(".recipe-edit-ingredient-options-panel:not([hidden])"):]

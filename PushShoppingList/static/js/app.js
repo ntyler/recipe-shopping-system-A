@@ -29994,6 +29994,55 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow) {
     return summary;
 }
 
+function resizeRecipeIngredientChoiceTitleInput(input) {
+    if (!input) return;
+    const textLength = String(input.value || "").trim().length;
+    input.size = Math.max(12, Math.min(60, textLength + 1));
+}
+
+function bindRecipeIngredientChoiceTitleEditor(row, input) {
+    if (!row || !input || input.dataset.ingredientChoiceTitleBound === "true") {
+        return;
+    }
+    input.dataset.ingredientChoiceTitleBound = "true";
+    input.addEventListener("focus", () => {
+        input.dataset.ingredientChoiceTitleStartValue = input.value;
+    });
+    input.addEventListener("input", () => {
+        const sourceField = recipeIngredientDirectField(row, "source_text");
+        if (sourceField) sourceField.value = input.value;
+        input.title = input.value;
+        resizeRecipeIngredientChoiceTitleInput(input);
+        updateRecipeEditorDirtyState();
+    });
+    input.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            input.blur();
+            return;
+        }
+        if (event.key === "Escape") {
+            event.preventDefault();
+            const startValue = input.dataset.ingredientChoiceTitleStartValue ?? input.value;
+            const sourceField = recipeIngredientDirectField(row, "source_text");
+            input.value = startValue;
+            if (sourceField) sourceField.value = startValue;
+            input.blur();
+        }
+    });
+    input.addEventListener("blur", () => {
+        const sourceField = recipeIngredientDirectField(row, "source_text");
+        const nextValue = input.value.trim();
+        input.value = nextValue;
+        input.title = nextValue;
+        if (sourceField) sourceField.value = nextValue;
+        delete input.dataset.ingredientChoiceTitleStartValue;
+        resizeRecipeIngredientChoiceTitleInput(input);
+        updateRecipeIngredientSubstitutionState(row, input);
+        updateRecipeIngredientSummary(row);
+    });
+}
+
 function ensureRecipeIngredientSelectedChoiceGroupHeader(row) {
     if (!row) {
         return null;
@@ -30012,11 +30061,24 @@ function ensureRecipeIngredientSelectedChoiceGroupHeader(row) {
             <div class="recipe-edit-selected-choice-group-copy">
                 <span class="recipe-edit-selected-choice-group-label"
                       data-ingredient-selected-choice-group-label></span>
-                <strong data-ingredient-selected-choice-group-title></strong>
+                <label class="recipe-edit-selected-choice-group-title-editor">
+                    <input type="text"
+                           class="recipe-edit-selected-choice-group-title-input"
+                           data-ingredient-selected-choice-group-title
+                           aria-label="Ingredient choice wording"
+                           autocomplete="off"
+                           spellcheck="true">
+                    <span class="recipe-edit-selected-choice-group-title-icon"
+                          aria-hidden="true">${recipeEditSvgIcon("edit")}</span>
+                </label>
             </div>
         `;
         row.insertBefore(header, row.firstChild);
     }
+    bindRecipeIngredientChoiceTitleEditor(
+        row,
+        header.querySelector("[data-ingredient-selected-choice-group-title]"),
+    );
     syncRecipeIngredientMobileHeader(row);
     return header;
 }
@@ -44657,7 +44719,10 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
             groupLabel.textContent = `${selectedChoiceKind} INGREDIENT CHOICE`;
         }
         if (groupTitle) {
-            groupTitle.textContent = choiceTitle;
+            if (document.activeElement !== groupTitle) {
+                groupTitle.value = choiceTitle;
+                resizeRecipeIngredientChoiceTitleInput(groupTitle);
+            }
             groupTitle.title = choiceTitle;
         }
     }

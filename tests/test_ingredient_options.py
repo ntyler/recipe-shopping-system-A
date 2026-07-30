@@ -646,7 +646,8 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state
     assert "function ensureRecipeIngredientSelectedChoiceGroupHeader" in script
     assert '`${selectedChoiceKind} INGREDIENT CHOICE`' in substitution_state
-    assert "groupTitle.textContent = choiceTitle;" in substitution_state
+    assert "groupTitle.value = choiceTitle;" in substitution_state
+    assert "document.activeElement !== groupTitle" in substitution_state
     assert '"has-selected-choice-group-header"' in substitution_state
     assert "alternativeCount && !hasSelectedChoice" in substitution_state
     assert "alternativeCount && hasSelectedChoice" in substitution_state
@@ -679,6 +680,9 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert '[data-ingredient-column="alternatives"]' in css
     assert '[data-ingredient-column="actions"]' in css
     assert "Ingredient editor v61: keep the option count visible" in css
+    assert "Ingredient editor v62: selected choice source wording is directly editable." in css
+    assert ".recipe-edit-selected-choice-group-title-editor" in css
+    assert ".recipe-edit-selected-choice-group-title-input" in css
 
 
 def test_selected_option_line_items_reorder_their_underlying_component_rows():
