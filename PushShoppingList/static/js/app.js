@@ -29567,6 +29567,12 @@ function handleRecipeIngredientReadImageError(image) {
     if (!image) {
         return;
     }
+    if (
+        image.dataset.deferredSrc
+        && image.dataset.deferredLoaded !== "1"
+    ) {
+        return;
+    }
     image.hidden = true;
     const imageCell = image.closest(".recipe-ingredient-image-panel");
     if (imageCell) {

@@ -499,6 +499,8 @@ def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows()
         script.index("function handleRecipeIngredientReadImageError"):
         script.index("function syncRecipeIngredientReadImageCell")
     ]
+    assert "image.dataset.deferredSrc" in image_error_handler
+    assert 'image.dataset.deferredLoaded !== "1"' in image_error_handler
     assert "image.hidden = true;" in image_error_handler
     assert 'image.closest(".recipe-ingredient-image-panel")' in image_error_handler
     assert 'imageCell.classList.add("recipe-image-empty");' in image_error_handler
