@@ -28311,6 +28311,7 @@ function organizeRecipeEditIngredientTools() {
             <span role="columnheader" aria-label="Row actions" class="recipe-edit-ingredient-actions-header" data-ingredient-column="actions"></span>
         `;
     }
+    tableHead.classList.add("recipe-edit-ingredient-table-grid");
     decorateRecipeEditIngredientColumnHeaders(tableHead);
     tableScroll.appendChild(tableHead);
     tableScroll.appendChild(ingredientList);
@@ -29429,6 +29430,56 @@ async function commitRecipeIngredientModal(button, options = {}) {
     }
 }
 
+const RECIPE_EDIT_INGREDIENT_GRID_CELL_ORDER = Object.freeze([
+    { key: "drag", column: "media", mediaTrack: "0" },
+    { key: "image", column: "media", mediaTrack: "1" },
+    { key: "ingredient", column: "ingredient" },
+    { key: "status", column: "status" },
+    { key: "quantity", column: "quantity" },
+    { key: "unit", column: "unit" },
+    { key: "size", column: "size" },
+    { key: "store", column: "store" },
+    { key: "type", column: "type" },
+    { key: "alternatives", column: "alternatives" },
+    { key: "actions", column: "actions" },
+]);
+
+function applyRecipeIngredientTableGridContract(grid, cells = {}) {
+    if (!grid) {
+        return null;
+    }
+
+    grid.classList.add("recipe-edit-ingredient-table-grid");
+    grid.dataset.ingredientGridRow = "";
+    const orderedCells = [];
+    RECIPE_EDIT_INGREDIENT_GRID_CELL_ORDER.forEach(definition => {
+        const supplied = Array.isArray(cells[definition.key])
+            ? cells[definition.key]
+            : [cells[definition.key]];
+        const resolved = supplied.filter(Boolean);
+        if (!resolved.length) {
+            const placeholder = document.createElement("div");
+            placeholder.className = "recipe-edit-ingredient-grid-placeholder";
+            placeholder.dataset.ingredientGridPlaceholder = definition.key;
+            placeholder.setAttribute("aria-hidden", "true");
+            resolved.push(placeholder);
+        }
+        resolved.forEach(cell => {
+            cell.dataset.ingredientColumn = definition.column;
+            if (definition.mediaTrack !== undefined) {
+                cell.dataset.ingredientMediaTrack = definition.mediaTrack;
+            }
+            cell.setAttribute("role", "cell");
+            orderedCells.push(cell);
+        });
+    });
+
+    const trailingChildren = [...grid.children].filter(child => !orderedCells.includes(child));
+    orderedCells.forEach(cell => grid.appendChild(cell));
+    trailingChildren.forEach(child => grid.appendChild(child));
+    return grid;
+}
+
 function createRecipeIngredientOptionRowSummary(className = "") {
     const summary = document.createElement("div");
     summary.className = [
@@ -29470,6 +29521,19 @@ function createRecipeIngredientOptionRowSummary(className = "") {
         <div class="recipe-edit-alternative-component-actions" data-ingredient-column="actions" role="cell"></div>
         <div class="recipe-edit-alternative-component-meta" data-alternative-component-metadata role="cell" hidden></div>
     `;
+    applyRecipeIngredientTableGridContract(summary, {
+        drag: summary.querySelector(".recipe-edit-alternative-component-handle-cell"),
+        image: summary.querySelector(".recipe-edit-alternative-component-image-cell"),
+        ingredient: summary.querySelector(".recipe-edit-alternative-component-copy"),
+        status: summary.querySelector(".recipe-edit-alternative-component-status"),
+        quantity: summary.querySelector(".recipe-edit-alternative-component-quantity"),
+        unit: summary.querySelector(".recipe-edit-alternative-component-unit"),
+        size: summary.querySelector(".recipe-edit-alternative-component-size"),
+        store: summary.querySelector(".recipe-edit-alternative-component-store"),
+        type: summary.querySelector(".recipe-edit-alternative-component-type"),
+        alternatives: summary.querySelector(".recipe-edit-alternative-component-option-spacer"),
+        actions: summary.querySelector(".recipe-edit-alternative-component-actions"),
+    });
     return summary;
 }
 
@@ -29511,7 +29575,7 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     if (typeElement) {
         const typeLabel = recipeIngredientTypeLabel(values);
         const typeClass = recipeIngredientTypeKey(values.section).replace(/\s+/g, "-") || "main";
-        typeElement.className = `recipe-edit-alternative-component-type-value is-${typeClass}`;
+        typeElement.className = `recipe-edit-alternative-component-type recipe-edit-alternative-component-type-value is-${typeClass}`;
         typeElement.textContent = typeLabel;
         typeElement.title = typeLabel;
     }
@@ -30182,6 +30246,7 @@ function organizeRecipeEditIngredientRow(row) {
     mobileQuantitySummary.appendChild(mobileAlternativesBadge);
     row.appendChild(mobileQuantitySummary);
 
+    let optionsCell = null;
     if (substitutions) {
         substitutions.classList.add("recipe-edit-ingredient-options-panel");
         substitutions.setAttribute("role", "region");
@@ -30195,7 +30260,7 @@ function organizeRecipeEditIngredientRow(row) {
         mobileAlternativesBadge.removeAttribute("aria-haspopup");
         mobileAlternativesBadge.setAttribute("aria-controls", substitutions.id);
 
-        const optionsCell = document.createElement("div");
+        optionsCell = document.createElement("div");
         optionsCell.className = "recipe-edit-ingredient-substitution-cell";
         optionsCell.setAttribute("role", "cell");
         const optionsButton = document.createElement("button");
@@ -30518,6 +30583,19 @@ function organizeRecipeEditIngredientRow(row) {
     organizeRecipeEditCompactRowActions(row, '[data-field="ingredient"]', "ingredient");
     const actions = row.querySelector(":scope > [data-recipe-edit-compact-row-actions]");
     if (actions) actions.setAttribute("role", "cell");
+    applyRecipeIngredientTableGridContract(row, {
+        drag: handle,
+        image: [number, imagePanel],
+        ingredient: readCell,
+        status: statusSummary,
+        quantity: row.querySelector(":scope > .recipe-edit-ingredient-quantity-summary"),
+        unit: row.querySelector(":scope > .recipe-edit-ingredient-unit-summary"),
+        size: row.querySelector(":scope > .recipe-edit-ingredient-size-summary"),
+        store: row.querySelector(":scope > .recipe-edit-ingredient-store-summary"),
+        type: row.querySelector(":scope > .recipe-edit-ingredient-type-summary"),
+        alternatives: optionsCell,
+        actions,
+    });
     if (actionMenuButton) {
         actionMenuButton.setAttribute("aria-label", "Ingredient actions");
         actionMenuButton.title = "Ingredient actions";
@@ -37603,6 +37681,7 @@ function recipeEditSvgIcon(name) {
         lock: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>',
         bot: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3"></rect><path d="M12 3v4"></path><path d="M8 12h.01"></path><path d="M16 12h.01"></path><path d="M9 16h6"></path></svg>',
         document: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Z"></path><path d="M14 3v5h5"></path><path d="M9 12h6"></path><path d="M9 16h6"></path></svg>',
+        image: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m5 17 4-4 3 3 2-2 5 3"></path></svg>',
         scale: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 4v16"></path><path d="M5 7h14"></path><path d="m5 7-3 7h6L5 7Z"></path><path d="m19 7-3 7h6l-3-7Z"></path><path d="M8 20h8"></path></svg>',
         pot: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 10h14l-1 9H6l-1-9Z"></path><path d="M3 10h18"></path><path d="M9 6c-1-1-1-2 0-3"></path><path d="M14 7c1-1 1-2 0-3"></path></svg>',
         notes: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>',
@@ -41594,7 +41673,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
                       role="img"
                       aria-label="No image available for ${escapeAttribute(optionIngredientName)}"
                       ${optionImageUrl ? "hidden" : ""}>
-                    ${recipeEditSvgIcon(recipeIngredientStoreSectionIconName(option.store_section || ""))}
+                    ${recipeEditSvgIcon("image")}
                 </span>
             </span>
             <div class="recipe-edit-ingredient-name-label">
@@ -43527,7 +43606,7 @@ function createRecipeIngredientDefaultOptionSummary(row) {
                     <span class="recipe-edit-substitution-image-fallback"
                           role="img"
                           aria-label="No image available for ${escapeAttribute(ingredientName)}">
-                        ${recipeEditSvgIcon(recipeIngredientStoreSectionIconName(values.store_section || ""))}
+                        ${recipeEditSvgIcon("image")}
                     </span>`}
             </span>
         `;

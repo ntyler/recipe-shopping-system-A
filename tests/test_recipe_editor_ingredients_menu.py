@@ -2792,7 +2792,7 @@ def test_recipe_editor_substitution_thumbnails_reuse_image_resolution_and_fallba
     assert 'alt="${escapeAttribute(optionIngredientName)} ingredient"' in row
     assert 'onerror="handleRecipeIngredientThumbnailError(this)"' in row
     assert "data-substitution-image-fallback" in row
-    assert 'recipeEditSvgIcon("basket")' in row
+    assert 'recipeEditSvgIcon("image")' in row
     assert 'data-field="ingredient_image_url"' in row
     assert "recipeIngredientStoreSectionIconName" not in row
 

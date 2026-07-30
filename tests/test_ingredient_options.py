@@ -338,3 +338,73 @@ def test_editor_uses_nested_table_rows_instead_of_cards_or_radio_choices():
     assert "Ingredient editor v45: nested, table-native ingredient option groups." in css
     assert "grid-template-columns: var(--recipe-edit-ingredient-grid);" in css
     assert ".recipe-edit-ingredient-option-group::before" in css
+
+
+def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    contract = script[
+        script.index("const RECIPE_EDIT_INGREDIENT_GRID_CELL_ORDER"):
+        script.index("function createRecipeIngredientOptionRowSummary")
+    ]
+    assert "function applyRecipeIngredientTableGridContract" in contract
+    for key in (
+        "drag",
+        "image",
+        "ingredient",
+        "status",
+        "quantity",
+        "unit",
+        "size",
+        "store",
+        "type",
+        "alternatives",
+        "actions",
+    ):
+        assert f'key: "{key}"' in contract
+    assert 'grid.classList.add("recipe-edit-ingredient-table-grid");' in contract
+    assert 'placeholder.className = "recipe-edit-ingredient-grid-placeholder";' in contract
+
+    nested_summary = script[
+        script.index("function createRecipeIngredientOptionRowSummary"):
+        script.index("function updateRecipeIngredientOptionRowSummary")
+    ]
+    top_level_row = script[
+        script.index("function organizeRecipeEditIngredientRow"):
+        script.index("function organizeRecipeEditCompactRowActions")
+    ]
+    assert "applyRecipeIngredientTableGridContract(summary" in nested_summary
+    assert "applyRecipeIngredientTableGridContract(row" in top_level_row
+    assert 'tableHead.classList.add("recipe-edit-ingredient-table-grid");' in script
+    assert (
+        "typeElement.className = `recipe-edit-alternative-component-type "
+        "recipe-edit-alternative-component-type-value is-${typeClass}`;"
+    ) in script
+
+    v48 = css[css.index("/* Ingredient editor v48:"):]
+    assert css.index("/* Ingredient editor v48:") > css.index("/* Ingredient editor v47:")
+    assert ".recipe-edit-ingredient-table-grid" in v48
+    assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in v48
+    assert "> .recipe-edit-ingredient-options-panel::before" in v48
+    assert "> .recipe-edit-alternative-card::before" in v48
+    assert "content: none !important;" in v48
+    assert "> .recipe-edit-alternative-card.is-single-alternative:not(.is-editing)" in v48
+    assert "grid-template-columns: minmax(0, 1fr) !important;" in v48
+    assert ".recipe-edit-alternative-component.recipe-edit-substitution-option-row" in v48
+    assert "grid-column: 1 / -1 !important;" in v48
+    assert "padding: 0 !important;" in v48
+    assert "transform: none !important;" in v48
+    assert "white-space: nowrap;" in v48
+    for column in (
+        "ingredient",
+        "status",
+        "quantity",
+        "unit",
+        "size",
+        "store",
+        "type",
+        "alternatives",
+        "actions",
+    ):
+        assert f'[data-ingredient-column="{column}"]' in v48
