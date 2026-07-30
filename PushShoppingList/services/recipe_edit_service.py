@@ -10018,7 +10018,10 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
                 item.get("substitutions")
                 or item.get("substitution_options")
                 or item.get("alternatives"),
-                parent_item=item,
+                parent_item={
+                    **item,
+                    "ingredient_image_url": ingredient_image_url,
+                },
             ),
             "ingredient_image_url": ingredient_image_url,
             "ingredient_image_generated_at": (
@@ -10203,11 +10206,28 @@ def normalize_nutrition_rows(nutrition, include_defaults=False):
 
 
 def normalize_ingredient_substitutions(value, existing_value=None, parent_item=None):
+    parent_item = parent_item if isinstance(parent_item, dict) else {}
     candidates = value
     if candidates is None:
         candidates = existing_value
 
     normalized = normalize_ingredient_substitution_options(candidates, parent_item=parent_item)
+    parent_identity_keys = {
+        instruction_match_text_key(parent_item.get(field))
+        for field in (
+            "ingredient",
+            "name",
+            "parsed_name",
+            "normalized_name",
+            "master_normalized_name",
+            "purchasable_item",
+            "buy_as",
+        )
+        if instruction_match_text_key(parent_item.get(field))
+    }
+    parent_image_url = nullable_string(
+        parent_item.get("ingredient_image_url") or parent_item.get("image_url")
+    )
     metadata_by_group_and_name = {}
     metadata_by_name = {}
     for option_rows in (existing_value, candidates):
@@ -10246,6 +10266,33 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
             else metadata_by_name.get(name_key, {})
         )
         merged = {**metadata, **row}
+        option_identity_keys = {
+            instruction_match_text_key(merged.get(field))
+            for field in (
+                "ingredient",
+                "name",
+                "parsed_name",
+                "normalized_name",
+                "master_normalized_name",
+                "purchasable_item",
+                "buy_as",
+            )
+            if instruction_match_text_key(merged.get(field))
+        }
+        if (
+            parent_image_url
+            and not nullable_string(merged.get("ingredient_image_url") or merged.get("image_url"))
+            and parent_identity_keys.intersection(option_identity_keys)
+        ):
+            merged["ingredient_image_url"] = parent_image_url
+            merged["ingredient_image_generated_at"] = nullable_string(
+                parent_item.get("ingredient_image_generated_at")
+                or parent_item.get("image_generated_at")
+            )
+            merged["ingredient_image_prompt"] = nullable_string(
+                parent_item.get("ingredient_image_prompt")
+                or parent_item.get("image_prompt")
+            )
         custom_section = (
             clean_recipe_custom_store_section(metadata.get("store_section"))
             if truthy(metadata.get("store_section_custom"))

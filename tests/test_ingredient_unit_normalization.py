@@ -195,6 +195,48 @@ def test_editor_display_repairs_an_already_saved_leading_or_form_choice(monkeypa
     assert rows[0]["substitutions"][0]["preparation"] == "frozen"
 
 
+def test_editor_same_ingredient_alternative_inherits_parent_thumbnail(monkeypatch):
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "recipe_edit_ingredient_master_lookup",
+        lambda *args, **kwargs: {},
+    )
+    image_url = "/static/generated/recipe_steps/corn.png"
+    generated_at = "2026-07-30T01:23:45Z"
+    prompt = "A small bowl of yellow corn kernels"
+
+    rows = recipe_edit_service.normalize_edit_ingredients([{
+        "ingredient": "corn",
+        "normalized_name": "corn",
+        "purchasable_item": "corn",
+        "ingredient_image_url": image_url,
+        "ingredient_image_generated_at": generated_at,
+        "ingredient_image_prompt": prompt,
+        "substitutions": [
+            {
+                "alternative_id": "frozen-corn",
+                "ingredient": "corn",
+                "preparation": "frozen",
+                "purchasable_item": "corn",
+            },
+            {
+                "alternative_id": "frozen-peas",
+                "ingredient": "peas",
+                "preparation": "frozen",
+                "purchasable_item": "peas",
+            },
+        ],
+    }])
+
+    frozen_corn, frozen_peas = rows[0]["substitutions"]
+    assert frozen_corn["ingredient_image_url"] == image_url
+    assert frozen_corn["ingredient_image_generated_at"] == generated_at
+    assert frozen_corn["ingredient_image_prompt"] == prompt
+    assert frozen_peas["ingredient_image_url"] == ""
+    assert frozen_peas["ingredient_image_generated_at"] == ""
+    assert frozen_peas["ingredient_image_prompt"] == ""
+
+
 def test_forbidden_values_are_relocated_and_unknown_units_are_preserved_for_review(caplog):
     size = normalize_ingredient_unit_fields({"quantity": "1", "unit": "large", "ingredient": "onion"})
     assert size["unit"] == "piece"
