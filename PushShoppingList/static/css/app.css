@@ -68439,3 +68439,21 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     color: var(--app-primary-hover);
     opacity: 1;
 }
+
+/* Ingredient editor v63: align the desktop option count with the row's data cells. */
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-ingredient-choice
+        > .recipe-edit-ingredient-substitution-cell {
+        align-self: center;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-ingredient-choice
+        .recipe-edit-ingredient-options-button
+        [data-ingredient-options-label] {
+        font-size: 11px;
+        font-weight: 650;
+        line-height: 1.4;
+    }
+}

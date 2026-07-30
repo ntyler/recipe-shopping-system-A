@@ -681,6 +681,20 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert '[data-ingredient-column="actions"]' in css
     assert "Ingredient editor v61: keep the option count visible" in css
     assert "Ingredient editor v62: selected choice source wording is directly editable." in css
+
+
+def test_collapsed_choice_option_count_aligns_with_desktop_row_cells():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    alignment_css = css[css.index(
+        "/* Ingredient editor v63: align the desktop option count with the row's data cells. */"
+    ):]
+
+    assert "@media (min-width: 768px)" in alignment_css
+    assert "> .recipe-edit-ingredient-substitution-cell {" in alignment_css
+    assert "align-self: center;" in alignment_css
+    assert "[data-ingredient-options-label] {" in alignment_css
+    assert "font-size: 11px;" in alignment_css
+    assert "line-height: 1.4;" in alignment_css
     assert ".recipe-edit-selected-choice-group-title-editor" in css
     assert ".recipe-edit-selected-choice-group-title-input" in css
 
