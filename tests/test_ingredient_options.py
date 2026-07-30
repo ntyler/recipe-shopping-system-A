@@ -85,7 +85,10 @@ def test_recipe_authored_fresh_or_frozen_choice_is_explicit_and_pdf_safe():
     assert requirement["selection_required"] is True
     assert requirement["source_text"] == "fresh or frozen corn"
     assert requirement["options"][1]["option_type"] == "recipe_choice"
-    assert "fresh or frozen" in pdf_html
+    assert (
+        '<td class="amount-cell">1</td><td>Corn</td><td>fresh or frozen</td>'
+        in pdf_html
+    )
     assert "Alternative:" not in pdf_html
 
 
