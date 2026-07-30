@@ -8,7 +8,11 @@ from datetime import datetime
 from datetime import timedelta
 from fractions import Fraction
 
+from PushShoppingList.services.ingredient_option_service import ingredient_name
 from PushShoppingList.services.ingredient_option_service import normalize_selection_map
+from PushShoppingList.services.ingredient_option_service import option_item
+from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
+from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import scoped_package_path
 
 
@@ -111,6 +115,16 @@ def meal_plan_yield_label(value):
     return yield_text
 
 
+def normalize_meal_ingredients(value):
+    if not isinstance(value, list):
+        return []
+    return [
+        option_item(item)
+        for item in value
+        if ingredient_name(item)
+    ]
+
+
 def normalize_meal(meal):
     meal_date = parse_date(meal.get("date"))
     meal_type = clean_text(meal.get("meal_type")).lower()
@@ -152,6 +166,8 @@ def normalize_meal(meal):
     normalized["ingredient_selection_needed"] = bool(
         meal.get("ingredient_selection_needed") or unresolved_ids
     )
+    if "ingredients" in meal:
+        normalized["ingredients"] = normalize_meal_ingredients(meal.get("ingredients"))
     return normalized
 
 
@@ -236,6 +252,7 @@ def update_meal_ingredient_option_selections(
     meal_id,
     selections,
     unresolved_requirement_ids=None,
+    ingredients=None,
 ):
     meal_id = clean_text(meal_id)
     selections = normalize_selection_map(selections)
@@ -259,8 +276,39 @@ def update_meal_ingredient_option_selections(
         target["ingredient_option_selections"] = selections
         target["unresolved_ingredient_requirement_ids"] = unresolved_requirement_ids
         target["ingredient_selection_needed"] = bool(unresolved_requirement_ids)
+        if ingredients is not None:
+            target["ingredients"] = normalize_meal_ingredients(ingredients)
         save_meal_plan(payload)
         return normalize_meal(target)
+
+
+def sync_meal_recipe_ingredients(recipe_url, recipe_data):
+    recipe_key = normalize_recipe_url_key(recipe_url)
+    if not recipe_key:
+        return 0
+
+    updated_count = 0
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        for meal in payload["meals"]:
+            if normalize_recipe_url_key(meal.get("recipe_url")) != recipe_key:
+                continue
+            resolution = resolve_ingredient_requirements(
+                recipe_data,
+                meal.get("ingredient_option_selections"),
+            )
+            meal["ingredient_option_selections"] = resolution["selected_options"]
+            meal["unresolved_ingredient_requirement_ids"] = [
+                requirement["id"]
+                for requirement in resolution["unresolved_requirements"]
+            ]
+            meal["ingredient_selection_needed"] = resolution["selection_needed"]
+            meal["ingredients"] = normalize_meal_ingredients(resolution["items"])
+            updated_count += 1
+
+        if updated_count:
+            save_meal_plan(payload)
+    return updated_count
 
 
 def meal_plan_home_preview(

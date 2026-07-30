@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from PushShoppingList.services import meal_plan_service
+from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import shopping_list_service
 from PushShoppingList.services.ingredient_option_service import (
@@ -42,6 +43,42 @@ def buttermilk_requirement():
                     },
                 ],
             }
+        ],
+    }
+
+
+def grouped_corn_requirement(default_option_id="corn-default"):
+    return {
+        "id": "ingredient-corn",
+        "ingredient": "Corn choice",
+        "default_option_id": default_option_id,
+        "substitutions": [
+            {
+                "alternative_id": "corn-default",
+                "alternative_order": 0,
+                "alternative_component_order": 0,
+                "option_type": "original",
+                "ingredient": "Corn",
+                "preparation": "fresh",
+                "purchasable_item": "corn",
+            },
+            {
+                "alternative_id": "corn-default",
+                "alternative_order": 0,
+                "alternative_component_order": 1,
+                "option_type": "original",
+                "ingredient": "Onion",
+                "purchasable_item": "onion",
+            },
+            {
+                "alternative_id": "corn-frozen",
+                "alternative_order": 1,
+                "alternative_component_order": 0,
+                "option_type": "recipe_choice",
+                "ingredient": "Corn",
+                "preparation": "frozen",
+                "purchasable_item": "corn",
+            },
         ],
     }
 
@@ -208,6 +245,9 @@ def test_explicit_multi_ingredient_default_option_uses_parent_only_as_summary():
         "Baking powder",
     ]
     assert "Flour mixture" not in [item["ingredient"] for item in resolution["items"]]
+    assert all("alternative_id" not in item for item in resolution["items"])
+    assert all("option_type" not in item for item in resolution["items"])
+    assert all("substitutions" not in item for item in resolution["items"])
 
 
 def test_migration_keeps_existing_flat_rows_and_adds_stable_group_metadata():
@@ -295,13 +335,134 @@ def test_meal_selection_is_saved_only_on_the_meal_instance(monkeypatch, tmp_path
         meal["id"],
         {requirement["id"]: "milk-lemon"},
         [],
+        ingredients=resolve_ingredient_requirements(
+            master_recipe,
+            {requirement["id"]: "milk-lemon"},
+        )["items"],
     )
 
     assert updated["ingredient_option_selections"] == {
         requirement["id"]: "milk-lemon"
     }
     assert updated["ingredient_selection_needed"] is False
+    assert [item["ingredient"] for item in updated["ingredients"]] == [
+        "Milk",
+        "Lemon juice",
+    ]
+    assert all("alternative_id" not in item for item in updated["ingredients"])
     assert master_recipe == original_recipe
+
+
+def test_meal_selected_group_components_refresh_when_recipe_option_is_edited(
+    monkeypatch,
+    tmp_path,
+):
+    target = tmp_path / "meal_plan.json"
+    monkeypatch.setattr(meal_plan_service, "MEAL_PLAN_FILE", target)
+    recipe_url = "recipe://corn"
+    recipe = {"ingredients": [grouped_corn_requirement()]}
+    requirement = ingredient_requirement(recipe["ingredients"][0])
+    initial_resolution = resolve_ingredient_requirements(recipe)
+    meal = meal_plan_service.add_meal({
+        "date": "2026-07-29",
+        "meal_type": "dinner",
+        "recipe_url": recipe_url,
+        "recipe_name": "Corn",
+        "ingredient_option_selections": initial_resolution["selected_options"],
+        "ingredients": initial_resolution["items"],
+    })
+
+    edited_recipe = json.loads(json.dumps(recipe))
+    edited_recipe["ingredients"][0]["substitutions"][1]["ingredient"] = "Shallot"
+    edited_recipe["ingredients"][0]["substitutions"][1]["purchasable_item"] = "shallot"
+
+    assert meal_plan_service.sync_meal_recipe_ingredients(
+        recipe_url,
+        edited_recipe,
+    ) == 1
+
+    refreshed = meal_plan_service.load_meal_plan()["meals"][0]
+    assert refreshed["id"] == meal["id"]
+    assert refreshed["ingredient_option_selections"] == {
+        requirement["id"]: "corn-default"
+    }
+    assert [item["ingredient"] for item in refreshed["ingredients"]] == [
+        "Corn",
+        "Shallot",
+    ]
+    assert all("alternative_id" not in item for item in refreshed["ingredients"])
+
+
+def test_switching_selected_group_replaces_stale_shopping_items(
+    monkeypatch,
+    tmp_path,
+):
+    list_file = tmp_path / "shopping_list.txt"
+    list_file.write_text("corn\nonion\n", encoding="utf-8")
+    monkeypatch.setattr(shopping_list_service, "SHOPPING_LIST_FILE", list_file)
+    monkeypatch.setattr(recipe_edit_service, "add_items", shopping_list_service.add_items)
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "load_recipe_ingredients",
+        lambda: {"recipe://corn": {"ingredients": ["corn"]}},
+    )
+    monkeypatch.setattr(recipe_edit_service, "sort_ingredients", lambda: None)
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "sync_meal_recipe_ingredients",
+        lambda *_args, **_kwargs: 0,
+    )
+    previous_recipe = {
+        "source_url": "recipe://corn",
+        "ingredients": [grouped_corn_requirement()],
+    }
+    updated_recipe = {
+        "source_url": "recipe://corn",
+        "ingredients": [grouped_corn_requirement("corn-frozen")],
+    }
+
+    recipe_edit_service.sync_saved_recipe_with_shopping_list(
+        updated_recipe,
+        recipe_edit_service.resolved_recipe_shopping_item_names(previous_recipe),
+    )
+
+    assert shopping_list_service.load_items() == ["corn"]
+
+
+def test_derived_recipe_record_contains_selected_components_not_group_container(
+    monkeypatch,
+):
+    saved = {}
+    recipe = {
+        "source_url": "recipe://corn",
+        "recipe_title": "Corn",
+        "ingredients": [grouped_corn_requirement()],
+    }
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: {})
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "save_recipe_ingredients",
+        lambda payload: saved.update(payload),
+    )
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "sync_recipe_master_records",
+        lambda *_args, **_kwargs: None,
+    )
+
+    recipe_edit_service.update_recipe_ingredient_record(
+        "recipe://corn",
+        1,
+        recipe,
+    )
+
+    record = next(iter(saved.values()))
+    assert record["ingredients"] == ["corn", "onion"]
+    assert [
+        detail["normalized_name"]
+        for detail in record["ingredient_details"]
+    ] == ["Corn", "Onion"]
+    assert "Corn choice" not in record["ingredients"]
 
 
 def test_editor_uses_nested_table_rows_instead_of_cards_or_radio_choices():

@@ -4453,6 +4453,7 @@ def add_meal_plan_entry_route():
                 for requirement in ingredient_resolution["unresolved_requirements"]
             ],
             "ingredient_selection_needed": ingredient_resolution["selection_needed"],
+            "ingredients": ingredient_resolution["items"],
         })
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -4491,6 +4492,7 @@ def update_meal_plan_ingredient_options_route(meal_id):
             requirement["id"]
             for requirement in resolution["unresolved_requirements"]
         ],
+        ingredients=resolution["items"],
     )
     return jsonify({
         "ok": True,

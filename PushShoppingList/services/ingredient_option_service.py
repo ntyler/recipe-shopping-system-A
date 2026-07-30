@@ -13,6 +13,27 @@ from copy import deepcopy
 
 
 OPTION_TYPES = {"original", "recipe_choice", "substitution", "custom"}
+GROUP_ONLY_ITEM_FIELDS = {
+    "substitutions",
+    "substitution_options",
+    "alternatives",
+    "ingredient_requirement_id",
+    "default_option_id",
+    "original_option_id",
+    "original_option_label",
+    "original_is_default",
+    "selection_required",
+    "alternative_id",
+    "group_id",
+    "substitution_group_id",
+    "alternative_order",
+    "alternative_component_order",
+    "alternative_label",
+    "option_type",
+    "recipe_authored",
+    "is_default",
+    "preferred",
+}
 
 
 class IngredientOptionSelectionRequired(ValueError):
@@ -252,7 +273,7 @@ def option_item(item):
     return {
         key: deepcopy(value)
         for key, value in (item if isinstance(item, dict) else {"ingredient": item}).items()
-        if not str(key).startswith("_")
+        if not str(key).startswith("_") and key not in GROUP_ONLY_ITEM_FIELDS
     }
 
 

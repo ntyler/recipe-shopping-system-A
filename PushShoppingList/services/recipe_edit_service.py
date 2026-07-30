@@ -46,6 +46,7 @@ from PushShoppingList.services.ingredient_option_service import migrate_ingredie
 from PushShoppingList.services.ingredient_option_service import migrate_recipe_ingredient_options
 from PushShoppingList.services.ingredient_option_service import original_option_id
 from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
+from PushShoppingList.services.meal_plan_service import sync_meal_recipe_ingredients
 from PushShoppingList.services.ingredient_option_service import shopping_item_name
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
 from PushShoppingList.services.ingredient_unit_service import normalize_recipe_unit_fields
@@ -6449,10 +6450,12 @@ def save_editable_recipe(original_url, payload, require_existing=False):
                 )
 
     previous_recipe_data = load_recipe_ingredients()
-    previous_ingredients = recipe_ingredients_for_key(
-        normalize_recipe_url_key(original_url),
-        previous_recipe_data,
-    )
+    previous_ingredients = resolved_recipe_shopping_item_names(existing_data)
+    if not previous_ingredients:
+        previous_ingredients = recipe_ingredients_for_key(
+            normalize_recipe_url_key(original_url),
+            previous_recipe_data,
+        )
     apply_recipe_pdf_asset_aliases(existing_data)
     log_recipe_pdf_fields("save_editable_recipe:existing", existing_data)
     payload_cover_image = payload.get("cover_image") if isinstance(payload.get("cover_image"), dict) else {}
@@ -6938,10 +6941,12 @@ def save_editable_recipe_ingredient(
         recipe_data["updated_at"] = now_iso()
         source_url = str(recipe_data.get("source_url") or original_url).strip() or original_url
         previous_recipe_data = load_recipe_ingredients()
-        previous_ingredients = recipe_ingredients_for_key(
-            normalize_recipe_url_key(source_url),
-            previous_recipe_data,
-        )
+        previous_ingredients = resolved_recipe_shopping_item_names(existing_data)
+        if not previous_ingredients:
+            previous_ingredients = recipe_ingredients_for_key(
+                normalize_recipe_url_key(source_url),
+                previous_recipe_data,
+            )
         recipe_meta = previous_recipe_data.get(normalize_recipe_url_key(source_url), {})
         quantity = normalize_recipe_quantity(
             recipe_meta.get("quantity", 1) if isinstance(recipe_meta, dict) else 1
@@ -9396,13 +9401,20 @@ def normalize_estimated_nutrition_value(key, value):
     return str(value or "").strip()
 
 
-def sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients):
-    resolution = resolve_ingredient_requirements(recipe_data)
-    ingredients = [
+def resolved_recipe_shopping_items(recipe_data, selections=None):
+    return resolve_ingredient_requirements(recipe_data, selections)["items"]
+
+
+def resolved_recipe_shopping_item_names(recipe_data, selections=None):
+    return [
         shopping_item_name(item)
-        for item in resolution["items"]
+        for item in resolved_recipe_shopping_items(recipe_data, selections)
         if shopping_item_name(item)
     ]
+
+
+def sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients):
+    ingredients = resolved_recipe_shopping_item_names(recipe_data)
 
     if ingredients:
         add_items(ingredients)
@@ -9412,6 +9424,7 @@ def sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients):
         load_recipe_ingredients(),
     )
     sort_ingredients()
+    sync_meal_recipe_ingredients(recipe_data.get("source_url"), recipe_data)
 
 
 def _read_recipe_output_json(json_path):
@@ -9559,6 +9572,12 @@ def update_recipe_ingredient_record(url, quantity, recipe_data, preserve_existin
     cover_image = recipe_data.get("cover_image")
     if not cover_image and preserve_existing_cover:
         cover_image = existing.get("cover_image")
+    resolved_items = resolved_recipe_shopping_items(recipe_data)
+    resolved_names = [
+        shopping_item_name(item)
+        for item in resolved_items
+        if shopping_item_name(item)
+    ]
     record = {
         "url": url,
         "quantity": quantity,
@@ -9572,8 +9591,11 @@ def update_recipe_ingredient_record(url, quantity, recipe_data, preserve_existin
         "base_servings": recipe_data.get("servings") or existing.get("base_servings"),
         "scaled_servings": existing.get("scaled_servings"),
         "scaled_ingredients": existing.get("scaled_ingredients", {}),
-        "ingredients": extract_ingredients_from_result(recipe_data),
-        "ingredient_details": ingredient_detail_records(recipe_metadata=recipe_data),
+        "ingredients": resolved_names,
+        "ingredient_details": ingredient_detail_records(
+            ingredients=resolved_items,
+            recipe_metadata={"ingredients": resolved_items},
+        ),
     }
 
     if cover_image:
