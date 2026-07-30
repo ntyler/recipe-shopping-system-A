@@ -68184,9 +68184,10 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     grid-template-columns: var(--recipe-edit-ingredient-grid);
     grid-column: 1 / -1 !important;
     grid-row: 1 !important;
-    width: 100%;
+    width: auto;
     min-width: 0;
-    max-width: 100%;
+    max-width: none;
+    margin-inline: -12px;
     padding: 7px 12px 8px;
     column-gap: var(--recipe-edit-ingredient-column-gap, 10px);
     border-bottom: 1px solid color-mix(in srgb, var(--app-primary-hover) 30%, var(--app-border));

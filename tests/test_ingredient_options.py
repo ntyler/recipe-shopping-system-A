@@ -732,6 +732,19 @@ def test_selected_choice_group_header_uses_standard_action_grid_cells():
     assert "margin-left" not in alignment_css
 
 
+def test_selected_choice_group_header_grid_matches_parent_row_content_edges():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    header_css = css[
+        css.index("/* Ingredient editor v59: selected choices use a shared group header. */"):
+        css.index("/* Ingredient editor v60: expansion keeps the shared selected-choice header. */")
+    ]
+
+    assert "width: auto;" in header_css
+    assert "max-width: none;" in header_css
+    assert "margin-inline: -12px;" in header_css
+    assert "padding: 7px 12px 8px;" in header_css
+
+
 def test_selected_option_line_items_reorder_their_underlying_component_rows():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
