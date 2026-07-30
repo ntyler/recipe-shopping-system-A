@@ -29480,6 +29480,76 @@ function applyRecipeIngredientTableGridContract(grid, cells = {}) {
     return grid;
 }
 
+function createRecipeIngredientReadCell(className = "", options = {}) {
+    const readCell = document.createElement("div");
+    readCell.className = [
+        "recipe-edit-ingredient-read-cell",
+        String(className || "").trim(),
+    ].filter(Boolean).join(" ");
+    readCell.setAttribute("role", "cell");
+    readCell.innerHTML = `
+        <input type="text"
+               class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-name"
+               data-ingredient-read-name
+               data-recipe-ingredient-inline-field="ingredient"
+               aria-label="Ingredient"
+               autocomplete="off">
+        <div class="recipe-edit-ingredient-read-details">
+            <input type="text"
+                   class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-preparation"
+                   data-recipe-ingredient-inline-field="preparation"
+                   aria-label="Preparation"
+                   placeholder="Add preparation"
+                   autocomplete="off">
+        </div>
+        <span class="recipe-edit-ingredient-source-text"
+              data-ingredient-source-text
+              hidden></span>
+        <label class="recipe-edit-ingredient-read-buy-as">
+            <span>Buy as:</span>
+            <input type="text"
+                   class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-buy-as"
+                   data-ingredient-read-buy-as
+                   data-recipe-ingredient-inline-field="purchasable_item"
+                   aria-label="Buy As"
+                   list="itemQtyBuyAsOptions"
+                   placeholder="Add buy as"
+                   autocomplete="off">
+        </label>
+        <span class="recipe-edit-ingredient-read-optional"
+              data-ingredient-read-optional
+              aria-label="Optional ingredient"
+              hidden>Optional</span>
+    `;
+    if (options.alternative) {
+        readCell.querySelector('[data-recipe-ingredient-inline-field="ingredient"]')
+            ?.setAttribute("data-alternative-component-name", "");
+        readCell.querySelector('[data-recipe-ingredient-inline-field="preparation"]')
+            ?.setAttribute("data-alternative-component-preparation", "");
+        readCell.querySelector("[data-ingredient-read-buy-as]")
+            ?.setAttribute("data-alternative-component-buy-as", "");
+    }
+    return readCell;
+}
+
+function createRecipeIngredientStatusSummary(className = "", options = {}) {
+    const statusSummary = document.createElement("div");
+    statusSummary.className = [
+        "recipe-edit-ingredient-status-summary",
+        String(className || "").trim(),
+    ].filter(Boolean).join(" ");
+    statusSummary.dataset.ingredientStatusSummary = "";
+    statusSummary.setAttribute("role", "cell");
+    const status = document.createElement("span");
+    status.className = "recipe-edit-ingredient-read-status";
+    status.dataset.ingredientReadStatus = "";
+    if (options.alternative) {
+        status.dataset.alternativeComponentStatus = "";
+    }
+    statusSummary.appendChild(status);
+    return statusSummary;
+}
+
 function appendRecipeIngredientInlineSummaryControl(cell, fieldName, tagName = "input") {
     if (!cell) {
         return null;
@@ -29523,17 +29593,9 @@ function createRecipeIngredientOptionRowSummary(className = "") {
     summary.setAttribute("role", "row");
     summary.innerHTML = `
         <div class="recipe-edit-alternative-component-handle-cell" data-ingredient-column="media" data-ingredient-media-track="0" role="cell"></div>
-        <div class="recipe-edit-alternative-component-image-cell" data-ingredient-column="media" data-ingredient-media-track="1" role="cell"></div>
-        <div class="recipe-edit-alternative-component-copy" data-ingredient-column="ingredient" role="cell">
-            <span class="recipe-edit-alternative-component-title-line">
-                <strong data-alternative-component-name></strong>
-            </span>
-            <span class="recipe-edit-alternative-component-preparation"
-                  data-alternative-component-preparation
-                  hidden></span>
-            <span class="recipe-edit-alternative-component-buy-as" data-alternative-component-buy-as hidden></span>
-        </div>
-        <div class="recipe-edit-alternative-component-status" data-alternative-component-status data-ingredient-column="status" role="cell"></div>
+        <div class="recipe-edit-alternative-component-image-cell recipe-edit-ingredient-image-cell" data-ingredient-column="media" data-ingredient-media-track="1" role="cell"></div>
+        <div data-option-ingredient-cell></div>
+        <div data-option-status-cell></div>
         <div class="recipe-edit-alternative-component-quantity recipe-edit-ingredient-quantity-summary"
              data-ingredient-column="quantity"
              role="cell"></div>
@@ -29543,23 +29605,41 @@ function createRecipeIngredientOptionRowSummary(className = "") {
         <div class="recipe-edit-alternative-component-size recipe-edit-ingredient-size-summary"
              data-ingredient-column="size"
              role="cell"></div>
-        <div class="recipe-edit-alternative-component-store" data-alternative-component-store data-ingredient-column="store" role="cell"></div>
-        <div class="recipe-edit-alternative-component-type" data-ingredient-column="type" role="cell">
-            <span class="recipe-edit-alternative-column-label">Type</span>
-            <span data-alternative-component-type></span>
-        </div>
+        <div class="recipe-edit-alternative-component-store recipe-edit-ingredient-store-summary"
+             data-ingredient-store-summary
+             data-ingredient-column="store"
+             role="cell"></div>
+        <div class="recipe-edit-alternative-component-type recipe-edit-ingredient-type-summary"
+             data-ingredient-type-summary
+             data-ingredient-column="type"
+             role="cell"></div>
         <div class="recipe-edit-alternative-component-option-spacer" data-ingredient-column="alternatives" role="cell" aria-hidden="true"></div>
         <div class="recipe-edit-alternative-component-actions" data-ingredient-column="actions" role="cell"></div>
         <div class="recipe-edit-alternative-component-meta" data-alternative-component-metadata role="cell" hidden></div>
     `;
+    const ingredientCell = createRecipeIngredientReadCell(
+        "recipe-edit-alternative-component-copy",
+        { alternative: true },
+    );
+    ingredientCell.dataset.ingredientColumn = "ingredient";
+    summary.querySelector("[data-option-ingredient-cell]")?.replaceWith(ingredientCell);
+    const statusCell = createRecipeIngredientStatusSummary(
+        "recipe-edit-alternative-component-status",
+        { alternative: true },
+    );
+    statusCell.dataset.ingredientColumn = "status";
+    summary.querySelector("[data-option-status-cell]")?.replaceWith(statusCell);
     [
         ["quantity", ".recipe-edit-alternative-component-quantity", "alternativeComponentQuantity"],
         ["unit", ".recipe-edit-alternative-component-unit", "alternativeComponentUnit"],
         ["size", ".recipe-edit-alternative-component-size", "alternativeComponentSize"],
-    ].forEach(([fieldName, selector, dataName]) => {
+        ["store_section", ".recipe-edit-alternative-component-store", "alternativeComponentStore", "select"],
+        ["section", ".recipe-edit-alternative-component-type", "alternativeComponentType", "select"],
+    ].forEach(([fieldName, selector, dataName, tagName = "input"]) => {
         const control = appendRecipeIngredientInlineSummaryControl(
             summary.querySelector(selector),
             fieldName,
+            tagName,
         );
         if (control) {
             control.dataset[dataName] = "";
@@ -29588,7 +29668,6 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     const name = String(values.ingredient || "").trim()
         || String(options.fallbackName || "Unnamed replacement ingredient");
     const buyAs = recipeIngredientMeaningfulBuyAs(values);
-    const storeSection = recipeStoreSectionDisplayLabel(values.store_section || "");
     const role = String(options.role || "").trim();
     const nameElement = summary.querySelector("[data-alternative-component-name]");
     const preparationElement = summary.querySelector("[data-alternative-component-preparation]");
@@ -29600,10 +29679,9 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     const typeElement = summary.querySelector("[data-alternative-component-type]");
     const metadataElement = summary.querySelector("[data-alternative-component-metadata]");
     const buyAsElement = summary.querySelector("[data-alternative-component-buy-as]");
-    if (nameElement) nameElement.textContent = name;
+    if (nameElement) nameElement.value = name;
     if (preparationElement) {
-        preparationElement.textContent = recipeIngredientSentenceCase(values.preparation || "");
-        preparationElement.hidden = !String(values.preparation || "").trim();
+        preparationElement.value = recipeIngredientSentenceCase(values.preparation || "");
     }
     if (statusElement) {
         statusElement.innerHTML = recipeIngredientReadStatusHtml(
@@ -29613,15 +29691,22 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     if (quantityElement) quantityElement.value = String(values.quantity || "").trim();
     if (unitElement) unitElement.value = String(values.unit || "").trim();
     if (sizeElement) sizeElement.value = String(values.size || "").trim();
-    if (storeElement) {
-        storeElement.innerHTML = `<span class="recipe-edit-alternative-column-label">Store section</span>${recipeIngredientStoreSectionIconHtml(values.store_section || "")}<span>${escapeHtml(storeSection || "\u2014")}</span>`;
-    }
+    if (storeElement) storeElement.value = String(values.store_section || "").trim();
     if (typeElement) {
+        const typeValue = recipeIngredientTypeValue(values);
+        typeElement.value = typeValue;
         const typeLabel = recipeIngredientTypeLabel(values);
-        const typeClass = recipeIngredientTypeKey(values.section).replace(/\s+/g, "-") || "main";
-        typeElement.className = `recipe-edit-alternative-component-type recipe-edit-alternative-component-type-value is-${typeClass}`;
-        typeElement.textContent = typeLabel;
-        typeElement.title = typeLabel;
+        const typeClass = recipeIngredientTypeKey(typeValue).replace(/\s+/g, "-") || "main";
+        const typeSummary = typeElement.closest("[data-ingredient-type-summary]");
+        if (typeSummary) {
+            typeSummary.className = [
+                "recipe-edit-alternative-component-type",
+                "recipe-edit-ingredient-type-summary",
+                `is-${typeClass}`,
+            ].join(" ");
+            typeSummary.title = typeLabel;
+            typeSummary.setAttribute("aria-label", `Type: ${typeLabel}`);
+        }
     }
     if (metadataElement) {
         const metadata = [
@@ -29648,8 +29733,9 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     }
     if (buyAsElement) {
         const showBuyAs = options.showBuyAs !== false && Boolean(buyAs);
-        buyAsElement.textContent = showBuyAs ? `Buy as: ${buyAs}` : "";
-        buyAsElement.hidden = !showBuyAs;
+        buyAsElement.value = showBuyAs ? String(values.purchasable_item || values.buy_as || "") : "";
+        const buyAsField = buyAsElement.closest(".recipe-edit-ingredient-read-buy-as");
+        if (buyAsField) buyAsField.hidden = !showBuyAs;
     }
     const accessiblePrefix = String(options.accessiblePrefix || "Edit replacement ingredient").trim();
     summary.setAttribute("aria-label", `${accessiblePrefix} ${name}`);
@@ -30171,50 +30257,10 @@ function organizeRecipeEditIngredientRow(row) {
         row.appendChild(imagePanel);
     }
 
-    const readCell = document.createElement("div");
-    readCell.className = "recipe-edit-ingredient-read-cell";
-    readCell.setAttribute("role", "cell");
-    readCell.innerHTML = `
-        <input type="text"
-               class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-name"
-               data-ingredient-read-name
-               data-recipe-ingredient-inline-field="ingredient"
-               aria-label="Ingredient"
-               autocomplete="off">
-        <div class="recipe-edit-ingredient-read-details">
-            <input type="text"
-                   class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-preparation"
-                   data-recipe-ingredient-inline-field="preparation"
-                   aria-label="Preparation"
-                   placeholder="Add preparation"
-                   autocomplete="off">
-        </div>
-        <span class="recipe-edit-ingredient-source-text"
-              data-ingredient-source-text
-              hidden></span>
-        <label class="recipe-edit-ingredient-read-buy-as">
-            <span>Buy as:</span>
-            <input type="text"
-                   class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-buy-as"
-                   data-ingredient-read-buy-as
-                   data-recipe-ingredient-inline-field="purchasable_item"
-                   aria-label="Buy As"
-                   list="itemQtyBuyAsOptions"
-                   placeholder="Add buy as"
-                   autocomplete="off">
-        </label>
-        <span class="recipe-edit-ingredient-read-optional"
-              data-ingredient-read-optional
-              aria-label="Optional ingredient"
-              hidden>Optional</span>
-    `;
+    const readCell = createRecipeIngredientReadCell();
     row.appendChild(readCell);
 
-    const statusSummary = document.createElement("div");
-    statusSummary.className = "recipe-edit-ingredient-status-summary";
-    statusSummary.dataset.ingredientStatusSummary = "";
-    statusSummary.setAttribute("role", "cell");
-    statusSummary.innerHTML = '<span class="recipe-edit-ingredient-read-status" data-ingredient-read-status></span>';
+    const statusSummary = createRecipeIngredientStatusSummary();
     row.appendChild(statusSummary);
 
     const summaryDefinitions = [
@@ -41678,6 +41724,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
     const optionImageSrcSet = recipeImageVariantSrcSet(optionImageUrl);
     const matchQuality = recipeIngredientSubstitutionMatchQuality(option);
     const ratio = recipeIngredientSubstitutionRatio(option);
+    const optionType = recipeIngredientTypeValue(option);
     ensureRecipeIngredientUnitOption();
 
     return `
@@ -41794,7 +41841,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
             <input type="hidden" data-field="ingredient_image_url" value="${escapeAttribute(optionImageUrl)}">
             <input type="hidden" data-field="ingredient_image_generated_at" value="${escapeAttribute(option.ingredient_image_generated_at || option.image_generated_at || "")}">
             <input type="hidden" data-field="ingredient_image_prompt" value="${escapeAttribute(option.ingredient_image_prompt || option.image_prompt || "")}">
-            <input type="hidden" data-field="section" value="${escapeAttribute(option.section || "")}">
+            <select data-field="section" hidden>${recipeIngredientTypeOptions(optionType)}</select>
             <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
             <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
             <input type="hidden" data-field="unit_id" value="${escapeAttribute(option.unit_id || "")}">
@@ -42603,6 +42650,7 @@ function bindRecipeIngredientSubstitutionRow(optionRow) {
     bindRecipeIngredientInlineEditor(optionRow);
     bindRecipeIngredientUnitControls(optionRow);
     bindRecipeIngredientStoreSectionControls(optionRow);
+    bindRecipeEditDragAndDrop(optionRow);
     bindRecipeIngredientBaseTracking(optionRow);
     optionRow.querySelectorAll("[data-field]").forEach(input => {
         const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";

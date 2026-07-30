@@ -67518,3 +67518,80 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         grid-column: 7 !important;
     }
 }
+
+/* Ingredient editor v50: standard parent-row cells throughout ingredient options. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-copy {
+    gap: 0;
+    padding: 0;
+    border: 0;
+    font-weight: 400;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-status {
+    display: flex;
+    width: auto;
+    max-width: 100%;
+    gap: 0;
+    color: var(--app-text);
+    font-size: inherit;
+    font-weight: 400;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-status::before {
+    display: none;
+    content: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > :is(
+        .recipe-edit-alternative-component-store,
+        .recipe-edit-alternative-component-type
+    ) {
+    width: 100%;
+    max-width: none;
+    overflow: visible;
+    color: var(--app-text);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-store {
+    gap: 8px;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-type {
+    display: block;
+    padding: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-image-cell {
+    overflow: visible;
+}
+
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-alternative-component-summary
+        > [data-ingredient-column="store"] {
+        grid-column: 8 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-alternative-component-summary
+        > [data-ingredient-column="type"] {
+        grid-column: 9 !important;
+    }
+}

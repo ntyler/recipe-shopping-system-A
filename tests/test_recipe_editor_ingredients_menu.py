@@ -465,13 +465,19 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
     organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
     organize = script[organize_start:organize_end]
+    shared_cells = script[
+        script.index("function createRecipeIngredientReadCell"):
+        script.index("function appendRecipeIngredientInlineSummaryControl")
+    ]
     assert 'row.classList.add("recipe-edit-read-first-row");' in organize
-    assert 'readCell.className = "recipe-edit-ingredient-read-cell";' in organize
-    assert 'statusSummary.className = "recipe-edit-ingredient-status-summary";' in organize
-    assert "data-ingredient-read-name" in organize
-    assert "data-ingredient-read-status" in organize
-    assert "data-ingredient-read-buy-as" in organize
-    assert "data-ingredient-read-optional" in organize
+    assert "const readCell = createRecipeIngredientReadCell();" in organize
+    assert "const statusSummary = createRecipeIngredientStatusSummary();" in organize
+    assert '"recipe-edit-ingredient-read-cell"' in shared_cells
+    assert '"recipe-edit-ingredient-status-summary"' in shared_cells
+    assert "data-ingredient-read-name" in shared_cells
+    assert "status.dataset.ingredientReadStatus" in shared_cells
+    assert "data-ingredient-read-buy-as" in shared_cells
+    assert "data-ingredient-read-optional" in shared_cells
     assert organize.index("row.appendChild(readCell);") < organize.index("row.appendChild(statusSummary);")
     assert organize.index("row.appendChild(statusSummary);") < organize.index("const summaryDefinitions = [")
     for summary_class in (
@@ -981,7 +987,12 @@ def test_mobile_ingredient_metadata_stays_compact_with_read_only_status():
     organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
     organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
     organize = script[organize_start:organize_end]
-    assert 'class="recipe-edit-ingredient-read-status" data-ingredient-read-status' in organize
+    status_factory = script[
+        script.index("function createRecipeIngredientStatusSummary"):
+        script.index("function appendRecipeIngredientInlineSummaryControl")
+    ]
+    assert 'status.className = "recipe-edit-ingredient-read-status";' in status_factory
+    assert "status.dataset.ingredientReadStatus" in status_factory
     assert 'data-recipe-ingredient-inline-field="match_status"' not in organize
     assert "RECIPE_INGREDIENT_EDITABLE_MATCH_STATUSES" not in script
     for field_name in ("quantity", "unit", "size", "store_section", "section"):
@@ -2444,10 +2455,16 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
     summary_start = script.index("function createRecipeIngredientOptionRowSummary(")
     summary_end = script.index("function updateRecipeIngredientOptionRowSummary", summary_start)
     summary = script[summary_start:summary_end]
+    shared_cells = script[
+        script.index("function createRecipeIngredientReadCell"):
+        script.index("function appendRecipeIngredientInlineSummaryControl")
+    ]
     assert 'optionRow.classList.add("recipe-edit-alternative-component");' in substitution
     assert "const summary = createRecipeIngredientOptionRowSummary();" in substitution
     assert '"recipe-edit-alternative-component-summary"' in summary
-    assert "data-alternative-component-name" in summary
+    assert "data-alternative-component-name" in shared_cells
+    assert "createRecipeIngredientReadCell(" in summary
+    assert "createRecipeIngredientStatusSummary(" in summary
     assert '"recipe-edit-alternative-component-quantity recipe-edit-ingredient-quantity-summary"' in summary
     assert '"recipe-edit-alternative-component-unit recipe-edit-ingredient-unit-summary"' in summary
     assert '"recipe-edit-alternative-component-size recipe-edit-ingredient-size-summary"' in summary
@@ -2455,17 +2472,26 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
         ("quantity", "alternativeComponentQuantity"),
         ("unit", "alternativeComponentUnit"),
         ("size", "alternativeComponentSize"),
+        ("store_section", "alternativeComponentStore"),
+        ("section", "alternativeComponentType"),
     ):
-        assert f'["{field_name}", ".recipe-edit-alternative-component-{field_name}", "{data_name}"]' in summary
+        selector_name = {
+            "store_section": "store",
+            "section": "type",
+        }.get(field_name, field_name)
+        assert (
+            f'["{field_name}", ".recipe-edit-alternative-component-{selector_name}", '
+            f'"{data_name}"'
+        ) in summary
     assert "appendRecipeIngredientInlineSummaryControl(" in summary
-    assert "data-alternative-component-store" in summary
-    assert "data-alternative-component-status" in summary
+    assert "alternativeComponentStore" in summary
+    assert "alternativeComponentStatus" in shared_cells
     assert '"alternativeComponentSize"' in summary
-    assert "data-alternative-component-type" in summary
+    assert "alternativeComponentType" in summary
     assert "data-alternative-component-metadata" in summary
-    assert "data-alternative-component-buy-as" in summary
+    assert "data-alternative-component-buy-as" in shared_cells
     assert 'data-ingredient-column="media"' in summary
-    assert 'data-ingredient-column="ingredient"' in summary
+    assert 'ingredientCell.dataset.ingredientColumn = "ingredient";' in summary
     assert 'data-ingredient-column="actions"' in summary
     assert 'editGrid.className = "recipe-edit-alternative-component-edit-grid";' in substitution
     assert 'identity.className = "recipe-edit-alternative-edit-field field-ingredient";' in substitution
@@ -2510,6 +2536,8 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
     assert 'data-field="confidence_score"' in alternative_markup
     assert 'data-field="match_confidence"' in alternative_markup
     assert 'data-field="reason"' in alternative_markup
+    assert '<select data-field="section" hidden>' in alternative_markup
+    assert "bindRecipeEditDragAndDrop(optionRow);" in script
 
     card_logic = script[
         script.index("function updateRecipeIngredientAlternativeCard"):
@@ -2918,22 +2946,26 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
         script.index("function appendRecipeIngredientInlineSummaryControl"):
         script.index("function createRecipeIngredientOptionRowSummary")
     ]
+    shared_visible_cells = script[
+        script.index("function createRecipeIngredientReadCell"):
+        script.index("function appendRecipeIngredientInlineSummaryControl")
+    ]
     for field_name in ("ingredient", "preparation", "purchasable_item", "quantity", "unit", "store_section", "section"):
-        assert f'data-recipe-ingredient-inline-field="{field_name}"' in organize or (
+        assert f'data-recipe-ingredient-inline-field="{field_name}"' in shared_visible_cells or (
             f'control.dataset.recipeIngredientInlineField = fieldName' in organize
             and f'"{field_name}"' in organize
         )
     for label in ("Ingredient", "Preparation", "Buy As", "Quantity", "Unit", "Store Section", "Type"):
         assert (
-            f'aria-label="{label}"' in organize
+            f'aria-label="{label}"' in shared_visible_cells
             or f'"{label}"' in organize
             or f'"{label}"' in inline_control_factory
         )
-    assert 'class="recipe-edit-ingredient-read-details"' in organize
-    assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-preparation"' in organize
-    assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-buy-as"' in organize
-    assert 'placeholder="Add preparation"' in organize
-    assert 'placeholder="Add buy as"' in organize
+    assert 'class="recipe-edit-ingredient-read-details"' in shared_visible_cells
+    assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-preparation"' in shared_visible_cells
+    assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-buy-as"' in shared_visible_cells
+    assert 'placeholder="Add preparation"' in shared_visible_cells
+    assert 'placeholder="Add buy as"' in shared_visible_cells
     assert "appendRecipeIngredientInlineSummaryControl(summary, fieldName, tagName);" in organize
     assert 'control.className = "recipe-edit-ingredient-inline-control";' in inline_control_factory
     assert "control.dataset.recipeIngredientInlineField = fieldName;" in inline_control_factory
@@ -3947,12 +3979,16 @@ def test_ingredient_rows_label_optional_items_beneath_buy_as_on_desktop_and_mobi
     organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
     organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
     organize = script[organize_start:organize_end]
-    optional_badge = organize.index('class="recipe-edit-ingredient-read-optional"')
-    buy_as = organize.index('class="recipe-edit-ingredient-read-buy-as"')
+    read_factory = script[
+        script.index("function createRecipeIngredientReadCell"):
+        script.index("function createRecipeIngredientStatusSummary")
+    ]
+    optional_badge = read_factory.index('class="recipe-edit-ingredient-read-optional"')
+    buy_as = read_factory.index('class="recipe-edit-ingredient-read-buy-as"')
     assert buy_as < optional_badge
-    assert "data-ingredient-read-optional" in organize
-    assert 'aria-label="Optional ingredient"' in organize
-    assert "hidden>Optional</span>" in organize
+    assert "data-ingredient-read-optional" in read_factory
+    assert 'aria-label="Optional ingredient"' in read_factory
+    assert "hidden>Optional</span>" in read_factory
 
     summary_start = script.index("function updateRecipeIngredientSummary(row)")
     summary_end = script.index("function recipeEditIngredientRows()", summary_start)

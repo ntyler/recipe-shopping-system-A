@@ -377,10 +377,10 @@ def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows()
     assert "applyRecipeIngredientTableGridContract(summary" in nested_summary
     assert "applyRecipeIngredientTableGridContract(row" in top_level_row
     assert 'tableHead.classList.add("recipe-edit-ingredient-table-grid");' in script
-    assert (
-        "typeElement.className = `recipe-edit-alternative-component-type "
-        "recipe-edit-alternative-component-type-value is-${typeClass}`;"
-    ) in script
+    assert "createRecipeIngredientReadCell(" in nested_summary
+    assert "createRecipeIngredientStatusSummary(" in nested_summary
+    assert '"recipe-edit-alternative-component-store recipe-edit-ingredient-store-summary"' in nested_summary
+    assert '"recipe-edit-alternative-component-type recipe-edit-ingredient-type-summary"' in nested_summary
 
     v48 = css[css.index("/* Ingredient editor v48:"):]
     assert css.index("/* Ingredient editor v48:") > css.index("/* Ingredient editor v47:")
@@ -427,6 +427,22 @@ def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows()
     assert "bindRecipeIngredientInlineEditor(optionRow);" in script
     assert "function appendRecipeIngredientInlineSummaryControl" in script
     assert '"recipe-edit-alternative-component-size recipe-edit-ingredient-size-summary"' in script
+    assert '"store_section", ".recipe-edit-alternative-component-store"' in script
+    assert '"section", ".recipe-edit-alternative-component-type"' in script
+    assert "bindRecipeEditDragAndDrop(optionRow);" in script
+    v50 = css[css.index("/* Ingredient editor v50:"):]
+    for class_name in (
+        ".recipe-edit-alternative-component-copy",
+        ".recipe-edit-alternative-component-status",
+        ".recipe-edit-alternative-component-store",
+        ".recipe-edit-alternative-component-type",
+        ".recipe-edit-alternative-component-image-cell",
+    ):
+        assert class_name in v50
+    assert '> [data-ingredient-column="store"]' in v50
+    assert "grid-column: 8 !important;" in v50
+    assert '> [data-ingredient-column="type"]' in v50
+    assert "grid-column: 9 !important;" in v50
     choice_overview = script[
         script.index("function ensureRecipeIngredientChoiceOverview"):
         script.index("function addRecipeIngredientDefaultComponent")
