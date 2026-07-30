@@ -553,3 +553,7 @@ def test_option_ingredient_pencils_use_the_standard_edit_ingredient_modal():
     assert 'editButton.className = "recipe-edit-compact-row-edit";' in script
     assert "openRecipeIngredientOptionModal(editButton)" in script
     assert "/* Ingredient editor v53:" in css
+    assert "> span:last-child:not(.recipe-edit-inline-icon)" in css
+    v53 = css[css.index("/* Ingredient editor v53:"):]
+    assert "> .recipe-edit-inline-icon" in v53
+    assert "display: inline-flex;" in v53

@@ -58004,7 +58004,9 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-component-actions > bu
     opacity: .35;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-alternative-component-actions > button > span:last-child {
+body.recipe-edit-standalone-page .recipe-edit-alternative-component-actions
+    > button
+    > span:last-child:not(.recipe-edit-inline-icon) {
     display: none;
 }
 
@@ -67739,6 +67741,16 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
     > .recipe-edit-compact-row-edit
+    > .recipe-edit-inline-icon {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
+    > .recipe-edit-compact-row-edit
+    > .recipe-edit-inline-icon
     > svg {
     width: 14px;
     height: 14px;
