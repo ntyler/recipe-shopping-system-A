@@ -67,6 +67,8 @@ def test_recipe_authored_fresh_or_frozen_choice_is_explicit_and_pdf_safe():
     ingredient = {
         "id": "ingredient-corn",
         "ingredient": "Corn",
+        "quantity": "1",
+        "unit": "cup",
         "preparation": "fresh",
         "original_text": "fresh or frozen corn",
         "substitutions": [
@@ -86,7 +88,7 @@ def test_recipe_authored_fresh_or_frozen_choice_is_explicit_and_pdf_safe():
     assert requirement["source_text"] == "fresh or frozen corn"
     assert requirement["options"][1]["option_type"] == "recipe_choice"
     assert (
-        '<td class="amount-cell">1</td><td>Corn</td><td>fresh or frozen</td>'
+        '<td class="amount-cell">1 cup</td><td>Corn</td><td>fresh or frozen</td>'
         in pdf_html
     )
     assert "Alternative:" not in pdf_html
@@ -267,4 +269,9 @@ def test_editor_uses_inline_option_detail_instead_of_an_alternative_dialog():
     assert "function moveRecipeIngredientAlternativeComponent(control, direction)" in script
     assert "function setRecipeIngredientDefaultOption" in script
     assert 'marker.type = "radio";' in script
+    assert "toggleRecipeIngredientSubstitutions(optionsButton, event)" in organizer
+    assert "toggleRecipeIngredientSubstitutions(mobileAlternativesBadge, event)" in organizer
+    assert "tableScroll.scrollLeft = inlineScrollLeft;" in script
     assert "grid-column: 1 / -1 !important;" in css
+    assert "position: sticky;" in css
+    assert "width: min(720px, calc(100cqi - 28px));" in css

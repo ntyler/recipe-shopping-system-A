@@ -65245,7 +65245,6 @@ body.recipe-edit-standalone-page
     body.recipe-edit-standalone-page #recipeEditIngredients
         > .recipe-edit-ingredient-row.recipe-edit-substitutions-open {
         display: grid !important;
-        grid-template-columns: var(--recipe-edit-ingredient-grid) !important;
         grid-template-rows: auto auto !important;
     }
 }
@@ -65275,7 +65274,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel
         .recipe-edit-ingredient-choice-overview,
         .recipe-edit-substitution-empty
     ) {
-    width: min(720px, 100%);
+    position: sticky;
+    left: 14px;
+    width: min(720px, calc(100cqi - 28px));
+    max-width: 100%;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
@@ -65487,7 +65489,8 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel:has(
             .recipe-edit-ingredient-choice-overview,
             .recipe-edit-substitution-empty
         ) {
-        width: 100%;
+        left: 9px;
+        width: min(720px, calc(100cqi - 18px));
     }
 
     body.recipe-edit-standalone-page .recipe-edit-ingredient-choice-tags {

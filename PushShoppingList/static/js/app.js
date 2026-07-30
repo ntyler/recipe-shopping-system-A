@@ -30049,7 +30049,7 @@ function organizeRecipeEditIngredientRow(row) {
     mobileAlternativesBadge.setAttribute("aria-expanded", "false");
     mobileAlternativesBadge.innerHTML = '<span data-ingredient-mobile-alternatives-label></span>';
     mobileAlternativesBadge.addEventListener("click", event => (
-        openRecipeIngredientAlternativesDialog(mobileAlternativesBadge, event)
+        toggleRecipeIngredientSubstitutions(mobileAlternativesBadge, event)
     ));
     mobileQuantitySummary.appendChild(mobileAlternativesBadge);
     row.appendChild(mobileQuantitySummary);
@@ -30085,7 +30085,9 @@ function organizeRecipeEditIngredientRow(row) {
                 ${recipeEditSvgIcon("chevron-down")}
             </span>
         `;
-        optionsButton.addEventListener("click", event => openRecipeIngredientAlternativesDialog(optionsButton, event));
+        optionsButton.addEventListener("click", event => (
+            toggleRecipeIngredientSubstitutions(optionsButton, event)
+        ));
         optionsCell.appendChild(optionsButton);
         row.appendChild(optionsCell);
         row.appendChild(substitutions);
@@ -42504,7 +42506,16 @@ function openRecipeIngredientAlternativesDialog(button, event = null, options = 
     row.recipeIngredientAlternativesReturnFocus = button;
     window.requestAnimationFrame(() => {
         if (!container.hidden) {
-            container.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            const tableScroll = container.closest(".recipe-edit-ingredient-table-scroll");
+            const inlineScrollLeft = tableScroll ? tableScroll.scrollLeft : null;
+            container.scrollIntoView({
+                behavior: "auto",
+                block: "nearest",
+                inline: "nearest",
+            });
+            if (tableScroll && inlineScrollLeft !== null) {
+                tableScroll.scrollLeft = inlineScrollLeft;
+            }
         }
     });
     return false;
