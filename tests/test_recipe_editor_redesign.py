@@ -1152,6 +1152,158 @@ def test_recipe_editor_substitution_groups_use_mockup_table_hierarchy():
     assert ".recipe-edit-alternative-component-actions" in css
 
 
+def test_recipe_editor_expanded_option_rows_share_the_parent_table_grid_without_offsets():
+    css = read_text("PushShoppingList/static/css/app.css")
+    expanded_grid_css = css[css.index("/* Ingredient editor v46:"):]
+
+    assert (
+        ".recipe-edit-standalone-page .recipe-edit-ingredient-table-head,\n"
+        ".recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {\n"
+        "    grid-template-columns: var(--recipe-edit-ingredient-grid)"
+    ) in css
+    assert ".recipe-edit-ingredient-option-divider," in expanded_grid_css
+    assert ".recipe-edit-alternative-component-summary," in expanded_grid_css
+    assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in expanded_grid_css
+    for declaration in (
+        "box-sizing: border-box;",
+        "width: 100%;",
+        "min-width: 0;",
+        "max-width: 100%;",
+    ):
+        assert declaration in expanded_grid_css
+
+    assert ".recipe-edit-alternative-component-summary > *" in expanded_grid_css
+    assert ".recipe-edit-alternative-component-handle-cell," in expanded_grid_css
+    assert ".recipe-edit-alternative-component-image-cell" in expanded_grid_css
+    assert "transform: none;" in expanded_grid_css
+    assert "transform: translateX" not in expanded_grid_css
+    assert "width: max-content" not in expanded_grid_css
+    assert "min-height: 58px;" in expanded_grid_css
+
+
+def test_recipe_editor_expanded_option_dividers_and_add_rows_are_compact_grid_rows():
+    css = read_text("PushShoppingList/static/css/app.css")
+    expanded_grid_css = css[css.index("/* Ingredient editor v46:"):]
+
+    divider_start = expanded_grid_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-option-divider {"
+    )
+    divider_rule = expanded_grid_css[
+        divider_start:expanded_grid_css.index("}", divider_start)
+    ]
+    assert "display: grid;" in divider_rule
+    assert "min-height: 30px;" in divider_rule
+    assert "padding: 3px 0;" in divider_rule
+
+    assert '> [data-ingredient-grid-column="ingredient"]' in expanded_grid_css
+    assert "grid-column: 3;" in expanded_grid_css
+    assert ".recipe-edit-alternative-add-component," in expanded_grid_css
+    assert "display: grid !important;" in expanded_grid_css
+    assert "min-height: 34px;" in expanded_grid_css
+    assert "margin: 0;" in expanded_grid_css
+    assert "padding: 2px 0;" in expanded_grid_css
+    assert ".recipe-edit-substitution-heading" in expanded_grid_css
+    assert "grid-column: 1 / -1;" in expanded_grid_css
+
+    # Hierarchy is carried by the ingredient-cell inset, not by shifting the row.
+    assert "padding-left: 14px;" in expanded_grid_css
+    assert "border-left: 1px solid" in expanded_grid_css
+    assert ".recipe-edit-ingredient-option-group::before" in expanded_grid_css
+    assert "content: none;" in expanded_grid_css
+
+
+def test_recipe_editor_nested_rows_keep_complete_columns_and_actions_at_the_far_right():
+    script = read_text("PushShoppingList/static/js/app.js")
+    summary_builder_start = script.index("function createRecipeIngredientOptionRowSummary(")
+    summary_builder_end = script.index(
+        "function updateRecipeIngredientOptionRowSummary",
+        summary_builder_start,
+    )
+    summary_markup = script[summary_builder_start:summary_builder_end]
+    organize_start = script.index("function organizeRecipeEditSubstitutionOptionRow(optionRow)")
+    organize_end = script.index(
+        "function editRecipeIngredientSubstitutionFields",
+        organize_start,
+    )
+    organize = script[organize_start:organize_end]
+
+    expected_columns = (
+        "media",
+        "ingredient",
+        "status",
+        "quantity",
+        "unit",
+        "size",
+        "store",
+        "type",
+        "alternatives",
+        "actions",
+    )
+    assert all(f'data-ingredient-column="{column}"' in summary_markup for column in expected_columns)
+    assert summary_markup.index('data-ingredient-column="ingredient"') < summary_markup.index(
+        'data-ingredient-column="status"'
+    )
+    assert summary_markup.index('data-ingredient-column="store"') < summary_markup.index(
+        'data-ingredient-column="type"'
+    )
+    assert summary_markup.index('data-ingredient-column="type"') < summary_markup.index(
+        'data-ingredient-column="actions"'
+    )
+    assert "trash" not in summary_markup
+    assert 'editButton.setAttribute("aria-label", "Edit ingredient");' in organize
+    assert 'menuButton.setAttribute("aria-label", "Replacement ingredient actions");' in organize
+    assert "actions?.append(editButton, menuWrap);" in organize
+    assert "Remove replacement ingredient" in organize
+    assert "const summary = createRecipeIngredientOptionRowSummary();" in organize
+
+    default_start = script.index("function createRecipeIngredientDefaultOptionSummary(row)")
+    default_end = script.index("function ensureRecipeIngredientChoiceOverview", default_start)
+    default_summary = script[default_start:default_end]
+    assert (
+        'createRecipeIngredientOptionRowSummary("recipe-edit-default-option-summary")'
+        in default_summary
+    )
+    assert 'class="recipe-edit-alternative-component-edit"' in default_summary
+    assert 'class="recipe-edit-row-menu-btn"' in default_summary
+    assert 'aria-expanded="false"' in default_summary
+    assert 'recipeEditSvgIcon("trash")' not in default_summary
+
+    card_start = script.index("function createRecipeIngredientAlternativeCard(group, groupIndex)")
+    card_end = script.index("function ensureRecipeIngredientAlternativeCards", card_start)
+    card = script[card_start:card_end]
+    assert "group.rows.forEach(optionRow => components.appendChild(optionRow));" in card
+
+
+def test_recipe_editor_expanded_groups_preserve_disclosure_and_option_heading_accessibility():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    organize_start = script.index("function organizeRecipeEditIngredientRow(row)")
+    organize_end = script.index("function organizeRecipeEditCompactRowActions", organize_start)
+    organize = script[organize_start:organize_end]
+    assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organize
+
+    expanded_start = script.index("function setRecipeIngredientSubstitutionsExpanded(")
+    expanded_end = script.index("function toggleRecipeIngredientSubstitutions", expanded_start)
+    expanded = script[expanded_start:expanded_end]
+    assert 'otherButton.setAttribute("aria-expanded", "false");' in expanded
+    assert 'optionsButton.setAttribute("aria-expanded", String(shouldOpen));' in expanded
+
+    default_start = script.index("function ensureRecipeIngredientChoiceOverview(")
+    default_end = script.index("function addRecipeIngredientDefaultComponent", default_start)
+    default_option = script[default_start:default_end]
+    alternative_start = script.index("function createRecipeIngredientAlternativeCard(")
+    alternative_end = script.index("function ensureRecipeIngredientAlternativeCards", alternative_start)
+    alternative_option = script[alternative_start:alternative_end]
+    for option_markup in (default_option, alternative_option):
+        assert 'role="heading"' in option_markup
+        assert 'aria-level="4"' in option_markup
+
+    nested_css = css[css.index("/* Ingredient editor v45:"):]
+    assert ".recipe-edit-alternative-component-edit:is(:hover, :focus-visible)" in nested_css
+    assert ".recipe-edit-alternative-add-component:is(:hover, :focus-visible)" in nested_css
+
+
 def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")

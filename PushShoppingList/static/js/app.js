@@ -29429,16 +29429,59 @@ async function commitRecipeIngredientModal(button, options = {}) {
     }
 }
 
-function updateRecipeIngredientAlternativeComponentSummary(optionRow) {
-    const summary = optionRow ? optionRow.querySelector("[data-alternative-component-summary]") : null;
+function createRecipeIngredientOptionRowSummary(className = "") {
+    const summary = document.createElement("div");
+    summary.className = [
+        "recipe-edit-alternative-component-summary",
+        String(className || "").trim(),
+    ].filter(Boolean).join(" ");
+    summary.setAttribute("role", "row");
+    summary.innerHTML = `
+        <div class="recipe-edit-alternative-component-handle-cell" data-ingredient-column="media" data-ingredient-media-track="0" role="cell"></div>
+        <div class="recipe-edit-alternative-component-image-cell" data-ingredient-column="media" data-ingredient-media-track="1" role="cell"></div>
+        <div class="recipe-edit-alternative-component-copy" data-ingredient-column="ingredient" role="cell">
+            <span class="recipe-edit-alternative-component-title-line">
+                <strong data-alternative-component-name></strong>
+            </span>
+            <span class="recipe-edit-alternative-component-preparation"
+                  data-alternative-component-preparation
+                  hidden></span>
+            <span class="recipe-edit-alternative-component-buy-as" data-alternative-component-buy-as hidden></span>
+        </div>
+        <div class="recipe-edit-alternative-component-status" data-alternative-component-status data-ingredient-column="status" role="cell"></div>
+        <div class="recipe-edit-alternative-component-quantity" data-ingredient-column="quantity" role="cell">
+            <span class="recipe-edit-alternative-column-label">Quantity</span>
+            <strong data-alternative-component-quantity></strong>
+        </div>
+        <div class="recipe-edit-alternative-component-unit" data-ingredient-column="unit" role="cell">
+            <span class="recipe-edit-alternative-column-label">Unit</span>
+            <span data-alternative-component-unit></span>
+        </div>
+        <div class="recipe-edit-alternative-component-size" data-ingredient-column="size" role="cell">
+            <span class="recipe-edit-alternative-column-label">Size</span>
+            <span data-alternative-component-size></span>
+        </div>
+        <div class="recipe-edit-alternative-component-store" data-alternative-component-store data-ingredient-column="store" role="cell"></div>
+        <div class="recipe-edit-alternative-component-type" data-ingredient-column="type" role="cell">
+            <span class="recipe-edit-alternative-column-label">Type</span>
+            <span data-alternative-component-type></span>
+        </div>
+        <div class="recipe-edit-alternative-component-option-spacer" data-ingredient-column="alternatives" role="cell" aria-hidden="true"></div>
+        <div class="recipe-edit-alternative-component-actions" data-ingredient-column="actions" role="cell"></div>
+        <div class="recipe-edit-alternative-component-meta" data-alternative-component-metadata role="cell" hidden></div>
+    `;
+    return summary;
+}
+
+function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {}, options = {}) {
     if (!summary) {
         return;
     }
-    const values = fieldValuesFromRow(optionRow);
-    const name = String(values.ingredient || "").trim() || "Unnamed replacement ingredient";
+    const name = String(values.ingredient || "").trim()
+        || String(options.fallbackName || "Unnamed replacement ingredient");
     const buyAs = recipeIngredientMeaningfulBuyAs(values);
     const storeSection = recipeStoreSectionDisplayLabel(values.store_section || "");
-    const role = recipeIngredientAlternativeRoleLabel(optionRow, values);
+    const role = String(options.role || "").trim();
     const nameElement = summary.querySelector("[data-alternative-component-name]");
     const preparationElement = summary.querySelector("[data-alternative-component-preparation]");
     const statusElement = summary.querySelector("[data-alternative-component-status]");
@@ -29456,7 +29499,7 @@ function updateRecipeIngredientAlternativeComponentSummary(optionRow) {
     }
     if (statusElement) {
         statusElement.innerHTML = recipeIngredientReadStatusHtml(
-            recipeIngredientMatchItemFromRow(optionRow, values)
+            recipeIngredientMatchItemFromRow(sourceRow, values)
         );
     }
     if (quantityElement) quantityElement.textContent = formatRecipeIngredientQuantityColumn(values);
@@ -29486,18 +29529,33 @@ function updateRecipeIngredientAlternativeComponentSummary(optionRow) {
             item.textContent = label ? `${label}: ${value}` : value;
             metadataElement.appendChild(item);
         });
-        const inlineRole = document.createElement("span");
-        inlineRole.className = "recipe-edit-alternative-component-inline-role";
-        inlineRole.textContent = role;
-        metadataElement.appendChild(inlineRole);
+        if (role) {
+            const inlineRole = document.createElement("span");
+            inlineRole.className = "recipe-edit-alternative-component-inline-role";
+            inlineRole.textContent = role;
+            metadataElement.appendChild(inlineRole);
+        }
         metadataElement.classList.toggle("has-secondary-metadata", metadata.length > 0);
-        metadataElement.hidden = false;
+        metadataElement.hidden = options.showMetadata === false;
     }
     if (buyAsElement) {
-        buyAsElement.textContent = buyAs ? `Buy as: ${buyAs}` : "";
-        buyAsElement.hidden = !buyAs;
+        const showBuyAs = options.showBuyAs !== false && Boolean(buyAs);
+        buyAsElement.textContent = showBuyAs ? `Buy as: ${buyAs}` : "";
+        buyAsElement.hidden = !showBuyAs;
     }
-    summary.setAttribute("aria-label", `Edit replacement ingredient ${name}`);
+    const accessiblePrefix = String(options.accessiblePrefix || "Edit replacement ingredient").trim();
+    summary.setAttribute("aria-label", `${accessiblePrefix} ${name}`);
+}
+
+function updateRecipeIngredientAlternativeComponentSummary(optionRow) {
+    const summary = optionRow ? optionRow.querySelector("[data-alternative-component-summary]") : null;
+    if (!summary) {
+        return;
+    }
+    const values = fieldValuesFromRow(optionRow);
+    updateRecipeIngredientOptionRowSummary(summary, optionRow, values, {
+        role: recipeIngredientAlternativeRoleLabel(optionRow, values),
+    });
 }
 
 function recipeIngredientAlternativeRoleLabel(optionRow, values = {}) {
@@ -29544,43 +29602,8 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
         buyAsLabel.textContent = "Purchasing name (if different)";
     }
 
-    const summary = document.createElement("div");
-    summary.className = "recipe-edit-alternative-component-summary";
+    const summary = createRecipeIngredientOptionRowSummary();
     summary.dataset.alternativeComponentSummary = "";
-    summary.innerHTML = `
-        <div class="recipe-edit-alternative-component-handle-cell" data-ingredient-column="media" data-ingredient-media-track="0" role="cell"></div>
-        <div class="recipe-edit-alternative-component-image-cell" data-ingredient-column="media" data-ingredient-media-track="1" role="cell"></div>
-        <div class="recipe-edit-alternative-component-copy" data-ingredient-column="ingredient" role="cell">
-            <span class="recipe-edit-alternative-component-title-line">
-                <strong data-alternative-component-name></strong>
-            </span>
-            <span class="recipe-edit-alternative-component-preparation"
-                  data-alternative-component-preparation
-                  hidden></span>
-            <span class="recipe-edit-alternative-component-buy-as" data-alternative-component-buy-as hidden></span>
-        </div>
-        <div class="recipe-edit-alternative-component-status" data-alternative-component-status data-ingredient-column="status" role="cell"></div>
-        <div class="recipe-edit-alternative-component-quantity" data-ingredient-column="quantity" role="cell">
-            <span class="recipe-edit-alternative-column-label">Quantity</span>
-            <strong data-alternative-component-quantity></strong>
-        </div>
-        <div class="recipe-edit-alternative-component-unit" data-ingredient-column="unit" role="cell">
-            <span class="recipe-edit-alternative-column-label">Unit</span>
-            <span data-alternative-component-unit></span>
-        </div>
-        <div class="recipe-edit-alternative-component-size" data-ingredient-column="size" role="cell">
-            <span class="recipe-edit-alternative-column-label">Size</span>
-            <span data-alternative-component-size></span>
-        </div>
-        <div class="recipe-edit-alternative-component-store" data-alternative-component-store data-ingredient-column="store" role="cell"></div>
-        <div class="recipe-edit-alternative-component-type" data-ingredient-column="type" role="cell">
-            <span class="recipe-edit-alternative-column-label">Type</span>
-            <span data-alternative-component-type></span>
-        </div>
-        <div class="recipe-edit-alternative-component-option-spacer" data-ingredient-column="alternatives" role="cell" aria-hidden="true"></div>
-        <div class="recipe-edit-alternative-component-actions" data-ingredient-column="actions" role="cell"></div>
-        <div class="recipe-edit-alternative-component-meta" data-alternative-component-metadata role="cell" hidden></div>
-    `;
     if (handle) {
         summary.querySelector(".recipe-edit-alternative-component-handle-cell")?.appendChild(handle);
     }
@@ -42884,6 +42907,8 @@ function createRecipeIngredientAlternativeCard(group, groupIndex) {
     card.innerHTML = `
         <div class="recipe-edit-ingredient-option-divider">
             <span data-ingredient-option-divider-label
+                  role="heading"
+                  aria-level="4"
                   data-ingredient-grid-column="ingredient">ALTERNATIVE OPTION</span>
             <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap"
                  data-ingredient-grid-column="actions">
@@ -43473,29 +43498,29 @@ function setRecipeIngredientDefaultOption(row, alternativeGroups, optionId, sele
 
 function createRecipeIngredientDefaultOptionSummary(row) {
     const values = fieldValuesFromRow(row);
-    const summary = document.createElement("div");
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
-    const preparation = recipeIngredientSentenceCase(values.preparation || "");
     const imageUrl = recipeIngredientImageUrl(values);
     const imageDisplayUrl = recipeImageVariantUrl(imageUrl, "thumb");
     const imageSrcSet = recipeImageVariantSrcSet(imageUrl);
-    const storeLabel = recipeStoreSectionDisplayLabel(values.store_section || "") || "\u2014";
-    const typeLabel = recipeIngredientTypeLabel(values);
-    summary.className = "recipe-edit-alternative-component-summary recipe-edit-default-option-summary";
-    summary.setAttribute("role", "row");
-    summary.innerHTML = `
-        <div class="recipe-edit-alternative-component-handle-cell" data-ingredient-column="media" data-ingredient-media-track="0" role="cell">
+    const summary = createRecipeIngredientOptionRowSummary("recipe-edit-default-option-summary");
+    const handleCell = summary.querySelector(".recipe-edit-alternative-component-handle-cell");
+    const imageCell = summary.querySelector(".recipe-edit-alternative-component-image-cell");
+    const actions = summary.querySelector(".recipe-edit-alternative-component-actions");
+    if (handleCell) {
+        handleCell.innerHTML = `
             <span class="recipe-edit-row-handle recipe-edit-substitution-handle" aria-hidden="true">
                 ${recipeEditSvgIcon("drag")}
             </span>
-        </div>
-        <div class="recipe-edit-alternative-component-image-cell" data-ingredient-column="media" data-ingredient-media-track="1" role="cell">
+        `;
+    }
+    if (imageCell) {
+        imageCell.innerHTML = `
             <span class="recipe-edit-substitution-thumbnail">
                 ${imageUrl ? `
                     <img src="${DEFERRED_IMAGE_PLACEHOLDER}"
                          data-deferred-src="${escapeAttribute(imageDisplayUrl)}"
                          ${imageSrcSet ? `data-deferred-srcset="${escapeAttribute(imageSrcSet)}"` : ""}
-                         sizes="44px"
+                         sizes="48px"
                          alt="${escapeAttribute(ingredientName)} ingredient"
                          loading="lazy"
                          decoding="async">` : `
@@ -43505,41 +43530,10 @@ function createRecipeIngredientDefaultOptionSummary(row) {
                         ${recipeEditSvgIcon("basket")}
                     </span>`}
             </span>
-        </div>
-        <div class="recipe-edit-alternative-component-copy" data-ingredient-column="ingredient" role="cell">
-            <span class="recipe-edit-alternative-component-title-line">
-                <strong>${escapeHtml(ingredientName)}</strong>
-            </span>
-            <span class="recipe-edit-alternative-component-preparation" ${preparation ? "" : "hidden"}>
-                ${escapeHtml(preparation)}
-            </span>
-        </div>
-        <div class="recipe-edit-alternative-component-status" data-ingredient-column="status" role="cell">
-            ${recipeIngredientReadStatusHtml(recipeIngredientMatchItemFromRow(row, values))}
-        </div>
-        <div class="recipe-edit-alternative-component-quantity" data-ingredient-column="quantity" role="cell">
-            <span class="recipe-edit-alternative-column-label">Quantity</span>
-            <strong>${escapeHtml(formatRecipeIngredientQuantityColumn(values))}</strong>
-        </div>
-        <div class="recipe-edit-alternative-component-unit" data-ingredient-column="unit" role="cell">
-            <span class="recipe-edit-alternative-column-label">Unit</span>
-            <span>${escapeHtml(formatRecipeIngredientUnitColumn(values))}</span>
-        </div>
-        <div class="recipe-edit-alternative-component-size" data-ingredient-column="size" role="cell">
-            <span class="recipe-edit-alternative-column-label">Size</span>
-            <span>${escapeHtml(String(values.size || "").trim() || "\u2014")}</span>
-        </div>
-        <div class="recipe-edit-alternative-component-store" data-ingredient-column="store" role="cell">
-            <span class="recipe-edit-alternative-column-label">Store section</span>
-            ${recipeIngredientStoreSectionIconHtml(values.store_section || "")}
-            <span>${escapeHtml(storeLabel)}</span>
-        </div>
-        <div class="recipe-edit-alternative-component-type" data-ingredient-column="type" role="cell">
-            <span class="recipe-edit-alternative-column-label">Type</span>
-            <span class="recipe-edit-alternative-component-type-value">${escapeHtml(typeLabel)}</span>
-        </div>
-        <div class="recipe-edit-alternative-component-option-spacer" data-ingredient-column="alternatives" role="cell" aria-hidden="true"></div>
-        <div class="recipe-edit-alternative-component-actions" data-ingredient-column="actions" role="cell">
+        `;
+    }
+    if (actions) {
+        actions.innerHTML = `
             <button type="button"
                     class="recipe-edit-alternative-component-edit"
                     aria-label="Edit ${escapeAttribute(ingredientName)}"
@@ -43563,8 +43557,14 @@ function createRecipeIngredientDefaultOptionSummary(row) {
                     </div>
                 </div>
             </div>
-        </div>
-    `;
+        `;
+    }
+    updateRecipeIngredientOptionRowSummary(summary, row, values, {
+        accessiblePrefix: "Edit ingredient",
+        fallbackName: "Unnamed ingredient",
+        showBuyAs: false,
+        showMetadata: false,
+    });
     summary.querySelector(".recipe-edit-alternative-component-edit")?.addEventListener(
         "click",
         event => setRecipeIngredientEditMode(row, true, { trigger: event.currentTarget }),
@@ -43599,7 +43599,11 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
         }
         const divider = document.createElement("div");
         divider.className = "recipe-edit-ingredient-option-divider";
-        divider.innerHTML = '<span data-ingredient-grid-column="ingredient">DEFAULT OPTION</span>';
+        divider.innerHTML = `
+            <span role="heading"
+                  aria-level="4"
+                  data-ingredient-grid-column="ingredient">DEFAULT OPTION</span>
+        `;
         const optionBody = document.createElement("div");
         optionBody.className = "recipe-edit-ingredient-default-option-body";
         optionBody.appendChild(createRecipeIngredientDefaultOptionSummary(row));
