@@ -44184,11 +44184,6 @@ function addRecipeIngredientSubstitutionRow(button) {
     updateRecipeIngredientSummary(row);
     const optionsButton = row.querySelector("[data-ingredient-substitutions-toggle]");
     setRecipeIngredientSubstitutionsExpanded(row, optionsButton || button, true);
-    const alternativeCard = optionRow ? optionRow.closest(".recipe-edit-alternative-card") : null;
-    if (alternativeCard) {
-        alternativeCard.dataset.newAlternative = "1";
-        setRecipeIngredientAlternativeEditMode(alternativeCard, true);
-    }
 
     if (optionsMenu && !optionsMenu.hidden && optionsMenu.recipeEditAnchorButton) {
         positionRecipeEditPopupMenu(optionsMenu, optionsMenu.recipeEditAnchorButton);
@@ -44196,7 +44191,9 @@ function addRecipeIngredientSubstitutionRow(button) {
         closeRecipeEditRowMenus();
     }
 
-    const field = optionRow ? optionRow.querySelector('[data-field="ingredient"]') : null;
+    const field = optionRow
+        ? optionRow.querySelector('[data-recipe-ingredient-inline-field="ingredient"]')
+        : null;
     if (field) {
         field.focus({ preventScroll: true });
     }

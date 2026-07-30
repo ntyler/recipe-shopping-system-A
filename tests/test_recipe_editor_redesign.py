@@ -1168,6 +1168,26 @@ def test_new_recipe_ingredient_alternative_is_organized_before_controls_are_boun
     assert add_alternative.index(organize_call) < add_alternative.index(bind_call)
 
 
+def test_new_recipe_ingredient_alternative_opens_as_a_standard_inline_row():
+    script = read_text("PushShoppingList/static/js/app.js")
+    add_start = script.index("function addRecipeIngredientSubstitutionRow(button)")
+    add_end = script.index(
+        "function removeRecipeIngredientSubstitutionRow",
+        add_start,
+    )
+    add_alternative = script[add_start:add_end]
+
+    assert "setRecipeIngredientAlternativeEditMode" not in add_alternative
+    assert "dataset.newAlternative" not in add_alternative
+    assert (
+        "optionRow.querySelector("
+        "'[data-recipe-ingredient-inline-field=\"ingredient\"]'"
+        ")"
+        in add_alternative
+    )
+    assert "field.focus({ preventScroll: true });" in add_alternative
+
+
 def test_recipe_editor_expanded_option_rows_share_the_parent_table_grid_without_offsets():
     css = read_text("PushShoppingList/static/css/app.css")
     expanded_grid_css = css[css.index("/* Ingredient editor v46:"):]
