@@ -2994,7 +2994,9 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert 'control.setAttribute("list", "recipeIngredientUnitOptions");' in inline_control_factory
     assert '"recipe-edit-unit-chevron recipe-edit-inline-picker-chevron"' in inline_control_factory
     assert "function recipeIngredientInlineEditorSourceRow(control, fallbackRow)" in script
-    assert 'control?.closest("[data-substitution-option-row]") || fallbackRow' in script
+    assert 'control?.closest("[data-substitution-option-row]")' in script
+    assert "recipeIngredientProjectedOptionSourceRow(control)" in script
+    assert "fallbackRow?.recipeIngredientInlineSummarySourceRow" in script
     assert "const sourceRow = recipeIngredientInlineEditorSourceRow(control, row);" in binding
     assert "const source = recipeIngredientDirectField(sourceRow, fieldName);" in binding
     assert 'source.dispatchEvent(new Event(eventName, { bubbles: true }));' in binding

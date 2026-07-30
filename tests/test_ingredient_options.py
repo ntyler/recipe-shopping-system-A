@@ -520,9 +520,80 @@ def test_editor_option_selection_is_always_visible_and_directly_changeable():
     assert "Ingredient editor v54: persistent, directly changeable option selection." in css
     assert ".recipe-edit-option-selection.is-selected" in css
     assert ".is-selected-option" in css
+    assert ".recipe-edit-ingredient-choice-overview," in css
+    assert ".recipe-edit-alternative-card" in css
+    assert "background: color-mix(in srgb, var(--app-primary-soft) 18%, var(--app-surface));" in css
+    assert "inset 3px 0 0 color-mix(in srgb, var(--app-primary-hover) 76%, transparent)" in css
+    assert ".recipe-edit-alternative-component-summary:not(:hover, :focus-within)" in css
 
 
-def test_collapsed_group_summary_projects_single_and_multi_item_selections():
+def test_group_parent_uses_authoritative_recipe_text_and_choice_only_metadata():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    read_cell = script[
+        script.index("function createRecipeIngredientReadCell"):
+        script.index("function createRecipeIngredientStatusSummary")
+    ]
+    state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
+    organizer = script[
+        script.index("function organizeRecipeEditIngredientRow"):
+        script.index("function organizeRecipeEditCompactRowActions")
+    ]
+    source_first_css = css[css.index("/* Ingredient editor v57:"):]
+
+    assert "INGREDIENT CHOICE" in read_cell
+    assert "Choose one option" in read_cell
+    assert "data-ingredient-choice-original-text" in read_cell
+    assert "data-ingredient-choice-selected-summary" in read_cell
+    assert "data-ingredient-choice-option-count" in read_cell
+    assert "parentValues.source_text || parentValues.original_text" in state
+    assert "originalText.textContent = choiceTitle;" in state
+    assert "row.classList.toggle(\"has-ingredient-choice\", alternativeCount > 0);" in state
+    assert '"has-selected-ingredient-choice"' in state
+    assert '"shows-ingredient-choice-summary"' in state
+    assert "choiceParent.hidden = !showsChoiceSummary;" in state
+    assert "Selected: ${selectedSummary}" in state
+    assert "optionCount.textContent = requirementChoiceSummary.label;" in state
+    assert 'label: `${summaries.length} option${summaries.length === 1 ? "" : "s"}`' in script
+    assert 'row.addEventListener("click"' in organizer
+    assert "[data-ingredient-substitutions], .recipe-edit-row-handle" in organizer
+
+    assert ".recipe-edit-ingredient-row.shows-ingredient-choice-summary" in source_first_css
+    assert "> :not(.recipe-edit-ingredient-choice-parent)" in source_first_css
+    for column in ("status", "quantity", "unit", "size", "store", "type"):
+        assert f'[data-ingredient-column="{column}"]' in source_first_css
+    assert "grid-column: 3 / -3 !important;" in source_first_css
+    assert "background: var(--app-surface);" in source_first_css
+    assert "box-shadow: inset 3px 0 0" in source_first_css
+    assert "grid-template-areas:" not in source_first_css
+    assert "display: flex;" in source_first_css
+    assert "text-overflow: ellipsis;" in source_first_css
+    assert "background: transparent !important;" in source_first_css
+
+
+def test_selected_group_summary_uses_preparation_when_it_distinguishes_options():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    summary = script[
+        script.index("function recipeIngredientChoiceItemSummary"):
+        script.index("function recipeIngredientAlternativeIsRecipeChoice")
+    ]
+    selected_choice = script[
+        script.index("function recipeIngredientSelectedChoice"):
+        script.index("function setRecipeIngredientDefaultOption")
+    ]
+
+    assert "preparationDistinguishesOption" in summary
+    assert "recipeIngredientComparableText(candidate.ingredient) === ingredientKey" in summary
+    assert "recipeIngredientComparableText(candidate.preparation) !== preparationKey" in summary
+    assert "return `${preparation} ${ingredientAfterPreparation}`;" in summary
+    assert "recipeIngredientChoiceItemSummary(" in selected_choice
+
+
+def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -542,9 +613,9 @@ def test_collapsed_group_summary_projects_single_and_multi_item_selections():
         script.index("function createRecipeIngredientReadCell"):
         script.index("function createRecipeIngredientStatusSummary")
     ]
-    default_option_summary = script[
-        script.index("function createRecipeIngredientDefaultOptionSummary"):
-        script.index("function ensureRecipeIngredientChoiceOverview")
+    selected_line_items = script[
+        script.index("function createRecipeIngredientSelectedOptionLineItem"):
+        script.index("function organizeRecipeEditSubstitutionOptionRow")
     ]
     substitution_state = script[
         script.index("function updateRecipeIngredientSubstitutionState"):
@@ -556,17 +627,30 @@ def test_collapsed_group_summary_projects_single_and_multi_item_selections():
     assert '.join(" + ");' in selected_choice
     assert 'selectionLabel: "Default selected"' in selected_choice
     assert '"Alternative selected"' in selected_choice
+    assert "recipeIngredientProjectedOptionSourceRow(control)" in inline_source
     assert "fallbackRow?.recipeIngredientInlineSummarySourceRow" in inline_source
     assert "row.recipeIngredientInlineSummarySourceRow = selectedSourceRow;" in summary
     assert "...fieldValuesFromRow(selectedSourceRow)" in summary
-    assert "data-ingredient-selected-group-summary" in read_cell
-    assert "const hasMultiItemSelection = selectedGroupValues.length > 1;" in summary
-    assert "const displayIngredientName = hasMultiItemSelection" in summary
-    assert "hasMultiItemSelection" not in default_option_summary
-    assert "selectedGroupSummary.hidden = !hasMultiItemSelection;" in summary
-    assert "if (readName) readName.hidden = hasMultiItemSelection;" in summary
-    assert "if (readDetails) readDetails.hidden = hasMultiItemSelection;" in summary
-    assert "Selected ingredients: ${selectedIngredientNames}" in summary
+    assert "data-ingredient-selected-group-summary" not in read_cell
+    assert "const selectedSourceRow = selectedChoice?.rows[0] || null;" in summary
+    assert "const displayIngredientName = ingredientName;" in summary
+    assert "if (readName) readName.hidden = false;" in summary
+    assert "if (readDetails) readDetails.hidden = false;" in summary
+    assert "additionalRows = selectedRows.slice(1);" in selected_line_items
+    assert "data-ingredient-selected-option-line-items" in selected_line_items
+    assert "createRecipeIngredientOptionRowSummary(" in selected_line_items
+    assert "summary.recipeIngredientOptionSourceRow = sourceRow;" in selected_line_items
+    assert "bindRecipeIngredientInlineEditor(row, summary);" in selected_line_items
+    assert "openRecipeIngredientOptionModal(editButton)" in selected_line_items
+    assert "lineItems.hidden = expanded || !hasAdditionalRows;" in selected_line_items
+    assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state
+    assert "function ensureRecipeIngredientSelectedChoiceGroupHeader" in script
+    assert '`${selectedChoiceKind} INGREDIENT CHOICE`' in substitution_state
+    assert "groupTitle.textContent = choiceTitle;" in substitution_state
+    assert '"has-selected-choice-group-header"' in substitution_state
+    assert "alternativeCount && !hasSelectedChoice" in substitution_state
+    assert "alternativeCount && hasSelectedChoice" in substitution_state
+    assert "alternativeCount && hasSelectedChoice && !isExpanded" not in substitution_state
     assert 'label.textContent += " · Selected";' in substitution_state
     assert "label.textContent = selectedLabel;" in substitution_state
     assert "selectedChoice?.ingredientSummary || selectedDetails" in substitution_state
@@ -578,8 +662,55 @@ def test_collapsed_group_summary_projects_single_and_multi_item_selections():
     )
     assert "Ingredient editor v55: collapsed group rows reflect the selected option." in css
     assert ".recipe-edit-ingredient-options-button.has-selected-option" in css
-    assert "Ingredient editor v56: show every ingredient in a selected multi-item group." in css
-    assert ".recipe-edit-selected-group-summary" in css
+    assert "Ingredient editor v58: selected option components remain normal table rows." in css
+    assert ".recipe-edit-selected-option-line-items" in css
+    assert ".recipe-edit-selected-option-line-item" in css
+    assert "position: relative;" in css
+    assert "grid-row: 2 !important;" in css
+    assert "grid-row: 8 !important;" in css
+    assert "Ingredient editor v59: selected choices use a shared group header." in css
+    assert ".recipe-edit-selected-choice-group-header" in css
+    assert ".recipe-edit-ingredient-source-text" in css
+    assert "> .recipe-edit-selected-option-line-items" in css
+    assert "grid-row: 3 !important;" in css
+    assert "Ingredient editor v60: expansion keeps the shared selected-choice header." in css
+    assert ".has-selected-choice-group-header.recipe-edit-substitutions-open" in css
+    assert '[data-ingredient-column="alternatives"]' in css
+    assert '[data-ingredient-column="actions"]' in css
+
+
+def test_selected_option_line_items_reorder_their_underlying_component_rows():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    drag_helpers = script[
+        script.index("function recipeEditUnderlyingMoveRow"):
+        script.index("function bindRecipeEditDragAndDrop")
+    ]
+    drag_binding = script[
+        script.index("function bindRecipeEditDragAndDrop"):
+        script.index("function startRecipeEditPointerDrag")
+    ]
+    pointer_target = script[
+        script.index("function recipeEditDropTargetFromPoint"):
+        script.index("function autoScrollRecipeEditDialogForDrag")
+    ]
+    drop_handler = script[
+        script.index("function dropRecipeEditRow"):
+        script.index("function updateRecipeEditRowOrder")
+    ]
+
+    assert "row?.recipeIngredientOptionSourceRow || row" in drag_helpers
+    assert "resolvedTarget.recipeIngredientInlineSummarySourceRow" in drag_helpers
+    assert "[data-ingredient-selected-option-line-item]" in drag_helpers
+    assert "recipeEditEventDropTarget(" in drag_binding
+    assert "recipeEditDraggedRow," in drag_binding
+    assert "recipeEditDraggedDisplayRow" in drag_binding
+    assert "[data-ingredient-selected-option-line-item]" in pointer_target
+    assert "const sourceRow = recipeEditUnderlyingMoveRow(draggedRow);" in drop_handler
+    assert "const resolvedTarget = recipeEditResolvedDropRow(sourceRow, targetRow);" in drop_handler
+    assert "resolvedTarget.before(sourceRow);" in drop_handler
+    assert "resolvedTarget.after(sourceRow);" in drop_handler
+    assert "updateRecipeIngredientSummary(" in drop_handler
 
 
 def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows():
@@ -786,7 +917,7 @@ def test_option_ingredient_pencils_use_the_standard_edit_ingredient_modal():
         script.index("const RECIPE_EDIT_INGREDIENT_GRID_CELL_ORDER")
     ]
 
-    assert "function openRecipeIngredientOptionModal(control)" in option_modal
+    assert "function openRecipeIngredientOptionModal(control, options = {})" in option_modal
     assert "setRecipeIngredientEditMode(row, true, { trigger });" in option_modal
     assert "function closeRecipeIngredientOptionModal(row, panel, options = {})" in option_modal
     assert "restoreRecipeIngredientEditableFieldSnapshot(" in option_modal
