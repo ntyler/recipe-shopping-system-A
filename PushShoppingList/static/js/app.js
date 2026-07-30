@@ -44179,8 +44179,8 @@ function addRecipeIngredientSubstitutionRow(button) {
     const optionRow = list.lastElementChild?.matches("[data-substitution-option-row]")
         ? list.lastElementChild
         : null;
-    bindRecipeIngredientSubstitutionRow(optionRow);
     organizeRecipeEditSubstitutionOptionRow(optionRow);
+    bindRecipeIngredientSubstitutionRow(optionRow);
     updateRecipeIngredientSummary(row);
     const optionsButton = row.querySelector("[data-ingredient-substitutions-toggle]");
     setRecipeIngredientSubstitutionsExpanded(row, optionsButton || button, true);

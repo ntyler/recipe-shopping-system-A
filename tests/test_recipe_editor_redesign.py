@@ -1152,6 +1152,22 @@ def test_recipe_editor_substitution_groups_use_mockup_table_hierarchy():
     assert ".recipe-edit-alternative-component-actions" in css
 
 
+def test_new_recipe_ingredient_alternative_is_organized_before_controls_are_bound():
+    script = read_text("PushShoppingList/static/js/app.js")
+    add_start = script.index("function addRecipeIngredientSubstitutionRow(button)")
+    add_end = script.index(
+        "function removeRecipeIngredientSubstitutionRow",
+        add_start,
+    )
+    add_alternative = script[add_start:add_end]
+
+    organize_call = "organizeRecipeEditSubstitutionOptionRow(optionRow);"
+    bind_call = "bindRecipeIngredientSubstitutionRow(optionRow);"
+    assert organize_call in add_alternative
+    assert bind_call in add_alternative
+    assert add_alternative.index(organize_call) < add_alternative.index(bind_call)
+
+
 def test_recipe_editor_expanded_option_rows_share_the_parent_table_grid_without_offsets():
     css = read_text("PushShoppingList/static/css/app.css")
     expanded_grid_css = css[css.index("/* Ingredient editor v46:"):]
