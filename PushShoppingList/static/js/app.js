@@ -29550,6 +29550,52 @@ function createRecipeIngredientStatusSummary(className = "", options = {}) {
     return statusSummary;
 }
 
+function createRecipeIngredientReadImageCell(className = "") {
+    const imageCell = document.createElement("div");
+    imageCell.className = [
+        "recipe-edit-row-image-panel",
+        "recipe-step-image-panel",
+        "recipe-ingredient-image-panel",
+        "recipe-edit-ingredient-image-cell",
+        String(className || "").trim(),
+    ].filter(Boolean).join(" ");
+    imageCell.setAttribute("role", "cell");
+    return imageCell;
+}
+
+function syncRecipeIngredientReadImageCell(imageCell, values = {}) {
+    if (!imageCell) {
+        return;
+    }
+    const imageUrl = recipeIngredientImageUrl(values);
+    if (imageCell.dataset.recipeIngredientImageUrl === imageUrl) {
+        return;
+    }
+
+    imageCell.dataset.recipeIngredientImageUrl = imageUrl;
+    imageCell.classList.toggle("recipe-image-empty", !imageUrl);
+    const image = document.createElement("img");
+    image.className = "recipe-step-image recipe-ingredient-image";
+    image.alt = "Ingredient image";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.fetchPriority = "low";
+    image.sizes = "120px";
+    image.dataset.fullSrc = imageUrl;
+    if (imageUrl) {
+        image.src = DEFERRED_IMAGE_PLACEHOLDER;
+        image.dataset.deferredSrc = recipeImageVariantUrl(imageUrl, "thumb");
+        const srcSet = recipeImageVariantSrcSet(imageUrl);
+        if (srcSet) {
+            image.dataset.deferredSrcset = srcSet;
+        }
+    } else {
+        image.hidden = true;
+    }
+    imageCell.replaceChildren(image);
+    initDeferredImages(imageCell);
+}
+
 function appendRecipeIngredientInlineSummaryControl(cell, fieldName, tagName = "input") {
     if (!cell) {
         return null;
@@ -29593,9 +29639,9 @@ function createRecipeIngredientOptionRowSummary(className = "") {
     summary.setAttribute("role", "row");
     summary.innerHTML = `
         <div class="recipe-edit-alternative-component-handle-cell" data-ingredient-column="media" data-ingredient-media-track="0" role="cell"></div>
-        <div class="recipe-edit-alternative-component-image-cell recipe-edit-ingredient-image-cell" data-ingredient-column="media" data-ingredient-media-track="1" role="cell"></div>
-        <div data-option-ingredient-cell></div>
-        <div data-option-status-cell></div>
+        <div data-option-image-cell data-ingredient-column="media"></div>
+        <div data-option-ingredient-cell data-ingredient-column="ingredient"></div>
+        <div data-option-status-cell data-ingredient-column="status"></div>
         <div class="recipe-edit-alternative-component-quantity recipe-edit-ingredient-quantity-summary"
              data-ingredient-column="quantity"
              role="cell"></div>
@@ -29617,6 +29663,12 @@ function createRecipeIngredientOptionRowSummary(className = "") {
         <div class="recipe-edit-alternative-component-actions" data-ingredient-column="actions" role="cell"></div>
         <div class="recipe-edit-alternative-component-meta" data-alternative-component-metadata role="cell" hidden></div>
     `;
+    const imageCell = createRecipeIngredientReadImageCell(
+        "recipe-edit-alternative-component-image-cell",
+    );
+    imageCell.dataset.ingredientColumn = "media";
+    imageCell.dataset.ingredientMediaTrack = "1";
+    summary.querySelector("[data-option-image-cell]")?.replaceWith(imageCell);
     const ingredientCell = createRecipeIngredientReadCell(
         "recipe-edit-alternative-component-copy",
         { alternative: true },
@@ -29679,6 +29731,10 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     const typeElement = summary.querySelector("[data-alternative-component-type]");
     const metadataElement = summary.querySelector("[data-alternative-component-metadata]");
     const buyAsElement = summary.querySelector("[data-alternative-component-buy-as]");
+    syncRecipeIngredientReadImageCell(
+        summary.querySelector(".recipe-edit-alternative-component-image-cell"),
+        values,
+    );
     if (nameElement) nameElement.value = name;
     if (preparationElement) {
         preparationElement.value = recipeIngredientSentenceCase(values.preparation || "");
@@ -29801,10 +29857,7 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
     if (handle) {
         summary.querySelector(".recipe-edit-alternative-component-handle-cell")?.appendChild(handle);
     }
-    if (image) {
-        image.removeAttribute("role");
-        summary.querySelector(".recipe-edit-alternative-component-image-cell")?.appendChild(image);
-    }
+    image?.remove();
     optionRow.insertBefore(summary, optionRow.firstChild);
 
     const editGrid = document.createElement("div");
@@ -42218,10 +42271,10 @@ function bindRecipeIngredientMasterPicker(input) {
 
 function bindRecipeIngredientNameField(row) {
     const sourceField = row ? recipeIngredientDirectField(row, "ingredient") : null;
-    const inlineField = row && !row.matches("[data-substitution-option-row]")
-        ? row.querySelector('[data-recipe-ingredient-inline-field="ingredient"]')
-        : null;
-    const fields = [sourceField, inlineField].filter(Boolean);
+    const inlineFields = row
+        ? [...row.querySelectorAll('[data-recipe-ingredient-inline-field="ingredient"]')]
+        : [];
+    const fields = [...new Set([sourceField, ...inlineFields].filter(Boolean))];
     if (!fields.length) {
         return;
     }
@@ -43656,12 +43709,8 @@ function setRecipeIngredientDefaultOption(row, alternativeGroups, optionId, sele
 function createRecipeIngredientDefaultOptionSummary(row) {
     const values = fieldValuesFromRow(row);
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
-    const imageUrl = recipeIngredientImageUrl(values);
-    const imageDisplayUrl = recipeImageVariantUrl(imageUrl, "thumb");
-    const imageSrcSet = recipeImageVariantSrcSet(imageUrl);
     const summary = createRecipeIngredientOptionRowSummary("recipe-edit-default-option-summary");
     const handleCell = summary.querySelector(".recipe-edit-alternative-component-handle-cell");
-    const imageCell = summary.querySelector(".recipe-edit-alternative-component-image-cell");
     const actions = summary.querySelector(".recipe-edit-alternative-component-actions");
     if (handleCell) {
         handleCell.innerHTML = `
@@ -43669,25 +43718,10 @@ function createRecipeIngredientDefaultOptionSummary(row) {
                 ${recipeEditSvgIcon("drag")}
             </span>
         `;
-    }
-    if (imageCell) {
-        imageCell.innerHTML = `
-            <span class="recipe-edit-substitution-thumbnail">
-                ${imageUrl ? `
-                    <img src="${DEFERRED_IMAGE_PLACEHOLDER}"
-                         data-deferred-src="${escapeAttribute(imageDisplayUrl)}"
-                         ${imageSrcSet ? `data-deferred-srcset="${escapeAttribute(imageSrcSet)}"` : ""}
-                         sizes="48px"
-                         alt="${escapeAttribute(ingredientName)} ingredient"
-                         loading="lazy"
-                         decoding="async">` : `
-                    <span class="recipe-edit-substitution-image-fallback"
-                          role="img"
-                          aria-label="No image available for ${escapeAttribute(ingredientName)}">
-                        ${recipeEditSvgIcon("image")}
-                    </span>`}
-            </span>
-        `;
+        bindRecipeEditDragAndDrop(
+            row,
+            handleCell.querySelector(".recipe-edit-row-handle"),
+        );
     }
     if (actions) {
         actions.innerHTML = `
@@ -43788,6 +43822,7 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
             });
         }
         bindRecipeIngredientInlineEditor(row, overview);
+        bindRecipeIngredientNameField(row);
     }
 
     let alternativeNumber = 0;
@@ -44610,65 +44645,72 @@ function recipeEditMoveSelectorForRow(row) {
     return ".recipe-edit-text-row";
 }
 
-function bindRecipeEditDragAndDrop(row) {
-    const handle = row ? row.querySelector(".recipe-edit-row-handle") : null;
+function bindRecipeEditDragAndDrop(row, requestedHandle = null) {
+    const handle = requestedHandle || (row ? row.querySelector(".recipe-edit-row-handle") : null);
 
-    if (!row || !handle || row.dataset.recipeEditDragBound === "true") {
+    if (!row || !handle) {
         return;
     }
 
+    if (handle.dataset.recipeEditDragHandleBound !== "true") {
+        handle.dataset.recipeEditDragHandleBound = "true";
+        handle.draggable = true;
+        handle.removeAttribute("aria-hidden");
+        handle.setAttribute("role", "button");
+        handle.setAttribute("tabindex", "0");
+        handle.setAttribute("aria-label", "Drag to reorder");
+        handle.setAttribute("title", "Drag to reorder");
+
+        handle.addEventListener("dragstart", event => {
+            if (handle.getAttribute("aria-disabled") === "true") {
+                event.preventDefault();
+                setRecipeEditIngredientColumnStatus(
+                    "Clear the ingredient view controls before reordering ingredients.",
+                );
+                return;
+            }
+            recipeEditDraggedRow = row;
+            closeRecipeEditRowMenus();
+            row.classList.add("recipe-edit-row-dragging");
+
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", recipeEditMoveSelectorForRow(row));
+
+                try {
+                    event.dataTransfer.setDragImage(row, 24, 24);
+                } catch (err) {
+                    // Some browsers only allow visible elements as drag images.
+                }
+            }
+        });
+
+        handle.addEventListener("dragend", () => {
+            clearRecipeEditDragState();
+        });
+
+        handle.addEventListener("pointerdown", event => {
+            startRecipeEditPointerDrag(row, handle, event);
+        });
+
+        handle.addEventListener("pointermove", event => {
+            moveRecipeEditPointerDrag(event);
+        });
+
+        handle.addEventListener("pointerup", event => {
+            endRecipeEditPointerDrag(event);
+        });
+
+        handle.addEventListener("pointercancel", event => {
+            endRecipeEditPointerDrag(event, true);
+        });
+    }
+
+    if (row.dataset.recipeEditDragBound === "true") {
+        return;
+    }
     row.dataset.recipeEditDragBound = "true";
     row.classList.add("recipe-edit-row-draggable");
-    handle.draggable = true;
-    handle.removeAttribute("aria-hidden");
-    handle.setAttribute("role", "button");
-    handle.setAttribute("tabindex", "0");
-    handle.setAttribute("aria-label", "Drag to reorder");
-    handle.setAttribute("title", "Drag to reorder");
-
-    handle.addEventListener("dragstart", event => {
-        if (handle.getAttribute("aria-disabled") === "true") {
-            event.preventDefault();
-            setRecipeEditIngredientColumnStatus(
-                "Clear the ingredient view controls before reordering ingredients.",
-            );
-            return;
-        }
-        recipeEditDraggedRow = row;
-        closeRecipeEditRowMenus();
-        row.classList.add("recipe-edit-row-dragging");
-
-        if (event.dataTransfer) {
-            event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.setData("text/plain", recipeEditMoveSelectorForRow(row));
-
-            try {
-                event.dataTransfer.setDragImage(row, 24, 24);
-            } catch (err) {
-                // Some browsers only allow visible elements as drag images.
-            }
-        }
-    });
-
-    handle.addEventListener("dragend", () => {
-        clearRecipeEditDragState();
-    });
-
-    handle.addEventListener("pointerdown", event => {
-        startRecipeEditPointerDrag(row, handle, event);
-    });
-
-    handle.addEventListener("pointermove", event => {
-        moveRecipeEditPointerDrag(event);
-    });
-
-    handle.addEventListener("pointerup", event => {
-        endRecipeEditPointerDrag(event);
-    });
-
-    handle.addEventListener("pointercancel", event => {
-        endRecipeEditPointerDrag(event, true);
-    });
 
     row.addEventListener("dragover", event => {
         if (!recipeEditCanDropOnRow(recipeEditDraggedRow, row)) {

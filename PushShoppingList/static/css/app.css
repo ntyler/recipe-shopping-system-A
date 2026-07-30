@@ -67595,3 +67595,52 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         grid-column: 9 !important;
     }
 }
+
+/* Ingredient editor v51: option rows use the parent row's drag and image cells. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-handle-cell {
+    width: 28px;
+    min-width: 28px;
+    margin: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-handle-cell
+    > .recipe-edit-row-handle {
+    width: 28px;
+    min-width: 28px;
+    margin: 0;
+    color: var(--app-muted);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-image-cell {
+    box-sizing: border-box;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 8px;
+    background: var(--app-bg-soft);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > .recipe-edit-alternative-component-image-cell
+    > .recipe-ingredient-image {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    border: 0 !important;
+    border-radius: 7px !important;
+    object-fit: cover;
+}

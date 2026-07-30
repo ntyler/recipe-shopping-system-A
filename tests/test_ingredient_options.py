@@ -443,9 +443,54 @@ def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows()
     assert "grid-column: 8 !important;" in v50
     assert '> [data-ingredient-column="type"]' in v50
     assert "grid-column: 9 !important;" in v50
+
+    image_factory = script[
+        script.index("function createRecipeIngredientReadImageCell"):
+        script.index("function appendRecipeIngredientInlineSummaryControl")
+    ]
+    assert '"recipe-ingredient-image-panel"' in image_factory
+    assert '"recipe-edit-ingredient-image-cell"' in image_factory
+    assert 'image.className = "recipe-step-image recipe-ingredient-image";' in image_factory
+    assert 'image.alt = "Ingredient image";' in image_factory
+    assert "imageCell.classList.toggle(\"recipe-image-empty\", !imageUrl);" in image_factory
+    assert "syncRecipeIngredientReadImageCell(" in script
+
+    name_binding = script[
+        script.index("function bindRecipeIngredientNameField"):
+        script.index("function addRecipeIngredientRow")
+    ]
+    assert 'row.querySelectorAll(\'[data-recipe-ingredient-inline-field="ingredient"]\')' in name_binding
+    assert "bindRecipeIngredientMasterPicker(field);" in name_binding
+
+    drag_binding = script[
+        script.index("function bindRecipeEditDragAndDrop"):
+        script.index("function startRecipeEditPointerDrag")
+    ]
+    assert "requestedHandle = null" in drag_binding
+    assert 'handle.dataset.recipeEditDragHandleBound !== "true"' in drag_binding
+    assert 'handle.setAttribute("aria-label", "Drag to reorder");' in drag_binding
+
+    v51 = css[css.index("/* Ingredient editor v51:"):]
+    assert css.index("/* Ingredient editor v51:") > css.index("/* Ingredient editor v50:")
+    assert ".recipe-edit-alternative-component-handle-cell" in v51
+    assert "> .recipe-edit-row-handle" in v51
+    assert "width: 28px;" in v51
+    assert ".recipe-edit-alternative-component-image-cell" in v51
+    assert "width: 48px !important;" in v51
+    assert "height: 48px !important;" in v51
+    assert "border: 1px solid var(--app-border-strong);" in v51
+    assert "> .recipe-ingredient-image" in v51
+
     choice_overview = script[
         script.index("function ensureRecipeIngredientChoiceOverview"):
         script.index("function addRecipeIngredientDefaultComponent")
     ]
     assert 'let summary = overview.querySelector(".recipe-edit-default-option-summary");' in choice_overview
     assert "bindRecipeIngredientInlineEditor(row, overview);" in choice_overview
+    assert "bindRecipeIngredientNameField(row);" in choice_overview
+    default_summary = script[
+        script.index("function createRecipeIngredientDefaultOptionSummary"):
+        script.index("function ensureRecipeIngredientChoiceOverview")
+    ]
+    assert "bindRecipeEditDragAndDrop(" in default_summary
+    assert 'handleCell.querySelector(".recipe-edit-row-handle")' in default_summary
