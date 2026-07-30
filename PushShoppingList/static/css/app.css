@@ -67479,32 +67479,42 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-alternative-component-summary
     > :is(
         .recipe-edit-alternative-component-quantity,
-        .recipe-edit-alternative-component-unit
+        .recipe-edit-alternative-component-unit,
+        .recipe-edit-alternative-component-size
     ) {
-    position: relative;
-    display: block;
-    width: 100%;
     overflow: visible;
+    font-weight: 400;
 }
 
-body.recipe-edit-standalone-page #recipeEditIngredients
-    .recipe-edit-alternative-component-summary
-    > :is(
-        .recipe-edit-alternative-component-quantity,
-        .recipe-edit-alternative-component-unit
-    )
-    > .recipe-edit-ingredient-inline-control {
-    width: 100%;
-    height: 32px;
-    min-height: 32px;
-    padding-inline: 7px;
-    color: var(--app-text);
-    font: inherit;
-}
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-alternative-component-summary
+        > [data-ingredient-column] {
+        grid-row: 1 !important;
+        align-self: center;
+    }
 
-body.recipe-edit-standalone-page #recipeEditIngredients
-    .recipe-edit-alternative-component-summary
-    > .recipe-edit-alternative-component-unit
-    > .recipe-edit-ingredient-inline-control {
-    padding-right: 22px;
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-alternative-component-summary
+        > [data-ingredient-column="status"] {
+        grid-column: 4 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-alternative-component-summary
+        > [data-ingredient-column="quantity"] {
+        grid-column: 5 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-alternative-component-summary
+        > [data-ingredient-column="unit"] {
+        grid-column: 6 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-alternative-component-summary
+        > [data-ingredient-column="size"] {
+        grid-column: 7 !important;
+    }
 }

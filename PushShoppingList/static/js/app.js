@@ -29480,6 +29480,40 @@ function applyRecipeIngredientTableGridContract(grid, cells = {}) {
     return grid;
 }
 
+function appendRecipeIngredientInlineSummaryControl(cell, fieldName, tagName = "input") {
+    if (!cell) {
+        return null;
+    }
+    const control = document.createElement(tagName);
+    if (tagName === "input") {
+        control.type = "text";
+        control.autocomplete = "off";
+    }
+    control.className = "recipe-edit-ingredient-inline-control";
+    control.dataset.recipeIngredientInlineField = fieldName;
+    control.setAttribute("aria-label", {
+        quantity: "Quantity",
+        unit: "Unit",
+        size: "Size",
+        store_section: "Store Section",
+        section: "Type",
+    }[fieldName]);
+    if (fieldName === "unit") {
+        control.setAttribute("list", "recipeIngredientUnitOptions");
+    }
+    cell.appendChild(control);
+    if (fieldName === "unit" || fieldName === "section") {
+        const chevron = document.createElement("span");
+        chevron.className = fieldName === "section"
+            ? "recipe-edit-unit-chevron recipe-edit-type-chevron recipe-edit-inline-picker-chevron"
+            : "recipe-edit-unit-chevron recipe-edit-inline-picker-chevron";
+        chevron.setAttribute("aria-hidden", "true");
+        chevron.innerHTML = recipeEditSvgIcon("chevron-down");
+        cell.appendChild(chevron);
+    }
+    return control;
+}
+
 function createRecipeIngredientOptionRowSummary(className = "") {
     const summary = document.createElement("div");
     summary.className = [
@@ -29500,32 +29534,15 @@ function createRecipeIngredientOptionRowSummary(className = "") {
             <span class="recipe-edit-alternative-component-buy-as" data-alternative-component-buy-as hidden></span>
         </div>
         <div class="recipe-edit-alternative-component-status" data-alternative-component-status data-ingredient-column="status" role="cell"></div>
-        <div class="recipe-edit-alternative-component-quantity" data-ingredient-column="quantity" role="cell">
-            <span class="recipe-edit-alternative-column-label">Quantity</span>
-            <input type="text"
-                   class="recipe-edit-ingredient-inline-control"
-                   data-alternative-component-quantity
-                   data-recipe-ingredient-inline-field="quantity"
-                   aria-label="Quantity"
-                   autocomplete="off">
-        </div>
-        <div class="recipe-edit-alternative-component-unit" data-ingredient-column="unit" role="cell">
-            <span class="recipe-edit-alternative-column-label">Unit</span>
-            <input type="text"
-                   class="recipe-edit-ingredient-inline-control"
-                   data-alternative-component-unit
-                   data-recipe-ingredient-inline-field="unit"
-                   list="recipeIngredientUnitOptions"
-                   aria-label="Unit"
-                   autocomplete="off">
-            <span class="recipe-edit-unit-chevron recipe-edit-inline-picker-chevron" aria-hidden="true">
-                ${recipeEditSvgIcon("chevron-down")}
-            </span>
-        </div>
-        <div class="recipe-edit-alternative-component-size" data-ingredient-column="size" role="cell">
-            <span class="recipe-edit-alternative-column-label">Size</span>
-            <span data-alternative-component-size></span>
-        </div>
+        <div class="recipe-edit-alternative-component-quantity recipe-edit-ingredient-quantity-summary"
+             data-ingredient-column="quantity"
+             role="cell"></div>
+        <div class="recipe-edit-alternative-component-unit recipe-edit-ingredient-unit-summary"
+             data-ingredient-column="unit"
+             role="cell"></div>
+        <div class="recipe-edit-alternative-component-size recipe-edit-ingredient-size-summary"
+             data-ingredient-column="size"
+             role="cell"></div>
         <div class="recipe-edit-alternative-component-store" data-alternative-component-store data-ingredient-column="store" role="cell"></div>
         <div class="recipe-edit-alternative-component-type" data-ingredient-column="type" role="cell">
             <span class="recipe-edit-alternative-column-label">Type</span>
@@ -29535,6 +29552,19 @@ function createRecipeIngredientOptionRowSummary(className = "") {
         <div class="recipe-edit-alternative-component-actions" data-ingredient-column="actions" role="cell"></div>
         <div class="recipe-edit-alternative-component-meta" data-alternative-component-metadata role="cell" hidden></div>
     `;
+    [
+        ["quantity", ".recipe-edit-alternative-component-quantity", "alternativeComponentQuantity"],
+        ["unit", ".recipe-edit-alternative-component-unit", "alternativeComponentUnit"],
+        ["size", ".recipe-edit-alternative-component-size", "alternativeComponentSize"],
+    ].forEach(([fieldName, selector, dataName]) => {
+        const control = appendRecipeIngredientInlineSummaryControl(
+            summary.querySelector(selector),
+            fieldName,
+        );
+        if (control) {
+            control.dataset[dataName] = "";
+        }
+    });
     applyRecipeIngredientTableGridContract(summary, {
         drag: summary.querySelector(".recipe-edit-alternative-component-handle-cell"),
         image: summary.querySelector(".recipe-edit-alternative-component-image-cell"),
@@ -29582,7 +29612,7 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     }
     if (quantityElement) quantityElement.value = String(values.quantity || "").trim();
     if (unitElement) unitElement.value = String(values.unit || "").trim();
-    if (sizeElement) sizeElement.textContent = String(values.size || "").trim() || "\u2014";
+    if (sizeElement) sizeElement.value = String(values.size || "").trim();
     if (storeElement) {
         storeElement.innerHTML = `<span class="recipe-edit-alternative-column-label">Store section</span>${recipeIngredientStoreSectionIconHtml(values.store_section || "")}<span>${escapeHtml(storeSection || "\u2014")}</span>`;
     }
@@ -30199,28 +30229,7 @@ function organizeRecipeEditIngredientRow(row) {
         summary.className = className;
         summary.dataset[dataName] = "";
         summary.setAttribute("role", "cell");
-        const control = document.createElement(tagName);
-        if (tagName === "input") control.type = "text";
-        control.className = "recipe-edit-ingredient-inline-control";
-        control.dataset.recipeIngredientInlineField = fieldName;
-        control.setAttribute("aria-label", {
-            quantity: "Quantity",
-            unit: "Unit",
-            size: "Size",
-            store_section: "Store Section",
-            section: "Type",
-        }[fieldName]);
-        if (fieldName === "unit") control.setAttribute("list", "recipeIngredientUnitOptions");
-        summary.appendChild(control);
-        if (fieldName === "unit" || fieldName === "section") {
-            const chevron = document.createElement("span");
-            chevron.className = fieldName === "section"
-                ? "recipe-edit-unit-chevron recipe-edit-type-chevron recipe-edit-inline-picker-chevron"
-                : "recipe-edit-unit-chevron recipe-edit-inline-picker-chevron";
-            chevron.setAttribute("aria-hidden", "true");
-            chevron.innerHTML = recipeEditSvgIcon("chevron-down");
-            summary.appendChild(chevron);
-        }
+        appendRecipeIngredientInlineSummaryControl(summary, fieldName, tagName);
         row.appendChild(summary);
     });
 

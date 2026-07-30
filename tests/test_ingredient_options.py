@@ -415,10 +415,18 @@ def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows()
     assert "content: none !important;" in v49
     assert ".recipe-edit-alternative-component-quantity" in v49
     assert ".recipe-edit-alternative-component-unit" in v49
-    assert "> .recipe-edit-ingredient-inline-control" in v49
-    assert "padding-right: 22px;" in v49
+    assert ".recipe-edit-alternative-component-size" in v49
+    assert "overflow: visible;" in v49
+    assert "font-weight: 400;" in v49
+    assert "> [data-ingredient-column]" in v49
+    assert "grid-row: 1 !important;" in v49
+    for column, grid_column in (("status", 4), ("quantity", 5), ("unit", 6), ("size", 7)):
+        assert f'> [data-ingredient-column="{column}"]' in v49
+        assert f"grid-column: {grid_column} !important;" in v49
 
     assert "bindRecipeIngredientInlineEditor(optionRow);" in script
+    assert "function appendRecipeIngredientInlineSummaryControl" in script
+    assert '"recipe-edit-alternative-component-size recipe-edit-ingredient-size-summary"' in script
     choice_overview = script[
         script.index("function ensureRecipeIngredientChoiceOverview"):
         script.index("function addRecipeIngredientDefaultComponent")

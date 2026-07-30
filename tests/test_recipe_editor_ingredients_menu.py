@@ -2378,7 +2378,11 @@ def test_recipe_editor_size_column_follows_unit_and_matches_quantity_formatting(
     assert row.index('"ingredientUnitSummary", "unit", "input"') < row.index(
         '"ingredientSizeSummary", "size", "input"'
     ) < row.index('"ingredientStoreSummary", "store_section", "select"')
-    assert 'size: "Size"' in row
+    inline_control_factory = script[
+        script.index("function appendRecipeIngredientInlineSummaryControl"):
+        script.index("function createRecipeIngredientOptionRowSummary")
+    ]
+    assert 'size: "Size"' in inline_control_factory
     assert 'substitutions.setAttribute("role", "region");' in row
     assert 'substitutions.removeAttribute("aria-colspan");' in row
 
@@ -2444,15 +2448,19 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
     assert "const summary = createRecipeIngredientOptionRowSummary();" in substitution
     assert '"recipe-edit-alternative-component-summary"' in summary
     assert "data-alternative-component-name" in summary
-    assert "data-alternative-component-quantity" in summary
-    assert "data-alternative-component-unit" in summary
-    assert 'data-recipe-ingredient-inline-field="quantity"' in summary
-    assert 'data-recipe-ingredient-inline-field="unit"' in summary
-    assert summary.count('class="recipe-edit-ingredient-inline-control"') == 2
-    assert 'class="recipe-edit-unit-chevron recipe-edit-inline-picker-chevron"' in summary
+    assert '"recipe-edit-alternative-component-quantity recipe-edit-ingredient-quantity-summary"' in summary
+    assert '"recipe-edit-alternative-component-unit recipe-edit-ingredient-unit-summary"' in summary
+    assert '"recipe-edit-alternative-component-size recipe-edit-ingredient-size-summary"' in summary
+    for field_name, data_name in (
+        ("quantity", "alternativeComponentQuantity"),
+        ("unit", "alternativeComponentUnit"),
+        ("size", "alternativeComponentSize"),
+    ):
+        assert f'["{field_name}", ".recipe-edit-alternative-component-{field_name}", "{data_name}"]' in summary
+    assert "appendRecipeIngredientInlineSummaryControl(" in summary
     assert "data-alternative-component-store" in summary
     assert "data-alternative-component-status" in summary
-    assert "data-alternative-component-size" in summary
+    assert '"alternativeComponentSize"' in summary
     assert "data-alternative-component-type" in summary
     assert "data-alternative-component-metadata" in summary
     assert "data-alternative-component-buy-as" in summary
@@ -2906,18 +2914,31 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
         script.index("function bindRecipeIngredientInlineEditor"):
         script.index("function organizeRecipeEditIngredientRow")
     ]
+    inline_control_factory = script[
+        script.index("function appendRecipeIngredientInlineSummaryControl"):
+        script.index("function createRecipeIngredientOptionRowSummary")
+    ]
     for field_name in ("ingredient", "preparation", "purchasable_item", "quantity", "unit", "store_section", "section"):
         assert f'data-recipe-ingredient-inline-field="{field_name}"' in organize or (
             f'control.dataset.recipeIngredientInlineField = fieldName' in organize
             and f'"{field_name}"' in organize
         )
     for label in ("Ingredient", "Preparation", "Buy As", "Quantity", "Unit", "Store Section", "Type"):
-        assert f'aria-label="{label}"' in organize or f'"{label}"' in organize
+        assert (
+            f'aria-label="{label}"' in organize
+            or f'"{label}"' in organize
+            or f'"{label}"' in inline_control_factory
+        )
     assert 'class="recipe-edit-ingredient-read-details"' in organize
     assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-preparation"' in organize
     assert 'class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-buy-as"' in organize
     assert 'placeholder="Add preparation"' in organize
     assert 'placeholder="Add buy as"' in organize
+    assert "appendRecipeIngredientInlineSummaryControl(summary, fieldName, tagName);" in organize
+    assert 'control.className = "recipe-edit-ingredient-inline-control";' in inline_control_factory
+    assert "control.dataset.recipeIngredientInlineField = fieldName;" in inline_control_factory
+    assert 'control.setAttribute("list", "recipeIngredientUnitOptions");' in inline_control_factory
+    assert '"recipe-edit-unit-chevron recipe-edit-inline-picker-chevron"' in inline_control_factory
     assert "function recipeIngredientInlineEditorSourceRow(control, fallbackRow)" in script
     assert 'control?.closest("[data-substitution-option-row]") || fallbackRow' in script
     assert "const sourceRow = recipeIngredientInlineEditorSourceRow(control, row);" in binding
@@ -3450,10 +3471,14 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     summary_start = script.index("const summaryDefinitions = [")
     summary_end = script.index("const mobileQuantitySummary", summary_start)
     summary_controls = script[summary_start:summary_end]
-    assert 'if (fieldName === "unit" || fieldName === "section")' in summary_controls
-    assert '"recipe-edit-unit-chevron recipe-edit-type-chevron recipe-edit-inline-picker-chevron"' in summary_controls
-    assert '"recipe-edit-unit-chevron recipe-edit-inline-picker-chevron"' in summary_controls
-    assert 'chevron.innerHTML = recipeEditSvgIcon("chevron-down");' in summary_controls
+    inline_control_factory = script[
+        script.index("function appendRecipeIngredientInlineSummaryControl"):
+        script.index("function createRecipeIngredientOptionRowSummary")
+    ]
+    assert 'if (fieldName === "unit" || fieldName === "section")' in inline_control_factory
+    assert '"recipe-edit-unit-chevron recipe-edit-type-chevron recipe-edit-inline-picker-chevron"' in inline_control_factory
+    assert '"recipe-edit-unit-chevron recipe-edit-inline-picker-chevron"' in inline_control_factory
+    assert 'chevron.innerHTML = recipeEditSvgIcon("chevron-down");' in inline_control_factory
     assert "bindRecipeIngredientStoreSectionControls(row);\n    bindRecipeIngredientTypeControls(row);" in script
     assert 'optionalInput.checked = recipeIngredientIsOptional({ section: typeSelect.value });' in script
     assert 'item.optional = recipeIngredientIsOptional(item);' in script
