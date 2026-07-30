@@ -43264,14 +43264,6 @@ function setRecipeIngredientAlternativeEditMode(control, shouldEdit, options = {
         return false;
     }
     const ingredientRow = card.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])");
-    if (!shouldEdit && options.restore && card.dataset.newAlternative === "1") {
-        card.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => optionRow.remove());
-        card.remove();
-        updateRecipeIngredientSubstitutionState(ingredientRow);
-        updateRecipeIngredientSummary(ingredientRow);
-        updateRecipeEditorDirtyState();
-        return false;
-    }
     if (shouldEdit) {
         const restoreOtherEdits = options.restoreOtherEdits !== false;
         if (ingredientRow && ingredientRow.classList.contains("is-editing")) {
@@ -43368,7 +43360,6 @@ function saveRecipeIngredientAlternativeEdit(button) {
         invalidUnit.focus({ preventScroll: false });
         return false;
     }
-    if (card) delete card.dataset.newAlternative;
     setRecipeIngredientAlternativeEditMode(card, false);
     updateRecipeEditorDirtyState(card ? card.closest("#recipeEditForm") : null);
     return false;
@@ -43556,9 +43547,6 @@ function addRecipeIngredientAlternativeComponent(button) {
     if (!card || !ingredientRow || !components || !existingRows.length) {
         return false;
     }
-    // Snapshot the option before inserting the new component so Cancel removes
-    // the unsaved row instead of treating it as part of the original option.
-    setRecipeIngredientAlternativeEditMode(card, true);
     let alternativeId = String(existingRows[0].querySelector('[data-field="alternative_id"]')?.value || "").trim();
     if (!alternativeId) {
         alternativeId = nextRecipeIngredientAlternativeId();
@@ -43587,9 +43575,11 @@ function addRecipeIngredientAlternativeComponent(button) {
         .find(candidate => candidate.dataset.alternativeId === alternativeId) || card;
     const updatedRows = [...updatedCard.querySelectorAll("[data-substitution-option-row]")];
     const updatedOptionRow = updatedRows[existingRows.length] || updatedRows[updatedRows.length - 1] || optionRow;
-    setRecipeIngredientAlternativeEditMode(updatedCard, true, { activeComponent: updatedOptionRow });
-    const field = updatedOptionRow ? updatedOptionRow.querySelector('[data-field="ingredient"]') : null;
-    if (field) field.focus({ preventScroll: false });
+    setRecipeIngredientAlternativeEditMode(updatedCard, false);
+    const field = updatedOptionRow
+        ? updatedOptionRow.querySelector('[data-recipe-ingredient-inline-field="ingredient"]')
+        : null;
+    if (field) field.focus({ preventScroll: true });
     updateRecipeEditorDirtyState();
     return false;
 }
@@ -43975,15 +43965,13 @@ function addRecipeIngredientDefaultComponent(button) {
         ? [...defaultCard.querySelectorAll("[data-substitution-option-row]")][1]
         : null;
     if (defaultCard) {
-        // The explicit original group replaces the synthetic parent summary.
-        // Treat the conversion as a new option until it is saved so Cancel can
-        // restore the one-ingredient default without leaving a blank child row.
-        defaultCard.dataset.newAlternative = "1";
-        setRecipeIngredientAlternativeEditMode(defaultCard, true, {
-            activeComponent: newComponent,
-        });
+        setRecipeIngredientAlternativeEditMode(defaultCard, false);
     }
     updateRecipeIngredientSummary(row);
+    const field = newComponent
+        ? newComponent.querySelector('[data-recipe-ingredient-inline-field="ingredient"]')
+        : null;
+    if (field) field.focus({ preventScroll: true });
     updateRecipeEditorDirtyState();
     return false;
 }

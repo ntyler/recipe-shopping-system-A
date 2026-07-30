@@ -3166,7 +3166,7 @@ def test_recipe_editor_secondary_metadata_normalizes_buy_as_for_summaries():
     assert ".recipe-edit-ingredient-read-separator" in v10
 
 
-def test_recipe_editor_compact_alternative_cards_cleanup_cancelled_blank_rows():
+def test_recipe_editor_compact_alternative_cards_keep_inline_adds_out_of_expanded_mode():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     editing = script[
@@ -3178,14 +3178,10 @@ def test_recipe_editor_compact_alternative_cards_cleanup_cancelled_blank_rows():
         script.index("function addRecipeIngredientSubstitutionRow")
     ]
 
-    assert 'options.restore && card.dataset.newAlternative === "1"' in editing
-    assert 'card.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => optionRow.remove());' in editing
-    assert "card.remove();" in editing
-    assert "updateRecipeIngredientSubstitutionState(ingredientRow);" in editing
+    assert "dataset.newAlternative" not in script
+    assert 'card.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => optionRow.remove());' not in editing
     assert 'list.hidden = optionRows.length === 0;' in state
     assert 'addLabel.textContent = "Add another option to this ingredient group";' in state
-    assert 'defaultCard.dataset.newAlternative = "1";' in script
-    assert "Snapshot the option before inserting the new component" in script
     assert "viewAll.hidden = true;" in state
 
     v10 = css[css.index("/* Ingredient editor v10:"):]

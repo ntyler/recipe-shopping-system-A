@@ -1188,6 +1188,32 @@ def test_new_recipe_ingredient_alternative_opens_as_a_standard_inline_row():
     assert "field.focus({ preventScroll: true });" in add_alternative
 
 
+def test_add_ingredient_to_option_opens_standard_inline_component_rows():
+    script = read_text("PushShoppingList/static/js/app.js")
+    default_start = script.index("function addRecipeIngredientDefaultComponent(button)")
+    default_end = script.index(
+        "function updateRecipeIngredientSubstitutionState",
+        default_start,
+    )
+    default_component = script[default_start:default_end]
+    alternative_start = script.index("function addRecipeIngredientAlternativeComponent(button)")
+    alternative_end = script.index(
+        "function removeRecipeIngredientAlternativeComponent",
+        alternative_start,
+    )
+    alternative_component = script[alternative_start:alternative_end]
+
+    for add_component in (default_component, alternative_component):
+        assert "setRecipeIngredientAlternativeEditMode" in add_component
+        assert ", true" not in add_component
+        assert ", false" in add_component
+        assert (
+            "'[data-recipe-ingredient-inline-field=\"ingredient\"]'"
+            in add_component
+        )
+        assert "field.focus({ preventScroll: true });" in add_component
+
+
 def test_recipe_editor_expanded_option_rows_share_the_parent_table_grid_without_offsets():
     css = read_text("PushShoppingList/static/css/app.css")
     expanded_grid_css = css[css.index("/* Ingredient editor v46:"):]
