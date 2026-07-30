@@ -636,13 +636,13 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "const displayIngredientName = ingredientName;" in summary
     assert "if (readName) readName.hidden = false;" in summary
     assert "if (readDetails) readDetails.hidden = false;" in summary
-    assert "additionalRows = selectedRows.slice(1);" in selected_line_items
+    assert "projectedRows = selectedRows;" in selected_line_items
     assert "data-ingredient-selected-option-line-items" in selected_line_items
     assert "createRecipeIngredientOptionRowSummary(" in selected_line_items
     assert "summary.recipeIngredientOptionSourceRow = sourceRow;" in selected_line_items
     assert "bindRecipeIngredientInlineEditor(row, summary);" in selected_line_items
     assert "openRecipeIngredientOptionModal(editButton)" in selected_line_items
-    assert "lineItems.hidden = expanded || !hasAdditionalRows;" in selected_line_items
+    assert "lineItems.hidden = expanded || !hasProjectedRows;" in selected_line_items
     assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state
     assert "function ensureRecipeIngredientSelectedChoiceGroupHeader" in script
     assert '`${selectedChoiceKind} INGREDIENT CHOICE`' in substitution_state
@@ -681,6 +681,7 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert '[data-ingredient-column="actions"]' in css
     assert "Ingredient editor v61: keep the option count visible" in css
     assert "Ingredient editor v62: selected choice source wording is directly editable." in css
+    assert "Ingredient editor v64: keep selected-choice group actions on the shared row grid." in css
 
 
 def test_collapsed_choice_option_count_aligns_with_desktop_row_cells():
@@ -697,6 +698,38 @@ def test_collapsed_choice_option_count_aligns_with_desktop_row_cells():
     assert "line-height: 1.4;" in alignment_css
     assert ".recipe-edit-selected-choice-group-title-editor" in css
     assert ".recipe-edit-selected-choice-group-title-input" in css
+
+
+def test_selected_choice_group_header_uses_standard_action_grid_cells():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    header = script[
+        script.index("function focusRecipeIngredientChoiceTitle"):
+        script.index("function syncRecipeIngredientSelectedOptionLineItems")
+    ]
+    alignment_css = css[css.index(
+        "/* Ingredient editor v64: keep selected-choice group actions on the shared row grid. */"
+    ):]
+
+    assert "setRecipeIngredientSelectedChoiceGroupControls" in header
+    assert "applyRecipeIngredientTableGridContract(header" in header
+    assert "drag: dragHandle" in header
+    assert "ingredient: header.querySelector(" in header
+    assert "alternatives: optionsCell" in header
+    assert "actions," in header
+    assert "recipe-edit-selected-choice-group-title-icon" not in header
+    assert 'editButton.dataset.ingredientChoiceTitleEdit = "";' in header
+    assert '"return focusRecipeIngredientChoiceTitle(this)"' in header
+    assert 'menuButton.title = "Ingredient group actions";' in header
+    assert "row.insertBefore(optionsCell, optionsPanel || null);" in header
+    assert "row.insertBefore(dragHandle, row.firstChild);" in header
+    assert "mobileHeader.appendChild(actions);" in header
+    assert ".recipe-edit-selected-choice-group-actions" in alignment_css
+    assert '> [data-ingredient-column="ingredient"]' in alignment_css
+    assert '> [data-ingredient-column="alternatives"]' in alignment_css
+    assert '> [data-ingredient-column="actions"]' in alignment_css
+    assert "position: absolute" not in alignment_css
+    assert "margin-left" not in alignment_css
 
 
 def test_selected_option_line_items_reorder_their_underlying_component_rows():

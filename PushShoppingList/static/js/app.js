@@ -30043,6 +30043,118 @@ function bindRecipeIngredientChoiceTitleEditor(row, input) {
     });
 }
 
+function focusRecipeIngredientChoiceTitle(button) {
+    const row = recipeIngredientParentRowFromControl(button)
+        || recipeEditActionRowFromButton(button);
+    const input = row
+        ? row.querySelector("[data-ingredient-selected-choice-group-title]")
+        : null;
+    if (input) {
+        input.focus({ preventScroll: false });
+        if (typeof input.select === "function") {
+            input.select();
+        }
+    }
+    return false;
+}
+
+function setRecipeIngredientSelectedChoiceGroupControls(row, header, enabled) {
+    if (!row || !header) {
+        return;
+    }
+    const dragHandle = header.querySelector(
+        ":scope > .recipe-edit-row-handle",
+    ) || Array.from(row.children).find(child => (
+        child.classList?.contains("recipe-edit-row-handle")
+    ));
+    const optionsCell = header.querySelector(
+        ":scope > .recipe-edit-ingredient-substitution-cell",
+    ) || Array.from(row.children).find(child => (
+        child.classList?.contains("recipe-edit-ingredient-substitution-cell")
+    ));
+    const actions = header.querySelector(
+        ":scope > [data-recipe-edit-compact-row-actions]",
+    ) || row.querySelector("[data-recipe-edit-compact-row-actions]");
+    const editButton = actions
+        ? actions.querySelector(":scope > .recipe-edit-compact-row-edit")
+        : null;
+    const menuButton = actions
+        ? actions.querySelector(":scope > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn")
+        : null;
+
+    if (enabled) {
+        if (!header.dataset.ingredientChoiceGridReady) {
+            applyRecipeIngredientTableGridContract(header, {
+                drag: dragHandle,
+                ingredient: header.querySelector(
+                    ":scope > .recipe-edit-selected-choice-group-copy",
+                ),
+                alternatives: optionsCell,
+                actions,
+            });
+            header.dataset.ingredientChoiceGridReady = "true";
+        } else {
+            if (dragHandle && dragHandle.parentElement !== header) {
+                header.appendChild(dragHandle);
+            }
+            if (optionsCell && optionsCell.parentElement !== header) {
+                header.appendChild(optionsCell);
+            }
+            if (actions && actions.parentElement !== header) {
+                header.appendChild(actions);
+            }
+        }
+        actions?.classList.add("recipe-edit-selected-choice-group-actions");
+        if (editButton) {
+            editButton.dataset.ingredientChoiceTitleEdit = "";
+            editButton.setAttribute("aria-label", "Edit ingredient group");
+            editButton.title = "Edit ingredient group";
+            editButton.setAttribute(
+                "onclick",
+                "return focusRecipeIngredientChoiceTitle(this)",
+            );
+        }
+        if (menuButton) {
+            menuButton.setAttribute("aria-label", "Ingredient group actions");
+            menuButton.title = "Ingredient group actions";
+        }
+        return;
+    }
+
+    const optionsPanel = row.querySelector(
+        ":scope > [data-ingredient-substitutions]",
+    );
+    if (dragHandle && dragHandle.parentElement === header) {
+        row.insertBefore(dragHandle, row.firstChild);
+    }
+    if (optionsCell && optionsCell.parentElement === header) {
+        row.insertBefore(optionsCell, optionsPanel || null);
+    }
+    if (actions && actions.parentElement === header) {
+        const mobileHeader = row.querySelector(
+            ":scope > .recipe-edit-ingredient-mobile-header",
+        );
+        if (mobileHeader) {
+            mobileHeader.appendChild(actions);
+        } else {
+            row.insertBefore(actions, optionsPanel || null);
+        }
+    }
+    actions?.classList.remove("recipe-edit-selected-choice-group-actions");
+    if (editButton) {
+        delete editButton.dataset.ingredientChoiceTitleEdit;
+        editButton.setAttribute("onclick", "return focusRecipeEditCompactRow(this)");
+        const ingredientField = row.querySelector('[data-field="ingredient"]');
+        const ingredientName = String(ingredientField?.value || "").trim() || "ingredient";
+        editButton.setAttribute("aria-label", `Edit ${ingredientName}`);
+        editButton.title = `Edit ${ingredientName}`;
+    }
+    if (menuButton) {
+        menuButton.setAttribute("aria-label", "Ingredient actions");
+        menuButton.title = "Ingredient actions";
+    }
+}
+
 function ensureRecipeIngredientSelectedChoiceGroupHeader(row) {
     if (!row) {
         return null;
@@ -30068,8 +30180,6 @@ function ensureRecipeIngredientSelectedChoiceGroupHeader(row) {
                            aria-label="Ingredient choice wording"
                            autocomplete="off"
                            spellcheck="true">
-                    <span class="recipe-edit-selected-choice-group-title-icon"
-                          aria-hidden="true">${recipeEditSvgIcon("edit")}</span>
                 </label>
             </div>
         `;
@@ -30094,11 +30204,11 @@ function syncRecipeIngredientSelectedOptionLineItems(
     const selectedRows = Array.isArray(selectedChoice?.rows)
         ? selectedChoice.rows
         : [];
-    const additionalRows = selectedRows.slice(1);
+    const projectedRows = selectedRows;
     let lineItems = row.querySelector(
         ":scope > [data-ingredient-selected-option-line-items]",
     );
-    if (!lineItems && additionalRows.length) {
+    if (!lineItems && projectedRows.length) {
         lineItems = document.createElement("div");
         lineItems.className = "recipe-edit-selected-option-line-items";
         lineItems.dataset.ingredientSelectedOptionLineItems = "";
@@ -30116,18 +30226,18 @@ function syncRecipeIngredientSelectedOptionLineItems(
     const currentRows = Array.isArray(lineItems.recipeIngredientOptionSourceRows)
         ? lineItems.recipeIngredientOptionSourceRows
         : [];
-    const needsRebuild = currentRows.length !== additionalRows.length
-        || currentRows.some((sourceRow, index) => sourceRow !== additionalRows[index]);
+    const needsRebuild = currentRows.length !== projectedRows.length
+        || currentRows.some((sourceRow, index) => sourceRow !== projectedRows[index]);
     if (needsRebuild) {
         lineItems.replaceChildren(
-            ...additionalRows.map(sourceRow => (
+            ...projectedRows.map(sourceRow => (
                 createRecipeIngredientSelectedOptionLineItem(row, sourceRow)
             )),
         );
-        lineItems.recipeIngredientOptionSourceRows = additionalRows;
+        lineItems.recipeIngredientOptionSourceRows = projectedRows;
     } else {
         [...lineItems.children].forEach((summary, index) => {
-            const sourceRow = additionalRows[index];
+            const sourceRow = projectedRows[index];
             if (!sourceRow) return;
             updateRecipeIngredientOptionRowSummary(
                 summary,
@@ -30143,11 +30253,11 @@ function syncRecipeIngredientSelectedOptionLineItems(
         });
     }
 
-    const hasAdditionalRows = additionalRows.length > 0;
-    lineItems.hidden = expanded || !hasAdditionalRows;
+    const hasProjectedRows = projectedRows.length > 0;
+    lineItems.hidden = expanded || !hasProjectedRows;
     row.classList.toggle(
         "has-selected-option-line-items",
-        hasAdditionalRows,
+        hasProjectedRows,
     );
 }
 
@@ -31197,6 +31307,14 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
         if (editButton) {
             editButton.setAttribute("aria-label", `Edit ${accessibleName}`);
             editButton.title = `Edit ${accessibleName}`;
+            const editsGroupTitle = Object.hasOwn(
+                editButton.dataset,
+                "ingredientChoiceTitleEdit",
+            );
+            if (editsGroupTitle) {
+                editButton.setAttribute("aria-label", "Edit ingredient group");
+                editButton.title = "Edit ingredient group";
+            }
         }
         if (deleteButton) {
             deleteButton.setAttribute("aria-label", `Delete ${accessibleName}`);
@@ -44705,6 +44823,11 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         ? ensureRecipeIngredientSelectedChoiceGroupHeader(row)
         : row.querySelector("[data-ingredient-selected-choice-group-header]");
     if (selectedChoiceGroupHeader) {
+        setRecipeIngredientSelectedChoiceGroupControls(
+            row,
+            selectedChoiceGroupHeader,
+            showsSelectedChoiceGroup,
+        );
         const groupLabel = selectedChoiceGroupHeader.querySelector(
             "[data-ingredient-selected-choice-group-label]",
         );
@@ -44724,6 +44847,16 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
                 resizeRecipeIngredientChoiceTitleInput(groupTitle);
             }
             groupTitle.title = choiceTitle;
+        }
+        const groupEditButton = selectedChoiceGroupHeader.querySelector(
+            "[data-ingredient-choice-title-edit]",
+        );
+        if (groupEditButton) {
+            groupEditButton.setAttribute(
+                "aria-label",
+                `Edit ingredient group: ${choiceTitle}`,
+            );
+            groupEditButton.title = "Edit ingredient group";
         }
     }
     row.classList.toggle("has-ingredient-choice", alternativeCount > 0);
