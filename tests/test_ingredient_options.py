@@ -538,6 +538,14 @@ def test_collapsed_group_summary_projects_single_and_multi_item_selections():
         script.index("function updateRecipeIngredientSummary(row)"):
         script.index("function recipeEditIngredientRows")
     ]
+    read_cell = script[
+        script.index("function createRecipeIngredientReadCell"):
+        script.index("function createRecipeIngredientStatusSummary")
+    ]
+    default_option_summary = script[
+        script.index("function createRecipeIngredientDefaultOptionSummary"):
+        script.index("function ensureRecipeIngredientChoiceOverview")
+    ]
     substitution_state = script[
         script.index("function updateRecipeIngredientSubstitutionState"):
         script.index("function addRecipeIngredientSubstitutionRow")
@@ -551,6 +559,14 @@ def test_collapsed_group_summary_projects_single_and_multi_item_selections():
     assert "fallbackRow?.recipeIngredientInlineSummarySourceRow" in inline_source
     assert "row.recipeIngredientInlineSummarySourceRow = selectedSourceRow;" in summary
     assert "...fieldValuesFromRow(selectedSourceRow)" in summary
+    assert "data-ingredient-selected-group-summary" in read_cell
+    assert "const hasMultiItemSelection = selectedGroupValues.length > 1;" in summary
+    assert "const displayIngredientName = hasMultiItemSelection" in summary
+    assert "hasMultiItemSelection" not in default_option_summary
+    assert "selectedGroupSummary.hidden = !hasMultiItemSelection;" in summary
+    assert "if (readName) readName.hidden = hasMultiItemSelection;" in summary
+    assert "if (readDetails) readDetails.hidden = hasMultiItemSelection;" in summary
+    assert "Selected ingredients: ${selectedIngredientNames}" in summary
     assert 'label.textContent += " · Selected";' in substitution_state
     assert "label.textContent = selectedLabel;" in substitution_state
     assert "selectedChoice?.ingredientSummary || selectedDetails" in substitution_state
@@ -562,6 +578,8 @@ def test_collapsed_group_summary_projects_single_and_multi_item_selections():
     )
     assert "Ingredient editor v55: collapsed group rows reflect the selected option." in css
     assert ".recipe-edit-ingredient-options-button.has-selected-option" in css
+    assert "Ingredient editor v56: show every ingredient in a selected multi-item group." in css
+    assert ".recipe-edit-selected-group-summary" in css
 
 
 def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows():

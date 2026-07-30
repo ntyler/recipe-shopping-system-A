@@ -67871,3 +67871,41 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     color: var(--app-text);
     font-weight: 650;
 }
+
+/* Ingredient editor v56: show every ingredient in a selected multi-item group. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-group-summary {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-group-summary
+    > [data-ingredient-selected-group-names] {
+    overflow: hidden;
+    color: var(--app-text);
+    font-size: 13px;
+    font-weight: 720;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-group-summary
+    > [data-ingredient-selected-group-count] {
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 540;
+    line-height: 1.1;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    :is(
+        .recipe-edit-selected-group-summary,
+        [data-ingredient-read-name],
+        .recipe-edit-ingredient-read-details
+    )[hidden] {
+    display: none !important;
+}

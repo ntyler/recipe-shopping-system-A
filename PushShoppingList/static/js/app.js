@@ -29560,6 +29560,13 @@ function createRecipeIngredientReadCell(className = "", options = {}) {
     ].filter(Boolean).join(" ");
     readCell.setAttribute("role", "cell");
     readCell.innerHTML = `
+        <div class="recipe-edit-selected-group-summary"
+             data-ingredient-selected-group-summary
+             aria-live="polite"
+             hidden>
+            <span data-ingredient-selected-group-names></span>
+            <span data-ingredient-selected-group-count></span>
+        </div>
         <input type="text"
                class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-name"
                data-ingredient-read-name
@@ -44719,6 +44726,18 @@ function updateRecipeIngredientSummary(row) {
     const readBuyAs = row ? row.querySelector("[data-ingredient-read-buy-as]") : null;
     const readBuyAsField = readBuyAs ? readBuyAs.closest(".recipe-edit-ingredient-read-buy-as") : null;
     const readOptional = row ? row.querySelector("[data-ingredient-read-optional]") : null;
+    const readCell = row
+        ? [...row.children].find(child => (
+            child.matches && child.matches(".recipe-edit-ingredient-read-cell")
+        ))
+        : null;
+    const readName = readCell ? readCell.querySelector(":scope > [data-ingredient-read-name]") : null;
+    const readDetails = readCell
+        ? readCell.querySelector(":scope > .recipe-edit-ingredient-read-details")
+        : null;
+    const selectedGroupSummary = readCell
+        ? readCell.querySelector(":scope > [data-ingredient-selected-group-summary]")
+        : null;
     const editSubtitle = row ? row.querySelector("[data-recipe-ingredient-edit-subtitle]") : null;
     const previewName = row ? row.querySelector("[data-recipe-ingredient-modal-preview-name]") : null;
     const previewBuyAs = row ? row.querySelector("[data-recipe-ingredient-modal-preview-buy-as]") : null;
@@ -44738,6 +44757,11 @@ function updateRecipeIngredientSummary(row) {
         parentValues,
         alternativeGroups,
     );
+    const selectedGroupValues = selectedChoice?.values || [];
+    const hasMultiItemSelection = selectedGroupValues.length > 1;
+    const selectedIngredientNames = String(
+        selectedChoice?.ingredientSummary || "",
+    ).trim();
     const selectedSourceRow = selectedChoice?.rows.length === 1
         ? selectedChoice.rows[0]
         : null;
@@ -44769,11 +44793,17 @@ function updateRecipeIngredientSummary(row) {
         matchDetails.innerHTML = recipeIngredientMatchDetailsHtml(matchItem);
     }
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
+    const displayIngredientName = hasMultiItemSelection && selectedIngredientNames
+        ? selectedIngredientNames
+        : ingredientName;
     const sourceWording = String(values.source_text || values.original_text || "").trim();
     const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();
     const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
     const quantitySummaryText = formatRecipeIngredientQuantityUnit(values);
-    if (previewName) previewName.textContent = recipeIngredientSentenceCase(ingredientName) || ingredientName;
+    if (previewName) {
+        previewName.textContent = recipeIngredientSentenceCase(displayIngredientName)
+            || displayIngredientName;
+    }
     if (previewBuyAs) {
         previewBuyAs.textContent = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "";
         previewBuyAs.hidden = !meaningfulBuyAs;
@@ -44788,7 +44818,10 @@ function updateRecipeIngredientSummary(row) {
         sourceText.hidden = !sourceWording || values.substitutions.length === 0;
         sourceText.title = sourceWording;
     }
-    if (readBuyAsField) readBuyAsField.hidden = !meaningfulBuyAs;
+    if (readBuyAsField) {
+        readBuyAsField.hidden = !meaningfulBuyAs;
+        if (hasMultiItemSelection) readBuyAsField.hidden = true;
+    }
     if (readOptional) readOptional.hidden = !recipeIngredientIsOptional(values);
     if (readBuyAs) {
         readBuyAs.value = buyAsValue;
@@ -44807,10 +44840,31 @@ function updateRecipeIngredientSummary(row) {
     if (editSubtitle) {
         const rows = recipeEditIngredientRows();
         const ingredientIndex = rows.indexOf(row);
-        const displayName = recipeIngredientSentenceCase(ingredientName) || "Ingredient";
+        const displayName = recipeIngredientSentenceCase(displayIngredientName) || "Ingredient";
         editSubtitle.textContent = `${displayName} \u00b7 Ingredient ${Math.max(ingredientIndex, 0) + 1} of ${Math.max(rows.length, 1)}`;
     }
     syncRecipeIngredientInlineEditor(row);
+    if (selectedGroupSummary) {
+        const names = selectedGroupSummary.querySelector(
+            "[data-ingredient-selected-group-names]",
+        );
+        const itemCount = selectedGroupSummary.querySelector(
+            "[data-ingredient-selected-group-count]",
+        );
+        selectedGroupSummary.hidden = !hasMultiItemSelection;
+        selectedGroupSummary.setAttribute(
+            "aria-label",
+            hasMultiItemSelection
+                ? `Selected ingredients: ${selectedIngredientNames}`
+                : "",
+        );
+        if (names) names.textContent = selectedIngredientNames;
+        if (itemCount) {
+            itemCount.textContent = `${selectedGroupValues.length} selected ingredients`;
+        }
+    }
+    if (readName) readName.hidden = hasMultiItemSelection;
+    if (readDetails) readDetails.hidden = hasMultiItemSelection;
     if (typeSummary) {
         const typeValue = recipeIngredientTypeValue(values);
         const typeLabel = recipeIngredientTypeLabel(values);
