@@ -651,8 +651,9 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "alternativeCount && !hasSelectedChoice" in substitution_state
     assert "alternativeCount && hasSelectedChoice" in substitution_state
     assert "alternativeCount && hasSelectedChoice && !isExpanded" not in substitution_state
-    assert 'label.textContent += " · Selected";' in substitution_state
-    assert "label.textContent = selectedLabel;" in substitution_state
+    assert 'label.textContent = alternativeCount ? optionLabel : "None";' in substitution_state
+    assert 'label.textContent += " · Selected";' not in substitution_state
+    assert "label.textContent = selectedLabel;" not in substitution_state
     assert "selectedChoice?.ingredientSummary || selectedDetails" in substitution_state
     assert "summary.textContent = selectedSummary;" in substitution_state
     assert "summary.title = alternativeCount && selectedDetails" in substitution_state
@@ -677,6 +678,7 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert ".has-selected-choice-group-header.recipe-edit-substitutions-open" in css
     assert '[data-ingredient-column="alternatives"]' in css
     assert '[data-ingredient-column="actions"]' in css
+    assert "Ingredient editor v61: keep the option count visible" in css
 
 
 def test_selected_option_line_items_reorder_their_underlying_component_rows():

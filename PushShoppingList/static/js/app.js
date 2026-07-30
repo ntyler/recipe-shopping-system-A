@@ -44820,12 +44820,6 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         const otherSummaries = groupSummaries.filter((_, index) => index !== preferredGroupIndex);
         if (label) {
             label.textContent = alternativeCount ? optionLabel : "None";
-            if (alternativeCount && selectedSummary) {
-                label.textContent += " · Selected";
-                if (selectedLabel) {
-                    label.textContent = selectedLabel;
-                }
-            }
         }
         if (summary) {
             summary.textContent = alternativeCount ? compactSummary.summary : "";

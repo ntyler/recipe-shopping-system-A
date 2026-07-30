@@ -2783,8 +2783,17 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert "recipeIngredientAlternativeRecommendation" in state
     assert "recipeIngredientSubstitutionConfidencePercent" in state
     assert "summary.hidden = !alternativeCount || !compactSummary.summary;" in state
+    assert 'label.textContent += " · Selected";' not in state
+    assert "label.textContent = selectedLabel;" not in state
     assert "ensureRecipeIngredientAlternativeCards(container)" in state
     assert "viewAll.hidden = true;" in state
+
+    visible_count_css = css[css.index("/* Ingredient editor v61:"):]
+    assert "@media (min-width: 768px)" in visible_count_css
+    assert "> .recipe-edit-ingredient-options-copy" in visible_count_css
+    assert "display: block !important;" in visible_count_css
+    assert "[data-ingredient-options-summary]" in visible_count_css
+    assert "display: none !important;" in visible_count_css
 
     v44 = css[css.index("/* Ingredient editor v44:"):]
     assert ".recipe-edit-ingredient-options-panel:not([hidden])" in v44

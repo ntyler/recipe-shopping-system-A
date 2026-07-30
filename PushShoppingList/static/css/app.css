@@ -68339,3 +68339,31 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         grid-column: 2 / -1;
     }
 }
+
+/* Ingredient editor v61: keep the option count visible beside the desktop disclosure chevron. */
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-ingredient-choice
+        .recipe-edit-ingredient-options-button {
+        grid-template-columns: minmax(0, 1fr) 14px;
+        width: 100%;
+        min-width: 0;
+        margin-inline: 0;
+        padding: 0 4px 0 6px;
+        justify-content: stretch;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-ingredient-choice
+        .recipe-edit-ingredient-options-button
+        > .recipe-edit-ingredient-options-copy {
+        display: block !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-ingredient-choice
+        .recipe-edit-ingredient-options-button
+        [data-ingredient-options-summary] {
+        display: none !important;
+    }
+}
