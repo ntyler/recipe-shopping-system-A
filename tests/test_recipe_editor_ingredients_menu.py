@@ -2529,7 +2529,13 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
     assert '["AI reasoning",' in substitution
     assert "optional.hidden = true;" not in substitution
     assert "removeComponent" not in substitution
-    assert "editRecipeIngredientAlternativeComponent(this)" in substitution
+    assert "openRecipeIngredientOptionModal(this)" in substitution
+    assert 'editButton.className = "recipe-edit-compact-row-edit";' in substitution
+    assert (
+        "editButton.addEventListener(\"click\", () => "
+        "openRecipeIngredientOptionModal(editButton));"
+        in substitution
+    )
     assert "duplicateRecipeIngredientAlternativeComponent(this)" in substitution
     assert ">Edit details</button>" in substitution
     assert ">Duplicate replacement ingredient</button>" in substitution

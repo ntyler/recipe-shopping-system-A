@@ -1318,6 +1318,8 @@ def test_recipe_editor_nested_rows_keep_complete_columns_and_actions_at_the_far_
     assert "actions?.append(editButton, menuWrap);" in organize
     assert "Remove replacement ingredient" in organize
     assert "const summary = createRecipeIngredientOptionRowSummary();" in organize
+    assert 'editButton.setAttribute("aria-label", `Edit ${name}`);' in script
+    assert 'editButton.title = `Edit ${name}`;' in script
 
     default_start = script.index("function createRecipeIngredientDefaultOptionSummary(row)")
     default_end = script.index("function ensureRecipeIngredientChoiceOverview", default_start)
@@ -1326,7 +1328,8 @@ def test_recipe_editor_nested_rows_keep_complete_columns_and_actions_at_the_far_
         'createRecipeIngredientOptionRowSummary("recipe-edit-default-option-summary")'
         in default_summary
     )
-    assert 'class="recipe-edit-alternative-component-edit"' in default_summary
+    assert 'class="recipe-edit-compact-row-edit"' in default_summary
+    assert 'aria-expanded="false"' in default_summary
     assert 'class="recipe-edit-row-menu-btn"' in default_summary
     assert 'aria-expanded="false"' in default_summary
     assert 'recipeEditSvgIcon("trash")' not in default_summary
@@ -1379,6 +1382,11 @@ def test_recipe_editor_expanded_groups_preserve_disclosure_and_option_heading_ac
     nested_css = css[css.index("/* Ingredient editor v45:"):]
     assert ".recipe-edit-alternative-component-edit:is(:hover, :focus-visible)" in nested_css
     assert ".recipe-edit-alternative-add-component:is(:hover, :focus-visible)" in nested_css
+    assert "/* Ingredient editor v53:" in nested_css
+    assert (
+        ".recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions"
+        in nested_css
+    )
 
 
 def test_recipe_editor_compact_rows_keep_headers_actions_and_tool_organization():

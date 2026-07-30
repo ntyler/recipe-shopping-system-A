@@ -67691,3 +67691,55 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     min-width: 0;
     white-space: nowrap;
 }
+/* Ingredient editor v53: option-row pencils match the standard ingredient action. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions {
+    display: flex;
+    width: 76px;
+    min-width: 76px;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
+    > .recipe-edit-compact-row-edit,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
+    > .recipe-edit-row-menu-wrap
+    > .recipe-edit-row-menu-btn {
+    display: inline-flex;
+    width: 34px;
+    min-width: 34px;
+    height: 38px;
+    min-height: 38px;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-text-soft);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
+    > .recipe-edit-compact-row-edit:is(:hover, :focus-visible),
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
+    > .recipe-edit-row-menu-wrap
+    > .recipe-edit-row-menu-btn:is(:hover, :focus-visible) {
+    outline: 0;
+    background: var(--app-surface-soft);
+    color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
+    > .recipe-edit-compact-row-edit
+    > svg {
+    width: 14px;
+    height: 14px;
+}

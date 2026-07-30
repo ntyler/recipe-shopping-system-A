@@ -529,3 +529,27 @@ def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows()
         assert declaration in v52
     assert "> [data-ingredient-read-status]" in v52
     assert "white-space: nowrap;" in v52
+
+
+def test_option_ingredient_pencils_use_the_standard_edit_ingredient_modal():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    option_modal = script[
+        script.index("function recipeIngredientOptionModalRows"):
+        script.index("function setRecipeIngredientEditMode")
+    ]
+    commit_modal = script[
+        script.index("async function commitRecipeIngredientModal"):
+        script.index("const RECIPE_EDIT_INGREDIENT_GRID_CELL_ORDER")
+    ]
+
+    assert "function openRecipeIngredientOptionModal(control)" in option_modal
+    assert "setRecipeIngredientEditMode(row, true, { trigger });" in option_modal
+    assert "function closeRecipeIngredientOptionModal(row, panel, options = {})" in option_modal
+    assert "restoreRecipeIngredientEditableFieldSnapshot(" in option_modal
+    assert "panel.recipeIngredientOptionSourceRow" in commit_modal
+    assert "closeRecipeIngredientOptionModal(row, panel, { commit: true })" in commit_modal
+    assert 'editButton.className = "recipe-edit-compact-row-edit";' in script
+    assert "openRecipeIngredientOptionModal(editButton)" in script
+    assert "/* Ingredient editor v53:" in css
