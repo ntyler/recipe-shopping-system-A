@@ -207,6 +207,7 @@ def test_editor_same_ingredient_alternative_inherits_parent_thumbnail(monkeypatc
 
     rows = recipe_edit_service.normalize_edit_ingredients([{
         "ingredient": "corn",
+        "ingredient_id": "18460",
         "normalized_name": "corn",
         "purchasable_item": "corn",
         "ingredient_image_url": image_url,
@@ -229,10 +230,12 @@ def test_editor_same_ingredient_alternative_inherits_parent_thumbnail(monkeypatc
     }])
 
     frozen_corn, frozen_peas = rows[0]["substitutions"]
+    assert frozen_corn["ingredient_id"] == "18460"
     assert frozen_corn["ingredient_image_url"] == image_url
     assert frozen_corn["ingredient_image_generated_at"] == generated_at
     assert frozen_corn["ingredient_image_prompt"] == prompt
     assert frozen_peas["ingredient_image_url"] == ""
+    assert frozen_peas.get("ingredient_id", "") == ""
     assert frozen_peas["ingredient_image_generated_at"] == ""
     assert frozen_peas["ingredient_image_prompt"] == ""
 

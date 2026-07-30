@@ -1157,6 +1157,22 @@ def test_ingredient_name_fields_use_the_normalized_master_data_picker():
     assert 'input.setAttribute("aria-autocomplete", "list");' in picker
     assert 'fetch(`/api/master-data/ingredients/options?${params.toString()}`' in picker
     assert "function chooseRecipeIngredientMasterOption" in picker
+    assert "function recipeIngredientMasterSelectedIndex" in picker
+    assert 'recipeIngredientDirectField(targetRow, "ingredient_id")' in picker
+    for field_name in (
+        "master_normalized_name",
+        "normalized_name",
+        "ingredient",
+        "parsed_name",
+        "purchasable_item",
+    ):
+        assert f'"{field_name}"' in picker
+    assert ".map(recipeIngredientComparableText)" in picker
+    assert "ingredient.aliases" in picker
+    assert "const selected = index === selectedOptionIndex;" in picker
+    assert picker.index("positionRecipeEditPopupMenu(menu, input);") < picker.index(
+        "setRecipeEditListboxActiveOption(menu, activeIndex >= 0 ? activeIndex : 0);"
+    )
     for field_name in (
         "ingredient_id",
         "normalized_name",

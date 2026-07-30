@@ -42002,6 +42002,52 @@ function recipeIngredientMasterTargetRow(input) {
         || input.closest(".recipe-edit-ingredient-row");
 }
 
+function recipeIngredientMasterSelectedIndex(ingredients, targetRow, input) {
+    if (!Array.isArray(ingredients) || !ingredients.length || !targetRow) {
+        return -1;
+    }
+
+    const selectedId = String(
+        recipeIngredientDirectField(targetRow, "ingredient_id")?.value || "",
+    ).trim();
+    if (selectedId) {
+        const selectedIdIndex = ingredients.findIndex(ingredient => (
+            String(ingredient.ingredient_id || ingredient.id || "").trim() === selectedId
+        ));
+        if (selectedIdIndex >= 0) {
+            return selectedIdIndex;
+        }
+    }
+
+    const selectedNames = new Set(
+        [
+            "master_normalized_name",
+            "normalized_name",
+            "ingredient",
+            "parsed_name",
+            "purchasable_item",
+        ]
+            .map(field => recipeIngredientDirectField(targetRow, field)?.value)
+            .concat(input?.value || "")
+            .map(recipeIngredientComparableText)
+            .filter(Boolean),
+    );
+    if (!selectedNames.size) {
+        return -1;
+    }
+
+    return ingredients.findIndex(ingredient => (
+        [
+            ingredient.normalized_name,
+            ingredient.name,
+            ...(Array.isArray(ingredient.aliases) ? ingredient.aliases : []),
+        ]
+            .map(recipeIngredientComparableText)
+            .filter(Boolean)
+            .some(name => selectedNames.has(name))
+    ));
+}
+
 function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) {
     if (!menu || !input || menu.recipeEditAnchorButton !== input) {
         return;
@@ -42009,8 +42055,7 @@ function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) 
 
     const ingredients = Array.isArray(data.ingredients) ? data.ingredients : [];
     const targetRow = recipeIngredientMasterTargetRow(input);
-    const selectedIdField = targetRow ? recipeIngredientDirectField(targetRow, "ingredient_id") : null;
-    const selectedId = String(selectedIdField ? selectedIdField.value : "");
+    const selectedOptionIndex = recipeIngredientMasterSelectedIndex(ingredients, targetRow, input);
     const query = String(options.query || "").trim();
     let content = "";
     if (options.loading) {
@@ -42036,7 +42081,7 @@ function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) 
                 ? ingredient.aliases.map(alias => String(alias || "").trim()).filter(Boolean)
                 : [];
             const aliasDetail = aliases.length ? ` · Also matches ${aliases.join(", ")}` : "";
-            const selected = Boolean(ingredientId && ingredientId === selectedId);
+            const selected = index === selectedOptionIndex;
             return `
                 <button type="button"
                         id="recipeIngredientMasterOption${index}"
@@ -42078,9 +42123,9 @@ function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) 
            rel="noopener">Manage master ingredients</a>
     `;
     const menuOptions = recipeEditListboxOptions(menu);
-    const selectedIndex = menuOptions.findIndex(option => option.getAttribute("aria-selected") === "true");
-    setRecipeEditListboxActiveOption(menu, selectedIndex >= 0 ? selectedIndex : 0);
+    const activeIndex = menuOptions.findIndex(option => option.getAttribute("aria-selected") === "true");
     positionRecipeEditPopupMenu(menu, input);
+    setRecipeEditListboxActiveOption(menu, activeIndex >= 0 ? activeIndex : 0);
 }
 
 async function loadRecipeIngredientMasterOptions(menu, input) {

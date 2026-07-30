@@ -10020,6 +10020,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
                 or item.get("alternatives"),
                 parent_item={
                     **item,
+                    "ingredient_id": str(ingredient_id) if ingredient_id else "",
                     "ingredient_image_url": ingredient_image_url,
                 },
             ),
@@ -10228,6 +10229,9 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
     parent_image_url = nullable_string(
         parent_item.get("ingredient_image_url") or parent_item.get("image_url")
     )
+    parent_ingredient_id = nullable_string(
+        parent_item.get("ingredient_id") or parent_item.get("master_ingredient_id")
+    )
     metadata_by_group_and_name = {}
     metadata_by_name = {}
     for option_rows in (existing_value, candidates):
@@ -10279,10 +10283,21 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
             )
             if instruction_match_text_key(merged.get(field))
         }
+        matches_parent_ingredient = bool(
+            parent_identity_keys.intersection(option_identity_keys)
+        )
+        if (
+            matches_parent_ingredient
+            and parent_ingredient_id
+            and not nullable_string(
+                merged.get("ingredient_id") or merged.get("master_ingredient_id")
+            )
+        ):
+            merged["ingredient_id"] = parent_ingredient_id
         if (
             parent_image_url
             and not nullable_string(merged.get("ingredient_image_url") or merged.get("image_url"))
-            and parent_identity_keys.intersection(option_identity_keys)
+            and matches_parent_ingredient
         ):
             merged["ingredient_image_url"] = parent_image_url
             merged["ingredient_image_generated_at"] = nullable_string(
