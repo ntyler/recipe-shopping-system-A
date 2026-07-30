@@ -29563,6 +29563,17 @@ function createRecipeIngredientReadImageCell(className = "") {
     return imageCell;
 }
 
+function handleRecipeIngredientReadImageError(image) {
+    if (!image) {
+        return;
+    }
+    image.hidden = true;
+    const imageCell = image.closest(".recipe-ingredient-image-panel");
+    if (imageCell) {
+        imageCell.classList.add("recipe-image-empty");
+    }
+}
+
 function syncRecipeIngredientReadImageCell(imageCell, values = {}) {
     if (!imageCell) {
         return;
@@ -29582,6 +29593,7 @@ function syncRecipeIngredientReadImageCell(imageCell, values = {}) {
     image.fetchPriority = "low";
     image.sizes = "120px";
     image.dataset.fullSrc = imageUrl;
+    image.addEventListener("error", () => handleRecipeIngredientReadImageError(image));
     if (imageUrl) {
         image.src = DEFERRED_IMAGE_PLACEHOLDER;
         image.dataset.deferredSrc = recipeImageVariantUrl(imageUrl, "thumb");
@@ -42364,6 +42376,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                      loading="lazy"
                      decoding="async"
                      fetchpriority="low"
+                     onerror="handleRecipeIngredientReadImageError(this)"
                      ${ingredientImageUrl ? "" : "hidden"}>
                 <div class="recipe-step-image-actions">
                     ${recipeImageProviderFieldHtml()}

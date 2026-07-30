@@ -494,3 +494,36 @@ def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows()
     ]
     assert "bindRecipeEditDragAndDrop(" in default_summary
     assert 'handleCell.querySelector(".recipe-edit-row-handle")' in default_summary
+
+    image_error_handler = script[
+        script.index("function handleRecipeIngredientReadImageError"):
+        script.index("function syncRecipeIngredientReadImageCell")
+    ]
+    assert "image.hidden = true;" in image_error_handler
+    assert 'image.closest(".recipe-ingredient-image-panel")' in image_error_handler
+    assert 'imageCell.classList.add("recipe-image-empty");' in image_error_handler
+    assert 'image.addEventListener("error", () => handleRecipeIngredientReadImageError(image));' in script
+    assert 'onerror="handleRecipeIngredientReadImageError(this)"' in script
+
+    v52 = css[css.index("/* Ingredient editor v52:"):]
+    assert css.index("/* Ingredient editor v52:") > css.index("/* Ingredient editor v51:")
+    assert ".recipe-ingredient-image[hidden]" in v52
+    assert "display: none !important;" in v52
+    assert ".recipe-edit-alternative-component-handle-cell" in v52
+    assert "> .recipe-edit-row-handle" in v52
+    assert "height: auto;" in v52
+    assert "min-height: 0;" in v52
+    assert ".recipe-edit-alternative-component-status" in v52
+    for declaration in (
+        "padding: 0;",
+        "border: 0;",
+        "border-radius: 0;",
+        "background: transparent;",
+        "color: inherit;",
+        "font-size: inherit;",
+        "font-weight: inherit;",
+        "line-height: inherit;",
+    ):
+        assert declaration in v52
+    assert "> [data-ingredient-read-status]" in v52
+    assert "white-space: nowrap;" in v52
