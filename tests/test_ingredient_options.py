@@ -695,6 +695,13 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert ".has-selected-choice-group-header.has-selected-option-line-items" in css
     assert "grid-template-rows: auto minmax(64px, auto) !important;" in css
     assert "align-items: stretch;" in css
+    assert "Ingredient editor v66: stack every ingredient in the active option when collapsed." in css
+    active_option_stack = css[css.index(
+        "/* Ingredient editor v66: stack every ingredient in the active option when collapsed. */"
+    ):]
+    assert ".recipe-edit-selected-option-line-items" in active_option_stack
+    assert "> .recipe-edit-selected-option-line-item" in active_option_stack
+    assert "grid-row: auto !important;" in active_option_stack
 
 
 def test_collapsed_choice_option_count_aligns_with_desktop_row_cells():

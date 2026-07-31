@@ -68765,3 +68765,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-table-body-scroll {
         z-index: auto;
     }
 }
+
+/* Ingredient editor v66: stack every ingredient in the active option when collapsed. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > .recipe-edit-selected-option-line-item {
+    grid-row: auto !important;
+}
