@@ -44527,6 +44527,19 @@ function recipeIngredientAlternativeCardFromControl(control) {
     if (directCard) {
         return directCard;
     }
+
+    // Selected replacement ingredients are projected into the main ingredient
+    // table. Their cloned action menus live outside the alternative card, so
+    // resolve the projected component back to its source row before looking up
+    // the owning card.
+    const optionRow = recipeIngredientAlternativeComponentFromControl(control);
+    const sourceCard = optionRow && optionRow.closest
+        ? optionRow.closest(".recipe-edit-alternative-card")
+        : null;
+    if (sourceCard) {
+        return sourceCard;
+    }
+
     const menu = control && control.closest ? control.closest(".recipe-edit-row-menu") : null;
     const anchor = menu ? menu.recipeEditAnchorButton : null;
     return anchor && anchor.closest ? anchor.closest(".recipe-edit-alternative-card") : null;
@@ -45146,6 +45159,7 @@ function duplicateRecipeIngredientAlternativeComponent(button) {
     bindRecipeIngredientSubstitutionRow(duplicateRow);
     initDeferredImages(duplicateRow);
 
+    closeRecipeEditRowMenus();
     updateRecipeIngredientSubstitutionState(ingredientRow);
     updateRecipeIngredientSummary(ingredientRow);
     const updatedCard = [...recipeIngredientSubstitutionContainer(ingredientRow).querySelectorAll(".recipe-edit-alternative-card")]
@@ -45157,7 +45171,6 @@ function duplicateRecipeIngredientAlternativeComponent(button) {
         const field = updatedDuplicate.querySelector('[data-field="ingredient"]');
         if (field) field.focus({ preventScroll: false });
     }
-    closeRecipeEditRowMenus();
     updateRecipeEditorDirtyState(ingredientRow.closest("#recipeEditForm"));
     setRecipeEditStatus("Replacement ingredient duplicated. Save Recipe to keep it.");
     return false;
@@ -45216,6 +45229,7 @@ function removeRecipeIngredientAlternativeComponent(button) {
     if (!card || !optionRow || !ingredientRow || componentRows.length <= 1) {
         return false;
     }
+    closeRecipeEditRowMenus();
     optionRow.remove();
     updateRecipeIngredientSubstitutionState(ingredientRow);
     updateRecipeIngredientSummary(ingredientRow);

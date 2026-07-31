@@ -3014,6 +3014,13 @@ def test_recipe_editor_v10_prioritizes_six_readable_groups_and_overflow_menu():
 def test_recipe_editor_replacement_rows_edit_and_duplicate_without_new_save_plumbing():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
+    card_lookup = script[
+        script.index("function recipeIngredientAlternativeCardFromControl"):
+        script.index("function recipeIngredientAlternativeComponentFromControl")
+    ]
+    assert "recipeIngredientAlternativeComponentFromControl(control)" in card_lookup
+    assert 'optionRow.closest(".recipe-edit-alternative-card")' in card_lookup
+
     component_lookup = script[
         script.index("function recipeIngredientAlternativeComponentFromControl"):
         script.index("function recipeIngredientSubstitutionConfidencePercent")
@@ -3058,6 +3065,31 @@ def test_recipe_editor_replacement_rows_edit_and_duplicate_without_new_save_plum
     assert "updateRecipeIngredientSubstitutionState(ingredientRow);" in duplicate
     assert "setRecipeIngredientAlternativeEditMode(updatedCard, true, { activeComponent: updatedDuplicate });" in duplicate
     assert "/api/" not in duplicate
+
+    for start_marker, end_marker in (
+        (
+            "function removeRecipeIngredientAlternativeComponent(button)",
+            "function moveRecipeIngredientAlternativeComponent(control, direction)",
+        ),
+        (
+            "function moveRecipeIngredientAlternativeComponent(control, direction)",
+            "function moveRecipeIngredientAlternative(control, direction)",
+        ),
+    ):
+        action = script[
+            script.index(start_marker):
+            script.index(end_marker)
+        ]
+        assert "recipeIngredientAlternativeCardFromControl" in action
+        assert "recipeIngredientAlternativeComponentFromControl" in action
+
+    remove_component = script[
+        script.index("function removeRecipeIngredientAlternativeComponent"):
+        script.index("function moveRecipeIngredientAlternativeComponent")
+    ]
+    assert remove_component.index("closeRecipeEditRowMenus();") < (
+        remove_component.index("optionRow.remove();")
+    )
 
 
 def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inline():
