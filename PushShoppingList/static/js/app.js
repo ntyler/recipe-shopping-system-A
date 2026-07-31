@@ -30933,7 +30933,16 @@ function createRecipeIngredientStoreSectionDisplay(source = null) {
         onActivate: button => startRecipeIngredientStoreSectionInlineEdit(button),
     });
     display.dataset.recipeIngredientInlineStoreSectionDisplay = "true";
+    display.dataset.recipeEditStoreSectionTrigger = "true";
+    display.setAttribute("role", "combobox");
+    display.setAttribute("aria-haspopup", "listbox");
+    display.setAttribute("aria-controls", "recipeIngredientStoreSectionMenu");
+    display.setAttribute("aria-expanded", "false");
     display.recipeEditStoreSectionSelect = source;
+    display.addEventListener(
+        "keydown",
+        event => handleRecipeIngredientStoreSectionKeydown(event, display),
+    );
     return display;
 }
 
@@ -30989,47 +30998,9 @@ function finishRecipeIngredientStoreSectionInlineEdit(options = {}) {
 function startRecipeIngredientStoreSectionInlineEdit(display) {
     if (!display || display.disabled) return false;
     const source = recipeIngredientStoreSectionDisplaySource(display);
-    const container = display.parentElement;
-    if (!source || !container) return false;
-    const current = window.StoreSectionEditor.current();
-    if (current?.display === display) {
-        openRecipeIngredientStoreSectionMenu(current.control);
-        return false;
-    }
-
-    const trigger = window.StoreSectionEditor.mount({
-        container,
-        display,
-        source,
-        createControl: () => createRecipeIngredientStoreSectionTrigger(source),
-        onUnmount: () => syncRecipeIngredientStoreSectionDisplay(display, source),
-    });
-    if (!trigger) return false;
-    trigger.dataset.recipeIngredientInlineStoreSectionEditor = "true";
-    trigger.recipeEditStoreSectionDisplay = display;
-    syncRecipeIngredientStoreSectionTrigger(trigger, source.value);
-    trigger.addEventListener("focusout", () => {
-        window.setTimeout(() => {
-            const active = window.StoreSectionEditor.current();
-            if (!active || active.control !== trigger) return;
-            const menu = document.getElementById("recipeIngredientStoreSectionMenu");
-            const focused = document.activeElement;
-            if (
-                menu
-                && !menu.hidden
-                && (menu.contains(focused) || menu.recipeEditAnchorButton === trigger)
-            ) {
-                return;
-            }
-            finishRecipeIngredientStoreSectionInlineEdit();
-        }, 0);
-    });
-    window.requestAnimationFrame(() => {
-        if (!trigger.isConnected) return;
-        trigger.focus({ preventScroll: true });
-        openRecipeIngredientStoreSectionMenu(trigger);
-    });
-    return false;
+    if (!source) return false;
+    display.recipeEditStoreSectionSelect = source;
+    return openRecipeIngredientStoreSectionMenu(display);
 }
 
 function ensureRecipeIngredientInlineStoreSectionTrigger(control, source) {

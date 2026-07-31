@@ -3751,7 +3751,9 @@ def test_store_section_display_and_editor_keep_icon_and_label_aligned():
     assert "border: 1px solid transparent;" in display_base_rule
     assert "border-radius: 6px;" in display_base_rule
     assert "opacity 120ms ease" not in display_base_rule
-    hover_start = css.index(".store-section-display:is(:hover, :focus-visible) {")
+    hover_start = css.index(
+        '.store-section-display:is(:hover, :focus-visible, [aria-expanded="true"]) {'
+    )
     hover_rule = css[hover_start:css.index("\n}", hover_start)]
     assert "border-color: var(--app-primary-hover);" in hover_rule
     assert "background: var(--app-surface);" in hover_rule
@@ -3783,6 +3785,18 @@ def test_store_section_display_and_editor_keep_icon_and_label_aligned():
     ]
     assert 'indicatorHtml: recipeEditSvgIcon("chevron-down"),' in display_factory
     assert 'indicatorHtml: recipeEditSvgIcon("edit"),' not in display_factory
+    assert 'display.dataset.recipeEditStoreSectionTrigger = "true";' in display_factory
+    assert 'display.setAttribute("role", "combobox");' in display_factory
+    assert 'display.setAttribute("aria-expanded", "false");' in display_factory
+    assert "handleRecipeIngredientStoreSectionKeydown(event, display)" in display_factory
+
+    inline_open = script[
+        script.index("function startRecipeIngredientStoreSectionInlineEdit(display)"):
+        script.index("function ensureRecipeIngredientInlineStoreSectionTrigger")
+    ]
+    assert "return openRecipeIngredientStoreSectionMenu(display);" in inline_open
+    assert "StoreSectionEditor.mount" not in inline_open
+    assert "createRecipeIngredientStoreSectionTrigger" not in inline_open
     assert 'class="store-section-display-chevron"' in display_component
     assert "store-section-display-edit-indicator" not in display_component
 
