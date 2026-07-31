@@ -881,17 +881,21 @@ def test_expanded_replacement_option_move_keeps_component_scoped_reordering():
     assert "dropRecipeEditRow(optionRow, rows[nextIndex], nextIndex > index);" in internal_move
 
 
-def test_selected_choice_header_uses_a_compact_options_control():
+def test_selected_choice_header_uses_a_compact_flat_options_control():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     header_controls = css[css.index(
-        "/* Ingredient editor v67: grouped choice rows and their header controls stay visually distinct. */"
-    ):]
+        "/* Ingredient editor v67: keep grouped choice header controls compact and flat. */"
+    ):css.index("/* Ingredient editor v68:")]
 
     assert ".recipe-edit-selected-choice-group-header" in header_controls
     assert ".recipe-edit-ingredient-options-button" in header_controls
     assert "width: auto;" in header_controls
     assert "min-height: 30px;" in header_controls
-    assert "border-radius: 999px;" in header_controls
+    assert "border: 0;" in header_controls
+    assert "border-radius: 0;" in header_controls
+    assert "background: transparent !important;" in header_controls
+    assert "box-shadow: none !important;" in header_controls
+    assert "border-radius: 999px;" not in header_controls
     assert "> .recipe-edit-ingredient-options-copy" in header_controls
     assert "display: inline-flex !important;" in header_controls
     assert "[data-ingredient-options-label]" in header_controls
@@ -1131,7 +1135,7 @@ def test_recipe_editor_v74_centers_both_desktop_action_controls_in_each_row():
     assert "transform: translate(-50%, -50%);" in dots_rule
 
 
-def test_recipe_editor_v75_groups_three_fixed_ingredient_actions_with_responsive_targets():
+def test_recipe_editor_v75_keeps_alternatives_in_their_column_and_two_actions_responsive():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -1139,10 +1143,19 @@ def test_recipe_editor_v75_groups_three_fixed_ingredient_actions_with_responsive
         script.index("const RECIPE_EDIT_INGREDIENT_COLUMNS"):
         script.index("const RECIPE_EDIT_INGREDIENT_VIEW_COLUMN_KEYS")
     ]
+    alternatives_column = columns[
+        columns.index("    alternatives: {"):
+        columns.index("    actions: {")
+    ]
+    actions_column = columns[columns.index("    actions: {"):]
+    assert "minWidth: 84" in alternatives_column
     assert 'label: "Actions"' in columns
-    assert "minWidth: 120" in columns
-    assert "maxWidth: 120" in columns
-    assert "fallbackWidth: 120" in columns
+    assert "minWidth: 80" in actions_column
+    assert "maxWidth: 80" in actions_column
+    assert "fallbackWidth: 80" in actions_column
+    assert "optionsCell.appendChild(optionsButton);" in script
+    assert "optionsCell.appendChild(optionsDisplay);" not in script
+    assert "organizeRecipeIngredientRowActions(row);" in script
 
     organizer = script[
         script.index("function createRecipeIngredientRowActionPlaceholder"):
@@ -1151,30 +1164,30 @@ def test_recipe_editor_v75_groups_three_fixed_ingredient_actions_with_responsive
     assert 'placeholder.setAttribute("aria-hidden", "true");' in organizer
     assert 'actions.classList.add("recipe-edit-ingredient-row-actions");' in organizer
     assert 'actions.querySelector(":scope > .recipe-edit-compact-row-collapse")?.remove();' in organizer
-    assert "actions.replaceChildren(alternativesControl, editControl, menuControl);" in organizer
+    assert "actions.replaceChildren(editControl, menuControl);" in organizer
+    assert "alternativesControl" not in organizer
     assert 'event => event.stopPropagation()' in organizer
-    assert '"Expand alternatives"' in organizer
-    assert '"Collapse alternatives"' in organizer
     assert 'menuButton.setAttribute("aria-label", "More actions");' in organizer
 
-    marker = "/* Ingredient editor v75: one fixed, compact action rail for every ingredient row. */"
+    marker = "/* Ingredient editor v75: keep alternatives in their column and actions compact. */"
     assert marker in css
     action_css = css[css.index(marker):]
     for declaration in (
-        "--recipe-edit-ingredient-actions-column-width: 120px;",
-        "grid-template-columns: repeat(3, 32px);",
+        "--recipe-edit-ingredient-actions-column-width: 80px;",
+        "grid-template-columns: repeat(2, 32px);",
         "> :nth-child(1) {",
-        "grid-column: 3 !important;",
+        "grid-column: 8 !important;",
         "gap: 8px;",
         "padding: 0 8px 0 0 !important;",
         "visibility: hidden;",
         "outline: 2px solid var(--app-primary-hover) !important;",
-        "--recipe-edit-ingredient-actions-column-width: 144px;",
-        "grid-template-columns: repeat(3, 40px);",
-        'display: none !important;',
-        'grid-column: 6 !important;',
+        "minmax(84px, 1fr)",
+        "--recipe-edit-ingredient-actions-column-width: 96px;",
+        "grid-template-columns: repeat(2, 40px);",
     ):
         assert declaration in action_css
+    assert ".recipe-edit-ingredient-alternatives-action" not in action_css
+    assert "grid-template-columns: repeat(3" not in action_css
 
 
 def test_grouped_component_projection_is_reused_while_inline_controls_update():
@@ -2881,7 +2894,7 @@ def test_recipe_editor_auto_fit_keeps_visible_columns_inside_the_table_width():
         definitions.index("    alternatives: {"):
         definitions.index("    actions: {")
     ]
-    assert "minWidth: 48" in alternatives
+    assert "minWidth: 84" in alternatives
     assert "maxWidth: 180" in alternatives
     assert "fallbackWidth: 132" in alternatives
 
