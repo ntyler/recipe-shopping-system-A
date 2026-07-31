@@ -36277,12 +36277,8 @@ function updateRecipeEditStickyOffsets() {
         const editorHeaderTop = editorHeaderIsSticky
             ? (parseFloat(editorHeaderStyle.top) || 0) + editorHeader.offsetHeight
             : 0;
-        const ingredientsToolbarStyle = ingredientsToolbar
-            ? getComputedStyle(ingredientsToolbar)
-            : null;
         const ingredientsToolbarHeight = ingredientsToolbar
             ? ingredientsToolbar.offsetHeight
-                + (parseFloat(ingredientsToolbarStyle?.marginBottom) || 0)
             : 0;
 
         ingredientsSection.style.setProperty(

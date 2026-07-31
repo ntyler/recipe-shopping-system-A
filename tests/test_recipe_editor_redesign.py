@@ -1813,6 +1813,7 @@ def test_recipe_editor_wide_ingredients_workspace_keeps_header_stack_sticky():
     assert "position: sticky;" in sticky_headers
     assert "z-index: 36;" in sticky_headers
     assert "top: var(--recipe-edit-ingredients-toolbar-sticky-top, 66px);" in sticky_headers
+    assert "margin-bottom: 0;" in sticky_headers
     assert "background: var(--recipe-editor-surface);" in sticky_headers
     assert (
         "body.recipe-edit-standalone-page\n"
@@ -1851,6 +1852,8 @@ def test_recipe_editor_wide_ingredients_workspace_keeps_header_stack_sticky():
     assert '":scope > .ingredients-toolbar"' in sticky_offsets
     assert '"body.recipe-edit-standalone-page .recipe-edit-header"' in sticky_offsets
     assert '["fixed", "sticky"].includes(editorHeaderStyle.position)' in sticky_offsets
+    assert "ingredientsToolbar.offsetHeight" in sticky_offsets
+    assert "ingredientsToolbarStyle" not in sticky_offsets
     assert '"--recipe-edit-ingredients-toolbar-sticky-top"' in sticky_offsets
     assert '"--recipe-edit-ingredient-table-sticky-top"' in sticky_offsets
 
