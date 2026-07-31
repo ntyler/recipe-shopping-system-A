@@ -40,6 +40,10 @@
 {% endif %}
 
 {% if not (app_public_auth|default(false)) %}
+<script src="{{ url_for('static', filename='js/store-sections/StoreSectionColorMap.js', v=app_js_version) }}"></script>
+<script src="{{ url_for('static', filename='js/store-sections/StoreSectionBadge.js', v=app_js_version) }}"></script>
+<script src="{{ url_for('static', filename='js/store-sections/StoreSectionDisplay.js', v=app_js_version) }}"></script>
+<script src="{{ url_for('static', filename='js/store-sections/StoreSectionEditor.js', v=app_js_version) }}"></script>
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 {% endif %}
 {% block app_scripts %}{% endblock %}

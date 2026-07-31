@@ -29914,6 +29914,11 @@ function appendRecipeIngredientInlineSummaryControl(cell, fieldName, tagName = "
     if (!cell) {
         return null;
     }
+    if (fieldName === "store_section") {
+        const display = createRecipeIngredientStoreSectionDisplay();
+        cell.appendChild(display);
+        return display;
+    }
     const control = document.createElement(tagName);
     if (tagName === "input") {
         control.type = "text";
@@ -29999,7 +30004,7 @@ function createRecipeIngredientOptionRowSummary(className = "") {
         ["quantity", ".recipe-edit-alternative-component-quantity", "alternativeComponentQuantity"],
         ["unit", ".recipe-edit-alternative-component-unit", "alternativeComponentUnit"],
         ["size", ".recipe-edit-alternative-component-size", "alternativeComponentSize"],
-        ["store_section", ".recipe-edit-alternative-component-store", "alternativeComponentStore", "select"],
+        ["store_section", ".recipe-edit-alternative-component-store", "alternativeComponentStore", "display"],
         ["section", ".recipe-edit-alternative-component-type", "alternativeComponentType", "select"],
     ].forEach(([fieldName, selector, dataName, tagName = "input"]) => {
         const control = appendRecipeIngredientInlineSummaryControl(
@@ -30916,6 +30921,117 @@ function recipeIngredientInlineOptionSignature(select) {
     ]));
 }
 
+function createRecipeIngredientStoreSectionDisplay(source = null) {
+    const selectedValue = String(source?.value || "").trim();
+    const display = window.StoreSectionDisplay.create({
+        section: selectedValue,
+        label: recipeStoreSectionDisplayLabel(selectedValue) || "Misc",
+        iconName: recipeIngredientStoreSectionIconName(selectedValue),
+        iconHtml: recipeIngredientStoreSectionIconHtml(selectedValue),
+        indicatorHtml: recipeEditSvgIcon("edit"),
+        disabled: Boolean(source?.disabled),
+        onActivate: button => startRecipeIngredientStoreSectionInlineEdit(button),
+    });
+    display.dataset.recipeIngredientInlineStoreSectionDisplay = "true";
+    display.recipeEditStoreSectionSelect = source;
+    return display;
+}
+
+function recipeIngredientStoreSectionDisplaySource(display, fallbackRow = null) {
+    if (display?.recipeEditStoreSectionSelect) {
+        return display.recipeEditStoreSectionSelect;
+    }
+    const sourceRow = recipeIngredientInlineEditorSourceRow(display, fallbackRow);
+    return recipeIngredientDirectField(sourceRow, "store_section");
+}
+
+function syncRecipeIngredientStoreSectionDisplay(display, source = null) {
+    if (!display) return;
+    source = source || recipeIngredientStoreSectionDisplaySource(display);
+    if (!source) return;
+    const selectedValue = String(source.value || "").trim();
+    const label = recipeStoreSectionDisplayLabel(selectedValue) || "Misc";
+    const badge = window.StoreSectionBadge.create({
+        section: selectedValue,
+        label,
+        iconName: recipeIngredientStoreSectionIconName(selectedValue),
+        iconHtml: recipeIngredientStoreSectionIconHtml(selectedValue),
+    });
+    display.querySelector("[data-store-section-badge]")?.replaceWith(badge);
+    display.recipeEditStoreSectionSelect = source;
+    display.dataset.storeSection = selectedValue;
+    display.disabled = Boolean(source.disabled);
+    display.setAttribute("aria-label", `Store Section: ${label}. Click to edit.`);
+    ["aria-invalid", "data-recipe-edit-validation-invalid"].forEach(attribute => {
+        if (source.hasAttribute(attribute)) {
+            display.setAttribute(attribute, source.getAttribute(attribute) || "true");
+        } else {
+            display.removeAttribute(attribute);
+        }
+    });
+}
+
+function finishRecipeIngredientStoreSectionInlineEdit(options = {}) {
+    const active = window.StoreSectionEditor.current();
+    if (!active) return null;
+    const display = active.display;
+    const source = active.source;
+    window.StoreSectionEditor.unmount();
+    if (display && source) {
+        syncRecipeIngredientStoreSectionDisplay(display, source);
+    }
+    if (options.restoreFocus && display?.isConnected) {
+        display.focus({ preventScroll: true });
+    }
+    return display;
+}
+
+function startRecipeIngredientStoreSectionInlineEdit(display) {
+    if (!display || display.disabled) return false;
+    const source = recipeIngredientStoreSectionDisplaySource(display);
+    const container = display.parentElement;
+    if (!source || !container) return false;
+    const current = window.StoreSectionEditor.current();
+    if (current?.display === display) {
+        openRecipeIngredientStoreSectionMenu(current.control);
+        return false;
+    }
+
+    const trigger = window.StoreSectionEditor.mount({
+        container,
+        display,
+        source,
+        createControl: () => createRecipeIngredientStoreSectionTrigger(source),
+        onUnmount: () => syncRecipeIngredientStoreSectionDisplay(display, source),
+    });
+    if (!trigger) return false;
+    trigger.dataset.recipeIngredientInlineStoreSectionEditor = "true";
+    trigger.recipeEditStoreSectionDisplay = display;
+    syncRecipeIngredientStoreSectionTrigger(trigger, source.value);
+    trigger.addEventListener("focusout", () => {
+        window.setTimeout(() => {
+            const active = window.StoreSectionEditor.current();
+            if (!active || active.control !== trigger) return;
+            const menu = document.getElementById("recipeIngredientStoreSectionMenu");
+            const focused = document.activeElement;
+            if (
+                menu
+                && !menu.hidden
+                && (menu.contains(focused) || menu.recipeEditAnchorButton === trigger)
+            ) {
+                return;
+            }
+            finishRecipeIngredientStoreSectionInlineEdit();
+        }, 0);
+    });
+    window.requestAnimationFrame(() => {
+        if (!trigger.isConnected) return;
+        trigger.focus({ preventScroll: true });
+        openRecipeIngredientStoreSectionMenu(trigger);
+    });
+    return false;
+}
+
 function ensureRecipeIngredientInlineStoreSectionTrigger(control, source) {
     if (
         !control
@@ -30971,6 +31087,12 @@ function recipeIngredientInlineEditorSourceRow(control, fallbackRow) {
 
 function syncRecipeIngredientInlineEditor(row, scope = row) {
     if (!row || !scope) return;
+    scope.querySelectorAll("[data-recipe-ingredient-inline-store-section-display]").forEach(display => {
+        const source = recipeIngredientStoreSectionDisplaySource(display, row);
+        if (source) {
+            syncRecipeIngredientStoreSectionDisplay(display, source);
+        }
+    });
     scope.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
         const fieldName = control.dataset.recipeIngredientInlineField;
         const sourceRow = recipeIngredientInlineEditorSourceRow(control, row);
@@ -31014,6 +31136,17 @@ function syncRecipeIngredientInlineEditor(row, scope = row) {
 
 function bindRecipeIngredientInlineEditor(row, scope = row) {
     if (!row || !scope) return;
+    scope.querySelectorAll("[data-recipe-ingredient-inline-store-section-display]").forEach(display => {
+        const source = recipeIngredientStoreSectionDisplaySource(display, row);
+        if (!source) return;
+        display.recipeEditStoreSectionSelect = source;
+        if (display.dataset.recipeIngredientInlineStoreSectionBound !== "true") {
+            display.dataset.recipeIngredientInlineStoreSectionBound = "true";
+            source.addEventListener("input", () => syncRecipeIngredientStoreSectionDisplay(display, source));
+            source.addEventListener("change", () => syncRecipeIngredientStoreSectionDisplay(display, source));
+        }
+        syncRecipeIngredientStoreSectionDisplay(display, source);
+    });
     scope.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
         if (control.dataset.recipeIngredientInlineBound === "true") return;
         control.dataset.recipeIngredientInlineBound = "true";
@@ -31130,7 +31263,7 @@ function organizeRecipeEditIngredientRow(row) {
         ["recipe-edit-ingredient-quantity-summary", "ingredientQuantitySummary", "quantity", "input"],
         ["recipe-edit-ingredient-unit-summary", "ingredientUnitSummary", "unit", "input"],
         ["recipe-edit-ingredient-size-summary", "ingredientSizeSummary", "size", "input"],
-        ["recipe-edit-ingredient-store-summary", "ingredientStoreSummary", "store_section", "select"],
+        ["recipe-edit-ingredient-store-summary", "ingredientStoreSummary", "store_section", "display"],
         ["recipe-edit-ingredient-type-summary", "ingredientTypeSummary", "section", "select"],
     ];
     summaryDefinitions.forEach(([className, dataName, fieldName, tagName]) => {
@@ -38795,12 +38928,15 @@ function recipeEditSvgIcon(name) {
         snowflake: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2v20"></path><path d="m4 6.5 16 11"></path><path d="m20 6.5-16 11"></path><path d="m9 4 3 3 3-3"></path><path d="m9 20 3-3 3 3"></path></svg>',
         package: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m4 7 8-4 8 4v10l-8 4-8-4V7Z"></path><path d="m4 7 8 4 8-4"></path><path d="M12 11v10"></path></svg>',
         wheat: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 21V6"></path><path d="M12 10C8 10 7 7 7 5c3 0 5 2 5 5Z"></path><path d="M12 14c4 0 5-3 5-5-3 0-5 2-5 5Z"></path><path d="M12 18c-4 0-5-3-5-5 3 0 5 2 5 5Z"></path></svg>',
+        whisk: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m6 18 9-9"></path><path d="m4 20 3-3"></path><path d="M14.5 3.5c3-1 6 2 5 5-1 3-5 5-7.5 2.5S11.5 4.5 14.5 3.5Z"></path><path d="M15 5c2 1 3 3 2 5"></path></svg>',
         sauce: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M9 3h6v4l2 3v10H7V10l2-3V3Z"></path><path d="M9 7h6"></path><path d="M9 13h6"></path></svg>',
         cookie: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M20 12a8 8 0 1 1-8-8 4 4 0 0 0 4 4 4 4 0 0 0 4 4Z"></path><path d="M8 10h.01"></path><path d="M11 16h.01"></path><path d="M7 15h.01"></path></svg>',
         cup: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 7h12v10a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V7Z"></path><path d="M17 10h2a3 3 0 0 1 0 6h-2"></path><path d="M8 3v2"></path><path d="M12 3v2"></path></svg>',
         bread: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 20V9a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v11H5Z"></path><path d="M9 8h.01"></path><path d="M14 8h.01"></path></svg>',
         sandwich: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m4 8 8-4 8 4-8 4-8-4Z"></path><path d="m4 12 8 4 8-4"></path><path d="m4 16 8 4 8-4"></path></svg>',
         home: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m3 11 9-8 9 8"></path><path d="M5 10v11h14V10"></path><path d="M9 21v-6h6v6"></path></svg>',
+        broom: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m15 3-5 11"></path><path d="m8.5 12.5 5 2.5"></path><path d="M8 12c-2 3-3 5-3 8h11c-1-3-2-5-4-7"></path><path d="M8 17h7"></path></svg>',
+        "personal-care": '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M9 3h6v4l2 2v12H7V9l2-2V3Z"></path><path d="M9 7h6"></path><path d="M10 13h4"></path><path d="M12 11v4"></path></svg>',
         heart: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 10.4-8.8 10.4S3.2 14 3.2 8.8A4.6 4.6 0 0 1 12 6.9a4.6 4.6 0 0 1 8.8 1.9Z"></path></svg>',
         paw: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="7" cy="8" r="2"></circle><circle cx="17" cy="8" r="2"></circle><circle cx="12" cy="5" r="2"></circle><path d="M6.5 18c0-3 2.5-6 5.5-6s5.5 3 5.5 6c0 2-2 3-5.5 1.5C8.5 21 6.5 20 6.5 18Z"></path></svg>',
         search: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>',
@@ -39161,6 +39297,9 @@ function recipeIngredientStoreSectionIconName(section) {
     const configured = recipeEditStoreSectionDetails.get(
         recipeIngredientStoreSectionKey(section),
     );
+    if (window.StoreSectionColorMap) {
+        return window.StoreSectionColorMap.get(section, configured?.icon).icon;
+    }
     if (configured && configured.icon) {
         return String(configured.icon).trim().toLowerCase();
     }
@@ -39221,8 +39360,13 @@ function recipeIngredientStoreSectionIconName(section) {
 
 function recipeIngredientStoreSectionIconHtml(section) {
     const iconName = recipeIngredientStoreSectionIconName(section);
+    const color = window.StoreSectionColorMap
+        ? window.StoreSectionColorMap.get(section, iconName).color
+        : "#94a3b8";
     return `<span class="recipe-edit-store-section-icon is-${escapeAttribute(iconName)}"
                   data-store-section-icon
+                  data-store-section="${escapeAttribute(section)}"
+                  style="--store-section-color:${escapeAttribute(color)};color:var(--store-section-color)"
                   aria-hidden="true">${recipeEditSvgIcon(iconName)}</span>`;
 }
 
@@ -41011,6 +41155,14 @@ function syncRecipeIngredientStoreSectionControl(select) {
         if (trigger.recipeEditStoreSectionSelect === select) triggers.add(trigger);
     });
     triggers.forEach(trigger => syncRecipeIngredientStoreSectionTrigger(trigger, selectedValue));
+    row?.querySelectorAll(
+        "[data-recipe-ingredient-inline-store-section-display], "
+        + "[data-recipe-ingredient-store-section-field-display]"
+    ).forEach(display => {
+        if (display.recipeEditStoreSectionSelect === select) {
+            syncRecipeIngredientStoreSectionDisplay(display, select);
+        }
+    });
     if (row?.parentElement?.id === "recipeEditIngredients") {
         applyRecipeIngredientColumnView();
         syncRecipeIngredientColumnViewOpenMenu({ render: true });
@@ -41159,11 +41311,11 @@ function openRecipeIngredientStoreSectionMenu(trigger) {
 
     const menu = ensureRecipeIngredientStoreSectionMenu();
     if (!menu.hidden && menu.recipeEditAnchorButton === trigger) {
-        closeRecipeEditRowMenus();
+        closeRecipeEditRowMenus({ restoreStoreSectionFocus: true });
         return false;
     }
 
-    closeRecipeEditRowMenus();
+    closeRecipeEditRowMenus({ keepStoreSectionEditor: true });
     menu.recipeEditAnchorButton = trigger;
     menu.recipeEditStoreSectionSelect = select;
     menu.hidden = false;
@@ -41193,7 +41345,7 @@ function chooseRecipeIngredientStoreSection(button) {
     select.value = button.dataset.storeSectionValue || "";
     select.dispatchEvent(new Event("change", { bubbles: true }));
     markRecipeIngredientStoreSectionOverride(select);
-    closeRecipeEditRowMenus();
+    closeRecipeEditRowMenus({ restoreStoreSectionFocus: true });
     if (trigger) {
         trigger.focus({ preventScroll: true });
     }
@@ -41222,7 +41374,7 @@ function addRecipeIngredientCustomStoreSection(button) {
     select.value = saveRecipeIngredientCustomStoreSectionName(name);
     select.dispatchEvent(new Event("change", { bubbles: true }));
     markRecipeIngredientStoreSectionOverride(select);
-    closeRecipeEditRowMenus();
+    closeRecipeEditRowMenus({ restoreStoreSectionFocus: true });
     if (trigger) trigger.focus({ preventScroll: true });
     return false;
 }
@@ -41316,7 +41468,7 @@ function handleRecipeIngredientStoreSectionKeydown(event, trigger) {
         }
     } else if (event.key === "Escape") {
         event.preventDefault();
-        closeRecipeEditRowMenus();
+        closeRecipeEditRowMenus({ restoreStoreSectionFocus: true });
     } else if (event.key === "Tab") {
         closeRecipeEditRowMenus();
     }
@@ -41347,10 +41499,15 @@ function bindRecipeIngredientStoreSectionControls(scope) {
         }
 
         label.querySelector("[data-store-section-icon]")?.remove();
-        const trigger = createRecipeIngredientStoreSectionTrigger(select);
         select.addEventListener("change", () => syncRecipeIngredientStoreSectionControl(select));
         select.hidden = true;
-        select.insertAdjacentElement("beforebegin", trigger);
+        let display = label.querySelector("[data-recipe-ingredient-store-section-field-display]");
+        if (!display) {
+            display = createRecipeIngredientStoreSectionDisplay(select);
+            display.dataset.recipeIngredientStoreSectionFieldDisplay = "true";
+            select.insertAdjacentElement("beforebegin", display);
+        }
+        display.recipeEditStoreSectionSelect = select;
         syncRecipeIngredientStoreSectionControl(select);
     });
 }
@@ -46449,6 +46606,7 @@ function recipeEditAdjacentMovableRow(row, direction) {
 }
 
 function closeRecipeEditRowMenus() {
+    const options = arguments[0] || {};
     document.querySelectorAll(".recipe-edit-row-menu").forEach(menu => {
         const anchorButton = menu.recipeEditAnchorButton;
         menu.hidden = true;
@@ -46488,6 +46646,11 @@ function closeRecipeEditRowMenus() {
         button.setAttribute("aria-expanded", "false");
     });
     closeRecipeViewGenerateSubmenus();
+    if (!options.keepStoreSectionEditor && window.StoreSectionEditor?.current()) {
+        finishRecipeIngredientStoreSectionInlineEdit({
+            restoreFocus: Boolean(options.restoreStoreSectionFocus),
+        });
+    }
 }
 
 function closeRecipeViewGenerateSubmenus(scope = document) {

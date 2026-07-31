@@ -77,7 +77,7 @@ INGREDIENT_STORE_SECTION_ICONS = {
     "FROZEN": "snowflake",
     "DRY GOODS": "package",
     "PASTA, RICE & GRAINS": "wheat",
-    "BAKING": "wheat",
+    "BAKING": "whisk",
     "CANNED": "can",
     "SAUCES & CONDIMENTS": "sauce",
     "SNACKS": "cookie",
@@ -86,8 +86,8 @@ INGREDIENT_STORE_SECTION_ICONS = {
     "OILS & VINEGARS": "oil",
     "BAKERY": "bread",
     "DELI": "sandwich",
-    "HOUSEHOLD": "home",
-    "PERSONAL CARE": "heart",
+    "HOUSEHOLD": "broom",
+    "PERSONAL CARE": "personal-care",
     "PET SUPPLIES": "paw",
     "MISC": "basket",
 }
@@ -98,6 +98,7 @@ INGREDIENT_STORE_SECTION_ICON_OPTIONS = (
     "snowflake",
     "package",
     "wheat",
+    "whisk",
     "can",
     "sauce",
     "cookie",
@@ -107,7 +108,9 @@ INGREDIENT_STORE_SECTION_ICON_OPTIONS = (
     "bread",
     "sandwich",
     "home",
+    "broom",
     "heart",
+    "personal-care",
     "paw",
     "basket",
 )
@@ -1100,6 +1103,24 @@ def migrate_existing_recipe_ingredient_units(connection):
                 1 if normalized.get("unit_review_required") else 0,
                 clean_text(normalized.get("unit_review_value")),
                 int(stored_row["id"]),
+            ),
+        )
+        connection.execute(
+            """
+            UPDATE ingredient_store_sections
+               SET icon = ?,
+                   updated_at = ?
+             WHERE user_id = ?
+               AND section_key = ?
+               AND is_builtin = 1
+               AND icon <> ?
+            """,
+            (
+                section["icon"],
+                timestamp,
+                user_id,
+                section["section_key"],
+                section["icon"],
             ),
         )
 
