@@ -40952,6 +40952,15 @@ function syncRecipeIngredientStoreSectionTrigger(trigger, selectedValue) {
     if (!trigger) return;
     const icon = trigger.querySelector("[data-store-section-icon]");
     const triggerLabel = trigger.querySelector("[data-store-section-trigger-label]");
+    const source = trigger.recipeEditStoreSectionSelect;
+    trigger.disabled = Boolean(source?.disabled);
+    ["aria-invalid", "data-recipe-edit-validation-invalid"].forEach(attribute => {
+        if (source?.hasAttribute(attribute)) {
+            trigger.setAttribute(attribute, source.getAttribute(attribute) || "true");
+        } else {
+            trigger.removeAttribute(attribute);
+        }
+    });
     if (icon) {
         const replacement = document.createElement("span");
         replacement.innerHTML = recipeIngredientStoreSectionIconHtml(selectedValue);

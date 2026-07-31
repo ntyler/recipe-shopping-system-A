@@ -3106,6 +3106,10 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
         script.index("function bindRecipeIngredientInlineEditor"):
         script.index("function organizeRecipeEditIngredientRow")
     ]
+    store_trigger_sync = script[
+        script.index("function syncRecipeIngredientStoreSectionTrigger"):
+        script.index("function createRecipeIngredientStoreSectionTrigger")
+    ]
     inline_control_factory = script[
         script.index("function appendRecipeIngredientInlineSummaryControl"):
         script.index("function createRecipeIngredientOptionRowSummary")
@@ -3148,6 +3152,10 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "function bindRecipeIngredientUnitPickerTrigger(input)" in script
     assert 'input.removeAttribute("list");' in script
     assert 'openRecipeIngredientUnitPicker(input, { showAll: true })' in script
+    assert "const source = trigger.recipeEditStoreSectionSelect;" in store_trigger_sync
+    assert "trigger.disabled = Boolean(source?.disabled);" in store_trigger_sync
+    assert '"aria-invalid", "data-recipe-edit-validation-invalid"' in store_trigger_sync
+    assert "trigger.removeAttribute(attribute);" in store_trigger_sync
     assert "syncRecipeIngredientInlineEditor(row)" in summary
     assert "readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem)" in summary
     assert 'const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();' in summary
@@ -3197,6 +3205,41 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     store_trigger_rule = store_trigger_rule[:store_trigger_rule.index("}")]
     assert "border: 1px solid transparent;" in store_trigger_rule
     assert "background: transparent;" in store_trigger_rule
+    assert "box-shadow: none;" in store_trigger_rule
+    assert "transition: border-color 120ms ease" in store_trigger_rule
+    store_trigger_hover = v20[
+        v20.index(
+            "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
+            "> .recipe-edit-store-section-trigger:not("
+        ):
+    ]
+    store_trigger_hover = store_trigger_hover[:store_trigger_hover.index("}")]
+    assert '[aria-expanded="true"]' in store_trigger_hover
+    assert '[aria-invalid="true"]' in store_trigger_hover
+    assert "color-mix(in srgb, var(--app-primary-hover) 72%" in store_trigger_hover
+    assert "color-mix(in srgb, var(--app-primary-hover) 18%" in store_trigger_hover
+    store_trigger_active_start = v20.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
+        "> .recipe-edit-store-section-trigger:not(",
+        v20.index(
+            "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
+            "> .recipe-edit-store-section-trigger:not("
+        ) + 1,
+    )
+    store_trigger_active = v20[store_trigger_active_start:]
+    store_trigger_active = store_trigger_active[:store_trigger_active.index("}")]
+    assert ':is(:focus, :focus-visible, [aria-expanded="true"])' in store_trigger_active
+    assert "border-color: var(--app-primary-hover);" in store_trigger_active
+    assert "color-mix(in srgb, var(--app-primary-hover) 24%" in store_trigger_active
+    store_trigger_invalid_start = v20.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
+        "> .recipe-edit-store-section-trigger:is("
+    )
+    store_trigger_invalid = v20[store_trigger_invalid_start:]
+    store_trigger_invalid = store_trigger_invalid[:store_trigger_invalid.index("}")]
+    assert '[aria-invalid="true"]' in store_trigger_invalid
+    assert "border-color: var(--app-danger, #ef4444);" in store_trigger_invalid
+    assert "color-mix(in srgb, var(--app-danger, #ef4444) 20%" in store_trigger_invalid
     read_cell_rule = v20[v20.index("body.recipe-edit-standalone-page .recipe-edit-ingredient-read-cell {"):]
     read_cell_rule = read_cell_rule[:read_cell_rule.index("}")]
     assert "gap: 0;" in read_cell_rule
