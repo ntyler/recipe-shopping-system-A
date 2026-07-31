@@ -30248,22 +30248,9 @@ function ensureRecipeIngredientSelectedChoiceGroupHeader(row) {
 }
 
 function recipeIngredientSelectedOptionProjectionRows(row, selectedChoice) {
-    const selectedRows = Array.isArray(selectedChoice?.rows)
+    return Array.isArray(selectedChoice?.rows)
         ? selectedChoice.rows
         : [];
-    if (!row || !selectedChoice?.isDefaultOption) {
-        return selectedRows;
-    }
-
-    return selectedRows.filter(sourceRow => {
-        const values = fieldValuesFromRow(sourceRow);
-        const componentOrder = Number(values.alternative_component_order || 0);
-        const isPrimaryOriginalComponent = (
-            String(values.option_type || "").trim() === "original"
-            && componentOrder === 0
-        );
-        return !isPrimaryOriginalComponent;
-    });
 }
 
 function syncRecipeIngredientSelectedOptionLineItems(

@@ -637,15 +637,17 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "if (readName) readName.hidden = false;" in summary
     assert "if (readDetails) readDetails.hidden = false;" in summary
     assert "function recipeIngredientSelectedOptionProjectionRows" in selected_line_items
-    assert "if (!row || !selectedChoice?.isDefaultOption)" in selected_line_items
-    assert "values.alternative_component_order" in selected_line_items
-    assert 'String(values.option_type || "").trim() === "original"' in selected_line_items
-    assert "componentOrder === 0" in selected_line_items
-    assert "return !isPrimaryOriginalComponent;" in selected_line_items
+    assert "return Array.isArray(selectedChoice?.rows)" in selected_line_items
+    assert "? selectedChoice.rows" in selected_line_items
+    assert "isPrimaryOriginalComponent" not in selected_line_items
     assert "recipeIngredientSelectedOptionProjectionRows(" in selected_line_items
     assert "data-ingredient-selected-option-line-items" in selected_line_items
     assert "createRecipeIngredientOptionRowSummary(" in selected_line_items
     assert "summary.recipeIngredientOptionSourceRow = sourceRow;" in selected_line_items
+    assert "bindRecipeEditDragAndDrop(" in selected_line_items
+    assert "actions.appendChild(editButton);" in selected_line_items
+    assert "const menuWrap = sourceMenuWrap.cloneNode(true);" in selected_line_items
+    assert "actions.appendChild(menuWrap);" in selected_line_items
     assert "bindRecipeIngredientInlineEditor(row, summary);" in selected_line_items
     assert "openRecipeIngredientOptionModal(editButton)" in selected_line_items
     assert "lineItems.hidden = expanded || !hasProjectedRows;" in selected_line_items
@@ -690,8 +692,9 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "Ingredient editor v61: keep the option count visible" in css
     assert "Ingredient editor v62: selected choice source wording is directly editable." in css
     assert "Ingredient editor v64: keep selected-choice group actions on the shared row grid." in css
-    assert ".is-default-option.is-selected-option" in css
-    assert ":has(" in css
+    assert ".has-selected-choice-group-header.has-selected-option-line-items" in css
+    assert "grid-template-rows: auto minmax(64px, auto) !important;" in css
+    assert "align-items: stretch;" in css
 
 
 def test_collapsed_choice_option_count_aligns_with_desktop_row_cells():
