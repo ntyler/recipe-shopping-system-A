@@ -839,12 +839,44 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     assert ".recipe-edit-selected-option-toggle" in grouped_css
     assert ".has-visible-ingredient-selected-option-toggle" in grouped_css
     assert ".is-ingredient-column-group-projection-row" in grouped_css
-    assert "pointer-events: none;" in grouped_css
+    assert "pointer-events: none;" not in grouped_css
+    assert "caret-color: transparent;" not in grouped_css
+    assert ".recipe-edit-inline-picker-chevron" not in grouped_css
     projection_alignment = grouped_css[grouped_css.index(
         "> .is-ingredient-column-group-projection-row {"
     ):]
     assert "box-sizing: border-box;" in projection_alignment[:160]
     assert "padding-inline: 12px;" in projection_alignment[:160]
+
+
+def test_grouped_component_projection_is_reused_while_inline_controls_update():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    view_start = script.index("function clearRecipeIngredientColumnViewGroupProjections")
+    view_end = script.index("function recipeIngredientColumnViewEntry", view_start)
+    grouped_view = script[view_start:view_end]
+
+    assert "function clearRecipeIngredientColumnViewGroupedAwayLineItems" in grouped_view
+    assert "function syncRecipeIngredientColumnViewGroupProjection" in grouped_view
+    assert "const existingProjections = new Map(" in grouped_view
+    assert "const retainedProjections = new Set();" in grouped_view
+    assert "existingProjections.get(sourceRow)" in grouped_view
+    assert "syncRecipeIngredientColumnViewGroupProjection(" in grouped_view
+    assert "syncRecipeIngredientInlineEditor(parentRow, summary);" in grouped_view
+    assert "ensureRecipeIngredientSelectedOptionToggle(parentRow, summary);" in grouped_view
+    assert "if (!retainedProjections.has(projection))" in grouped_view
+    prepare = grouped_view[grouped_view.index(
+        "function prepareRecipeIngredientColumnViewDisplayRows"
+    ):]
+    grouped_branch = prepare[:prepare.index(
+        "return recipeIngredientColumnViewDisplayRows(list);",
+        prepare.index("if (!recipeEditIngredientColumnView.groupByStoreSection)"),
+    )]
+    assert "clearRecipeIngredientColumnViewGroupProjections(list);" in grouped_branch
+    after_ungrouped_branch = prepare[prepare.index(
+        "return recipeIngredientColumnViewDisplayRows(list);",
+        prepare.index("if (!recipeEditIngredientColumnView.groupByStoreSection)"),
+    ) + 1:]
+    assert "clearRecipeIngredientColumnViewGroupProjections(list);" not in after_ungrouped_branch
 
 
 def test_recipe_editor_ingredient_modal_requires_pencil_and_preserves_dirty_close_state():

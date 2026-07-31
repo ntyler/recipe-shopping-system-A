@@ -68941,30 +68941,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     height: 12px;
 }
 
-body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-column-group-projection
-    .is-ingredient-column-group-projection-row
-    :is(
-        .recipe-edit-ingredient-inline-control,
-        [data-recipe-ingredient-inline-store-section-trigger],
-        [data-recipe-ingredient-inline-type-trigger]
-    ) {
-    border-color: transparent !important;
-    outline: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    caret-color: transparent;
-    cursor: default;
-    pointer-events: none;
-}
-
-body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-column-group-projection
-    .is-ingredient-column-group-projection-row
-    .recipe-edit-inline-picker-chevron {
-    display: none !important;
-}
-
 @media (min-width: 768px) {
     body.recipe-edit-standalone-page #recipeEditIngredients
         > .recipe-edit-ingredient-column-group-projection

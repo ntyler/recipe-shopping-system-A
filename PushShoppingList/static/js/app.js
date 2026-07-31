@@ -27009,6 +27009,10 @@ function clearRecipeIngredientColumnViewGroupProjections(list) {
     list?.querySelectorAll(
         ":scope > [data-recipe-ingredient-column-group-projection]",
     ).forEach(projection => projection.remove());
+    clearRecipeIngredientColumnViewGroupedAwayLineItems(list);
+}
+
+function clearRecipeIngredientColumnViewGroupedAwayLineItems(list) {
     list?.querySelectorAll(
         "[data-ingredient-selected-option-line-item].is-ingredient-column-grouped-away",
     ).forEach(lineItem => {
@@ -27031,22 +27035,71 @@ function createRecipeIngredientColumnViewGroupProjection(list, parentRow, lineIt
     const projection = document.createElement("div");
     projection.className = "recipe-edit-ingredient-column-group-projection";
     projection.dataset.recipeIngredientColumnGroupProjection = "";
-    projection.recipeIngredientOptionSourceRow = sourceRow;
-    projection.recipeIngredientColumnViewParentRow = parentRow;
-    const summary = createRecipeIngredientSelectedOptionLineItem(parentRow, sourceRow);
-    summary.classList.add("is-ingredient-column-group-projection-row");
-    projection.appendChild(summary);
-    lineItem.classList.add("is-ingredient-column-grouped-away");
+    syncRecipeIngredientColumnViewGroupProjection(
+        projection,
+        parentRow,
+        lineItem,
+    );
     list.insertAdjacentElement("beforeend", projection);
     return projection;
 }
 
+function syncRecipeIngredientColumnViewGroupProjection(
+    projection,
+    parentRow,
+    lineItem,
+) {
+    const sourceRow = recipeIngredientColumnViewSourceRow(lineItem);
+    if (!projection || !parentRow || !sourceRow || sourceRow === lineItem) {
+        return null;
+    }
+    projection.recipeIngredientOptionSourceRow = sourceRow;
+    projection.recipeIngredientColumnViewParentRow = parentRow;
+    let summary = projection.querySelector(
+        ":scope > [data-ingredient-selected-option-line-item]",
+    );
+    if (
+        !summary
+        || summary.recipeIngredientOptionSourceRow !== sourceRow
+    ) {
+        summary = createRecipeIngredientSelectedOptionLineItem(parentRow, sourceRow);
+        projection.replaceChildren(summary);
+    } else {
+        summary.recipeIngredientChoiceParentRow = parentRow;
+        updateRecipeIngredientOptionRowSummary(
+            summary,
+            sourceRow,
+            fieldValuesFromRow(sourceRow),
+            {
+                accessiblePrefix: "Edit ingredient",
+                fallbackName: "Unnamed ingredient",
+                showMetadata: false,
+            },
+        );
+        syncRecipeIngredientInlineEditor(parentRow, summary);
+        ensureRecipeIngredientSelectedOptionToggle(parentRow, summary);
+    }
+    summary.classList.add("is-ingredient-column-group-projection-row");
+    lineItem.classList.add("is-ingredient-column-grouped-away");
+    return projection;
+}
+
 function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
-    clearRecipeIngredientColumnViewGroupProjections(list);
+    const existingProjections = new Map(
+        [...list.querySelectorAll(
+            ":scope > [data-recipe-ingredient-column-group-projection]",
+        )].map(projection => [
+            projection.recipeIngredientOptionSourceRow,
+            projection,
+        ]),
+    );
+    const retainedProjections = new Set();
+    clearRecipeIngredientColumnViewGroupedAwayLineItems(list);
     rows.forEach(row => {
         row.classList.remove("is-ingredient-store-section-grouped-choice");
     });
     if (!recipeEditIngredientColumnView.groupByStoreSection) {
+        clearRecipeIngredientColumnViewGroupProjections(list);
         rows.forEach(syncRecipeIngredientSelectedOptionToggles);
         return recipeIngredientColumnViewDisplayRows(list);
     }
@@ -27060,9 +27113,29 @@ function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
         lineItems.forEach(lineItem => {
             const componentSection = recipeIngredientColumnViewEntry(lineItem, "store");
             if (componentSection.key === parentSection.key) return;
-            createRecipeIngredientColumnViewGroupProjection(list, parentRow, lineItem);
+            const sourceRow = recipeIngredientColumnViewSourceRow(lineItem);
+            const existingProjection = existingProjections.get(sourceRow);
+            const projection = existingProjection
+                ? syncRecipeIngredientColumnViewGroupProjection(
+                    existingProjection,
+                    parentRow,
+                    lineItem,
+                )
+                : createRecipeIngredientColumnViewGroupProjection(
+                    list,
+                    parentRow,
+                    lineItem,
+                );
+            if (projection) {
+                retainedProjections.add(projection);
+            }
         });
         syncRecipeIngredientSelectedOptionToggles(parentRow);
+    });
+    existingProjections.forEach(projection => {
+        if (!retainedProjections.has(projection)) {
+            projection.remove();
+        }
     });
     return recipeIngredientColumnViewDisplayRows(list);
 }
