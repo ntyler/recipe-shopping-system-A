@@ -524,7 +524,19 @@ def test_editor_option_selection_is_always_visible_and_directly_changeable():
     assert ".recipe-edit-ingredient-choice-overview," in css
     assert ".recipe-edit-alternative-card" in css
     assert "background: color-mix(in srgb, var(--app-primary-soft) 18%, var(--app-surface));" in css
-    assert "inset 3px 0 0 color-mix(in srgb, var(--app-primary-hover) 76%, transparent)" in css
+    selected_option_css = css[
+        css.index(
+            ":is(\n"
+            "        .recipe-edit-ingredient-choice-overview,\n"
+            "        .recipe-edit-alternative-card"
+        ):
+        css.index(
+            ".recipe-edit-alternative-component-summary:not(:hover, :focus-within)"
+        )
+    ]
+    assert "inset 3px 0 0" not in selected_option_css
+    assert "inset 0 1px 0" in selected_option_css
+    assert "inset 0 -1px 0" in selected_option_css
     assert ".recipe-edit-alternative-component-summary:not(:hover, :focus-within)" in css
 
 

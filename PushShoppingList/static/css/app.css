@@ -67912,7 +67912,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     ).is-selected-option {
     background: color-mix(in srgb, var(--app-primary-soft) 18%, var(--app-surface));
     box-shadow:
-        inset 3px 0 0 color-mix(in srgb, var(--app-primary-hover) 76%, transparent),
         inset 0 1px 0 color-mix(in srgb, var(--app-primary-hover) 28%, transparent),
         inset 0 -1px 0 color-mix(in srgb, var(--app-primary-hover) 28%, transparent);
 }
