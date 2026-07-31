@@ -804,6 +804,44 @@ def test_selected_choice_header_uses_a_compact_options_control():
     assert "white-space: nowrap;" in header_controls
 
 
+def test_store_section_grouping_moves_choice_access_to_each_component_row():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    view_start = script.index("function prepareRecipeIngredientColumnViewDisplayRows")
+    view_end = script.index("function recipeIngredientColumnViewEntry", view_start)
+    grouped_view = script[view_start:view_end]
+    toggles_start = script.index("function recipeIngredientSelectedOptionSummaries")
+    toggles_end = script.index("function createRecipeIngredientSelectedOptionLineItem", toggles_start)
+    toggles = script[toggles_start:toggles_end]
+    parent_lookup = script[
+        script.index("function recipeIngredientParentRowFromControl"):
+        script.index("function bindRecipeIngredientSubstitutionRows")
+    ]
+
+    assert '"is-ingredient-store-section-grouped-choice"' in grouped_view
+    assert "lineItems.length > 0" in grouped_view
+    assert "syncRecipeIngredientSelectedOptionToggles(parentRow);" in grouped_view
+    assert "function ensureRecipeIngredientSelectedOptionToggle" in toggles
+    assert 'button.dataset.ingredientSelectedOptionToggle = "";' in toggles
+    assert "toggleRecipeIngredientSubstitutions(button, event)" in toggles
+    assert "function syncRecipeIngredientSelectedOptionToggles" in toggles
+    assert 'sourceLabel?.textContent || "Options"' in toggles
+    assert 'sourceButton.getAttribute("aria-expanded") || "false"' in toggles
+    assert "selectedOptionSummary?.recipeIngredientChoiceParentRow" in parent_lookup
+
+    grouped_css = css[css.index(
+        "/* Ingredient editor v68: Store Section groups expose choices on each component row. */"
+    ):]
+    assert ".is-ingredient-store-section-grouped-choice" in grouped_css
+    assert "> .recipe-edit-selected-choice-group-header" in grouped_css
+    assert "display: none !important;" in grouped_css
+    assert ".recipe-edit-selected-option-toggle" in grouped_css
+    assert ".has-visible-ingredient-selected-option-toggle" in grouped_css
+    assert ".is-ingredient-column-group-projection-row" in grouped_css
+    assert "pointer-events: none;" in grouped_css
+
+
 def test_recipe_editor_ingredient_modal_requires_pencil_and_preserves_dirty_close_state():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

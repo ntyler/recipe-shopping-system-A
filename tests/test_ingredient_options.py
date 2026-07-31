@@ -494,7 +494,8 @@ def test_editor_uses_nested_table_rows_instead_of_cards_or_radio_choices():
     assert 'data-ingredient-column="type"' in script
     assert "toggleRecipeIngredientSubstitutions(optionsButton, event)" in organizer
     assert "toggleRecipeIngredientSubstitutions(mobileAlternativesBadge, event)" in organizer
-    assert "tableScroll.scrollLeft = inlineScrollLeft;" in script
+    assert "bodyScroll.scrollLeft = inlineScrollLeft;" in script
+    assert "syncRecipeEditIngredientTableHeaderScroll(tableScroll);" in script
     assert "grid-column: 1 / -1 !important;" in css
     assert "Ingredient editor v45: nested, table-native ingredient option groups." in css
     assert "grid-template-columns: var(--recipe-edit-ingredient-grid);" in css
