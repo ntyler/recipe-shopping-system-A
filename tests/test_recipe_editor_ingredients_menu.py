@@ -171,6 +171,9 @@ def test_recipe_editor_match_column_only_surfaces_attention_states():
     assert "const matchItem = recipeIngredientMatchItemFromRow(row, values);" in summary
     assert "recipeIngredientBadgesHtml(matchItem, { maxVisible: 2 })" in summary
     assert "recipeIngredientMatchDetailsHtml(matchItem)" in summary
+    assert 'row.querySelector(":scope > [data-recipe-ingredient-edit-panel]")' in summary
+    assert 'editPanel.querySelector("[data-ingredient-match-details]")' in summary
+    assert 'row ? row.querySelector("[data-ingredient-match-details]")' not in summary
 
     assert "recipeIngredientBadgesHtml(option, { includeMatchStatus: false })" in script
     assert "recipeIngredientBadgesHtml(fieldValuesFromRow(optionRow), { includeMatchStatus: false })" in script

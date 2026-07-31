@@ -46448,7 +46448,12 @@ function updateRecipeIngredientSummary(row) {
         return;
     }
     const badges = row ? row.querySelector("[data-ingredient-badges]") : null;
-    const matchDetails = row ? row.querySelector("[data-ingredient-match-details]") : null;
+    const editPanel = row
+        ? row.querySelector(":scope > [data-recipe-ingredient-edit-panel]")
+        : null;
+    const matchDetails = editPanel
+        ? editPanel.querySelector("[data-ingredient-match-details]")
+        : null;
     const readStatus = row ? row.querySelector("[data-ingredient-read-status]") : null;
     const sourceText = row ? row.querySelector("[data-ingredient-source-text]") : null;
     const readBuyAs = row ? row.querySelector("[data-ingredient-read-buy-as]") : null;
