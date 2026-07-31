@@ -44858,7 +44858,13 @@ function updateRecipeIngredientOptionSelectionState(option, selected) {
     if (!option) return;
     const isSelected = Boolean(selected);
     const control = option.querySelector("[data-ingredient-option-select]");
+    const menuAction = option.querySelector("[data-set-alternative-preferred]");
     option.classList.toggle("is-selected-option", isSelected);
+
+    if (menuAction) {
+        menuAction.textContent = isSelected ? "Selected option" : "Use this option";
+        menuAction.disabled = isSelected;
+    }
     if (!control) return;
 
     const label = control.querySelector("[data-ingredient-option-select-label]");
@@ -45811,6 +45817,27 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
                     </span>
                     <span data-ingredient-option-select-label>Use this option</span>
                 </button>
+                <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap"
+                     data-ingredient-grid-column="actions">
+                    <button type="button"
+                            class="recipe-edit-row-menu-btn"
+                            aria-label="Option actions"
+                            title="Option actions"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            onclick="return toggleRecipeEditRowMenu(this, event)">
+                        <span aria-hidden="true"></span>
+                    </button>
+                    <div class="recipe-edit-row-menu recipe-edit-alternative-menu" hidden>
+                        <div class="recipe-edit-menu-group">
+                            <div class="recipe-edit-menu-group-label">Ingredient option</div>
+                            <button type="button" onclick="return focusRecipeEditCompactRow(this)">Edit option</button>
+                            <button type="button"
+                                    data-set-alternative-preferred
+                                    onclick="return setRecipeIngredientOptionSelected(this)">Use this option</button>
+                        </div>
+                    </div>
+                </div>
             `;
             const optionBody = document.createElement("div");
             optionBody.className = "recipe-edit-ingredient-default-option-body";
@@ -46258,6 +46285,18 @@ function addRecipeIngredientSubstitutionRow(button) {
     const nextAlternativeIndex = recipeIngredientSubstitutionDomGroups(
         [...list.querySelectorAll("[data-substitution-option-row]")]
     ).length;
+    if (nextAlternativeIndex === 0) {
+        const defaultField = row.querySelector('[data-field="default_option_id"]');
+        const selectionField = row.querySelector('[data-field="selection_required"]');
+        const originalOption = row.querySelector("[data-original-option-id]");
+        const originalOptionId = String(originalOption ? originalOption.value : "").trim();
+        if (selectionField) {
+            selectionField.value = "true";
+        }
+        if (defaultField && !String(defaultField.value || "").trim() && originalOptionId) {
+            defaultField.value = originalOptionId;
+        }
+    }
     list.insertAdjacentHTML("beforeend", recipeIngredientSubstitutionOptionRowHtml({
         optional: true,
         inferred: true,

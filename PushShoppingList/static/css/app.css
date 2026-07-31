@@ -67857,13 +67857,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    .recipe-edit-ingredient-choice-overview
-    > .recipe-edit-ingredient-option-divider
-    > .recipe-edit-option-selection {
-    right: 12px;
-}
-
-body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-option-selection:is(:hover, :focus-visible):not(:disabled) {
     outline: 0;
     border-color: color-mix(in srgb, var(--app-primary-hover) 58%, var(--app-border));
@@ -67935,12 +67928,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         font-size: 9px;
     }
 
-    body.recipe-edit-standalone-page #recipeEditIngredients
-        .recipe-edit-ingredient-choice-overview
-        > .recipe-edit-ingredient-option-divider
-        > .recipe-edit-option-selection {
-        right: 8px;
-    }
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
@@ -69669,4 +69656,40 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         .recipe-edit-selected-choice-group-header {
         grid-template-columns: 40px minmax(0, 1fr) 34px 96px !important;
     }
+}
+
+/* Ingredient editor v76: keep idle choice groups visually neutral. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.has-ingredient-choice {
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.has-ingredient-choice.recipe-edit-substitutions-open {
+    background: var(--app-surface);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-choice-group-header {
+    border-bottom-color: var(--app-border);
+    background: color-mix(in srgb, var(--app-text) 3%, var(--app-surface));
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-options-panel,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection
+    > .recipe-edit-ingredient-options-panel,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > .recipe-edit-ingredient-options-panel {
+    border-top-color: var(--app-border);
+    background: var(--app-surface);
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor {
+    background: var(--app-surface);
 }

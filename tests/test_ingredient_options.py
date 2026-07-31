@@ -784,6 +784,69 @@ def test_selected_choice_group_header_grid_matches_parent_row_content_edges():
     assert "padding: 7px 12px 8px;" in header_css
 
 
+def test_idle_choice_group_chrome_does_not_look_selected():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    marker = "/* Ingredient editor v76: keep idle choice groups visually neutral. */"
+    neutral_css = css[css.index(marker):]
+
+    assert "> .recipe-edit-ingredient-row.has-ingredient-choice {" in neutral_css
+    assert "box-shadow: none;" in neutral_css
+    assert (
+        "> .recipe-edit-ingredient-row.has-ingredient-choice.recipe-edit-substitutions-open {"
+        in neutral_css
+    )
+    assert "background: var(--app-surface);" in neutral_css
+    assert ".recipe-edit-selected-choice-group-header {" in neutral_css
+    assert "border-bottom-color: var(--app-border);" in neutral_css
+    assert "var(--app-text) 3%" in neutral_css
+    assert "> .recipe-edit-ingredient-options-panel" in neutral_css
+    assert ".is-ingredient-expansion-anchor" in neutral_css
+
+
+def test_first_alternative_keeps_original_ingredient_as_the_default_choice():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    add_group = script[
+        script.index("function addRecipeIngredientSubstitutionRow"):
+        script.index("function removeRecipeIngredientSubstitutionRow")
+    ]
+
+    assert "if (nextAlternativeIndex === 0)" in add_group
+    assert "const defaultField = row.querySelector('[data-field=\"default_option_id\"]');" in add_group
+    assert "const selectionField = row.querySelector('[data-field=\"selection_required\"]');" in add_group
+    assert 'const originalOption = row.querySelector("[data-original-option-id]");' in add_group
+    assert "originalOptionId" in add_group
+    assert 'selectionField.value = "true";' in add_group
+    assert "!String(defaultField.value || \"\").trim()" in add_group
+    assert "defaultField.value = originalOptionId;" in add_group
+    assert add_group.index("defaultField.value = originalOptionId;") < add_group.index(
+        'list.insertAdjacentHTML("beforeend"'
+        )
+
+
+def test_implicit_default_option_header_has_the_option_actions_submenu():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    overview = script[
+        script.index("function ensureRecipeIngredientChoiceOverview"):
+        script.index("function addRecipeIngredientDefaultComponent")
+    ]
+    selection_state = script[
+        script.index("function updateRecipeIngredientOptionSelectionState"):
+        script.index("function updateRecipeIngredientAlternativeCard")
+    ]
+
+    assert "recipe-edit-alternative-menu-wrap" in overview
+    assert 'data-ingredient-grid-column="actions"' in overview
+    assert 'aria-label="Option actions"' in overview
+    assert "Ingredient option" in overview
+    assert 'onclick="return focusRecipeEditCompactRow(this)">Edit option</button>' in overview
+    assert "data-set-alternative-preferred" in overview
+    assert 'onclick="return setRecipeIngredientOptionSelected(this)"' in overview
+    assert 'menuAction.textContent = isSelected ? "Selected option" : "Use this option";' in selection_state
+    assert "menuAction.disabled = isSelected;" in selection_state
+    assert ".recipe-edit-ingredient-choice-overview\n    > .recipe-edit-ingredient-option-divider\n    > .recipe-edit-option-selection" not in css
+
+
 def test_selected_option_line_items_reorder_their_underlying_component_rows():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
