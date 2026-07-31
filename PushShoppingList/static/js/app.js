@@ -45553,7 +45553,7 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         );
         optionsButton.disabled = false;
         optionsButton.setAttribute("aria-expanded", String(isExpanded));
-        const action = isExpanded ? "Hide" : "Show";
+        const action = isExpanded ? "Collapse" : "Show";
         const tooltip = alternativeCount
             ? `\n\nPreferred:\n${preferredSummary}\n\nOther options:\n${otherSummaries.join("\n") || "None"}`
             : "";

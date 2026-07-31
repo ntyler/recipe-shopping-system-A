@@ -835,7 +835,34 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     ):]
     assert ".is-ingredient-store-section-grouped-choice" in grouped_css
     assert "> .recipe-edit-selected-choice-group-header" in grouped_css
-    assert "display: none !important;" in grouped_css
+    collapsed_header_selector = (
+        "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice:not(\n"
+        "        .recipe-edit-substitutions-open\n"
+        "    )\n"
+        "    > .recipe-edit-selected-choice-group-header {"
+    )
+    assert collapsed_header_selector in grouped_css
+    collapsed_header = grouped_css[
+        grouped_css.index(collapsed_header_selector):
+    ]
+    assert "display: none !important;" in collapsed_header[:240]
+
+    expanded_header_selector = (
+        "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice."
+        "recipe-edit-substitutions-open\n"
+        "    > .recipe-edit-selected-choice-group-header {"
+    )
+    assert expanded_header_selector in grouped_css
+    expanded_header = grouped_css[
+        grouped_css.index(expanded_header_selector):
+    ]
+    assert "display: grid !important;" in expanded_header[:260]
+    assert "grid-row: 1 !important;" in expanded_header[:260]
+    assert (
+        "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice."
+        "recipe-edit-substitutions-open {\n"
+        "    grid-template-rows: auto auto !important;"
+    ) in grouped_css
     assert ".recipe-edit-selected-option-toggle" in grouped_css
     assert ".has-visible-ingredient-selected-option-toggle" in grouped_css
     assert ".is-ingredient-column-group-projection-row" in grouped_css
@@ -847,6 +874,12 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     ):]
     assert "box-sizing: border-box;" in projection_alignment[:160]
     assert "padding-inline: 12px;" in projection_alignment[:160]
+
+    substitution_state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
+    assert 'const action = isExpanded ? "Collapse" : "Show";' in substitution_state
 
 
 def test_grouped_component_projection_is_reused_while_inline_controls_update():

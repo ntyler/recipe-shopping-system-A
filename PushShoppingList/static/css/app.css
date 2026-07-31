@@ -68911,14 +68911,30 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 
 /* Ingredient editor v68: Store Section groups expose choices on each component row. */
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
+    > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice:not(
+        .recipe-edit-substitutions-open
+    )
     > .recipe-edit-selected-choice-group-header {
     display: none !important;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice {
+    > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice:not(
+        .recipe-edit-substitutions-open
+    ) {
     grid-template-rows: minmax(64px, auto) auto !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice.recipe-edit-substitutions-open {
+    grid-template-rows: auto auto !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice.recipe-edit-substitutions-open
+    > .recipe-edit-selected-choice-group-header {
+    display: grid !important;
+    grid-row: 1 !important;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
