@@ -840,6 +840,11 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     assert ".has-visible-ingredient-selected-option-toggle" in grouped_css
     assert ".is-ingredient-column-group-projection-row" in grouped_css
     assert "pointer-events: none;" in grouped_css
+    projection_alignment = grouped_css[grouped_css.index(
+        "> .is-ingredient-column-group-projection-row {"
+    ):]
+    assert "box-sizing: border-box;" in projection_alignment[:160]
+    assert "padding-inline: 12px;" in projection_alignment[:160]
 
 
 def test_recipe_editor_ingredient_modal_requires_pencil_and_preserves_dirty_close_state():

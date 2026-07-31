@@ -68964,3 +68964,12 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-inline-picker-chevron {
     display: none !important;
 }
+
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-column-group-projection
+        > .is-ingredient-column-group-projection-row {
+        box-sizing: border-box;
+        padding-inline: 12px;
+    }
+}
