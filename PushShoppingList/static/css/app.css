@@ -69258,6 +69258,16 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 72%, transparent);
 }
 
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row
+        > .recipe-edit-ingredient-options-panel {
+        width: calc(100% + 24px);
+        max-width: none;
+        margin-inline: -12px;
+    }
+}
+
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row
     > .recipe-edit-ingredient-options-panel:not([hidden]),

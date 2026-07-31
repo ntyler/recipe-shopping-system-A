@@ -921,6 +921,9 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "padding: 10px 0 12px;" in attached_panel
     assert "border-left: 3px solid" not in attached_panel
     assert "box-shadow: inset 3px 0 0" in attached_panel
+    assert "@media (min-width: 768px)" in attached_panel
+    assert "width: calc(100% + 24px);" in attached_panel
+    assert "margin-inline: -12px;" in attached_panel
     assert "background: color-mix(" in attached_panel
     assert ".is-ingredient-expansion-anchor" in attached_panel
 
