@@ -648,6 +648,8 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "actions.appendChild(editButton);" in selected_line_items
     assert "const menuWrap = sourceMenuWrap.cloneNode(true);" in selected_line_items
     assert "actions.appendChild(menuWrap);" in selected_line_items
+    assert "bindRecipeIngredientMasterPicker(" in selected_line_items
+    assert 'data-recipe-ingredient-inline-field="ingredient"' in selected_line_items
     assert "bindRecipeIngredientInlineEditor(row, summary);" in selected_line_items
     assert "openRecipeIngredientOptionModal(editButton)" in selected_line_items
     assert "lineItems.hidden = expanded || !hasProjectedRows;" in selected_line_items

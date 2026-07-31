@@ -1158,6 +1158,7 @@ def test_ingredient_name_fields_use_the_normalized_master_data_picker():
     assert 'fetch(`/api/master-data/ingredients/options?${params.toString()}`' in picker
     assert "function chooseRecipeIngredientMasterOption" in picker
     assert "function recipeIngredientMasterSelectedIndex" in picker
+    assert "recipeIngredientProjectedOptionSourceRow(input)" in picker
     assert 'recipeIngredientDirectField(targetRow, "ingredient_id")' in picker
     for field_name in (
         "master_normalized_name",

@@ -30043,6 +30043,9 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow) {
             showMetadata: false,
         },
     );
+    bindRecipeIngredientMasterPicker(
+        summary.querySelector('[data-recipe-ingredient-inline-field="ingredient"]'),
+    );
     bindRecipeIngredientInlineEditor(row, summary);
     initDeferredImages(summary);
     return summary;
@@ -42715,6 +42718,7 @@ function recipeIngredientMasterTargetRow(input) {
         return null;
     }
     return input.closest("[data-substitution-option-row]")
+        || recipeIngredientProjectedOptionSourceRow(input)
         || input.closest(".recipe-edit-ingredient-row");
 }
 
