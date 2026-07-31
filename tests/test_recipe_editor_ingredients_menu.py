@@ -3198,19 +3198,25 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     ) not in v20
     store_trigger_rule = v20[
         v20.index(
-            "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
-            "> .recipe-edit-store-section-trigger {"
+            "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+            "    > .recipe-edit-ingredient-row\n"
+            "    > .recipe-edit-ingredient-store-summary\n"
+            "    > .recipe-edit-store-section-trigger {"
         ):
     ]
     store_trigger_rule = store_trigger_rule[:store_trigger_rule.index("}")]
+    assert "#recipeEditIngredients" in store_trigger_rule
+    assert "> .recipe-edit-ingredient-row" in store_trigger_rule
     assert "border: 1px solid transparent;" in store_trigger_rule
     assert "background: transparent;" in store_trigger_rule
     assert "box-shadow: none;" in store_trigger_rule
     assert "transition: border-color 120ms ease" in store_trigger_rule
     store_trigger_hover = v20[
         v20.index(
-            "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
-            "> .recipe-edit-store-section-trigger:not("
+            "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+            "    > .recipe-edit-ingredient-row\n"
+            "    > .recipe-edit-ingredient-store-summary\n"
+            "    > .recipe-edit-store-section-trigger:not("
         ):
     ]
     store_trigger_hover = store_trigger_hover[:store_trigger_hover.index("}")]
@@ -3219,11 +3225,15 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "color-mix(in srgb, var(--app-primary-hover) 72%" in store_trigger_hover
     assert "color-mix(in srgb, var(--app-primary-hover) 18%" in store_trigger_hover
     store_trigger_active_start = v20.index(
-        "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
-        "> .recipe-edit-store-section-trigger:not(",
+        "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+        "    > .recipe-edit-ingredient-row\n"
+        "    > .recipe-edit-ingredient-store-summary\n"
+        "    > .recipe-edit-store-section-trigger:not(",
         v20.index(
-            "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
-            "> .recipe-edit-store-section-trigger:not("
+            "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+            "    > .recipe-edit-ingredient-row\n"
+            "    > .recipe-edit-ingredient-store-summary\n"
+            "    > .recipe-edit-store-section-trigger:not("
         ) + 1,
     )
     store_trigger_active = v20[store_trigger_active_start:]
@@ -3232,8 +3242,10 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "border-color: var(--app-primary-hover);" in store_trigger_active
     assert "color-mix(in srgb, var(--app-primary-hover) 24%" in store_trigger_active
     store_trigger_invalid_start = v20.index(
-        "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
-        "> .recipe-edit-store-section-trigger:is("
+        "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+        "    > .recipe-edit-ingredient-row\n"
+        "    > .recipe-edit-ingredient-store-summary\n"
+        "    > .recipe-edit-store-section-trigger:is("
     )
     store_trigger_invalid = v20[store_trigger_invalid_start:]
     store_trigger_invalid = store_trigger_invalid[:store_trigger_invalid.index("}")]

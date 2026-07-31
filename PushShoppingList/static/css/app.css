@@ -60331,7 +60331,11 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-
     display: none !important;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger {
+/* Keep this row-level selector above the specificity of the legacy picker rules. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-store-summary
+    > .recipe-edit-store-section-trigger {
     box-sizing: border-box;
     display: grid;
     grid-template-columns: 16px minmax(0, 1fr) 14px;
@@ -60353,7 +60357,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe
     transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger:not(
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-store-summary
+    > .recipe-edit-store-section-trigger:not(
     :disabled,
     :focus,
     :focus-visible,
@@ -60366,7 +60373,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger:not(
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-store-summary
+    > .recipe-edit-store-section-trigger:not(
     :disabled,
     [aria-invalid="true"],
     [data-recipe-edit-validation-invalid="true"]
@@ -60377,7 +60387,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 24%, transparent);
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger:is(
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-store-summary
+    > .recipe-edit-store-section-trigger:is(
     [aria-invalid="true"],
     [data-recipe-edit-validation-invalid="true"]
 ) {
@@ -60386,7 +60399,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-danger, #ef4444) 20%, transparent);
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe-edit-store-section-trigger:disabled {
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-store-summary
+    > .recipe-edit-store-section-trigger:disabled {
     cursor: not-allowed;
     opacity: .58;
 }
