@@ -126,7 +126,7 @@ def test_validation_reveals_invalid_nested_editor_without_restoring_other_live_e
     assert "restore: restoreOtherEdits" in main_edit
     assert '!row.classList.contains("is-editing") || !panel.dataset.editSnapshot' in main_edit
     assert "const restoreOtherEdits = options.restoreOtherEdits !== false;" in disclosure
-    assert disclosure.count("restore: restoreOtherEdits") >= 3
+    assert disclosure.count("restore: restoreOtherEdits") >= 2
     assert "const restoreOtherEdits = options.restoreOtherEdits !== false;" in alternative_edit
     assert alternative_edit.count("restore: restoreOtherEdits") >= 2
 

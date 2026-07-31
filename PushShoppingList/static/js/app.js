@@ -44366,6 +44366,55 @@ function recipeIngredientSubstitutionContainer(row, control = null) {
     return optionsMenu ? optionsMenu.querySelector("[data-ingredient-substitutions]") : null;
 }
 
+function recipeIngredientVerticalScrollContainer(row) {
+    let candidate = row?.parentElement || null;
+    while (
+        candidate
+        && candidate !== document.body
+        && candidate !== document.documentElement
+    ) {
+        const overflowY = window.getComputedStyle(candidate).overflowY;
+        if (
+            /^(?:auto|scroll|overlay)$/.test(overflowY)
+            && candidate.scrollHeight > candidate.clientHeight
+        ) {
+            return candidate;
+        }
+        candidate = candidate.parentElement;
+    }
+    return null;
+}
+
+function toggleRecipeIngredientExpansionWithAnchor(row, toggleExpansion) {
+    if (!row || typeof toggleExpansion !== "function") {
+        return false;
+    }
+
+    const previousTop = row.getBoundingClientRect().top;
+    const scrollContainer = recipeIngredientVerticalScrollContainer(row);
+    const result = toggleExpansion();
+    if (row.recipeIngredientAnchorFrame) {
+        window.cancelAnimationFrame(row.recipeIngredientAnchorFrame);
+    }
+    row.recipeIngredientAnchorFrame = window.requestAnimationFrame(() => {
+        row.recipeIngredientAnchorFrame = null;
+        if (!row.isConnected) {
+            return;
+        }
+        const newTop = row.getBoundingClientRect().top;
+        const delta = newTop - previousTop;
+        if (!Number.isFinite(delta) || delta === 0) {
+            return;
+        }
+        if (scrollContainer?.isConnected) {
+            scrollContainer.scrollTop += delta;
+        } else {
+            window.scrollBy({ top: delta, behavior: "instant" });
+        }
+    });
+    return result;
+}
+
 function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, options = {}) {
     const container = recipeIngredientSubstitutionContainer(row, control);
     if (!row || !container) {
@@ -44379,22 +44428,6 @@ function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, opti
             setRecipeIngredientEditMode(editingRow, false, { restore: restoreOtherEdits });
         });
     }
-    document.querySelectorAll("#recipeEditIngredients > .recipe-edit-ingredient-row").forEach(otherRow => {
-        const otherContainer = recipeIngredientSubstitutionContainer(otherRow);
-        const otherButton = otherRow.querySelector("[data-ingredient-substitutions-toggle]");
-        if (otherRow !== row && otherContainer && otherContainer !== container) {
-            otherContainer.querySelectorAll(".recipe-edit-alternative-card.is-editing").forEach(card => {
-                setRecipeIngredientAlternativeEditMode(card, false, { restore: restoreOtherEdits });
-            });
-            resetRecipeIngredientExpansionMount(otherRow, otherContainer);
-        }
-        if (otherRow !== row && otherButton) {
-            otherButton.setAttribute("aria-expanded", "false");
-        }
-        if (otherRow !== row && otherContainer && otherContainer !== container) {
-            updateRecipeIngredientSubstitutionState(otherRow, otherButton);
-        }
-    });
 
     if (!shouldOpen) {
         container.querySelectorAll(".recipe-edit-alternative-card.is-editing").forEach(card => {
@@ -44427,9 +44460,14 @@ function toggleRecipeIngredientSubstitutions(button, event = null) {
         return false;
     }
 
-    return recipeIngredientExpansionIsOpen(row, button)
-        ? closeRecipeIngredientAlternativesDialog(button, event)
-        : openRecipeIngredientAlternativesDialog(button, event);
+    return toggleRecipeIngredientExpansionWithAnchor(
+        row,
+        () => (
+            recipeIngredientExpansionIsOpen(row, button)
+                ? closeRecipeIngredientAlternativesDialog(button, event)
+                : openRecipeIngredientAlternativesDialog(button, event)
+        ),
+    );
 }
 
 function openRecipeIngredientAlternativesDialog(button, event = null, options = {}) {
@@ -44446,22 +44484,6 @@ function openRecipeIngredientAlternativesDialog(button, event = null, options = 
 
     setRecipeIngredientSubstitutionsExpanded(row, button, true, options);
     row.recipeIngredientAlternativesReturnFocus = button;
-    window.requestAnimationFrame(() => {
-        if (!container.hidden) {
-            const tableScroll = container.closest(".recipe-edit-ingredient-table-scroll");
-            const bodyScroll = recipeEditIngredientTableBodyScroll(tableScroll);
-            const inlineScrollLeft = bodyScroll ? bodyScroll.scrollLeft : null;
-            container.scrollIntoView({
-                behavior: "auto",
-                block: "nearest",
-                inline: "nearest",
-            });
-            if (bodyScroll && inlineScrollLeft !== null) {
-                bodyScroll.scrollLeft = inlineScrollLeft;
-                syncRecipeEditIngredientTableHeaderScroll(tableScroll);
-            }
-        }
-    });
     return false;
 }
 

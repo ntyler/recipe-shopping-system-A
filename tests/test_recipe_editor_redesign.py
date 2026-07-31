@@ -1366,8 +1366,8 @@ def test_recipe_editor_expanded_groups_preserve_disclosure_and_option_heading_ac
     expanded_start = script.index("function setRecipeIngredientSubstitutionsExpanded(")
     expanded_end = script.index("function toggleRecipeIngredientSubstitutions", expanded_start)
     expanded = script[expanded_start:expanded_end]
-    assert 'otherButton.setAttribute("aria-expanded", "false");' in expanded
-    assert 'optionsButton.setAttribute("aria-expanded", String(shouldOpen));' in expanded
+    assert 'otherButton.setAttribute("aria-expanded", "false");' not in expanded
+    assert "recipeIngredientExpansionIsOpen(row, optionsButton)" in expanded
 
     default_start = script.index("function ensureRecipeIngredientChoiceOverview(")
     default_end = script.index("function addRecipeIngredientDefaultComponent", default_start)

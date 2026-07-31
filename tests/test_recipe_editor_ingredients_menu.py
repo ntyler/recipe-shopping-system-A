@@ -923,6 +923,30 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert ".is-ingredient-expansion-anchor" in attached_panel
 
 
+def test_ingredient_choice_disclosure_anchors_its_row_in_the_active_vertical_scroller():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    anchor_start = script.index("function recipeIngredientVerticalScrollContainer")
+    anchor_end = script.index("function setRecipeIngredientSubstitutionsExpanded", anchor_start)
+    anchor = script[anchor_start:anchor_end]
+    toggle_start = script.index("function toggleRecipeIngredientSubstitutions")
+    toggle_end = script.index("function recipeIngredientSubstitutionDomGroups", toggle_start)
+    toggle = script[toggle_start:toggle_end]
+
+    assert "window.getComputedStyle(candidate).overflowY" in anchor
+    assert "candidate.scrollHeight > candidate.clientHeight" in anchor
+    assert anchor.count("row.getBoundingClientRect().top") == 2
+    assert "const delta = newTop - previousTop;" in anchor
+    assert "scrollContainer.scrollTop += delta;" in anchor
+    assert 'window.scrollBy({ top: delta, behavior: "instant" });' in anchor
+    assert "window.requestAnimationFrame" in anchor
+    assert "window.cancelAnimationFrame(row.recipeIngredientAnchorFrame);" in anchor
+
+    assert "toggleRecipeIngredientExpansionWithAnchor(" in toggle
+    assert "container.scrollIntoView" not in toggle
+    assert "returnFocus.focus({ preventScroll: true });" in toggle
+    assert "resetRecipeIngredientExpansionMount(otherRow, otherContainer);" not in toggle
+
+
 def test_grouped_component_projection_is_reused_while_inline_controls_update():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     view_start = script.index("function clearRecipeIngredientColumnViewGroupProjections")
@@ -1344,7 +1368,7 @@ def test_mobile_ingredient_header_surfaces_saved_alternatives_inline():
     open_end = script.index("function recipeIngredientSubstitutionDomGroups", open_start)
     open_helper = script[open_start:open_end]
     assert "setRecipeIngredientSubstitutionsExpanded(row, button, true, options);" in open_helper
-    assert "container.scrollIntoView" in open_helper
+    assert "container.scrollIntoView" not in open_helper
     assert "function closeRecipeIngredientAlternativesDialog" in open_helper
     assert "setRecipeIngredientSubstitutionsExpanded(row, control, false, options);" in open_helper
     assert "showModal" not in open_helper
@@ -2961,7 +2985,6 @@ def test_recipe_editor_v10_prioritizes_six_readable_groups_and_overflow_menu():
 
     assert "function toggleRecipeIngredientSubstitutions(button, event = null)" in script
     assert "function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, options = {})" in script
-    assert "resetRecipeIngredientExpansionMount(otherRow, otherContainer);" in script
     assert "String(recipeIngredientExpansionIsOpen(row, optionsButton))" in script
     assert 'row.classList.toggle("recipe-edit-substitutions-open", anchor === row);' in script
     assert 'const isIngredientRow = label === "ingredient";' in script
@@ -3057,7 +3080,7 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert 'recipeEditSvgIcon("chevron-down")' in options_button_markup
 
     assert "!optionCount" not in toggle
-    assert "resetRecipeIngredientExpansionMount(otherRow, otherContainer);" in toggle
+    assert "resetRecipeIngredientExpansionMount(otherRow, otherContainer);" not in toggle
     assert "mountRecipeIngredientExpansion(row, container, control);" in toggle
     assert "container.hidden = false;" in toggle
     assert "resetRecipeIngredientExpansionMount(row, container);" in toggle
@@ -3065,7 +3088,7 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert "event.preventDefault();" in toggle
     assert "event.stopPropagation();" in toggle
     assert "function openRecipeIngredientAlternativesDialog" in toggle
-    assert "container.scrollIntoView" in toggle
+    assert "container.scrollIntoView" not in toggle
     assert "function closeRecipeIngredientAlternativesDialog" in toggle
     assert "showModal" not in toggle
 
