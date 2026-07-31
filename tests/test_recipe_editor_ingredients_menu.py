@@ -1511,7 +1511,10 @@ def test_quantity_and_unit_hover_use_active_field_highlight():
 
     selector = (
         "body.recipe-edit-standalone-page #recipeEditIngredients\n"
-        "    > .recipe-edit-ingredient-row\n"
+        "    > :is(\n"
+        "        .recipe-edit-ingredient-row,\n"
+        "        .recipe-edit-ingredient-column-group-projection\n"
+        "    )\n"
         "    :is(\n"
         "        .recipe-edit-ingredient-quantity-summary,\n"
         "        .recipe-edit-ingredient-unit-summary\n"
@@ -1524,6 +1527,7 @@ def test_quantity_and_unit_hover_use_active_field_highlight():
     assert ":disabled," in rule
     assert '[aria-invalid="true"]' in rule
     assert ':is(:hover, :focus, [aria-expanded="true"])' in rule
+    assert ".recipe-edit-ingredient-column-group-projection" in rule
     assert "border-color: var(--app-primary-hover);" in rule
     assert "background: var(--app-surface);" in rule
     assert "box-shadow: 0 0 0 2px" in rule

@@ -60556,7 +60556,10 @@ body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredien
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row
+    > :is(
+        .recipe-edit-ingredient-row,
+        .recipe-edit-ingredient-column-group-projection
+    )
     :is(
         .recipe-edit-ingredient-quantity-summary,
         .recipe-edit-ingredient-unit-summary
