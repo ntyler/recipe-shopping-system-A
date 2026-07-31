@@ -1068,6 +1068,29 @@ def test_recipe_editor_v72_aligns_all_desktop_action_cells_to_the_shared_track()
         assert declaration in rule
 
 
+def test_recipe_editor_v73_keeps_choice_group_controls_on_one_centered_row():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    marker = "/* Ingredient editor v73: keep choice-group controls on one centered table row. */"
+    assert marker in css
+    assert css.index(marker) > css.index("/* Ingredient editor v72:")
+    group_row = css[css.index(marker):]
+    header_selector = ".recipe-edit-selected-choice-group-header {"
+    assert header_selector in group_row
+    header_rule = group_row[group_row.index(header_selector):]
+    header_rule = header_rule[:header_rule.index("}")]
+    assert "grid-template-rows: minmax(48px, 1fr) !important;" in header_rule
+    assert "min-height: 64px;" in header_rule
+    assert "align-content: center;" in header_rule
+
+    cells_selector = ".recipe-edit-selected-choice-group-header\n        > [data-ingredient-column] {"
+    assert cells_selector in group_row
+    cells_rule = group_row[group_row.index(cells_selector):]
+    cells_rule = cells_rule[:cells_rule.index("}")]
+    assert "grid-row: 1 !important;" in cells_rule
+    assert "align-self: center !important;" in cells_rule
+
+
 def test_grouped_component_projection_is_reused_while_inline_controls_update():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     view_start = script.index("function clearRecipeIngredientColumnViewGroupProjections")

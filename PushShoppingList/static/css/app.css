@@ -69367,3 +69367,20 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         padding: 0;
     }
 }
+
+/* Ingredient editor v73: keep choice-group controls on one centered table row. */
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-selected-choice-group-header {
+        grid-template-rows: minmax(48px, 1fr) !important;
+        min-height: 64px;
+        align-content: center;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-selected-choice-group-header
+        > [data-ingredient-column] {
+        grid-row: 1 !important;
+        align-self: center !important;
+    }
+}
