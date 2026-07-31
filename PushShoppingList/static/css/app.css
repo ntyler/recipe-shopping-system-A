@@ -60330,10 +60330,9 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary > .recipe-
     display: none !important;
 }
 
-/* Keep this row-level selector above the specificity of the legacy picker rules. */
+/* Keep this summary-level selector above the specificity of the legacy picker rules. */
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row
-    > .recipe-edit-ingredient-store-summary
+    .recipe-edit-ingredient-store-summary
     > .recipe-edit-store-section-trigger {
     box-sizing: border-box;
     display: grid;
@@ -60357,8 +60356,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row
-    > .recipe-edit-ingredient-store-summary
+    .recipe-edit-ingredient-store-summary
     > .recipe-edit-store-section-trigger:not(
     :disabled,
     :focus,
@@ -60373,8 +60371,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row
-    > .recipe-edit-ingredient-store-summary
+    .recipe-edit-ingredient-store-summary
     > .recipe-edit-store-section-trigger:not(
     :disabled,
     [aria-invalid="true"],
@@ -60387,8 +60384,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row
-    > .recipe-edit-ingredient-store-summary
+    .recipe-edit-ingredient-store-summary
     > .recipe-edit-store-section-trigger:is(
     [aria-invalid="true"],
     [data-recipe-edit-validation-invalid="true"]
@@ -60397,8 +60393,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row
-    > .recipe-edit-ingredient-store-summary
+    .recipe-edit-ingredient-store-summary
     > .recipe-edit-store-section-trigger:disabled {
     cursor: not-allowed;
     opacity: .58;
@@ -69141,15 +69136,13 @@ label.recipe-edit-store-section-label.is-store-section-editing > .store-section-
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row
-    > .recipe-edit-ingredient-store-summary
+    .recipe-edit-ingredient-store-summary
     > .store-section-display {
     padding-inline: 3px;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row
-    > .recipe-edit-ingredient-store-summary
+    .recipe-edit-ingredient-store-summary
     > .store-section-editor-control {
     gap: 8px;
     padding-inline: 3px;

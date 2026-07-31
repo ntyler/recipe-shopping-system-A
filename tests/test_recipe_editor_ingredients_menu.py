@@ -3226,14 +3226,14 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     store_trigger_rule = v20[
         v20.index(
             "body.recipe-edit-standalone-page #recipeEditIngredients\n"
-            "    > .recipe-edit-ingredient-row\n"
-            "    > .recipe-edit-ingredient-store-summary\n"
+            "    .recipe-edit-ingredient-store-summary\n"
             "    > .recipe-edit-store-section-trigger {"
         ):
     ]
     store_trigger_rule = store_trigger_rule[:store_trigger_rule.index("}")]
     assert "#recipeEditIngredients" in store_trigger_rule
-    assert "> .recipe-edit-ingredient-row" in store_trigger_rule
+    assert ".recipe-edit-ingredient-store-summary" in store_trigger_rule
+    assert "> .recipe-edit-ingredient-row" not in store_trigger_rule
     assert "border: 1px solid transparent;" in store_trigger_rule
     assert "background: transparent;" in store_trigger_rule
     assert "box-shadow: none;" in store_trigger_rule
@@ -3241,8 +3241,7 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     store_trigger_hover = v20[
         v20.index(
             "body.recipe-edit-standalone-page #recipeEditIngredients\n"
-            "    > .recipe-edit-ingredient-row\n"
-            "    > .recipe-edit-ingredient-store-summary\n"
+            "    .recipe-edit-ingredient-store-summary\n"
             "    > .recipe-edit-store-section-trigger:not("
         ):
     ]
@@ -3254,13 +3253,11 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "box-shadow: none;" in store_trigger_hover
     store_trigger_active_start = v20.index(
         "body.recipe-edit-standalone-page #recipeEditIngredients\n"
-        "    > .recipe-edit-ingredient-row\n"
-        "    > .recipe-edit-ingredient-store-summary\n"
+        "    .recipe-edit-ingredient-store-summary\n"
         "    > .recipe-edit-store-section-trigger:not(",
         v20.index(
             "body.recipe-edit-standalone-page #recipeEditIngredients\n"
-            "    > .recipe-edit-ingredient-row\n"
-            "    > .recipe-edit-ingredient-store-summary\n"
+            "    .recipe-edit-ingredient-store-summary\n"
             "    > .recipe-edit-store-section-trigger:not("
         ) + 1,
     )
@@ -3273,8 +3270,7 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "color-mix(in srgb, var(--app-primary-hover) 22%" in store_trigger_active
     store_trigger_invalid_start = v20.index(
         "body.recipe-edit-standalone-page #recipeEditIngredients\n"
-        "    > .recipe-edit-ingredient-row\n"
-        "    > .recipe-edit-ingredient-store-summary\n"
+        "    .recipe-edit-ingredient-store-summary\n"
         "    > .recipe-edit-store-section-trigger:is("
     )
     store_trigger_invalid = v20[store_trigger_invalid_start:]
@@ -3730,22 +3726,22 @@ def test_store_section_display_and_editor_keep_icon_and_label_aligned():
 
     display_selector = (
         "body.recipe-edit-standalone-page #recipeEditIngredients\n"
-        "    > .recipe-edit-ingredient-row\n"
-        "    > .recipe-edit-ingredient-store-summary\n"
+        "    .recipe-edit-ingredient-store-summary\n"
         "    > .store-section-display {"
     )
     display_start = css.index(display_selector)
     display_rule = css[display_start:css.index("\n}", display_start)]
+    assert "> .recipe-edit-ingredient-row" not in display_rule
     assert "padding-inline: 3px;" in display_rule
 
     editor_selector = (
         "body.recipe-edit-standalone-page #recipeEditIngredients\n"
-        "    > .recipe-edit-ingredient-row\n"
-        "    > .recipe-edit-ingredient-store-summary\n"
+        "    .recipe-edit-ingredient-store-summary\n"
         "    > .store-section-editor-control {"
     )
     editor_start = css.index(editor_selector)
     editor_rule = css[editor_start:css.index("\n}", editor_start)]
+    assert "> .recipe-edit-ingredient-row" not in editor_rule
     assert "gap: 8px;" in editor_rule
     assert "padding-inline: 3px;" in editor_rule
     assert "border-color: var(--app-primary-hover);" in editor_rule
