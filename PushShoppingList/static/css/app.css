@@ -69348,3 +69348,22 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         max-width: 100%;
     }
 }
+
+/* Ingredient editor v72: align every desktop action cell to the shared column edge. */
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        [data-ingredient-column="actions"].recipe-edit-compact-row-actions {
+        box-sizing: border-box;
+        display: flex !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        align-self: stretch;
+        justify-self: stretch;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        margin: 0;
+        padding: 0;
+    }
+}

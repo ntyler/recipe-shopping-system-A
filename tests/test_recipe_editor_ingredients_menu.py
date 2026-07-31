@@ -1043,6 +1043,31 @@ def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_posi
     assert "overflow-anchor: none;" in attached_panel
 
 
+def test_recipe_editor_v72_aligns_all_desktop_action_cells_to_the_shared_track():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    marker = "/* Ingredient editor v72: align every desktop action cell to the shared column edge. */"
+    assert marker in css
+    assert css.index(marker) > css.index("/* Ingredient editor v71:")
+    actions = css[css.index(marker):]
+    selector = '[data-ingredient-column="actions"].recipe-edit-compact-row-actions {'
+    assert selector in actions
+    rule = actions[actions.index(selector):]
+    rule = rule[:rule.index("}")]
+    for declaration in (
+        "display: flex !important;",
+        "width: 100% !important;",
+        "min-width: 0 !important;",
+        "max-width: 100%;",
+        "align-self: stretch;",
+        "justify-self: stretch;",
+        "align-items: center;",
+        "justify-content: flex-end;",
+        "gap: 4px;",
+    ):
+        assert declaration in rule
+
+
 def test_grouped_component_projection_is_reused_while_inline_controls_update():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     view_start = script.index("function clearRecipeIngredientColumnViewGroupProjections")
