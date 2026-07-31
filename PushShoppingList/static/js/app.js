@@ -27127,6 +27127,7 @@ function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
     rows.forEach(parentRow => {
         const parentSection = recipeIngredientColumnViewEntry(parentRow, "store");
         const lineItems = recipeIngredientColumnViewSelectedOptionLineItems(parentRow);
+        let projectionAnchor = parentRow;
         parentRow.classList.toggle(
             "is-ingredient-store-section-grouped-choice",
             lineItems.length > 0,
@@ -27148,6 +27149,12 @@ function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
                     lineItem,
                 );
             if (projection) {
+                // Keep projections next to their top-level source row in the
+                // underlying DOM. The grouped view uses that manual order as
+                // its within-section tie-breaker, so moving the source row is
+                // reflected immediately and survives serialization/reload.
+                projectionAnchor.insertAdjacentElement("afterend", projection);
+                projectionAnchor = projection;
                 retainedProjections.add(projection);
             }
         });
@@ -30949,8 +30956,12 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
                     <div class="recipe-edit-menu-group-label">Replacement ingredient</div>
                     <button type="button" onclick="return openRecipeIngredientOptionModal(this)">Edit details</button>
                     <button type="button" onclick="return duplicateRecipeIngredientAlternativeComponent(this)">Duplicate replacement ingredient</button>
-                    <button type="button" onclick="return moveRecipeIngredientAlternativeComponent(this, -1)">Move ingredient up</button>
-                    <button type="button" onclick="return moveRecipeIngredientAlternativeComponent(this, 1)">Move ingredient down</button>
+                    <button type="button"
+                            data-alternative-component-move="-1"
+                            onclick="return moveRecipeIngredientAlternativeComponent(this, -1)">Move ingredient up</button>
+                    <button type="button"
+                            data-alternative-component-move="1"
+                            onclick="return moveRecipeIngredientAlternativeComponent(this, 1)">Move ingredient down</button>
                 </div>
                 <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
                     <button type="button"
@@ -44565,10 +44576,141 @@ function recipeIngredientAlternativeComponentFromControl(control) {
 }
 
 function recipeIngredientProjectedOptionSourceRow(control) {
-    const projection = control && control.closest
+    return recipeIngredientProjectedSummaryFromControl(control)
+        ?.recipeIngredientOptionSourceRow || null;
+}
+
+function recipeIngredientProjectedSummaryFromControl(control) {
+    const directSummary = control && control.closest
         ? control.closest("[data-ingredient-selected-option-line-item]")
         : null;
-    return projection?.recipeIngredientOptionSourceRow || null;
+    if (directSummary) {
+        return directSummary;
+    }
+    const menu = control && control.closest
+        ? control.closest(".recipe-edit-row-menu")
+        : null;
+    const anchor = menu ? menu.recipeEditAnchorButton : null;
+    return anchor && anchor.closest
+        ? anchor.closest("[data-ingredient-selected-option-line-item]")
+        : null;
+}
+
+function recipeIngredientProjectedColumnDisplayRow(control) {
+    return recipeIngredientProjectedSummaryFromControl(control)?.closest(
+        "[data-recipe-ingredient-column-group-projection]",
+    ) || null;
+}
+
+function recipeIngredientColumnViewManualRowsInSection(displayRow) {
+    if (!displayRow || !recipeEditIngredientColumnView.groupByStoreSection) {
+        return [];
+    }
+    const sectionKey = recipeIngredientColumnViewEntry(displayRow, "store").key;
+    return recipeIngredientColumnViewDisplayRows()
+        .map((row, index) => {
+            const parsedOrder = Number.parseFloat(row.style.order);
+            return {
+                row,
+                index,
+                order: Number.isFinite(parsedOrder) ? parsedOrder : index,
+            };
+        })
+        .filter(entry => (
+            !entry.row.classList.contains("is-ingredient-column-filtered")
+            && recipeIngredientColumnViewEntry(entry.row, "store").key === sectionKey
+        ))
+        .sort((left, right) => (left.order - right.order) || (left.index - right.index))
+        .map(entry => entry.row);
+}
+
+function recipeIngredientTopLevelSourceRow(displayRow) {
+    const sourceRow = recipeIngredientColumnViewSourceRow(displayRow);
+    if (displayRow?.recipeIngredientColumnViewParentRow) {
+        return displayRow.recipeIngredientColumnViewParentRow;
+    }
+    if (sourceRow?.matches(
+        ".recipe-edit-ingredient-row:not([data-substitution-option-row])",
+    )) {
+        return sourceRow;
+    }
+    return sourceRow?.closest(
+        ".recipe-edit-ingredient-row:not([data-substitution-option-row])",
+    ) || null;
+}
+
+function recipeIngredientProjectedMoveContext(control, direction) {
+    const displayRow = recipeIngredientProjectedColumnDisplayRow(control);
+    if (!displayRow) {
+        return null;
+    }
+    const withinSectionSortActive = recipeIngredientColumnViewSorts().some(sort => (
+        sort.columnKey !== "store"
+    ));
+    const visibleRows = recipeIngredientColumnViewManualRowsInSection(displayRow);
+    const currentIndex = visibleRows.indexOf(displayRow);
+    const offset = Number(direction) < 0 ? -1 : 1;
+    const targetDisplayRow = currentIndex >= 0
+        ? visibleRows[currentIndex + offset] || null
+        : null;
+    const optionRow = recipeIngredientAlternativeComponentFromControl(control);
+    if (withinSectionSortActive || !optionRow || !targetDisplayRow) {
+        return {
+            displayRow,
+            sourceRow: null,
+            targetRow: null,
+            insertAfter: offset > 0,
+        };
+    }
+
+    if (recipeEditCanDropOnRow(optionRow, targetDisplayRow)) {
+        return {
+            displayRow,
+            sourceRow: optionRow,
+            targetRow: targetDisplayRow,
+            insertAfter: offset > 0,
+        };
+    }
+
+    const sourceParentRow = recipeIngredientTopLevelSourceRow(displayRow);
+    const targetParentRow = recipeIngredientTopLevelSourceRow(targetDisplayRow);
+    const canMoveParent = sourceParentRow !== targetParentRow
+        && recipeEditCanDropOnRow(sourceParentRow, targetParentRow);
+    return {
+        displayRow,
+        sourceRow: canMoveParent ? sourceParentRow : null,
+        targetRow: canMoveParent ? targetParentRow : null,
+        insertAfter: offset > 0,
+    };
+}
+
+function recipeIngredientAlternativeComponentCanMove(control, direction) {
+    const projectedMove = recipeIngredientProjectedMoveContext(control, direction);
+    if (projectedMove) {
+        return Boolean(projectedMove.sourceRow && projectedMove.targetRow);
+    }
+    const optionRow = recipeIngredientAlternativeComponentFromControl(control);
+    const components = optionRow ? optionRow.parentElement : null;
+    const rows = components
+        ? [...components.querySelectorAll(":scope > [data-substitution-option-row]")]
+        : [];
+    const index = rows.indexOf(optionRow);
+    const nextIndex = index + (Number(direction) < 0 ? -1 : 1);
+    return index >= 0 && nextIndex >= 0 && nextIndex < rows.length;
+}
+
+function syncRecipeIngredientAlternativeComponentMoveActions(menu, control) {
+    if (!menu) {
+        return;
+    }
+    menu.querySelectorAll("[data-alternative-component-move]").forEach(button => {
+        const direction = Number(button.dataset.alternativeComponentMove || 0);
+        const canMove = recipeIngredientAlternativeComponentCanMove(control, direction);
+        button.disabled = !canMove;
+        button.title = canMove
+            ? ""
+            : `No visible ingredient ${direction < 0 ? "above" : "below"} to move past.`;
+    });
 }
 
 function recipeIngredientSubstitutionConfidencePercent(values = {}) {
@@ -45241,6 +45383,28 @@ function removeRecipeIngredientAlternativeComponent(button) {
 }
 
 function moveRecipeIngredientAlternativeComponent(control, direction) {
+    const projectedMove = recipeIngredientProjectedMoveContext(control, direction);
+    if (projectedMove) {
+        if (!projectedMove.sourceRow || !projectedMove.targetRow) {
+            return false;
+        }
+        const sourceParentRow = recipeIngredientTopLevelSourceRow(projectedMove.displayRow);
+        if (!dropRecipeEditRow(
+            projectedMove.sourceRow,
+            projectedMove.targetRow,
+            projectedMove.insertAfter,
+        )) {
+            return false;
+        }
+        if (
+            sourceParentRow
+            && projectedMove.sourceRow === sourceParentRow
+        ) {
+            updateRecipeIngredientSummary(sourceParentRow);
+        }
+        return false;
+    }
+
     const optionRow = recipeIngredientAlternativeComponentFromControl(control);
     const card = recipeIngredientAlternativeCardFromControl(control);
     const ingredientRow = card
@@ -45256,15 +45420,7 @@ function moveRecipeIngredientAlternativeComponent(control, direction) {
         return false;
     }
 
-    if (nextIndex < index) {
-        components.insertBefore(optionRow, rows[nextIndex]);
-    } else {
-        components.insertBefore(optionRow, rows[nextIndex].nextElementSibling);
-    }
-    closeRecipeEditRowMenus();
-    updateRecipeIngredientSubstitutionState(ingredientRow);
-    updateRecipeIngredientSummary(ingredientRow);
-    updateRecipeEditorDirtyState();
+    dropRecipeEditRow(optionRow, rows[nextIndex], nextIndex > index);
     return false;
 }
 
@@ -46384,6 +46540,7 @@ function toggleRecipeEditRowMenu(button, event = null) {
         updateCurrentRecipeUrlSummaryCollapseMenuToggle(row);
         updateRecipeViewCardCollapseMenuToggle(row);
         updateRecipeDetailMenuToggleForButton(button);
+        syncRecipeIngredientAlternativeComponentMoveActions(menu, button);
         if (row) {
             row.classList.add("recipe-edit-menu-open");
         }

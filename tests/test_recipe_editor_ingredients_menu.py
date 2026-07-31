@@ -787,6 +787,89 @@ def test_store_section_grouping_projects_selected_components_into_their_own_sect
     assert "display: none !important;" in grouped_away[:200]
 
 
+def test_projected_replacement_move_uses_visible_store_section_siblings_and_drag_drop():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    helpers = script[
+        script.index("function recipeIngredientProjectedSummaryFromControl"):
+        script.index("function recipeIngredientSubstitutionConfidencePercent")
+    ]
+    move = script[
+        script.index("function moveRecipeIngredientAlternativeComponent"):
+        script.index("function moveRecipeIngredientAlternative(control")
+    ]
+
+    assert "function recipeIngredientColumnViewManualRowsInSection" in helpers
+    assert 'recipeIngredientColumnViewEntry(displayRow, "store").key' in helpers
+    assert 'recipeIngredientColumnViewEntry(entry.row, "store").key === sectionKey' in helpers
+    assert 'entry.row.classList.contains("is-ingredient-column-filtered")' in helpers
+    assert "visibleRows[currentIndex + offset]" in helpers
+    assert "recipeIngredientTopLevelSourceRow(displayRow)" in helpers
+    assert "recipeIngredientTopLevelSourceRow(targetDisplayRow)" in helpers
+    assert "recipeEditCanDropOnRow(sourceParentRow, targetParentRow)" in helpers
+    assert "dropRecipeEditRow(" in move
+    assert "projectedMove.sourceRow" in move
+    assert "projectedMove.targetRow" in move
+    assert "projectedMove.insertAfter" in move
+    assert "updateRecipeIngredientSummary(sourceParentRow);" in move
+
+
+def test_projected_replacement_move_updates_the_serialized_top_level_order():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    grouped_view = script[
+        script.index("function prepareRecipeIngredientColumnViewDisplayRows"):
+        script.index("function recipeIngredientColumnViewEntry", script.index("function prepareRecipeIngredientColumnViewDisplayRows"))
+    ]
+    collection = script[
+        script.index("function collectRecipeIngredientRows"):
+        script.index("function collectRecipeNutritionRows")
+    ]
+
+    assert "let projectionAnchor = parentRow;" in grouped_view
+    assert 'projectionAnchor.insertAdjacentElement("afterend", projection);' in grouped_view
+    assert "projectionAnchor = projection;" in grouped_view
+    assert "return recipeEditIngredientRows()" in collection
+    assert ".map(row => {" in collection
+    assert "const item = fieldValuesFromRow(row);" in collection
+
+
+def test_replacement_move_actions_disable_at_visible_and_component_boundaries():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    organizer = script[
+        script.index("function organizeRecipeEditSubstitutionOptionRow"):
+        script.index("function editRecipeIngredientSubstitutionFields")
+    ]
+    availability = script[
+        script.index("function recipeIngredientAlternativeComponentCanMove"):
+        script.index("function recipeIngredientSubstitutionConfidencePercent")
+    ]
+    menu_toggle = script[
+        script.index("function toggleRecipeEditRowMenu"):
+        script.index("function toggleRecipeEditSectionMenu")
+    ]
+
+    assert 'data-alternative-component-move="-1"' in organizer
+    assert 'data-alternative-component-move="1"' in organizer
+    assert "Boolean(projectedMove.sourceRow && projectedMove.targetRow)" in availability
+    assert "nextIndex >= 0 && nextIndex < rows.length" in availability
+    assert "button.disabled = !canMove;" in availability
+    assert 'No visible ingredient ${direction < 0 ? "above" : "below"} to move past.' in availability
+    assert "syncRecipeIngredientAlternativeComponentMoveActions(menu, button);" in menu_toggle
+
+
+def test_expanded_replacement_option_move_keeps_component_scoped_reordering():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    move = script[
+        script.index("function moveRecipeIngredientAlternativeComponent"):
+        script.index("function moveRecipeIngredientAlternative(control")
+    ]
+    internal_move = move[move.index("const optionRow ="):]
+
+    assert 'components.querySelectorAll(":scope > [data-substitution-option-row]")' in internal_move
+    assert "const nextIndex = index + (Number(direction) < 0 ? -1 : 1);" in internal_move
+    assert "nextIndex < 0 || nextIndex >= rows.length" in internal_move
+    assert "dropRecipeEditRow(optionRow, rows[nextIndex], nextIndex > index);" in internal_move
+
+
 def test_selected_choice_header_uses_a_compact_options_control():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     header_controls = css[css.index(
