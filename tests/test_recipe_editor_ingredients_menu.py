@@ -918,7 +918,9 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "> .recipe-edit-ingredient-column-group-projection" in attached_panel
     assert ".recipe-edit-selected-option-line-items" in attached_panel
     assert "> .recipe-edit-ingredient-options-panel" in attached_panel
-    assert "border-left: 3px solid" in attached_panel
+    assert "padding: 10px 0 12px;" in attached_panel
+    assert "border-left: 3px solid" not in attached_panel
+    assert "box-shadow: inset 3px 0 0" in attached_panel
     assert "background: color-mix(" in attached_panel
     assert ".is-ingredient-expansion-anchor" in attached_panel
 

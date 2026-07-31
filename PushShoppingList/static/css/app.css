@@ -69249,14 +69249,13 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     min-width: 0;
     max-width: 100%;
     margin: 0;
-    padding: 10px 14px 12px;
+    padding: 10px 0 12px;
     overflow: visible;
     border: 0;
-    border-left: 3px solid color-mix(in srgb, var(--app-primary) 72%, transparent);
     border-top: 1px solid color-mix(in srgb, var(--app-primary-hover) 38%, var(--app-border));
     border-radius: 0 0 8px 8px;
     background: color-mix(in srgb, var(--app-surface) 94%, var(--app-primary-soft));
-    box-shadow: none;
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 72%, transparent);
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
