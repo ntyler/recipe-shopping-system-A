@@ -1506,6 +1506,29 @@ def test_mobile_detail_inputs_share_quantity_quiet_and_hover_colors():
     assert "background: var(--app-bg-soft);" in quiet_styles
 
 
+def test_quantity_and_unit_hover_use_active_field_highlight():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    selector = (
+        "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+        "    > .recipe-edit-ingredient-row\n"
+        "    :is(\n"
+        "        .recipe-edit-ingredient-quantity-summary,\n"
+        "        .recipe-edit-ingredient-unit-summary\n"
+        "    )\n"
+        "    > .recipe-edit-ingredient-inline-control:not("
+    )
+    rule_start = css.index(selector)
+    rule = css[rule_start:css.index("\n}", rule_start)]
+
+    assert ":disabled," in rule
+    assert '[aria-invalid="true"]' in rule
+    assert ':is(:hover, :focus, [aria-expanded="true"])' in rule
+    assert "border-color: var(--app-primary-hover);" in rule
+    assert "background: var(--app-surface);" in rule
+    assert "box-shadow: 0 0 0 2px" in rule
+
+
 def test_recipe_editor_ingredient_modal_navigation_and_busy_state_are_wired():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
