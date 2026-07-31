@@ -55922,6 +55922,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-image-options-trigger {
     transform: translate(-50%, -50%);
 }
 
+body.recipe-edit-standalone-page .recipe-edit-ingredient-image-options-trigger[data-recipe-ingredient-option-preview] {
+    display: none !important;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-ingredient-image-options-trigger::after {
     content: "\2026";
     position: absolute;

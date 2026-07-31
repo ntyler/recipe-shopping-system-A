@@ -1653,7 +1653,6 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert 'data-recipe-ingredient-modal-preview-media' in organizer
     assert 'aria-haspopup="dialog"' in organizer
     assert 'aria-label="Open ingredient image options"' in organizer
-
     click_handler = script[
         script.index("function handleRecipeCoverImageClick"):
         script.index("function handleRecipeCoverImageKeydown")
@@ -1699,6 +1698,45 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
     assert "min-height: 28px !important;" in desktop_image_actions
     assert "dialog.recipe-edit-ingredient-edit-panel > .recipe-edit-floating-menu" in modal_css
     assert "z-index: 40 !important;" in modal_css
+
+
+def test_selected_ingredient_option_modal_uses_the_clicked_component_identity():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    option_markup = script[
+        script.index("function recipeIngredientSubstitutionOptionRowHtml"):
+        script.index("function recipeIngredientSubstitutionOptionsHtml")
+    ]
+    image_contract = script[
+        script.index("function mountRecipeIngredientModalImage"):
+        script.index("function restoreRecipeIngredientModalImage")
+    ]
+    option_modal = script[
+        script.index("function openRecipeIngredientOptionModal"):
+        script.index("function switchRecipeIngredientOptionModal")
+    ]
+    match_details = script[
+        script.index("function recipeIngredientMatchDetails(item = {})"):
+        script.index("function recipeIngredientMatchDetailsHtml")
+    ]
+
+    assert "JSON.stringify(recipeIngredientMatchSnapshot(option))" in option_markup
+    assert 'data-ingredient-match-details="${escapeAttribute(matchDetails)}"' in option_markup
+    assert "const optionRow = panel.recipeIngredientOptionSourceRow;" in image_contract
+    assert "fieldValuesFromRow(optionRow)" in image_contract
+    assert 'optionImagePanel.dataset.recipeIngredientModalOptionImage = "";' in image_contract
+    assert "slot.replaceChildren(optionImagePanel);" in image_contract
+    assert "imageOptionsTrigger.hidden = true;" in image_contract
+    assert "imageOptionsTrigger.dataset.recipeIngredientOptionPreview" in image_contract
+    assert "recipeIngredientMatchItemFromRow(optionRow, fieldValuesFromRow(optionRow))" in option_modal
+    assert "row.dataset.ingredientMatchDetails = JSON.stringify(recipeIngredientMatchSnapshot(optionMatch));" in option_modal
+    assert "item.master_normalized_name" in match_details
+    assert "item.normalized_name" in match_details
+    assert (
+        ".recipe-edit-ingredient-image-options-trigger[data-recipe-ingredient-option-preview]"
+        in css
+    )
 
 
 def test_recipe_editor_ingredient_image_lightbox_stays_above_the_modal_and_restores_focus():

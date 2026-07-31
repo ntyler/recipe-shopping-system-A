@@ -29094,9 +29094,38 @@ function syncRecipeIngredientModalImageActionsForViewport() {
 }
 
 function mountRecipeIngredientModalImage(row, panel) {
-    const imagePanel = recipeIngredientModalImagePanel(row);
     const slot = panel ? panel.querySelector("[data-recipe-ingredient-modal-image-slot]") : null;
-    if (!imagePanel || !slot || imagePanel.closest("[data-recipe-ingredient-edit-panel]") === panel) {
+    if (!slot) {
+        return;
+    }
+    slot.querySelector("[data-recipe-ingredient-modal-option-image]")?.remove();
+    const imageOptionsTrigger = panel.querySelector(
+        "[data-recipe-ingredient-image-options-trigger]",
+    );
+    const optionRow = panel.recipeIngredientOptionSourceRow;
+    if (optionRow) {
+        const optionImagePanel = createRecipeIngredientReadImageCell(
+            "recipe-edit-ingredient-modal-image-panel",
+        );
+        optionImagePanel.dataset.recipeIngredientModalOptionImage = "";
+        optionImagePanel.setAttribute("aria-label", "Selected ingredient image");
+        syncRecipeIngredientReadImageCell(
+            optionImagePanel,
+            fieldValuesFromRow(optionRow),
+        );
+        slot.replaceChildren(optionImagePanel);
+        if (imageOptionsTrigger) {
+            imageOptionsTrigger.hidden = true;
+            imageOptionsTrigger.dataset.recipeIngredientOptionPreview = "";
+        }
+        return;
+    }
+    if (imageOptionsTrigger) {
+        imageOptionsTrigger.hidden = false;
+        delete imageOptionsTrigger.dataset.recipeIngredientOptionPreview;
+    }
+    const imagePanel = recipeIngredientModalImagePanel(row);
+    if (!imagePanel || imagePanel.closest("[data-recipe-ingredient-edit-panel]") === panel) {
         return;
     }
     const placeholder = document.createComment("recipe-ingredient-image-placeholder");
@@ -29108,6 +29137,15 @@ function mountRecipeIngredientModalImage(row, panel) {
 }
 
 function restoreRecipeIngredientModalImage(row) {
+    const editPanel = row ? row.querySelector("[data-recipe-ingredient-edit-panel]") : null;
+    editPanel?.querySelector("[data-recipe-ingredient-modal-option-image]")?.remove();
+    const imageOptionsTrigger = editPanel?.querySelector(
+        "[data-recipe-ingredient-image-options-trigger]",
+    );
+    if (imageOptionsTrigger) {
+        imageOptionsTrigger.hidden = false;
+        delete imageOptionsTrigger.dataset.recipeIngredientOptionPreview;
+    }
     const imagePanel = recipeIngredientModalImagePanel(row);
     if (!imagePanel) return;
     const previewMedia = imagePanel.closest("[data-recipe-ingredient-modal-preview-media]");
@@ -38968,6 +39006,8 @@ function recipeIngredientMatchSnapshot(item = {}) {
         "matched_master_ingredient",
         "master_ingredient_name",
         "matched_ingredient",
+        "master_normalized_name",
+        "normalized_name",
         "best_match",
         "is_best_match",
         "best_available_match",
@@ -39094,6 +39134,8 @@ function recipeIngredientMatchDetails(item = {}) {
         item.matched_master_ingredient
         || item.master_ingredient_name
         || item.matched_ingredient
+        || item.master_normalized_name
+        || item.normalized_name
         || purchasable
         || ingredient
         || ""
@@ -42923,6 +42965,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
     const optionImageDisplayUrl = recipeImageVariantUrl(optionImageUrl, "thumb");
     const optionImageSrcSet = recipeImageVariantSrcSet(optionImageUrl);
     const matchQuality = recipeIngredientSubstitutionMatchQuality(option);
+    const matchDetails = JSON.stringify(recipeIngredientMatchSnapshot(option));
     const ratio = recipeIngredientSubstitutionRatio(option);
     const optionType = recipeIngredientTypeValue(option);
     ensureRecipeIngredientUnitOption();
@@ -42930,6 +42973,7 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
     return `
         <div class="recipe-edit-substitution-option-row recipe-edit-ingredient-row${componentIndex ? " is-alternative-component" : " is-alternative-start"}"
              data-substitution-option-row
+             data-ingredient-match-details="${escapeAttribute(matchDetails)}"
              data-alternative-group-index="${escapeAttribute(String(groupIndex))}"
              data-alternative-component-index="${escapeAttribute(String(componentIndex))}">
             <span class="recipe-edit-row-handle recipe-edit-substitution-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
