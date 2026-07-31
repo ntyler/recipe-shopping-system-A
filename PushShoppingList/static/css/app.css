@@ -59832,7 +59832,6 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-component-store :is(.r
     width: 17px;
     min-width: 17px;
     height: 17px;
-    color: var(--app-primary-hover);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-alternative-component-type {
@@ -69002,6 +69001,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 .store-section-badge > .recipe-edit-store-section-icon {
+    --store-section-color: inherit !important;
     display: inline-flex;
     width: 16px;
     min-width: 16px;

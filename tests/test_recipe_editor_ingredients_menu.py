@@ -3655,6 +3655,15 @@ def test_store_section_summary_icon_stays_inside_its_table_cell():
 
     # The SVG must inherit the category color from its is-* icon wrapper.
     assert "color:" not in summary_icon_size_rule
+    projected_icon_size_start = css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-alternative-component-store "
+        ":is(.recipe-edit-inline-icon, svg) {",
+    )
+    projected_icon_size_end = css.index("\n}", projected_icon_size_start)
+    projected_icon_size_rule = css[
+        projected_icon_size_start:projected_icon_size_end
+    ]
+    assert "color:" not in projected_icon_size_rule
     for color_rule in (
         ".recipe-edit-store-section-icon.is-leaf { color: #4ade80; }",
         ".recipe-edit-store-section-icon.is-dairy { color: #60a5fa; }",
@@ -3663,6 +3672,13 @@ def test_store_section_summary_icon_stays_inside_its_table_cell():
         ".recipe-edit-store-section-icon.is-oil { color: #fbbf24; }",
     ):
         assert color_rule in css
+
+    badge_icon_start = css.index(
+        ".store-section-badge > .recipe-edit-store-section-icon {",
+    )
+    badge_icon_end = css.index("\n}", badge_icon_start)
+    badge_icon_rule = css[badge_icon_start:badge_icon_end]
+    assert "--store-section-color: inherit !important;" in badge_icon_rule
 
 
 def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional_state():
