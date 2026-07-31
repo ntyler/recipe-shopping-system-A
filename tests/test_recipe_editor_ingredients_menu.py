@@ -759,6 +759,51 @@ def test_recipe_editor_store_section_menu_can_group_rows_without_reordering_row_
     assert "data-recipe-ingredient-column-view-menu=\"store\"" in css
 
 
+def test_store_section_grouping_projects_selected_components_into_their_own_sections():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    view_start = script.index("function recipeIngredientColumnViewSourceRow")
+    view_end = script.index("function recipeIngredientColumnViewEntry", view_start)
+    projection_view = script[view_start:view_end]
+
+    assert "function recipeIngredientColumnViewDisplayRows" in projection_view
+    assert 'row.hasAttribute?.("data-recipe-ingredient-column-group-projection")' in projection_view
+    assert "function clearRecipeIngredientColumnViewGroupProjections" in projection_view
+    assert '"is-ingredient-column-grouped-away"' in projection_view
+    assert "function createRecipeIngredientColumnViewGroupProjection" in projection_view
+    assert 'projection.className = "recipe-edit-ingredient-column-group-projection";' in projection_view
+    assert "projection.recipeIngredientOptionSourceRow = sourceRow;" in projection_view
+    assert "lineItem.classList.add(\"is-ingredient-column-grouped-away\");" in projection_view
+    assert "const parentSection = recipeIngredientColumnViewEntry(parentRow, \"store\");" in projection_view
+    assert "const componentSection = recipeIngredientColumnViewEntry(lineItem, \"store\");" in projection_view
+    assert "if (componentSection.key === parentSection.key) return;" in projection_view
+
+    assert "> .recipe-edit-ingredient-column-group-projection {" in css
+    assert "> .recipe-edit-ingredient-column-group-projection.is-ingredient-column-filtered" in css
+    grouped_away = css[css.index(
+        ".recipe-edit-selected-option-line-item.is-ingredient-column-grouped-away"
+    ):]
+    assert "display: none !important;" in grouped_away[:200]
+
+
+def test_selected_choice_header_uses_a_compact_options_control():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    header_controls = css[css.index(
+        "/* Ingredient editor v67: grouped choice rows and their header controls stay visually distinct. */"
+    ):]
+
+    assert ".recipe-edit-selected-choice-group-header" in header_controls
+    assert ".recipe-edit-ingredient-options-button" in header_controls
+    assert "width: auto;" in header_controls
+    assert "min-height: 30px;" in header_controls
+    assert "border-radius: 999px;" in header_controls
+    assert "> .recipe-edit-ingredient-options-copy" in header_controls
+    assert "display: inline-flex !important;" in header_controls
+    assert "[data-ingredient-options-label]" in header_controls
+    assert "white-space: nowrap;" in header_controls
+
+
 def test_recipe_editor_ingredient_modal_requires_pencil_and_preserves_dirty_close_state():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
