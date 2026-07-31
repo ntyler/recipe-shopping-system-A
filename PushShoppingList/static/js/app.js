@@ -27979,7 +27979,9 @@ function applyRecipeEditIngredientColumnVisibility(layout) {
             });
         });
         row.querySelectorAll(
-            ".recipe-edit-alternative-component-summary > [data-ingredient-column]"
+            ".recipe-edit-ingredient-mobile-header > [data-ingredient-column], "
+            + ".recipe-edit-selected-choice-group-header > [data-ingredient-column], "
+            + ".recipe-edit-alternative-component-summary > [data-ingredient-column]"
         ).forEach(cell => {
             if (hidden.has(cell.dataset.ingredientColumn)) {
                 cell.dataset.recipeEditIngredientColumnHidden = "true";
@@ -28027,7 +28029,9 @@ function clearRecipeEditIngredientColumnLayoutStyles() {
         row.querySelectorAll(":scope > .recipe-edit-ingredient-options-panel, :scope > .recipe-edit-ingredient-advanced-details")
             .forEach(panel => panel.style.removeProperty("grid-column"));
         row.querySelectorAll(
-            ".recipe-edit-alternative-component-summary > [data-ingredient-column]"
+            ".recipe-edit-ingredient-mobile-header > [data-ingredient-column], "
+            + ".recipe-edit-selected-choice-group-header > [data-ingredient-column], "
+            + ".recipe-edit-alternative-component-summary > [data-ingredient-column]"
         ).forEach(cell => {
             delete cell.dataset.recipeEditIngredientColumnHidden;
             cell.style.removeProperty("grid-column");
@@ -28064,7 +28068,9 @@ function applyRecipeEditIngredientColumnLayoutToRow(row, layout, positions, minW
     row.querySelectorAll(":scope > .recipe-edit-ingredient-options-panel, :scope > .recipe-edit-ingredient-advanced-details")
         .forEach(panel => panel.style.setProperty("grid-column", "1 / -1", "important"));
     row.querySelectorAll(
-        ".recipe-edit-alternative-component-summary > [data-ingredient-column]"
+        ".recipe-edit-ingredient-mobile-header > [data-ingredient-column], "
+        + ".recipe-edit-selected-choice-group-header > [data-ingredient-column], "
+        + ".recipe-edit-alternative-component-summary > [data-ingredient-column]"
     ).forEach(cell => {
         const key = cell.dataset.ingredientColumn;
         const position = positions[key];

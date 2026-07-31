@@ -1354,6 +1354,51 @@ def test_recipe_editor_nested_rows_keep_complete_columns_and_actions_at_the_far_
     assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in v47_css
 
 
+def test_recipe_editor_selected_choice_actions_follow_custom_column_positions():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    mobile_header_selector = (
+        '".recipe-edit-ingredient-mobile-header > [data-ingredient-column], "'
+    )
+    selected_choice_selector = (
+        '".recipe-edit-selected-choice-group-header > [data-ingredient-column], "'
+    )
+    option_row_selector = (
+        '".recipe-edit-alternative-component-summary > [data-ingredient-column]"'
+    )
+
+    visibility_start = script.index("function applyRecipeEditIngredientColumnVisibility")
+    visibility_end = script.index("function clearRecipeIngredientModalColumnVisibility", visibility_start)
+    visibility = script[visibility_start:visibility_end]
+    assert mobile_header_selector in visibility
+    assert selected_choice_selector in visibility
+    assert option_row_selector in visibility
+
+    clear_start = script.index("function clearRecipeEditIngredientColumnLayoutStyles")
+    clear_end = script.index("function applyRecipeEditIngredientColumnLayoutToRow", clear_start)
+    clear = script[clear_start:clear_end]
+    assert mobile_header_selector in clear
+    assert selected_choice_selector in clear
+    assert option_row_selector in clear
+
+    apply_start = script.index("function applyRecipeEditIngredientColumnLayoutToRow")
+    apply_end = script.index("function applyRecipeEditIngredientColumnLayout()", apply_start)
+    apply = script[apply_start:apply_end]
+    assert mobile_header_selector in apply
+    assert selected_choice_selector in apply
+    assert option_row_selector in apply
+    assert 'cell.style.setProperty(\n            "grid-column",' in apply
+    assert 'cell.dataset.recipeEditIngredientColumnHidden = "true";' in apply
+
+    mobile_release = css[css.index("/* Ingredient editor v71:"):]
+    assert css.index("/* Ingredient editor v71:") > css.index("/* Ingredient editor v48:")
+    assert "> .recipe-edit-ingredient-row.recipe-edit-ingredient-table-grid {" in mobile_release
+    assert "grid-template-columns: 40px minmax(0, 1fr) max-content 106px !important;" in mobile_release
+    assert "> .recipe-edit-ingredient-mobile-header {" in mobile_release
+    assert "width: 100%;" in mobile_release
+    assert "max-width: 100%;" in mobile_release
+
+
 def test_recipe_editor_expanded_groups_preserve_disclosure_and_option_heading_accessibility():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
