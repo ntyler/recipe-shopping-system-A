@@ -69062,8 +69062,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     transition:
         border-color 120ms ease,
         background-color 120ms ease,
-        box-shadow 120ms ease,
-        opacity 120ms ease;
+        box-shadow 120ms ease;
 }
 
 .store-section-display:is(:hover, :focus-visible) {
@@ -69109,6 +69108,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary
 
 .is-store-section-editing > .store-section-display {
     opacity: 0;
+    transition: none;
 }
 
 .store-section-editor-control {
@@ -69116,12 +69116,11 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary
     transition:
         border-color 120ms ease,
         background-color 120ms ease,
-        box-shadow 120ms ease,
-        opacity 120ms ease;
+        box-shadow 120ms ease;
 }
 
 .store-section-editor-control.is-entering {
-    opacity: 0;
+    opacity: 1;
 }
 
 label.recipe-edit-store-section-label.is-store-section-editing {
@@ -69149,6 +69148,14 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     border-color: var(--app-primary-hover);
     background: var(--app-surface);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 22%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-ingredient-store-summary
+    :is(.store-section-badge-label, [data-store-section-trigger-label]) {
+    font: inherit;
+    line-height: inherit;
+    letter-spacing: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {

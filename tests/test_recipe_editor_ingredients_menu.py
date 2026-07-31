@@ -3750,11 +3750,32 @@ def test_store_section_display_and_editor_keep_icon_and_label_aligned():
     display_base_rule = css[display_base_start:css.index("\n}", display_base_start)]
     assert "border: 1px solid transparent;" in display_base_rule
     assert "border-radius: 6px;" in display_base_rule
+    assert "opacity 120ms ease" not in display_base_rule
     hover_start = css.index(".store-section-display:is(:hover, :focus-visible) {")
     hover_rule = css[hover_start:css.index("\n}", hover_start)]
     assert "border-color: var(--app-primary-hover);" in hover_rule
     assert "background: var(--app-surface);" in hover_rule
     assert "box-shadow: 0 0 0 2px" in hover_rule
+
+    editing_start = css.index(".is-store-section-editing > .store-section-display {")
+    editing_rule = css[editing_start:css.index("\n}", editing_start)]
+    assert "opacity: 0;" in editing_rule
+    assert "transition: none;" in editing_rule
+
+    entering_start = css.index(".store-section-editor-control.is-entering {")
+    entering_rule = css[entering_start:css.index("\n}", entering_start)]
+    assert "opacity: 1;" in entering_rule
+
+    shared_label_selector = (
+        "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+        "    .recipe-edit-ingredient-store-summary\n"
+        "    :is(.store-section-badge-label, [data-store-section-trigger-label]) {"
+    )
+    shared_label_start = css.index(shared_label_selector)
+    shared_label_rule = css[shared_label_start:css.index("\n}", shared_label_start)]
+    assert "font: inherit;" in shared_label_rule
+    assert "line-height: inherit;" in shared_label_rule
+    assert "letter-spacing: inherit;" in shared_label_rule
 
     display_factory = script[
         script.index("function createRecipeIngredientStoreSectionDisplay(source = null)"):
