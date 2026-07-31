@@ -60307,10 +60307,10 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control {
     min-height: 32px;
     margin: 0;
     padding: 0 7px;
-    border: 1px solid color-mix(in srgb, var(--app-border-strong) 58%, transparent);
+    border: 1px solid transparent;
     border-radius: 6px;
     outline: 0;
-    background: color-mix(in srgb, var(--app-bg-soft) 44%, transparent);
+    background: transparent;
     color: var(--app-text);
     font: inherit;
     line-height: 1.2;
@@ -60342,9 +60342,9 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary > .recipe
     margin: 0;
     padding: 0 7px;
     gap: 7px;
-    border: 1px solid color-mix(in srgb, var(--app-border-strong) 58%, transparent);
+    border: 1px solid transparent;
     border-radius: 6px;
-    background: color-mix(in srgb, var(--app-bg-soft) 44%, transparent);
+    background: transparent;
     color: var(--app-text);
     font: inherit;
     line-height: 1.2;
@@ -60480,11 +60480,6 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-read-buy-as {
     box-sizing: border-box;
     width: 100%;
     padding-inline: 7px;
-}
-
-body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row:hover .recipe-edit-ingredient-inline-control {
-    border-color: var(--app-border-strong);
-    background: var(--app-bg-soft);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control:focus {

@@ -3176,6 +3176,27 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     v20 = css[css.index("/* Ingredient editor v20:"):]
     assert ".recipe-edit-ingredient-inline-control" in v20
     assert ".recipe-edit-ingredient-inline-control:focus" in v20
+    inline_control_rule = v20[
+        v20.index(
+            "body.recipe-edit-standalone-page .recipe-edit-ingredient-inline-control {"
+        ):
+    ]
+    inline_control_rule = inline_control_rule[:inline_control_rule.index("}")]
+    assert "border: 1px solid transparent;" in inline_control_rule
+    assert "background: transparent;" in inline_control_rule
+    assert (
+        "#recipeEditIngredients > .recipe-edit-ingredient-row:hover "
+        ".recipe-edit-ingredient-inline-control"
+    ) not in v20
+    store_trigger_rule = v20[
+        v20.index(
+            "body.recipe-edit-standalone-page .recipe-edit-ingredient-store-summary "
+            "> .recipe-edit-store-section-trigger {"
+        ):
+    ]
+    store_trigger_rule = store_trigger_rule[:store_trigger_rule.index("}")]
+    assert "border: 1px solid transparent;" in store_trigger_rule
+    assert "background: transparent;" in store_trigger_rule
     read_cell_rule = v20[v20.index("body.recipe-edit-standalone-page .recipe-edit-ingredient-read-cell {"):]
     read_cell_rule = read_cell_rule[:read_cell_rule.index("}")]
     assert "gap: 0;" in read_cell_rule
