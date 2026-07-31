@@ -1091,6 +1091,35 @@ def test_recipe_editor_v73_keeps_choice_group_controls_on_one_centered_row():
     assert "align-self: center !important;" in cells_rule
 
 
+def test_recipe_editor_v74_centers_both_desktop_action_controls_in_each_row():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    marker = "/* Ingredient editor v74: center both action controls within every desktop row. */"
+    assert marker in css
+    assert css.index(marker) > css.index("/* Ingredient editor v73:")
+    actions = css[css.index(marker):]
+    action_selector = '[data-ingredient-column="actions"].recipe-edit-compact-row-actions {'
+    assert action_selector in actions
+    action_rule = actions[actions.index(action_selector):]
+    action_rule = action_rule[:action_rule.index("}")]
+    assert "display: grid !important;" in action_rule
+    assert "grid-template-columns: repeat(2, 34px);" in action_rule
+    assert "grid-auto-flow: column;" in action_rule
+    assert "align-items: center;" in action_rule
+    assert "justify-content: end;" in action_rule
+
+    menu_rule = actions[actions.index("> .recipe-edit-row-menu-wrap {"):]
+    menu_rule = menu_rule[:menu_rule.index("}")]
+    assert "height: 38px;" in menu_rule
+    assert "align-self: center;" in menu_rule
+    assert "align-items: center;" in menu_rule
+
+    dots_rule = actions[actions.index("> .recipe-edit-row-menu-btn::before {"):]
+    dots_rule = dots_rule[:dots_rule.index("}")]
+    assert "top: 50%;" in dots_rule
+    assert "transform: translate(-50%, -50%);" in dots_rule
+
+
 def test_grouped_component_projection_is_reused_while_inline_controls_update():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     view_start = script.index("function clearRecipeIngredientColumnViewGroupProjections")

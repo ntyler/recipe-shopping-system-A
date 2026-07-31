@@ -69384,3 +69384,34 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         align-self: center !important;
     }
 }
+
+/* Ingredient editor v74: center both action controls within every desktop row. */
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        [data-ingredient-column="actions"].recipe-edit-compact-row-actions {
+        display: grid !important;
+        grid-template-columns: repeat(2, 34px);
+        grid-auto-flow: column;
+        align-items: center;
+        justify-content: end;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        [data-ingredient-column="actions"].recipe-edit-compact-row-actions
+        > .recipe-edit-row-menu-wrap {
+        display: flex;
+        height: 38px;
+        min-height: 38px;
+        align-self: center;
+        align-items: center;
+        justify-content: center;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        [data-ingredient-column="actions"].recipe-edit-compact-row-actions
+        > .recipe-edit-row-menu-wrap
+        > .recipe-edit-row-menu-btn::before {
+        top: 50%;
+        transform: translate(-50%, -50%);
+    }
+}
