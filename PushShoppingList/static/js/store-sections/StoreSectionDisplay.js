@@ -14,7 +14,7 @@
         button.disabled = Boolean(options.disabled);
         button.innerHTML = `
             ${global.StoreSectionBadge.markup(options)}
-            <span class="store-section-display-edit-indicator" aria-hidden="true">
+            <span class="store-section-display-chevron" aria-hidden="true">
                 ${String(options.indicatorHtml || "")}
             </span>
         `;

@@ -30928,7 +30928,7 @@ function createRecipeIngredientStoreSectionDisplay(source = null) {
         label: recipeStoreSectionDisplayLabel(selectedValue) || "Misc",
         iconName: recipeIngredientStoreSectionIconName(selectedValue),
         iconHtml: recipeIngredientStoreSectionIconHtml(selectedValue),
-        indicatorHtml: recipeEditSvgIcon("edit"),
+        indicatorHtml: recipeEditSvgIcon("chevron-down"),
         disabled: Boolean(source?.disabled),
         onActivate: button => startRecipeIngredientStoreSectionInlineEdit(button),
     });
@@ -41322,6 +41322,7 @@ function openRecipeIngredientStoreSectionMenu(trigger) {
     trigger.setAttribute("aria-expanded", "true");
     renderRecipeIngredientStoreSectionMenu(menu, select);
     positionRecipeEditPopupMenu(menu, trigger);
+    setRecipeEditListboxActiveOption(menu, Number(menu.dataset.activeIndex || 0));
     return false;
 }
 

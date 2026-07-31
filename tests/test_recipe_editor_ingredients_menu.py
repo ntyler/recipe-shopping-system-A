@@ -3538,6 +3538,15 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert "function chooseRecipeIngredientStoreSection(button)" in script
     assert 'select.value = button.dataset.storeSectionValue || "";' in script
     assert 'select.dispatchEvent(new Event("change", { bubbles: true }));' in script
+    store_section_open = script[
+        script.index("function openRecipeIngredientStoreSectionMenu(trigger)"):
+        script.index("function chooseRecipeIngredientStoreSection(button)")
+    ]
+    assert store_section_open.index("positionRecipeEditPopupMenu(menu, trigger);") < (
+        store_section_open.index(
+            "setRecipeEditListboxActiveOption(menu, Number(menu.dataset.activeIndex || 0));"
+        )
+    )
     assert "const configured = recipeEditStoreSectionDetails.get(" in script
     assert "if (configured && !recipeIngredientMatchFlag(configured.is_builtin))" in script
     assert 'const RECIPE_INGREDIENT_CUSTOM_STORE_SECTIONS_KEY = "recipeIngredientCustomStoreSections";' in script
@@ -3679,6 +3688,59 @@ def test_store_section_summary_icon_stays_inside_its_table_cell():
     badge_icon_end = css.index("\n}", badge_icon_start)
     badge_icon_rule = css[badge_icon_start:badge_icon_end]
     assert "--store-section-color: inherit !important;" in badge_icon_rule
+
+
+def test_store_section_display_and_editor_keep_icon_and_label_aligned():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    display_component = (
+        ROOT / "PushShoppingList/static/js/store-sections/StoreSectionDisplay.js"
+    ).read_text(encoding="utf-8")
+
+    badge_start = css.index(".store-section-badge {")
+    badge_rule = css[badge_start:css.index("\n}", badge_start)]
+    assert "gap: 8px;" in badge_rule
+
+    display_selector = (
+        "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+        "    > .recipe-edit-ingredient-row\n"
+        "    > .recipe-edit-ingredient-store-summary\n"
+        "    > .store-section-display {"
+    )
+    display_start = css.index(display_selector)
+    display_rule = css[display_start:css.index("\n}", display_start)]
+    assert "padding-inline: 3px;" in display_rule
+
+    editor_selector = (
+        "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+        "    > .recipe-edit-ingredient-row\n"
+        "    > .recipe-edit-ingredient-store-summary\n"
+        "    > .store-section-editor-control {"
+    )
+    editor_start = css.index(editor_selector)
+    editor_rule = css[editor_start:css.index("\n}", editor_start)]
+    assert "gap: 8px;" in editor_rule
+    assert "padding-inline: 3px;" in editor_rule
+    assert "border-color: var(--app-primary-hover);" in editor_rule
+
+    display_base_start = css.index(".store-section-display {")
+    display_base_rule = css[display_base_start:css.index("\n}", display_base_start)]
+    assert "border: 1px solid transparent;" in display_base_rule
+    assert "border-radius: 6px;" in display_base_rule
+    hover_start = css.index(".store-section-display:is(:hover, :focus-visible) {")
+    hover_rule = css[hover_start:css.index("\n}", hover_start)]
+    assert "border-color: var(--app-primary-hover);" in hover_rule
+    assert "background: var(--app-surface);" in hover_rule
+    assert "box-shadow: 0 0 0 2px" in hover_rule
+
+    display_factory = script[
+        script.index("function createRecipeIngredientStoreSectionDisplay(source = null)"):
+        script.index("function recipeIngredientStoreSectionDisplaySource")
+    ]
+    assert 'indicatorHtml: recipeEditSvgIcon("chevron-down"),' in display_factory
+    assert 'indicatorHtml: recipeEditSvgIcon("edit"),' not in display_factory
+    assert 'class="store-section-display-chevron"' in display_component
+    assert "store-section-display-edit-indicator" not in display_component
 
 
 def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional_state():
