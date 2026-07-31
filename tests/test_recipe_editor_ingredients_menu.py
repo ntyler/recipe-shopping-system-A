@@ -1018,6 +1018,42 @@ def test_recipe_editor_ingredient_rows_restore_visible_pencil_action():
     assert "overscroll-behavior: none !important;" in scroll_lock_rule
 
 
+def test_recipe_editor_ingredient_pencils_share_lightweight_collision_aware_tooltip():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    tooltip_script = script[
+        script.index("const RECIPE_INGREDIENT_EDIT_TOOLTIP_ID"):
+        script.index("function updateRecipeIngredientOptionRowSummary")
+    ]
+    assert 'button.dataset.recipeEditIngredientAction = "";' in tooltip_script
+    assert 'button.setAttribute("aria-label", "Edit ingredient");' in tooltip_script
+    assert 'button.removeAttribute("title");' in tooltip_script
+    assert 'tooltip.setAttribute("role", "tooltip");' in tooltip_script
+    assert 'tooltip.textContent = "Edit ingredient";' in tooltip_script
+    assert 'document.body.appendChild(tooltip);' in tooltip_script
+    assert "buttonRect.right + gap + tooltipRect.width" in tooltip_script
+    assert 'tooltip.dataset.placement = fitsRight ? "right" : "left";' in tooltip_script
+    assert 'document.addEventListener("pointerover"' in tooltip_script
+    assert 'document.addEventListener("focusin"' in tooltip_script
+    assert 'document.addEventListener("focusout"' in tooltip_script
+    assert 'document.addEventListener("scroll"' in tooltip_script
+    assert 'window.addEventListener("resize"' in tooltip_script
+
+    tooltip_css = css[css.index("/* Ingredient editor v69:"):]
+    assert "button.recipe-edit-compact-row-edit[data-recipe-edit-ingredient-action]" in tooltip_css
+    assert "background: transparent !important;" in tooltip_css
+    assert "box-shadow: none !important;" in tooltip_css
+    assert "color: var(--app-primary-hover);" in tooltip_css
+    assert "cursor: pointer;" in tooltip_css
+    assert ".recipe-edit-ingredient-action-tooltip" in tooltip_css
+    assert "position: fixed;" in tooltip_css
+    assert "z-index: 10000;" in tooltip_css
+
+    assert script.count("createRecipeIngredientEditActionButton()") >= 3
+    assert "configureRecipeIngredientEditAction(editButton);" in script
+
+
 def test_recipe_editor_mobile_ingredient_cards_keep_identity_and_details_readable():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
@@ -2749,7 +2785,7 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
     assert "optional.hidden = true;" not in substitution
     assert "removeComponent" not in substitution
     assert "openRecipeIngredientOptionModal(this)" in substitution
-    assert 'editButton.className = "recipe-edit-compact-row-edit";' in substitution
+    assert "createRecipeIngredientEditActionButton()" in substitution
     assert (
         "editButton.addEventListener(\"click\", () => "
         "openRecipeIngredientOptionModal(editButton));"

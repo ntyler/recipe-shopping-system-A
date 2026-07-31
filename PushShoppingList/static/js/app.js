@@ -30070,6 +30070,153 @@ function createRecipeIngredientOptionRowSummary(className = "") {
     return summary;
 }
 
+const RECIPE_INGREDIENT_EDIT_TOOLTIP_ID = "recipeIngredientEditActionTooltip";
+let activeRecipeIngredientEditAction = null;
+
+function configureRecipeIngredientEditAction(button) {
+    if (!button) return null;
+    button.dataset.recipeEditIngredientAction = "";
+    button.setAttribute("aria-label", "Edit ingredient");
+    button.removeAttribute("title");
+    return button;
+}
+
+function createRecipeIngredientEditActionButton() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "recipe-edit-compact-row-edit";
+    button.setAttribute("aria-expanded", "false");
+    button.innerHTML = recipeEditSvgIcon("edit");
+    return configureRecipeIngredientEditAction(button);
+}
+
+function recipeIngredientEditActionTooltip() {
+    let tooltip = document.getElementById(RECIPE_INGREDIENT_EDIT_TOOLTIP_ID);
+    if (tooltip) return tooltip;
+    tooltip = document.createElement("span");
+    tooltip.id = RECIPE_INGREDIENT_EDIT_TOOLTIP_ID;
+    tooltip.className = "recipe-edit-ingredient-action-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+    tooltip.textContent = "Edit ingredient";
+    tooltip.hidden = true;
+    document.body.appendChild(tooltip);
+    return tooltip;
+}
+
+function positionRecipeIngredientEditActionTooltip(button, tooltip) {
+    if (!button || !tooltip || tooltip.hidden) return;
+    const gap = 7;
+    const margin = 8;
+    const buttonRect = button.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const fitsRight = buttonRect.right + gap + tooltipRect.width <= viewportWidth - margin;
+    const preferredLeft = fitsRight
+        ? buttonRect.right + gap
+        : buttonRect.left - gap - tooltipRect.width;
+    const left = Math.max(
+        margin,
+        Math.min(preferredLeft, viewportWidth - margin - tooltipRect.width),
+    );
+    const centeredTop = buttonRect.top + ((buttonRect.height - tooltipRect.height) / 2);
+    const top = Math.max(
+        margin,
+        Math.min(centeredTop, viewportHeight - margin - tooltipRect.height),
+    );
+    tooltip.dataset.placement = fitsRight ? "right" : "left";
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(top)}px`;
+}
+
+function showRecipeIngredientEditActionTooltip(button) {
+    if (!button || !button.closest("#recipeEditIngredients")) return;
+    configureRecipeIngredientEditAction(button);
+    const tooltip = recipeIngredientEditActionTooltip();
+    if (activeRecipeIngredientEditAction && activeRecipeIngredientEditAction !== button) {
+        activeRecipeIngredientEditAction.removeAttribute("aria-describedby");
+    }
+    activeRecipeIngredientEditAction = button;
+    button.setAttribute("aria-describedby", RECIPE_INGREDIENT_EDIT_TOOLTIP_ID);
+    tooltip.hidden = false;
+    positionRecipeIngredientEditActionTooltip(button, tooltip);
+}
+
+function hideRecipeIngredientEditActionTooltip(button, options = {}) {
+    if (
+        !activeRecipeIngredientEditAction
+        || (button && activeRecipeIngredientEditAction !== button)
+    ) {
+        return;
+    }
+    if (
+        !options.force
+        && (
+            document.activeElement === activeRecipeIngredientEditAction
+            || activeRecipeIngredientEditAction.matches(":hover")
+        )
+    ) {
+        return;
+    }
+    activeRecipeIngredientEditAction.removeAttribute("aria-describedby");
+    activeRecipeIngredientEditAction = null;
+    const tooltip = document.getElementById(RECIPE_INGREDIENT_EDIT_TOOLTIP_ID);
+    if (tooltip) tooltip.hidden = true;
+}
+
+function recipeIngredientEditActionFromEvent(event) {
+    const button = event.target?.closest?.(
+        "#recipeEditIngredients button.recipe-edit-compact-row-edit",
+    );
+    return button && button.closest("#recipeEditIngredients") ? button : null;
+}
+
+document.addEventListener("pointerover", event => {
+    const button = recipeIngredientEditActionFromEvent(event);
+    if (!button || button.contains(event.relatedTarget)) return;
+    showRecipeIngredientEditActionTooltip(button);
+});
+
+document.addEventListener("pointerout", event => {
+    const button = recipeIngredientEditActionFromEvent(event);
+    if (!button || button.contains(event.relatedTarget)) return;
+    hideRecipeIngredientEditActionTooltip(button);
+});
+
+document.addEventListener("focusin", event => {
+    const button = recipeIngredientEditActionFromEvent(event);
+    if (button) showRecipeIngredientEditActionTooltip(button);
+});
+
+document.addEventListener("focusout", event => {
+    const button = recipeIngredientEditActionFromEvent(event);
+    if (button) hideRecipeIngredientEditActionTooltip(button);
+});
+
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && activeRecipeIngredientEditAction) {
+        hideRecipeIngredientEditActionTooltip(activeRecipeIngredientEditAction, { force: true });
+    }
+});
+
+document.addEventListener("scroll", () => {
+    if (activeRecipeIngredientEditAction) {
+        positionRecipeIngredientEditActionTooltip(
+            activeRecipeIngredientEditAction,
+            recipeIngredientEditActionTooltip(),
+        );
+    }
+}, true);
+
+window.addEventListener("resize", () => {
+    if (activeRecipeIngredientEditAction) {
+        positionRecipeIngredientEditActionTooltip(
+            activeRecipeIngredientEditAction,
+            recipeIngredientEditActionTooltip(),
+        );
+    }
+}, { passive: true });
+
 function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {}, options = {}) {
     if (!summary) {
         return;
@@ -30154,8 +30301,7 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     const accessiblePrefix = String(options.accessiblePrefix || "Edit replacement ingredient").trim();
     summary.setAttribute("aria-label", `${accessiblePrefix} ${name}`);
     if (editButton) {
-        editButton.setAttribute("aria-label", `Edit ${name}`);
-        editButton.title = `Edit ${name}`;
+        configureRecipeIngredientEditAction(editButton);
     }
 }
 
@@ -30320,13 +30466,7 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow) {
     const actions = summary.querySelector(".recipe-edit-alternative-component-actions");
     if (actions) {
         actions.classList.add("recipe-edit-compact-row-actions");
-        const editButton = document.createElement("button");
-        editButton.type = "button";
-        editButton.className = "recipe-edit-compact-row-edit";
-        editButton.setAttribute("aria-label", "Edit ingredient");
-        editButton.title = "Edit ingredient";
-        editButton.setAttribute("aria-expanded", "false");
-        editButton.innerHTML = recipeEditSvgIcon("edit");
+        const editButton = createRecipeIngredientEditActionButton();
         editButton.addEventListener("click", () => (
             openRecipeIngredientOptionModal(editButton)
         ));
@@ -30479,8 +30619,7 @@ function setRecipeIngredientSelectedChoiceGroupControls(row, header, enabled) {
         actions?.classList.add("recipe-edit-selected-choice-group-actions");
         if (editButton) {
             editButton.dataset.ingredientChoiceTitleEdit = "";
-            editButton.setAttribute("aria-label", "Edit ingredient group");
-            editButton.title = "Edit ingredient group";
+            configureRecipeIngredientEditAction(editButton);
             editButton.setAttribute(
                 "onclick",
                 "return focusRecipeIngredientChoiceTitle(this)",
@@ -30777,13 +30916,7 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
         }
         const actions = summary.querySelector(".recipe-edit-alternative-component-actions");
         actions?.classList.add("recipe-edit-compact-row-actions");
-        const editButton = document.createElement("button");
-        editButton.type = "button";
-        editButton.className = "recipe-edit-compact-row-edit";
-        editButton.setAttribute("aria-label", "Edit ingredient");
-        editButton.title = "Edit ingredient";
-        editButton.setAttribute("aria-expanded", "false");
-        editButton.innerHTML = recipeEditSvgIcon("edit");
+        const editButton = createRecipeIngredientEditActionButton();
         editButton.addEventListener("click", () => openRecipeIngredientOptionModal(editButton));
         actions?.append(editButton, menuWrap);
     }
@@ -31784,11 +31917,14 @@ function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
         if (editButton) {
             editButton.setAttribute("aria-label", `Edit ${accessibleName}`);
             editButton.title = `Edit ${accessibleName}`;
+            if (isIngredientRow) {
+                configureRecipeIngredientEditAction(editButton);
+            }
             const editsGroupTitle = Object.hasOwn(
                 editButton.dataset,
                 "ingredientChoiceTitleEdit",
             );
-            if (editsGroupTitle) {
+            if (editsGroupTitle && !isIngredientRow) {
                 editButton.setAttribute("aria-label", "Edit ingredient group");
                 editButton.title = "Edit ingredient group";
             }
@@ -45118,8 +45254,7 @@ function createRecipeIngredientDefaultOptionSummary(row) {
         actions.innerHTML = `
             <button type="button"
                     class="recipe-edit-compact-row-edit"
-                    aria-label="Edit ${escapeAttribute(ingredientName)}"
-                    title="Edit ingredient"
+                    aria-label="Edit ingredient"
                     aria-expanded="false">
                 ${recipeEditSvgIcon("edit")}
             </button>
@@ -45141,6 +45276,9 @@ function createRecipeIngredientDefaultOptionSummary(row) {
                 </div>
             </div>
         `;
+        configureRecipeIngredientEditAction(
+            actions.querySelector(".recipe-edit-compact-row-edit"),
+        );
     }
     updateRecipeIngredientOptionRowSummary(summary, row, values, {
         accessiblePrefix: "Edit ingredient",

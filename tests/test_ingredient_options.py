@@ -1012,7 +1012,7 @@ def test_option_ingredient_pencils_use_the_standard_edit_ingredient_modal():
     assert "restoreRecipeIngredientEditableFieldSnapshot(" in option_modal
     assert "panel.recipeIngredientOptionSourceRow" in commit_modal
     assert "closeRecipeIngredientOptionModal(row, panel, { commit: true })" in commit_modal
-    assert 'editButton.className = "recipe-edit-compact-row-edit";' in script
+    assert "createRecipeIngredientEditActionButton()" in script
     assert "openRecipeIngredientOptionModal(editButton)" in script
     assert "/* Ingredient editor v53:" in css
     assert "> span:last-child:not(.recipe-edit-inline-icon)" in css
