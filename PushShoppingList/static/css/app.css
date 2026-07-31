@@ -68518,13 +68518,23 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row.has-selected-choice-group-header
+    > .recipe-edit-ingredient-row.has-selected-choice-group-header:not(
+        :has(
+            > .recipe-edit-ingredient-options-panel
+            .is-default-option.is-selected-option
+        )
+    )
     > [data-ingredient-column] {
     display: none !important;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-row.has-selected-choice-group-header
+    > .recipe-edit-ingredient-row.has-selected-choice-group-header:not(
+        :has(
+            > .recipe-edit-ingredient-options-panel
+            .is-default-option.is-selected-option
+        )
+    )
     > .recipe-edit-selected-option-line-items,
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row.has-selected-choice-group-header
