@@ -69233,3 +69233,92 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     line-height: 1.2;
     white-space: nowrap;
 }
+
+/* Ingredient editor v70: keep each choice panel attached to its disclosure row. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-options-panel,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection
+    > .recipe-edit-ingredient-options-panel,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > .recipe-edit-ingredient-options-panel {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    padding: 10px 14px 12px;
+    overflow: visible;
+    border: 0;
+    border-left: 3px solid color-mix(in srgb, var(--app-primary) 72%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--app-primary-hover) 38%, var(--app-border));
+    border-radius: 0 0 8px 8px;
+    background: color-mix(in srgb, var(--app-surface) 94%, var(--app-primary-soft));
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-options-panel:not([hidden]),
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection
+    > .recipe-edit-ingredient-options-panel:not([hidden]),
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > .recipe-edit-ingredient-options-panel:not([hidden]) {
+    display: grid !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > .recipe-edit-ingredient-options-panel[hidden],
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection
+    > .recipe-edit-ingredient-options-panel[hidden],
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > .recipe-edit-ingredient-options-panel[hidden] {
+    display: none !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    background: color-mix(in srgb, var(--app-primary-soft) 6%, var(--app-surface));
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor
+    > .is-ingredient-column-group-projection-row {
+    grid-row: 1;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor
+    > .recipe-edit-ingredient-options-panel {
+    grid-row: 2;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > .is-ingredient-expansion-anchor
+    + .recipe-edit-ingredient-options-panel {
+    grid-row: auto !important;
+}
+
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row
+        > .recipe-edit-ingredient-options-panel,
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-column-group-projection
+        > .recipe-edit-ingredient-options-panel,
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-selected-option-line-items
+        > .recipe-edit-ingredient-options-panel {
+        padding: 9px;
+    }
+}

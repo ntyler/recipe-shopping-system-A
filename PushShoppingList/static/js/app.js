@@ -22977,6 +22977,8 @@ let recipeEditPdfRefreshToken = 0;
 let recipeEditIngredientDetailsId = 0;
 let recipeEditIngredientSubstitutionsId = 0;
 let recipeEditIngredientAlternativeId = 0;
+let recipeEditIngredientExpansionId = 0;
+const recipeEditExpandedIngredientIds = new Set();
 let recipeEditIngredientModalId = 0;
 let recipeEditIngredientModalActiveRow = null;
 let recipeEditIngredientModalReturnFocus = null;
@@ -27008,7 +27010,16 @@ function recipeIngredientColumnViewDisplayRows(list = null) {
 function clearRecipeIngredientColumnViewGroupProjections(list) {
     list?.querySelectorAll(
         ":scope > [data-recipe-ingredient-column-group-projection]",
-    ).forEach(projection => projection.remove());
+    ).forEach(projection => {
+        const parentRow = projection.recipeIngredientColumnViewParentRow;
+        if (parentRow?.recipeIngredientExpansionAnchor === projection) {
+            resetRecipeIngredientExpansionMount(
+                parentRow,
+                parentRow.recipeIngredientSubstitutionPanel,
+            );
+        }
+        projection.remove();
+    });
     clearRecipeIngredientColumnViewGroupedAwayLineItems(list);
 }
 
@@ -27062,6 +27073,12 @@ function syncRecipeIngredientColumnViewGroupProjection(
         !summary
         || summary.recipeIngredientOptionSourceRow !== sourceRow
     ) {
+        if (parentRow.recipeIngredientExpansionAnchor === projection) {
+            resetRecipeIngredientExpansionMount(
+                parentRow,
+                parentRow.recipeIngredientSubstitutionPanel,
+            );
+        }
         summary = createRecipeIngredientSelectedOptionLineItem(parentRow, sourceRow);
         projection.replaceChildren(summary);
     } else {
@@ -27080,6 +27097,10 @@ function syncRecipeIngredientColumnViewGroupProjection(
         ensureRecipeIngredientSelectedOptionToggle(parentRow, summary);
     }
     summary.classList.add("is-ingredient-column-group-projection-row");
+    projection.dataset.ingredientExpansionId = recipeIngredientExpansionIdForControl(
+        parentRow,
+        summary,
+    );
     lineItem.classList.add("is-ingredient-column-grouped-away");
     return projection;
 }
@@ -27134,6 +27155,13 @@ function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
     });
     existingProjections.forEach(projection => {
         if (!retainedProjections.has(projection)) {
+            const parentRow = projection.recipeIngredientColumnViewParentRow;
+            if (parentRow?.recipeIngredientExpansionAnchor === projection) {
+                resetRecipeIngredientExpansionMount(
+                    parentRow,
+                    parentRow.recipeIngredientSubstitutionPanel,
+                );
+            }
             projection.remove();
         }
     });
@@ -30418,9 +30446,18 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
             "aria-label",
             sourceButton.getAttribute("aria-label") || "Show ingredient options",
         );
+        const isExpanded = recipeIngredientExpansionIsOpen(row, button);
+        button.setAttribute("aria-expanded", String(isExpanded));
         button.setAttribute(
-            "aria-expanded",
-            sourceButton.getAttribute("aria-expanded") || "false",
+            "aria-label",
+            recipeIngredientDisclosureActionText(
+                button.getAttribute("aria-label"),
+                isExpanded,
+            ),
+        );
+        button.title = recipeIngredientDisclosureActionText(
+            sourceButton.title,
+            isExpanded,
         );
         const controls = sourceButton.getAttribute("aria-controls");
         if (controls) {
@@ -30746,6 +30783,15 @@ function syncRecipeIngredientSelectedOptionLineItems(
     const needsRebuild = currentRows.length !== projectedRows.length
         || currentRows.some((sourceRow, index) => sourceRow !== projectedRows[index]);
     if (needsRebuild) {
+        if (
+            row.recipeIngredientExpansionAnchor
+            && lineItems.contains(row.recipeIngredientExpansionAnchor)
+        ) {
+            resetRecipeIngredientExpansionMount(
+                row,
+                row.recipeIngredientSubstitutionPanel,
+            );
+        }
         lineItems.replaceChildren(
             ...projectedRows.map(sourceRow => (
                 createRecipeIngredientSelectedOptionLineItem(row, sourceRow)
@@ -31497,6 +31543,12 @@ function organizeRecipeEditIngredientRow(row) {
         optionsCell.appendChild(optionsButton);
         row.appendChild(optionsCell);
         row.appendChild(substitutions);
+        row.recipeIngredientSubstitutionHome = document.createComment(
+            "ingredient-options-panel-home",
+        );
+        row.insertBefore(row.recipeIngredientSubstitutionHome, substitutions);
+        row.recipeIngredientSubstitutionPanel = substitutions;
+        substitutions.recipeIngredientChoiceParentRow = row;
         row.addEventListener("click", event => {
             if (
                 !row.classList.contains("has-ingredient-choice")
@@ -43985,6 +44037,10 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         <input type="hidden" data-field="inferred" value="${escapeAttribute(recipeIngredientInferredValue(item))}">
         <input type="hidden" data-field="warning" value="${escapeAttribute(extractionWarning)}">
     `;
+    ensureRecipeIngredientExpansionId(row, {
+        stableId: item.recipe_ingredient_id || item.id || item.row_id || "",
+        kind: "ingredient-group",
+    });
     const ingredientTextReview = normalizeRecipeIngredientFoodReviewState(item.food_review || null);
     if (ingredientTextReview) {
         row.dataset.ingredientTextReview = JSON.stringify(ingredientTextReview);
@@ -44053,6 +44109,11 @@ function recipeIngredientParentRowFromControl(control) {
         return null;
     }
 
+    const substitutions = control.closest("[data-ingredient-substitutions]");
+    if (substitutions?.recipeIngredientChoiceParentRow) {
+        return substitutions.recipeIngredientChoiceParentRow;
+    }
+
     const optionRow = control.closest("[data-substitution-option-row]");
     if (optionRow) {
         return optionRow.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])")
@@ -44069,6 +44130,156 @@ function recipeIngredientParentRowFromControl(control) {
     return control.closest(".recipe-edit-ingredient-row") || recipeEditActionRowFromButton(control);
 }
 
+function ensureRecipeIngredientExpansionId(row, options = {}) {
+    if (!row) {
+        return "";
+    }
+    if (row.dataset.ingredientExpansionId) {
+        return row.dataset.ingredientExpansionId;
+    }
+
+    const fieldValue = fieldName => String(
+        recipeIngredientDirectField(row, fieldName)?.value || "",
+    ).trim();
+    const isOptionRow = row.hasAttribute?.("data-substitution-option-row");
+    const kind = String(
+        options.kind || (isOptionRow ? "ingredient-option" : "ingredient-group"),
+    ).trim();
+    const explicitId = String(options.stableId || "").trim();
+    const persistedId = explicitId || (
+        isOptionRow
+            ? (
+                fieldValue("substitution_id")
+                || fieldValue("id")
+                || [
+                    fieldValue("alternative_id"),
+                    fieldValue("alternative_component_order"),
+                    fieldValue("ingredient_id"),
+                ].filter(Boolean).join(":")
+            )
+            : (
+                fieldValue("recipe_ingredient_id")
+                || fieldValue("id")
+            )
+    );
+    recipeEditIngredientExpansionId += 1;
+    row.dataset.ingredientExpansionId = persistedId
+        ? `${kind}:${persistedId}`
+        : `${kind}:local-${recipeEditIngredientExpansionId}`;
+    return row.dataset.ingredientExpansionId;
+}
+
+function recipeIngredientExpansionSourceRow(row, control = null) {
+    const selectedOptionSummary = control?.closest?.(
+        "[data-ingredient-selected-option-line-item]",
+    );
+    return selectedOptionSummary?.recipeIngredientOptionSourceRow || row;
+}
+
+function recipeIngredientExpansionIdForControl(row, control = null) {
+    return ensureRecipeIngredientExpansionId(
+        recipeIngredientExpansionSourceRow(row, control),
+    );
+}
+
+function recipeIngredientExpansionAnchorFromControl(row, control = null) {
+    const selectedOptionSummary = control?.closest?.(
+        "[data-ingredient-selected-option-line-item]",
+    );
+    if (
+        selectedOptionSummary
+        && selectedOptionSummary.recipeIngredientChoiceParentRow === row
+    ) {
+        return selectedOptionSummary.closest(
+            "[data-recipe-ingredient-column-group-projection]",
+        ) || selectedOptionSummary;
+    }
+    return row;
+}
+
+function recipeIngredientExpansionIsOpen(row, control = null) {
+    const expansionId = recipeIngredientExpansionIdForControl(row, control);
+    return Boolean(
+        expansionId
+        && recipeEditExpandedIngredientIds.has(expansionId)
+        && row?.recipeIngredientActiveExpansionId === expansionId
+        && row.recipeIngredientSubstitutionPanel
+        && !row.recipeIngredientSubstitutionPanel.hidden
+    );
+}
+
+function recipeIngredientDisclosureActionText(value, expanded) {
+    const text = String(value || "").trim();
+    if (!text) {
+        return expanded ? "Collapse ingredient options" : "Show ingredient options";
+    }
+    const action = expanded ? "Collapse" : "Show";
+    return /^(?:Show|Collapse)\b/.test(text)
+        ? text.replace(/^(?:Show|Collapse)\b/, action)
+        : `${action} ${text}`;
+}
+
+function resetRecipeIngredientExpansionMount(row, container, options = {}) {
+    if (!row || !container) {
+        return;
+    }
+    const activeId = row.recipeIngredientActiveExpansionId || "";
+    if (activeId) {
+        recipeEditExpandedIngredientIds.delete(activeId);
+    }
+    const anchor = row.recipeIngredientExpansionAnchor;
+    if (anchor) {
+        anchor.classList?.remove(
+            "recipe-edit-substitutions-open",
+            "is-ingredient-expansion-anchor",
+        );
+    }
+    row.classList.remove("recipe-edit-substitutions-open");
+    const home = row.recipeIngredientSubstitutionHome;
+    if (home?.parentNode === row) {
+        home.after(container);
+    } else if (container.parentElement !== row) {
+        row.appendChild(container);
+    }
+    if (options.hide !== false) {
+        container.hidden = true;
+    }
+    delete container.dataset.ingredientExpansionFor;
+    row.recipeIngredientExpansionAnchor = null;
+    row.recipeIngredientActiveExpansionId = "";
+}
+
+function mountRecipeIngredientExpansion(row, container, control = null) {
+    if (!row || !container) {
+        return null;
+    }
+    resetRecipeIngredientExpansionMount(row, container, { hide: false });
+    const anchor = recipeIngredientExpansionAnchorFromControl(row, control);
+    const expansionId = recipeIngredientExpansionIdForControl(row, control);
+    if (anchor === row) {
+        const home = row.recipeIngredientSubstitutionHome;
+        if (home?.parentNode === row) {
+            home.after(container);
+        } else {
+            row.appendChild(container);
+        }
+    } else if (anchor.hasAttribute?.("data-recipe-ingredient-column-group-projection")) {
+        anchor.appendChild(container);
+    } else {
+        anchor.insertAdjacentElement("afterend", container);
+    }
+    anchor.classList?.add(
+        "recipe-edit-substitutions-open",
+        "is-ingredient-expansion-anchor",
+    );
+    row.classList.toggle("recipe-edit-substitutions-open", anchor === row);
+    row.recipeIngredientExpansionAnchor = anchor;
+    row.recipeIngredientActiveExpansionId = expansionId;
+    container.dataset.ingredientExpansionFor = expansionId;
+    recipeEditExpandedIngredientIds.add(expansionId);
+    return anchor;
+}
+
 function bindRecipeIngredientSubstitutionRows(row) {
     row.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => {
         bindRecipeIngredientSubstitutionRow(optionRow);
@@ -44080,6 +44291,7 @@ function bindRecipeIngredientSubstitutionRow(optionRow) {
         return;
     }
 
+    ensureRecipeIngredientExpansionId(optionRow);
     optionRow.dataset.substitutionBound = "true";
     bindRecipeIngredientNameField(optionRow);
     bindRecipeIngredientInlineEditor(optionRow);
@@ -44135,6 +44347,9 @@ function updateRecipeIngredientSubstitutionRowSummary(optionRow) {
 }
 
 function recipeIngredientSubstitutionContainer(row, control = null) {
+    if (row?.recipeIngredientSubstitutionPanel?.isConnected) {
+        return row.recipeIngredientSubstitutionPanel;
+    }
     const directContainer = row
         ? Array.from(row.children).find(child => child.matches && child.matches("[data-ingredient-substitutions]"))
         : null;
@@ -44171,8 +44386,7 @@ function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, opti
             otherContainer.querySelectorAll(".recipe-edit-alternative-card.is-editing").forEach(card => {
                 setRecipeIngredientAlternativeEditMode(card, false, { restore: restoreOtherEdits });
             });
-            otherContainer.hidden = true;
-            otherRow.classList.remove("recipe-edit-substitutions-open");
+            resetRecipeIngredientExpansionMount(otherRow, otherContainer);
         }
         if (otherRow !== row && otherButton) {
             otherButton.setAttribute("aria-expanded", "false");
@@ -44186,12 +44400,17 @@ function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, opti
         container.querySelectorAll(".recipe-edit-alternative-card.is-editing").forEach(card => {
             setRecipeIngredientAlternativeEditMode(card, false, { restore: restoreOtherEdits });
         });
+        resetRecipeIngredientExpansionMount(row, container);
+    } else {
+        mountRecipeIngredientExpansion(row, container, control);
+        container.hidden = false;
     }
-    container.hidden = !shouldOpen;
-    row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);
     const optionsButton = row.querySelector("[data-ingredient-substitutions-toggle]");
     if (optionsButton) {
-        optionsButton.setAttribute("aria-expanded", String(shouldOpen));
+        optionsButton.setAttribute(
+            "aria-expanded",
+            String(recipeIngredientExpansionIsOpen(row, optionsButton)),
+        );
     }
     updateRecipeIngredientSubstitutionState(row, optionsButton || control);
     return true;
@@ -44208,7 +44427,7 @@ function toggleRecipeIngredientSubstitutions(button, event = null) {
         return false;
     }
 
-    return !container.hidden
+    return recipeIngredientExpansionIsOpen(row, button)
         ? closeRecipeIngredientAlternativesDialog(button, event)
         : openRecipeIngredientAlternativesDialog(button, event);
 }
@@ -44225,7 +44444,7 @@ function openRecipeIngredientAlternativesDialog(button, event = null, options = 
         return false;
     }
 
-    setRecipeIngredientSubstitutionsExpanded(row, optionsButton, true, options);
+    setRecipeIngredientSubstitutionsExpanded(row, button, true, options);
     row.recipeIngredientAlternativesReturnFocus = button;
     window.requestAnimationFrame(() => {
         if (!container.hidden) {
@@ -44260,7 +44479,7 @@ function closeRecipeIngredientAlternativesDialog(control, event = null, options 
     const returnFocus = row.recipeIngredientAlternativesReturnFocus;
     row.recipeIngredientAlternativesReturnFocus = null;
     const optionsButton = row.querySelector("[data-ingredient-substitutions-toggle]");
-    setRecipeIngredientSubstitutionsExpanded(row, optionsButton, false, options);
+    setRecipeIngredientSubstitutionsExpanded(row, control, false, options);
     if (options.restoreFocus !== false && returnFocus && returnFocus.isConnected) {
         returnFocus.focus({ preventScroll: true });
     }
@@ -45487,7 +45706,16 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     const optionRows = list ? [...list.querySelectorAll("[data-substitution-option-row]")] : [];
     const alternativeGroups = recipeIngredientSubstitutionDomGroups(optionRows);
     const alternativeCount = alternativeGroups.length;
-    const isExpanded = Boolean(container && !container.hidden);
+    const isExpanded = Boolean(
+        container
+        && !container.hidden
+        && row.recipeIngredientActiveExpansionId
+        && recipeEditExpandedIngredientIds.has(row.recipeIngredientActiveExpansionId)
+    );
+    const isExpandedAtParentRow = Boolean(
+        isExpanded
+        && row.recipeIngredientExpansionAnchor === row
+    );
     const parentValues = fieldValuesFromRow(row);
     const requirementChoiceSummary = recipeIngredientCompactChoiceSummary(
         parentValues,
@@ -45594,7 +45822,7 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     syncRecipeIngredientSelectedOptionLineItems(
         row,
         selectedChoice,
-        isExpanded,
+        isExpandedAtParentRow,
     );
     const mobileAlternativesBadge = row
         ? row.querySelector("[data-ingredient-mobile-alternatives-badge]")
@@ -45663,7 +45891,10 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         const badgeLabel = requirementChoiceSummary.label;
         if (mobileAlternativesLabel) mobileAlternativesLabel.textContent = badgeLabel;
         mobileAlternativesBadge.hidden = alternativeCount === 0;
-        mobileAlternativesBadge.setAttribute("aria-expanded", String(isExpanded));
+        mobileAlternativesBadge.setAttribute(
+            "aria-expanded",
+            String(recipeIngredientExpansionIsOpen(row, mobileAlternativesBadge)),
+        );
         mobileAlternativesBadge.setAttribute(
             "aria-label",
             `${requirementChoiceSummary.label} available for ${choiceTitle}. Show ingredient choices.`
@@ -45734,8 +45965,12 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
             Boolean(alternativeCount && selectedSummary),
         );
         optionsButton.disabled = false;
-        optionsButton.setAttribute("aria-expanded", String(isExpanded));
-        const action = isExpanded ? "Collapse" : "Show";
+        const optionsButtonExpanded = recipeIngredientExpansionIsOpen(
+            row,
+            optionsButton,
+        );
+        optionsButton.setAttribute("aria-expanded", String(optionsButtonExpanded));
+        const action = optionsButtonExpanded ? "Collapse" : "Show";
         const tooltip = alternativeCount
             ? `\n\nPreferred:\n${preferredSummary}\n\nOther options:\n${otherSummaries.join("\n") || "None"}`
             : "";

@@ -730,9 +730,13 @@ def test_selected_choice_group_header_uses_standard_action_grid_cells():
         script.index("function focusRecipeIngredientChoiceTitle"):
         script.index("function syncRecipeIngredientSelectedOptionLineItems")
     ]
-    alignment_css = css[css.index(
+    alignment_start = css.index(
         "/* Ingredient editor v64: keep selected-choice group actions on the shared row grid. */"
-    ):]
+    )
+    alignment_css = css[alignment_start:css.index(
+        "/* Ingredient editor v65:",
+        alignment_start,
+    )]
 
     assert "setRecipeIngredientSelectedChoiceGroupControls" in header
     assert "applyRecipeIngredientTableGridContract(header" in header

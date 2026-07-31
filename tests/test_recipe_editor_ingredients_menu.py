@@ -827,7 +827,9 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     assert "toggleRecipeIngredientSubstitutions(button, event)" in toggles
     assert "function syncRecipeIngredientSelectedOptionToggles" in toggles
     assert 'sourceLabel?.textContent || "Options"' in toggles
-    assert 'sourceButton.getAttribute("aria-expanded") || "false"' in toggles
+    assert "recipeIngredientExpansionIsOpen(row, button)" in toggles
+    assert 'button.setAttribute("aria-expanded", String(isExpanded));' in toggles
+    assert "recipeIngredientDisclosureActionText" in toggles
     assert "selectedOptionSummary?.recipeIngredientChoiceParentRow" in parent_lookup
 
     grouped_css = css[css.index(
@@ -879,7 +881,46 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
         script.index("function updateRecipeIngredientSubstitutionState"):
         script.index("function addRecipeIngredientSubstitutionRow")
     ]
-    assert 'const action = isExpanded ? "Collapse" : "Show";' in substitution_state
+    assert 'const action = optionsButtonExpanded ? "Collapse" : "Show";' in substitution_state
+
+
+def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    expansion_start = script.index("function ensureRecipeIngredientExpansionId")
+    expansion_end = script.index("function bindRecipeIngredientSubstitutionRows", expansion_start)
+    expansion = script[expansion_start:expansion_end]
+    toggle_start = script.index("function setRecipeIngredientSubstitutionsExpanded")
+    toggle_end = script.index("function recipeIngredientSubstitutionDomGroups", toggle_start)
+    toggle = script[toggle_start:toggle_end]
+
+    assert "const recipeEditExpandedIngredientIds = new Set();" in script
+    assert 'fieldValue("recipe_ingredient_id")' in expansion
+    assert 'fieldValue("substitution_id")' in expansion
+    assert "recipeIngredientExpansionAnchorFromControl" in expansion
+    assert "selectedOptionSummary.closest(" in expansion
+    assert '"[data-recipe-ingredient-column-group-projection]"' in expansion
+    assert 'anchor.insertAdjacentElement("afterend", container);' in expansion
+    assert "anchor.appendChild(container);" in expansion
+    assert "home.after(container);" in expansion
+    assert "container.dataset.ingredientExpansionFor = expansionId;" in expansion
+    assert "recipeEditExpandedIngredientIds.add(expansionId);" in expansion
+
+    assert "mountRecipeIngredientExpansion(row, container, control);" in toggle
+    assert "recipeIngredientExpansionIsOpen(row, button)" in toggle
+    assert "setRecipeIngredientSubstitutionsExpanded(row, button, true, options);" in toggle
+    assert "setRecipeIngredientSubstitutionsExpanded(row, control, false, options);" in toggle
+
+    attached_panel = css[css.index(
+        "/* Ingredient editor v70: keep each choice panel attached to its disclosure row. */"
+    ):]
+    assert "> .recipe-edit-ingredient-column-group-projection" in attached_panel
+    assert ".recipe-edit-selected-option-line-items" in attached_panel
+    assert "> .recipe-edit-ingredient-options-panel" in attached_panel
+    assert "border-left: 3px solid" in attached_panel
+    assert "background: color-mix(" in attached_panel
+    assert ".is-ingredient-expansion-anchor" in attached_panel
 
 
 def test_grouped_component_projection_is_reused_while_inline_controls_update():
@@ -1296,16 +1337,16 @@ def test_mobile_ingredient_header_surfaces_saved_alternatives_inline():
     state = script[state_start:state_end]
     assert "const badgeLabel = requirementChoiceSummary.label;" in state
     assert "mobileAlternativesBadge.hidden = alternativeCount === 0;" in state
-    assert 'mobileAlternativesBadge.setAttribute("aria-expanded", String(isExpanded));' in state
+    assert "String(recipeIngredientExpansionIsOpen(row, mobileAlternativesBadge))" in state
     assert "alternativesDialogName" not in state
 
     open_start = script.index("function openRecipeIngredientAlternativesDialog")
     open_end = script.index("function recipeIngredientSubstitutionDomGroups", open_start)
     open_helper = script[open_start:open_end]
-    assert "setRecipeIngredientSubstitutionsExpanded(row, optionsButton, true, options);" in open_helper
+    assert "setRecipeIngredientSubstitutionsExpanded(row, button, true, options);" in open_helper
     assert "container.scrollIntoView" in open_helper
     assert "function closeRecipeIngredientAlternativesDialog" in open_helper
-    assert "setRecipeIngredientSubstitutionsExpanded(row, optionsButton, false, options);" in open_helper
+    assert "setRecipeIngredientSubstitutionsExpanded(row, control, false, options);" in open_helper
     assert "showModal" not in open_helper
 
     v41_start = css.index("/* Ingredient editor v41:")
@@ -2920,9 +2961,9 @@ def test_recipe_editor_v10_prioritizes_six_readable_groups_and_overflow_menu():
 
     assert "function toggleRecipeIngredientSubstitutions(button, event = null)" in script
     assert "function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, options = {})" in script
-    assert 'otherContainer.hidden = true;' in script
-    assert 'optionsButton.setAttribute("aria-expanded", String(shouldOpen));' in script
-    assert 'row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);' in script
+    assert "resetRecipeIngredientExpansionMount(otherRow, otherContainer);" in script
+    assert "String(recipeIngredientExpansionIsOpen(row, optionsButton))" in script
+    assert 'row.classList.toggle("recipe-edit-substitutions-open", anchor === row);' in script
     assert 'const isIngredientRow = label === "ingredient";' in script
     assert 'const editButtonHtml = `' in script
     assert 'const editButtonHtml = isIngredientRow ? "" :' not in script
@@ -3016,9 +3057,11 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert 'recipeEditSvgIcon("chevron-down")' in options_button_markup
 
     assert "!optionCount" not in toggle
-    assert 'otherContainer.hidden = true;' in toggle
-    assert 'container.hidden = !shouldOpen;' in toggle
-    assert 'row.classList.toggle("recipe-edit-substitutions-open", shouldOpen);' in toggle
+    assert "resetRecipeIngredientExpansionMount(otherRow, otherContainer);" in toggle
+    assert "mountRecipeIngredientExpansion(row, container, control);" in toggle
+    assert "container.hidden = false;" in toggle
+    assert "resetRecipeIngredientExpansionMount(row, container);" in toggle
+    assert 'row.classList.toggle("recipe-edit-substitutions-open", anchor === row);' in script
     assert "event.preventDefault();" in toggle
     assert "event.stopPropagation();" in toggle
     assert "function openRecipeIngredientAlternativesDialog" in toggle
