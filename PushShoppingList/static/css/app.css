@@ -68713,3 +68713,56 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         grid-row: 2 !important;
     }
 }
+
+/* Ingredient editor v65: keep ingredient controls and desktop column labels visible while rows scroll. */
+body.recipe-edit-standalone-page
+    .recipe-edit-tabs-card
+    #recipeEditPanelIngredients
+    > .ingredients-toolbar {
+    position: sticky;
+    z-index: 36;
+    top: var(--recipe-edit-ingredients-toolbar-sticky-top, 66px);
+    background: var(--recipe-editor-surface);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, .2);
+}
+
+body.recipe-edit-standalone-page
+    .recipe-edit-ingredients-section
+    .recipe-edit-ingredient-table-scroll {
+    overflow: visible;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head-viewport {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-table-body-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-border-strong) transparent;
+}
+
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head-viewport {
+        position: sticky;
+        z-index: 35;
+        top: var(--recipe-edit-ingredient-table-sticky-top, 113px);
+        background: var(--recipe-editor-surface-soft);
+        box-shadow:
+            0 1px 0 var(--recipe-editor-border),
+            0 8px 16px rgba(0, 0, 0, .2);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head {
+        position: static;
+        top: auto;
+        z-index: auto;
+    }
+}

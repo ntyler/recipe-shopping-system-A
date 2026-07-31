@@ -1071,8 +1071,8 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     tools_end = script.index("function organizeRecipeEditEquipmentTools()", tools_start)
     tools_block = script[tools_start:tools_end]
     assert 'tableScroll.className = "recipe-edit-ingredient-table-scroll";' in tools_block
-    assert "tableScroll.appendChild(tableHead);" in tools_block
-    assert "tableScroll.appendChild(ingredientList);" in tools_block
+    assert "tableHeadViewport.appendChild(tableHead);" in tools_block
+    assert "tableBodyScroll.appendChild(ingredientList);" in tools_block
 
 
 def test_recipe_editor_ingredient_options_use_inline_nested_table_disclosure():
@@ -1781,8 +1781,9 @@ def test_recipe_editor_wide_workspace_preserves_exactly_two_content_columns():
     assert "recipe-edit-utility-column" not in wide_workspace
 
 
-def test_recipe_editor_wide_ingredients_workspace_grows_without_sticky_headers():
+def test_recipe_editor_wide_ingredients_workspace_keeps_header_stack_sticky():
     css = read_text("PushShoppingList/static/css/app.css")
+    script = read_text("PushShoppingList/static/js/app.js")
 
     wide_workspace_start = css.index("/* Wide recipe workspace:")
     wide_workspace = css[wide_workspace_start:]
@@ -1807,6 +1808,51 @@ def test_recipe_editor_wide_ingredients_workspace_grows_without_sticky_headers()
     assert ".recipe-edit-standalone-page .recipe-edit-ingredient-table-head {\n    position: static;" in ingredient_polish
     assert "top: auto;" in ingredient_polish
     assert "z-index: auto;" in ingredient_polish
+    sticky_headers = wide_workspace[wide_workspace.index("/* Ingredient editor v65:"):]
+    assert "#recipeEditPanelIngredients\n    > .ingredients-toolbar {" in sticky_headers
+    assert "position: sticky;" in sticky_headers
+    assert "z-index: 36;" in sticky_headers
+    assert "top: var(--recipe-edit-ingredients-toolbar-sticky-top, 66px);" in sticky_headers
+    assert "background: var(--recipe-editor-surface);" in sticky_headers
+    assert (
+        "body.recipe-edit-standalone-page\n"
+        "    .recipe-edit-ingredients-section\n"
+        "    .recipe-edit-ingredient-table-scroll {\n"
+        "    overflow: visible;"
+    ) in sticky_headers
+    assert (
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-table-body-scroll {"
+        in sticky_headers
+    )
+    assert "overflow-x: auto;" in sticky_headers
+    assert "@media (min-width: 768px)" in sticky_headers
+    assert (
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head-viewport {"
+        in sticky_headers
+    )
+    assert "z-index: 35;" in sticky_headers
+    assert "top: var(--recipe-edit-ingredient-table-sticky-top, 113px);" in sticky_headers
+    assert "background: var(--recipe-editor-surface-soft);" in sticky_headers
+    ingredient_tools = script[
+        script.index("function organizeRecipeEditIngredientTools()"):
+        script.index("function organizeRecipeEditEquipmentTools()")
+    ]
+    assert '"recipe-edit-ingredient-table-head-viewport"' in ingredient_tools
+    assert '"recipe-edit-ingredient-table-body-scroll"' in ingredient_tools
+    assert "tableHeadViewport.appendChild(tableHead);" in ingredient_tools
+    assert "tableBodyScroll.appendChild(ingredientList);" in ingredient_tools
+    assert "syncRecipeEditIngredientTableHeaderScroll(tableScroll);" in ingredient_tools
+    assert "headerViewport.scrollLeft = bodyScroll.scrollLeft;" in script
+    sticky_offsets = script[
+        script.index("function updateRecipeEditStickyOffsets()"):
+        script.index("function setValue(", script.index("function updateRecipeEditStickyOffsets()"))
+    ]
+    assert '"body.recipe-edit-standalone-page #recipeEditPanelIngredients"' in sticky_offsets
+    assert '":scope > .ingredients-toolbar"' in sticky_offsets
+    assert '"body.recipe-edit-standalone-page .recipe-edit-header"' in sticky_offsets
+    assert '["fixed", "sticky"].includes(editorHeaderStyle.position)' in sticky_offsets
+    assert '"--recipe-edit-ingredients-toolbar-sticky-top"' in sticky_offsets
+    assert '"--recipe-edit-ingredient-table-sticky-top"' in sticky_offsets
 
 
 def test_recipe_editor_description_loads_and_saves_existing_field(monkeypatch, tmp_path):

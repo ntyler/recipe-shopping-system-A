@@ -26532,6 +26532,28 @@ function recipeEditIngredientColumnHeaders() {
         : [];
 }
 
+function recipeEditIngredientTableBodyScroll(tableScroll = null) {
+    const table = tableScroll || document.querySelector(
+        "[data-recipe-edit-ingredient-table-scroll]"
+    );
+    return table?.querySelector(
+        ":scope > [data-recipe-edit-ingredient-table-body-scroll]"
+    ) || table;
+}
+
+function syncRecipeEditIngredientTableHeaderScroll(tableScroll = null) {
+    const table = tableScroll || document.querySelector(
+        "[data-recipe-edit-ingredient-table-scroll]"
+    );
+    const headerViewport = table?.querySelector(
+        ":scope > [data-recipe-edit-ingredient-table-head-viewport]"
+    );
+    const bodyScroll = recipeEditIngredientTableBodyScroll(table);
+    if (headerViewport && bodyScroll) {
+        headerViewport.scrollLeft = bodyScroll.scrollLeft;
+    }
+}
+
 function orderRecipeEditIngredientColumnHeaders(order) {
     const tableHead = document.querySelector("[data-recipe-edit-ingredient-table-head]");
     if (!tableHead) return;
@@ -28077,7 +28099,8 @@ function showRecipeEditIngredientColumnResizeGuide(tableScroll, clientX) {
     const guide = recipeEditIngredientColumnResizeGuide(tableScroll);
     if (!guide) return;
     const tableRect = tableScroll.getBoundingClientRect();
-    guide.style.left = `${Math.round(clientX - tableRect.left + tableScroll.scrollLeft)}px`;
+    const bodyScroll = recipeEditIngredientTableBodyScroll(tableScroll);
+    guide.style.left = `${Math.round(clientX - tableRect.left + (bodyScroll?.scrollLeft || 0))}px`;
     guide.style.height = `${Math.max(tableScroll.scrollHeight, tableScroll.clientHeight)}px`;
     guide.hidden = false;
 }
@@ -28293,6 +28316,27 @@ function organizeRecipeEditIngredientTools() {
     tableScroll.setAttribute("aria-label", "Ingredients");
     ingredientList.setAttribute("role", "rowgroup");
 
+    let tableHeadViewport = tableScroll.querySelector(
+        ":scope > [data-recipe-edit-ingredient-table-head-viewport]"
+    );
+    if (!tableHeadViewport) {
+        tableHeadViewport = document.createElement("div");
+        tableHeadViewport.className = "recipe-edit-ingredient-table-head-viewport";
+        tableHeadViewport.dataset.recipeEditIngredientTableHeadViewport = "";
+        tableHeadViewport.setAttribute("role", "rowgroup");
+        tableScroll.prepend(tableHeadViewport);
+    }
+
+    let tableBodyScroll = tableScroll.querySelector(
+        ":scope > [data-recipe-edit-ingredient-table-body-scroll]"
+    );
+    if (!tableBodyScroll) {
+        tableBodyScroll = document.createElement("div");
+        tableBodyScroll.className = "recipe-edit-ingredient-table-body-scroll";
+        tableBodyScroll.dataset.recipeEditIngredientTableBodyScroll = "";
+        tableScroll.appendChild(tableBodyScroll);
+    }
+
     let tableHead = section.querySelector("[data-recipe-edit-ingredient-table-head]");
     if (!tableHead) {
         tableHead = document.createElement("div");
@@ -28314,8 +28358,17 @@ function organizeRecipeEditIngredientTools() {
     }
     tableHead.classList.add("recipe-edit-ingredient-table-grid");
     decorateRecipeEditIngredientColumnHeaders(tableHead);
-    tableScroll.appendChild(tableHead);
-    tableScroll.appendChild(ingredientList);
+    tableHeadViewport.appendChild(tableHead);
+    tableBodyScroll.appendChild(ingredientList);
+    if (tableBodyScroll.dataset.recipeEditIngredientHeaderScrollBound !== "true") {
+        tableBodyScroll.dataset.recipeEditIngredientHeaderScrollBound = "true";
+        tableBodyScroll.addEventListener(
+            "scroll",
+            () => syncRecipeEditIngredientTableHeaderScroll(tableScroll),
+            { passive: true },
+        );
+    }
+    syncRecipeEditIngredientTableHeaderScroll(tableScroll);
 
     let footer = section.querySelector("[data-recipe-edit-ingredient-footer]");
     if (!footer) {
@@ -28662,6 +28715,7 @@ const RECIPE_INGREDIENT_MODAL_SCROLL_CONTAINER_SELECTOR = [
     "[data-app-content]",
     ".app-sidebar",
     ".recipe-edit-ingredient-table-scroll",
+    ".recipe-edit-ingredient-table-body-scroll",
 ].join(", ");
 
 function captureRecipeIngredientModalScrollState() {
@@ -36206,6 +36260,41 @@ function openRecipeEditorPdf(link, event) {
 }
 
 function updateRecipeEditStickyOffsets() {
+    const ingredientsSection = document.querySelector(
+        "body.recipe-edit-standalone-page #recipeEditPanelIngredients"
+    );
+    const ingredientsToolbar = ingredientsSection?.querySelector(
+        ":scope > .ingredients-toolbar"
+    );
+    const editorHeader = document.querySelector(
+        "body.recipe-edit-standalone-page .recipe-edit-header"
+    );
+    if (ingredientsSection) {
+        const editorHeaderStyle = editorHeader ? getComputedStyle(editorHeader) : null;
+        const editorHeaderIsSticky = editorHeaderStyle
+            ? ["fixed", "sticky"].includes(editorHeaderStyle.position)
+            : false;
+        const editorHeaderTop = editorHeaderIsSticky
+            ? (parseFloat(editorHeaderStyle.top) || 0) + editorHeader.offsetHeight
+            : 0;
+        const ingredientsToolbarStyle = ingredientsToolbar
+            ? getComputedStyle(ingredientsToolbar)
+            : null;
+        const ingredientsToolbarHeight = ingredientsToolbar
+            ? ingredientsToolbar.offsetHeight
+                + (parseFloat(ingredientsToolbarStyle?.marginBottom) || 0)
+            : 0;
+
+        ingredientsSection.style.setProperty(
+            "--recipe-edit-ingredients-toolbar-sticky-top",
+            `${Math.ceil(editorHeaderTop)}px`
+        );
+        ingredientsSection.style.setProperty(
+            "--recipe-edit-ingredient-table-sticky-top",
+            `${Math.ceil(editorHeaderTop + ingredientsToolbarHeight)}px`
+        );
+    }
+
     document.querySelectorAll(".recipe-edit-equipment-section, .recipe-edit-instructions-section, .recipe-edit-nutrition-section, .recipe-edit-reflection-section")
         .forEach(section => {
             const sectionHeader = section.querySelector(".recipe-edit-section-header");
@@ -43557,14 +43646,16 @@ function openRecipeIngredientAlternativesDialog(button, event = null, options = 
     window.requestAnimationFrame(() => {
         if (!container.hidden) {
             const tableScroll = container.closest(".recipe-edit-ingredient-table-scroll");
-            const inlineScrollLeft = tableScroll ? tableScroll.scrollLeft : null;
+            const bodyScroll = recipeEditIngredientTableBodyScroll(tableScroll);
+            const inlineScrollLeft = bodyScroll ? bodyScroll.scrollLeft : null;
             container.scrollIntoView({
                 behavior: "auto",
                 block: "nearest",
                 inline: "nearest",
             });
-            if (tableScroll && inlineScrollLeft !== null) {
-                tableScroll.scrollLeft = inlineScrollLeft;
+            if (bodyScroll && inlineScrollLeft !== null) {
+                bodyScroll.scrollLeft = inlineScrollLeft;
+                syncRecipeEditIngredientTableHeaderScroll(tableScroll);
             }
         }
     });
