@@ -67814,7 +67814,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
     > .recipe-edit-row-menu-wrap
     > .recipe-edit-row-menu-btn:is(:hover, :focus-visible) {
-    outline: 0;
     background: var(--app-surface-soft);
     color: var(--app-primary-hover);
 }

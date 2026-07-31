@@ -1016,6 +1016,10 @@ def test_option_ingredient_pencils_use_the_standard_edit_ingredient_modal():
     assert "openRecipeIngredientOptionModal(editButton)" in script
     assert "/* Ingredient editor v53:" in css
     assert "> span:last-child:not(.recipe-edit-inline-icon)" in css
-    v53 = css[css.index("/* Ingredient editor v53:"):]
+    v53 = css[
+        css.index("/* Ingredient editor v53:"):
+        css.index("/* Ingredient editor v54:")
+    ]
     assert "> .recipe-edit-inline-icon" in v53
     assert "display: inline-flex;" in v53
+    assert "outline: 0;" not in v53
