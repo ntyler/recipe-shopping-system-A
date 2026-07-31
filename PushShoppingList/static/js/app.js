@@ -44366,8 +44366,8 @@ function recipeIngredientSubstitutionContainer(row, control = null) {
     return optionsMenu ? optionsMenu.querySelector("[data-ingredient-substitutions]") : null;
 }
 
-function recipeIngredientVerticalScrollContainer(row) {
-    let candidate = row?.parentElement || null;
+function recipeIngredientVerticalScrollContainer(anchor) {
+    let candidate = anchor?.parentElement || null;
     while (
         candidate
         && candidate !== document.body
@@ -44385,33 +44385,28 @@ function recipeIngredientVerticalScrollContainer(row) {
     return null;
 }
 
-function toggleRecipeIngredientExpansionWithAnchor(row, toggleExpansion) {
+function toggleRecipeIngredientExpansionWithAnchor(row, control, toggleExpansion) {
     if (!row || typeof toggleExpansion !== "function") {
         return false;
     }
 
-    const previousTop = row.getBoundingClientRect().top;
-    const scrollContainer = recipeIngredientVerticalScrollContainer(row);
+    const anchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;
+    const previousTop = anchor.getBoundingClientRect().top;
+    const scrollContainer = recipeIngredientVerticalScrollContainer(anchor);
     const result = toggleExpansion();
-    if (row.recipeIngredientAnchorFrame) {
-        window.cancelAnimationFrame(row.recipeIngredientAnchorFrame);
+    if (!anchor.isConnected) {
+        return result;
     }
-    row.recipeIngredientAnchorFrame = window.requestAnimationFrame(() => {
-        row.recipeIngredientAnchorFrame = null;
-        if (!row.isConnected) {
-            return;
-        }
-        const newTop = row.getBoundingClientRect().top;
-        const delta = newTop - previousTop;
-        if (!Number.isFinite(delta) || delta === 0) {
-            return;
-        }
-        if (scrollContainer?.isConnected) {
-            scrollContainer.scrollTop += delta;
-        } else {
-            window.scrollBy({ top: delta, behavior: "instant" });
-        }
-    });
+    const newTop = anchor.getBoundingClientRect().top;
+    const delta = newTop - previousTop;
+    if (!Number.isFinite(delta) || delta === 0) {
+        return result;
+    }
+    if (scrollContainer?.isConnected) {
+        scrollContainer.scrollTop += delta;
+    } else {
+        window.scrollBy({ top: delta, behavior: "instant" });
+    }
     return result;
 }
 
@@ -44462,6 +44457,7 @@ function toggleRecipeIngredientSubstitutions(button, event = null) {
 
     return toggleRecipeIngredientExpansionWithAnchor(
         row,
+        button,
         () => (
             recipeIngredientExpansionIsOpen(row, button)
                 ? closeRecipeIngredientAlternativesDialog(button, event)

@@ -928,8 +928,9 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert ".is-ingredient-expansion-anchor" in attached_panel
 
 
-def test_ingredient_choice_disclosure_anchors_its_row_in_the_active_vertical_scroller():
+def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_position():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     anchor_start = script.index("function recipeIngredientVerticalScrollContainer")
     anchor_end = script.index("function setRecipeIngredientSubstitutionsExpanded", anchor_start)
     anchor = script[anchor_start:anchor_end]
@@ -939,17 +940,24 @@ def test_ingredient_choice_disclosure_anchors_its_row_in_the_active_vertical_scr
 
     assert "window.getComputedStyle(candidate).overflowY" in anchor
     assert "candidate.scrollHeight > candidate.clientHeight" in anchor
-    assert anchor.count("row.getBoundingClientRect().top") == 2
+    assert "const anchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;" in anchor
+    assert "const previousTop = anchor.getBoundingClientRect().top;" in anchor
+    assert "const result = toggleExpansion();" in anchor
+    assert "const newTop = anchor.getBoundingClientRect().top;" in anchor
     assert "const delta = newTop - previousTop;" in anchor
     assert "scrollContainer.scrollTop += delta;" in anchor
     assert 'window.scrollBy({ top: delta, behavior: "instant" });' in anchor
-    assert "window.requestAnimationFrame" in anchor
-    assert "window.cancelAnimationFrame(row.recipeIngredientAnchorFrame);" in anchor
+    assert "window.requestAnimationFrame" not in anchor
 
     assert "toggleRecipeIngredientExpansionWithAnchor(" in toggle
+    assert "row,\n        button,\n        () => (" in toggle
     assert "container.scrollIntoView" not in toggle
     assert "returnFocus.focus({ preventScroll: true });" in toggle
     assert "resetRecipeIngredientExpansionMount(otherRow, otherContainer);" not in toggle
+    attached_panel = css[css.index(
+        "/* Ingredient editor v70: keep each choice panel attached to its disclosure row. */"
+    ):]
+    assert "overflow-anchor: none;" in attached_panel
 
 
 def test_grouped_component_projection_is_reused_while_inline_controls_update():

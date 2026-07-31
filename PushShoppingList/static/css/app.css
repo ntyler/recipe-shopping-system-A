@@ -69250,6 +69250,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     margin: 0;
     padding: 10px 0 12px;
     overflow: visible;
+    overflow-anchor: none;
     border: 0;
     border-top: 1px solid color-mix(in srgb, var(--app-primary-hover) 38%, var(--app-border));
     border-radius: 0 0 8px 8px;
