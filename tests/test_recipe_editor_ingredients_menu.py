@@ -457,8 +457,8 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
     assert tools.count('role="columnheader"') == len(headers) + 1
     positions = [tools.index(f">{header}</span>") for header in headers]
     assert positions == sorted(positions)
-    assert 'role="columnheader" aria-label="Row actions"' in tools
-    assert ">Actions</span>" not in tools
+    assert 'class="recipe-edit-ingredient-actions-header"' in tools
+    assert ">ACTIONS</span>" in tools
     for removed_header in ("Match / Status", "Amount", "Preparation", "Buy As", "Substitutions"):
         assert f">{removed_header}</span>" not in tools
 
@@ -774,7 +774,15 @@ def test_store_section_grouping_projects_selected_components_into_their_own_sect
     assert "function createRecipeIngredientColumnViewGroupProjection" in projection_view
     assert 'projection.className = "recipe-edit-ingredient-column-group-projection";' in projection_view
     assert "projection.recipeIngredientOptionSourceRow = sourceRow;" in projection_view
+    assert 'summary.classList.remove("is-ingredient-column-grouped-away");' in projection_view
+    assert "summary.hidden = false;" in projection_view
+    assert 'summary.removeAttribute("aria-hidden");' in projection_view
     assert "lineItem.classList.add(\"is-ingredient-column-grouped-away\");" in projection_view
+    assert projection_view.index(
+        'summary.classList.remove("is-ingredient-column-grouped-away");'
+    ) < projection_view.index(
+        'lineItem.classList.add("is-ingredient-column-grouped-away");'
+    )
     assert "const parentSection = recipeIngredientColumnViewEntry(parentRow, \"store\");" in projection_view
     assert "const componentSection = recipeIngredientColumnViewEntry(lineItem, \"store\");" in projection_view
     assert "if (componentSection.key === parentSection.key) return;" in projection_view
@@ -1030,7 +1038,7 @@ def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_posi
     assert "const delta = newTop - previousTop;" in anchor
     assert "scrollContainer.scrollTop += delta;" in anchor
     assert 'window.scrollBy({ top: delta, behavior: "instant" });' in anchor
-    assert "window.requestAnimationFrame" not in anchor
+    assert "window.requestAnimationFrame(restoreInlineScroll)" in anchor
 
     assert "toggleRecipeIngredientExpansionWithAnchor(" in toggle
     assert "row,\n        button,\n        () => (" in toggle
@@ -1118,6 +1126,52 @@ def test_recipe_editor_v74_centers_both_desktop_action_controls_in_each_row():
     dots_rule = dots_rule[:dots_rule.index("}")]
     assert "top: 50%;" in dots_rule
     assert "transform: translate(-50%, -50%);" in dots_rule
+
+
+def test_recipe_editor_v75_groups_three_fixed_ingredient_actions_with_responsive_targets():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    columns = script[
+        script.index("const RECIPE_EDIT_INGREDIENT_COLUMNS"):
+        script.index("const RECIPE_EDIT_INGREDIENT_VIEW_COLUMN_KEYS")
+    ]
+    assert 'label: "Actions"' in columns
+    assert "minWidth: 120" in columns
+    assert "maxWidth: 120" in columns
+    assert "fallbackWidth: 120" in columns
+
+    organizer = script[
+        script.index("function createRecipeIngredientRowActionPlaceholder"):
+        script.index("function organizeRecipeEditCompactRowActions")
+    ]
+    assert 'placeholder.setAttribute("aria-hidden", "true");' in organizer
+    assert 'actions.classList.add("recipe-edit-ingredient-row-actions");' in organizer
+    assert 'actions.querySelector(":scope > .recipe-edit-compact-row-collapse")?.remove();' in organizer
+    assert "actions.replaceChildren(alternativesControl, editControl, menuControl);" in organizer
+    assert 'event => event.stopPropagation()' in organizer
+    assert '"Expand alternatives"' in organizer
+    assert '"Collapse alternatives"' in organizer
+    assert 'menuButton.setAttribute("aria-label", "More actions");' in organizer
+
+    marker = "/* Ingredient editor v75: one fixed, compact action rail for every ingredient row. */"
+    assert marker in css
+    action_css = css[css.index(marker):]
+    for declaration in (
+        "--recipe-edit-ingredient-actions-column-width: 120px;",
+        "grid-template-columns: repeat(3, 32px);",
+        "> :nth-child(1) {",
+        "grid-column: 3 !important;",
+        "gap: 8px;",
+        "padding: 0 8px 0 0 !important;",
+        "visibility: hidden;",
+        "outline: 2px solid var(--app-primary-hover) !important;",
+        "--recipe-edit-ingredient-actions-column-width: 144px;",
+        "grid-template-columns: repeat(3, 40px);",
+        'display: none !important;',
+        'grid-column: 6 !important;',
+    ):
+        assert declaration in action_css
 
 
 def test_grouped_component_projection_is_reused_while_inline_controls_update():
@@ -2824,7 +2878,7 @@ def test_recipe_editor_auto_fit_keeps_visible_columns_inside_the_table_width():
         definitions.index("    alternatives: {"):
         definitions.index("    actions: {")
     ]
-    assert "minWidth: 84" in alternatives
+    assert "minWidth: 48" in alternatives
     assert "maxWidth: 180" in alternatives
     assert "fallbackWidth: 132" in alternatives
 

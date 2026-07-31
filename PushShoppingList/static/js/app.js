@@ -23086,16 +23086,16 @@ const RECIPE_EDIT_INGREDIENT_COLUMNS = {
     },
     alternatives: {
         label: "Alternatives",
-        minWidth: 84,
+        minWidth: 48,
         maxWidth: 180,
         fallbackWidth: 132,
         selectors: [":scope > .recipe-edit-ingredient-substitution-cell"],
     },
     actions: {
         label: "Actions",
-        minWidth: 76,
-        maxWidth: 180,
-        fallbackWidth: 76,
+        minWidth: 120,
+        maxWidth: 120,
+        fallbackWidth: 120,
         selectors: [":scope > .recipe-edit-compact-row-actions"],
     },
 };
@@ -27097,6 +27097,9 @@ function syncRecipeIngredientColumnViewGroupProjection(
         ensureRecipeIngredientSelectedOptionToggle(parentRow, summary);
     }
     summary.classList.add("is-ingredient-column-group-projection-row");
+    summary.classList.remove("is-ingredient-column-grouped-away");
+    summary.hidden = false;
+    summary.removeAttribute("aria-hidden");
     projection.dataset.ingredientExpansionId = recipeIngredientExpansionIdForControl(
         parentRow,
         summary,
@@ -28426,6 +28429,11 @@ function decorateRecipeEditIngredientColumnHeaders(tableHead) {
         if (!RECIPE_EDIT_INGREDIENT_COLUMNS[key]) return;
         header.dataset.ingredientColumn = key;
         header.draggable = false;
+        if (key === "actions") {
+            header.tabIndex = -1;
+            header.title = "Actions";
+            return;
+        }
         header.tabIndex = 0;
         header.title = `${RECIPE_EDIT_INGREDIENT_COLUMNS[key].label}: drag the grip to move; drag the divider to resize; double-click the divider to auto-fit. Alt+Arrow moves; Alt+Shift+Arrow resizes.`;
         if (recipeIngredientColumnViewDefinition(key)) {
@@ -28550,7 +28558,7 @@ function organizeRecipeEditIngredientTools() {
             <span role="columnheader" data-ingredient-column="store">Store Section</span>
             <span role="columnheader" data-ingredient-column="type">Type</span>
             <span role="columnheader" data-ingredient-column="alternatives">Alternatives</span>
-            <span role="columnheader" aria-label="Row actions" class="recipe-edit-ingredient-actions-header" data-ingredient-column="actions"></span>
+            <span role="columnheader" class="recipe-edit-ingredient-actions-header" data-ingredient-column="actions">ACTIONS</span>
         `;
     }
     tableHead.classList.add("recipe-edit-ingredient-table-grid");
@@ -30534,6 +30542,7 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow) {
             if (menu) menu.hidden = true;
             actions.appendChild(menuWrap);
         }
+        organizeRecipeIngredientRowActions(summary);
     }
 
     updateRecipeIngredientOptionRowSummary(
@@ -30676,8 +30685,8 @@ function setRecipeIngredientSelectedChoiceGroupControls(row, header, enabled) {
             );
         }
         if (menuButton) {
-            menuButton.setAttribute("aria-label", "Ingredient group actions");
-            menuButton.title = "Ingredient group actions";
+            menuButton.setAttribute("aria-label", "More actions");
+            menuButton.title = "More actions";
         }
         return;
     }
@@ -30711,8 +30720,8 @@ function setRecipeIngredientSelectedChoiceGroupControls(row, header, enabled) {
         editButton.title = `Edit ${ingredientName}`;
     }
     if (menuButton) {
-        menuButton.setAttribute("aria-label", "Ingredient actions");
-        menuButton.title = "Ingredient actions";
+        menuButton.setAttribute("aria-label", "More actions");
+        menuButton.title = "More actions";
     }
 }
 
@@ -30982,6 +30991,7 @@ function organizeRecipeEditSubstitutionOptionRow(optionRow) {
         const editButton = createRecipeIngredientEditActionButton();
         editButton.addEventListener("click", () => openRecipeIngredientOptionModal(editButton));
         actions?.append(editButton, menuWrap);
+        organizeRecipeIngredientRowActions(summary);
     }
     updateRecipeIngredientAlternativeComponentSummary(optionRow);
 }
@@ -31523,6 +31533,7 @@ function organizeRecipeEditIngredientRow(row) {
     row.appendChild(mobileQuantitySummary);
 
     let optionsCell = null;
+    let alternativesActionButton = null;
     if (substitutions) {
         substitutions.classList.add("recipe-edit-ingredient-options-panel");
         substitutions.setAttribute("role", "region");
@@ -31557,7 +31568,18 @@ function organizeRecipeEditIngredientRow(row) {
         optionsButton.addEventListener("click", event => (
             toggleRecipeIngredientSubstitutions(optionsButton, event)
         ));
-        optionsCell.appendChild(optionsButton);
+        const optionsDisplay = document.createElement("span");
+        optionsDisplay.className = [
+            "recipe-edit-ingredient-options-copy",
+            "recipe-edit-ingredient-options-display",
+        ].join(" ");
+        optionsDisplay.dataset.ingredientOptionsDisplay = "";
+        optionsDisplay.innerHTML = `
+            <span data-ingredient-options-display-label>None</span>
+            <span data-ingredient-options-display-summary hidden></span>
+        `;
+        optionsCell.appendChild(optionsDisplay);
+        alternativesActionButton = optionsButton;
         row.appendChild(optionsCell);
         row.appendChild(substitutions);
         row.recipeIngredientSubstitutionHome = document.createComment(
@@ -31878,6 +31900,7 @@ function organizeRecipeEditIngredientRow(row) {
     organizeRecipeEditCompactRowActions(row, '[data-field="ingredient"]', "ingredient");
     const actions = row.querySelector(":scope > [data-recipe-edit-compact-row-actions]");
     if (actions) actions.setAttribute("role", "cell");
+    organizeRecipeIngredientRowActions(row, alternativesActionButton);
     applyRecipeIngredientTableGridContract(row, {
         drag: handle,
         image: [number, imagePanel],
@@ -31892,8 +31915,8 @@ function organizeRecipeEditIngredientRow(row) {
         actions,
     });
     if (actionMenuButton) {
-        actionMenuButton.setAttribute("aria-label", "Ingredient actions");
-        actionMenuButton.title = "Ingredient actions";
+        actionMenuButton.setAttribute("aria-label", "More actions");
+        actionMenuButton.title = "More actions";
     }
     if (substitutions) {
         row.appendChild(substitutions);
@@ -31902,6 +31925,56 @@ function organizeRecipeEditIngredientRow(row) {
     initializeRecipeIngredientMobileHeaderLayout();
     syncRecipeIngredientMobileHeader(row);
     updateRecipeIngredientSubstitutionState(row);
+}
+
+function createRecipeIngredientRowActionPlaceholder() {
+    const placeholder = document.createElement("span");
+    placeholder.className = "recipe-edit-ingredient-row-action-placeholder";
+    placeholder.setAttribute("aria-hidden", "true");
+    return placeholder;
+}
+
+function syncRecipeIngredientAlternativesActionLabel(row, button = null) {
+    const action = button || row?.querySelector("[data-ingredient-substitutions-toggle]");
+    if (!row || !action) return;
+    const label = recipeIngredientExpansionIsOpen(row, action)
+        ? "Collapse alternatives"
+        : "Expand alternatives";
+    action.setAttribute("aria-label", label);
+    action.title = label;
+}
+
+function organizeRecipeIngredientRowActions(row, alternativesButton = null) {
+    const actions = row?.querySelector(":scope > [data-recipe-edit-compact-row-actions]")
+        || row?.querySelector(":scope > [data-ingredient-column=\"actions\"]");
+    if (!actions) return null;
+
+    actions.classList.add("recipe-edit-ingredient-row-actions");
+    actions.querySelector(":scope > .recipe-edit-compact-row-collapse")?.remove();
+
+    const editButton = actions.querySelector(":scope > .recipe-edit-compact-row-edit");
+    const menuWrap = actions.querySelector(":scope > .recipe-edit-row-menu-wrap");
+    const menuButton = menuWrap?.querySelector(":scope > .recipe-edit-row-menu-btn");
+    const alternativesControl = alternativesButton || createRecipeIngredientRowActionPlaceholder();
+    const editControl = editButton || createRecipeIngredientRowActionPlaceholder();
+    const menuControl = menuWrap || createRecipeIngredientRowActionPlaceholder();
+
+    if (alternativesButton) {
+        alternativesButton.classList.add("recipe-edit-ingredient-alternatives-action");
+        syncRecipeIngredientAlternativesActionLabel(row, alternativesButton);
+    }
+    if (editButton) configureRecipeIngredientEditAction(editButton);
+    if (menuButton) {
+        menuButton.setAttribute("aria-label", "More actions");
+        menuButton.title = "More actions";
+    }
+
+    actions.replaceChildren(alternativesControl, editControl, menuControl);
+    if (actions.dataset.recipeIngredientActionsPropagationBound !== "true") {
+        actions.dataset.recipeIngredientActionsPropagationBound = "true";
+        actions.addEventListener("click", event => event.stopPropagation());
+    }
+    return actions;
 }
 
 function organizeRecipeEditCompactRowActions(row, focusSelector, itemLabel) {
@@ -43960,8 +44033,8 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
                     class="recipe-edit-row-menu-btn"
-                    aria-label="Ingredient actions"
-                    title="Ingredient actions"
+                    aria-label="More actions"
+                    title="More actions"
                     aria-haspopup="true"
                     aria-expanded="false"
                     onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -44410,7 +44483,20 @@ function toggleRecipeIngredientExpansionWithAnchor(row, control, toggleExpansion
     const anchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;
     const previousTop = anchor.getBoundingClientRect().top;
     const scrollContainer = recipeIngredientVerticalScrollContainer(anchor);
+    const bodyScroll = row.closest("[data-recipe-edit-ingredient-table-body-scroll]");
+    const inlineScrollLeft = bodyScroll ? bodyScroll.scrollLeft : 0;
+    const restoreInlineScroll = () => {
+        if (!bodyScroll?.isConnected) return;
+        bodyScroll.scrollLeft = inlineScrollLeft;
+        syncRecipeEditIngredientTableHeaderScroll(
+            bodyScroll.closest("[data-recipe-edit-ingredient-table-scroll]"),
+        );
+    };
     const result = toggleExpansion();
+    restoreInlineScroll();
+    window.requestAnimationFrame(() => (
+        window.requestAnimationFrame(restoreInlineScroll)
+    ));
     if (!anchor.isConnected) {
         return result;
     }
@@ -45674,8 +45760,8 @@ function createRecipeIngredientDefaultOptionSummary(row) {
             <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-component-menu">
                 <button type="button"
                         class="recipe-edit-row-menu-btn"
-                        aria-label="${escapeAttribute(ingredientName)} actions"
-                        title="Ingredient actions"
+                        aria-label="More actions"
+                        title="More actions"
                         aria-haspopup="true"
                         aria-expanded="false"
                         onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -45692,6 +45778,7 @@ function createRecipeIngredientDefaultOptionSummary(row) {
         configureRecipeIngredientEditAction(
             actions.querySelector(".recipe-edit-compact-row-edit"),
         );
+        organizeRecipeIngredientRowActions(summary);
     }
     updateRecipeIngredientOptionRowSummary(summary, row, values, {
         accessiblePrefix: "Edit ingredient",
@@ -46115,6 +46202,8 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     if (optionsButton) {
         const label = optionsButton.querySelector("[data-ingredient-options-label]");
         const summary = optionsButton.querySelector("[data-ingredient-options-summary]");
+        const displayLabel = row.querySelector("[data-ingredient-options-display-label]");
+        const displaySummary = row.querySelector("[data-ingredient-options-display-summary]");
         const compactSummary = requirementChoiceSummary;
         const optionLabel = compactSummary.label;
         const groupSummaries = alternativeGroups.map(group => (
@@ -46142,6 +46231,9 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         if (label) {
             label.textContent = alternativeCount ? optionLabel : "None";
         }
+        if (displayLabel) {
+            displayLabel.textContent = alternativeCount ? optionLabel : "None";
+        }
         if (summary) {
             summary.textContent = alternativeCount ? compactSummary.summary : "";
             summary.hidden = !alternativeCount || !compactSummary.summary;
@@ -46150,6 +46242,17 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
                 summary.hidden = false;
             }
             summary.title = alternativeCount && selectedDetails
+                ? selectedDetails
+                : compactSummary.summary;
+        }
+        if (displaySummary) {
+            displaySummary.textContent = alternativeCount ? compactSummary.summary : "";
+            displaySummary.hidden = !alternativeCount || !compactSummary.summary;
+            if (alternativeCount && selectedSummary) {
+                displaySummary.textContent = selectedSummary;
+                displaySummary.hidden = false;
+            }
+            displaySummary.title = alternativeCount && selectedDetails
                 ? selectedDetails
                 : compactSummary.summary;
         }
@@ -46174,6 +46277,7 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
             `${action} ${optionLabel.toLowerCase()} for ${choiceTitle}`
                 + `${selectedDetails ? `. Selected: ${selectedDetails}` : ""}`,
         );
+        syncRecipeIngredientAlternativesActionLabel(row, optionsButton);
     }
     syncRecipeIngredientSelectedOptionToggles(row);
     const tableScroll = row?.closest("[data-recipe-edit-ingredient-table-scroll]");

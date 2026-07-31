@@ -759,7 +759,7 @@ def test_selected_choice_group_header_uses_standard_action_grid_cells():
     assert "recipe-edit-selected-choice-group-title-icon" not in header
     assert 'editButton.dataset.ingredientChoiceTitleEdit = "";' in header
     assert '"return focusRecipeIngredientChoiceTitle(this)"' in header
-    assert 'menuButton.title = "Ingredient group actions";' in header
+    assert 'menuButton.title = "More actions";' in header
     assert "row.insertBefore(optionsCell, optionsPanel || null);" in header
     assert "row.insertBefore(dragHandle, row.firstChild);" in header
     assert "mobileHeader.appendChild(actions);" in header
