@@ -1742,7 +1742,7 @@
                     <div class="recipe-edit-section-actions recipe-edit-ingredient-actions ingredients-toolbar-actions">
                         <button type="button"
                                 class="recipe-edit-add-ingredient-button"
-                                onclick="addRecipeIngredientRow({}, { expanded: true })">
+                                onclick="setRecipeEditIngredientView('table'); addRecipeIngredientRow({}, { expanded: true })">
                             <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
                             <span>Add Ingredient</span>
                         </button>
@@ -1769,7 +1769,8 @@
                             <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
                             <span class="sr-only" data-recipe-ingredients-collapse-label>Collapse All</span>
                         </button>
-                        <div class="recipe-edit-section-menu-wrap recipe-edit-ingredient-column-menu-wrap">
+                        <div class="recipe-edit-section-menu-wrap recipe-edit-ingredient-column-menu-wrap"
+                             data-recipe-ingredient-table-action>
                             <button type="button"
                                     class="recipe-edit-ingredient-columns-button"
                                     aria-label="Adjust ingredient columns"
@@ -1896,7 +1897,71 @@
                         </div>
                     </div>
                 </div>
-                <div id="recipeEditIngredients" class="recipe-edit-ingredients"></div>
+                <div class="recipe-edit-ingredient-view-switcher-row">
+                    <div class="recipe-edit-ingredient-view-switcher"
+                         role="tablist"
+                         aria-label="Ingredient view"
+                         aria-orientation="horizontal"
+                         data-recipe-ingredient-view-switcher>
+                        <button type="button"
+                                id="recipeEditIngredientViewTabRecipe"
+                                class="recipe-edit-ingredient-view-tab"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="recipeEditIngredientViewRecipe"
+                                tabindex="-1"
+                                data-recipe-ingredient-view-tab="recipe">
+                            Recipe
+                        </button>
+                        <button type="button"
+                                id="recipeEditIngredientViewTabSmart"
+                                class="recipe-edit-ingredient-view-tab"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="recipeEditIngredientViewSmart"
+                                tabindex="-1"
+                                data-recipe-ingredient-view-tab="smart">
+                            Smart
+                        </button>
+                        <button type="button"
+                                id="recipeEditIngredientViewTabTable"
+                                class="recipe-edit-ingredient-view-tab is-active"
+                                role="tab"
+                                aria-selected="true"
+                                aria-controls="recipeEditIngredientViewTable"
+                                tabindex="0"
+                                data-recipe-ingredient-view-tab="table">
+                            Table
+                        </button>
+                    </div>
+                </div>
+                <div id="recipeEditIngredientViewTable"
+                     class="recipe-edit-ingredient-view-panel recipe-edit-ingredient-table-view-panel"
+                     role="tabpanel"
+                     aria-labelledby="recipeEditIngredientViewTabTable"
+                     data-recipe-ingredient-view-panel="table">
+                    <div id="recipeEditIngredients" class="recipe-edit-ingredients"></div>
+                </div>
+                <div id="recipeEditIngredientViewRecipe"
+                     class="recipe-edit-ingredient-view-panel recipe-edit-ingredient-placeholder-view"
+                     role="tabpanel"
+                     aria-labelledby="recipeEditIngredientViewTabRecipe"
+                     data-recipe-ingredient-view-panel="recipe"
+                     hidden>
+                    <div class="recipe-edit-ingredient-placeholder-panel">
+                        Recipe View will be implemented in Phase 2.
+                    </div>
+                </div>
+                <div id="recipeEditIngredientViewSmart"
+                     class="recipe-edit-ingredient-view-panel recipe-edit-ingredient-placeholder-view"
+                     role="tabpanel"
+                     aria-labelledby="recipeEditIngredientViewTabSmart"
+                     data-recipe-ingredient-view-panel="smart"
+                     hidden>
+                    <div class="recipe-edit-ingredient-placeholder-panel">
+                        Smart View will be implemented in Phase 3.
+                    </div>
+                </div>
             </section>
 
             <section id="recipeEditPanelEquipment"

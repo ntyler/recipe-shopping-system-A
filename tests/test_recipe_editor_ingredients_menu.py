@@ -5158,3 +5158,55 @@ def test_recipe_editor_has_store_section_review_controls():
     assert "function applyRecipeStoreSectionReviewToEditor" in script
     assert 'fetch("/api/recipe/review_store_sections"' in script
     assert '@recipe_bp.route("/api/recipe/review_store_sections", methods=["POST"])' in routes
+
+
+def test_recipe_editor_phase_one_ingredient_views_share_the_existing_table():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8",
+    )
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    ingredient_start = template.index('id="recipeEditPanelIngredients"')
+    ingredient_end = template.index('id="recipeEditPanelEquipment"', ingredient_start)
+    ingredient_section = template[ingredient_start:ingredient_end]
+    switch_start = script.index("function setRecipeEditIngredientView(value, options = {})")
+    switch_end = script.index("function handleRecipeEditIngredientViewKeydown", switch_start)
+    switch_function = script[switch_start:switch_end]
+    collect_start = script.index("function collectRecipeIngredientRows()")
+    collect_end = script.index("function collectRecipeNutritionRows()", collect_start)
+    collect_function = script[collect_start:collect_end]
+
+    assert 'role="tablist"' in ingredient_section
+    assert 'aria-label="Ingredient view"' in ingredient_section
+    for view in ("recipe", "smart", "table"):
+        assert f'data-recipe-ingredient-view-tab="{view}"' in ingredient_section
+        assert f'data-recipe-ingredient-view-panel="{view}"' in ingredient_section
+    assert 'data-recipe-ingredient-view-tab="table"' in ingredient_section
+    assert 'aria-selected="true"' in ingredient_section
+    assert ingredient_section.count('id="recipeEditIngredients"') == 1
+    assert "Recipe View will be implemented in Phase 2." in ingredient_section
+    assert "Smart View will be implemented in Phase 3." in ingredient_section
+    assert "data-recipe-ingredient-table-action" in ingredient_section
+    assert "setRecipeEditIngredientView('table'); addRecipeIngredientRow({}, { expanded: true })" in ingredient_section
+
+    assert 'const RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY = "ai-pantry-ingredient-view";' in script
+    assert 'new Set(["recipe", "smart", "table"])' in script
+    assert 'let recipeEditIngredientView = "table";' in script
+    assert "function initRecipeEditIngredientViews()" in script
+    assert "function addEmptyRecipeIngredientRow()" in script
+    assert script.count("addEmptyRecipeIngredientRow();") == 2
+    assert 'if (recipeEditIngredientView === "table")' in script
+    assert "addRecipeIngredientRow({}, { expanded: false });" in script
+    assert 'tab.addEventListener("keydown", handleRecipeEditIngredientViewKeydown);' in script
+    assert 'panel.hidden = panel.dataset.recipeIngredientViewPanel !== view;' in switch_function
+    assert "syncRecipeEditIngredientViewActions(section, view);" in switch_function
+    assert "populateRecipeEditor" not in switch_function
+    assert "fetch(" not in switch_function
+    assert ".innerHTML" not in switch_function
+
+    assert "return recipeEditIngredientRows()" in collect_function
+    assert 'document.getElementById("recipeEditIngredients")' in script
+    assert ".recipe-edit-ingredient-view-switcher" in css
+    assert ".recipe-edit-ingredient-view-tab:focus-visible" in css
+    assert "[data-recipe-ingredient-table-action][hidden]" in css

@@ -22988,6 +22988,7 @@ let recipeEditIngredientColumnLayout = null;
 let recipeEditIngredientColumnMoveState = null;
 let recipeEditIngredientColumnResizeState = null;
 let recipeEditIngredientColumnResizeObserver = null;
+let recipeEditIngredientView = "table";
 let recipeEditIngredientColumnView = {
     filterKeys: new Map(),
     sorts: [],
@@ -23016,6 +23017,8 @@ const RECIPE_EDIT_CATEGORY_AI_FIELD_NAMES = CATEGORY_FIELD_NAMES;
 const RECIPE_EDIT_CATEGORY_FIELD_NAMES = [...CATEGORY_FIELD_NAMES, RECIPE_EDIT_MENU_SECTION_FIELD_NAME];
 const RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES = [...RECIPE_EDIT_CATEGORY_FIELD_NAMES, "custom_categories"];
 const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV2";
+const RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY = "ai-pantry-ingredient-view";
+const RECIPE_EDIT_INGREDIENT_VIEWS = new Set(["recipe", "smart", "table"]);
 const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [
     "media",
     "ingredient",
@@ -24535,7 +24538,7 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
             setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());
         } else {
             setRecipeIngredientsCollapsed(false);
-            addRecipeIngredientRow({}, { expanded: true });
+            addEmptyRecipeIngredientRow();
         }
     }
 
@@ -24625,7 +24628,7 @@ function replaceRecipeEditorIngredients(ingredients = []) {
     (hasIngredients ? ingredients : []).forEach(item => addRecipeIngredientRow(item));
     if (!ingredientWrap.querySelector(".recipe-edit-ingredient-row")) {
         setRecipeIngredientsCollapsed(false);
-        addRecipeIngredientRow({}, { expanded: true });
+        addEmptyRecipeIngredientRow();
     } else {
         setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());
     }
@@ -28514,6 +28517,176 @@ function resetRecipeEditIngredientColumnLayout() {
     return false;
 }
 
+function normalizeRecipeEditIngredientView(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return RECIPE_EDIT_INGREDIENT_VIEWS.has(normalized) ? normalized : "table";
+}
+
+function loadRecipeEditIngredientView() {
+    try {
+        return normalizeRecipeEditIngredientView(
+            window.localStorage.getItem(RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY),
+        );
+    } catch (_error) {
+        return "table";
+    }
+}
+
+function saveRecipeEditIngredientView(view) {
+    try {
+        window.localStorage.setItem(
+            RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY,
+            normalizeRecipeEditIngredientView(view),
+        );
+    } catch (_error) {
+        // The selected view still works for this page when browser storage is unavailable.
+    }
+}
+
+function addEmptyRecipeIngredientRow() {
+    if (recipeEditIngredientView === "table") {
+        addRecipeIngredientRow({}, { expanded: true });
+        return;
+    }
+    addRecipeIngredientRow({}, { expanded: false });
+}
+
+function recipeEditIngredientViewScrollState() {
+    const mainScrollRegion = typeof appMainScrollRegion === "function"
+        ? appMainScrollRegion()
+        : null;
+    const pageScrollRegion = document.scrollingElement || document.documentElement;
+    return {
+        mainScrollRegion,
+        mainScrollLeft: mainScrollRegion ? mainScrollRegion.scrollLeft : 0,
+        mainScrollTop: mainScrollRegion ? mainScrollRegion.scrollTop : 0,
+        pageScrollRegion,
+        pageScrollLeft: pageScrollRegion ? pageScrollRegion.scrollLeft : 0,
+        pageScrollTop: pageScrollRegion ? pageScrollRegion.scrollTop : 0,
+    };
+}
+
+function restoreRecipeEditIngredientViewScroll(state) {
+    if (!state) return;
+    if (state.mainScrollRegion && state.mainScrollRegion.isConnected) {
+        state.mainScrollRegion.scrollLeft = state.mainScrollLeft;
+        state.mainScrollRegion.scrollTop = state.mainScrollTop;
+    }
+    if (state.pageScrollRegion && state.pageScrollRegion.isConnected) {
+        state.pageScrollRegion.scrollLeft = state.pageScrollLeft;
+        state.pageScrollRegion.scrollTop = state.pageScrollTop;
+    }
+}
+
+function syncRecipeEditIngredientViewActions(section, view) {
+    const tableIsActive = view === "table";
+    section.querySelectorAll("[data-recipe-ingredient-table-action]").forEach(action => {
+        action.hidden = !tableIsActive;
+        if (!tableIsActive) {
+            const trigger = action.querySelector("[aria-expanded]");
+            const menu = action.querySelector(".recipe-edit-section-menu");
+            if (trigger) trigger.setAttribute("aria-expanded", "false");
+            if (menu) menu.hidden = true;
+        }
+    });
+}
+
+function setRecipeEditIngredientView(value, options = {}) {
+    const section = document.querySelector(".recipe-edit-ingredients-section");
+    if (!section) return false;
+
+    const view = normalizeRecipeEditIngredientView(value);
+    const scrollState = recipeEditIngredientViewScrollState();
+    const tablePanel = section.querySelector('[data-recipe-ingredient-view-panel="table"]');
+    if (view !== "table" && tablePanel && !tablePanel.hidden) {
+        const tableHeight = Math.ceil(tablePanel.getBoundingClientRect().height);
+        if (tableHeight > 0) {
+            section.style.setProperty(
+                "--recipe-edit-ingredient-view-table-height",
+                `${tableHeight}px`,
+            );
+        }
+    }
+
+    recipeEditIngredientView = view;
+    section.dataset.recipeIngredientView = view;
+    section.querySelectorAll("[data-recipe-ingredient-view-tab]").forEach(tab => {
+        const selected = tab.dataset.recipeIngredientViewTab === view;
+        tab.classList.toggle("is-active", selected);
+        tab.setAttribute("aria-selected", selected ? "true" : "false");
+        tab.tabIndex = selected ? 0 : -1;
+    });
+    section.querySelectorAll("[data-recipe-ingredient-view-panel]").forEach(panel => {
+        panel.hidden = panel.dataset.recipeIngredientViewPanel !== view;
+    });
+    syncRecipeEditIngredientViewActions(section, view);
+
+    if (options.persist !== false) {
+        saveRecipeEditIngredientView(view);
+    }
+
+    if (options.focus === true) {
+        const activeTab = section.querySelector(
+            `[data-recipe-ingredient-view-tab="${view}"]`,
+        );
+        if (activeTab) activeTab.focus({ preventScroll: true });
+    }
+
+    restoreRecipeEditIngredientViewScroll(scrollState);
+    window.requestAnimationFrame(() => {
+        if (view === "table") {
+            refreshRecipeEditIngredientColumnLayout();
+            syncRecipeEditIngredientTableHeaderScroll();
+        }
+        restoreRecipeEditIngredientViewScroll(scrollState);
+    });
+    return false;
+}
+
+function handleRecipeEditIngredientViewKeydown(event) {
+    if (!event || event.altKey || event.ctrlKey || event.metaKey) return;
+    const tab = event.currentTarget;
+    const tablist = tab ? tab.closest("[data-recipe-ingredient-view-switcher]") : null;
+    const tabs = tablist
+        ? [...tablist.querySelectorAll("[data-recipe-ingredient-view-tab]")]
+        : [];
+    const currentIndex = tabs.indexOf(tab);
+    let nextIndex = currentIndex;
+
+    if (event.key === "ArrowRight") {
+        nextIndex = (currentIndex + 1) % tabs.length;
+    } else if (event.key === "ArrowLeft") {
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    } else if (event.key === "Home") {
+        nextIndex = 0;
+    } else if (event.key === "End") {
+        nextIndex = tabs.length - 1;
+    } else {
+        return;
+    }
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    if (nextTab) {
+        setRecipeEditIngredientView(nextTab.dataset.recipeIngredientViewTab, { focus: true });
+    }
+}
+
+function initRecipeEditIngredientViews() {
+    const switcher = document.querySelector("[data-recipe-ingredient-view-switcher]");
+    if (!switcher) return;
+
+    switcher.querySelectorAll("[data-recipe-ingredient-view-tab]").forEach(tab => {
+        if (tab.dataset.recipeIngredientViewBound === "true") return;
+        tab.dataset.recipeIngredientViewBound = "true";
+        tab.addEventListener("click", () => {
+            setRecipeEditIngredientView(tab.dataset.recipeIngredientViewTab);
+        });
+        tab.addEventListener("keydown", handleRecipeEditIngredientViewKeydown);
+    });
+    setRecipeEditIngredientView(loadRecipeEditIngredientView(), { persist: false });
+}
+
 function organizeRecipeEditIngredientTools() {
     const section = document.querySelector(".recipe-edit-ingredients-section");
     const ingredientList = document.getElementById("recipeEditIngredients");
@@ -28606,6 +28779,7 @@ function organizeRecipeEditIngredientTools() {
             viewSection = document.createElement("div");
             viewSection.className = "overflow-menu-section";
             viewSection.dataset.recipeEditIngredientViewActions = "";
+            viewSection.dataset.recipeIngredientTableAction = "";
             viewSection.innerHTML = '<div class="overflow-menu-section-title">Table View</div>';
             overflowMenu.appendChild(viewSection);
         }
@@ -28646,6 +28820,7 @@ function organizeRecipeEditIngredientTools() {
     }
     window.requestAnimationFrame(refreshRecipeEditIngredientColumnLayout);
     applyRecipeIngredientColumnView();
+    initRecipeEditIngredientViews();
 }
 
 function organizeRecipeEditEquipmentTools() {
