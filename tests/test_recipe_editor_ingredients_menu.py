@@ -1,4 +1,9 @@
+import json
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import recipe_edit_service
@@ -1067,9 +1072,20 @@ def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_posi
     assert "const result = toggleExpansion();" in anchor
     assert "const newTop = anchor.getBoundingClientRect().top;" in anchor
     assert "const delta = newTop - previousTop;" in anchor
-    assert "scrollContainer.scrollTop += delta;" in anchor
+    assert "function recipeIngredientScrollMaximum" in anchor
+    assert "function recipeIngredientScrollReserveState" in anchor
+    assert "function releaseRecipeIngredientScrollReserve" in anchor
+    assert "const targetScrollTop = Math.max(0, scrollContainer.scrollTop + delta);" in anchor
+    assert "targetScrollTop > maximumScrollTop" in anchor
+    assert "state.height + Math.ceil(targetScrollTop - maximumScrollTop) + 1" in anchor
+    assert "scrollContainer.scrollTop = targetScrollTop;" in anchor
     assert 'window.scrollBy({ top: delta, behavior: "instant" });' in anchor
-    assert "window.requestAnimationFrame(restoreInlineScroll)" in anchor
+    assert anchor.count("restoreRecipeIngredientExpansionAnchor(") >= 2
+    assert anchor.count("restoreAnchorIfCurrent()") >= 3
+    assert "window.cancelAnimationFrame(row.recipeIngredientAnchorFrame);" in anchor
+    assert "recipe-edit-ingredient-scroll-stabilizing" in anchor
+    assert "state.stabilizationToken += 1;" in anchor
+    assert script.count("clearRecipeIngredientScrollReserve(appMainScrollRegion());") >= 2
 
     assert "toggleRecipeIngredientExpansionWithAnchor(" in toggle
     assert "row,\n        button,\n        () => (" in toggle
@@ -1080,6 +1096,146 @@ def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_posi
         "/* Ingredient editor v70: keep each choice panel attached to its disclosure row. */"
     ):]
     assert "overflow-anchor: none;" in attached_panel
+    assert ".recipe-edit-ingredient-scroll-stabilizing" in css
+    assert ".recipe-edit-ingredient-scroll-reserve" in css
+
+
+def test_ingredient_choice_scroll_reserve_bridges_the_maximum_scroll_clamp():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    helpers_start = script.index("function recipeIngredientScrollMaximum")
+    helpers_end = script.index(
+        "function toggleRecipeIngredientExpansionWithAnchor",
+        helpers_start,
+    )
+    helpers = script[helpers_start:helpers_end]
+    node = shutil.which("node")
+
+    if not node:
+        pytest.skip("Node.js is not available for the supplemental scroll-helper regression")
+
+    harness = """
+const recipeEditIngredientScrollReserveStates = new WeakMap();
+const window = {
+    scrollBy() {
+        throw new Error("The element-scroll scenario must not fall back to window scrolling");
+    },
+};
+const document = {
+    createElement() {
+        return {
+            className: "",
+            dataset: {},
+            parentElement: null,
+            style: {
+                height: "",
+                removeProperty(name) {
+                    if (name === "height") this.height = "";
+                },
+            },
+            setAttribute() {},
+            remove() {
+                const parent = this.parentElement;
+                if (!parent) return;
+                if (parent.spacer === this) parent.spacer = null;
+                this.parentElement = null;
+            },
+        };
+    },
+};
+""" + helpers + """
+const scrollContainer = {
+    baseScrollHeight: 640,
+    clientHeight: 480,
+    _scrollTop: 160,
+    spacer: null,
+    isConnected: true,
+    get scrollHeight() {
+        return this.baseScrollHeight
+            + Number.parseFloat(this.spacer?.style.height || "0");
+    },
+    get scrollTop() {
+        return this._scrollTop;
+    },
+    set scrollTop(value) {
+        const maximum = Math.max(0, this.scrollHeight - this.clientHeight);
+        this._scrollTop = Math.min(maximum, Math.max(0, Number(value) || 0));
+    },
+    addEventListener() {},
+    appendChild(element) {
+        this.spacer = element;
+        element.parentElement = this;
+    },
+};
+const anchor = {
+    isConnected: true,
+    getBoundingClientRect() {
+        return { top: 500 };
+    },
+};
+
+// The collapsed content leaves only 160px of native scroll range, but keeping
+// the anchor at its previous 280px viewport position requires scrollTop 380.
+restoreRecipeIngredientExpansionAnchor(anchor, 280, scrollContainer);
+const state = recipeEditIngredientScrollReserveStates.get(scrollContainer);
+const afterRestore = {
+    reserveHeight: state.height,
+    scrollTop: scrollContainer.scrollTop,
+    maximum: recipeIngredientScrollMaximum(scrollContainer),
+};
+
+// Releasing 51px of slack must shrink the reserve without allowing the
+// browser-like scrollTop setter to clamp the viewport upward.
+scrollContainer.scrollTop = 330;
+releaseRecipeIngredientScrollReserve(scrollContainer);
+const afterPartialRelease = {
+    reserveHeight: state.height,
+    scrollTop: scrollContainer.scrollTop,
+    maximum: recipeIngredientScrollMaximum(scrollContainer),
+};
+
+// Once enough real scroll range is available, the remainder can disappear.
+scrollContainer.scrollTop = 100;
+releaseRecipeIngredientScrollReserve(scrollContainer);
+const afterFullRelease = {
+    reserveHeight: state.height,
+    scrollTop: scrollContainer.scrollTop,
+    maximum: recipeIngredientScrollMaximum(scrollContainer),
+    spacerConnected: Boolean(state.spacer.parentElement),
+};
+
+process.stdout.write(JSON.stringify({
+    afterRestore,
+    afterPartialRelease,
+    afterFullRelease,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["afterRestore"] == {
+        "reserveHeight": 221,
+        "scrollTop": 380,
+        "maximum": 381,
+    }
+    assert result["afterPartialRelease"] == {
+        "reserveHeight": 170,
+        "scrollTop": 330,
+        "maximum": 330,
+    }
+    assert result["afterFullRelease"] == {
+        "reserveHeight": 0,
+        "scrollTop": 100,
+        "maximum": 160,
+        "spacerConnected": False,
+    }
 
 
 def test_recipe_editor_v72_aligns_all_desktop_action_cells_to_the_shared_track():

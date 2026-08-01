@@ -22979,6 +22979,7 @@ let recipeEditIngredientSubstitutionsId = 0;
 let recipeEditIngredientAlternativeId = 0;
 let recipeEditIngredientExpansionId = 0;
 const recipeEditExpandedIngredientIds = new Set();
+const recipeEditIngredientScrollReserveStates = new WeakMap();
 let recipeEditIngredientModalId = 0;
 let recipeEditIngredientModalActiveRow = null;
 let recipeEditIngredientModalReturnFocus = null;
@@ -24408,6 +24409,7 @@ function closeRecipeEditor(options = {}) {
     if (hasUnsavedChanges) {
         rememberRecipeEditorSavedState(form);
     }
+    clearRecipeIngredientScrollReserve(appMainScrollRegion());
     closeRecipeImageChangeActions();
     closeRecipeEditAiAnalysis({ restoreFocus: false });
     closeRecipeDescriptionReview({ restoreFocus: false });
@@ -24441,6 +24443,7 @@ function closeRecipeEditor(options = {}) {
 }
 
 function populateRecipeEditor(recipe, originalUrl, options = {}) {
+    clearRecipeIngredientScrollReserve(appMainScrollRegion());
     const form = document.getElementById("recipeEditForm");
     const preserveSavedState = options.preserveSavedState === true;
     const previousOriginalSnapshot = recipeEditOriginalSnapshot;
@@ -24610,6 +24613,7 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
 }
 
 function replaceRecipeEditorIngredients(ingredients = []) {
+    clearRecipeIngredientScrollReserve(appMainScrollRegion());
     const ingredientWrap = document.getElementById("recipeEditIngredients");
 
     if (!ingredientWrap) {
@@ -25877,6 +25881,10 @@ function setRecipeEditActiveTab(tabKey, options = {}) {
 
     if (!tabsRoot) {
         return false;
+    }
+
+    if (activeKey !== "ingredients") {
+        clearRecipeIngredientScrollReserve(appMainScrollRegion());
     }
 
     tabsRoot.querySelectorAll("[data-recipe-edit-tab]").forEach(tab => {
@@ -44454,6 +44462,133 @@ function recipeIngredientVerticalScrollContainer(anchor) {
     return null;
 }
 
+function recipeIngredientScrollMaximum(scrollContainer) {
+    if (!scrollContainer) {
+        return 0;
+    }
+    return Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+}
+
+function recipeIngredientScrollReserveState(scrollContainer) {
+    if (!scrollContainer) {
+        return null;
+    }
+
+    let state = recipeEditIngredientScrollReserveStates.get(scrollContainer);
+    if (state) {
+        return state;
+    }
+
+    const spacer = document.createElement("div");
+    spacer.className = "recipe-edit-ingredient-scroll-reserve";
+    spacer.dataset.recipeIngredientScrollReserve = "";
+    spacer.setAttribute("aria-hidden", "true");
+    state = {
+        spacer,
+        height: 0,
+        adjusting: false,
+        stabilizationToken: 0,
+    };
+    recipeEditIngredientScrollReserveStates.set(scrollContainer, state);
+    scrollContainer.addEventListener("scroll", () => {
+        if (!state.adjusting) {
+            releaseRecipeIngredientScrollReserve(scrollContainer);
+        }
+    }, { passive: true });
+    return state;
+}
+
+function setRecipeIngredientScrollReserveHeight(scrollContainer, height) {
+    const state = recipeIngredientScrollReserveState(scrollContainer);
+    if (!state) {
+        return;
+    }
+
+    const nextHeight = Math.max(0, Math.ceil(Number(height) || 0));
+    state.height = nextHeight;
+    if (nextHeight > 0) {
+        if (state.spacer.parentElement !== scrollContainer) {
+            scrollContainer.appendChild(state.spacer);
+        }
+        state.spacer.style.height = `${nextHeight}px`;
+        return;
+    }
+
+    state.spacer.remove();
+    state.spacer.style.removeProperty("height");
+}
+
+function releaseRecipeIngredientScrollReserve(scrollContainer) {
+    const state = recipeEditIngredientScrollReserveStates.get(scrollContainer);
+    if (!state || state.height <= 0) {
+        return;
+    }
+
+    const removableHeight = Math.min(
+        state.height,
+        Math.max(
+            0,
+            Math.floor(recipeIngredientScrollMaximum(scrollContainer) - scrollContainer.scrollTop),
+        ),
+    );
+    if (removableHeight <= 0) {
+        return;
+    }
+
+    state.adjusting = true;
+    setRecipeIngredientScrollReserveHeight(
+        scrollContainer,
+        state.height - removableHeight,
+    );
+    state.adjusting = false;
+}
+
+function clearRecipeIngredientScrollReserve(scrollContainer) {
+    const state = recipeEditIngredientScrollReserveStates.get(scrollContainer);
+    if (!state) {
+        return;
+    }
+
+    state.stabilizationToken += 1;
+    state.adjusting = true;
+    setRecipeIngredientScrollReserveHeight(scrollContainer, 0);
+    state.adjusting = false;
+    scrollContainer.classList.remove("recipe-edit-ingredient-scroll-stabilizing");
+}
+
+function restoreRecipeIngredientExpansionAnchor(anchor, previousTop, scrollContainer) {
+    if (!anchor?.isConnected) {
+        return;
+    }
+
+    if (scrollContainer?.isConnected) {
+        releaseRecipeIngredientScrollReserve(scrollContainer);
+    }
+    const newTop = anchor.getBoundingClientRect().top;
+    const delta = newTop - previousTop;
+    if (!Number.isFinite(delta) || Math.abs(delta) < 0.5) {
+        return;
+    }
+
+    if (scrollContainer?.isConnected) {
+        const targetScrollTop = Math.max(0, scrollContainer.scrollTop + delta);
+        const maximumScrollTop = recipeIngredientScrollMaximum(scrollContainer);
+        if (targetScrollTop > maximumScrollTop) {
+            const state = recipeIngredientScrollReserveState(scrollContainer);
+            setRecipeIngredientScrollReserveHeight(
+                scrollContainer,
+                state.height + Math.ceil(targetScrollTop - maximumScrollTop) + 1,
+            );
+        }
+        const state = recipeEditIngredientScrollReserveStates.get(scrollContainer);
+        if (state) state.adjusting = true;
+        scrollContainer.scrollTop = targetScrollTop;
+        if (state) state.adjusting = false;
+    } else {
+        window.scrollBy({ top: delta, behavior: "instant" });
+    }
+}
+
 function toggleRecipeIngredientExpansionWithAnchor(row, control, toggleExpansion) {
     if (!row || typeof toggleExpansion !== "function") {
         return false;
@@ -44462,6 +44597,14 @@ function toggleRecipeIngredientExpansionWithAnchor(row, control, toggleExpansion
     const anchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;
     const previousTop = anchor.getBoundingClientRect().top;
     const scrollContainer = recipeIngredientVerticalScrollContainer(anchor);
+    const scrollState = recipeIngredientScrollReserveState(scrollContainer);
+    const stabilizationToken = scrollState
+        ? scrollState.stabilizationToken + 1
+        : 0;
+    if (scrollState) {
+        scrollState.stabilizationToken = stabilizationToken;
+        scrollContainer.classList.add("recipe-edit-ingredient-scroll-stabilizing");
+    }
     const bodyScroll = row.closest("[data-recipe-edit-ingredient-table-body-scroll]");
     const inlineScrollLeft = bodyScroll ? bodyScroll.scrollLeft : 0;
     const restoreInlineScroll = () => {
@@ -44472,23 +44615,39 @@ function toggleRecipeIngredientExpansionWithAnchor(row, control, toggleExpansion
         );
     };
     const result = toggleExpansion();
-    restoreInlineScroll();
-    window.requestAnimationFrame(() => (
-        window.requestAnimationFrame(restoreInlineScroll)
-    ));
-    if (!anchor.isConnected) {
-        return result;
+    const restoreAnchorIfCurrent = () => {
+        if (
+            scrollState
+            && scrollState.stabilizationToken !== stabilizationToken
+        ) {
+            return false;
+        }
+        restoreInlineScroll();
+        restoreRecipeIngredientExpansionAnchor(anchor, previousTop, scrollContainer);
+        return true;
+    };
+    restoreAnchorIfCurrent();
+    if (row.recipeIngredientAnchorFrame) {
+        window.cancelAnimationFrame(row.recipeIngredientAnchorFrame);
     }
-    const newTop = anchor.getBoundingClientRect().top;
-    const delta = newTop - previousTop;
-    if (!Number.isFinite(delta) || delta === 0) {
-        return result;
-    }
-    if (scrollContainer?.isConnected) {
-        scrollContainer.scrollTop += delta;
-    } else {
-        window.scrollBy({ top: delta, behavior: "instant" });
-    }
+    row.recipeIngredientAnchorFrame = window.requestAnimationFrame(() => {
+        if (!restoreAnchorIfCurrent()) {
+            row.recipeIngredientAnchorFrame = null;
+            return;
+        }
+        row.recipeIngredientAnchorFrame = window.requestAnimationFrame(() => {
+            row.recipeIngredientAnchorFrame = null;
+            if (!restoreAnchorIfCurrent()) {
+                return;
+            }
+            if (
+                scrollState
+                && scrollState.stabilizationToken === stabilizationToken
+            ) {
+                scrollContainer.classList.remove("recipe-edit-ingredient-scroll-stabilizing");
+            }
+        });
+    });
     return result;
 }
 

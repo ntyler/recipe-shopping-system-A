@@ -68814,6 +68814,20 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-table-body-scroll {
     scrollbar-color: var(--app-border-strong) transparent;
 }
 
+.recipe-edit-ingredient-scroll-stabilizing {
+    overflow-anchor: none !important;
+}
+
+.recipe-edit-ingredient-scroll-reserve {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow-anchor: none;
+    pointer-events: none;
+}
+
 @media (min-width: 768px) {
     body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head-viewport {
         position: sticky;
