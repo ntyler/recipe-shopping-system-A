@@ -70584,9 +70584,27 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-option {
     display: grid;
     grid-template-columns: 16px minmax(0, 1fr);
     gap: 7px;
+    width: 100%;
     min-width: 0;
+    margin: 0;
     padding: 7px 0;
+    border: 0;
     border-bottom: 1px solid color-mix(in srgb, var(--recipe-editor-border-soft) 78%, transparent);
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-option:hover {
+    background: color-mix(in srgb, var(--app-primary) 5%, transparent);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-option:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-primary) 72%, white 8%);
+    outline-offset: 2px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-option-marker {
@@ -70622,7 +70640,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-option-components
     list-style: none;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-option-components > li {
+body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-option-component {
     display: grid;
     grid-template-columns: minmax(64px, auto) minmax(0, 1fr);
     gap: 8px;

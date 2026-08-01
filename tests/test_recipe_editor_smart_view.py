@@ -213,3 +213,72 @@ def test_smart_projection_refreshes_with_row_edits_and_reordering():
     assert "renderRecipeIngredientSmartView();" in indexes
     assert 'action.hidden = view !== "table";' in actions
     assert 'const tableIsActive = view === "table";' in actions
+
+
+def test_smart_option_sets_select_through_shared_choice_state_and_support_keyboard():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    css = CSS_PATH.read_text(encoding="utf-8")
+
+    option = _function(
+        script,
+        "createRecipeIngredientSmartViewOption(",
+        "renderRecipeIngredientSmartViewOptions",
+    )
+    details = _function(
+        script,
+        "renderRecipeIngredientSmartViewDetails(",
+        "syncRecipeIngredientSmartViewCardExpanded",
+    )
+    select = _function(
+        script,
+        "selectRecipeIngredientSmartViewOption(button, event = null)",
+        "navigateRecipeIngredientSmartViewOptions",
+    )
+    keyboard = _function(
+        script,
+        "navigateRecipeIngredientSmartViewOptions(button, event)",
+        "editRecipeIngredientFromSmartView",
+    )
+    apply_selection = _function(
+        script,
+        "applyRecipeIngredientOptionSelection(ingredientRow, optionId)",
+        "setRecipeIngredientOptionSelected",
+    )
+    choice_groups = _function(
+        script,
+        "recipeIngredientRecipeViewChoiceGroups(row, parentValues, alternativeGroups)",
+        "createRecipeIngredientRecipeViewItem",
+    )
+    shared_mutation = _function(
+        script,
+        "setRecipeIngredientDefaultOption(row, alternativeGroups, optionId, selectedGroupIndex = -1)",
+        "createRecipeIngredientDefaultOptionSummary",
+    )
+
+    assert 'document.createElement("button")' in option
+    assert 'option.setAttribute("role", "radio")' in option
+    assert 'option.setAttribute("aria-checked", String(Boolean(group.isSelected)))' in option
+    assert "group.values.forEach(values =>" in option
+    assert 'option.addEventListener("click"' in option
+    assert 'option.addEventListener("keydown"' in option
+    assert 'options.setAttribute("role", "radiogroup")' in details
+
+    assert "card?.recipeIngredientSourceRow" in select
+    assert "applyRecipeIngredientOptionSelection(row, optionId)" in select
+    assert 'setRecipeEditStatus("Ingredient option selected. Save Recipe to keep it.")' in select
+    assert 'selectedOption?.focus({ preventScroll: true });' in select
+    assert 'event.key === "Enter" || event.key === " "' in keyboard
+    for key in ("ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"):
+        assert key in keyboard
+
+    assert "recipeIngredientSubstitutionDomGroups(" in apply_selection
+    assert "group => group.alternativeId === normalizedOptionId" in apply_selection
+    assert "setRecipeIngredientDefaultOption(" in apply_selection
+    assert "group.rows.every(optionRow =>" in apply_selection
+    assert 'String(value.option_type || "").trim() === "original"' in choice_groups
+    assert "recipeIngredientMatchFlag(value.is_default)" not in choice_groups
+    assert "updateRecipeIngredientSubstitutionState(row);" in shared_mutation
+    assert "updateRecipeIngredientSummary(row);" in shared_mutation
+    assert "updateRecipeEditorDirtyState();" in shared_mutation
+    assert "smartViewIngredients" not in select
+    assert ".recipe-edit-ingredient-smart-option:focus-visible" in css
