@@ -752,6 +752,30 @@ def test_collapsed_choice_keeps_dividers_only_between_component_rows():
     assert "border-bottom: 0;" in collapsed_divider_css
 
 
+def test_collapsed_default_choice_has_one_parent_gap_before_its_ingredient_group():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    substitution_state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function updateRecipeIngredientSummary")
+    ]
+    spacing_css = css[css.index(
+        "/* Ingredient editor v78: separate a collapsed default choice from its ingredient group. */"
+    ):]
+    rule_start = spacing_css.index(
+        "> .recipe-edit-ingredient-row.has-selected-choice-group-header.has-selected-default-choice:not("
+    )
+    rule = spacing_css[rule_start:spacing_css.index("}", rule_start)]
+
+    assert '"has-selected-default-choice"' in substitution_state
+    assert "showsSelectedChoiceGroup && selectedChoice?.isDefaultOption" in substitution_state
+    assert "@media (min-width: 768px)" in spacing_css
+    assert ".recipe-edit-substitutions-open" in rule
+    assert "row-gap: 8px !important;" in rule
+    assert ".has-selected-option-line-items" not in rule
+    assert ".recipe-edit-selected-option-line-item" not in rule
+
+
 def test_selected_choice_group_header_uses_standard_action_grid_cells():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

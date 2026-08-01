@@ -69705,3 +69705,13 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-selected-option-line-item:last-child {
     border-bottom: 0;
 }
+
+/* Ingredient editor v78: separate a collapsed default choice from its ingredient group. */
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-selected-choice-group-header.has-selected-default-choice:not(
+            .recipe-edit-substitutions-open
+        ) {
+        row-gap: 8px !important;
+    }
+}

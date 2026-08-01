@@ -46161,6 +46161,10 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         "has-selected-choice-group-header",
         showsSelectedChoiceGroup,
     );
+    row.classList.toggle(
+        "has-selected-default-choice",
+        Boolean(showsSelectedChoiceGroup && selectedChoice?.isDefaultOption),
+    );
     if (choiceParent) {
         const originalText = choiceParent.querySelector("[data-ingredient-choice-original-text]");
         const selected = choiceParent.querySelector("[data-ingredient-choice-selected-summary]");
