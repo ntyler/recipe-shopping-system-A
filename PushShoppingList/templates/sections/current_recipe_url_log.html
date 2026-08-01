@@ -1980,13 +1980,33 @@
                     </div>
                 </div>
                 <div id="recipeEditIngredientViewSmart"
-                     class="recipe-edit-ingredient-view-panel recipe-edit-ingredient-placeholder-view"
+                     class="recipe-edit-ingredient-view-panel recipe-edit-ingredient-smart-view"
                      role="tabpanel"
                      aria-labelledby="recipeEditIngredientViewTabSmart"
                      data-recipe-ingredient-view-panel="smart"
                      hidden>
-                    <div class="recipe-edit-ingredient-placeholder-panel">
-                        Smart View will be implemented in Phase 3.
+                    <div class="recipe-edit-ingredient-smart-shell" data-recipe-ingredient-smart-shell>
+                        <div id="recipeEditIngredientSmartGrid"
+                             class="recipe-edit-ingredient-smart-grid"
+                             role="list"
+                             aria-labelledby="recipeEditIngredientsTitle"
+                             data-recipe-ingredient-smart-grid></div>
+                        <div class="recipe-edit-ingredient-smart-empty"
+                             data-recipe-ingredient-smart-empty
+                             hidden>
+                            <p>No ingredients yet.</p>
+                            <button type="button" onclick="addRecipeIngredientFromCurrentView()">
+                                <span aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
+                                <span>Add Ingredient</span>
+                            </button>
+                        </div>
+                        <button type="button"
+                                class="recipe-edit-ingredient-smart-add"
+                                data-recipe-ingredient-smart-add
+                                onclick="addRecipeIngredientFromCurrentView()">
+                            <span aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
+                            <span>Add Ingredient</span>
+                        </button>
                     </div>
                 </div>
             </section>

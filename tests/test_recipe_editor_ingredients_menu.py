@@ -5186,13 +5186,16 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
     assert 'aria-selected="true"' in ingredient_section
     assert ingredient_section.count('id="recipeEditIngredients"') == 1
     assert "Recipe View will be implemented in Phase 2." not in ingredient_section
-    assert "Smart View will be implemented in Phase 3." in ingredient_section
+    assert "Smart View will be implemented in Phase 3." not in ingredient_section
     assert 'id="recipeEditIngredientRecipeList"' in ingredient_section
     assert "data-recipe-ingredient-recipe-empty" in ingredient_section
+    assert 'id="recipeEditIngredientSmartGrid"' in ingredient_section
+    assert "data-recipe-ingredient-smart-empty" in ingredient_section
     assert "No ingredients yet." in ingredient_section
     assert ingredient_section.count("data-recipe-ingredient-recipe-add") == 1
+    assert ingredient_section.count("data-recipe-ingredient-smart-add") == 1
     assert "data-recipe-ingredient-table-action" in ingredient_section
-    assert ingredient_section.count("addRecipeIngredientFromCurrentView()") == 3
+    assert ingredient_section.count("addRecipeIngredientFromCurrentView()") == 5
 
     assert 'const RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY = "ai-pantry-ingredient-view";' in script
     assert 'new Set(["recipe", "smart", "table"])' in script
@@ -5205,6 +5208,8 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
     assert 'tab.addEventListener("keydown", handleRecipeEditIngredientViewKeydown);' in script
     assert 'panel.hidden = panel.dataset.recipeIngredientViewPanel !== view;' in switch_function
     assert "syncRecipeEditIngredientViewActions(section, view);" in switch_function
+    assert 'view === "smart"' in switch_function
+    assert "renderRecipeIngredientSmartView();" in switch_function
     assert "populateRecipeEditor" not in switch_function
     assert "fetch(" not in switch_function
     assert ".innerHTML" not in switch_function

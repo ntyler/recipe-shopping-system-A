@@ -22992,6 +22992,11 @@ let recipeEditIngredientColumnResizeObserver = null;
 let recipeEditIngredientView = "table";
 let recipeEditIngredientRecipeViewPanelId = 0;
 const recipeEditExpandedRecipeViewIngredientIds = new Set();
+let recipeEditIngredientSmartViewPanelId = 0;
+let recipeEditExpandedSmartViewIngredientId = "";
+let recipeEditIngredientSmartViewLayoutFrame = 0;
+let recipeEditIngredientSmartViewLayoutWidth = 0;
+let recipeEditIngredientSmartViewResizeObserver = null;
 let recipeEditIngredientColumnView = {
     filterKeys: new Map(),
     sorts: [],
@@ -28593,7 +28598,7 @@ function syncRecipeEditIngredientViewActions(section, view) {
         }
     });
     section.querySelectorAll("[data-recipe-ingredient-recipe-hidden]").forEach(action => {
-        action.hidden = view === "recipe";
+        action.hidden = view !== "table";
     });
 }
 
@@ -28969,6 +28974,466 @@ function renderRecipeIngredientRecipeView() {
     add.hidden = !hasRows;
 }
 
+function handleRecipeIngredientSmartViewImageError(image) {
+    if (!image) return;
+    if (image.dataset.deferredSrc && image.dataset.deferredLoaded !== "1") {
+        return;
+    }
+    handleRecipeIngredientReadImageError(image);
+    const fallback = image.closest(".recipe-edit-substitution-thumbnail")
+        ?.querySelector("[data-substitution-image-fallback]");
+    if (fallback) fallback.hidden = false;
+}
+
+function syncRecipeIngredientSmartViewImage(imageCell, values = {}) {
+    if (!imageCell) return;
+    const imageUrl = recipeIngredientImageUrl(values);
+    if (imageCell.dataset.recipeIngredientImageUrl === imageUrl && imageCell.children.length) {
+        return;
+    }
+
+    imageCell.dataset.recipeIngredientImageUrl = imageUrl;
+    imageCell.classList.toggle("recipe-image-empty", !imageUrl);
+    const image = document.createElement("img");
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.fetchPriority = "low";
+    image.sizes = "64px";
+    image.dataset.fullSrc = imageUrl;
+
+    const fallback = document.createElement("span");
+    fallback.className = "recipe-edit-substitution-image-fallback";
+    fallback.dataset.substitutionImageFallback = "";
+    fallback.setAttribute("aria-hidden", "true");
+    fallback.innerHTML = recipeEditSvgIcon("image");
+    fallback.hidden = Boolean(imageUrl);
+
+    image.addEventListener("error", () => handleRecipeIngredientSmartViewImageError(image));
+    if (imageUrl) {
+        image.src = DEFERRED_IMAGE_PLACEHOLDER;
+        image.dataset.deferredSrc = recipeImageVariantUrl(imageUrl, "thumb");
+        const srcSet = recipeImageVariantSrcSet(imageUrl);
+        if (srcSet) image.dataset.deferredSrcset = srcSet;
+    } else {
+        image.hidden = true;
+    }
+    imageCell.replaceChildren(image, fallback);
+    initDeferredImages(imageCell);
+}
+
+function createRecipeIngredientSmartViewCard(row) {
+    const card = document.createElement("article");
+    card.className = "recipe-edit-ingredient-smart-card";
+    card.setAttribute("role", "listitem");
+    card.innerHTML = `
+        <div class="recipe-edit-ingredient-smart-header">
+            <div class="recipe-edit-ingredient-smart-image recipe-edit-substitution-thumbnail"
+                 data-smart-view-image></div>
+            <div class="recipe-edit-ingredient-smart-primary">
+                <strong data-smart-view-name></strong>
+                <div class="recipe-edit-ingredient-smart-meta" data-smart-view-meta>
+                    <span data-smart-view-amount></span>
+                    <span class="recipe-edit-ingredient-smart-status" data-smart-view-status></span>
+                    <span class="recipe-edit-ingredient-smart-option-count" data-smart-view-option-count></span>
+                </div>
+            </div>
+            <div class="recipe-edit-ingredient-smart-actions">
+                <span class="recipe-edit-ingredient-smart-store" data-smart-view-store></span>
+                <button type="button"
+                        class="recipe-edit-ingredient-smart-edit"
+                        data-smart-view-edit>
+                    ${recipeEditSvgIcon("edit")}
+                </button>
+                <button type="button"
+                        class="recipe-edit-ingredient-smart-disclosure"
+                        data-smart-view-disclosure
+                        aria-expanded="false">
+                    ${recipeEditSvgIcon("chevron-down")}
+                </button>
+            </div>
+        </div>
+        <div class="recipe-edit-ingredient-smart-details"
+             data-smart-view-details
+             hidden></div>
+    `;
+    card.querySelector("[data-smart-view-edit]")?.addEventListener(
+        "click",
+        event => editRecipeIngredientFromSmartView(event.currentTarget),
+    );
+    card.querySelector("[data-smart-view-disclosure]")?.addEventListener(
+        "click",
+        event => toggleRecipeIngredientSmartView(event.currentTarget),
+    );
+    return card;
+}
+
+function appendRecipeIngredientSmartViewDetail(list, labelText, value, options = {}) {
+    const text = typeof value === "string" || typeof value === "number"
+        ? String(value).trim()
+        : "";
+    if (!list || !text) return;
+
+    const term = document.createElement("dt");
+    term.textContent = labelText;
+    const description = document.createElement("dd");
+    description.classList.toggle("is-empty-prompt", Boolean(options.emptyPrompt));
+    if (options.iconHtml) {
+        const icon = document.createElement("span");
+        icon.className = "recipe-edit-ingredient-smart-detail-icon";
+        icon.innerHTML = options.iconHtml;
+        icon.setAttribute("aria-hidden", "true");
+        description.appendChild(icon);
+    }
+    const valueText = document.createElement("span");
+    valueText.textContent = text;
+    description.appendChild(valueText);
+    list.append(term, description);
+}
+
+function createRecipeIngredientSmartViewOption(group, parentValues, alternativeGroups, index) {
+    const option = document.createElement("div");
+    option.className = "recipe-edit-ingredient-smart-option";
+    option.classList.toggle("is-selected", Boolean(group.isSelected));
+    option.dataset.smartViewOptionId = group.id || `option-${index + 1}`;
+
+    const marker = document.createElement("span");
+    marker.className = "recipe-edit-ingredient-smart-option-marker";
+    marker.innerHTML = group.isSelected ? recipeEditSvgIcon("check") : "";
+    marker.setAttribute("aria-hidden", "true");
+
+    const components = document.createElement("ul");
+    components.className = "recipe-edit-ingredient-smart-option-components";
+    group.values.forEach(values => {
+        const component = document.createElement("li");
+        const amount = document.createElement("span");
+        amount.className = "recipe-edit-ingredient-smart-option-amount";
+        amount.textContent = recipeIngredientRecipeViewAmount(values);
+        const name = document.createElement("span");
+        name.className = "recipe-edit-ingredient-smart-option-name";
+        name.textContent = recipeIngredientChoiceItemSummary(
+            values,
+            parentValues,
+            alternativeGroups,
+        );
+        component.append(amount, name);
+        components.appendChild(component);
+    });
+    option.append(marker, components);
+    return option;
+}
+
+function renderRecipeIngredientSmartViewOptions(
+    container,
+    parentValues,
+    alternativeGroups,
+    choiceGroups,
+) {
+    const defaultGroups = choiceGroups.filter(group => group.isDefaultOption);
+    const alternativeChoiceGroups = choiceGroups.filter(group => !group.isDefaultOption);
+    const collections = [
+        { label: "Default", groups: defaultGroups },
+        {
+            label: `Alternatives (${alternativeChoiceGroups.length})`,
+            groups: alternativeChoiceGroups,
+        },
+    ];
+    let optionIndex = 0;
+    collections.forEach(collection => {
+        if (!collection.groups.length) return;
+        const section = document.createElement("section");
+        section.className = "recipe-edit-ingredient-smart-option-set";
+        const heading = document.createElement("h4");
+        heading.textContent = collection.label;
+        section.appendChild(heading);
+        collection.groups.forEach(group => {
+            section.appendChild(createRecipeIngredientSmartViewOption(
+                group,
+                parentValues,
+                alternativeGroups,
+                optionIndex,
+            ));
+            optionIndex += 1;
+        });
+        container.appendChild(section);
+    });
+}
+
+function renderRecipeIngredientSmartViewDetails(
+    container,
+    values,
+    alternativeGroups,
+    choiceGroups,
+) {
+    if (!container) return;
+    container.replaceChildren();
+    if (choiceGroups.length) {
+        const options = document.createElement("div");
+        options.className = "recipe-edit-ingredient-smart-options";
+        renderRecipeIngredientSmartViewOptions(
+            options,
+            values,
+            alternativeGroups,
+            choiceGroups,
+        );
+        container.appendChild(options);
+    }
+
+    const details = document.createElement("dl");
+    details.className = "recipe-edit-ingredient-smart-detail-list";
+    const buyAs = String(values.purchasable_item || values.buy_as || "").trim();
+    const groupedParentName = choiceGroups.length
+        ? recipeIngredientRecipeViewName(values, true)
+        : "";
+    const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values) || (
+        buyAs
+        && groupedParentName
+        && recipeIngredientComparableText(buyAs)
+            !== recipeIngredientComparableText(groupedParentName)
+            ? buyAs
+            : ""
+    );
+    appendRecipeIngredientSmartViewDetail(
+        details,
+        "Buy As",
+        meaningfulBuyAs,
+    );
+    const storeSection = String(values.store_section || "").trim();
+    if (storeSection) {
+        appendRecipeIngredientSmartViewDetail(
+            details,
+            "Store Section",
+            recipeStoreSectionDisplayLabel(storeSection) || storeSection,
+            { iconHtml: recipeIngredientStoreSectionIconHtml(storeSection) },
+        );
+    }
+    appendRecipeIngredientSmartViewDetail(
+        details,
+        "Preparation",
+        recipeIngredientSentenceCase(values.preparation || ""),
+    );
+    appendRecipeIngredientSmartViewDetail(details, "Size", values.size || "");
+    appendRecipeIngredientSmartViewDetail(
+        details,
+        "Type",
+        recipeIngredientTypeLabel(values),
+    );
+    const notes = String(values.notes || "").trim();
+    appendRecipeIngredientSmartViewDetail(
+        details,
+        "Notes",
+        notes || "Click to add notes\u2026",
+        { emptyPrompt: !notes },
+    );
+    if (details.children.length) container.appendChild(details);
+}
+
+function syncRecipeIngredientSmartViewCardExpanded(card, expanded) {
+    if (!card) return;
+    const disclosure = card.querySelector("[data-smart-view-disclosure]");
+    const details = card.querySelector("[data-smart-view-details]");
+    const name = String(card.querySelector("[data-smart-view-name]")?.textContent || "ingredient").trim();
+    card.classList.toggle("is-expanded", expanded);
+    if (details) details.hidden = !expanded;
+    if (disclosure) {
+        disclosure.setAttribute("aria-expanded", String(expanded));
+        disclosure.setAttribute("aria-controls", details?.id || "");
+        disclosure.setAttribute(
+            "aria-label",
+            `${expanded ? "Collapse" : "Expand"} ${name || "ingredient"} details`,
+        );
+        disclosure.title = expanded ? "Collapse ingredient details" : "Expand ingredient details";
+    }
+}
+
+function renderRecipeIngredientSmartViewCard(card, row, values, alternativeGroups) {
+    const key = ensureRecipeIngredientExpansionId(row);
+    const choice = recipeIngredientRecipeViewChoiceGroups(row, values, alternativeGroups);
+    const name = recipeIngredientSentenceCase(
+        recipeIngredientRecipeViewName(values, choice.groups.length > 0),
+    ) || "Unnamed ingredient";
+    card.dataset.smartViewIngredientId = key;
+    card.recipeIngredientSourceRow = row;
+
+    const nameElement = card.querySelector("[data-smart-view-name]");
+    if (nameElement) {
+        nameElement.textContent = name;
+        nameElement.title = name;
+    }
+    syncRecipeIngredientSmartViewImage(
+        card.querySelector("[data-smart-view-image]"),
+        values,
+    );
+    const amount = card.querySelector("[data-smart-view-amount]");
+    if (amount) {
+        const amountText = recipeIngredientRecipeViewAmount(values);
+        amount.textContent = amountText;
+        amount.hidden = !amountText;
+    }
+    const status = card.querySelector("[data-smart-view-status]");
+    if (status) {
+        status.innerHTML = recipeIngredientReadStatusHtml(
+            recipeIngredientMatchItemFromRow(row, values),
+        );
+    }
+    const optionCount = card.querySelector("[data-smart-view-option-count]");
+    if (optionCount) {
+        optionCount.textContent = choice.groups.length ? choice.summary.label : "";
+        optionCount.hidden = !choice.groups.length;
+    }
+    renderRecipeIngredientRecipeViewStore(
+        card.querySelector("[data-smart-view-store]"),
+        values,
+    );
+    const edit = card.querySelector("[data-smart-view-edit]");
+    if (edit) {
+        edit.setAttribute("aria-label", `Edit ${name}`);
+        edit.title = `Edit ${name}`;
+    }
+    const details = card.querySelector("[data-smart-view-details]");
+    if (details && !details.id) {
+        recipeEditIngredientSmartViewPanelId += 1;
+        details.id = `recipeEditIngredientSmartDetails${recipeEditIngredientSmartViewPanelId}`;
+    }
+    renderRecipeIngredientSmartViewDetails(
+        details,
+        values,
+        alternativeGroups,
+        choice.groups,
+    );
+    syncRecipeIngredientSmartViewCardExpanded(
+        card,
+        recipeEditExpandedSmartViewIngredientId === key,
+    );
+}
+
+function layoutRecipeIngredientSmartView() {
+    recipeEditIngredientSmartViewLayoutFrame = 0;
+    const grid = document.querySelector("[data-recipe-ingredient-smart-grid]");
+    const panel = grid?.closest('[data-recipe-ingredient-view-panel="smart"]');
+    if (!grid || !panel || panel.hidden) return;
+
+    const width = grid.getBoundingClientRect().width;
+    if (width <= 0) return;
+    recipeEditIngredientSmartViewLayoutWidth = width;
+    const columnCount = width >= 700 ? 2 : 1;
+    grid.dataset.smartColumns = String(columnCount);
+    const cards = [...grid.querySelectorAll(":scope > [data-smart-view-ingredient-id]")];
+    cards.forEach((card, index) => {
+        card.style.gridColumn = String(columnCount === 1 ? 1 : (index % 2) + 1);
+        card.style.gridRowStart = "auto";
+        card.style.gridRowEnd = "auto";
+    });
+    void grid.offsetHeight;
+
+    const nextRow = Array(columnCount).fill(1);
+    const gap = 12;
+    cards.forEach((card, index) => {
+        const column = columnCount === 1 ? 0 : index % 2;
+        const height = Math.max(1, Math.ceil(card.getBoundingClientRect().height));
+        const start = nextRow[column];
+        card.style.gridColumn = String(column + 1);
+        card.style.gridRow = `${start} / span ${height}`;
+        nextRow[column] = start + height + gap;
+    });
+}
+
+function scheduleRecipeIngredientSmartViewLayout() {
+    if (recipeEditIngredientSmartViewLayoutFrame) return;
+    recipeEditIngredientSmartViewLayoutFrame = window.requestAnimationFrame(
+        layoutRecipeIngredientSmartView,
+    );
+}
+
+function initRecipeIngredientSmartViewLayout() {
+    const grid = document.querySelector("[data-recipe-ingredient-smart-grid]");
+    if (
+        !grid
+        || recipeEditIngredientSmartViewResizeObserver
+        || typeof ResizeObserver !== "function"
+    ) {
+        return;
+    }
+    recipeEditIngredientSmartViewResizeObserver = new ResizeObserver(entries => {
+        const width = entries[0]?.contentRect?.width || 0;
+        if (Math.abs(width - recipeEditIngredientSmartViewLayoutWidth) > 0.5) {
+            scheduleRecipeIngredientSmartViewLayout();
+        }
+    });
+    recipeEditIngredientSmartViewResizeObserver.observe(grid);
+}
+
+function renderRecipeIngredientSmartView() {
+    const grid = document.querySelector("[data-recipe-ingredient-smart-grid]");
+    const empty = document.querySelector("[data-recipe-ingredient-smart-empty]");
+    const add = document.querySelector("[data-recipe-ingredient-smart-add]");
+    if (!grid || !empty || !add) return;
+
+    const existingCards = new Map(
+        [...grid.children].map(card => [card.dataset.smartViewIngredientId || "", card]),
+    );
+    const rows = recipeEditIngredientRows().map(row => {
+        const values = fieldValuesFromRow(row);
+        const alternativeGroups = recipeIngredientSubstitutionDomGroups(
+            [...row.querySelectorAll("[data-substitution-option-row]")],
+        );
+        return { row, values, alternativeGroups };
+    }).filter(({ values, alternativeGroups }) => (
+        recipeIngredientRecipeViewHasContent(values, alternativeGroups)
+    ));
+    const liveKeys = new Set();
+
+    rows.forEach(({ row, values, alternativeGroups }) => {
+        const key = ensureRecipeIngredientExpansionId(row);
+        liveKeys.add(key);
+        let card = existingCards.get(key);
+        if (!card) card = createRecipeIngredientSmartViewCard(row);
+        existingCards.delete(key);
+        renderRecipeIngredientSmartViewCard(card, row, values, alternativeGroups);
+        grid.appendChild(card);
+    });
+    existingCards.forEach(card => card.remove());
+    if (
+        recipeEditExpandedSmartViewIngredientId
+        && !liveKeys.has(recipeEditExpandedSmartViewIngredientId)
+    ) {
+        recipeEditExpandedSmartViewIngredientId = "";
+    }
+    const hasRows = rows.length > 0;
+    grid.hidden = !hasRows;
+    empty.hidden = hasRows;
+    add.hidden = !hasRows;
+    initRecipeIngredientSmartViewLayout();
+    scheduleRecipeIngredientSmartViewLayout();
+}
+
+function toggleRecipeIngredientSmartView(button) {
+    const card = button ? button.closest("[data-smart-view-ingredient-id]") : null;
+    const key = String(card?.dataset.smartViewIngredientId || "");
+    if (!card || !key) return false;
+
+    const shouldExpand = recipeEditExpandedSmartViewIngredientId !== key;
+    const openCard = card.parentElement?.querySelector(
+        ":scope > .recipe-edit-ingredient-smart-card.is-expanded",
+    );
+    if (openCard && openCard !== card) {
+        syncRecipeIngredientSmartViewCardExpanded(openCard, false);
+    }
+    recipeEditExpandedSmartViewIngredientId = shouldExpand ? key : "";
+    syncRecipeIngredientSmartViewCardExpanded(card, shouldExpand);
+    scheduleRecipeIngredientSmartViewLayout();
+    return false;
+}
+
+function editRecipeIngredientFromSmartView(button) {
+    const card = button ? button.closest("[data-smart-view-ingredient-id]") : null;
+    const row = card?.recipeIngredientSourceRow;
+    if (!row || !row.isConnected) return false;
+    recipeEditIngredientModalReturnView = recipeEditIngredientView;
+    setRecipeEditIngredientView("table", { persist: false });
+    return setRecipeIngredientEditMode(row, true, { trigger: button });
+}
+
 function toggleRecipeIngredientRecipeView(button) {
     const item = button ? button.closest("[data-recipe-view-ingredient-id]") : null;
     const key = String(item?.dataset.recipeViewIngredientId || "");
@@ -29029,6 +29494,8 @@ function setRecipeEditIngredientView(value, options = {}) {
     section.dataset.recipeIngredientView = view;
     if (view === "recipe") {
         renderRecipeIngredientRecipeView();
+    } else if (view === "smart") {
+        renderRecipeIngredientSmartView();
     }
     section.querySelectorAll("[data-recipe-ingredient-view-tab]").forEach(tab => {
         const selected = tab.dataset.recipeIngredientViewTab === view;
@@ -47493,6 +47960,7 @@ function updateRecipeIngredientSummary(row) {
         syncRecipeIngredientColumnViewOpenMenu({ render: true });
     }
     renderRecipeIngredientRecipeView();
+    renderRecipeIngredientSmartView();
 }
 
 function recipeEditIngredientRows() {
@@ -47527,6 +47995,7 @@ function updateRecipeIngredientRowIndexes() {
         count.textContent = `(${rows.length})`;
     }
     renderRecipeIngredientRecipeView();
+    renderRecipeIngredientSmartView();
     updateRecipeEditIngredientGallery();
     updateRecipeEditorHealth();
 }
