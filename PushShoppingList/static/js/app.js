@@ -32234,7 +32234,10 @@ function openRecipeIngredientOptionModal(control, options = {}) {
                 ? control
                 : editButton
         );
-    setRecipeIngredientEditMode(row, true, { trigger });
+    setRecipeIngredientEditMode(row, true, {
+        trigger,
+        restoreOtherEdits: options.restoreOtherEdits,
+    });
     if (editButton) editButton.setAttribute("aria-expanded", "true");
     const values = fieldValuesFromRow(optionRow);
     const card = optionRow.closest(".recipe-edit-alternative-card");
@@ -37309,14 +37312,32 @@ function showRecipeEditorValidationErrors(errors, options = {}) {
         : null;
     if (optionRow) {
         const ingredientRow = recipeIngredientParentRowFromControl(optionRow);
-        const alternativesButton = ingredientRow
+        const fieldName = String(firstErrorControl.dataset.field || "").trim();
+        const card = optionRow.closest(".recipe-edit-alternative-card");
+        if (card && card.classList.contains("is-editing")) {
+            setRecipeIngredientAlternativeEditMode(card, false);
+        }
+        const optionsButton = ingredientRow
             ? ingredientRow.querySelector("[data-ingredient-substitutions-toggle]")
             : null;
-        if (alternativesButton) {
-            openRecipeIngredientAlternativesDialog(alternativesButton, null, { restoreOtherEdits: false });
+        if (optionsButton) {
+            openRecipeIngredientAlternativesDialog(optionsButton, null, {
+                restoreOtherEdits: false,
+            });
         }
-        const card = optionRow.closest(".recipe-edit-alternative-card");
-        if (card) setRecipeIngredientAlternativeEditMode(card, true, { restoreOtherEdits: false });
+        syncRecipeIngredientInlineEditor(optionRow);
+        const compactControl = fieldName
+            ? [...optionRow.querySelectorAll(
+                '[data-alternative-component-summary] [data-recipe-ingredient-inline-field]',
+            )].find(control => control.dataset.recipeIngredientInlineField === fieldName)
+            : null;
+        if (compactControl) {
+            compactControl.setAttribute("aria-invalid", "true");
+            compactControl.dataset.recipeEditValidationInvalid = "true";
+            recipeEditorValidationContainer(compactControl)?.classList.add("recipe-edit-has-validation-error");
+            const firstError = safeErrors.find(error => error.control === firstErrorControl);
+            if (firstError) firstError.control = compactControl;
+        }
     } else if (firstErrorControl && firstErrorControl.closest) {
         const instructionRow = firstErrorControl.closest(".recipe-edit-read-first-instruction");
         const ingredientRow = firstErrorControl.closest(".recipe-edit-read-first-row");

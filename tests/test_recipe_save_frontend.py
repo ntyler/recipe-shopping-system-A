@@ -121,10 +121,22 @@ def test_validation_reveals_invalid_nested_editor_without_restoring_other_live_e
         script.index("function setRecipeIngredientAlternativeEditMode"):
         script.index("function replaceRecipeIngredientWithAlternativeCard")
     ]
+    option_modal = script[
+        script.index("function openRecipeIngredientOptionModal"):
+        script.index("function switchRecipeIngredientOptionModal")
+    ]
 
-    assert reveal.count("{ restoreOtherEdits: false }") == 4
+    assert "openRecipeIngredientAlternativesDialog(optionsButton" in reveal
+    assert "restoreOtherEdits: false" in reveal
+    assert "setRecipeIngredientAlternativeEditMode(card, true" not in reveal
+    assert 'card.classList.contains("is-editing")' in reveal
+    assert "setRecipeIngredientAlternativeEditMode(card, false);" in reveal
+    assert "syncRecipeIngredientInlineEditor(optionRow);" in reveal
+    assert "firstError.control = compactControl" in reveal
+    assert 'compactControl.dataset.recipeEditValidationInvalid = "true"' in reveal
     assert "setRecipeIngredientEditMode(ingredientRow, true, { restoreOtherEdits: false });" in reveal
     assert "setRecipeInstructionEditMode(instructionRow, true, { restoreOtherEdits: false });" in reveal
+    assert "restoreOtherEdits: options.restoreOtherEdits" in option_modal
     assert "const restoreOtherEdits = options.restoreOtherEdits !== false;" in main_edit
     assert "restore: restoreOtherEdits" in main_edit
     assert '!row.classList.contains("is-editing") || !panel.dataset.editSnapshot' in main_edit
