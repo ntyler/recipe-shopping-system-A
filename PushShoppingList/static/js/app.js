@@ -28985,6 +28985,81 @@ function handleRecipeIngredientSmartViewImageError(image) {
     if (fallback) fallback.hidden = false;
 }
 
+function recipeIngredientSmartViewQuantityNumber(value) {
+    const fraction = parseQuantityFraction(value);
+    if (!fraction || !fraction.denominator) return null;
+    return fraction.numerator / fraction.denominator;
+}
+
+function recipeIngredientSmartViewAmount(values = {}) {
+    const quantityText = String(values.quantity_text || "").trim();
+    const quantity = String(values.quantity || values.amount || "").trim();
+    const size = String(values.size || "").trim();
+    const unit = String(values.unit || "").trim();
+    const amount = quantityText || quantity;
+    if (/^(?:to taste|as needed)$/i.test(unit)) {
+        return amount && !/\d/.test(amount) ? amount : unit;
+    }
+
+    const quantityNumber = recipeIngredientSmartViewQuantityNumber(amount);
+    const unitLabel = quantityNumber !== null && quantityNumber > 1
+        ? recipeIngredientPluralUnit(unit, String(quantityNumber), { includePieces: true })
+        : unit;
+    const amountKey = recipeIngredientComparableText(amount);
+    const details = [size, unitLabel].filter((value, index, valuesList) => {
+        const key = recipeIngredientComparableText(value);
+        if (!key || (amountKey && amountKey.includes(key))) return false;
+        return valuesList.findIndex(candidate => (
+            recipeIngredientComparableText(candidate) === key
+        )) === index;
+    });
+    return [amount, ...details].filter(Boolean).join(" ");
+}
+
+function recipeIngredientSmartViewPluralName(value) {
+    const name = recipeIngredientComparableText(value);
+    if (!name) return "";
+    if (/[^aeiou]y$/i.test(name)) return `${name.slice(0, -1)}ies`;
+    if (/(?:s|x|z|ch|sh|o)$/i.test(name)) return `${name}es`;
+    return `${name}s`;
+}
+
+function recipeIngredientSmartViewNamesDifferOnlyByCount(left, right) {
+    const leftName = recipeIngredientComparableText(left);
+    const rightName = recipeIngredientComparableText(right);
+    if (!leftName || !rightName) return false;
+    return leftName === rightName
+        || recipeIngredientSmartViewPluralName(leftName) === rightName
+        || recipeIngredientSmartViewPluralName(rightName) === leftName;
+}
+
+function recipeIngredientSmartViewName(values = {}, hasChoices = false) {
+    const name = recipeIngredientRecipeViewName(values, hasChoices);
+    if (hasChoices || String(values.preparation || "").trim()) return name;
+    const buyAs = String(values.purchasable_item || values.buy_as || "").trim();
+    const quantityNumber = recipeIngredientSmartViewQuantityNumber(
+        String(values.quantity_text || values.quantity || values.amount || "").trim(),
+    );
+    if (
+        buyAs
+        && quantityNumber !== null
+        && quantityNumber > 1
+        && recipeIngredientSmartViewNamesDifferOnlyByCount(name, buyAs)
+    ) {
+        return buyAs;
+    }
+    return name;
+}
+
+function recipeIngredientSmartViewMeaningfulBuyAs(values = {}, displayName = "") {
+    const ingredient = String(displayName || values.ingredient || "").trim();
+    const buyAs = String(values.purchasable_item || values.buy_as || "").trim();
+    if (!buyAs || recipeIngredientSmartViewNamesDifferOnlyByCount(ingredient, buyAs)) {
+        return "";
+    }
+    return buyAs;
+}
+
 function syncRecipeIngredientSmartViewImage(imageCell, values = {}) {
     if (!imageCell) return;
     const imageUrl = recipeIngredientImageUrl(values);
@@ -29108,7 +29183,7 @@ function createRecipeIngredientSmartViewOption(group, parentValues, alternativeG
         const component = document.createElement("li");
         const amount = document.createElement("span");
         amount.className = "recipe-edit-ingredient-smart-option-amount";
-        amount.textContent = recipeIngredientRecipeViewAmount(values);
+        amount.textContent = recipeIngredientSmartViewAmount(values);
         const name = document.createElement("span");
         name.className = "recipe-edit-ingredient-smart-option-name";
         name.textContent = recipeIngredientChoiceItemSummary(
@@ -29181,17 +29256,12 @@ function renderRecipeIngredientSmartViewDetails(
 
     const details = document.createElement("dl");
     details.className = "recipe-edit-ingredient-smart-detail-list";
-    const buyAs = String(values.purchasable_item || values.buy_as || "").trim();
     const groupedParentName = choiceGroups.length
         ? recipeIngredientRecipeViewName(values, true)
         : "";
-    const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values) || (
-        buyAs
-        && groupedParentName
-        && recipeIngredientComparableText(buyAs)
-            !== recipeIngredientComparableText(groupedParentName)
-            ? buyAs
-            : ""
+    const meaningfulBuyAs = recipeIngredientSmartViewMeaningfulBuyAs(
+        values,
+        groupedParentName,
     );
     appendRecipeIngredientSmartViewDetail(
         details,
@@ -29250,7 +29320,7 @@ function renderRecipeIngredientSmartViewCard(card, row, values, alternativeGroup
     const key = ensureRecipeIngredientExpansionId(row);
     const choice = recipeIngredientRecipeViewChoiceGroups(row, values, alternativeGroups);
     const name = recipeIngredientSentenceCase(
-        recipeIngredientRecipeViewName(values, choice.groups.length > 0),
+        recipeIngredientSmartViewName(values, choice.groups.length > 0),
     ) || "Unnamed ingredient";
     card.dataset.smartViewIngredientId = key;
     card.recipeIngredientSourceRow = row;
@@ -29266,15 +29336,21 @@ function renderRecipeIngredientSmartViewCard(card, row, values, alternativeGroup
     );
     const amount = card.querySelector("[data-smart-view-amount]");
     if (amount) {
-        const amountText = recipeIngredientRecipeViewAmount(values);
+        const amountText = recipeIngredientSmartViewAmount(values);
         amount.textContent = amountText;
         amount.hidden = !amountText;
     }
     const status = card.querySelector("[data-smart-view-status]");
     if (status) {
-        status.innerHTML = recipeIngredientReadStatusHtml(
-            recipeIngredientMatchItemFromRow(row, values),
-        );
+        const statusDetails = recipeIngredientRecipeViewStatus(row, values);
+        status.replaceChildren();
+        if (statusDetails) {
+            const statusLabel = document.createElement("span");
+            statusLabel.className = statusDetails.className;
+            statusLabel.textContent = statusDetails.text;
+            status.appendChild(statusLabel);
+        }
+        status.hidden = !statusDetails;
     }
     const optionCount = card.querySelector("[data-smart-view-option-count]");
     if (optionCount) {

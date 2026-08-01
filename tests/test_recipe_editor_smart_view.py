@@ -88,30 +88,60 @@ def test_smart_cards_reuse_images_status_store_sections_and_structured_options()
     assert 'image.alt = "";' in image
 
     assert "recipeIngredientRecipeViewChoiceGroups(row, values, alternativeGroups)" in card
-    assert "recipeIngredientRecipeViewName(values, choice.groups.length > 0)" in card
-    assert "recipeIngredientRecipeViewAmount(values)" in card
-    assert "recipeIngredientReadStatusHtml(" in card
-    assert "recipeIngredientMatchItemFromRow(row, values)" in card
+    assert "recipeIngredientSmartViewName(values, choice.groups.length > 0)" in card
+    assert "recipeIngredientSmartViewAmount(values)" in card
+    assert "recipeIngredientRecipeViewStatus(row, values)" in card
+    assert "status.hidden = !statusDetails;" in card
     assert "renderRecipeIngredientRecipeViewStore(" in card
 
     assert 'const defaultGroups = choiceGroups.filter(group => group.isDefaultOption);' in options
     assert 'const alternativeChoiceGroups = choiceGroups.filter(group => !group.isDefaultOption);' in options
     assert "group.values.forEach(values =>" in script
     assert "recipeIngredientChoiceItemSummary(" in script
-    assert "recipeIngredientRecipeViewAmount(values)" in script
+    assert "recipeIngredientSmartViewAmount(values)" in script
     assert 'label: "Default"' in options
     assert 'label: `Alternatives (${alternativeChoiceGroups.length})`' in options
 
     assert '"Buy As"' in details
-    assert "recipeIngredientMeaningfulBuyAs(values)" in details
+    assert "recipeIngredientSmartViewMeaningfulBuyAs(" in details
     assert "recipeIngredientRecipeViewName(values, true)" in details
-    assert "recipeIngredientComparableText(groupedParentName)" in details
     assert '"Store Section"' in details
     assert "recipeIngredientStoreSectionIconHtml(storeSection)" in details
     assert '"Preparation"' in details
     assert '"Type"' in details
     assert "recipeIngredientTypeLabel(values)" in details
     assert 'notes || "Click to add notes\\u2026"' in details
+
+
+def test_smart_collapsed_cards_prioritize_units_sizes_and_actionable_statuses():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    amount = _function(
+        script,
+        "recipeIngredientSmartViewAmount(values = {})",
+        "recipeIngredientSmartViewPluralName",
+    )
+    name = _function(
+        script,
+        "recipeIngredientSmartViewName(values = {}, hasChoices = false)",
+        "recipeIngredientSmartViewMeaningfulBuyAs",
+    )
+    buy_as = _function(
+        script,
+        'recipeIngredientSmartViewMeaningfulBuyAs(values = {}, displayName = "")',
+        "syncRecipeIngredientSmartViewImage",
+    )
+
+    assert 'const quantityText = String(values.quantity_text || "").trim();' in amount
+    assert 'const size = String(values.size || "").trim();' in amount
+    assert 'const unit = String(values.unit || "").trim();' in amount
+    assert "quantityNumber > 1" in amount
+    assert 'return [amount, ...details].filter(Boolean).join(" ");' in amount
+
+    assert "recipeIngredientSmartViewNamesDifferOnlyByCount(name, buyAs)" in name
+    assert "quantityNumber > 1" in name
+    assert "return buyAs;" in name
+    assert "recipeIngredientSmartViewNamesDifferOnlyByCount(ingredient, buyAs)" in buy_as
 
 
 def test_smart_expansion_is_single_stable_view_only_state_and_accessible():
