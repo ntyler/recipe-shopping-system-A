@@ -88,8 +88,8 @@ def test_smart_cards_reuse_images_status_store_sections_and_structured_options()
     assert 'image.alt = "";' in image
 
     assert "recipeIngredientRecipeViewChoiceGroups(row, values, alternativeGroups)" in card
-    assert "recipeIngredientSmartViewName(values, choice.groups.length > 0)" in card
-    assert "recipeIngredientSmartViewAmount(values)" in card
+    assert "recipeIngredientViewName(values, choice.groups.length > 0)" in card
+    assert "recipeIngredientViewAmount(values)" in card
     assert "recipeIngredientRecipeViewStatus(row, values)" in card
     assert "status.hidden = !statusDetails;" in card
     assert "renderRecipeIngredientRecipeViewStore(" in card
@@ -98,12 +98,12 @@ def test_smart_cards_reuse_images_status_store_sections_and_structured_options()
     assert 'const alternativeChoiceGroups = choiceGroups.filter(group => !group.isDefaultOption);' in options
     assert "group.values.forEach(values =>" in script
     assert "recipeIngredientChoiceItemSummary(" in script
-    assert "recipeIngredientSmartViewAmount(values)" in script
+    assert "recipeIngredientViewAmount(values)" in script
     assert 'label: "Default"' in options
     assert 'label: `Alternatives (${alternativeChoiceGroups.length})`' in options
 
     assert '"Buy As"' in details
-    assert "recipeIngredientSmartViewMeaningfulBuyAs(" in details
+    assert "recipeIngredientViewMeaningfulBuyAs(" in details
     assert "recipeIngredientRecipeViewName(values, true)" in details
     assert '"Store Section"' in details
     assert "recipeIngredientStoreSectionIconHtml(storeSection)" in details
@@ -118,17 +118,17 @@ def test_smart_collapsed_cards_prioritize_units_sizes_and_actionable_statuses():
 
     amount = _function(
         script,
-        "recipeIngredientSmartViewAmount(values = {})",
-        "recipeIngredientSmartViewPluralName",
+        "recipeIngredientViewAmount(values = {})",
+        "recipeIngredientViewPluralName",
     )
     name = _function(
         script,
-        "recipeIngredientSmartViewName(values = {}, hasChoices = false)",
-        "recipeIngredientSmartViewMeaningfulBuyAs",
+        "recipeIngredientViewName(values = {}, hasChoices = false)",
+        "recipeIngredientViewMeaningfulBuyAs",
     )
     buy_as = _function(
         script,
-        'recipeIngredientSmartViewMeaningfulBuyAs(values = {}, displayName = "")',
+        'recipeIngredientViewMeaningfulBuyAs(values = {}, displayName = "")',
         "syncRecipeIngredientSmartViewImage",
     )
 
@@ -138,10 +138,10 @@ def test_smart_collapsed_cards_prioritize_units_sizes_and_actionable_statuses():
     assert "quantityNumber > 1" in amount
     assert 'return [amount, ...details].filter(Boolean).join(" ");' in amount
 
-    assert "recipeIngredientSmartViewNamesDifferOnlyByCount(name, buyAs)" in name
+    assert "recipeIngredientViewNamesDifferOnlyByCount(name, buyAs)" in name
     assert "quantityNumber > 1" in name
     assert "return buyAs;" in name
-    assert "recipeIngredientSmartViewNamesDifferOnlyByCount(ingredient, buyAs)" in buy_as
+    assert "recipeIngredientViewNamesDifferOnlyByCount(ingredient, buyAs)" in buy_as
 
 
 def test_smart_expansion_is_single_stable_view_only_state_and_accessible():

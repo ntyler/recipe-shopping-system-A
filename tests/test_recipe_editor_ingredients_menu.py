@@ -5250,8 +5250,8 @@ def test_recipe_editor_phase_two_recipe_view_reuses_shared_rows_handlers_and_opt
     assert "fetch(" not in render
     assert "recipeViewIngredients" not in script
 
-    assert "recipeIngredientRecipeViewAmount(values)" in item
-    assert "recipeIngredientRecipeViewName(values, hasChoices)" in item
+    assert "recipeIngredientViewAmount(values)" in item
+    assert "recipeIngredientViewName(values, hasChoices)" in item
     assert "recipeIngredientRecipeViewStatus(row, values)" in script
     assert "recipeIngredientMeaningfulBuyAs(values)" in script
     assert "StoreSectionBadge.create" in script
@@ -5287,7 +5287,15 @@ def test_recipe_editor_phase_two_recipe_view_reuses_shared_rows_handlers_and_opt
         script.index("function toggleRecipeEditRowMenu")
     ]
     assert "Ingredient editor v81: compact recipe-style ingredient list." in css
+    assert "Ingredient editor v83: align Recipe view metadata into orderly desktop columns." in css
     assert ".recipe-edit-ingredient-recipe-item" in css
+    inline_css = css[css.index("Ingredient editor v83:"):]
+    assert "grid-template-columns:" in inline_css
+    assert "text-overflow: ellipsis;" in inline_css
+    assert ".recipe-edit-ingredient-recipe-secondary" in inline_css
+    assert "grid-column: 3;" in inline_css
+    assert "grid-column: 5;" in inline_css
+    assert "grid-column: 7;" in inline_css
     assert "overflow-x: clip;" in css
     assert ".recipe-edit-ingredient-recipe-disclosure:focus-visible" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
