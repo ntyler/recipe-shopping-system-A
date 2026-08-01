@@ -69693,3 +69693,10 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor {
     background: var(--app-surface);
 }
+
+/* Ingredient editor v77: end collapsed choices without a trailing inset rule. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > .recipe-edit-selected-option-line-item:last-child {
+    border-bottom: 0;
+}

@@ -735,6 +735,17 @@ def test_collapsed_choice_option_count_aligns_with_desktop_row_cells():
     assert ".recipe-edit-selected-choice-group-title-input" in css
 
 
+def test_collapsed_choice_omits_only_the_trailing_component_divider():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    trailing_divider_css = css[css.index(
+        "/* Ingredient editor v77: end collapsed choices without a trailing inset rule. */"
+    ):]
+
+    assert ".recipe-edit-selected-option-line-items" in trailing_divider_css
+    assert "> .recipe-edit-selected-option-line-item:last-child" in trailing_divider_css
+    assert "border-bottom: 0;" in trailing_divider_css
+
+
 def test_selected_choice_group_header_uses_standard_action_grid_cells():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -840,11 +851,27 @@ def test_implicit_default_option_header_has_the_option_actions_submenu():
     assert 'aria-label="Option actions"' in overview
     assert "Ingredient option" in overview
     assert 'onclick="return focusRecipeEditCompactRow(this)">Edit option</button>' in overview
+    assert 'onclick="return duplicateRecipeIngredientDefaultOption(this)">Duplicate option</button>' in overview
+    assert 'onclick="return moveRecipeIngredientDefaultOption(this, -1)">Move option up</button>' in overview
+    assert 'onclick="return moveRecipeIngredientDefaultOption(this, 1)">Move option down</button>' in overview
     assert "data-set-alternative-preferred" in overview
     assert 'onclick="return setRecipeIngredientOptionSelected(this)"' in overview
+    assert 'onclick="return removeRecipeIngredientDefaultOption(this)">Remove option</button>' in overview
     assert 'menuAction.textContent = isSelected ? "Selected option" : "Use this option";' in selection_state
     assert "menuAction.disabled = isSelected;" in selection_state
     assert ".recipe-edit-ingredient-choice-overview\n    > .recipe-edit-ingredient-option-divider\n    > .recipe-edit-option-selection" not in css
+
+    default_actions = script[
+        script.index("function materializeRecipeIngredientDefaultOption"):
+        script.index("function addRecipeIngredientDefaultComponent")
+    ]
+    assert "function duplicateRecipeIngredientDefaultOption" in default_actions
+    assert "function moveRecipeIngredientDefaultOption" in default_actions
+    assert "function removeRecipeIngredientDefaultOption" in default_actions
+    assert "duplicateRecipeIngredientAlternative(card)" in default_actions
+    assert "moveRecipeIngredientAlternative(card, direction)" in default_actions
+    assert 'window.confirm("Delete this replacement group and all of its ingredients?")' in default_actions
+    assert "removeRecipeIngredientAlternative(card, { confirm: false })" in default_actions
 
 
 def test_selected_option_line_items_reorder_their_underlying_component_rows():

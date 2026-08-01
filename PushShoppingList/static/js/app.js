@@ -45522,13 +45522,13 @@ function moveRecipeIngredientAlternative(control, direction) {
     return false;
 }
 
-function removeRecipeIngredientAlternative(button) {
+function removeRecipeIngredientAlternative(button, options = {}) {
     const card = recipeIngredientAlternativeCardFromControl(button);
     const ingredientRow = card ? card.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])") : null;
     if (!card || !ingredientRow) {
         return false;
     }
-    if (!window.confirm("Delete this replacement group and all of its ingredients?")) {
+    if (options.confirm !== false && !window.confirm("Delete this replacement group and all of its ingredients?")) {
         return false;
     }
     card.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => optionRow.remove());
@@ -45832,9 +45832,17 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
                         <div class="recipe-edit-menu-group">
                             <div class="recipe-edit-menu-group-label">Ingredient option</div>
                             <button type="button" onclick="return focusRecipeEditCompactRow(this)">Edit option</button>
+                            <button type="button" onclick="return duplicateRecipeIngredientDefaultOption(this)">Duplicate option</button>
+                            <button type="button" onclick="return moveRecipeIngredientDefaultOption(this, -1)">Move option up</button>
+                            <button type="button" onclick="return moveRecipeIngredientDefaultOption(this, 1)">Move option down</button>
                             <button type="button"
                                     data-set-alternative-preferred
                                     onclick="return setRecipeIngredientOptionSelected(this)">Use this option</button>
+                        </div>
+                        <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
+                            <button type="button"
+                                    class="delete"
+                                    onclick="return removeRecipeIngredientDefaultOption(this)">Remove option</button>
                         </div>
                     </div>
                 </div>
@@ -45892,6 +45900,80 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
         }
     });
     return overview;
+}
+
+function materializeRecipeIngredientDefaultOption(control) {
+    const row = recipeIngredientParentRowFromControl(control);
+    const container = recipeIngredientSubstitutionContainer(row, control);
+    const list = container ? container.querySelector("[data-ingredient-substitution-list]") : null;
+    if (!row || !container || !list) {
+        return null;
+    }
+
+    const values = fieldValuesFromRow(row);
+    const alternativeId = nextRecipeIngredientAlternativeId();
+    const defaultField = row.querySelector('[data-field="default_option_id"]');
+    const selectionField = row.querySelector('[data-field="selection_required"]');
+    const originalOption = row.querySelector("[data-original-option-id]");
+    const originalOptionId = String(originalOption ? originalOption.value : "").trim();
+    const selected = Boolean(
+        originalOptionId
+        && defaultField
+        && String(defaultField.value || "").trim() === originalOptionId
+    );
+    const originalValues = {
+        ...values,
+        id: "",
+        substitution_id: "",
+        alternative_id: alternativeId,
+        alternative_order: 0,
+        alternative_component_order: 0,
+        alternative_label: String(values.ingredient || "Default option").trim(),
+        option_type: "original",
+        recipe_authored: true,
+        is_default: selected,
+        preferred: selected,
+        optional: recipeIngredientIsOptional(values),
+    };
+    delete originalValues.substitutions;
+
+    closeRecipeEditRowMenus();
+    list.insertAdjacentHTML(
+        "afterbegin",
+        recipeIngredientSubstitutionOptionRowHtml(originalValues, 0, {
+            index: 0,
+            componentIndex: 0,
+        }),
+    );
+    const optionRow = list.querySelector(":scope > [data-substitution-option-row]");
+    organizeRecipeEditSubstitutionOptionRow(optionRow);
+    bindRecipeIngredientSubstitutionRow(optionRow);
+    if (selected && defaultField) defaultField.value = alternativeId;
+    if (selectionField) selectionField.value = "true";
+    updateRecipeIngredientSubstitutionState(row);
+    updateRecipeIngredientSummary(row);
+    updateRecipeEditorDirtyState();
+    return recipeIngredientSubstitutionContainer(row)
+        ?.querySelector(`.recipe-edit-alternative-card[data-alternative-id="${CSS.escape(alternativeId)}"]`)
+        || null;
+}
+
+function duplicateRecipeIngredientDefaultOption(button) {
+    const card = materializeRecipeIngredientDefaultOption(button);
+    return card ? duplicateRecipeIngredientAlternative(card) : false;
+}
+
+function moveRecipeIngredientDefaultOption(button, direction) {
+    const card = materializeRecipeIngredientDefaultOption(button);
+    return card ? moveRecipeIngredientAlternative(card, direction) : false;
+}
+
+function removeRecipeIngredientDefaultOption(button) {
+    if (!window.confirm("Delete this replacement group and all of its ingredients?")) {
+        return false;
+    }
+    const card = materializeRecipeIngredientDefaultOption(button);
+    return card ? removeRecipeIngredientAlternative(card, { confirm: false }) : false;
 }
 
 function addRecipeIngredientDefaultComponent(button) {
