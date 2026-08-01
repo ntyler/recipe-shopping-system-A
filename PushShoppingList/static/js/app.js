@@ -27121,6 +27121,12 @@ function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
     clearRecipeIngredientColumnViewGroupedAwayLineItems(list);
     rows.forEach(row => {
         row.classList.remove("is-ingredient-store-section-grouped-choice");
+        // Grouping changes whether an implicit original/default choice needs a
+        // separate shared header. Refresh the row after clearing the previous
+        // grouping state so its controls return to the parent ingredient row.
+        if (row.classList.contains("has-selected-implicit-default-choice")) {
+            updateRecipeIngredientSubstitutionState(row);
+        }
     });
     if (!recipeEditIngredientColumnView.groupByStoreSection) {
         clearRecipeIngredientColumnViewGroupProjections(list);
@@ -46105,8 +46111,19 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     const showsChoiceSummary = Boolean(
         alternativeCount && !hasSelectedChoice,
     );
+    const selectedChoiceUsesParentIngredientRow = Boolean(
+        selectedChoice?.isDefaultOption
+        && recipeIngredientSelectedOptionProjectionRows(row, selectedChoice).length === 0
+    );
+    const hidesImplicitDefaultHeaderInStoreSectionView = Boolean(
+        recipeEditIngredientColumnView.groupByStoreSection
+        && !isExpanded
+        && selectedChoiceUsesParentIngredientRow
+    );
     const showsSelectedChoiceGroup = Boolean(
-        alternativeCount && hasSelectedChoice,
+        alternativeCount
+        && hasSelectedChoice
+        && !hidesImplicitDefaultHeaderInStoreSectionView,
     );
     const selectedChoiceGroupHeader = showsSelectedChoiceGroup
         ? ensureRecipeIngredientSelectedChoiceGroupHeader(row)
@@ -46152,6 +46169,14 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     row.classList.toggle(
         "has-selected-ingredient-choice",
         Boolean(alternativeCount && hasSelectedChoice),
+    );
+    row.classList.toggle(
+        "has-selected-implicit-default-choice",
+        Boolean(
+            alternativeCount
+            && hasSelectedChoice
+            && selectedChoiceUsesParentIngredientRow
+        ),
     );
     row.classList.toggle(
         "shows-ingredient-choice-summary",

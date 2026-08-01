@@ -982,6 +982,30 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     assert 'const action = optionsButtonExpanded ? "Collapse" : "Show";' in substitution_state
 
 
+def test_store_section_grouping_keeps_an_implicit_default_on_its_parent_row():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    grouped_view = script[
+        script.index("function prepareRecipeIngredientColumnViewDisplayRows"):
+        script.index("function recipeIngredientColumnViewEntry")
+    ]
+    substitution_state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
+
+    assert 'row.classList.remove("is-ingredient-store-section-grouped-choice");' in grouped_view
+    assert 'row.classList.contains("has-selected-implicit-default-choice")' in grouped_view
+    assert "updateRecipeIngredientSubstitutionState(row);" in grouped_view
+    assert "selectedChoiceUsesParentIngredientRow" in substitution_state
+    assert "selectedChoice?.isDefaultOption" in substitution_state
+    assert "recipeIngredientSelectedOptionProjectionRows(row, selectedChoice).length === 0" in substitution_state
+    assert '"has-selected-implicit-default-choice"' in substitution_state
+    assert "hidesImplicitDefaultHeaderInStoreSectionView" in substitution_state
+    assert "recipeEditIngredientColumnView.groupByStoreSection" in substitution_state
+    assert "&& !isExpanded" in substitution_state
+    assert "&& !hidesImplicitDefaultHeaderInStoreSectionView" in substitution_state
+
+
 def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
