@@ -77,6 +77,9 @@ def test_save_validation_and_dirty_state_cover_nested_editors():
     assert "Add at least one ingredient." in validation
     assert "Ingredient ${index + 1} has an invalid amount." in validation
     assert "Alternative ${optionIndex + 1}" in validation
+    assert "recipeIngredientSubstitutionHasIdentity(optionValues)" in validation
+    assert "Enter a replacement ingredient name or remove the empty option." in validation
+    assert "ingredients.${index}.substitutions.${optionIndex}.ingredient" in validation
     assert "const scope = recipeIngredientSubstitutionContainer(row) || row;" in validation
     assert "recipeIngredientOptionsMenuForRow(row)" not in validation
     assert "Add at least one instruction step." in validation
@@ -285,6 +288,7 @@ def test_live_payload_preserves_nested_ids_order_and_metadata():
     assert "Object.assign(item, recipeIngredientMatchSnapshot(recipeIngredientMatchItemFromRow(row, item)));" in ingredient_collection
     assert "item.substitutions = collectRecipeIngredientSubstitutionRows(row);" in ingredient_collection
     assert ".filter(item => item.ingredient || item.original_text)" in ingredient_collection
+    assert ".filter(option => recipeIngredientSubstitutionHasIdentity(option))" in script
     assert 'updateRecipeEditorDirtyState(parentRow ? parentRow.closest("#recipeEditForm") : null)' in script
     assert "step_id: values.step_id || \"\"" in script
     assert "row_id: values.row_id || \"\"" in script
@@ -303,6 +307,19 @@ def test_save_loading_validation_and_error_styles_are_visible():
     assert "animation: recipe-edit-save-spin" in css
     assert '.recipe-edit-save[aria-busy="true"] > .app-icon-svg' in css
     assert ".recipe-edit-save:disabled" in css
+
+
+def test_save_progress_compares_nested_ingredient_values_instead_of_object_identity():
+    script = read_text("PushShoppingList/static/js/app.js")
+    changes = script[
+        script.index("function changedRecipeIngredientLines"):
+        script.index("function formatRecipeIngredientAmount", script.index("function changedRecipeIngredientLines"))
+    ]
+
+    assert 'JSON.stringify(previous.substitutions || []) !== JSON.stringify(item.substitutions || [])' in changes
+    assert 'JSON.stringify(previous.food_review || null) !== JSON.stringify(item.food_review || null)' in changes
+    assert 'lines.push(`${name}: ingredient choices updated`);' in changes
+    assert '"food_review",' not in changes
 
 
 def test_inference_preview_preserves_saved_baseline_and_stays_dirty():

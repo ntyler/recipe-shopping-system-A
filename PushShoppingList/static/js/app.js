@@ -37234,6 +37234,15 @@ function recipeEditorNumericExpressionIsMalformed(value, options = {}) {
     });
 }
 
+function recipeIngredientSubstitutionHasIdentity(option = {}) {
+    return [
+        option.ingredient,
+        option.original_text,
+        option.purchasable_item,
+        option.buy_as,
+    ].some(value => Boolean(String(value || "").trim()));
+}
+
 function recipeEditorControlForFieldPath(path, form = document.getElementById("recipeEditForm")) {
     if (!form) {
         return null;
@@ -37376,8 +37385,16 @@ function validateRecipeEditor(form, payload) {
             const optionName = recipeIngredientDirectField(optionRow, "ingredient");
             const optionQuantity = recipeIngredientDirectField(optionRow, "quantity");
             const optionUnit = recipeIngredientDirectField(optionRow, "unit");
+            const optionValues = fieldValuesFromRow(optionRow);
             const hasOptionValues = [optionName, optionQuantity, optionUnit].some(control => String(control ? control.value : "").trim());
-            if (hasOptionValues && !String(optionName ? optionName.value : "").trim()) {
+            if (!recipeIngredientSubstitutionHasIdentity(optionValues)) {
+                addRecipeEditorValidationError(
+                    errors,
+                    `Alternative ${optionIndex + 1} for ingredient ${index + 1} is incomplete. Enter a replacement ingredient name or remove the empty option.`,
+                    optionName,
+                    `ingredients.${index}.substitutions.${optionIndex}.ingredient`,
+                );
+            } else if (hasOptionValues && !String(optionName ? optionName.value : "").trim()) {
                 addRecipeEditorValidationError(errors, `Alternative ${optionIndex + 1} for ingredient ${index + 1} needs a name.`, optionName);
             }
             if (recipeEditorNumericExpressionIsMalformed(optionQuantity ? optionQuantity.value : "")) {
@@ -52206,6 +52223,7 @@ function changedRecipeIngredientLines(previousIngredients, nextIngredients) {
         const amountChanged = previous.quantity !== item.quantity || previous.unit !== item.unit;
         const sectionChanged = previous.store_section !== item.store_section;
         const buyAsChanged = previous.purchasable_item !== item.purchasable_item;
+        const choicesChanged = JSON.stringify(previous.substitutions || []) !== JSON.stringify(item.substitutions || []);
         const detailsChanged = [
             "original_text",
             "parsed_name",
@@ -52215,9 +52233,9 @@ function changedRecipeIngredientLines(previousIngredients, nextIngredients) {
             "confidence",
             "inferred",
             "warning",
-            "food_review",
             "optional",
-        ].some(key => previous[key] !== item[key]);
+        ].some(key => previous[key] !== item[key])
+            || JSON.stringify(previous.food_review || null) !== JSON.stringify(item.food_review || null);
 
         if (amountChanged) {
             lines.push(`${name}: ${formatRecipeIngredientAmount(previous) || "(blank)"} -> ${formatRecipeIngredientAmount(item) || "(blank)"}`);
@@ -52225,6 +52243,8 @@ function changedRecipeIngredientLines(previousIngredients, nextIngredients) {
             lines.push(`${name} store section: ${previous.store_section || "(blank)"} -> ${item.store_section || "(blank)"}`);
         } else if (buyAsChanged) {
             lines.push(`${name} Buy As: ${previous.purchasable_item || "(blank)"} -> ${item.purchasable_item || "(blank)"}`);
+        } else if (choicesChanged) {
+            lines.push(`${name}: ingredient choices updated`);
         } else if (detailsChanged) {
             lines.push(`${name}: ingredient details updated`);
         }
@@ -52497,7 +52517,7 @@ function collectRecipeIngredientSubstitutionRows(row) {
             option.inferred = recipeIngredientInferredValue(option) === "true";
             return option;
         })
-        .filter(option => option.ingredient || option.original_text || option.purchasable_item);
+        .filter(option => recipeIngredientSubstitutionHasIdentity(option));
 }
 
 function collectRecipeIngredientRows() {
