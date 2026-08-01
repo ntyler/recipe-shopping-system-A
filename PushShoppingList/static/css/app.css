@@ -69730,16 +69730,16 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     }
 }
 
-/* Ingredient editor v79: keep collapsed choice media on the shared table tracks. */
+/* Ingredient editor v79: keep every choice row on the shared table tracks. */
 @media (min-width: 768px) {
     body.recipe-edit-standalone-page #recipeEditIngredients
-        .recipe-edit-selected-option-line-item
+        .recipe-edit-alternative-component-summary
         > [data-ingredient-column="media"][data-ingredient-media-track="0"] {
         grid-column: 1 !important;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients
-        .recipe-edit-selected-option-line-item
+        .recipe-edit-alternative-component-summary
         > [data-ingredient-column="media"][data-ingredient-media-track="1"] {
         grid-column: 2 !important;
         align-self: center;
@@ -69748,7 +69748,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients
-        .recipe-edit-selected-option-line-item
+        .recipe-edit-alternative-component-summary
         > [data-ingredient-column="ingredient"] {
         grid-column: 3 !important;
     }
