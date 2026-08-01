@@ -69694,7 +69694,12 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     background: var(--app-surface);
 }
 
-/* Ingredient editor v77: end collapsed choices without a trailing inset rule. */
+/* Ingredient editor v77: leave dividers only between collapsed choice ingredients. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items {
+    border-top: 0;
+}
+
 body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-selected-option-line-items
     > .recipe-edit-selected-option-line-item:last-child {

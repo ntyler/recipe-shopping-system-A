@@ -735,15 +735,21 @@ def test_collapsed_choice_option_count_aligns_with_desktop_row_cells():
     assert ".recipe-edit-selected-choice-group-title-input" in css
 
 
-def test_collapsed_choice_omits_only_the_trailing_component_divider():
+def test_collapsed_choice_keeps_dividers_only_between_component_rows():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    trailing_divider_css = css[css.index(
-        "/* Ingredient editor v77: end collapsed choices without a trailing inset rule. */"
+    collapsed_divider_css = css[css.index(
+        "/* Ingredient editor v77: leave dividers only between collapsed choice ingredients. */"
     ):]
 
-    assert ".recipe-edit-selected-option-line-items" in trailing_divider_css
-    assert "> .recipe-edit-selected-option-line-item:last-child" in trailing_divider_css
-    assert "border-bottom: 0;" in trailing_divider_css
+    line_items_rule_start = collapsed_divider_css.index(
+        ".recipe-edit-selected-option-line-items {"
+    )
+    line_items_rule = collapsed_divider_css[
+        line_items_rule_start:collapsed_divider_css.index("}", line_items_rule_start)
+    ]
+    assert "border-top: 0;" in line_items_rule
+    assert "> .recipe-edit-selected-option-line-item:last-child" in collapsed_divider_css
+    assert "border-bottom: 0;" in collapsed_divider_css
 
 
 def test_selected_choice_group_header_uses_standard_action_grid_cells():
