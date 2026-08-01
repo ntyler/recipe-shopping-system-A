@@ -4794,7 +4794,7 @@ def test_recipe_editor_equipment_uses_same_compact_expand_controls_as_ingredient
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     assert 'data-recipe-ingredients-collapse-toggle' in template
-    assert 'addRecipeIngredientRow({}, { expanded: true })' in template
+    assert 'addRecipeIngredientFromCurrentView()' in template
     assert 'data-recipe-equipment-collapse-toggle' in template
     assert "toggleRecipeEquipmentCollapsed(this)" in template
     assert "addRecipeEquipmentRow('', { expanded: true })" in template
@@ -5160,7 +5160,7 @@ def test_recipe_editor_has_store_section_review_controls():
     assert '@recipe_bp.route("/api/recipe/review_store_sections", methods=["POST"])' in routes
 
 
-def test_recipe_editor_phase_one_ingredient_views_share_the_existing_table():
+def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_recipe_projection():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",
     )
@@ -5185,10 +5185,14 @@ def test_recipe_editor_phase_one_ingredient_views_share_the_existing_table():
     assert 'data-recipe-ingredient-view-tab="table"' in ingredient_section
     assert 'aria-selected="true"' in ingredient_section
     assert ingredient_section.count('id="recipeEditIngredients"') == 1
-    assert "Recipe View will be implemented in Phase 2." in ingredient_section
+    assert "Recipe View will be implemented in Phase 2." not in ingredient_section
     assert "Smart View will be implemented in Phase 3." in ingredient_section
+    assert 'id="recipeEditIngredientRecipeList"' in ingredient_section
+    assert "data-recipe-ingredient-recipe-empty" in ingredient_section
+    assert "No ingredients yet." in ingredient_section
+    assert ingredient_section.count("data-recipe-ingredient-recipe-add") == 1
     assert "data-recipe-ingredient-table-action" in ingredient_section
-    assert "setRecipeEditIngredientView('table'); addRecipeIngredientRow({}, { expanded: true })" in ingredient_section
+    assert ingredient_section.count("addRecipeIngredientFromCurrentView()") == 3
 
     assert 'const RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY = "ai-pantry-ingredient-view";' in script
     assert 'new Set(["recipe", "smart", "table"])' in script
@@ -5210,3 +5214,75 @@ def test_recipe_editor_phase_one_ingredient_views_share_the_existing_table():
     assert ".recipe-edit-ingredient-view-switcher" in css
     assert ".recipe-edit-ingredient-view-tab:focus-visible" in css
     assert "[data-recipe-ingredient-table-action][hidden]" in css
+
+
+def test_recipe_editor_phase_two_recipe_view_reuses_shared_rows_handlers_and_option_groups():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    render_start = script.index("function renderRecipeIngredientRecipeView()")
+    render_end = script.index("function toggleRecipeIngredientRecipeView", render_start)
+    render = script[render_start:render_end]
+    item_start = script.index("function renderRecipeIngredientRecipeViewItem(")
+    item_end = script.index("function renderRecipeIngredientRecipeView()", item_start)
+    item = script[item_start:item_end]
+    groups_start = script.index("function recipeIngredientRecipeViewChoiceGroups")
+    groups_end = script.index("function createRecipeIngredientRecipeViewItem", groups_start)
+    groups = script[groups_start:groups_end]
+    toggle_start = script.index("function toggleRecipeIngredientRecipeView")
+    toggle_end = script.index("function editRecipeIngredientFromRecipeView", toggle_start)
+    toggle = script[toggle_start:toggle_end]
+    edit_start = toggle_end
+    edit_end = script.index("function setRecipeEditIngredientView", edit_start)
+    edit = script[edit_start:edit_end]
+
+    assert "recipeEditIngredientRows().map(row =>" in render
+    assert "fieldValuesFromRow(row)" in render
+    assert "recipeIngredientSubstitutionDomGroups(" in render
+    assert "ensureRecipeIngredientExpansionId(row)" in render
+    assert "existingItems.get(key)" in render
+    assert "list.appendChild(item)" in render
+    assert "fetch(" not in render
+    assert "recipeViewIngredients" not in script
+
+    assert "recipeIngredientRecipeViewAmount(values)" in item
+    assert "recipeIngredientRecipeViewName(values, hasChoices)" in item
+    assert "recipeIngredientRecipeViewStatus(row, values)" in script
+    assert "recipeIngredientMeaningfulBuyAs(values)" in script
+    assert "StoreSectionBadge.create" in script
+    assert 'edit.setAttribute("aria-label", `Edit ${name || "ingredient"}`);' in item
+    assert 'disclosure.setAttribute("aria-expanded", String(expanded));' in item
+    assert 'disclosure.setAttribute("aria-controls", choices?.id || "");' in item
+
+    assert "recipeIngredientCompactChoiceSummary(parentValues, alternativeGroups)" in groups
+    assert "recipeIngredientSelectedChoice(" in groups
+    assert "group.rows.map(fieldValuesFromRow)" in groups
+    assert "group.values.forEach(values =>" in script
+    assert 'label.textContent = group.isDefaultOption ? "Default option" : "Alternative option";' in script
+    assert "recipeIngredientChoiceItemSummary(" in script
+    assert "recipeEditExpandedRecipeViewIngredientIds" in toggle
+    assert "scrollIntoView" not in toggle
+    assert "scrollTop" not in toggle
+    assert "setRecipeIngredientEditMode(row, true, { trigger: button })" in edit
+    assert 'setRecipeEditIngredientView("table", { persist: false });' in edit
+    assert "function addRecipeIngredientFromCurrentView()" in edit
+    assert "return addRecipeIngredientRow({}, { expanded: true });" in edit
+    modal_start = script.index("function setRecipeIngredientEditMode")
+    modal_end = script.index("function saveRecipeIngredientInlineEdit", modal_start)
+    modal = script[modal_start:modal_end]
+    assert "const returnView = recipeEditIngredientModalReturnView;" in modal
+    assert "setRecipeEditIngredientView(returnView, { persist: false });" in modal
+
+    assert "renderRecipeIngredientRecipeView();" in script[
+        script.index("function updateRecipeIngredientSummary"):
+        script.index("function recipeEditIngredientRows")
+    ]
+    assert "renderRecipeIngredientRecipeView();" in script[
+        script.index("function updateRecipeIngredientRowIndexes"):
+        script.index("function toggleRecipeEditRowMenu")
+    ]
+    assert "Ingredient editor v81: compact recipe-style ingredient list." in css
+    assert ".recipe-edit-ingredient-recipe-item" in css
+    assert "overflow-x: clip;" in css
+    assert ".recipe-edit-ingredient-recipe-disclosure:focus-visible" in css
+    assert "@media (prefers-reduced-motion: reduce)" in css

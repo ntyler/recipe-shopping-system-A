@@ -22983,12 +22983,15 @@ const recipeEditIngredientScrollReserveStates = new WeakMap();
 let recipeEditIngredientModalId = 0;
 let recipeEditIngredientModalActiveRow = null;
 let recipeEditIngredientModalReturnFocus = null;
+let recipeEditIngredientModalReturnView = "";
 let recipeEditIngredientModalScrollState = null;
 let recipeEditIngredientColumnLayout = null;
 let recipeEditIngredientColumnMoveState = null;
 let recipeEditIngredientColumnResizeState = null;
 let recipeEditIngredientColumnResizeObserver = null;
 let recipeEditIngredientView = "table";
+let recipeEditIngredientRecipeViewPanelId = 0;
+const recipeEditExpandedRecipeViewIngredientIds = new Set();
 let recipeEditIngredientColumnView = {
     filterKeys: new Map(),
     sorts: [],
@@ -28589,6 +28592,420 @@ function syncRecipeEditIngredientViewActions(section, view) {
             if (menu) menu.hidden = true;
         }
     });
+    section.querySelectorAll("[data-recipe-ingredient-recipe-hidden]").forEach(action => {
+        action.hidden = view === "recipe";
+    });
+}
+
+function recipeIngredientRecipeViewAmount(values = {}) {
+    const quantityText = String(values.quantity_text || "").trim();
+    const quantity = String(values.quantity || values.amount || "").trim();
+    const unit = String(values.unit || "").trim();
+    const size = String(values.size || "").trim();
+    if (quantityText || (!/\d/.test(quantity) && quantity) || /^(?:to taste|as needed)$/i.test(unit)) {
+        const phrase = formatRecipeIngredientQuantityUnit(values);
+        return phrase === "\u2014" ? "" : phrase;
+    }
+    const unitLabel = recipeIngredientPluralUnit(unit, quantity, { includePieces: true });
+    const details = [size, unitLabel].filter((value, index, valuesList) => (
+        value
+        && valuesList.findIndex(candidate => (
+            recipeIngredientComparableText(candidate)
+                === recipeIngredientComparableText(value)
+        )) === index
+    ));
+    return [quantity, ...details].filter(Boolean).join(" ");
+}
+
+function recipeIngredientRecipeViewStripAmount(text, values = {}) {
+    let result = String(text || "").trim();
+    const prefixes = [
+        String(values.quantity_text || "").trim(),
+        recipeIngredientRecipeViewAmount(values),
+        [String(values.quantity || "").trim(), String(values.unit || "").trim()]
+            .filter(Boolean)
+            .join(" "),
+    ].filter(Boolean).sort((left, right) => right.length - left.length);
+    prefixes.some(prefix => {
+        const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const match = result.match(new RegExp(`^${escapedPrefix}(?:\\s+|,\\s*)`, "i"));
+        if (!match) return false;
+        result = result.slice(match[0].length).trim();
+        return true;
+    });
+    return result;
+}
+
+function recipeIngredientRecipeViewName(values = {}, hasChoices = false) {
+    const ingredient = String(values.ingredient || "").trim();
+    if (hasChoices) {
+        const sourceText = String(values.source_text || values.original_text || "").trim();
+        return recipeIngredientRecipeViewStripAmount(sourceText, values) || ingredient;
+    }
+    const preparation = String(values.preparation || "").trim();
+    if (
+        preparation
+        && !recipeIngredientComparableText(ingredient).includes(
+            recipeIngredientComparableText(preparation),
+        )
+    ) {
+        return [ingredient, preparation].filter(Boolean).join(", ");
+    }
+    return ingredient;
+}
+
+function recipeIngredientRecipeViewStatus(row, values = {}) {
+    const template = document.createElement("template");
+    template.innerHTML = recipeIngredientReadStatusHtml(
+        recipeIngredientMatchItemFromRow(row, values),
+    ).trim();
+    const status = template.content.firstElementChild;
+    const text = String(status?.textContent || "").trim();
+    if (!text || text.toLowerCase() === "good match") {
+        return null;
+    }
+    return {
+        text,
+        className: String(status.className || "").trim(),
+    };
+}
+
+function recipeIngredientRecipeViewHasContent(values = {}, alternativeGroups = []) {
+    return alternativeGroups.length > 0 || [
+        "ingredient",
+        "quantity",
+        "quantity_text",
+        "unit",
+        "size",
+        "preparation",
+        "purchasable_item",
+        "buy_as",
+        "notes",
+        "store_section",
+        "source_text",
+        "original_text",
+    ].some(field => String(values[field] || "").trim());
+}
+
+function recipeIngredientRecipeViewChoiceGroups(row, parentValues, alternativeGroups) {
+    const summary = recipeIngredientCompactChoiceSummary(parentValues, alternativeGroups);
+    if (!alternativeGroups.length) {
+        return { groups: [], selectedChoice: null, summary };
+    }
+    const selectedChoice = recipeIngredientSelectedChoice(
+        row,
+        parentValues,
+        alternativeGroups,
+    );
+    const groups = [];
+    if (!summary.hasExplicitOriginalGroup) {
+        groups.push({
+            id: String(row.querySelector("[data-original-option-id]")?.value || "").trim(),
+            rows: [],
+            values: [parentValues],
+            isDefaultOption: true,
+        });
+    }
+    alternativeGroups.forEach(group => {
+        const values = group.rows.map(fieldValuesFromRow);
+        groups.push({
+            id: group.alternativeId,
+            rows: group.rows,
+            values,
+            isDefaultOption: values.some(value => (
+                String(value.option_type || "").trim() === "original"
+                || recipeIngredientMatchFlag(value.is_default)
+            )),
+        });
+    });
+    if (summary.hasExplicitOriginalGroup && !groups.some(group => group.isDefaultOption) && groups.length) {
+        groups[0].isDefaultOption = true;
+    }
+    groups.forEach(group => {
+        group.isSelected = selectedChoice
+            ? (
+                group.rows.length
+                    ? Boolean(group.id && group.id === selectedChoice.id)
+                    : selectedChoice.rows.length === 0
+            )
+            : group.isDefaultOption;
+    });
+    return { groups, selectedChoice, summary };
+}
+
+function createRecipeIngredientRecipeViewItem(row) {
+    const item = document.createElement("li");
+    item.className = "recipe-edit-ingredient-recipe-item";
+    item.innerHTML = `
+        <span class="recipe-edit-ingredient-recipe-amount" data-recipe-view-amount></span>
+        <div class="recipe-edit-ingredient-recipe-content">
+            <strong data-recipe-view-name></strong>
+            <div class="recipe-edit-ingredient-recipe-secondary" data-recipe-view-secondary></div>
+        </div>
+        <span class="recipe-edit-ingredient-recipe-options" data-recipe-view-options></span>
+        <span class="recipe-edit-ingredient-recipe-store" data-recipe-view-store></span>
+        <span class="recipe-edit-ingredient-recipe-disclosure-cell">
+            <button type="button"
+                    class="recipe-edit-ingredient-recipe-disclosure"
+                    data-recipe-view-disclosure
+                    aria-expanded="false">
+                ${recipeEditSvgIcon("chevron-down")}
+            </button>
+        </span>
+        <button type="button"
+                class="recipe-edit-ingredient-recipe-edit"
+                data-recipe-view-edit>
+            ${recipeEditSvgIcon("edit")}
+        </button>
+        <div class="recipe-edit-ingredient-recipe-choices"
+             data-recipe-view-choices
+             hidden></div>
+    `;
+    item.querySelector("[data-recipe-view-disclosure]")?.addEventListener(
+        "click",
+        event => toggleRecipeIngredientRecipeView(event.currentTarget),
+    );
+    item.querySelector("[data-recipe-view-edit]")?.addEventListener(
+        "click",
+        event => editRecipeIngredientFromRecipeView(event.currentTarget),
+    );
+    return item;
+}
+
+function renderRecipeIngredientRecipeViewSecondary(container, row, values, selectedChoice) {
+    if (!container) return;
+    container.replaceChildren();
+    const append = (text, className = "") => {
+        const value = String(text || "").trim();
+        if (!value) return;
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = value;
+        container.appendChild(span);
+    };
+    const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
+    const notes = String(values.notes || "").trim();
+    const status = recipeIngredientRecipeViewStatus(row, values);
+    if (selectedChoice) {
+        const selectionLabel = selectedChoice.isDefaultOption ? "Default" : "Selected";
+        append(
+            `${selectionLabel}: ${selectedChoice.ingredientSummary || selectedChoice.summary || ""}`,
+            "recipe-edit-ingredient-recipe-selection",
+        );
+    }
+    if (status) append(status.text, `recipe-edit-ingredient-recipe-status ${status.className}`);
+    if (meaningfulBuyAs) append(`Buy as: ${meaningfulBuyAs}`, "recipe-edit-ingredient-recipe-buy-as");
+    if (notes) append(notes, "recipe-edit-ingredient-recipe-notes");
+    container.hidden = container.children.length === 0;
+}
+
+function renderRecipeIngredientRecipeViewStore(container, values = {}) {
+    if (!container) return;
+    const section = String(values.store_section || "").trim();
+    container.replaceChildren();
+    container.hidden = !section;
+    if (!section) return;
+    const label = recipeStoreSectionDisplayLabel(section) || section;
+    const badge = window.StoreSectionBadge
+        ? window.StoreSectionBadge.create({
+            section,
+            label,
+            iconName: recipeIngredientStoreSectionIconName(section),
+            iconHtml: recipeIngredientStoreSectionIconHtml(section),
+        })
+        : null;
+    if (badge) {
+        badge.title = label;
+        badge.setAttribute("aria-label", `Store section: ${label}`);
+        container.appendChild(badge);
+    } else {
+        container.textContent = label;
+    }
+}
+
+function renderRecipeIngredientRecipeViewChoices(
+    container,
+    parentValues,
+    alternativeGroups,
+    choiceGroups,
+) {
+    if (!container) return;
+    container.replaceChildren();
+    choiceGroups.forEach((group, groupIndex) => {
+        const option = document.createElement("section");
+        option.className = "recipe-edit-ingredient-recipe-option";
+        option.dataset.recipeViewOptionId = group.id || `option-${groupIndex + 1}`;
+        option.classList.toggle("is-selected", Boolean(group.isSelected));
+
+        const heading = document.createElement("div");
+        heading.className = "recipe-edit-ingredient-recipe-option-heading";
+        const marker = document.createElement("span");
+        marker.className = "recipe-edit-ingredient-recipe-option-marker";
+        marker.innerHTML = group.isSelected ? recipeEditSvgIcon("check") : "";
+        marker.setAttribute("aria-hidden", "true");
+        const label = document.createElement("span");
+        label.textContent = group.isDefaultOption ? "Default option" : "Alternative option";
+        heading.append(marker, label);
+        option.appendChild(heading);
+
+        const components = document.createElement("ul");
+        components.className = "recipe-edit-ingredient-recipe-option-components";
+        group.values.forEach(values => {
+            const component = document.createElement("li");
+            const amount = document.createElement("span");
+            amount.className = "recipe-edit-ingredient-recipe-option-amount";
+            amount.textContent = recipeIngredientRecipeViewAmount(values);
+            const name = document.createElement("span");
+            name.className = "recipe-edit-ingredient-recipe-option-name";
+            name.textContent = recipeIngredientChoiceItemSummary(
+                values,
+                parentValues,
+                alternativeGroups,
+            );
+            component.append(amount, name);
+            components.appendChild(component);
+        });
+        option.appendChild(components);
+        container.appendChild(option);
+    });
+}
+
+function renderRecipeIngredientRecipeViewItem(item, row, values, alternativeGroups) {
+    const key = ensureRecipeIngredientExpansionId(row);
+    const choice = recipeIngredientRecipeViewChoiceGroups(row, values, alternativeGroups);
+    const hasChoices = choice.groups.length > 0;
+    const name = recipeIngredientRecipeViewName(values, hasChoices);
+    const expanded = hasChoices && recipeEditExpandedRecipeViewIngredientIds.has(key);
+    item.dataset.recipeViewIngredientId = key;
+    item.recipeIngredientSourceRow = row;
+    item.classList.toggle("has-choices", hasChoices);
+    item.classList.toggle("is-expanded", expanded);
+
+    const amount = item.querySelector("[data-recipe-view-amount]");
+    const nameElement = item.querySelector("[data-recipe-view-name]");
+    const options = item.querySelector("[data-recipe-view-options]");
+    const disclosure = item.querySelector("[data-recipe-view-disclosure]");
+    const disclosureCell = disclosure?.closest(".recipe-edit-ingredient-recipe-disclosure-cell");
+    const edit = item.querySelector("[data-recipe-view-edit]");
+    const choices = item.querySelector("[data-recipe-view-choices]");
+    if (amount) amount.textContent = recipeIngredientRecipeViewAmount(values);
+    if (nameElement) nameElement.textContent = name;
+    renderRecipeIngredientRecipeViewSecondary(
+        item.querySelector("[data-recipe-view-secondary]"),
+        row,
+        values,
+        choice.selectedChoice,
+    );
+    if (options) {
+        options.textContent = hasChoices ? choice.summary.label : "";
+        options.hidden = !hasChoices;
+    }
+    renderRecipeIngredientRecipeViewStore(
+        item.querySelector("[data-recipe-view-store]"),
+        values,
+    );
+    if (disclosure) {
+        disclosure.hidden = !hasChoices;
+        disclosure.setAttribute("aria-expanded", String(expanded));
+        disclosure.setAttribute("aria-controls", choices?.id || "");
+        disclosure.setAttribute(
+            "aria-label",
+            `${expanded ? "Collapse" : "Show"} ${choice.summary.label} for ${name || "ingredient"}`,
+        );
+        disclosure.title = expanded ? "Collapse ingredient options" : "Show ingredient options";
+    }
+    if (disclosureCell) disclosureCell.setAttribute("aria-hidden", String(!hasChoices));
+    if (edit) {
+        edit.setAttribute("aria-label", `Edit ${name || "ingredient"}`);
+        edit.title = `Edit ${name || "ingredient"}`;
+    }
+    if (choices) {
+        choices.hidden = !expanded;
+        renderRecipeIngredientRecipeViewChoices(
+            choices,
+            values,
+            alternativeGroups,
+            choice.groups,
+        );
+    }
+}
+
+function renderRecipeIngredientRecipeView() {
+    const list = document.querySelector("[data-recipe-ingredient-recipe-list]");
+    const empty = document.querySelector("[data-recipe-ingredient-recipe-empty]");
+    const add = document.querySelector("[data-recipe-ingredient-recipe-add]");
+    if (!list || !empty || !add) return;
+
+    const existingItems = new Map(
+        [...list.children].map(item => [item.dataset.recipeViewIngredientId || "", item]),
+    );
+    const rows = recipeEditIngredientRows().map(row => {
+        const values = fieldValuesFromRow(row);
+        const alternativeGroups = recipeIngredientSubstitutionDomGroups(
+            [...row.querySelectorAll("[data-substitution-option-row]")],
+        );
+        return { row, values, alternativeGroups };
+    }).filter(({ values, alternativeGroups }) => (
+        recipeIngredientRecipeViewHasContent(values, alternativeGroups)
+    ));
+
+    rows.forEach(({ row, values, alternativeGroups }) => {
+        const key = ensureRecipeIngredientExpansionId(row);
+        let item = existingItems.get(key);
+        if (!item) item = createRecipeIngredientRecipeViewItem(row);
+        existingItems.delete(key);
+        if (!item.querySelector("[data-recipe-view-choices]")?.id) {
+            recipeEditIngredientRecipeViewPanelId += 1;
+            item.querySelector("[data-recipe-view-choices]").id =
+                `recipeEditIngredientRecipeChoices${recipeEditIngredientRecipeViewPanelId}`;
+        }
+        renderRecipeIngredientRecipeViewItem(item, row, values, alternativeGroups);
+        list.appendChild(item);
+    });
+    existingItems.forEach(item => item.remove());
+    const hasRows = rows.length > 0;
+    list.hidden = !hasRows;
+    empty.hidden = hasRows;
+    add.hidden = !hasRows;
+}
+
+function toggleRecipeIngredientRecipeView(button) {
+    const item = button ? button.closest("[data-recipe-view-ingredient-id]") : null;
+    const key = String(item?.dataset.recipeViewIngredientId || "");
+    const choices = item ? item.querySelector("[data-recipe-view-choices]") : null;
+    if (!item || !key || !choices) return false;
+    const expanded = !recipeEditExpandedRecipeViewIngredientIds.has(key);
+    if (expanded) {
+        recipeEditExpandedRecipeViewIngredientIds.add(key);
+    } else {
+        recipeEditExpandedRecipeViewIngredientIds.delete(key);
+    }
+    item.classList.toggle("is-expanded", expanded);
+    choices.hidden = !expanded;
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute(
+        "aria-label",
+        `${expanded ? "Collapse" : "Show"} ${item.querySelector("[data-recipe-view-options]")?.textContent || "options"} for ${item.querySelector("[data-recipe-view-name]")?.textContent || "ingredient"}`,
+    );
+    button.title = expanded ? "Collapse ingredient options" : "Show ingredient options";
+    return false;
+}
+
+function editRecipeIngredientFromRecipeView(button) {
+    const item = button ? button.closest("[data-recipe-view-ingredient-id]") : null;
+    const row = item?.recipeIngredientSourceRow;
+    if (!row || !row.isConnected) return false;
+    recipeEditIngredientModalReturnView = recipeEditIngredientView;
+    setRecipeEditIngredientView("table", { persist: false });
+    return setRecipeIngredientEditMode(row, true, { trigger: button });
+}
+
+function addRecipeIngredientFromCurrentView() {
+    if (recipeEditIngredientView !== "table") {
+        recipeEditIngredientModalReturnView = recipeEditIngredientView;
+        setRecipeEditIngredientView("table", { persist: false });
+    }
+    return addRecipeIngredientRow({}, { expanded: true });
 }
 
 function setRecipeEditIngredientView(value, options = {}) {
@@ -28610,6 +29027,9 @@ function setRecipeEditIngredientView(value, options = {}) {
 
     recipeEditIngredientView = view;
     section.dataset.recipeIngredientView = view;
+    if (view === "recipe") {
+        renderRecipeIngredientRecipeView();
+    }
     section.querySelectorAll("[data-recipe-ingredient-view-tab]").forEach(tab => {
         const selected = tab.dataset.recipeIngredientViewTab === view;
         tab.classList.toggle("is-active", selected);
@@ -32500,6 +32920,11 @@ function setRecipeIngredientEditMode(row, shouldEdit, options = {}) {
             document.body.classList.remove("recipe-ingredient-modal-open");
             if (options.restoreScroll !== false) {
                 restoreRecipeIngredientModalScrollState();
+            }
+            const returnView = recipeEditIngredientModalReturnView;
+            recipeEditIngredientModalReturnView = "";
+            if (returnView && recipeEditIngredientView !== returnView) {
+                setRecipeEditIngredientView(returnView, { persist: false });
             }
             const returnFocus = recipeEditIngredientModalReturnFocus;
             recipeEditIngredientModalReturnFocus = null;
@@ -47067,6 +47492,7 @@ function updateRecipeIngredientSummary(row) {
         applyRecipeIngredientColumnView();
         syncRecipeIngredientColumnViewOpenMenu({ render: true });
     }
+    renderRecipeIngredientRecipeView();
 }
 
 function recipeEditIngredientRows() {
@@ -47100,6 +47526,7 @@ function updateRecipeIngredientRowIndexes() {
     if (count) {
         count.textContent = `(${rows.length})`;
     }
+    renderRecipeIngredientRecipeView();
     updateRecipeEditIngredientGallery();
     updateRecipeEditorHealth();
 }
