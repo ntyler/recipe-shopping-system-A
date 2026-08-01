@@ -776,6 +776,23 @@ def test_collapsed_default_choice_has_one_parent_gap_before_its_ingredient_group
     assert ".recipe-edit-selected-option-line-item" not in rule
 
 
+def test_collapsed_choice_thumbnail_stays_in_the_shared_image_column():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    alignment_css = css[css.index(
+        "/* Ingredient editor v79: keep collapsed choice media on the shared table tracks. */"
+    ):]
+
+    assert '@media (min-width: 768px)' in alignment_css
+    assert '.recipe-edit-selected-option-line-item' in alignment_css
+    assert '[data-ingredient-column="media"][data-ingredient-media-track="0"]' in alignment_css
+    assert 'grid-column: 1 !important;' in alignment_css
+    assert '[data-ingredient-column="media"][data-ingredient-media-track="1"]' in alignment_css
+    assert 'grid-column: 2 !important;' in alignment_css
+    assert 'transform: none !important;' in alignment_css
+    assert '[data-ingredient-column="ingredient"]' in alignment_css
+    assert 'grid-column: 3 !important;' in alignment_css
+
+
 def test_selected_choice_group_header_uses_standard_action_grid_cells():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
