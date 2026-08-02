@@ -2365,14 +2365,56 @@ def list_master_records(
                            WHERE a.user_id = m.user_id
                              AND a.ingredient_id = m.id
                            ORDER BY a.normalized_alias ASC
-                      ) alias_rows
+                       ) alias_rows
                 ), '') AS aliases_serialized"""
+        usage_select = """,
+                COUNT(DISTINCT u.recipe_id) AS ingredient_name_usage_count,
+                (
+                    SELECT COUNT(DISTINCT buy_usage.recipe_id)
+                      FROM recipe_ingredients buy_usage
+                     WHERE buy_usage.user_id = m.user_id
+                       AND (
+                            LOWER(TRIM(buy_usage.buy_as)) = LOWER(TRIM(m.normalized_name))
+                            OR EXISTS (
+                                SELECT 1
+                                  FROM ingredient_aliases buy_alias
+                                 WHERE buy_alias.user_id = m.user_id
+                                   AND buy_alias.ingredient_id = m.id
+                                   AND buy_alias.normalized_alias = LOWER(TRIM(buy_usage.buy_as))
+                            )
+                       )
+                ) AS buy_as_usage_count,
+                (
+                    SELECT COUNT(*)
+                      FROM (
+                            SELECT name_usage.recipe_id
+                              FROM recipe_ingredients name_usage
+                             WHERE name_usage.user_id = m.user_id
+                               AND name_usage.ingredient_id = m.id
+                            UNION
+                            SELECT total_buy_usage.recipe_id
+                              FROM recipe_ingredients total_buy_usage
+                             WHERE total_buy_usage.user_id = m.user_id
+                               AND (
+                                    LOWER(TRIM(total_buy_usage.buy_as)) = LOWER(TRIM(m.normalized_name))
+                                    OR EXISTS (
+                                        SELECT 1
+                                          FROM ingredient_aliases total_buy_alias
+                                         WHERE total_buy_alias.user_id = m.user_id
+                                           AND total_buy_alias.ingredient_id = m.id
+                                           AND total_buy_alias.normalized_alias = LOWER(TRIM(total_buy_usage.buy_as))
+                                    )
+                               )
+                      ) unique_usage_recipes
+                ) AS usage_count"""
     elif table_name == "equipment":
         section_select = ",\n                m.equipment_section"
         alias_select = ""
+        usage_select = ",\n                COUNT(u.id) AS usage_count"
     else:
         section_select = ""
         alias_select = ""
+        usage_select = ",\n                COUNT(u.id) AS usage_count"
 
     with existing_recipe_master_connection() as connection:
         if connection is None:
@@ -2388,8 +2430,7 @@ def list_master_records(
                 m.image_url,
                 m.image_path,
                 m.created_at,
-                m.updated_at{alias_select},
-                COUNT(u.id) AS usage_count
+                m.updated_at{alias_select}{usage_select}
               FROM {table_name} m
               LEFT JOIN {usage_table} u
                 ON u.{usage_fk} = m.id
@@ -2415,6 +2456,10 @@ def list_master_records(
                 for alias in aliases_serialized.split(chr(31))
                 if clean_text(alias)
             ]
+            row_data["ingredient_name_usage_count"] = int(
+                row["ingredient_name_usage_count"] or 0
+            )
+            row_data["buy_as_usage_count"] = int(row["buy_as_usage_count"] or 0)
         elif table_name == "equipment":
             row_data["equipment_section"] = clean_equipment_section(row_data.get("equipment_section"))
             row_data["equipment_section_order"] = equipment_section_sort_key(row_data["equipment_section"])
@@ -2661,6 +2706,9 @@ def list_master_record_recipe_references(
             "record": None,
             "references": [],
             "total": 0,
+            "total_reference_count": 0,
+            "ingredient_name_recipe_count": 0,
+            "buy_as_recipe_count": 0,
         }
 
     limit = bounded_master_limit(limit, default=25, maximum=500)
@@ -2668,6 +2716,8 @@ def list_master_record_recipe_references(
     usage_fk = config["usage_fk"]
     if table_name == "ingredients":
         detail_columns = """
+                r.ingredient_id,
+                source_ingredient.name AS ingredient_name,
                 r.quantity,
                 r.unit,
                 r.unit_id,
@@ -2686,6 +2736,8 @@ def list_master_record_recipe_references(
         """
     else:
         detail_columns = """
+                0 AS ingredient_id,
+                '' AS ingredient_name,
                 '' AS quantity,
                 '' AS unit,
                 '' AS unit_id,
@@ -2709,32 +2761,110 @@ def list_master_record_recipe_references(
                 "record": record,
                 "references": [],
                 "total": 0,
+                "total_reference_count": 0,
+                "ingredient_name_recipe_count": 0,
+                "buy_as_recipe_count": 0,
             }
 
-        total_row = connection.execute(
-            f"""
-            SELECT COUNT(*) AS reference_count
-              FROM {usage_table} r
-             WHERE r.user_id = ?
-               AND r.{usage_fk} = ?
-            """,
-            (record["user_id"], int(record["id"])),
-        ).fetchone()
-        rows = connection.execute(
-            f"""
-            SELECT
-                r.id,
-                r.user_id,
-                r.recipe_id,
-                {detail_columns}
-              FROM {usage_table} r
-             WHERE r.user_id = ?
-               AND r.{usage_fk} = ?
-             ORDER BY LOWER(r.recipe_id) ASC, r.sort_order ASC, r.id ASC
-             LIMIT ?
-            """,
-            (record["user_id"], int(record["id"]), limit),
-        ).fetchall()
+        if table_name == "ingredients":
+            alias_rows = connection.execute(
+                """
+                SELECT normalized_alias
+                  FROM ingredient_aliases
+                 WHERE user_id = ?
+                   AND ingredient_id = ?
+                """,
+                (record["user_id"], int(record["id"])),
+            ).fetchall()
+            target_names = sorted({
+                normalized_master_name(record.get("normalized_name") or record.get("name")),
+                *(
+                    normalized_master_name(alias_row["normalized_alias"])
+                    for alias_row in alias_rows
+                ),
+            } - {""})
+            buy_as_placeholders = ", ".join("?" for _ in target_names)
+            buy_as_match_sql = f"LOWER(TRIM(r.buy_as)) IN ({buy_as_placeholders})"
+            summary_row = connection.execute(
+                f"""
+                SELECT
+                    COUNT(DISTINCT CASE
+                        WHEN r.ingredient_id = ? THEN r.recipe_id
+                    END) AS ingredient_name_recipe_count,
+                    COUNT(DISTINCT CASE
+                        WHEN {buy_as_match_sql} THEN r.recipe_id
+                    END) AS buy_as_recipe_count,
+                    COUNT(DISTINCT r.recipe_id) AS total_recipe_count,
+                    COUNT(*) AS reference_count
+                  FROM recipe_ingredients r
+                 WHERE r.user_id = ?
+                   AND (
+                        r.ingredient_id = ?
+                        OR {buy_as_match_sql}
+                   )
+                """,
+                (
+                    int(record["id"]),
+                    *target_names,
+                    record["user_id"],
+                    int(record["id"]),
+                    *target_names,
+                ),
+            ).fetchone()
+            rows = connection.execute(
+                f"""
+                SELECT
+                    r.id,
+                    r.user_id,
+                    r.recipe_id,
+                    {detail_columns}
+                  FROM recipe_ingredients r
+                  LEFT JOIN ingredients source_ingredient
+                    ON source_ingredient.id = r.ingredient_id
+                   AND source_ingredient.user_id = r.user_id
+                 WHERE r.user_id = ?
+                   AND (
+                        r.ingredient_id = ?
+                        OR {buy_as_match_sql}
+                   )
+                 ORDER BY LOWER(r.recipe_id) ASC, r.sort_order ASC, r.id ASC
+                 LIMIT ?
+                """,
+                (
+                    record["user_id"],
+                    int(record["id"]),
+                    *target_names,
+                    limit,
+                ),
+            ).fetchall()
+        else:
+            target_names = []
+            summary_row = connection.execute(
+                f"""
+                SELECT
+                    COUNT(DISTINCT r.recipe_id) AS total_recipe_count,
+                    COUNT(*) AS reference_count
+                  FROM {usage_table} r
+                 WHERE r.user_id = ?
+                   AND r.{usage_fk} = ?
+                """,
+                (record["user_id"], int(record["id"])),
+            ).fetchone()
+            rows = connection.execute(
+                f"""
+                SELECT
+                    r.id,
+                    r.user_id,
+                    r.recipe_id,
+                    {detail_columns}
+                  FROM {usage_table} r
+                 WHERE r.user_id = ?
+                   AND r.{usage_fk} = ?
+                 ORDER BY LOWER(r.recipe_id) ASC, r.sort_order ASC, r.id ASC
+                 LIMIT ?
+                """,
+                (record["user_id"], int(record["id"]), limit),
+            ).fetchall()
 
     metadata = recipe_reference_metadata(record["user_id"])
     references = []
@@ -2744,6 +2874,8 @@ def list_master_record_recipe_references(
         metadata_record = metadata.get(recipe_id)
         metadata_record = metadata_record if isinstance(metadata_record, dict) else {}
         recipe_url = clean_text(metadata_record.get("url")) or recipe_id
+        ingredient_name = clean_text(row_data.get("ingredient_name"))
+        buy_as = clean_text(row_data.get("buy_as"))
         cover_image = metadata_record.get("cover_image")
         references.append({
             "id": int(row_data.get("id") or 0),
@@ -2752,6 +2884,15 @@ def list_master_record_recipe_references(
             "recipe_url": recipe_url,
             "recipe_title": recipe_reference_title(recipe_id, metadata_record),
             "cover_image": dict(cover_image) if isinstance(cover_image, dict) else {},
+            "ingredient_name": ingredient_name,
+            "matches_ingredient_name": bool(
+                table_name == "ingredients"
+                and int(row_data.get("ingredient_id") or 0) == int(record["id"])
+            ),
+            "matches_buy_as": bool(
+                table_name == "ingredients"
+                and normalized_master_name(buy_as) in target_names
+            ),
             "quantity": clean_text(row_data.get("quantity")),
             "unit": clean_text(row_data.get("unit")),
             "unit_id": clean_text(row_data.get("unit_id")),
@@ -2762,7 +2903,7 @@ def list_master_record_recipe_references(
             "unit_review_required": bool(row_data.get("unit_review_required")),
             "unit_review_value": clean_text(row_data.get("unit_review_value")),
             "unit_custom": bool(row_data.get("unit_custom")),
-            "buy_as": clean_text(row_data.get("buy_as")),
+            "buy_as": buy_as,
             "store_section": clean_ingredient_store_section(row_data.get("store_section"), default="")
             if table_name == "ingredients"
             else "",
@@ -2774,7 +2915,16 @@ def list_master_record_recipe_references(
     return {
         "record": record,
         "references": references,
-        "total": int(total_row["reference_count"] or 0) if total_row else 0,
+        "total": int(summary_row["total_recipe_count"] or 0) if summary_row else 0,
+        "total_reference_count": int(summary_row["reference_count"] or 0)
+        if summary_row
+        else 0,
+        "ingredient_name_recipe_count": int(summary_row["ingredient_name_recipe_count"] or 0)
+        if table_name == "ingredients" and summary_row
+        else 0,
+        "buy_as_recipe_count": int(summary_row["buy_as_recipe_count"] or 0)
+        if table_name == "ingredients" and summary_row
+        else 0,
         "limit": limit,
     }
 

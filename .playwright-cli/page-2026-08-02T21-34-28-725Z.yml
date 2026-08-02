@@ -1,0 +1,195 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=e3]:
+    - complementary "Primary navigation" [ref=e4]:
+      - link "AI Pantry home" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e13]:
+          - strong [ref=e14]: AI Pantry
+          - generic [ref=e15]: Recipe Shopping List
+      - button "Collapse sidebar" [ref=e16] [cursor=pointer]:
+        - generic [ref=e17]: ‹ <
+      - navigation "App sections" [ref=e18]:
+        - generic [ref=e19]: MAIN
+        - link "Home" [ref=e20] [cursor=pointer]:
+          - /url: /#appPageHeader
+        - link "Recipes" [ref=e26] [cursor=pointer]:
+          - /url: /#recipesPage
+        - link "Menus" [ref=e31] [cursor=pointer]:
+          - /url: /#menusPage
+        - link "Cookbooks" [ref=e35] [cursor=pointer]:
+          - /url: /#cookbooksCard
+        - link "Shopping Lists" [ref=e40] [cursor=pointer]:
+          - /url: /#shoppingViewsSection
+        - link "Pantry" [ref=e47] [cursor=pointer]:
+          - /url: /#aiPantrySection
+        - link "Meal Planner" [ref=e53] [cursor=pointer]:
+          - /url: /#mealPlannerPage
+        - generic [ref=e58]: SHOP
+        - link "Stores" [ref=e59] [cursor=pointer]:
+          - /url: /#storesPage
+        - link "Compare Prices" [ref=e66] [cursor=pointer]:
+          - /url: /#priceComparisonPage
+        - generic [ref=e72]: TOOLS
+        - link "Import" [ref=e73] [cursor=pointer]:
+          - /url: /#importPage
+        - link "Scan Barcode" [ref=e79] [cursor=pointer]:
+          - /url: /pantry/coming-soon
+        - generic [ref=e83]: ACCOUNT
+        - link "Usage and Billing" [ref=e84] [cursor=pointer]:
+          - /url: /#accountUsageDashboardPanel
+          - generic [ref=e88]: Usage & Billing
+        - link "Help and Support" [ref=e89] [cursor=pointer]:
+          - /url: /#feedbackSupportSection
+          - generic [ref=e94]: Help & Support
+        - link "Settings" [ref=e95] [cursor=pointer]:
+          - /url: /#settingsWorkspaceSection
+      - complementary "AI Pantry Pro" [ref=e101]:
+        - generic [ref=e105]:
+          - strong [ref=e106]: AI Pantry Pro
+          - generic [ref=e107]: Unlock more from your pantry.
+          - list "Plan benefits" [ref=e108]:
+            - listitem [ref=e109]: More imports
+            - listitem [ref=e110]: Advanced AI tools
+            - listitem [ref=e111]: Faster processing
+        - link "View AI Pantry Pro plans" [ref=e112] [cursor=pointer]:
+          - /url: /#accountUsageDashboardPanel
+          - generic [ref=e113]: View Plans
+    - generic [ref=e114]:
+      - banner "App toolbar" [ref=e115]:
+        - search [ref=e117]:
+          - generic [ref=e118]: Search AI Pantry
+          - combobox "Search AI Pantry" [ref=e119]
+          - generic: Ctrl + K
+          - button "Search" [ref=e120] [cursor=pointer]
+        - generic "Quick actions" [ref=e122]:
+          - link "Import" [ref=e123] [cursor=pointer]:
+            - /url: /#importPage
+          - link "Notifications" [ref=e126] [cursor=pointer]:
+            - /url: /#notificationsPage
+        - button "Open account menu for Nathaniel Tyler" [ref=e133] [cursor=pointer]:
+          - generic [ref=e135]:
+            - strong [ref=e136]: Nathaniel Tyler
+            - generic [ref=e137]: Pro Plan
+      - main [ref=e141]:
+        - region [ref=e142]:
+          - generic [ref=e143]:
+            - generic [ref=e144]:
+              - link "Account" [ref=e145] [cursor=pointer]:
+                - /url: /#userAccountSection
+              - heading "Ingredient Master Data" [level=1] [ref=e146]
+              - paragraph [ref=e147]: Browse normalized reusable recipe records for the active workspace.
+            - navigation "Master data" [ref=e148]:
+              - link "Ingredients" [ref=e149] [cursor=pointer]:
+                - /url: /admin/master-data/ingredients
+              - link "Equipment" [ref=e150] [cursor=pointer]:
+                - /url: /admin/master-data/equipment
+              - link "Store Sections" [ref=e151] [cursor=pointer]:
+                - /url: /admin/master-data/store-sections
+          - generic [ref=e152]:
+            - generic [ref=e153]:
+              - generic [ref=e154]: Search
+              - searchbox "Search" [ref=e155]: butter
+            - generic [ref=e156]:
+              - generic [ref=e157]: Scope
+              - combobox "Scope" [ref=e158]:
+                - option "My data" [selected]
+                - option "All users"
+                - option "Specific user"
+            - generic [ref=e159]:
+              - generic [ref=e160]: User
+              - combobox "User" [ref=e161]
+            - generic [ref=e162]: Nathaniel Tyler - ntylerbert@gmail.com - 6700fb164a...101bc7
+            - generic [ref=e163]:
+              - generic [ref=e164]: Store Section
+              - combobox "Store Section" [ref=e165]:
+                - option "All sections" [selected]
+                - option "Produce"
+                - option "Meat & Seafood"
+                - option "Dairy & Eggs"
+                - option "Frozen"
+                - option "Dry Goods"
+                - option "Pasta, Rice & Grains"
+                - option "Baking"
+                - option "Canned Goods"
+                - option "Sauces & Condiments"
+                - option "Snacks"
+                - option "Beverages"
+                - option "Spices"
+                - option "Oils & Vinegars"
+                - option "Bakery"
+                - option "Deli"
+                - option "Household"
+                - option "Personal Care"
+                - option "Pet Supplies"
+                - option "Misc"
+                - option "nates extra store section"
+            - generic [ref=e166]:
+              - generic [ref=e167]: Sort
+              - combobox "Sort" [ref=e168]:
+                - option "Updated At" [selected]
+                - option "Usage Count"
+                - option "Name"
+            - generic [ref=e169]:
+              - generic [ref=e170]: Limit
+              - combobox "Limit" [ref=e171]:
+                - option "50"
+                - option "100" [selected]
+                - option "250"
+                - option "500"
+            - button "Apply" [ref=e172] [cursor=pointer]
+          - generic [ref=e173]:
+            - generic [ref=e174]: Showing 1-2 of 2 ingredients.
+            - generic [ref=e175]:
+              - generic [ref=e176]: Thumbnail Size
+              - generic [ref=e177]:
+                - button "Decrease thumbnail size" [ref=e178] [cursor=pointer]: "-"
+                - generic [ref=e179]: 64px
+                - button "Increase thumbnail size" [ref=e180] [cursor=pointer]: +
+                - button "Reset" [ref=e181] [cursor=pointer]
+          - generic [ref=e182]:
+            - generic [ref=e183]:
+              - strong [ref=e184]: No ingredient changes
+              - generic [ref=e185]: Edit ingredient names or store sections, then save all pending changes here.
+            - button "Save Changes" [disabled] [ref=e186]
+          - table [ref=e189]:
+            - rowgroup [ref=e190]:
+              - row [ref=e191]:
+                - columnheader "Item" [ref=e192]
+                - columnheader "Store Section" [ref=e193]
+                - columnheader "Usage" [ref=e194]
+                - columnheader "Last Updated" [ref=e195]
+            - rowgroup [ref=e196]:
+              - row [ref=e197]:
+                - rowheader "DAIRY & EGGS" [ref=e198]
+              - row [ref=e199]:
+                - cell [ref=e200]:
+                  - generic [ref=e201]:
+                    - button "Enlarge unsalted butter image" [ref=e202]
+                    - strong [ref=e204]: unsalted butter
+                    - button "Show editing controls for unsalted butter" [ref=e205] [cursor=pointer]
+                - cell "Dairy & Eggs" [ref=e208]
+                - cell [ref=e217]:
+                  - button "Show 3 recipes referencing unsalted butter" [ref=e218] [cursor=pointer]:
+                    - generic [ref=e219]: "3"
+                - cell [ref=e220]:
+                  - time [ref=e221]: 2026-07-09
+              - row [ref=e222]:
+                - cell [ref=e223]:
+                  - generic [ref=e224]:
+                    - button "Enlarge butter image" [ref=e225]
+                    - strong [ref=e227]: butter
+                    - button "Show editing controls for butter" [ref=e228] [cursor=pointer]
+                - cell "Dairy & Eggs" [ref=e231]
+                - cell [ref=e240]:
+                  - button "Show 5 recipes referencing butter" [ref=e241] [cursor=pointer]:
+                    - generic [ref=e242]: "5"
+                - cell [ref=e243]:
+                  - time [ref=e244]: 2026-07-09
+          - generic [ref=e245]:
+            - generic [ref=e246]: Previous
+            - strong [ref=e247]: Page 1 of 1
+            - generic [ref=e248]: Next
+          - group [ref=e249]:
+            - generic "Maintenance tools" [ref=e250] [cursor=pointer]

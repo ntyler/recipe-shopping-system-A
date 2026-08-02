@@ -459,7 +459,13 @@ def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_
     user_b_garlic = master_data.master_record_for_name("ingredients", "user-b", "garlic")
     with master_data.recipe_master_connection() as connection:
         connection.execute(
-            "UPDATE recipe_ingredients SET preparation = 'diced', notes = 'use ripe tomatoes' WHERE ingredient_id = ?",
+            """
+            UPDATE recipe_ingredients
+               SET preparation = 'diced',
+                   notes = 'use ripe tomatoes',
+                   buy_as = 'tomato'
+             WHERE ingredient_id = ?
+            """,
             (user_a_tomato["id"],),
         )
     metadata_path = users_root / "user-a" / "recipe-extractor" / "data" / "recipe_ingredients.json"
@@ -501,7 +507,13 @@ def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_
     assert admin_response.status_code == 200
     assert admin_payload["record"]["name"] == "Tomato"
     assert admin_payload["total"] == 1
+    assert admin_payload["total_reference_count"] == 1
+    assert admin_payload["ingredient_name_recipe_count"] == 1
+    assert admin_payload["buy_as_recipe_count"] == 1
     assert admin_payload["references"][0]["recipe_title"] == "User A Soup"
+    assert admin_payload["references"][0]["ingredient_name"] == "Tomato"
+    assert admin_payload["references"][0]["matches_ingredient_name"] is True
+    assert admin_payload["references"][0]["matches_buy_as"] is True
     assert admin_payload["references"][0]["recipe_url"] == "https://example.com/user-a-soup"
     assert admin_payload["references"][0]["preparation"] == "diced"
     assert admin_payload["references"][0]["notes"] == "use ripe tomatoes"
@@ -1784,6 +1796,10 @@ def test_master_data_reference_expander_is_wired():
     assert "master_data_record_references_route" in template
     assert "aria-expanded=\"false\"" in template
     assert "aria-label=\"Show {{ row.usage_count }} recipe" in template
+    assert "{{ row.ingredient_name_usage_count }} by Ingredient Name" in template
+    assert "{{ row.buy_as_usage_count }} by Buy As" in template
+    assert 'class="master-data-usage-total"' in template
+    assert 'class="master-data-usage-breakdown"' in template
     assert "master-data-record-row-unused" in template
     assert 'data-master-record-unused="true"' in template
     assert "<strong>Unused</strong>" in template
@@ -1805,6 +1821,13 @@ def test_master_data_reference_expander_is_wired():
 
     assert "function toggleReferenceRow" in script
     assert "function renderReferences" in script
+    assert "master-data-reference-usage-breakdown" in script
+    assert "Ingredient Name ${ingredientNameCount}" in script
+    assert "Buy As ${buyAsCount}" in script
+    assert "Counts overlap when a recipe uses this record in both fields." in script
+    assert "master-data-reference-matches" in script
+    assert 'nameMatch.textContent = "Ingredient Name";' in script
+    assert 'buyAsMatch.textContent = "Buy As";' in script
     assert "[data-master-reference-toggle]" in script
     assert "function initMasterDataStoreSectionIconPickers()" in script
     assert "createRecipeIngredientStoreSectionTrigger(select)" in script
@@ -1833,6 +1856,10 @@ def test_master_data_reference_expander_is_wired():
     assert "updateReferenceImageSizes" in script
 
     assert ".master-data-usage-button" in css
+    assert ".master-data-usage-total" in css
+    assert ".master-data-usage-breakdown" in css
+    assert ".master-data-reference-usage-breakdown" in css
+    assert ".master-data-reference-matches" in css
     assert ".master-data-usage-button span:nth-child" not in css
     assert ".master-data-usage-chevron" not in css
     assert ".master-data-reference-row[hidden]" in css

@@ -555,6 +555,9 @@
 
     function referenceDetailText(reference) {
         const details = [];
+        if (reference.ingredient_name && reference.matches_buy_as && !reference.matches_ingredient_name) {
+            details.push(`Ingredient: ${reference.ingredient_name}`);
+        }
         const amount = [reference.quantity, reference.unit].map(text).filter(Boolean).join(" ");
         if (amount) {
             details.push(amount);
@@ -620,6 +623,24 @@
         title.textContent = text(reference.recipe_title || reference.recipe_id || "Recipe");
         copy.appendChild(title);
 
+        if (reference.matches_ingredient_name || reference.matches_buy_as) {
+            const matches = document.createElement("div");
+            matches.className = "master-data-reference-matches";
+            if (reference.matches_ingredient_name) {
+                const nameMatch = document.createElement("span");
+                nameMatch.className = "is-name";
+                nameMatch.textContent = "Ingredient Name";
+                matches.appendChild(nameMatch);
+            }
+            if (reference.matches_buy_as) {
+                const buyAsMatch = document.createElement("span");
+                buyAsMatch.className = "is-buy-as";
+                buyAsMatch.textContent = "Buy As";
+                matches.appendChild(buyAsMatch);
+            }
+            copy.appendChild(matches);
+        }
+
         const detail = document.createElement("div");
         detail.className = "master-data-reference-detail";
         detail.textContent = referenceDetailText(reference) || text(reference.recipe_id || "");
@@ -658,18 +679,41 @@
 
         const references = Array.isArray(data && data.references) ? data.references : [];
         const total = Number(data && data.total) || references.length;
+        const totalReferences = Number(data && data.total_reference_count) || references.length;
+        const ingredientNameCount = Math.max(
+            0,
+            Number(data && data.ingredient_name_recipe_count) || 0,
+        );
+        const buyAsCount = Math.max(0, Number(data && data.buy_as_recipe_count) || 0);
+        const hasIngredientBreakdown = text(data && data.record_type) === "ingredients";
 
         const header = document.createElement("div");
         header.className = "master-data-reference-header";
 
+        const heading = document.createElement("div");
+        heading.className = "master-data-reference-heading";
         const title = document.createElement("strong");
         const recordName = text(data && data.record && data.record.name);
         title.textContent = `${recordName || "Record"} is used by ${total} recipe${total === 1 ? "" : "s"}`;
-        header.appendChild(title);
+        heading.appendChild(title);
 
-        if (total > references.length) {
+        if (hasIngredientBreakdown) {
+            const breakdown = document.createElement("div");
+            breakdown.className = "master-data-reference-usage-breakdown";
+            const nameUsage = document.createElement("span");
+            nameUsage.textContent = `Ingredient Name ${ingredientNameCount}`;
+            const buyAsUsage = document.createElement("span");
+            buyAsUsage.textContent = `Buy As ${buyAsCount}`;
+            const overlapNote = document.createElement("small");
+            overlapNote.textContent = "Counts overlap when a recipe uses this record in both fields.";
+            breakdown.append(nameUsage, buyAsUsage, overlapNote);
+            heading.appendChild(breakdown);
+        }
+        header.appendChild(heading);
+
+        if (totalReferences > references.length) {
             const note = document.createElement("span");
-            note.textContent = `Showing first ${references.length}.`;
+            note.textContent = `Showing first ${references.length} references.`;
             header.appendChild(note);
         }
 

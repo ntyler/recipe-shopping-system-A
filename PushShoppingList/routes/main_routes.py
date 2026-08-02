@@ -1865,6 +1865,11 @@ def master_data_record_references_route(record_type, record_id):
         "record": references.get("record"),
         "references": enriched_references,
         "total": int(references.get("total") or 0),
+        "total_reference_count": int(references.get("total_reference_count") or 0),
+        "ingredient_name_recipe_count": int(
+            references.get("ingredient_name_recipe_count") or 0
+        ),
+        "buy_as_recipe_count": int(references.get("buy_as_recipe_count") or 0),
         "limit": int(references.get("limit") or 0),
     })
 

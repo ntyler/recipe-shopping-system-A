@@ -141,12 +141,23 @@
                         data-reference-url="{{ master_data_reference_url(row, master_data) }}"
                         aria-expanded="false"
                         aria-controls="{{ reference_row_id }}"
-                        aria-label="Show {{ row.usage_count }} recipe{% if row.usage_count != 1 %}s{% endif %} referencing {{ row.name }}"
+                        aria-label="Show {{ row.usage_count }} recipe{% if row.usage_count != 1 %}s{% endif %} referencing {{ row.name }}{% if master_data.record_type == 'ingredients' %}: {{ row.ingredient_name_usage_count }} by Ingredient Name and {{ row.buy_as_usage_count }} by Buy As; these counts may overlap{% endif %}"
                         title="Show recipes referencing {{ row.name }}">
-                    <span aria-hidden="true">{{ row.usage_count }}</span>
-                    <span class="master-data-mobile-usage-label">
-                        {% if row.usage_count == 1 %}use{% else %}uses{% endif %}
-                    </span>
+                    {% if master_data.record_type == 'ingredients' %}
+                        <span class="master-data-usage-total" aria-hidden="true">
+                            <strong>{{ row.usage_count }}</strong>
+                            <span>{% if row.usage_count == 1 %}recipe{% else %}recipes{% endif %}</span>
+                        </span>
+                        <span class="master-data-usage-breakdown" aria-hidden="true">
+                            <span>Name {{ row.ingredient_name_usage_count }}</span>
+                            <span>Buy As {{ row.buy_as_usage_count }}</span>
+                        </span>
+                    {% else %}
+                        <span aria-hidden="true">{{ row.usage_count }}</span>
+                        <span class="master-data-mobile-usage-label">
+                            {% if row.usage_count == 1 %}use{% else %}uses{% endif %}
+                        </span>
+                    {% endif %}
                 </button>
             {% else %}
                 <span class="master-data-usage-empty"

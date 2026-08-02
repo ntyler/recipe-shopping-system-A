@@ -1279,6 +1279,67 @@ def test_list_master_records_searches_sorts_and_counts_usage(monkeypatch, tmp_pa
     assert master_data.count_equipment(user_id="user-a", equipment_section="BAKEWARE") == 1
 
 
+def test_ingredient_usage_breakdown_counts_unique_recipes_across_name_and_buy_as(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/butter-both",
+        recipe_data={"ingredients": [{"ingredient": "Butter", "buy_as": "butter"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/butter-buy-as-only",
+        recipe_data={"ingredients": [{"ingredient": "Unsalted Butter", "buy_as": "Butter"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/butter-name-only",
+        recipe_data={"ingredients": [{"ingredient": "Butter", "buy_as": "Ghee"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/other-user-butter",
+        recipe_data={"ingredients": [{"ingredient": "Butter", "buy_as": "butter"}]},
+        user_id="user-b",
+    )
+
+    butter = next(
+        row
+        for row in master_data.list_ingredients(user_id="user-a", search="butter")
+        if row["normalized_name"] == "butter"
+    )
+    references = master_data.list_master_record_recipe_references(
+        "ingredients",
+        butter["id"],
+        user_id="user-a",
+    )
+
+    assert butter["ingredient_name_usage_count"] == 2
+    assert butter["buy_as_usage_count"] == 2
+    assert butter["usage_count"] == 3
+    assert references["ingredient_name_recipe_count"] == 2
+    assert references["buy_as_recipe_count"] == 2
+    assert references["total"] == 3
+    assert references["total_reference_count"] == 3
+    reference_by_recipe = {
+        row["recipe_id"]: row
+        for row in references["references"]
+    }
+    both = reference_by_recipe[master_data.recipe_id_for_url("https://example.com/butter-both")]
+    buy_as_only = reference_by_recipe[
+        master_data.recipe_id_for_url("https://example.com/butter-buy-as-only")
+    ]
+    name_only = reference_by_recipe[
+        master_data.recipe_id_for_url("https://example.com/butter-name-only")
+    ]
+    assert both["matches_ingredient_name"] is True
+    assert both["matches_buy_as"] is True
+    assert buy_as_only["ingredient_name"] == "Unsalted Butter"
+    assert buy_as_only["matches_ingredient_name"] is False
+    assert buy_as_only["matches_buy_as"] is True
+    assert name_only["matches_ingredient_name"] is True
+    assert name_only["matches_buy_as"] is False
+
+
 def test_update_ingredient_master_record_changes_identity_without_breaking_recipe_links(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     recipe_url = "https://example.com/master-edit"
