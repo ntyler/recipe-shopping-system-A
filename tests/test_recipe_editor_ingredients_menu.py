@@ -5064,6 +5064,21 @@ def test_wide_desktop_ingredient_overview_uses_one_page_compact_grid():
             assert declaration in rule
 
 
+def test_desktop_ingredient_modal_has_a_full_workspace_fit_mode():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    compact = css[css.index("/* Ingredient editor v85:"):]
+    assert "@media (min-width: 1280px) and (min-height: 760px)" in compact
+    assert "grid-template-rows: 62px minmax(0, 1fr) 62px;" in compact
+    assert "grid-template-columns: 230px minmax(0, 1fr);" in compact
+    assert "grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);" in compact
+    assert "gap: 10px;" in compact
+    assert "min-height: 70px;" in compact
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in compact
+    assert ".recipe-edit-ingredient-modal-options-panel .recipe-edit-alternative-component-summary" in compact
+    assert "min-height: 48px;" in compact
+
+
 def test_recipe_menu_edit_links_to_standalone_editor_page():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     current_recipes = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
