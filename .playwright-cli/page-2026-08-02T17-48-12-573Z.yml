@@ -1,0 +1,427 @@
+- generic [ref=f8e1]:
+  - link "Skip to content" [ref=f8e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=f8e3]:
+    - complementary "Primary navigation" [ref=f8e4]:
+      - link "AI Pantry home" [ref=f8e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f8e13]:
+          - strong [ref=f8e14]: AI Pantry
+          - generic [ref=f8e454]: Recipe Shopping List
+      - button "Collapse sidebar" [ref=f8e15] [cursor=pointer]:
+        - generic [ref=f8e455]: ‹ <
+      - navigation "App sections" [ref=f8e16]:
+        - generic [ref=f8e17]: MAIN
+        - link "Home" [ref=f8e18] [cursor=pointer]:
+          - /url: /#appPageHeader
+        - link "Recipes" [ref=f8e23] [cursor=pointer]:
+          - /url: /#recipesPage
+        - link "Menus" [ref=f8e27] [cursor=pointer]:
+          - /url: /#menusPage
+        - link "Cookbooks" [ref=f8e30] [cursor=pointer]:
+          - /url: /#cookbooksCard
+        - link "Shopping Lists" [ref=f8e34] [cursor=pointer]:
+          - /url: /#shoppingViewsSection
+        - link "Pantry" [ref=f8e40] [cursor=pointer]:
+          - /url: /#aiPantrySection
+        - link "Meal Planner" [ref=f8e45] [cursor=pointer]:
+          - /url: /#mealPlannerPage
+        - generic [ref=f8e49]: SHOP
+        - link "Stores" [ref=f8e50] [cursor=pointer]:
+          - /url: /#storesPage
+        - link "Compare Prices" [ref=f8e56] [cursor=pointer]:
+          - /url: /#priceComparisonPage
+        - generic [ref=f8e61]: TOOLS
+        - link "Import" [ref=f8e62] [cursor=pointer]:
+          - /url: /#importPage
+        - link "Scan Barcode" [ref=f8e67] [cursor=pointer]:
+          - /url: /pantry/coming-soon
+        - generic [ref=f8e70]: ACCOUNT
+        - link "Usage and Billing" [ref=f8e71] [cursor=pointer]:
+          - /url: /#accountUsageDashboardPanel
+          - generic [ref=f8e467]: Usage & Billing
+        - link "Help and Support" [ref=f8e75] [cursor=pointer]:
+          - /url: /#feedbackSupportSection
+          - generic [ref=f8e468]: Help & Support
+        - link "Settings" [ref=f8e80] [cursor=pointer]:
+          - /url: /#settingsWorkspaceSection
+      - complementary "AI Pantry Pro" [ref=f8e85]:
+        - generic [ref=f8e89]:
+          - strong [ref=f8e90]: AI Pantry Pro
+          - generic [ref=f8e470]: Unlock more from your pantry.
+          - list "Plan benefits" [ref=f8e91]:
+            - listitem [ref=f8e92]: More imports
+            - listitem [ref=f8e93]: Advanced AI tools
+            - listitem [ref=f8e94]: Faster processing
+        - link "View AI Pantry Pro plans" [ref=f8e95] [cursor=pointer]:
+          - /url: /#accountUsageDashboardPanel
+          - generic [ref=f8e471]: View Plans
+    - generic [ref=f8e99]:
+      - banner "App toolbar" [ref=f8e100]:
+        - search [ref=f8e110]:
+          - generic [ref=f8e472]: Search AI Pantry
+          - combobox "Search AI Pantry" [ref=f8e115]
+          - generic: Ctrl + K
+          - button "Search" [ref=f8e116] [cursor=pointer]
+        - generic "Quick actions" [ref=f8e117]:
+          - link "Import" [ref=f8e118] [cursor=pointer]:
+            - /url: /#importPage
+          - link "Notifications" [ref=f8e120] [cursor=pointer]:
+            - /url: /#notificationsPage
+        - button "Open account menu for Nathaniel Tyler" [ref=f8e130] [cursor=pointer]:
+          - generic [ref=f8e132]:
+            - strong [ref=f8e133]: Nathaniel Tyler
+            - generic [ref=f8e476]: Pro Plan
+      - main "Recipe editor" [ref=f8e137]:
+        - dialog "Edit Recipe" [ref=f8e477]:
+          - generic [ref=f8e140]:
+            - generic [ref=f8e141]:
+              - navigation "Breadcrumb" [ref=f8e478]:
+                - link "Recipes" [ref=f8e479] [cursor=pointer]:
+                  - /url: /#currentRecipeUrlLogCard
+                - generic [ref=f8e480]: /
+                - generic [ref=f8e481]: Corn Spoon Bread
+                - generic [ref=f8e482]: /
+                - generic [ref=f8e483]: Edit Recipe
+              - generic [ref=f8e151]:
+                - button "Preview Recipe" [ref=f8e484] [cursor=pointer]
+                - link "Download recipe PDF" [ref=f8e691] [cursor=pointer]:
+                  - /url: https://pub-c0815444ad5143baade63b3e205bf1b4.r2.dev/recipe-pdfs/vegetablerecipes_com_corn-spoon-bread_generated_recipe.pdf
+                  - text: ↓
+                  - generic [ref=f8e695]: Recipe PDF
+                - text: ↓
+                - generic [ref=f8e156]:
+                  - button "More actions" [ref=f8e491] [cursor=pointer]
+                  - text: "> >"
+                - button "Cancel" [ref=f8e493] [cursor=pointer]
+                - button "Save Recipe" [disabled] [ref=f8e494]
+            - generic [ref=f8e162]:
+              - generic [ref=f8e163]:
+                - generic [ref=f8e175]:
+                  - generic [ref=f8e497]:
+                    - generic [ref=f8e498]:
+                      - generic [ref=f8e499]:
+                        - generic [ref=f8e176]:
+                          - generic [ref=f8e500]: Recipe Name
+                          - textbox "Recipe Name" [ref=f8e501]:
+                            - /placeholder: Untitled Recipe
+                            - text: Corn Spoon Bread
+                        - button "Edit recipe name" [ref=f8e502] [cursor=pointer]
+                      - radiogroup "Recipe rating" [ref=f8e507]:
+                        - radio "1 star. Click the selected star again to clear the rating." [ref=f8e508] [cursor=pointer]: ☆
+                        - radio "2 stars. Click the selected star again to clear the rating." [ref=f8e509] [cursor=pointer]: ☆
+                        - radio "3 stars. Click the selected star again to clear the rating." [ref=f8e510] [cursor=pointer]: ☆
+                        - radio "4 stars. Click the selected star again to clear the rating." [ref=f8e511] [cursor=pointer]: ☆
+                        - radio "5 stars. Click the selected star again to clear the rating." [ref=f8e512] [cursor=pointer]: ☆
+                      - generic [ref=f8e513]:
+                        - generic [ref=f8e259]:
+                          - combobox "🇺🇸 American Remove 🇺🇸 American" [ref=f8e696]:
+                            - option "Use inferred"
+                            - option "🇺🇸 American" [selected]
+                            - option "🇲🇽 Mexican"
+                            - option "🇮🇹 Italian"
+                            - option "🇯🇵 Japanese"
+                            - option "🇹🇭 Thai"
+                            - option "🇨🇳 Chinese"
+                            - option "🇮🇳 Indian"
+                            - option "🇫🇷 French"
+                            - option "🌍 Other / Fusion"
+                          - generic [ref=f8e697]:
+                            - generic [ref=f8e698]: 🇺🇸 American
+                            - button "Remove 🇺🇸 American" [ref=f8e699] [cursor=pointer]
+                        - button "Add Tag" [ref=f8e518] [cursor=pointer]
+                    - generic [ref=f8e521]:
+                      - generic [ref=f8e243]:
+                        - generic [ref=f8e522]: Cookbook
+                        - button "Cookbook actions" [ref=f8e523] [cursor=pointer]:
+                          - generic "unclassified" [ref=f8e703]
+                      - generic [ref=f8e271]:
+                        - generic [ref=f8e525]: Section
+                        - button "Menu section actions" [ref=f8e526] [cursor=pointer]:
+                          - generic "Miscellaneous" [ref=f8e704]
+                  - generic [ref=f8e528]:
+                    - generic [ref=f8e241]:
+                      - generic [ref=f8e529]:
+                        - generic [ref=f8e535]: Servings
+                        - button "About Servings" [ref=f8e536]: "?"
+                      - generic [ref=f8e537]:
+                        - textbox "Servings About Servings people" [ref=f8e538]: "12"
+                        - generic [ref=f8e539]: people
+                    - generic [ref=f8e229]:
+                      - generic [ref=f8e540]:
+                        - generic [ref=f8e230]: Total Time
+                        - button "About Total Time" [ref=f8e545]: "?"
+                      - generic [ref=f8e546]:
+                        - textbox "Total Time About Total Time min" [ref=f8e547]: "45"
+                        - generic [ref=f8e548]: min
+                    - generic [ref=f8e232]:
+                      - generic [ref=f8e549]:
+                        - generic [ref=f8e233]: Prep Time
+                        - button "About Prep Time" [ref=f8e553]: "?"
+                      - generic [ref=f8e554]:
+                        - textbox "Prep Time About Prep Time min" [ref=f8e555]: "5"
+                        - generic [ref=f8e556]: min
+                    - generic [ref=f8e238]:
+                      - generic [ref=f8e557]:
+                        - generic [ref=f8e239]: Cook Time
+                        - button "About Cook Time" [ref=f8e562]: "?"
+                      - generic [ref=f8e563]:
+                        - textbox "Cook Time About Cook Time min" [ref=f8e564]: "40"
+                        - generic [ref=f8e565]: min
+                    - generic [ref=f8e235]:
+                      - generic [ref=f8e566]:
+                        - generic [ref=f8e236]: Inactive Time
+                        - button "About Inactive Time" [ref=f8e570]: "?"
+                      - generic [ref=f8e571]:
+                        - textbox "Inactive Time About Inactive Time min" [ref=f8e572]: "0"
+                        - generic [ref=f8e573]: min
+                    - generic [ref=f8e226]:
+                      - generic [ref=f8e574]:
+                        - generic [ref=f8e227]: Difficulty
+                        - button "About Difficulty" [ref=f8e582]: "?"
+                      - combobox "Difficulty About Difficulty" [ref=f8e584]:
+                        - option "Not set"
+                        - option "Easy" [selected]
+                        - option "Medium"
+                        - option "Hard"
+                        - option "Expert"
+                    - generic [ref=f8e223]:
+                      - generic [ref=f8e585]:
+                        - generic [ref=f8e224]: Scale
+                        - button "About Scale" [ref=f8e590]: "?"
+                      - combobox "Scale About Scale" [ref=f8e592]:
+                        - option "1x" [selected]
+                        - option "2x"
+                        - option "3x"
+                  - generic [ref=f8e593]:
+                    - generic [ref=f8e180]:
+                      - generic [ref=f8e594]: Description
+                      - textbox "Description 0 characters" [ref=f8e705]
+                      - generic: 0 characters
+                    - generic [ref=f8e596]:
+                      - generic [ref=f8e597]: Price (optional)
+                      - textbox "Price (optional)" [ref=f8e598]
+                  - group [ref=f8e221]:
+                    - generic "Technical Details" [ref=f8e599] [cursor=pointer]
+                - region [ref=f8e602]:
+                  - generic [ref=f8e247]:
+                    - generic [ref=f8e249]:
+                      - heading "Edit Recipe Categories" [level=3] [ref=f8e604]
+                      - paragraph [ref=f8e706]: Corn Spoon Bread
+                    - generic [ref=f8e251]:
+                      - button "Collapse recipe categories" [expanded] [ref=f8e605] [cursor=pointer]
+                      - button "Recipe category actions" [ref=f8e607] [cursor=pointer]
+                  - generic [ref=f8e256]:
+                    - generic [ref=f8e257]:
+                      - generic [ref=f8e608]: Meal Type
+                      - combobox "Meal Type" [ref=f8e609]:
+                        - option "Use inferred"
+                        - option "🍳 Breakfast"
+                        - option "🥪 Lunch"
+                        - option "🍽️ Dinner" [selected]
+                        - option "🥗 Side Dish"
+                        - option "🍰 Dessert"
+                        - option "🍹 Drink"
+                        - option "🥣 Soup"
+                        - option "🍱 Meal Prep"
+                        - option "🍿 Snack"
+                    - generic [ref=f8e261]:
+                      - generic [ref=f8e610]: Main Ingredient
+                      - combobox "Main Ingredient" [ref=f8e611]:
+                        - option "Use inferred"
+                        - option "🐔 Chicken"
+                        - option "🥩 Beef"
+                        - option "🐷 Pork"
+                        - option "🐟 Seafood"
+                        - option "🥚 Eggs"
+                        - option "🫘 Beans"
+                        - option "🥬 Vegetarian" [selected]
+                        - option "🌱 Vegan"
+                        - option "🍝 Pasta"
+                        - option "🍚 Rice / Grains"
+                        - option "🥔 Potatoes"
+                        - option "🧀 Cheese"
+                    - generic [ref=f8e263]:
+                      - generic [ref=f8e612]: Cooking Method
+                      - combobox "Cooking Method" [ref=f8e613]:
+                        - option "Use inferred"
+                        - option "🔥 Grilled"
+                        - option "🍳 Skillet"
+                        - option "🥘 One Pot"
+                        - option "🍲 Slow Cooker"
+                        - option "♨️ Oven Baked" [selected]
+                        - option "🥗 No Cook"
+                        - option "🧊 Make Ahead"
+                        - option "⚡ Quick Meal"
+                    - generic [ref=f8e265]:
+                      - generic [ref=f8e614]: Occasion
+                      - combobox "Occasion" [ref=f8e615]:
+                        - option "Use inferred"
+                        - option "❤️ Date Night"
+                        - option "👨‍👩‍👧 Family Dinner" [selected]
+                        - option "🎉 Party Food"
+                        - option "🏈 Game Day"
+                        - option "🎄 Holiday"
+                        - option "☀️ Summer"
+                        - option "❄️ Winter"
+                        - option "🧺 Potluck"
+                    - generic [ref=f8e267]:
+                      - generic [ref=f8e616]: Dietary Preference
+                      - combobox "Dietary Preference" [ref=f8e617]:
+                        - option "Use inferred"
+                        - option "🥩 High Protein"
+                        - option "🥗 Low Carb"
+                        - option "🌱 Vegan"
+                        - option "🌱 Vegetarian"
+                        - option "🌾 Gluten Free"
+                        - option "🥛 Dairy Free" [selected]
+                        - option "🧂 Low Sodium"
+                        - option "🔥 Spicy"
+                        - option "🍬 Low Sugar"
+                    - generic [ref=f8e269]:
+                      - generic [ref=f8e618]: Prep Time
+                      - combobox "Prep Time" [ref=f8e619]:
+                        - option "Use inferred"
+                        - option "⚡ Under 15 Minutes"
+                        - option "⏱️ 15–30 Minutes"
+                        - option "🕐 30–60 Minutes" [selected]
+                        - option "⏳ Over 1 Hour"
+                        - option "🧊 Make Ahead"
+                    - generic [ref=f8e274]:
+                      - generic [ref=f8e620]: Custom Categories
+                      - textbox "Custom Categories" [ref=f8e621]:
+                        - /placeholder: Sophia's Favorites, Weeknight Dinners
+                        - text: Comfort Food, Casserole, Vegetarian Side
+                - generic [ref=f8e276]:
+                  - tablist "Recipe editor sections" [ref=f8e622]:
+                    - tab "Ingredients" [selected] [ref=f8e623] [cursor=pointer]
+                    - tab "Instructions" [ref=f8e624] [cursor=pointer]
+                    - tab "Equipment" [ref=f8e625] [cursor=pointer]
+                    - tab "Nutrition" [ref=f8e626] [cursor=pointer]
+                    - tab "Notes" [ref=f8e627] [cursor=pointer]
+                  - generic [ref=f8e283]:
+                    - tabpanel "Ingredients" [ref=f8e628]:
+                      - generic [ref=f8e285]:
+                        - heading "Ingredients (10)" [level=3] [ref=f8e707]
+                        - generic [ref=f8e290]:
+                          - button "Add Ingredient" [ref=f8e630] [cursor=pointer]
+                          - button "Ingredient actions" [ref=f8e632] [cursor=pointer]
+                      - tablist "Ingredient view" [ref=f8e633]:
+                        - tab "Recipe" [selected] [ref=f8e634] [cursor=pointer]
+                        - tab "Smart" [ref=f8e635] [cursor=pointer]
+                        - tab "Table" [ref=f8e636] [cursor=pointer]
+                      - text: … … … … … … … … · … … · · · ·
+                      - tabpanel "Recipe" [ref=f8e637]:
+                        - generic [ref=f8e638]:
+                          - list "Ingredients (10)" [ref=f8e708]:
+                            - listitem [ref=f8e709]:
+                              - generic [ref=f8e710]: ¾
+                              - strong [ref=f8e712]: yellow cornmeal
+                              - 'generic "Store section: Misc" [ref=f8e2509]': Misc
+                              - button "Edit yellow cornmeal" [ref=f8e722] [cursor=pointer]
+                            - listitem [ref=f8e727]:
+                              - generic [ref=f8e728]: ¾
+                              - strong [ref=f8e730]: all-purpose flour
+                              - 'generic "Store section: Baking" [ref=f8e2517]': Baking
+                              - button "Edit all-purpose flour" [ref=f8e741] [cursor=pointer]
+                            - listitem [ref=f8e746]:
+                              - generic [ref=f8e747]: ½
+                              - strong [ref=f8e749]: sugar
+                              - 'generic "Store section: Baking" [ref=f8e2526]': Baking
+                              - button "Edit sugar" [ref=f8e760] [cursor=pointer]
+                            - listitem [ref=f8e765]:
+                              - generic [ref=f8e766]: 2 teaspoons
+                              - strong [ref=f8e768]: baking powder
+                              - 'generic "Store section: Baking" [ref=f8e2535]': Baking
+                              - button "Edit baking powder" [ref=f8e779] [cursor=pointer]
+                            - listitem [ref=f8e784]:
+                              - generic [ref=f8e785]: ½
+                              - generic [ref=f8e786]:
+                                - strong [ref=f8e787]: kosher salt
+                                - generic [ref=f8e788]: Pantry staple
+                              - 'generic "Store section: Spices" [ref=f8e2545]': Spices
+                              - button "Edit kosher salt" [ref=f8e798] [cursor=pointer]
+                            - listitem [ref=f8e803]:
+                              - generic [ref=f8e804]: "2"
+                              - generic [ref=f8e805]:
+                                - strong [ref=f8e806]: egg
+                                - generic [ref=f8e807]: "Buy as: eggs"
+                              - 'generic "Store section: Dairy & Eggs" [ref=f8e2553]': Dairy & Eggs
+                              - button "Edit egg" [ref=f8e817] [cursor=pointer]
+                            - listitem [ref=f8e822]:
+                              - generic [ref=f8e823]: ⅔
+                              - strong [ref=f8e825]: sour cream
+                              - 'generic "Store section: Dairy & Eggs" [ref=f8e2560]': Dairy & Eggs
+                              - button "Edit sour cream" [ref=f8e834] [cursor=pointer]
+                            - listitem [ref=f8e839]:
+                              - generic [ref=f8e840]: ½
+                              - generic [ref=f8e841]:
+                                - strong [ref=f8e842]: butter (melted)
+                                - generic [ref=f8e843]: "Default: Butter"
+                              - generic [ref=f8e845]: 2 options
+                              - 'generic "Store section: Dairy & Eggs" [ref=f8e2568]': Dairy & Eggs
+                              - button "Show 2 options for butter (melted)" [ref=f8e855] [cursor=pointer]
+                              - button "Edit butter (melted)" [active] [ref=f8e859] [cursor=pointer]
+                            - listitem [ref=f8e864]:
+                              - generic [ref=f8e865]: 14 ounces
+                              - strong [ref=f8e867]: canned cream-style corn
+                              - 'generic "Store section: Canned Goods" [ref=f8e2575]': Canned Goods
+                              - button "Edit canned cream-style corn" [ref=f8e877] [cursor=pointer]
+                            - listitem [ref=f8e882]:
+                              - generic [ref=f8e883]: 1 cup
+                              - generic [ref=f8e884]:
+                                - strong [ref=f8e885]: fresh or frozen corn
+                                - generic [ref=f8e886]: "Default: Fresh corn + Cumin"
+                              - generic [ref=f8e888]: 2 options
+                              - 'generic "Store section: Produce" [ref=f8e2584]': Produce
+                              - button "Show 2 options for fresh or frozen corn" [ref=f8e898] [cursor=pointer]
+                              - button "Edit fresh or frozen corn" [ref=f8e902] [cursor=pointer]
+                          - button "Add Ingredient" [ref=f8e907] [cursor=pointer]
+                    - text: No image No image No image No reflection notes yet. Add one after cooking to remember what worked or what to change next time.
+              - complementary "Recipe context" [ref=f8e645]:
+                - region "Recipe Image" [ref=f8e646]:
+                  - generic [ref=f8e182]:
+                    - generic [ref=f8e183]:
+                      - img "Corn Spoon Bread" [ref=f8e911]
+                      - button "Add Corn Spoon Bread to favorites" [ref=f8e912] [cursor=pointer]
+                    - generic [ref=f8e186]:
+                      - button "Replace Image" [ref=f8e648] [cursor=pointer]
+                      - button "AI Generate" [ref=f8e650] [cursor=pointer]
+                      - button "Remove" [ref=f8e915] [cursor=pointer]
+                - group [ref=f8e385]:
+                  - generic "Restaurant Source Edit" [ref=f8e657] [cursor=pointer]:
+                    - generic [ref=f8e658]: Restaurant Source
+                    - button "Edit" [ref=f8e659]
+                - region [ref=f8e663]:
+                  - generic [ref=f8e403]:
+                    - heading "AI Assistant" [level=3] [ref=f8e664]
+                    - paragraph [ref=f8e408]: Complete missing recipe details with the existing AI workflow.
+                  - generic [ref=f8e920]:
+                    - generic [ref=f8e2281]: "Missing or incomplete:"
+                    - strong [ref=f8e2282]: Description
+                  - generic [ref=f8e409]:
+                    - button "Infer Missing Details" [ref=f8e2058] [cursor=pointer]
+                    - button "Regenerate Recipe" [ref=f8e667] [cursor=pointer]
+                    - button "Regenerate Ingredients" [ref=f8e668] [cursor=pointer]
+                    - group [ref=f8e422]:
+                      - generic "More AI Actions" [ref=f8e669] [cursor=pointer]
+                - group [ref=f8e333]:
+                  - generic [ref=f8e670] [cursor=pointer]:
+                    - generic [ref=f8e335]:
+                      - text: Source & Documents
+                      - button "About Source and Documents" [ref=f8e671]
+                    - button "Edit" [ref=f8e673]
+                - group [ref=f8e392]:
+                  - generic "Ingredient Gallery" [ref=f8e680] [cursor=pointer]
+                - group [ref=f8e683]:
+                  - generic "Recipe Health 1 item need attention" [ref=f8e948] [cursor=pointer]:
+                    - generic [ref=f8e685]: Recipe Health
+                    - generic [ref=f8e949]: 1 item need attention
+                - region "AI Confidence" [ref=f8e687]:
+                  - generic [ref=f8e397]:
+                    - generic [ref=f8e688]: AI Confidence
+                    - strong [ref=f8e398]: Not available
+                  - generic [ref=f8e399]:
+                    - progressbar "AI confidence" [ref=f8e689]
+                    - paragraph [ref=f8e400]: Confidence is calculated from source quality, extraction reliability, AI certainty, and user verification.
+                    - button "AI Quality Report" [ref=f8e690] [cursor=pointer]
