@@ -5093,8 +5093,9 @@ def test_desktop_ingredient_modal_has_a_full_workspace_fit_mode():
     assert "gap: 10px;" in compact
     assert "min-height: 70px;" in compact
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in compact
-    assert ".recipe-edit-ingredient-modal-options-panel .recipe-edit-alternative-component-summary" in compact
-    assert "min-height: 48px;" in compact
+    assert ".recipe-edit-alternative-component-summary {" not in compact
+    assert ".recipe-edit-ingredient-option-divider {" not in compact
+    assert ".recipe-edit-alternative-add-component {" not in compact
 
 
 def test_recipe_menu_edit_links_to_standalone_editor_page():

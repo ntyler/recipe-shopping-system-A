@@ -71777,18 +71777,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
-        .recipe-edit-ingredient-modal-options-panel .recipe-edit-ingredient-option-divider {
-        min-height: 22px;
-        padding-block: 1px;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
-        .recipe-edit-ingredient-modal-options-panel .recipe-edit-alternative-component-summary {
-        min-height: 48px;
-        padding-block: 0;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
         .recipe-edit-ingredient-modal-options-panel .recipe-edit-ingredient-inline-name {
         height: 28px;
         min-height: 28px;
@@ -71830,13 +71818,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         min-width: 28px;
         height: 28px;
         min-height: 28px;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
-        .recipe-edit-ingredient-modal-options-panel .recipe-edit-alternative-add-component {
-        min-height: 24px;
-        height: 24px;
-        padding-block: 0;
     }
 
     body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
