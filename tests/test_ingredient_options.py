@@ -540,6 +540,28 @@ def test_editor_option_selection_is_always_visible_and_directly_changeable():
     assert ".recipe-edit-alternative-component-summary:not(:hover, :focus-within)" in css
 
 
+def test_selecting_an_option_focuses_its_record_in_the_open_ingredient_modal():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    selection = script[
+        script.index("function setRecipeIngredientOptionSelected"):
+        script.index("function setRecipeIngredientAlternativePreferred")
+    ]
+    option_modal = script[
+        script.index("function openRecipeIngredientDefaultOptionModal"):
+        script.index("function switchRecipeIngredientOptionModal")
+    ]
+
+    assert 'const selectedOptionRow = card' in selection
+    assert 'card.querySelector("[data-substitution-option-row]")' in selection
+    assert "panel.recipeIngredientOptionHostSnapshot.default_option_id = optionId;" in selection
+    assert "openRecipeIngredientOptionModal(button, {" in selection
+    assert "optionRow: selectedOptionRow" in selection
+    assert "openRecipeIngredientDefaultOptionModalWithOptions(button, {" in selection
+    assert "skipUnsavedCheck: !focusedOptionRow || !focusedRecordHadChanges" in selection
+    assert "skipUnsavedCheck: !focusedRecordHadChanges" in selection
+    assert "!options.skipUnsavedCheck && recipeIngredientModalHasChanges(row)" in option_modal
+
+
 def test_group_parent_uses_authoritative_recipe_text_and_choice_only_metadata():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

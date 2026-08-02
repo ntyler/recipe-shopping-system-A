@@ -33894,6 +33894,13 @@ function closeRecipeIngredientOptionModal(row, panel, options = {}) {
 }
 
 function openRecipeIngredientDefaultOptionModal(control) {
+    ensureRecipeIngredientModalOptionsExpanded(control);
+    return openRecipeIngredientDefaultOptionModalWithOptions(control, {
+        optionsAlreadyExpanded: true,
+    });
+}
+
+function openRecipeIngredientDefaultOptionModalWithOptions(control, options = {}) {
     const row = recipeIngredientParentRowFromControl(control)
         || recipeEditActionRowFromButton(control);
     const panel = row
@@ -33902,9 +33909,11 @@ function openRecipeIngredientDefaultOptionModal(control) {
     if (!row || !panel) {
         return false;
     }
-    ensureRecipeIngredientModalOptionsExpanded(control);
+    if (!options.optionsAlreadyExpanded) {
+        ensureRecipeIngredientModalOptionsExpanded(control);
+    }
     if (panel.recipeIngredientOptionSourceRow) {
-        if (recipeIngredientModalHasChanges(row)) {
+        if (!options.skipUnsavedCheck && recipeIngredientModalHasChanges(row)) {
             return showRecipeIngredientDiscardConfirmation(
                 panel,
                 { type: "navigate-default-option" },
@@ -33944,6 +33953,7 @@ function openRecipeIngredientOptionModal(control, options = {}) {
     if (
         row.classList.contains("is-editing")
         && panel.dataset.editSnapshot
+        && !options.skipUnsavedCheck
         && recipeIngredientModalHasChanges(row)
     ) {
         return showRecipeIngredientDiscardConfirmation(
@@ -47259,6 +47269,23 @@ function setRecipeIngredientOptionSelected(button) {
         return false;
     }
 
+    const panel = ingredientRow.querySelector(
+        ":scope > [data-recipe-ingredient-edit-panel]",
+    );
+    const modalIsActive = Boolean(
+        panel
+        && ingredientRow.classList.contains("is-editing")
+        && !panel.hidden
+        && panel.open
+    );
+    const focusedOptionRow = panel?.recipeIngredientOptionSourceRow || null;
+    const focusedRecordHadChanges = modalIsActive
+        ? recipeIngredientModalHasChanges(ingredientRow)
+        : false;
+    const selectedOptionRow = card
+        ? card.querySelector("[data-substitution-option-row]")
+        : null;
+
     let optionId = "";
     if (card) {
         optionId = String(card.dataset.alternativeId || "").trim();
@@ -47271,7 +47298,21 @@ function setRecipeIngredientOptionSelected(button) {
     }
 
     applyRecipeIngredientOptionSelection(ingredientRow, optionId);
+    if (panel?.recipeIngredientOptionHostSnapshot) {
+        panel.recipeIngredientOptionHostSnapshot.default_option_id = optionId;
+    }
     closeRecipeEditRowMenus();
+    if (modalIsActive && selectedOptionRow) {
+        openRecipeIngredientOptionModal(button, {
+            optionRow: selectedOptionRow,
+            trigger: button,
+            skipUnsavedCheck: !focusedOptionRow || !focusedRecordHadChanges,
+        });
+    } else if (modalIsActive && focusedOptionRow) {
+        openRecipeIngredientDefaultOptionModalWithOptions(button, {
+            skipUnsavedCheck: !focusedRecordHadChanges,
+        });
+    }
     setRecipeEditStatus("Ingredient option selected. Save Recipe to keep it.");
     return false;
 }
