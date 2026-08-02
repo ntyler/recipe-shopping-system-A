@@ -71924,3 +71924,73 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         min-width: 124px;
     }
 }
+
+/* Ingredient modal options v86: align the selected choice as a labeled inline table. */
+body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-heading {
+    align-items: center;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-heading-copy {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-columns {
+    display: grid;
+    grid-template-columns: 40px minmax(180px, 1fr) minmax(76px, .38fr) minmax(112px, .65fr) minmax(56px, .32fr);
+    min-width: 0;
+    min-height: 24px;
+    align-items: end;
+    gap: 12px;
+    padding: 3px 0 5px;
+    border-top: 1px solid color-mix(in srgb, var(--app-border) 86%, transparent);
+    color: var(--app-muted);
+    font-size: 8.5px;
+    font-weight: 720;
+    letter-spacing: .06em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-row {
+    border-top-color: color-mix(in srgb, var(--app-border) 68%, transparent);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-amount {
+    font-variant-numeric: tabular-nums;
+}
+
+body.recipe-edit-standalone-page :is(
+    .recipe-edit-ingredient-modal-selected-option-store,
+    .recipe-edit-ingredient-modal-selected-option-type
+) {
+    box-sizing: border-box;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 22px;
+    border: 1px solid color-mix(in srgb, var(--app-border) 72%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--app-surface) 82%, var(--app-primary-soft));
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-store {
+    padding: 3px 8px 3px 6px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-type {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+}
+
+@media (max-width: 760px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-heading-copy {
+        display: grid;
+        gap: 2px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-columns {
+        display: none;
+    }
+}

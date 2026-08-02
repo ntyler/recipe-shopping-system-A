@@ -5355,6 +5355,8 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert 'label: `Selected option ingredients: ${ingredients.join(" + ")}`' in sync
     assert "values: selectedChoice.values || []" in sync
     assert 'item.className = "recipe-edit-ingredient-modal-selected-option-row"' in sync
+    assert 'columns.className = "recipe-edit-ingredient-modal-selected-option-columns"' in sync
+    assert '["", "Ingredient", "Quantity", "Store section", "Type"]' in sync
     assert "valuesList.slice(0, 3).forEach" in sync
     assert 'openButton.textContent = `View ${optionCount} option' in sync
     assert 'preview.hidden = shouldExpand || preview.dataset.hasContent !== "true";' in sync
@@ -5386,6 +5388,7 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert ".recipe-edit-ingredient-modal-options-summary.is-warning" in css
     assert ".recipe-edit-ingredient-modal-selected-option-heading" in css
     assert ".recipe-edit-ingredient-modal-selected-option-row" in css
+    assert ".recipe-edit-ingredient-modal-selected-option-columns" in css
     assert ".recipe-edit-ingredient-modal-selected-option-image" in css
     assert ".recipe-edit-ingredient-modal-selected-option-store" in css
     assert ".recipe-edit-ingredient-modal-section.is-options.is-collapsed" in css

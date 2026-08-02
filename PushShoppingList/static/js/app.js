@@ -32561,6 +32561,17 @@ function renderRecipeIngredientModalSelectedOptionPreview(panel, selection, opti
     const list = document.createElement("div");
     list.className = "recipe-edit-ingredient-modal-selected-option-list";
     list.setAttribute("role", "list");
+
+    const columns = document.createElement("div");
+    columns.className = "recipe-edit-ingredient-modal-selected-option-columns";
+    columns.setAttribute("aria-hidden", "true");
+    ["", "Ingredient", "Quantity", "Store section", "Type"].forEach(columnLabel => {
+        const column = document.createElement("span");
+        column.textContent = columnLabel;
+        columns.appendChild(column);
+    });
+    list.appendChild(columns);
+
     valuesList.slice(0, 3).forEach(values => {
         list.appendChild(createRecipeIngredientModalSelectedOptionRow(values));
     });
