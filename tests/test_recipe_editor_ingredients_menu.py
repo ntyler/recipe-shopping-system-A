@@ -1883,6 +1883,16 @@ def test_ingredient_name_fields_use_the_normalized_master_data_picker():
     assert "@media (max-width: 520px)" in v43
 
 
+def test_compact_ingredient_controls_do_not_compress_master_data_options():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert (
+        ":is(input, select, button):not(.recipe-edit-ingredient-master-option)"
+        in css
+    )
+    assert "min-height: 52px;" in css
+
+
 def test_mobile_expanded_editable_values_share_one_typography_treatment():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 

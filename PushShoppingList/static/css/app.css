@@ -40196,7 +40196,8 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     background: var(--app-surface-soft);
 }
 
-.recipe-edit-standalone-page .recipe-edit-ingredient-row :is(input, select, button) {
+.recipe-edit-standalone-page .recipe-edit-ingredient-row
+    :is(input, select, button):not(.recipe-edit-ingredient-master-option) {
     min-height: 30px;
     height: 30px;
     padding-inline: 6px;
