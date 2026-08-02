@@ -5332,9 +5332,20 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     )
     assert 'data-recipe-ingredient-modal-section="options"' in modal
     assert "Choose one option for this ingredient." in modal
+    assert "data-recipe-ingredient-modal-options-toggle" in modal
+    assert 'aria-expanded="false"' in modal
+    assert 'aria-controls="${modalOptionsBodyId}"' in modal
+    assert "data-recipe-ingredient-modal-options-summary" in modal
+    assert "data-recipe-ingredient-modal-options-body" in modal
     assert "data-recipe-ingredient-modal-options-slot" in modal
 
     assert "function recipeIngredientModalOptionsSummary(row)" in sync
+    assert "function recipeIngredientModalOptionSelection(row, summary)" in sync
+    assert "function setRecipeIngredientModalOptionsExpanded(panel, expanded, options = {})" in sync
+    assert "function toggleRecipeIngredientModalOptions(button)" in sync
+    assert "body.hidden = !shouldExpand;" in sync
+    assert 'toggle.setAttribute("aria-expanded", String(shouldExpand));' in sync
+    assert "selection.needsAttention || recipeEditIngredientModalOptionsExpanded" in sync
     assert "hasChoiceGroup: optionCount > 1" in sync
     assert "isAvailable: optionCount > 0" in sync
     assert "const optionCount = groups.length + (hasExplicitDefault ? 0 : 1);" in sync
@@ -5359,6 +5370,10 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert ".recipe-edit-ingredient-modal-section.is-options" in modal_css
     assert ".recipe-edit-ingredient-modal-options-panel" in modal_css
     assert ".recipe-edit-ingredient-choice-overview.is-editing-another-option" in modal_css
+    assert ".recipe-edit-ingredient-modal-options-toggle" in css
+    assert ".recipe-edit-ingredient-modal-options-summary.is-warning" in css
+    assert ".recipe-edit-ingredient-modal-section.is-options.is-collapsed" in css
+    assert ".recipe-edit-ingredient-modal-options-body[hidden]" in css
     assert "@media (max-width: 760px)" in modal_css
     assert ".recipe-edit-ingredient-recipe-item" in css
     inline_css = css[css.index("Ingredient editor v83:"):]
@@ -5371,3 +5386,35 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert "overflow-x: clip;" in css
     assert ".recipe-edit-ingredient-recipe-disclosure:focus-visible" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
+
+
+def test_edit_ingredient_modal_options_open_for_navigation_edits_and_errors():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    navigation_start = script.index("function navigateRecipeIngredientModalSection")
+    navigation_end = script.index("function toggleRecipeIngredientModalAnalysis", navigation_start)
+    navigation = script[navigation_start:navigation_end]
+    errors_start = script.index("function applyRecipeIngredientModalServerErrors")
+    errors_end = script.index("function applySavedRecipeIngredientToModalRow", errors_start)
+    errors = script[errors_start:errors_end]
+
+    assert 'button.dataset.recipeIngredientModalNav === "options"' in navigation
+    assert "setRecipeIngredientModalOptionsExpanded(panel, true" in navigation
+    assert "remember: true" in navigation
+    assert "scroll: true" in navigation
+    assert '/option|alternative|substitution|selection/i.test(String(path || ""))' in errors
+    assert "if (hasOptionsError)" in errors
+    assert "setRecipeIngredientModalOptionsExpanded(panel, true" in errors
+
+    for function_name in (
+        "openRecipeIngredientDefaultOptionModal",
+        "openRecipeIngredientOptionModal",
+        "setRecipeIngredientAlternativeEditMode",
+        "addRecipeIngredientAlternativeComponent",
+        "addRecipeIngredientDefaultComponent",
+        "addRecipeIngredientSubstitutionRow",
+    ):
+        start = script.index(f"function {function_name}")
+        next_function = script.find("\nfunction ", start + 10)
+        function_source = script[start:next_function if next_function >= 0 else None]
+        assert "ensureRecipeIngredientModalOptionsExpanded(" in function_source

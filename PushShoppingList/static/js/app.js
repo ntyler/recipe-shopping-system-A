@@ -22985,6 +22985,7 @@ let recipeEditIngredientModalActiveRow = null;
 let recipeEditIngredientModalReturnFocus = null;
 let recipeEditIngredientModalReturnView = "";
 let recipeEditIngredientModalScrollState = null;
+let recipeEditIngredientModalOptionsExpanded = false;
 let recipeEditIngredientColumnLayout = null;
 let recipeEditIngredientColumnMoveState = null;
 let recipeEditIngredientColumnResizeState = null;
@@ -30615,9 +30616,12 @@ function applyRecipeIngredientModalServerErrors(row, panel, fieldErrors = {}) {
         requirement: "section",
     };
     let firstInvalid = null;
+    let hasOptionsError = false;
     Object.entries(fieldErrors && typeof fieldErrors === "object" ? fieldErrors : {}).forEach(([path, message]) => {
         const pathParts = String(path || "").split(".");
         const field = fieldMap[pathParts[pathParts.length - 1]] || pathParts[pathParts.length - 1];
+        hasOptionsError = hasOptionsError
+            || /option|alternative|substitution|selection/i.test(String(path || ""));
         const input = recipeIngredientDirectField(row, field);
         if (!input) return;
         setRecipeIngredientModalFieldError(input, String(message || "This field needs attention."));
@@ -30626,6 +30630,12 @@ function applyRecipeIngredientModalServerErrors(row, panel, fieldErrors = {}) {
     if (firstInvalid) {
         firstInvalid.focus({ preventScroll: true });
         firstInvalid.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    if (hasOptionsError) {
+        setRecipeIngredientModalOptionsExpanded(panel, true, {
+            remember: false,
+            scroll: !firstInvalid,
+        });
     }
     return firstInvalid;
 }
@@ -32377,6 +32387,83 @@ function recipeIngredientModalOptionsSummary(row) {
     };
 }
 
+function recipeIngredientModalOptionSelection(row, summary) {
+    const originalValues = recipeIngredientChoiceParentValues(row);
+    const selectedChoice = recipeIngredientSelectedChoice(
+        row,
+        originalValues,
+        summary.groups,
+    );
+    const selectedIngredients = selectedChoice?.values
+        ?.map(values => recipeIngredientSentenceCase(values.ingredient || ""))
+        .filter(Boolean)
+        .join(" + ");
+    if (selectedChoice) {
+        return {
+            label: `Selected: ${selectedIngredients || selectedChoice.ingredientSummary || "Option"}`,
+            needsAttention: false,
+        };
+    }
+    if (!summary.hasChoiceGroup) {
+        const defaultName = recipeIngredientSentenceCase(originalValues.ingredient || "")
+            || "Ingredient";
+        return {
+            label: `Default: ${defaultName}`,
+            needsAttention: false,
+        };
+    }
+    return {
+        label: "Selection required",
+        needsAttention: true,
+    };
+}
+
+function setRecipeIngredientModalOptionsExpanded(panel, expanded, options = {}) {
+    const section = panel?.querySelector('[data-recipe-ingredient-modal-section="options"]');
+    const body = section?.querySelector("[data-recipe-ingredient-modal-options-body]");
+    const toggle = section?.querySelector("[data-recipe-ingredient-modal-options-toggle]");
+    if (!section || !body || !toggle) return false;
+    const shouldExpand = Boolean(expanded);
+    body.hidden = !shouldExpand;
+    section.classList.toggle("is-collapsed", !shouldExpand);
+    toggle.setAttribute("aria-expanded", String(shouldExpand));
+    toggle.setAttribute(
+        "aria-label",
+        `${shouldExpand ? "Collapse" : "Expand"} ingredient options`,
+    );
+    toggle.title = `${shouldExpand ? "Collapse" : "Expand"} ingredient options`;
+    if (options.remember !== false) {
+        recipeEditIngredientModalOptionsExpanded = shouldExpand;
+    }
+    if (shouldExpand && options.scroll === true) {
+        window.requestAnimationFrame(() => {
+            if (!section.isConnected) return;
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    }
+    return true;
+}
+
+function toggleRecipeIngredientModalOptions(button) {
+    const panel = button?.closest("[data-recipe-ingredient-edit-panel]");
+    if (!panel || !button) return false;
+    const shouldExpand = button.getAttribute("aria-expanded") !== "true";
+    setRecipeIngredientModalOptionsExpanded(panel, shouldExpand, {
+        remember: true,
+        scroll: shouldExpand,
+    });
+    return false;
+}
+
+function ensureRecipeIngredientModalOptionsExpanded(control, options = {}) {
+    const panel = control?.closest("[data-recipe-ingredient-edit-panel]");
+    if (!panel) return false;
+    return setRecipeIngredientModalOptionsExpanded(panel, true, {
+        remember: options.remember !== false,
+        scroll: Boolean(options.scroll),
+    });
+}
+
 function restoreRecipeIngredientModalOptions(panel) {
     const mount = panel?.recipeIngredientModalOptionsMount;
     if (!panel || !mount?.container) {
@@ -32438,6 +32525,12 @@ function syncRecipeIngredientModalOptions(row, panel = null) {
     panel.querySelectorAll("[data-recipe-ingredient-modal-options-count]").forEach(count => {
         count.textContent = `(${summary.optionCount})`;
     });
+    const selection = recipeIngredientModalOptionSelection(row, summary);
+    const selectionSummary = panel.querySelector("[data-recipe-ingredient-modal-options-summary]");
+    if (selectionSummary) {
+        selectionSummary.textContent = selection.label;
+        selectionSummary.classList.toggle("is-warning", selection.needsAttention);
+    }
     if (nav) nav.hidden = !summary.isAvailable;
     if (section) section.hidden = !summary.isAvailable;
 
@@ -32468,6 +32561,11 @@ function syncRecipeIngredientModalOptions(row, panel = null) {
     summary.container.hidden = false;
     summary.container.classList.add("recipe-edit-ingredient-modal-options-panel");
     syncRecipeIngredientModalDefaultOptionControls(row, panel, summary.container);
+    setRecipeIngredientModalOptionsExpanded(
+        panel,
+        selection.needsAttention || recipeEditIngredientModalOptionsExpanded,
+        { remember: false },
+    );
 }
 
 function setActiveRecipeIngredientModalSection(panel, sectionKey) {
@@ -32504,7 +32602,14 @@ function navigateRecipeIngredientModalSection(button) {
     const target = targetId ? document.getElementById(targetId) : null;
     if (!panel || !target || !panel.contains(target)) return false;
     setActiveRecipeIngredientModalSection(panel, button.dataset.recipeIngredientModalNav);
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (button.dataset.recipeIngredientModalNav === "options") {
+        setRecipeIngredientModalOptionsExpanded(panel, true, {
+            remember: true,
+            scroll: true,
+        });
+    } else {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     return false;
 }
 
@@ -32992,6 +33097,7 @@ function organizeRecipeEditIngredientRow(row) {
     const modalQuantityId = `${modalId}Quantity`;
     const modalUsageId = `${modalId}Usage`;
     const modalOptionsId = `${modalId}Options`;
+    const modalOptionsBodyId = `${modalOptionsId}Body`;
     const modalNotesId = `${modalId}Notes`;
     const modalAnalysisId = `${modalId}Analysis`;
     const editPanel = document.createElement("dialog");
@@ -33082,10 +33188,30 @@ function organizeRecipeEditIngredientRow(row) {
                     <section id="${modalOptionsId}" class="recipe-edit-ingredient-modal-section is-options" data-recipe-ingredient-modal-section="options" aria-labelledby="${modalId}OptionsTitle" hidden>
                         <div class="recipe-edit-ingredient-modal-section-surface">
                             <div class="recipe-edit-ingredient-modal-options-heading">
-                                <h3 id="${modalId}OptionsTitle">Options <span data-recipe-ingredient-modal-options-count>(0)</span></h3>
-                                <p>Choose one option for this ingredient. Edit, add, or remove options here.</p>
+                                <button type="button"
+                                        class="recipe-edit-ingredient-modal-options-toggle"
+                                        data-recipe-ingredient-modal-options-toggle
+                                        aria-expanded="false"
+                                        aria-controls="${modalOptionsBodyId}"
+                                        aria-label="Expand ingredient options"
+                                        title="Expand ingredient options"
+                                        onclick="return toggleRecipeIngredientModalOptions(this)">
+                                    <span id="${modalId}OptionsTitle"
+                                          class="recipe-edit-ingredient-modal-options-title"
+                                          role="heading"
+                                          aria-level="3">Options <span data-recipe-ingredient-modal-options-count>(0)</span></span>
+                                    <span class="recipe-edit-ingredient-modal-options-helper">Choose one option for this ingredient. Edit, add, or remove options here.</span>
+                                    <span class="recipe-edit-ingredient-modal-options-summary"
+                                          data-recipe-ingredient-modal-options-summary>Default option</span>
+                                    <span class="recipe-edit-ingredient-modal-options-chevron" aria-hidden="true">${recipeEditSvgIcon("chevron-down")}</span>
+                                </button>
                             </div>
-                            <div class="recipe-edit-ingredient-modal-options-slot" data-recipe-ingredient-modal-options-slot></div>
+                            <div id="${modalOptionsBodyId}"
+                                 class="recipe-edit-ingredient-modal-options-body"
+                                 data-recipe-ingredient-modal-options-body
+                                 hidden>
+                                <div class="recipe-edit-ingredient-modal-options-slot" data-recipe-ingredient-modal-options-slot></div>
+                            </div>
                         </div>
                     </section>
                     <div class="recipe-edit-ingredient-modal-bottom-grid">
@@ -33600,6 +33726,7 @@ function openRecipeIngredientDefaultOptionModal(control) {
     if (!row || !panel) {
         return false;
     }
+    ensureRecipeIngredientModalOptionsExpanded(control);
     if (panel.recipeIngredientOptionSourceRow) {
         if (recipeIngredientModalHasChanges(row)) {
             return showRecipeIngredientDiscardConfirmation(
@@ -33632,6 +33759,7 @@ function openRecipeIngredientOptionModal(control, options = {}) {
     if (!optionRow || !row || !panel) {
         return false;
     }
+    ensureRecipeIngredientModalOptionsExpanded(control);
     if (panel.recipeIngredientOptionSourceRow === optionRow) {
         const field = recipeIngredientDirectField(row, "ingredient");
         field?.focus({ preventScroll: true });
@@ -46752,6 +46880,9 @@ function setRecipeIngredientAlternativeEditMode(control, shouldEdit, options = {
     if (!card) {
         return false;
     }
+    if (shouldEdit) {
+        ensureRecipeIngredientModalOptionsExpanded(control);
+    }
     const ingredientRow = card.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])");
     if (shouldEdit) {
         const restoreOtherEdits = options.restoreOtherEdits !== false;
@@ -47087,6 +47218,7 @@ function addRecipeIngredientAlternativeComponent(button) {
     if (!card || !ingredientRow || !components || !existingRows.length) {
         return false;
     }
+    ensureRecipeIngredientModalOptionsExpanded(button);
     let alternativeId = String(existingRows[0].querySelector('[data-field="alternative_id"]')?.value || "").trim();
     if (!alternativeId) {
         alternativeId = nextRecipeIngredientAlternativeId();
@@ -47677,6 +47809,7 @@ function addRecipeIngredientDefaultComponent(button) {
     if (!row || !container || !list) {
         return false;
     }
+    ensureRecipeIngredientModalOptionsExpanded(button);
 
     const values = fieldValuesFromRow(row);
     const alternativeId = nextRecipeIngredientAlternativeId();
@@ -48081,6 +48214,7 @@ function addRecipeIngredientSubstitutionRow(button) {
     if (!row || !container || !list) {
         return false;
     }
+    ensureRecipeIngredientModalOptionsExpanded(button);
 
     const nextAlternativeIndex = recipeIngredientSubstitutionDomGroups(
         [...list.querySelectorAll("[data-substitution-option-row]")]
