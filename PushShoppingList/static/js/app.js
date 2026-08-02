@@ -31483,6 +31483,9 @@ function recipeIngredientEditActionFromEvent(event) {
     const button = event.target?.closest?.(
         "#recipeEditIngredients button.recipe-edit-compact-row-edit",
     );
+    if (button?.hasAttribute("data-ingredient-choice-title-edit")) {
+        return null;
+    }
     return button && button.closest("#recipeEditIngredients") ? button : null;
 }
 
@@ -31895,6 +31898,76 @@ function focusRecipeIngredientChoiceTitle(button) {
     return false;
 }
 
+function restoreRecipeIngredientRowActions(row, actions) {
+    if (!row || !actions) {
+        return;
+    }
+    const mobileHeader = row.querySelector(
+        ":scope > .recipe-edit-ingredient-mobile-header",
+    );
+    const optionsPanel = row.querySelector(
+        ":scope > [data-ingredient-substitutions]",
+    );
+    if (mobileHeader) {
+        mobileHeader.appendChild(actions);
+    } else if (actions.parentElement !== row) {
+        row.insertBefore(actions, optionsPanel || null);
+    }
+}
+
+function syncRecipeIngredientRowActionControls(row, actions) {
+    if (!row || !actions) {
+        return;
+    }
+    actions.classList.remove("recipe-edit-selected-choice-group-actions");
+    const editButton = actions.querySelector(":scope > .recipe-edit-compact-row-edit");
+    const menuButton = actions.querySelector(
+        ":scope > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn",
+    );
+    if (editButton) {
+        delete editButton.dataset.ingredientChoiceTitleEdit;
+        editButton.setAttribute("onclick", "return focusRecipeEditCompactRow(this)");
+        const ingredientField = row.querySelector('[data-field="ingredient"]');
+        const ingredientName = String(ingredientField?.value || "").trim() || "ingredient";
+        editButton.setAttribute("aria-label", `Edit ${ingredientName}`);
+        editButton.title = `Edit ${ingredientName}`;
+    }
+    if (menuButton) {
+        menuButton.setAttribute("aria-label", "More actions");
+        menuButton.title = "More actions";
+    }
+}
+
+function ensureRecipeIngredientChoiceTitleActions(row, header) {
+    if (!row || !header) {
+        return null;
+    }
+    let actions = header.querySelector(
+        ":scope > [data-ingredient-choice-title-actions]",
+    );
+    if (actions) {
+        return actions;
+    }
+    actions = document.createElement("div");
+    actions.className = [
+        "recipe-edit-compact-row-actions",
+        "recipe-edit-ingredient-row-actions",
+        "recipe-edit-selected-choice-group-actions",
+    ].join(" ");
+    actions.dataset.recipeEditCompactRowActions = "";
+    actions.dataset.ingredientChoiceTitleActions = "";
+    actions.dataset.ingredientColumn = "actions";
+    actions.setAttribute("role", "cell");
+    const editButton = createRecipeIngredientEditActionButton();
+    editButton.dataset.ingredientChoiceTitleEdit = "";
+    editButton.setAttribute("onclick", "return focusRecipeIngredientChoiceTitle(this)");
+    editButton.setAttribute("aria-label", "Edit ingredient choice title");
+    editButton.title = "Edit ingredient choice title";
+    actions.appendChild(editButton);
+    header.appendChild(actions);
+    return actions;
+}
+
 function setRecipeIngredientSelectedChoiceGroupControls(row, header, enabled) {
     if (!row || !header) {
         return;
@@ -31909,15 +31982,19 @@ function setRecipeIngredientSelectedChoiceGroupControls(row, header, enabled) {
     ) || Array.from(row.children).find(child => (
         child.classList?.contains("recipe-edit-ingredient-substitution-cell")
     ));
-    const actions = header.querySelector(
-        ":scope > [data-recipe-edit-compact-row-actions]",
-    ) || row.querySelector("[data-recipe-edit-compact-row-actions]");
-    const editButton = actions
-        ? actions.querySelector(":scope > .recipe-edit-compact-row-edit")
-        : null;
-    const menuButton = actions
-        ? actions.querySelector(":scope > .recipe-edit-row-menu-wrap > .recipe-edit-row-menu-btn")
-        : null;
+    const legacyHeaderActions = header.querySelector(
+        ":scope > [data-recipe-edit-compact-row-actions]:not([data-ingredient-choice-title-actions])",
+    );
+    let rowActions = [...row.querySelectorAll("[data-recipe-edit-compact-row-actions]")]
+        .find(actions => !actions.hasAttribute("data-ingredient-choice-title-actions")) || null;
+    if (legacyHeaderActions) {
+        restoreRecipeIngredientRowActions(row, legacyHeaderActions);
+        rowActions = legacyHeaderActions;
+    }
+    syncRecipeIngredientRowActionControls(row, rowActions);
+    const actions = enabled
+        ? ensureRecipeIngredientChoiceTitleActions(row, header)
+        : header.querySelector(":scope > [data-ingredient-choice-title-actions]");
 
     if (enabled) {
         if (!header.dataset.ingredientChoiceGridReady) {
@@ -31937,22 +32014,6 @@ function setRecipeIngredientSelectedChoiceGroupControls(row, header, enabled) {
             if (optionsCell && optionsCell.parentElement !== header) {
                 header.appendChild(optionsCell);
             }
-            if (actions && actions.parentElement !== header) {
-                header.appendChild(actions);
-            }
-        }
-        actions?.classList.add("recipe-edit-selected-choice-group-actions");
-        if (editButton) {
-            editButton.dataset.ingredientChoiceTitleEdit = "";
-            configureRecipeIngredientEditAction(editButton);
-            editButton.setAttribute(
-                "onclick",
-                "return focusRecipeIngredientChoiceTitle(this)",
-            );
-        }
-        if (menuButton) {
-            menuButton.setAttribute("aria-label", "More actions");
-            menuButton.title = "More actions";
         }
         return;
     }
@@ -31966,29 +32027,7 @@ function setRecipeIngredientSelectedChoiceGroupControls(row, header, enabled) {
     if (optionsCell && optionsCell.parentElement === header) {
         row.insertBefore(optionsCell, optionsPanel || null);
     }
-    if (actions && actions.parentElement === header) {
-        const mobileHeader = row.querySelector(
-            ":scope > .recipe-edit-ingredient-mobile-header",
-        );
-        if (mobileHeader) {
-            mobileHeader.appendChild(actions);
-        } else {
-            row.insertBefore(actions, optionsPanel || null);
-        }
-    }
-    actions?.classList.remove("recipe-edit-selected-choice-group-actions");
-    if (editButton) {
-        delete editButton.dataset.ingredientChoiceTitleEdit;
-        editButton.setAttribute("onclick", "return focusRecipeEditCompactRow(this)");
-        const ingredientField = row.querySelector('[data-field="ingredient"]');
-        const ingredientName = String(ingredientField?.value || "").trim() || "ingredient";
-        editButton.setAttribute("aria-label", `Edit ${ingredientName}`);
-        editButton.title = `Edit ${ingredientName}`;
-    }
-    if (menuButton) {
-        menuButton.setAttribute("aria-label", "More actions");
-        menuButton.title = "More actions";
-    }
+    actions?.remove();
 }
 
 function ensureRecipeIngredientSelectedChoiceGroupHeader(row) {
@@ -48602,15 +48641,25 @@ function updateRecipeIngredientSummary(row) {
     const matchDetails = editPanel
         ? editPanel.querySelector(".recipe-edit-ingredient-match-details[data-ingredient-match-details]")
         : null;
-    const readStatus = row ? row.querySelector("[data-ingredient-read-status]") : null;
-    const sourceText = row ? row.querySelector("[data-ingredient-source-text]") : null;
-    const readBuyAs = row ? row.querySelector("[data-ingredient-read-buy-as]") : null;
-    const readBuyAsField = readBuyAs ? readBuyAs.closest(".recipe-edit-ingredient-read-buy-as") : null;
-    const readOptional = row ? row.querySelector("[data-ingredient-read-optional]") : null;
     const readCell = row
         ? [...row.children].find(child => (
             child.matches && child.matches(".recipe-edit-ingredient-read-cell")
         ))
+        : null;
+    const readStatus = row
+        ? [...row.children].find(child => (
+            child.matches && child.matches(".recipe-edit-ingredient-status-summary")
+        ))?.querySelector("[data-ingredient-read-status]") || null
+        : null;
+    const sourceText = readCell
+        ? readCell.querySelector(":scope > [data-ingredient-source-text]")
+        : null;
+    const readBuyAs = readCell
+        ? readCell.querySelector(":scope > .recipe-edit-ingredient-read-buy-as [data-ingredient-read-buy-as]")
+        : null;
+    const readBuyAsField = readBuyAs ? readBuyAs.closest(".recipe-edit-ingredient-read-buy-as") : null;
+    const readOptional = readCell
+        ? readCell.querySelector(":scope > [data-ingredient-read-optional]")
         : null;
     const readName = readCell ? readCell.querySelector(":scope > [data-ingredient-read-name]") : null;
     const readDetails = readCell
@@ -48625,8 +48674,11 @@ function updateRecipeIngredientSummary(row) {
     const mobileQuantityValue = row ? row.querySelector("[data-ingredient-mobile-quantity-value]") : null;
     const container = recipeIngredientSubstitutionContainer(row);
     const substitutionCount = container ? container.querySelector("[data-ingredient-substitution-count]") : null;
-    const parentValues = row ? fieldValuesFromRow(row) : {};
-    parentValues.substitutions = collectRecipeIngredientSubstitutionRows(row);
+    const rowValues = row ? fieldValuesFromRow(row) : {};
+    const parentValues = recipeIngredientChoiceParentValues(row);
+    const substitutionRows = collectRecipeIngredientSubstitutionRows(row);
+    rowValues.substitutions = substitutionRows;
+    parentValues.substitutions = substitutionRows;
     const alternativeGroups = recipeIngredientSubstitutionDomGroups(
         row ? [...row.querySelectorAll("[data-substitution-option-row]")] : [],
     );
@@ -48656,12 +48708,20 @@ function updateRecipeIngredientSummary(row) {
             recipeIngredientMatchItemFromRow(selectedSourceRow, values),
         );
     }
+    const modalValues = editPanel?.recipeIngredientOptionSourceRow
+        ? {
+            ...parentValues,
+            ...rowValues,
+            substitutions: substitutionRows,
+        }
+        : rowValues;
+    const modalMatchItem = recipeIngredientMatchItemFromRow(row, modalValues);
 
     if (badges) {
         badges.innerHTML = recipeIngredientBadgesHtml(matchItem, { maxVisible: 2 });
     }
     if (matchDetails) {
-        matchDetails.innerHTML = recipeIngredientMatchDetailsHtml(matchItem);
+        matchDetails.innerHTML = recipeIngredientMatchDetailsHtml(modalMatchItem);
     }
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
     const displayIngredientName = ingredientName;
@@ -48669,17 +48729,20 @@ function updateRecipeIngredientSummary(row) {
     const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();
     const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
     const quantitySummaryText = formatRecipeIngredientQuantityUnit(values);
+    const modalIngredientName = String(modalValues.ingredient || "").trim()
+        || "Unnamed ingredient";
+    const modalBuyAs = recipeIngredientMeaningfulBuyAs(modalValues);
     if (previewName) {
-        previewName.textContent = recipeIngredientSentenceCase(displayIngredientName)
-            || displayIngredientName;
+        previewName.textContent = recipeIngredientSentenceCase(modalIngredientName)
+            || modalIngredientName;
     }
     if (previewBuyAs) {
-        previewBuyAs.textContent = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "";
-        previewBuyAs.hidden = !meaningfulBuyAs;
+        previewBuyAs.textContent = modalBuyAs ? `Buy as: ${modalBuyAs}` : "";
+        previewBuyAs.hidden = !modalBuyAs;
     }
     if (previewStore) {
-        const storeLabel = recipeStoreSectionDisplayLabel(values.store_section || "") || "Misc";
-        previewStore.innerHTML = `${recipeIngredientStoreSectionIconHtml(values.store_section || "")}<span>${escapeHtml(storeLabel)}</span>`;
+        const storeLabel = recipeStoreSectionDisplayLabel(modalValues.store_section || "") || "Misc";
+        previewStore.innerHTML = `${recipeIngredientStoreSectionIconHtml(modalValues.store_section || "")}<span>${escapeHtml(storeLabel)}</span>`;
     }
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
     if (sourceText) {
@@ -48708,7 +48771,7 @@ function updateRecipeIngredientSummary(row) {
     if (editSubtitle) {
         const rows = recipeEditIngredientRows();
         const ingredientIndex = rows.indexOf(row);
-        const displayName = recipeIngredientSentenceCase(displayIngredientName) || "Ingredient";
+        const displayName = recipeIngredientSentenceCase(modalIngredientName) || "Ingredient";
         editSubtitle.textContent = `${displayName} \u00b7 Ingredient ${Math.max(ingredientIndex, 0) + 1} of ${Math.max(rows.length, 1)}`;
     }
     syncRecipeIngredientInlineEditor(row);

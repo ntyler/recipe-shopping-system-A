@@ -175,7 +175,7 @@ def test_recipe_editor_match_column_only_surfaces_attention_states():
     summary = script[summary_start:summary_end]
     assert "const matchItem = recipeIngredientMatchItemFromRow(row, values);" in summary
     assert "recipeIngredientBadgesHtml(matchItem, { maxVisible: 2 })" in summary
-    assert "recipeIngredientMatchDetailsHtml(matchItem)" in summary
+    assert "recipeIngredientMatchDetailsHtml(modalMatchItem)" in summary
     assert 'row.querySelector(":scope > [data-recipe-ingredient-edit-panel]")' in summary
     assert (
         'editPanel.querySelector(".recipe-edit-ingredient-match-details[data-ingredient-match-details]")'
@@ -3820,11 +3820,11 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values)" in summary
     assert 'readBuyAs.closest(".recipe-edit-ingredient-read-buy-as")' in summary
     assert "readBuyAsField.hidden = !meaningfulBuyAs;" in summary
-    assert 'const readOptional = row ? row.querySelector("[data-ingredient-read-optional]") : null;' in summary
+    assert 'readCell.querySelector(":scope > [data-ingredient-read-optional]")' in summary
     assert "readOptional.hidden = !recipeIngredientIsOptional(values);" in summary
     assert "readBuyAs.value = buyAsValue;" in summary
     assert 'readBuyAs.title = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "Buy As matches Ingredient Name";' in summary
-    assert "previewBuyAs.hidden = !meaningfulBuyAs;" in summary
+    assert "previewBuyAs.hidden = !modalBuyAs;" in summary
     assert "quantitySummary.textContent" not in summary
     assert "unitSummary.textContent" not in summary
     assert "preparationSummary" not in summary
@@ -4039,8 +4039,8 @@ def test_recipe_editor_secondary_metadata_normalizes_buy_as_for_summaries():
         script.index("function updateRecipeIngredientSummary"):
         script.index("function recipeEditIngredientRows")
     ]
-    assert 'previewBuyAs.textContent = meaningfulBuyAs ? `Buy as: ${meaningfulBuyAs}` : "";' in summary
-    assert "previewBuyAs.hidden = !meaningfulBuyAs;" in summary
+    assert 'previewBuyAs.textContent = modalBuyAs ? `Buy as: ${modalBuyAs}` : "";' in summary
+    assert "previewBuyAs.hidden = !modalBuyAs;" in summary
     assert "readBuyAsField.hidden = !meaningfulBuyAs;" in summary
     assert 'data-recipe-ingredient-inline-field="purchasable_item"' in script
     assert "recipeIngredientReadStatusHtml(matchItem)" in summary
@@ -5002,9 +5002,8 @@ def test_ingredient_rows_label_optional_items_beneath_buy_as_on_desktop_and_mobi
     summary_start = script.index("function updateRecipeIngredientSummary(row)")
     summary_end = script.index("function recipeEditIngredientRows()", summary_start)
     summary = script[summary_start:summary_end]
-    assert 'row.querySelector("[data-ingredient-read-optional]")' in summary
+    assert 'readCell.querySelector(":scope > [data-ingredient-read-optional]")' in summary
     assert "readOptional.hidden = !recipeIngredientIsOptional(values);" in summary
-
     optional_css = css[css.index("/* Ingredient editor v26:"):]
     assert "@media (max-width: 767px)" in optional_css
     assert ".recipe-edit-ingredient-read-optional:not([hidden])" in optional_css
@@ -5023,6 +5022,25 @@ def test_ingredient_rows_label_optional_items_beneath_buy_as_on_desktop_and_mobi
     assert "text-transform: uppercase;" in desktop_badge
     assert "@media (min-width: 768px)" in desktop_badge
     assert "margin-left: 7px;" in desktop_badge
+
+
+def test_ingredient_modal_labels_follow_the_focused_record_not_the_selected_projection():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    summary = script[
+        script.index("function updateRecipeIngredientSummary(row)"):
+        script.index("function recipeEditIngredientRows()")
+    ]
+
+    assert "const rowValues = row ? fieldValuesFromRow(row) : {};" in summary
+    assert "const parentValues = recipeIngredientChoiceParentValues(row);" in summary
+    assert "const modalValues = editPanel?.recipeIngredientOptionSourceRow" in summary
+    assert "...rowValues," in summary
+    assert "recipeIngredientMatchDetailsHtml(modalMatchItem)" in summary
+    assert "recipeIngredientSentenceCase(modalIngredientName)" in summary
+    assert "recipeIngredientMeaningfulBuyAs(modalValues)" in summary
+    assert "recipeStoreSectionDisplayLabel(modalValues.store_section" in summary
+    assert "readCell.querySelector(\":scope > [data-ingredient-read-optional]\")" in summary
+    assert 'row.querySelector("[data-ingredient-read-optional]")' not in summary
 
 
 def test_wide_desktop_ingredient_overview_uses_one_page_compact_grid():
