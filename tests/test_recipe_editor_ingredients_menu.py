@@ -5336,16 +5336,28 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert 'aria-expanded="false"' in modal
     assert 'aria-controls="${modalOptionsBodyId}"' in modal
     assert "data-recipe-ingredient-modal-options-summary" in modal
+    assert "data-recipe-ingredient-modal-selected-option" in modal
+    assert 'aria-label="Selected option preview"' in modal
     assert "data-recipe-ingredient-modal-options-body" in modal
     assert "data-recipe-ingredient-modal-options-slot" in modal
 
     assert "function recipeIngredientModalOptionsSummary(row)" in sync
     assert "function recipeIngredientModalOptionSelection(row, summary)" in sync
+    assert "function renderRecipeIngredientModalOptionSelection(summaryElement, selection)" in sync
+    assert "function recipeIngredientModalSelectedOptionSummary(valuesList = [])" in sync
+    assert "function createRecipeIngredientModalSelectedOptionRow(values = {})" in sync
+    assert "function renderRecipeIngredientModalSelectedOptionPreview(panel, selection, optionCount)" in sync
     assert "function setRecipeIngredientModalOptionsExpanded(panel, expanded, options = {})" in sync
     assert "function toggleRecipeIngredientModalOptions(button)" in sync
     assert "body.hidden = !shouldExpand;" in sync
     assert 'toggle.setAttribute("aria-expanded", String(shouldExpand));' in sync
     assert "selection.needsAttention || recipeEditIngredientModalOptionsExpanded" in sync
+    assert 'label: `Selected option ingredients: ${ingredients.join(" + ")}`' in sync
+    assert "values: selectedChoice.values || []" in sync
+    assert 'item.className = "recipe-edit-ingredient-modal-selected-option-row"' in sync
+    assert "valuesList.slice(0, 3).forEach" in sync
+    assert 'openButton.textContent = `View ${optionCount} option' in sync
+    assert 'preview.hidden = shouldExpand || preview.dataset.hasContent !== "true";' in sync
     assert "hasChoiceGroup: optionCount > 1" in sync
     assert "isAvailable: optionCount > 0" in sync
     assert "const optionCount = groups.length + (hasExplicitDefault ? 0 : 1);" in sync
@@ -5372,6 +5384,10 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert ".recipe-edit-ingredient-choice-overview.is-editing-another-option" in modal_css
     assert ".recipe-edit-ingredient-modal-options-toggle" in css
     assert ".recipe-edit-ingredient-modal-options-summary.is-warning" in css
+    assert ".recipe-edit-ingredient-modal-selected-option-heading" in css
+    assert ".recipe-edit-ingredient-modal-selected-option-row" in css
+    assert ".recipe-edit-ingredient-modal-selected-option-image" in css
+    assert ".recipe-edit-ingredient-modal-selected-option-store" in css
     assert ".recipe-edit-ingredient-modal-section.is-options.is-collapsed" in css
     assert ".recipe-edit-ingredient-modal-options-body[hidden]" in css
     assert "@media (max-width: 760px)" in modal_css
