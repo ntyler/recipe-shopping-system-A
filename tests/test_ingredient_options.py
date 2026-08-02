@@ -838,16 +838,25 @@ def test_selected_choice_group_header_uses_standard_action_grid_cells():
     assert "actions," in header
     assert "recipe-edit-selected-choice-group-title-icon" not in header
     assert "function ensureRecipeIngredientChoiceTitleActions" in header
+    assert "function ensureRecipeIngredientChoiceGroupDragHandle" in header
+    assert 'handle.dataset.ingredientChoiceGroupDrag = "";' in header
+    assert "bindRecipeEditDragAndDrop(row, handle);" in header
     assert 'actions.dataset.ingredientChoiceTitleActions = "";' in header
     assert 'editButton.setAttribute("aria-label", "Edit ingredient choice title");' in header
     assert 'editButton.dataset.ingredientChoiceTitleEdit = "";' in header
     assert '"return focusRecipeIngredientChoiceTitle(this)"' in header
+    assert "const menuWrap = sourceMenuWrap.cloneNode(true);" in header
+    assert 'menuWrap.dataset.ingredientChoiceGroupMenu = "";' in header
+    assert 'menuButton.setAttribute("aria-label", "More actions for ingredient choice");' in header
+    assert "actions.appendChild(menuWrap);" in header
     assert "restoreRecipeIngredientRowActions(row, legacyHeaderActions);" in header
     assert "syncRecipeIngredientRowActionControls(row, rowActions);" in header
     assert 'editButton.setAttribute("onclick", "return focusRecipeEditCompactRow(this)");' in header
     assert "actions?.remove();" in header
     assert "row.insertBefore(optionsCell, optionsPanel || null);" in header
-    assert "row.insertBefore(dragHandle, row.firstChild);" in header
+    assert "row.insertBefore(legacyHeaderDragHandle, row.firstChild);" in header
+    assert "delete header.dataset.ingredientChoiceGridReady;" in header
+    assert "dragHandle?.remove();" in header
     assert "mobileHeader.appendChild(actions);" in header
     assert 'button?.hasAttribute("data-ingredient-choice-title-edit")' in script
     assert ".recipe-edit-selected-choice-group-actions" in alignment_css
