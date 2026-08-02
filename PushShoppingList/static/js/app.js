@@ -45339,26 +45339,32 @@ function recipeIngredientMasterSelectedIndex(ingredients, targetRow, input) {
         return -1;
     }
 
-    const selectedId = String(
-        recipeIngredientDirectField(targetRow, "ingredient_id")?.value || "",
-    ).trim();
-    if (selectedId) {
-        const selectedIdIndex = ingredients.findIndex(ingredient => (
-            String(ingredient.ingredient_id || ingredient.id || "").trim() === selectedId
-        ));
-        if (selectedIdIndex >= 0) {
-            return selectedIdIndex;
+    const targetField = String(input?.dataset.recipeIngredientMasterField || "ingredient");
+    if (targetField === "ingredient") {
+        const selectedId = String(
+            recipeIngredientDirectField(targetRow, "ingredient_id")?.value || "",
+        ).trim();
+        if (selectedId) {
+            const selectedIdIndex = ingredients.findIndex(ingredient => (
+                String(ingredient.ingredient_id || ingredient.id || "").trim() === selectedId
+            ));
+            if (selectedIdIndex >= 0) {
+                return selectedIdIndex;
+            }
         }
     }
 
-    const selectedNames = new Set(
-        [
+    const selectedFieldNames = targetField === "purchasable_item"
+        ? ["purchasable_item"]
+        : [
             "master_normalized_name",
             "normalized_name",
             "ingredient",
             "parsed_name",
             "purchasable_item",
-        ]
+        ];
+    const selectedNames = new Set(
+        selectedFieldNames
             .map(field => recipeIngredientDirectField(targetRow, field)?.value)
             .concat(input?.value || "")
             .map(recipeIngredientComparableText)
@@ -45536,6 +45542,24 @@ function chooseRecipeIngredientMasterOption(button) {
         return false;
     }
 
+    const targetField = String(input.dataset.recipeIngredientMasterField || "ingredient");
+    if (targetField === "purchasable_item") {
+        setRowFieldValue(row, "purchasable_item", name);
+        const buyAsField = recipeIngredientDirectField(row, "purchasable_item");
+        syncRecipeIngredientPurchaseGroup(buyAsField);
+        if (row.matches("[data-substitution-option-row]")) {
+            updateRecipeIngredientSubstitutionRowSummary(row);
+            updateRecipeIngredientSummary(recipeIngredientParentRowFromControl(row));
+        } else {
+            updateRecipeIngredientSummary(row);
+        }
+        updateRecipeEditorDirtyState(row.closest("#recipeEditForm"));
+        closeRecipeEditRowMenus();
+        input.focus({ preventScroll: true });
+        setRecipeEditStatus(`Selected ${name} as the Buy As ingredient. Save Recipe to keep it.`);
+        return false;
+    }
+
     const previousNameField = recipeIngredientDirectField(row, "ingredient");
     const previousName = String(previousNameField ? previousNameField.value : "").trim();
     const normalizedName = String(button.dataset.masterIngredientNormalizedName || name).trim();
@@ -45666,10 +45690,14 @@ function bindRecipeIngredientMasterPicker(input) {
 
 function bindRecipeIngredientNameField(row) {
     const sourceField = row ? recipeIngredientDirectField(row, "ingredient") : null;
+    const sourceBuyAsField = row ? recipeIngredientDirectField(row, "purchasable_item") : null;
     const inlineFields = row
-        ? [...row.querySelectorAll('[data-recipe-ingredient-inline-field="ingredient"]')]
+        ? [
+            ...row.querySelectorAll('[data-recipe-ingredient-inline-field="ingredient"]'),
+            ...row.querySelectorAll('[data-recipe-ingredient-inline-field="purchasable_item"]'),
+        ]
         : [];
-    const fields = [...new Set([sourceField, ...inlineFields].filter(Boolean))];
+    const fields = [...new Set([sourceField, sourceBuyAsField, ...inlineFields].filter(Boolean))];
     if (!fields.length) {
         return;
     }
@@ -45678,8 +45706,15 @@ function bindRecipeIngredientNameField(row) {
             return;
         }
         field.dataset.recipeIngredientNameBound = "true";
+        const targetField = field.dataset.field
+            || field.dataset.recipeIngredientInlineField
+            || "ingredient";
+        field.dataset.recipeIngredientMasterField = targetField;
+        if (targetField === "purchasable_item") {
+            field.removeAttribute("list");
+        }
         bindRecipeIngredientMasterPicker(field);
-        if (field.tagName === "TEXTAREA") {
+        if (targetField === "ingredient" && field.tagName === "TEXTAREA") {
             field.addEventListener("input", () => resizeRecipeIngredientNameField(field));
             field.addEventListener("focus", () => resizeRecipeIngredientNameField(field));
             window.requestAnimationFrame(() => resizeRecipeIngredientNameField(field));

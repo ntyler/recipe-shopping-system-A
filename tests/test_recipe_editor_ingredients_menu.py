@@ -1818,7 +1818,7 @@ def test_mobile_ingredient_header_surfaces_saved_alternatives_inline():
     assert "@media (max-width: 767px)" in v45
 
 
-def test_ingredient_name_fields_use_the_normalized_master_data_picker():
+def test_ingredient_name_and_buy_as_fields_use_the_normalized_master_data_picker():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -1826,7 +1826,11 @@ def test_ingredient_name_fields_use_the_normalized_master_data_picker():
     bind_end = script.index("function addRecipeIngredientRow", bind_start)
     binding = script[bind_start:bind_end]
     assert 'recipeIngredientDirectField(row, "ingredient")' in binding
+    assert 'recipeIngredientDirectField(row, "purchasable_item")' in binding
     assert 'data-recipe-ingredient-inline-field="ingredient"' in binding
+    assert 'data-recipe-ingredient-inline-field="purchasable_item"' in binding
+    assert 'field.dataset.recipeIngredientMasterField = targetField;' in binding
+    assert 'field.removeAttribute("list");' in binding
     assert "bindRecipeIngredientMasterPicker(field);" in binding
 
     picker_start = script.index("function ensureRecipeIngredientMasterMenu")
@@ -1839,6 +1843,9 @@ def test_ingredient_name_fields_use_the_normalized_master_data_picker():
     assert "function chooseRecipeIngredientMasterOption" in picker
     assert "function recipeIngredientMasterSelectedIndex" in picker
     assert "recipeIngredientProjectedOptionSourceRow(input)" in picker
+    assert 'targetField === "purchasable_item"' in picker
+    assert 'setRowFieldValue(row, "purchasable_item", name);' in picker
+    assert "syncRecipeIngredientPurchaseGroup(buyAsField);" in picker
     assert 'recipeIngredientDirectField(targetRow, "ingredient_id")' in picker
     for field_name in (
         "master_normalized_name",
