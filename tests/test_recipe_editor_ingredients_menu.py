@@ -177,7 +177,10 @@ def test_recipe_editor_match_column_only_surfaces_attention_states():
     assert "recipeIngredientBadgesHtml(matchItem, { maxVisible: 2 })" in summary
     assert "recipeIngredientMatchDetailsHtml(matchItem)" in summary
     assert 'row.querySelector(":scope > [data-recipe-ingredient-edit-panel]")' in summary
-    assert 'editPanel.querySelector("[data-ingredient-match-details]")' in summary
+    assert (
+        'editPanel.querySelector(".recipe-edit-ingredient-match-details[data-ingredient-match-details]")'
+        in summary
+    )
     assert 'row ? row.querySelector("[data-ingredient-match-details]")' not in summary
 
     assert "recipeIngredientBadgesHtml(option, { includeMatchStatus: false })" in script
@@ -5288,6 +5291,60 @@ def test_recipe_editor_phase_two_recipe_view_reuses_shared_rows_handlers_and_opt
     ]
     assert "Ingredient editor v81: compact recipe-style ingredient list." in css
     assert "Ingredient editor v83: align Recipe view metadata into orderly desktop columns." in css
+
+
+def test_edit_ingredient_modal_exposes_the_shared_option_group():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    modal_start = script.index("function organizeRecipeEditIngredientRow")
+    modal_end = script.index("function setRecipeIngredientEditMode", modal_start)
+    modal = script[modal_start:modal_end]
+    sync_start = script.index("function recipeIngredientChoiceParentValues")
+    sync_end = script.index("function setActiveRecipeIngredientModalSection", sync_start)
+    sync = script[sync_start:sync_end]
+    add_start = script.index("function addRecipeIngredientSubstitutionRow")
+    add_end = script.index("function removeRecipeIngredientSubstitutionRow", add_start)
+    add = script[add_start:add_end]
+    inline_start = script.index("function recipeIngredientInlineEditorSourceRow")
+    inline_end = script.index("function syncRecipeIngredientInlineEditor", inline_start)
+    inline = script[inline_start:inline_end]
+
+    assert 'data-recipe-ingredient-modal-nav="options"' in modal
+    assert "Options <span data-recipe-ingredient-modal-options-count>(0)</span>" in modal
+    assert modal.index('data-recipe-ingredient-modal-nav="options"') < modal.index(
+        'data-recipe-ingredient-modal-nav="quantity"'
+    )
+    assert 'data-recipe-ingredient-modal-section="options"' in modal
+    assert "Choose one option for this ingredient." in modal
+    assert "data-recipe-ingredient-modal-options-slot" in modal
+
+    assert "function recipeIngredientModalOptionsSummary(row)" in sync
+    assert "hasChoiceGroup: optionCount > 1" in sync
+    assert "isAvailable: optionCount > 0" in sync
+    assert "const optionCount = groups.length + (hasExplicitDefault ? 0 : 1);" in sync
+    assert "function restoreRecipeIngredientModalOptions(panel)" in sync
+    assert "slot.appendChild(summary.container);" in sync
+    assert 'summary.container.classList.add("recipe-edit-ingredient-modal-options-panel")' in sync
+    assert "syncRecipeIngredientModalDefaultOptionControls(row, panel, summary.container);" in sync
+    assert 'control?.closest("[data-ingredient-choice-overview]")' in inline
+    assert "if (panel?.recipeIngredientOptionSourceRow)" in inline
+    assert "return null;" in inline
+    assert "return fallbackRow;" in inline
+
+    assert 'container.closest("[data-recipe-ingredient-modal-options-slot]")' in add
+    assert "setRecipeIngredientSubstitutionsExpanded(row, optionsButton || button, true);" in add
+    assert "function openRecipeIngredientDefaultOptionModal(control)" in script
+    assert "function openRecipeIngredientOptionModal(control, options = {})" in script
+    assert 'data-recipe-ingredient-default-edit onclick="return openRecipeIngredientDefaultOptionModal(this)"' in script
+    assert 'editPanel.querySelector(".recipe-edit-ingredient-match-details[data-ingredient-match-details]")' in script
+    assert 'alternativeGroups.length || row.classList.contains("is-editing")' in script
+
+    modal_css = css[css.index("/* Ingredient editor v84:"):]
+    assert ".recipe-edit-ingredient-modal-section.is-options" in modal_css
+    assert ".recipe-edit-ingredient-modal-options-panel" in modal_css
+    assert ".recipe-edit-ingredient-choice-overview.is-editing-another-option" in modal_css
+    assert "@media (max-width: 760px)" in modal_css
     assert ".recipe-edit-ingredient-recipe-item" in css
     inline_css = css[css.index("Ingredient editor v83:"):]
     assert "grid-template-columns:" in inline_css
