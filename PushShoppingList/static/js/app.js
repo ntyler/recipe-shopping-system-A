@@ -48907,6 +48907,8 @@ function updateRecipeIngredientSummary(row) {
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
     const displayIngredientName = ingredientName;
     const sourceWording = String(values.source_text || values.original_text || "").trim();
+    const selectedChoiceLabel = String(selectedChoice?.selectionLabel || "").trim();
+    const selectedChoiceDetails = String(selectedChoice?.summary || "").trim();
     const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();
     const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
     const preparationValue = recipeIngredientSentenceCase(values.preparation || "");
@@ -48928,9 +48930,12 @@ function updateRecipeIngredientSummary(row) {
     }
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
     if (sourceText) {
-        sourceText.textContent = sourceWording;
-        sourceText.hidden = !sourceWording || values.substitutions.length === 0;
-        sourceText.title = sourceWording;
+        const compactChoiceState = selectedChoiceLabel || sourceWording;
+        sourceText.textContent = compactChoiceState;
+        sourceText.hidden = !compactChoiceState || values.substitutions.length === 0;
+        sourceText.title = selectedChoiceLabel && selectedChoiceDetails
+            ? `${selectedChoiceLabel}: ${selectedChoiceDetails}`
+            : sourceWording;
     }
     if (readBuyAsField) {
         readBuyAsField.hidden = !meaningfulBuyAs;

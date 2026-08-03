@@ -1275,3 +1275,18 @@ def test_selected_choice_header_shows_option_state_without_losing_editable_sourc
     assert "input.dataset.ingredientChoiceSourceTitle ?? input.value" in title_editor
     assert "input.value = sourceTitle;" in title_editor
     assert "input.dataset.ingredientChoiceSourceTitle = nextValue;" in title_editor
+
+
+def test_compact_grouped_row_replaces_source_wording_with_selected_option_state():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    summary = script[
+        script.index("function updateRecipeIngredientSummary(row)"):
+        script.index("function recipeEditIngredientRows")
+    ]
+
+    assert 'const selectedChoiceLabel = String(selectedChoice?.selectionLabel || "").trim();' in summary
+    assert 'const selectedChoiceDetails = String(selectedChoice?.summary || "").trim();' in summary
+    assert "const compactChoiceState = selectedChoiceLabel || sourceWording;" in summary
+    assert "sourceText.textContent = compactChoiceState;" in summary
+    assert "sourceText.hidden = !compactChoiceState || values.substitutions.length === 0;" in summary
+    assert "`${selectedChoiceLabel}: ${selectedChoiceDetails}`" in summary
