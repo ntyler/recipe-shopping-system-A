@@ -4551,6 +4551,34 @@ def test_store_section_display_and_editor_keep_icon_and_label_aligned():
     assert "store-section-display-edit-indicator" not in display_component
 
 
+def test_compact_store_section_display_rebinds_when_the_selected_choice_changes():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    source_resolution = script[
+        script.index("function recipeIngredientStoreSectionDisplaySource"):
+        script.index("function syncRecipeIngredientStoreSectionDisplay")
+    ]
+    inline_sync = script[
+        script.index("function syncRecipeIngredientInlineEditor"):
+        script.index("function bindRecipeIngredientInlineEditor")
+    ]
+    inline_binding = script[
+        script.index("function bindRecipeIngredientInlineEditor"):
+        script.index("function bindRecipeIngredientNameField")
+    ]
+
+    dynamic_source = (
+        'const sourceRow = recipeIngredientInlineEditorSourceRow(display, fallbackRow);'
+    )
+    cached_source = "if (display?.recipeEditStoreSectionSelect)"
+    assert dynamic_source in source_resolution
+    assert source_resolution.index(dynamic_source) < source_resolution.index(cached_source)
+    assert "function bindRecipeIngredientStoreSectionDisplaySource" in source_resolution
+    assert 'previousSource.removeEventListener("change", previousHandler);' in source_resolution
+    assert 'source.addEventListener("change", syncDisplay);' in source_resolution
+    assert "bindRecipeIngredientStoreSectionDisplaySource(display, source);" in inline_sync
+    assert "bindRecipeIngredientStoreSectionDisplaySource(display, source);" in inline_binding
+
+
 def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional_state():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

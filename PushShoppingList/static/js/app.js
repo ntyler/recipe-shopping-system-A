@@ -33222,11 +33222,40 @@ function createRecipeIngredientStoreSectionDisplay(source = null) {
 }
 
 function recipeIngredientStoreSectionDisplaySource(display, fallbackRow = null) {
+    if (fallbackRow) {
+        const sourceRow = recipeIngredientInlineEditorSourceRow(display, fallbackRow);
+        const currentSource = recipeIngredientDirectField(sourceRow, "store_section");
+        if (currentSource) {
+            return currentSource;
+        }
+    }
     if (display?.recipeEditStoreSectionSelect) {
         return display.recipeEditStoreSectionSelect;
     }
-    const sourceRow = recipeIngredientInlineEditorSourceRow(display, fallbackRow);
-    return recipeIngredientDirectField(sourceRow, "store_section");
+    return null;
+}
+
+function bindRecipeIngredientStoreSectionDisplaySource(display, source) {
+    if (!display || !source) return;
+    const previousSource = display.recipeEditStoreSectionBoundSelect;
+    const previousHandler = display.recipeEditStoreSectionSyncHandler;
+    if (previousSource !== source) {
+        if (previousSource && previousHandler) {
+            previousSource.removeEventListener("input", previousHandler);
+            previousSource.removeEventListener("change", previousHandler);
+        }
+        const syncDisplay = () => {
+            if (display.recipeEditStoreSectionSelect === source) {
+                syncRecipeIngredientStoreSectionDisplay(display, source);
+            }
+        };
+        source.addEventListener("input", syncDisplay);
+        source.addEventListener("change", syncDisplay);
+        display.recipeEditStoreSectionBoundSelect = source;
+        display.recipeEditStoreSectionSyncHandler = syncDisplay;
+    }
+    display.recipeEditStoreSectionSelect = source;
+    display.dataset.recipeIngredientInlineStoreSectionBound = "true";
 }
 
 function syncRecipeIngredientStoreSectionDisplay(display, source = null) {
@@ -33345,6 +33374,7 @@ function syncRecipeIngredientInlineEditor(row, scope = row) {
     scope.querySelectorAll("[data-recipe-ingredient-inline-store-section-display]").forEach(display => {
         const source = recipeIngredientStoreSectionDisplaySource(display, row);
         if (source) {
+            bindRecipeIngredientStoreSectionDisplaySource(display, source);
             syncRecipeIngredientStoreSectionDisplay(display, source);
         }
     });
@@ -33395,12 +33425,7 @@ function bindRecipeIngredientInlineEditor(row, scope = row) {
     scope.querySelectorAll("[data-recipe-ingredient-inline-store-section-display]").forEach(display => {
         const source = recipeIngredientStoreSectionDisplaySource(display, row);
         if (!source) return;
-        display.recipeEditStoreSectionSelect = source;
-        if (display.dataset.recipeIngredientInlineStoreSectionBound !== "true") {
-            display.dataset.recipeIngredientInlineStoreSectionBound = "true";
-            source.addEventListener("input", () => syncRecipeIngredientStoreSectionDisplay(display, source));
-            source.addEventListener("change", () => syncRecipeIngredientStoreSectionDisplay(display, source));
-        }
+        bindRecipeIngredientStoreSectionDisplaySource(display, source);
         syncRecipeIngredientStoreSectionDisplay(display, source);
     });
     scope.querySelectorAll("[data-recipe-ingredient-inline-field]").forEach(control => {
@@ -49121,7 +49146,6 @@ function updateRecipeIngredientSummary(row) {
     }
     const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
     const displayIngredientName = ingredientName;
-    const sourceWording = String(values.source_text || values.original_text || "").trim();
     const selectedChoiceLabel = String(selectedChoice?.selectionLabel || "").trim();
     const selectedChoiceDetails = String(selectedChoice?.summary || "").trim();
     const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();
@@ -49145,15 +49169,13 @@ function updateRecipeIngredientSummary(row) {
     }
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
     if (sourceText) {
-        const compactChoiceState = selectedChoiceLabel
-            ? selectedChoiceLabel
-            : sourceWording;
+        const compactChoiceState = selectedChoiceLabel;
         sourceText.classList.toggle("is-selected-choice", Boolean(selectedChoiceLabel));
         if (sourceTextLabel) sourceTextLabel.textContent = compactChoiceState;
-        sourceText.hidden = !compactChoiceState || values.substitutions.length === 0;
+        sourceText.hidden = !selectedChoiceLabel || values.substitutions.length === 0;
         sourceText.title = selectedChoiceLabel && selectedChoiceDetails
             ? `${selectedChoiceLabel}: ${selectedChoiceDetails}`
-            : sourceWording;
+            : selectedChoiceLabel;
     }
     if (readBuyAsField) {
         readBuyAsField.hidden = !meaningfulBuyAs;

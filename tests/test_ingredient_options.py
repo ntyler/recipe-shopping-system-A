@@ -1336,7 +1336,7 @@ def test_selected_option_type_terminology_is_shared_by_every_ingredient_choice_v
         assert forbidden_label.casefold() not in script.casefold()
 
 
-def test_compact_grouped_row_replaces_source_wording_with_selected_option_state():
+def test_compact_grouped_row_only_shows_selected_option_state():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     summary = script[
         script.index("function updateRecipeIngredientSummary(row)"):
@@ -1345,12 +1345,13 @@ def test_compact_grouped_row_replaces_source_wording_with_selected_option_state(
 
     assert 'const selectedChoiceLabel = String(selectedChoice?.selectionLabel || "").trim();' in summary
     assert 'const selectedChoiceDetails = String(selectedChoice?.summary || "").trim();' in summary
-    assert "const compactChoiceState = selectedChoiceLabel" in summary
-    assert "? selectedChoiceLabel" in summary
+    assert "const compactChoiceState = selectedChoiceLabel;" in summary
+    assert "sourceWording" not in summary
     assert 'sourceText.classList.toggle("is-selected-choice", Boolean(selectedChoiceLabel));' in summary
     assert "if (sourceTextLabel) sourceTextLabel.textContent = compactChoiceState;" in summary
-    assert "sourceText.hidden = !compactChoiceState || values.substitutions.length === 0;" in summary
+    assert "sourceText.hidden = !selectedChoiceLabel || values.substitutions.length === 0;" in summary
     assert "`${selectedChoiceLabel}: ${selectedChoiceDetails}`" in summary
+    assert ": selectedChoiceLabel;" in summary
 
 
 def test_compact_choice_state_matches_the_optional_badge_anatomy():
