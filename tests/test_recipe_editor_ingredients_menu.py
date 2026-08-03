@@ -1049,7 +1049,7 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     expanded_header_selector = (
         "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice."
         "recipe-edit-substitutions-open\n"
-        "    > .recipe-edit-selected-choice-group-header {"
+        "    > .recipe-edit-selected-choice-group-header:not([hidden]) {"
     )
     assert expanded_header_selector in grouped_css
     expanded_header = grouped_css[

@@ -69095,7 +69095,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice.recipe-edit-substitutions-open
-    > .recipe-edit-selected-choice-group-header {
+    > .recipe-edit-selected-choice-group-header:not([hidden]) {
     display: grid !important;
     grid-row: 1 !important;
 }
