@@ -72520,3 +72520,49 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         border-bottom: 0;
     }
 }
+
+/* Ingredient editor v90: retain populated preparation in compact phone summaries. */
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients.recipe-edit-ingredients-collapsed
+        > .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded)
+        > .recipe-edit-ingredient-mobile-header
+        > .recipe-edit-ingredient-read-cell
+        > .recipe-edit-ingredient-read-details.has-preparation,
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.recipe-edit-row-collapsed
+        > .recipe-edit-ingredient-mobile-header
+        > .recipe-edit-ingredient-read-cell
+        > .recipe-edit-ingredient-read-details.has-preparation,
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-selected-option-line-item
+        > .recipe-edit-alternative-component-copy
+        > .recipe-edit-ingredient-read-details.has-preparation {
+        display: flex !important;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 3px;
+        height: 16px;
+        min-height: 16px;
+        overflow: hidden;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-read-details.has-preparation::before {
+        flex: 0 0 auto;
+        color: var(--app-muted);
+        font-size: 10px;
+        line-height: 1;
+        content: "\00b7";
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-read-details.has-preparation
+        > .recipe-edit-ingredient-inline-preparation {
+        flex: 1 1 auto;
+        height: 16px !important;
+        min-height: 16px !important;
+        padding: 0 !important;
+        font-size: 10.5px;
+        line-height: 16px;
+    }
+}

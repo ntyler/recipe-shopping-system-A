@@ -4054,6 +4054,7 @@ def test_recipe_editor_secondary_metadata_normalizes_buy_as_for_summaries():
     assert ".toLowerCase()" in comparison
     assert ".replace(/[^a-z0-9]+/g, \" \")" in comparison
     assert "recipeIngredientComparableText(ingredient) === recipeIngredientComparableText(buyAs)" in comparison
+    assert "recipeIngredientViewNamesDifferOnlyByCount(ingredient, buyAs)" in comparison
     assert 'return "";' in comparison
 
     summary = script[
@@ -4069,6 +4070,29 @@ def test_recipe_editor_secondary_metadata_normalizes_buy_as_for_summaries():
     v10 = css[css.index("/* Ingredient editor v10:"):]
     assert ".recipe-edit-ingredient-read-buy-as > .recipe-edit-ingredient-inline-buy-as" in v10
     assert ".recipe-edit-ingredient-read-separator" in v10
+
+
+def test_mobile_compact_ingredient_summaries_show_preparation_and_hide_redundant_buy_as():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    summary = script[
+        script.index("function updateRecipeIngredientSummary"):
+        script.index("function recipeEditIngredientRows")
+    ]
+    option_summary = script[
+        script.index("function updateRecipeIngredientOptionRowSummary"):
+        script.index("function updateRecipeIngredientAlternativeComponentSummary")
+    ]
+    mobile_preparation = css[css.index("/* Ingredient editor v90:"):]
+
+    assert ":scope > .recipe-edit-ingredient-mobile-header > .recipe-edit-ingredient-read-cell" in summary
+    assert 'readDetails.classList.toggle("has-preparation", Boolean(preparationValue));' in summary
+    assert 'preparationDetails.classList.toggle("has-preparation", Boolean(preparation));' in option_summary
+    assert ".recipe-edit-ingredient-read-details.has-preparation" in mobile_preparation
+    assert ".recipe-edit-selected-option-line-item" in mobile_preparation
+    assert "display: flex !important;" in mobile_preparation
+    assert 'content: "\\00b7";' in mobile_preparation
 
 
 def test_recipe_editor_compact_alternative_cards_keep_inline_adds_out_of_expanded_mode():

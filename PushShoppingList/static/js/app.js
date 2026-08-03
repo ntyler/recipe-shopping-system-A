@@ -30041,7 +30041,11 @@ function recipeIngredientComparableText(value) {
 function recipeIngredientMeaningfulBuyAs(values = {}) {
     const ingredient = String(values.ingredient || "").trim();
     const buyAs = String(values.purchasable_item || values.buy_as || "").trim();
-    if (!buyAs || recipeIngredientComparableText(ingredient) === recipeIngredientComparableText(buyAs)) {
+    if (
+        !buyAs
+        || recipeIngredientComparableText(ingredient) === recipeIngredientComparableText(buyAs)
+        || recipeIngredientViewNamesDifferOnlyByCount(ingredient, buyAs)
+    ) {
         return "";
     }
     return buyAs;
@@ -31581,7 +31585,15 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     );
     if (nameElement) nameElement.value = name;
     if (preparationElement) {
-        preparationElement.value = recipeIngredientSentenceCase(values.preparation || "");
+        const preparation = recipeIngredientSentenceCase(values.preparation || "");
+        preparationElement.value = preparation;
+        preparationElement.title = preparation;
+        const preparationDetails = preparationElement.closest(
+            ".recipe-edit-ingredient-read-details",
+        );
+        if (preparationDetails) {
+            preparationDetails.classList.toggle("has-preparation", Boolean(preparation));
+        }
     }
     if (statusElement) {
         statusElement.innerHTML = recipeIngredientReadStatusHtml(
@@ -48775,9 +48787,10 @@ function updateRecipeIngredientSummary(row) {
         ? editPanel.querySelector(".recipe-edit-ingredient-match-details[data-ingredient-match-details]")
         : null;
     const readCell = row
-        ? [...row.children].find(child => (
-            child.matches && child.matches(".recipe-edit-ingredient-read-cell")
-        ))
+        ? row.querySelector(
+            ":scope > .recipe-edit-ingredient-read-cell, "
+            + ":scope > .recipe-edit-ingredient-mobile-header > .recipe-edit-ingredient-read-cell",
+        )
         : null;
     const readStatus = row
         ? [...row.children].find(child => (
@@ -48861,6 +48874,7 @@ function updateRecipeIngredientSummary(row) {
     const sourceWording = String(values.source_text || values.original_text || "").trim();
     const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();
     const meaningfulBuyAs = recipeIngredientMeaningfulBuyAs(values);
+    const preparationValue = recipeIngredientSentenceCase(values.preparation || "");
     const quantitySummaryText = formatRecipeIngredientQuantityUnit(values);
     const modalIngredientName = String(modalValues.ingredient || "").trim()
         || "Unnamed ingredient";
@@ -48909,7 +48923,14 @@ function updateRecipeIngredientSummary(row) {
     }
     syncRecipeIngredientInlineEditor(row);
     if (readName) readName.hidden = false;
-    if (readDetails) readDetails.hidden = false;
+    if (readDetails) {
+        readDetails.hidden = false;
+        readDetails.classList.toggle("has-preparation", Boolean(preparationValue));
+        const readPreparation = readDetails.querySelector(
+            '[data-recipe-ingredient-inline-field="preparation"]',
+        );
+        if (readPreparation) readPreparation.title = preparationValue;
+    }
     if (typeSummary) {
         const typeValue = recipeIngredientTypeValue(values);
         const typeLabel = recipeIngredientTypeLabel(values);
