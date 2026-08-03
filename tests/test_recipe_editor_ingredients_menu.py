@@ -1166,7 +1166,13 @@ def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_posi
 
     assert "window.getComputedStyle(candidate).overflowY" in anchor
     assert "candidate.scrollHeight > candidate.clientHeight" in anchor
-    assert "const anchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;" in anchor
+    assert "function recipeIngredientExpansionViewportAnchor" in anchor
+    assert "const expansionAnchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;" in anchor
+    assert '".recipe-edit-selected-option-line-items"' in anchor
+    assert '"has-mobile-implicit-default-line-item"' in anchor
+    assert "expansionAnchor !== row" in anchor
+    assert "return row;" in anchor
+    assert "const anchor = recipeIngredientExpansionViewportAnchor(row, control);" in anchor
     assert "const previousTop = anchor.getBoundingClientRect().top;" in anchor
     assert "const result = toggleExpansion();" in anchor
     assert "const newTop = anchor.getBoundingClientRect().top;" in anchor

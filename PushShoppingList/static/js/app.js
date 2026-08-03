@@ -46521,6 +46521,25 @@ function recipeIngredientExpansionAnchorFromControl(row, control = null) {
     return row;
 }
 
+function recipeIngredientExpansionViewportAnchor(row, control = null) {
+    const expansionAnchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;
+    const selectedOptionLineItems = expansionAnchor?.closest?.(
+        ".recipe-edit-selected-option-line-items",
+    );
+    if (
+        expansionAnchor !== row
+        && selectedOptionLineItems?.classList.contains(
+            "has-mobile-implicit-default-line-item",
+        )
+    ) {
+        // The implicit-default projection changes from display:none to grid while
+        // the panel toggles on desktop. Measure the stable ingredient row so that
+        // its temporary zero-sized rectangle cannot move the page viewport.
+        return row;
+    }
+    return expansionAnchor;
+}
+
 function recipeIngredientExpansionIsOpen(row, control = null) {
     const expansionId = recipeIngredientExpansionIdForControl(row, control);
     return Boolean(
@@ -46841,7 +46860,7 @@ function toggleRecipeIngredientExpansionWithAnchor(row, control, toggleExpansion
         return false;
     }
 
-    const anchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;
+    const anchor = recipeIngredientExpansionViewportAnchor(row, control);
     const previousTop = anchor.getBoundingClientRect().top;
     const scrollContainer = recipeIngredientVerticalScrollContainer(anchor);
     const scrollState = recipeIngredientScrollReserveState(scrollContainer);
