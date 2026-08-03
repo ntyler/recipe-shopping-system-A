@@ -747,7 +747,8 @@ def test_ingredient_column_menu_can_hide_empty_optional_inline_fields():
     assert "data-recipe-ingredient-column-view-hide-empty-fields" in view
     assert "Hide empty fields" in view
     assert "Hides blank Preparation and Buy As inputs." in view
-    assert 'field.hidden = hideEmptyFields && empty && !field.matches(":focus-within");' in view
+    assert "hideEmptyFields && empty" in view
+    assert '!field.matches(":focus-within")' in view
     assert 'data-recipe-ingredient-optional-field="preparation"' in read_cell
     assert 'data-recipe-ingredient-optional-field="buy-as"' in read_cell
     assert "summary.dataset.recipeIngredientOptionalField = fieldName;" in script
@@ -756,6 +757,24 @@ def test_ingredient_column_menu_can_hide_empty_optional_inline_fields():
     optional_field_css = css[css.index("/* Ingredient editor v93:"):]
     assert "[data-recipe-ingredient-optional-field][hidden]" in optional_field_css
     assert "display: none !important;" in optional_field_css
+
+
+def test_ingredient_column_menu_can_hide_buy_as_matching_ingredient_name():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    view_start = script.index("function recipeIngredientColumnViewDefinition")
+    view_end = script.index("function clearRecipeEditIngredientColumnDropTargets", view_start)
+    view = script[view_start:view_end]
+
+    assert "hideMatchingBuyAs: false" in script
+    assert "function recipeIngredientOptionalFieldMatchesName(field, control)" in view
+    assert 'fieldName !== "buy-as" && fieldName !== "purchasable_item"' in view
+    assert "recipeIngredientViewNamesDifferOnlyByCount(" in view
+    assert "data-recipe-ingredient-column-view-hide-matching-buy-as" in view
+    assert "Hide matching Buy As" in view
+    assert "Hides Buy As when it matches the Ingredient name." in view
+    assert "hideMatchingBuyAs && matchingBuyAs" in view
+    assert "recipeEditIngredientColumnView.hideMatchingBuyAs = false;" in view
 
 
 def test_recipe_editor_store_section_menu_can_group_rows_without_reordering_row_nodes():

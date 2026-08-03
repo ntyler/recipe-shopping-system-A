@@ -23003,6 +23003,7 @@ let recipeEditIngredientColumnView = {
     sorts: [],
     groupByStoreSection: false,
     hideEmptyFields: false,
+    hideMatchingBuyAs: false,
 };
 let recipeEditIngredientMasterSearchTimer = null;
 let recipeEditIngredientMasterRequestId = 0;
@@ -27278,30 +27279,56 @@ function recipeIngredientColumnViewIsActive(columnKey = "") {
             )
             || (
                 columnKey === "ingredient"
-                && recipeEditIngredientColumnView.hideEmptyFields
+                && (
+                    recipeEditIngredientColumnView.hideEmptyFields
+                    || recipeEditIngredientColumnView.hideMatchingBuyAs
+                )
             )
             || Boolean(recipeIngredientColumnViewSort(columnKey));
     }
     return recipeEditIngredientColumnView.filterKeys.size > 0
         || recipeEditIngredientColumnView.groupByStoreSection
         || recipeEditIngredientColumnView.hideEmptyFields
+        || recipeEditIngredientColumnView.hideMatchingBuyAs
         || recipeIngredientColumnViewSorts().length > 0;
+}
+
+function recipeIngredientOptionalFieldMatchesName(field, control) {
+    const fieldName = String(field?.dataset.recipeIngredientOptionalField || "");
+    if (fieldName !== "buy-as" && fieldName !== "purchasable_item") return false;
+    const readCell = field.closest(".recipe-edit-ingredient-read-cell");
+    const displayRow = field.closest(
+        ".recipe-edit-ingredient-row, [data-recipe-ingredient-column-group-projection]",
+    );
+    const ingredientControl = (readCell || displayRow)?.querySelector(
+        '[data-recipe-ingredient-inline-field="ingredient"]',
+    );
+    return recipeIngredientViewNamesDifferOnlyByCount(
+        ingredientControl?.value,
+        control?.value,
+    );
 }
 
 function syncRecipeIngredientEmptyFieldVisibility() {
     const list = document.getElementById("recipeEditIngredients");
     if (!list) return;
     const hideEmptyFields = Boolean(recipeEditIngredientColumnView.hideEmptyFields);
+    const hideMatchingBuyAs = Boolean(recipeEditIngredientColumnView.hideMatchingBuyAs);
     list.classList.toggle("recipe-edit-ingredients-hide-empty-fields", hideEmptyFields);
     list.querySelectorAll("[data-recipe-ingredient-optional-field]").forEach(field => {
         const control = field.querySelector("input, textarea, select");
         const empty = !String(control?.value || "").trim();
+        const matchingBuyAs = recipeIngredientOptionalFieldMatchesName(field, control);
         field.dataset.recipeIngredientOptionalFieldEmpty = String(empty);
+        field.dataset.recipeIngredientOptionalFieldMatchesName = String(matchingBuyAs);
         if (field.dataset.recipeIngredientOptionalFieldDisabled === "true") {
             field.hidden = true;
             return;
         }
-        field.hidden = hideEmptyFields && empty && !field.matches(":focus-within");
+        field.hidden = (
+            (hideEmptyFields && empty)
+            || (hideMatchingBuyAs && matchingBuyAs)
+        ) && !field.matches(":focus-within");
     });
 }
 
@@ -27337,8 +27364,15 @@ function recipeIngredientColumnViewDescription() {
             : " Ingredients remain in manual recipe order within each section";
         description = `Grouped by Store Section using ${groupOrder}.${rowOrder}`;
     }
-    return recipeEditIngredientColumnView.hideEmptyFields
-        ? `${description.replace(/\.$/, "")}. Empty Preparation and Buy As fields are hidden`
+    const displayNotes = [];
+    if (recipeEditIngredientColumnView.hideEmptyFields) {
+        displayNotes.push("Empty Preparation and Buy As fields are hidden");
+    }
+    if (recipeEditIngredientColumnView.hideMatchingBuyAs) {
+        displayNotes.push("Buy As fields matching Ingredient names are hidden");
+    }
+    return displayNotes.length
+        ? `${description.replace(/\.$/, "")}. ${displayNotes.join(". ")}`
         : description;
 }
 
@@ -27515,7 +27549,13 @@ function syncRecipeIngredientColumnViewHeaders() {
             && recipeEditIngredientColumnView.groupByStoreSection;
         const hidesEmptyFields = columnKey === "ingredient"
             && recipeEditIngredientColumnView.hideEmptyFields;
-        const active = Boolean(filterKeys) || sorted || grouped || hidesEmptyFields;
+        const hidesMatchingBuyAs = columnKey === "ingredient"
+            && recipeEditIngredientColumnView.hideMatchingBuyAs;
+        const active = Boolean(filterKeys)
+            || sorted
+            || grouped
+            || hidesEmptyFields
+            || hidesMatchingBuyAs;
         const stateParts = [];
         if (sorted) {
             stateParts.push(
@@ -27531,6 +27571,7 @@ function syncRecipeIngredientColumnViewHeaders() {
             stateParts.push(`${filterCount} value${filterCount === 1 ? "" : "s"} selected`);
         }
         if (hidesEmptyFields) stateParts.push("empty Preparation and Buy As fields hidden");
+        if (hidesMatchingBuyAs) stateParts.push("Buy As fields matching Ingredient names hidden");
         trigger.classList.toggle("is-active", active);
         trigger.dataset.recipeIngredientColumnViewActive = String(active);
         trigger.setAttribute(
@@ -27673,6 +27714,7 @@ function clearRecipeIngredientColumnView(columnKey = "", options = {}) {
         }
         if (columnKey === "ingredient") {
             recipeEditIngredientColumnView.hideEmptyFields = false;
+            recipeEditIngredientColumnView.hideMatchingBuyAs = false;
         }
         setRecipeIngredientColumnViewSort(columnKey, "manual");
     } else {
@@ -27681,6 +27723,7 @@ function clearRecipeIngredientColumnView(columnKey = "", options = {}) {
             sorts: [],
             groupByStoreSection: false,
             hideEmptyFields: false,
+            hideMatchingBuyAs: false,
         };
     }
     applyRecipeIngredientColumnView({ announce: options.announce !== false });
@@ -27706,6 +27749,12 @@ function syncRecipeIngredientColumnViewMenuState(menu) {
     );
     if (hideEmptyFields) {
         hideEmptyFields.checked = Boolean(recipeEditIngredientColumnView.hideEmptyFields);
+    }
+    const hideMatchingBuyAs = menu.querySelector(
+        "[data-recipe-ingredient-column-view-hide-matching-buy-as]",
+    );
+    if (hideMatchingBuyAs) {
+        hideMatchingBuyAs.checked = Boolean(recipeEditIngredientColumnView.hideMatchingBuyAs);
     }
     menu.querySelectorAll("[data-recipe-ingredient-column-view-sort]").forEach(input => {
         input.checked = input.value === currentSortMode;
@@ -27813,6 +27862,15 @@ function renderRecipeIngredientColumnViewMenu(menu) {
                 <p class="recipe-edit-ingredient-column-view-group-note">
                     Hides blank Preparation and Buy As inputs. Filled fields remain visible and editable.
                 </p>
+                <label class="recipe-edit-ingredient-column-view-option">
+                    <input type="checkbox"
+                           data-recipe-ingredient-column-view-hide-matching-buy-as
+                           ${recipeEditIngredientColumnView.hideMatchingBuyAs ? "checked" : ""}>
+                    <span>Hide matching Buy As</span>
+                </label>
+                <p class="recipe-edit-ingredient-column-view-group-note">
+                    Hides Buy As when it matches the Ingredient name. Different values remain visible and editable.
+                </p>
             </fieldset>
         ` : ""}
         ${columnKey === "store" ? `
@@ -27907,6 +27965,14 @@ function renderRecipeIngredientColumnViewMenu(menu) {
     menu.querySelector("[data-recipe-ingredient-column-view-hide-empty-fields]")
         ?.addEventListener("change", event => {
             recipeEditIngredientColumnView.hideEmptyFields = Boolean(
+                event.currentTarget.checked,
+            );
+            applyRecipeIngredientColumnView({ announce: true });
+            syncRecipeIngredientColumnViewMenuState(menu);
+        });
+    menu.querySelector("[data-recipe-ingredient-column-view-hide-matching-buy-as]")
+        ?.addEventListener("change", event => {
+            recipeEditIngredientColumnView.hideMatchingBuyAs = Boolean(
                 event.currentTarget.checked,
             );
             applyRecipeIngredientColumnView({ announce: true });
