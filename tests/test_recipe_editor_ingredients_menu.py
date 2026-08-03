@@ -1152,6 +1152,21 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "margin-inline: -12px;" in attached_panel
     assert "background: color-mix(" in attached_panel
     assert ".is-ingredient-expansion-anchor" in attached_panel
+    expansion_projection = attached_panel[
+        attached_panel.index(
+            "> .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor {"
+        ):
+        attached_panel.index(
+            "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+            "    .recipe-edit-selected-option-line-items",
+            attached_panel.index(
+                "> .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor {"
+            ),
+        )
+    ]
+    assert "display: block;" in expansion_projection
+    assert "display: grid;" not in expansion_projection
+    assert "grid-template-columns:" not in expansion_projection
 
 
 def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_position():

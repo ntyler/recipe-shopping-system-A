@@ -69462,21 +69462,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    display: block;
     background: color-mix(in srgb, var(--app-primary-soft) 6%, var(--app-surface));
-}
-
-body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor
-    > .is-ingredient-column-group-projection-row {
-    grid-row: 1;
-}
-
-body.recipe-edit-standalone-page #recipeEditIngredients
-    > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor
-    > .recipe-edit-ingredient-options-panel {
-    grid-row: 2;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
