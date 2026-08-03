@@ -806,6 +806,33 @@ def test_store_section_grouping_projects_selected_components_into_their_own_sect
     assert "display: none !important;" in grouped_away[:200]
 
 
+def test_grouped_projected_selected_components_inherit_their_choice_state_badge():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    projection_start = script.index("function syncRecipeIngredientColumnViewGroupProjection")
+    projection_end = script.index("function prepareRecipeIngredientColumnViewDisplayRows", projection_start)
+    projection = script[projection_start:projection_end]
+    update_start = script.index("function updateRecipeIngredientOptionRowSummary")
+    update_end = script.index("function updateRecipeIngredientAlternativeComponentSummary", update_start)
+    update_summary = script[update_start:update_end]
+    create_start = script.index("function createRecipeIngredientSelectedOptionLineItem")
+    create_end = script.index("function resizeRecipeIngredientChoiceTitleInput", create_start)
+    create_line_item = script[create_start:create_end]
+    sync_start = script.index("function syncRecipeIngredientSelectedOptionLineItems")
+    sync_end = script.index("function organizeRecipeEditSubstitutionOptionRow", sync_start)
+    sync_line_items = script[sync_start:sync_end]
+
+    assert "lineItem.dataset.ingredientSelectedChoiceState" in projection
+    assert "selectionState," in projection
+    assert 'summary.querySelector("[data-ingredient-source-text]")' in update_summary
+    assert 'selectionStateElement.classList.toggle("is-selected-choice", Boolean(selectionState));' in update_summary
+    assert "selectionStateElement.hidden = !selectionState;" in update_summary
+    assert "options = {}" in create_line_item
+    assert "summary.dataset.ingredientSelectedChoiceState = selectionState;" in create_line_item
+    assert 'selectedChoice.isDefaultOption ? "Default selected" : "Alternative selected"' in sync_line_items
+    assert "createRecipeIngredientSelectedOptionLineItem(row, sourceRow, {" in sync_line_items
+
+
 def test_projected_replacement_move_uses_visible_store_section_siblings_and_drag_drop():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     helpers = script[

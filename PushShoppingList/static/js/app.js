@@ -27084,6 +27084,9 @@ function syncRecipeIngredientColumnViewGroupProjection(
     if (!projection || !parentRow || !sourceRow || sourceRow === lineItem) {
         return null;
     }
+    const selectionState = String(
+        lineItem.dataset.ingredientSelectedChoiceState || "",
+    ).trim();
     projection.recipeIngredientOptionSourceRow = sourceRow;
     projection.recipeIngredientColumnViewParentRow = parentRow;
     let summary = projection.querySelector(
@@ -27099,10 +27102,13 @@ function syncRecipeIngredientColumnViewGroupProjection(
                 parentRow.recipeIngredientSubstitutionPanel,
             );
         }
-        summary = createRecipeIngredientSelectedOptionLineItem(parentRow, sourceRow);
+        summary = createRecipeIngredientSelectedOptionLineItem(parentRow, sourceRow, {
+            selectionState,
+        });
         projection.replaceChildren(summary);
     } else {
         summary.recipeIngredientChoiceParentRow = parentRow;
+        summary.dataset.ingredientSelectedChoiceState = selectionState;
         updateRecipeIngredientOptionRowSummary(
             summary,
             sourceRow,
@@ -27111,6 +27117,7 @@ function syncRecipeIngredientColumnViewGroupProjection(
                 accessiblePrefix: "Edit ingredient",
                 fallbackName: "Unnamed ingredient",
                 showMetadata: false,
+                selectionState,
             },
         );
         syncRecipeIngredientInlineEditor(parentRow, summary);
@@ -31609,6 +31616,11 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     const typeElement = summary.querySelector("[data-alternative-component-type]");
     const metadataElement = summary.querySelector("[data-alternative-component-metadata]");
     const buyAsElement = summary.querySelector("[data-alternative-component-buy-as]");
+    const selectionStateElement = summary.querySelector("[data-ingredient-source-text]");
+    const selectionStateLabel = selectionStateElement
+        ? selectionStateElement.querySelector("[data-ingredient-source-label]")
+        : null;
+    const selectionState = String(options.selectionState || "").trim();
     const editButton = summary.querySelector(".recipe-edit-compact-row-edit");
     syncRecipeIngredientReadImageCell(
         summary.querySelector(".recipe-edit-alternative-component-image-cell"),
@@ -31690,6 +31702,12 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
         buyAsElement.value = showBuyAs ? String(values.purchasable_item || values.buy_as || "") : "";
         const buyAsField = buyAsElement.closest(".recipe-edit-ingredient-read-buy-as");
         if (buyAsField) buyAsField.hidden = !showBuyAs;
+    }
+    if (selectionStateElement) {
+        if (selectionStateLabel) selectionStateLabel.textContent = selectionState;
+        selectionStateElement.classList.toggle("is-selected-choice", Boolean(selectionState));
+        selectionStateElement.hidden = !selectionState;
+        selectionStateElement.title = selectionState;
     }
     const accessiblePrefix = String(options.accessiblePrefix || "Edit replacement ingredient").trim();
     summary.setAttribute("aria-label", `${accessiblePrefix} ${name}`);
@@ -31841,8 +31859,9 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
     });
 }
 
-function createRecipeIngredientSelectedOptionLineItem(row, sourceRow) {
+function createRecipeIngredientSelectedOptionLineItem(row, sourceRow, options = {}) {
     const usesParentIngredientRow = sourceRow === row;
+    const selectionState = String(options.selectionState || "").trim();
     const summary = createRecipeIngredientOptionRowSummary(
         "recipe-edit-selected-option-line-item",
     );
@@ -31851,6 +31870,7 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow) {
         usesParentIngredientRow,
     );
     summary.dataset.ingredientSelectedOptionLineItem = "";
+    summary.dataset.ingredientSelectedChoiceState = selectionState;
     summary.recipeIngredientOptionSourceRow = sourceRow;
     summary.recipeIngredientChoiceParentRow = row;
 
@@ -31905,6 +31925,7 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow) {
             accessiblePrefix: "Edit ingredient",
             fallbackName: "Unnamed ingredient",
             showMetadata: false,
+            selectionState,
         },
     );
     ensureRecipeIngredientSelectedOptionToggle(row, summary);
@@ -32229,6 +32250,9 @@ function syncRecipeIngredientSelectedOptionLineItems(
         selectedChoice?.isDefaultOption
         && projectedRows.length === 0
     );
+    const selectionState = selectedChoice
+        ? (selectedChoice.isDefaultOption ? "Default selected" : "Alternative selected")
+        : "";
     const renderedRows = usesParentIngredientRow ? [row] : projectedRows;
     let lineItems = row.querySelector(
         ":scope > [data-ingredient-selected-option-line-items]",
@@ -32269,7 +32293,9 @@ function syncRecipeIngredientSelectedOptionLineItems(
         }
         lineItems.replaceChildren(
             ...renderedRows.map(sourceRow => (
-                createRecipeIngredientSelectedOptionLineItem(row, sourceRow)
+                createRecipeIngredientSelectedOptionLineItem(row, sourceRow, {
+                    selectionState,
+                })
             )),
         );
         lineItems.recipeIngredientOptionSourceRows = renderedRows;
@@ -32277,6 +32303,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
         [...lineItems.children].forEach((summary, index) => {
             const sourceRow = renderedRows[index];
             if (!sourceRow) return;
+            summary.dataset.ingredientSelectedChoiceState = selectionState;
             updateRecipeIngredientOptionRowSummary(
                 summary,
                 sourceRow,
@@ -32285,6 +32312,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
                     accessiblePrefix: "Edit ingredient",
                     fallbackName: "Unnamed ingredient",
                     showMetadata: false,
+                    selectionState,
                 },
             );
             syncRecipeIngredientInlineEditor(row, summary);
