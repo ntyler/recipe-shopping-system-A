@@ -878,7 +878,7 @@ def test_grouped_projected_selected_components_inherit_their_choice_state_badge(
     assert "selectionStateElement.hidden = !selectionState;" in update_summary
     assert "options = {}" in create_line_item
     assert "summary.dataset.ingredientSelectedChoiceState = selectionState;" in create_line_item
-    assert 'selectedChoice.isDefaultOption ? "Default selected" : "Alternative selected"' in sync_line_items
+    assert 'selectedChoice.isDefaultOption ? "Default Option" : "Alternative Option"' in sync_line_items
     assert "createRecipeIngredientSelectedOptionLineItem(row, sourceRow, {" in sync_line_items
 
 

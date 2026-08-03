@@ -660,8 +660,8 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "defaultOptionId && group.alternativeId === defaultOptionId" in selected_choice
     assert "recipeIngredientOptionItemDisplay(value)" in selected_choice
     assert '.join(" + ");' in selected_choice
-    assert 'selectionLabel: "Default option selected"' in selected_choice
-    assert '"Alternative option selected"' in selected_choice
+    assert 'selectionLabel: "Default Option"' in selected_choice
+    assert '"Alternative Option"' in selected_choice
     assert "recipeIngredientProjectedOptionSourceRow(control)" in inline_source
     assert "fallbackRow?.recipeIngredientInlineSummarySourceRow" in inline_source
     assert "row.recipeIngredientInlineSummarySourceRow = selectedSourceRow;" in summary
@@ -692,7 +692,9 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "isDefaultOption," in selected_choice
     assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state
     assert "function ensureRecipeIngredientSelectedChoiceGroupHeader" in script
-    assert 'groupLabel.textContent = `${selectedChoiceKind} INGREDIENT CHOICE`;' in substitution_state
+    assert 'groupLabel.textContent = selectedChoice?.isDefaultOption' in substitution_state
+    assert '? "DEFAULT OPTION"' in substitution_state
+    assert ': "ALTERNATIVE OPTION";' in substitution_state
     assert "groupTitle.value = choiceTitle;" in substitution_state
     assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in substitution_state
     assert "document.activeElement !== groupTitle" in substitution_state
@@ -1266,9 +1268,11 @@ def test_selected_choice_header_shows_option_state_without_losing_editable_sourc
         script.index("function addRecipeIngredientSubstitutionRow")
     ]
 
-    assert 'selectionLabel: "Default option selected"' in selection
-    assert '"Alternative option selected"' in selection
-    assert 'groupLabel.textContent = `${selectedChoiceKind} INGREDIENT CHOICE`;' in state
+    assert 'selectionLabel: "Default Option"' in selection
+    assert '"Alternative Option"' in selection
+    assert 'groupLabel.textContent = selectedChoice?.isDefaultOption' in state
+    assert '? "DEFAULT OPTION"' in state
+    assert ': "ALTERNATIVE OPTION";' in state
     assert "groupTitle.value = choiceTitle;" in state
     assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in state
     assert "`${selectedLabel}: ${choiceTitle} (${selectedDetails})`" in state
@@ -1286,7 +1290,8 @@ def test_compact_grouped_row_replaces_source_wording_with_selected_option_state(
 
     assert 'const selectedChoiceLabel = String(selectedChoice?.selectionLabel || "").trim();' in summary
     assert 'const selectedChoiceDetails = String(selectedChoice?.summary || "").trim();' in summary
-    assert 'selectedChoice?.isDefaultOption ? "Default selected" : "Alternative selected"' in summary
+    assert "const compactChoiceState = selectedChoiceLabel" in summary
+    assert "? selectedChoiceLabel" in summary
     assert 'sourceText.classList.toggle("is-selected-choice", Boolean(selectedChoiceLabel));' in summary
     assert "if (sourceTextLabel) sourceTextLabel.textContent = compactChoiceState;" in summary
     assert "sourceText.hidden = !compactChoiceState || values.substitutions.length === 0;" in summary

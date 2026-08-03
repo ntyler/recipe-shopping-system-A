@@ -32394,7 +32394,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
         && projectedRows.length === 0
     );
     const selectionState = selectedChoice
-        ? (selectedChoice.isDefaultOption ? "Default selected" : "Alternative selected")
+        ? (selectedChoice.isDefaultOption ? "Default Option" : "Alternative Option")
         : "";
     const renderedRows = usesParentIngredientRow ? [row] : projectedRows;
     let lineItems = row.querySelector(
@@ -48086,7 +48086,7 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
             values: [originalValues],
             summary: recipeIngredientOptionItemDisplay(originalValues),
             ingredientSummary,
-            selectionLabel: "Default option selected",
+            selectionLabel: "Default Option",
             isDefaultOption: true,
         };
     }
@@ -48117,8 +48117,8 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
                 .join(" + "),
             ingredientSummary,
             selectionLabel: isDefaultOption
-                ? "Default option selected"
-                : "Alternative option selected",
+                ? "Default Option"
+                : "Alternative Option",
             isDefaultOption,
         };
     }
@@ -48573,12 +48573,11 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         const groupTitle = selectedChoiceGroupHeader.querySelector(
             "[data-ingredient-selected-choice-group-title]",
         );
-        const selectedChoiceKind = selectedChoice?.isDefaultOption
-            ? "Default"
-            : "Alternative";
         selectedChoiceGroupHeader.hidden = !showsSelectedChoiceGroup;
         if (groupLabel) {
-            groupLabel.textContent = `${selectedChoiceKind} INGREDIENT CHOICE`;
+            groupLabel.textContent = selectedChoice?.isDefaultOption
+                ? "DEFAULT OPTION"
+                : "ALTERNATIVE OPTION";
         }
         if (groupTitle) {
             if (document.activeElement !== groupTitle) {
@@ -49113,7 +49112,7 @@ function updateRecipeIngredientSummary(row) {
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
     if (sourceText) {
         const compactChoiceState = selectedChoiceLabel
-            ? (selectedChoice?.isDefaultOption ? "Default selected" : "Alternative selected")
+            ? selectedChoiceLabel
             : sourceWording;
         sourceText.classList.toggle("is-selected-choice", Boolean(selectedChoiceLabel));
         if (sourceTextLabel) sourceTextLabel.textContent = compactChoiceState;

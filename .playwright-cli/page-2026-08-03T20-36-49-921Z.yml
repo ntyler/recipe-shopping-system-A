@@ -1,0 +1,802 @@
+- generic [active] [ref=f11e1]:
+  - link "Skip to content" [ref=f11e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=f11e3]:
+    - complementary "Primary navigation" [ref=f11e4]:
+      - link "AI Pantry home" [ref=f11e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f11e13]:
+          - strong [ref=f11e14]: AI Pantry
+          - generic [ref=f11e15]: Recipe Shopping List
+      - button "Collapse sidebar" [ref=f11e16] [cursor=pointer]:
+        - generic [ref=f11e17]: ‹ <
+      - navigation "App sections" [ref=f11e18]:
+        - generic [ref=f11e19]: MAIN
+        - link "Home" [ref=f11e20] [cursor=pointer]:
+          - /url: /#appPageHeader
+        - link "Recipes" [ref=f11e26] [cursor=pointer]:
+          - /url: /#recipesPage
+        - link "Menus" [ref=f11e31] [cursor=pointer]:
+          - /url: /#menusPage
+        - link "Cookbooks" [ref=f11e35] [cursor=pointer]:
+          - /url: /#cookbooksCard
+        - link "Shopping Lists" [ref=f11e40] [cursor=pointer]:
+          - /url: /#shoppingViewsSection
+        - link "Pantry" [ref=f11e47] [cursor=pointer]:
+          - /url: /#aiPantrySection
+        - link "Meal Planner" [ref=f11e53] [cursor=pointer]:
+          - /url: /#mealPlannerPage
+        - generic [ref=f11e58]: SHOP
+        - link "Stores" [ref=f11e59] [cursor=pointer]:
+          - /url: /#storesPage
+        - link "Compare Prices" [ref=f11e66] [cursor=pointer]:
+          - /url: /#priceComparisonPage
+        - generic [ref=f11e72]: TOOLS
+        - link "Import" [ref=f11e73] [cursor=pointer]:
+          - /url: /#importPage
+        - link "Scan Barcode" [ref=f11e79] [cursor=pointer]:
+          - /url: /pantry/coming-soon
+        - generic [ref=f11e83]: ACCOUNT
+        - link "Usage and Billing" [ref=f11e84] [cursor=pointer]:
+          - /url: /#accountUsageDashboardPanel
+          - generic [ref=f11e88]: Usage & Billing
+        - link "Help and Support" [ref=f11e89] [cursor=pointer]:
+          - /url: /#feedbackSupportSection
+          - generic [ref=f11e94]: Help & Support
+        - link "Settings" [ref=f11e95] [cursor=pointer]:
+          - /url: /#settingsWorkspaceSection
+      - complementary "AI Pantry Pro" [ref=f11e101]:
+        - generic [ref=f11e105]:
+          - strong [ref=f11e106]: AI Pantry Pro
+          - generic [ref=f11e107]: Unlock more from your pantry.
+          - list "Plan benefits" [ref=f11e108]:
+            - listitem [ref=f11e109]: More imports
+            - listitem [ref=f11e110]: Advanced AI tools
+            - listitem [ref=f11e111]: Faster processing
+        - link "View AI Pantry Pro plans" [ref=f11e112] [cursor=pointer]:
+          - /url: /#accountUsageDashboardPanel
+          - generic [ref=f11e113]: View Plans
+    - generic [ref=f11e114]:
+      - banner "App toolbar" [ref=f11e115]:
+        - search [ref=f11e117]:
+          - generic [ref=f11e118]: Search AI Pantry
+          - combobox "Search AI Pantry" [ref=f11e119]
+          - generic: Ctrl + K
+          - button "Search" [ref=f11e120] [cursor=pointer]
+        - generic "Quick actions" [ref=f11e122]:
+          - link "Import" [ref=f11e123] [cursor=pointer]:
+            - /url: /#importPage
+          - link "Notifications" [ref=f11e126] [cursor=pointer]:
+            - /url: /#notificationsPage
+        - button "Open account menu for Nathaniel Tyler" [ref=f11e133] [cursor=pointer]:
+          - generic [ref=f11e135]:
+            - strong [ref=f11e136]: Nathaniel Tyler
+            - generic [ref=f11e137]: Pro Plan
+      - main "Recipe editor" [ref=f11e141]:
+        - dialog "Edit Recipe" [ref=f11e143]:
+          - generic [ref=f11e144]:
+            - generic [ref=f11e145]:
+              - navigation "Breadcrumb" [ref=f11e147]:
+                - link "Recipes" [ref=f11e152] [cursor=pointer]:
+                  - /url: /#currentRecipeUrlLogCard
+                - generic [ref=f11e153]: /
+                - generic [ref=f11e154]: Corn Spoon Bread
+                - generic [ref=f11e155]: /
+                - generic [ref=f11e156]: Edit Recipe
+              - generic [ref=f11e157]:
+                - button "Preview Recipe" [ref=f11e158] [cursor=pointer]
+                - link "Download recipe PDF" [ref=f11e525] [cursor=pointer]:
+                  - /url: https://pub-c0815444ad5143baade63b3e205bf1b4.r2.dev/recipe-pdfs/vegetablerecipes_com_corn-spoon-bread_generated_recipe.pdf
+                  - text: ↓
+                  - generic [ref=f11e529]: Recipe PDF
+                - text: ↓
+                - generic [ref=f11e168]:
+                  - button "More actions" [ref=f11e169] [cursor=pointer]
+                  - text: "> >"
+                - button "Cancel" [ref=f11e171] [cursor=pointer]
+                - button "Save Recipe" [ref=f11e172] [cursor=pointer]
+            - status [ref=f11e176]: Ingredient option selected. Save Recipe to keep it.
+            - generic [ref=f11e177]:
+              - generic [ref=f11e178]:
+                - generic [ref=f11e180]:
+                  - generic [ref=f11e181]:
+                    - generic [ref=f11e182]:
+                      - generic [ref=f11e183]:
+                        - generic [ref=f11e184]:
+                          - generic [ref=f11e185]: Recipe Name
+                          - textbox "Recipe Name" [ref=f11e186]:
+                            - /placeholder: Untitled Recipe
+                            - text: Corn Spoon Bread
+                        - button "Edit recipe name" [ref=f11e187] [cursor=pointer]
+                      - radiogroup "Recipe rating" [ref=f11e193]:
+                        - radio "1 star. Click the selected star again to clear the rating." [ref=f11e194] [cursor=pointer]: ☆
+                        - radio "2 stars. Click the selected star again to clear the rating." [ref=f11e195] [cursor=pointer]: ☆
+                        - radio "3 stars. Click the selected star again to clear the rating." [ref=f11e196] [cursor=pointer]: ☆
+                        - radio "4 stars. Click the selected star again to clear the rating." [ref=f11e197] [cursor=pointer]: ☆
+                        - radio "5 stars. Click the selected star again to clear the rating." [ref=f11e198] [cursor=pointer]: ☆
+                      - generic [ref=f11e199]:
+                        - generic [ref=f11e200]:
+                          - combobox "🇺🇸 American Remove 🇺🇸 American" [ref=f11e530]:
+                            - option "Use inferred"
+                            - option "🇺🇸 American" [selected]
+                            - option "🇲🇽 Mexican"
+                            - option "🇮🇹 Italian"
+                            - option "🇯🇵 Japanese"
+                            - option "🇹🇭 Thai"
+                            - option "🇨🇳 Chinese"
+                            - option "🇮🇳 Indian"
+                            - option "🇫🇷 French"
+                            - option "🌍 Other / Fusion"
+                          - generic [ref=f11e531]:
+                            - generic [ref=f11e532]: 🇺🇸 American
+                            - button "Remove 🇺🇸 American" [ref=f11e533] [cursor=pointer]
+                        - button "Add Tag" [ref=f11e205] [cursor=pointer]
+                    - generic [ref=f11e208]:
+                      - generic [ref=f11e209]:
+                        - generic [ref=f11e210]: Cookbook
+                        - button "Cookbook actions" [ref=f11e212] [cursor=pointer]:
+                          - generic "unclassified" [ref=f11e537]
+                      - generic [ref=f11e214]:
+                        - generic [ref=f11e215]: Section
+                        - button "Menu section actions" [ref=f11e217] [cursor=pointer]:
+                          - generic "Miscellaneous" [ref=f11e538]
+                  - generic [ref=f11e219]:
+                    - generic [ref=f11e220]:
+                      - generic [ref=f11e221]:
+                        - generic [ref=f11e227]: Servings
+                        - button "About Servings" [ref=f11e228]: "?"
+                      - generic [ref=f11e229]:
+                        - textbox "Servings About Servings people" [ref=f11e230]: "12"
+                        - generic [ref=f11e231]: people
+                    - generic [ref=f11e232]:
+                      - generic [ref=f11e233]:
+                        - generic [ref=f11e238]: Total Time
+                        - button "About Total Time" [ref=f11e239]: "?"
+                      - generic [ref=f11e240]:
+                        - textbox "Total Time About Total Time min" [ref=f11e241]: "45"
+                        - generic [ref=f11e242]: min
+                    - generic [ref=f11e243]:
+                      - generic [ref=f11e244]:
+                        - generic [ref=f11e248]: Prep Time
+                        - button "About Prep Time" [ref=f11e249]: "?"
+                      - generic [ref=f11e250]:
+                        - textbox "Prep Time About Prep Time min" [ref=f11e251]: "5"
+                        - generic [ref=f11e252]: min
+                    - generic [ref=f11e253]:
+                      - generic [ref=f11e254]:
+                        - generic [ref=f11e259]: Cook Time
+                        - button "About Cook Time" [ref=f11e260]: "?"
+                      - generic [ref=f11e261]:
+                        - textbox "Cook Time About Cook Time min" [ref=f11e262]: "40"
+                        - generic [ref=f11e263]: min
+                    - generic [ref=f11e264]:
+                      - generic [ref=f11e265]:
+                        - generic [ref=f11e269]: Inactive Time
+                        - button "About Inactive Time" [ref=f11e270]: "?"
+                      - generic [ref=f11e271]:
+                        - textbox "Inactive Time About Inactive Time min" [ref=f11e272]: "0"
+                        - generic [ref=f11e273]: min
+                    - generic [ref=f11e274]:
+                      - generic [ref=f11e275]:
+                        - generic [ref=f11e283]: Difficulty
+                        - button "About Difficulty" [ref=f11e284]: "?"
+                      - combobox "Difficulty About Difficulty" [ref=f11e286]:
+                        - option "Not set"
+                        - option "Easy" [selected]
+                        - option "Medium"
+                        - option "Hard"
+                        - option "Expert"
+                    - generic [ref=f11e287]:
+                      - generic [ref=f11e288]:
+                        - generic [ref=f11e293]: Scale
+                        - button "About Scale" [ref=f11e294]: "?"
+                      - combobox "Scale About Scale" [ref=f11e296]:
+                        - option "1x" [selected]
+                        - option "2x"
+                        - option "3x"
+                  - generic [ref=f11e297]:
+                    - generic [ref=f11e298]:
+                      - generic [ref=f11e299]: Description
+                      - textbox "Description 0 characters" [ref=f11e539]
+                      - generic: 0 characters
+                    - generic [ref=f11e301]:
+                      - generic [ref=f11e302]: Price (optional)
+                      - textbox "Price (optional)" [ref=f11e303]
+                  - group [ref=f11e304]:
+                    - generic "Technical Details" [ref=f11e305] [cursor=pointer]
+                - region [ref=f11e308]:
+                  - generic [ref=f11e309]:
+                    - generic [ref=f11e312]:
+                      - heading "Edit Recipe Categories" [level=3] [ref=f11e313]
+                      - paragraph [ref=f11e540]: Corn Spoon Bread
+                    - generic [ref=f11e314]:
+                      - button "Collapse recipe categories" [expanded] [ref=f11e315] [cursor=pointer]
+                      - button "Recipe category actions" [ref=f11e318] [cursor=pointer]
+                  - generic [ref=f11e320]:
+                    - generic [ref=f11e321]:
+                      - generic [ref=f11e322]: Meal Type
+                      - combobox "Meal Type" [ref=f11e323]:
+                        - option "Use inferred"
+                        - option "🍳 Breakfast"
+                        - option "🥪 Lunch"
+                        - option "🍽️ Dinner" [selected]
+                        - option "🥗 Side Dish"
+                        - option "🍰 Dessert"
+                        - option "🍹 Drink"
+                        - option "🥣 Soup"
+                        - option "🍱 Meal Prep"
+                        - option "🍿 Snack"
+                    - generic [ref=f11e324]:
+                      - generic [ref=f11e325]: Main Ingredient
+                      - combobox "Main Ingredient" [ref=f11e326]:
+                        - option "Use inferred"
+                        - option "🐔 Chicken"
+                        - option "🥩 Beef"
+                        - option "🐷 Pork"
+                        - option "🐟 Seafood"
+                        - option "🥚 Eggs"
+                        - option "🫘 Beans"
+                        - option "🥬 Vegetarian" [selected]
+                        - option "🌱 Vegan"
+                        - option "🍝 Pasta"
+                        - option "🍚 Rice / Grains"
+                        - option "🥔 Potatoes"
+                        - option "🧀 Cheese"
+                    - generic [ref=f11e327]:
+                      - generic [ref=f11e328]: Cooking Method
+                      - combobox "Cooking Method" [ref=f11e329]:
+                        - option "Use inferred"
+                        - option "🔥 Grilled"
+                        - option "🍳 Skillet"
+                        - option "🥘 One Pot"
+                        - option "🍲 Slow Cooker"
+                        - option "♨️ Oven Baked" [selected]
+                        - option "🥗 No Cook"
+                        - option "🧊 Make Ahead"
+                        - option "⚡ Quick Meal"
+                    - generic [ref=f11e330]:
+                      - generic [ref=f11e331]: Occasion
+                      - combobox "Occasion" [ref=f11e332]:
+                        - option "Use inferred"
+                        - option "❤️ Date Night"
+                        - option "👨‍👩‍👧 Family Dinner" [selected]
+                        - option "🎉 Party Food"
+                        - option "🏈 Game Day"
+                        - option "🎄 Holiday"
+                        - option "☀️ Summer"
+                        - option "❄️ Winter"
+                        - option "🧺 Potluck"
+                    - generic [ref=f11e333]:
+                      - generic [ref=f11e334]: Dietary Preference
+                      - combobox "Dietary Preference" [ref=f11e335]:
+                        - option "Use inferred"
+                        - option "🥩 High Protein"
+                        - option "🥗 Low Carb"
+                        - option "🌱 Vegan"
+                        - option "🌱 Vegetarian"
+                        - option "🌾 Gluten Free"
+                        - option "🥛 Dairy Free" [selected]
+                        - option "🧂 Low Sodium"
+                        - option "🔥 Spicy"
+                        - option "🍬 Low Sugar"
+                    - generic [ref=f11e336]:
+                      - generic [ref=f11e337]: Prep Time
+                      - combobox "Prep Time" [ref=f11e338]:
+                        - option "Use inferred"
+                        - option "⚡ Under 15 Minutes"
+                        - option "⏱️ 15–30 Minutes"
+                        - option "🕐 30–60 Minutes" [selected]
+                        - option "⏳ Over 1 Hour"
+                        - option "🧊 Make Ahead"
+                    - generic [ref=f11e339]:
+                      - generic [ref=f11e340]: Custom Categories
+                      - textbox "Custom Categories" [ref=f11e341]:
+                        - /placeholder: Sophia's Favorites, Weeknight Dinners
+                        - text: Comfort Food, Casserole, Vegetarian Side
+                - generic [ref=f11e342]:
+                  - tablist "Recipe editor sections" [ref=f11e343]:
+                    - tab "Ingredients" [selected] [ref=f11e344] [cursor=pointer]
+                    - tab "Instructions" [ref=f11e345] [cursor=pointer]
+                    - tab "Equipment" [ref=f11e346] [cursor=pointer]
+                    - tab "Nutrition" [ref=f11e347] [cursor=pointer]
+                    - tab "Notes" [ref=f11e348] [cursor=pointer]
+                  - generic [ref=f11e349]:
+                    - tabpanel "Ingredients" [ref=f11e350]:
+                      - generic [ref=f11e351]:
+                        - heading "Ingredients (10)" [level=3] [ref=f11e541]
+                        - generic [ref=f11e355]:
+                          - button "Add Ingredient" [ref=f11e356] [cursor=pointer]
+                          - button "Adjust ingredient columns" [ref=f11e361] [cursor=pointer]:
+                            - generic [ref=f11e369]: Columns
+                          - button "Ingredient actions" [ref=f11e374] [cursor=pointer]
+                      - tablist "Ingredient view" [ref=f11e376]:
+                        - tab "Recipe" [ref=f11e377] [cursor=pointer]
+                        - tab "Smart" [ref=f11e378] [cursor=pointer]
+                        - tab "Table" [selected] [ref=f11e379] [cursor=pointer]
+                      - tabpanel "Table" [ref=f11e380]:
+                        - table "Ingredients" [ref=f11e381]:
+                          - rowgroup [ref=f11e382]:
+                            - row [ref=f11e383]:
+                              - columnheader "Drag / Image" [ref=f11e384]
+                              - columnheader [ref=f11e387]:
+                                - button "Ingredient filter, sort" [ref=f11e389] [cursor=pointer]:
+                                  - generic [ref=f11e390]: Ingredient
+                              - columnheader [ref=f11e396]:
+                                - button "Status filter, sort" [ref=f11e398] [cursor=pointer]:
+                                  - generic [ref=f11e399]: Status
+                              - columnheader "Quantity" [ref=f11e405]
+                              - columnheader [ref=f11e408]:
+                                - button "Unit filter, sort" [ref=f11e410] [cursor=pointer]:
+                                  - generic [ref=f11e411]: Unit
+                              - columnheader "Size" [ref=f11e417]
+                              - columnheader [ref=f11e420]:
+                                - button "Store Section filter, sort, and group" [ref=f11e422] [cursor=pointer]:
+                                  - generic [ref=f11e423]: Store Section
+                              - columnheader [ref=f11e429]:
+                                - button "Type filter, sort" [ref=f11e431] [cursor=pointer]:
+                                  - generic [ref=f11e432]: Type
+                              - columnheader "Alternatives" [ref=f11e438]
+                              - columnheader "ACTIONS" [ref=f11e441]
+                          - rowgroup [ref=f11e543]:
+                            - row [ref=f11e544]:
+                              - button "Drag to reorder" [ref=f11e545]
+                              - cell [ref=f11e554]:
+                                - img "Ingredient image" [ref=f11e555]
+                              - 'cell "yellow cornmeal Buy as: yellow cornmeal" [ref=f11e556]':
+                                - combobox "Ingredient" [ref=f11e557]: yellow cornmeal
+                                - textbox "Preparation" [ref=f11e559]:
+                                  - /placeholder: Add preparation
+                                - generic [ref=f11e560]:
+                                  - generic [ref=f11e561]: "Buy as:"
+                                  - combobox "Buy As" [ref=f11e562]: yellow cornmeal
+                              - cell "Good match" [ref=f11e563]
+                              - cell [ref=f11e566]:
+                                - textbox "Quantity" [ref=f11e567]: 3/4
+                              - cell [ref=f11e568]:
+                                - combobox "Unit" [ref=f11e569]: cup
+                              - cell [ref=f11e570]:
+                                - textbox "Size" [ref=f11e571]
+                              - cell [ref=f11e572]:
+                                - 'combobox "Store Section: Misc. Click to edit." [ref=f11e573] [cursor=pointer]':
+                                  - generic [ref=f11e574]: Misc
+                              - 'cell "Type: Main" [ref=f11e586]':
+                                - combobox [ref=f11e587] [cursor=pointer]: Main
+                              - cell [ref=f11e588]:
+                                - button "Show 1 option for 3/4 cup yellow cornmeal" [ref=f11e589] [cursor=pointer]:
+                                  - generic [ref=f11e590]: None
+                              - cell [ref=f11e596]:
+                                - button "Edit ingredient" [ref=f11e597] [cursor=pointer]
+                                - button "More actions" [ref=f11e603] [cursor=pointer]
+                              - text: …
+                            - row [ref=f11e604]:
+                              - button "Drag to reorder" [ref=f11e605]
+                              - cell [ref=f11e614]:
+                                - img "Ingredient image" [ref=f11e615]
+                              - 'cell "all-purpose flour Buy as: all-purpose flour" [ref=f11e616]':
+                                - combobox "Ingredient" [ref=f11e617]: all-purpose flour
+                                - textbox "Preparation" [ref=f11e619]:
+                                  - /placeholder: Add preparation
+                                - generic [ref=f11e620]:
+                                  - generic [ref=f11e621]: "Buy as:"
+                                  - combobox "Buy As" [ref=f11e622]: all-purpose flour
+                              - cell "Good match" [ref=f11e623]
+                              - cell [ref=f11e626]:
+                                - textbox "Quantity" [ref=f11e627]: 3/4
+                              - cell [ref=f11e628]:
+                                - combobox "Unit" [ref=f11e629]: cup
+                              - cell [ref=f11e630]:
+                                - textbox "Size" [ref=f11e631]
+                              - cell [ref=f11e632]:
+                                - 'combobox "Store Section: Baking. Click to edit." [ref=f11e633] [cursor=pointer]':
+                                  - generic [ref=f11e634]: Baking
+                              - 'cell "Type: Main" [ref=f11e647]':
+                                - combobox [ref=f11e648] [cursor=pointer]: Main
+                              - cell [ref=f11e649]:
+                                - button "Show 1 option for 3/4 cup all-purpose flour" [ref=f11e650] [cursor=pointer]:
+                                  - generic [ref=f11e651]: None
+                              - cell [ref=f11e657]:
+                                - button "Edit ingredient" [ref=f11e658] [cursor=pointer]
+                                - button "More actions" [ref=f11e664] [cursor=pointer]
+                              - text: …
+                            - row [ref=f11e665]:
+                              - button "Drag to reorder" [ref=f11e666]
+                              - cell [ref=f11e675]:
+                                - img "Ingredient image" [ref=f11e676]
+                              - 'cell "sugar Buy as: sugar" [ref=f11e677]':
+                                - combobox "Ingredient" [ref=f11e678]: sugar
+                                - textbox "Preparation" [ref=f11e680]:
+                                  - /placeholder: Add preparation
+                                - generic [ref=f11e681]:
+                                  - generic [ref=f11e682]: "Buy as:"
+                                  - combobox "Buy As" [ref=f11e683]: sugar
+                              - cell "Good match" [ref=f11e684]
+                              - cell [ref=f11e687]:
+                                - textbox "Quantity" [ref=f11e688]: 1/2
+                              - cell [ref=f11e689]:
+                                - combobox "Unit" [ref=f11e690]: cup
+                              - cell [ref=f11e691]:
+                                - textbox "Size" [ref=f11e692]
+                              - cell [ref=f11e693]:
+                                - 'combobox "Store Section: Baking. Click to edit." [ref=f11e694] [cursor=pointer]':
+                                  - generic [ref=f11e695]: Baking
+                              - 'cell "Type: Main" [ref=f11e708]':
+                                - combobox [ref=f11e709] [cursor=pointer]: Main
+                              - cell [ref=f11e710]:
+                                - button "Show 1 option for 1/2 cup sugar" [ref=f11e711] [cursor=pointer]:
+                                  - generic [ref=f11e712]: None
+                              - cell [ref=f11e718]:
+                                - button "Edit ingredient" [ref=f11e719] [cursor=pointer]
+                                - button "More actions" [ref=f11e725] [cursor=pointer]
+                              - text: …
+                            - row [ref=f11e726]:
+                              - button "Drag to reorder" [ref=f11e727]
+                              - cell [ref=f11e736]:
+                                - img "Ingredient image" [ref=f11e737]
+                              - 'cell "baking powder Buy as: baking powder" [ref=f11e738]':
+                                - combobox "Ingredient" [ref=f11e739]: baking powder
+                                - textbox "Preparation" [ref=f11e741]:
+                                  - /placeholder: Add preparation
+                                - generic [ref=f11e742]:
+                                  - generic [ref=f11e743]: "Buy as:"
+                                  - combobox "Buy As" [ref=f11e744]: baking powder
+                              - cell "Good match" [ref=f11e745]
+                              - cell [ref=f11e748]:
+                                - textbox "Quantity" [ref=f11e749]: "2"
+                              - cell [ref=f11e750]:
+                                - combobox "Unit" [ref=f11e751]: teaspoon
+                              - cell [ref=f11e752]:
+                                - textbox "Size" [ref=f11e753]
+                              - cell [ref=f11e754]:
+                                - 'combobox "Store Section: Baking. Click to edit." [ref=f11e755] [cursor=pointer]':
+                                  - generic [ref=f11e756]: Baking
+                              - 'cell "Type: Main" [ref=f11e769]':
+                                - combobox [ref=f11e770] [cursor=pointer]: Main
+                              - cell [ref=f11e771]:
+                                - button "Show 1 option for 2 teaspoons baking powder" [ref=f11e772] [cursor=pointer]:
+                                  - generic [ref=f11e773]: None
+                              - cell [ref=f11e779]:
+                                - button "Edit ingredient" [ref=f11e780] [cursor=pointer]
+                                - button "More actions" [ref=f11e786] [cursor=pointer]
+                              - text: …
+                            - row [ref=f11e787]:
+                              - button "Drag to reorder" [ref=f11e788]
+                              - cell [ref=f11e797]:
+                                - img "Ingredient image" [ref=f11e798]
+                              - 'cell "kosher salt Buy as: kosher salt" [ref=f11e799]':
+                                - combobox "Ingredient" [ref=f11e800]: kosher salt
+                                - textbox "Preparation" [ref=f11e802]:
+                                  - /placeholder: Add preparation
+                                - generic [ref=f11e803]:
+                                  - generic [ref=f11e804]: "Buy as:"
+                                  - combobox "Buy As" [ref=f11e805]: kosher salt
+                              - cell "Pantry staple" [ref=f11e806]
+                              - cell [ref=f11e809]:
+                                - textbox "Quantity" [ref=f11e810]: 1/2
+                              - cell [ref=f11e811]:
+                                - combobox "Unit" [ref=f11e812]: teaspoon
+                              - cell [ref=f11e813]:
+                                - textbox "Size" [ref=f11e814]
+                              - cell [ref=f11e815]:
+                                - 'combobox "Store Section: Spices. Click to edit." [ref=f11e816] [cursor=pointer]':
+                                  - generic [ref=f11e817]: Spices
+                              - 'cell "Type: Main" [ref=f11e828]':
+                                - combobox [ref=f11e829] [cursor=pointer]: Main
+                              - cell [ref=f11e830]:
+                                - button "Show 1 option for 1/2 teaspoon kosher salt" [ref=f11e831] [cursor=pointer]:
+                                  - generic [ref=f11e832]: None
+                              - cell [ref=f11e838]:
+                                - button "Edit ingredient" [ref=f11e839] [cursor=pointer]
+                                - button "More actions" [ref=f11e845] [cursor=pointer]
+                              - text: …
+                            - row [ref=f11e846]:
+                              - button "Drag to reorder" [ref=f11e847]
+                              - cell [ref=f11e856]:
+                                - img "Ingredient image" [ref=f11e857]
+                              - 'cell "egg Buy as: large egg" [ref=f11e858]':
+                                - combobox "Ingredient" [ref=f11e859]: egg
+                                - textbox "Preparation" [ref=f11e861]:
+                                  - /placeholder: Add preparation
+                                - generic [ref=f11e862]:
+                                  - generic [ref=f11e863]: "Buy as:"
+                                  - combobox "Buy As" [ref=f11e864]: large egg
+                              - cell "Good match" [ref=f11e865]
+                              - cell [ref=f11e868]:
+                                - textbox "Quantity" [ref=f11e869]: "2"
+                              - cell [ref=f11e870]:
+                                - combobox "Unit" [ref=f11e871]
+                              - cell [ref=f11e872]:
+                                - textbox "Size" [ref=f11e873]
+                              - cell [ref=f11e874]:
+                                - 'combobox "Store Section: Dairy & Eggs. Click to edit." [ref=f11e875] [cursor=pointer]':
+                                  - generic [ref=f11e876]: Dairy & Eggs
+                              - 'cell "Type: Main" [ref=f11e887]':
+                                - combobox [ref=f11e888] [cursor=pointer]: Main
+                              - cell [ref=f11e889]:
+                                - button "Show 1 option for 2 eggs" [ref=f11e890] [cursor=pointer]:
+                                  - generic [ref=f11e891]: None
+                              - cell [ref=f11e897]:
+                                - button "Edit ingredient" [ref=f11e898] [cursor=pointer]
+                                - button "More actions" [ref=f11e904] [cursor=pointer]
+                              - text: …
+                            - row [ref=f11e905]:
+                              - button "Drag to reorder" [ref=f11e906]
+                              - cell [ref=f11e915]:
+                                - img "Ingredient image" [ref=f11e916]
+                              - 'cell "sour cream Buy as: sour cream" [ref=f11e917]':
+                                - combobox "Ingredient" [ref=f11e918]: sour cream
+                                - textbox "Preparation" [ref=f11e920]:
+                                  - /placeholder: Add preparation
+                                - generic [ref=f11e921]:
+                                  - generic [ref=f11e922]: "Buy as:"
+                                  - combobox "Buy As" [ref=f11e923]: sour cream
+                              - cell "Good match" [ref=f11e924]
+                              - cell [ref=f11e927]:
+                                - textbox "Quantity" [ref=f11e928]: 2/3
+                              - cell [ref=f11e929]:
+                                - combobox "Unit" [ref=f11e930]: cup
+                              - cell [ref=f11e931]:
+                                - textbox "Size" [ref=f11e932]
+                              - cell [ref=f11e933]:
+                                - 'combobox "Store Section: Dairy & Eggs. Click to edit." [ref=f11e934] [cursor=pointer]':
+                                  - generic [ref=f11e935]: Dairy & Eggs
+                              - 'cell "Type: Main" [ref=f11e946]':
+                                - combobox [ref=f11e947] [cursor=pointer]: Main
+                              - cell [ref=f11e948]:
+                                - button "Show 1 option for 2/3 cup sour cream" [ref=f11e949] [cursor=pointer]:
+                                  - generic [ref=f11e950]: None
+                              - cell [ref=f11e956]:
+                                - button "Edit ingredient" [ref=f11e957] [cursor=pointer]
+                                - button "More actions" [ref=f11e963] [cursor=pointer]
+                              - text: …
+                            - row [ref=f11e1402] [cursor=pointer]:
+                              - cell [ref=f11e1403]:
+                                - cell "Drag to reorder" [ref=f11e966]
+                                - cell
+                                - cell "ALTERNATIVE OPTION 1/2 cup butter (melted)" [ref=f11e1404]:
+                                  - generic [ref=f11e976]: ALTERNATIVE OPTION
+                                  - textbox "Ingredient choice wording" [ref=f11e978]: 1/2 cup butter (melted)
+                                - cell
+                                - cell
+                                - cell
+                                - cell
+                                - cell
+                                - cell
+                                - cell [ref=f11e1405]:
+                                  - 'button "Collapse 2 options for 1/2 cup butter (melted). Selected: Unsalted butter" [expanded] [ref=f11e1406]':
+                                    - generic [ref=f11e981]: 2 options
+                                - cell [ref=f11e987]:
+                                  - 'button "Edit ingredient group: 1/2 cup butter (melted)" [ref=f11e988]'
+                                  - button "More actions for ingredient choice" [ref=f11e994]
+                              - region "Ingredient choices" [ref=f11e1259]:
+                                - button "Add another option to this ingredient group" [ref=f11e1261]
+                                - generic [ref=f11e1266]:
+                                  - generic [ref=f11e1267]:
+                                    - heading "DEFAULT OPTION" [level=4] [ref=f11e1268]
+                                    - button "Use this ingredient option" [ref=f11e1407]:
+                                      - generic [ref=f11e1274]: Use this option
+                                    - button "Option actions" [ref=f11e1276]
+                                  - generic [ref=f11e1277]:
+                                    - row "Edit ingredient butter" [ref=f11e1278]:
+                                      - cell [ref=f11e1279]:
+                                        - button "Drag to reorder" [ref=f11e1280]
+                                      - cell [ref=f11e1289]:
+                                        - img "Ingredient image" [ref=f11e1290]
+                                      - cell [ref=f11e1291]:
+                                        - combobox "Ingredient" [ref=f11e1292]: butter
+                                        - textbox "Preparation" [ref=f11e1294]:
+                                          - /placeholder: Add preparation
+                                          - text: melted
+                                      - cell "Good match" [ref=f11e1295]
+                                      - cell [ref=f11e1298]:
+                                        - textbox "Quantity" [ref=f11e1299]: 1/2
+                                      - cell [ref=f11e1300]:
+                                        - combobox "Unit" [ref=f11e1301]: cup
+                                      - cell [ref=f11e1302]:
+                                        - textbox "Size" [ref=f11e1303]
+                                      - cell [ref=f11e1304]:
+                                        - 'combobox "Store Section: Dairy & Eggs. Click to edit." [ref=f11e1305]':
+                                          - generic [ref=f11e1409]: Dairy & Eggs
+                                      - 'cell "Type: Main" [ref=f11e1317]':
+                                        - combobox [ref=f11e1318]: Main
+                                      - cell [ref=f11e1319]:
+                                        - button "Edit ingredient" [ref=f11e1320]
+                                        - button "More actions" [ref=f11e1326]
+                                    - button "Add ingredient to this option" [ref=f11e1327]
+                                - 'region "Best Match: unsalted butter" [ref=f11e1416]':
+                                  - generic [ref=f11e1334]:
+                                    - heading "ALTERNATIVE OPTION" [level=4] [ref=f11e1335]
+                                    - button "Selected ingredient option" [disabled] [pressed] [ref=f11e1417]:
+                                      - generic [ref=f11e1337]: Selected
+                                    - button "Option actions" [ref=f11e1339]
+                                  - region "Ingredients in this option" [ref=f11e1340]:
+                                    - row [ref=f11e1342]:
+                                      - row "Edit replacement ingredient unsalted butter" [ref=f11e1343]:
+                                        - cell [ref=f11e1344]:
+                                          - button "Drag to reorder" [ref=f11e1345]
+                                        - cell [ref=f11e1354]:
+                                          - img "Ingredient image" [ref=f11e1355]
+                                        - 'cell "unsalted butter Buy as: unsalted butter" [ref=f11e1356]':
+                                          - combobox "Ingredient" [ref=f11e1357]: unsalted butter
+                                          - textbox "Preparation" [ref=f11e1359]:
+                                            - /placeholder: Add preparation
+                                          - generic [ref=f11e1360]:
+                                            - generic [ref=f11e1361]: "Buy as:"
+                                            - combobox "Buy As" [ref=f11e1362]: unsalted butter
+                                        - cell "Good match" [ref=f11e1363]
+                                        - cell [ref=f11e1366]:
+                                          - textbox "Quantity" [ref=f11e1367]
+                                        - cell [ref=f11e1368]:
+                                          - combobox "Unit" [ref=f11e1369]
+                                        - cell [ref=f11e1370]:
+                                          - textbox "Size" [ref=f11e1371]
+                                        - cell [ref=f11e1372]:
+                                          - 'combobox "Store Section: Dairy & Eggs. Click to edit." [ref=f11e1373]':
+                                            - generic [ref=f11e1423]: Dairy & Eggs
+                                        - 'cell "Type: Optional" [ref=f11e1385]':
+                                          - combobox [ref=f11e1386]: Optional
+                                        - cell [ref=f11e1387]:
+                                          - button "Edit ingredient" [ref=f11e1388]
+                                          - button "More actions" [ref=f11e1394]
+                                        - text: ·
+                                    - button "Add ingredient to this option" [ref=f11e1395]
+                              - text: …
+                            - row [ref=f11e1045]:
+                              - button "Drag to reorder" [ref=f11e1046]
+                              - cell [ref=f11e1055]:
+                                - img "Ingredient image" [ref=f11e1056]
+                              - 'cell "canned cream-style corn Buy as: canned cream-style corn" [ref=f11e1057]':
+                                - combobox "Ingredient" [ref=f11e1058]: canned cream-style corn
+                                - textbox "Preparation" [ref=f11e1060]:
+                                  - /placeholder: Add preparation
+                                - generic [ref=f11e1061]:
+                                  - generic [ref=f11e1062]: "Buy as:"
+                                  - combobox "Buy As" [ref=f11e1063]: canned cream-style corn
+                              - cell "Good match" [ref=f11e1064]
+                              - cell [ref=f11e1067]:
+                                - textbox "Quantity" [ref=f11e1068]: "14"
+                              - cell [ref=f11e1069]:
+                                - combobox "Unit" [ref=f11e1070]: ounce
+                              - cell [ref=f11e1071]:
+                                - textbox "Size" [ref=f11e1072]
+                              - cell [ref=f11e1073]:
+                                - 'combobox "Store Section: Canned Goods. Click to edit." [ref=f11e1074] [cursor=pointer]':
+                                  - generic [ref=f11e1075]: Canned Goods
+                              - 'cell "Type: Main" [ref=f11e1087]':
+                                - combobox [ref=f11e1088] [cursor=pointer]: Main
+                              - cell [ref=f11e1089]:
+                                - button "Show 1 option for 14 ounce canned cream-style corn" [ref=f11e1090] [cursor=pointer]:
+                                  - generic [ref=f11e1091]: None
+                              - cell [ref=f11e1097]:
+                                - button "Edit ingredient" [ref=f11e1098] [cursor=pointer]
+                                - button "More actions" [ref=f11e1104] [cursor=pointer]
+                              - text: …
+                            - row [ref=f11e1105]:
+                              - cell [ref=f11e1106]:
+                                - cell "Drag to reorder" [ref=f11e1107]
+                                - cell
+                                - cell "DEFAULT OPTION 1 cup fresh or frozen corn" [ref=f11e1116]:
+                                  - generic [ref=f11e1117]: DEFAULT OPTION
+                                  - textbox "Ingredient choice wording" [ref=f11e1119]: 1 cup fresh or frozen corn
+                                - cell
+                                - cell
+                                - cell
+                                - cell
+                                - cell
+                                - cell
+                                - cell [ref=f11e1120]:
+                                  - 'button "Show 2 options for 1 cup fresh or frozen corn. Selected: 1 cup Corn, Fresh + 1 cup Cumin, Chopped" [ref=f11e1121] [cursor=pointer]':
+                                    - generic [ref=f11e1122]: 2 options
+                                - cell [ref=f11e1128]:
+                                  - 'button "Edit ingredient group: 1 cup fresh or frozen corn" [ref=f11e1129] [cursor=pointer]'
+                                  - button "More actions for ingredient choice" [ref=f11e1135] [cursor=pointer]
+                              - text: …
+                              - rowgroup [ref=f11e1136]:
+                                - row "Edit ingredient corn" [ref=f11e1137]:
+                                  - cell [ref=f11e1138]:
+                                    - button "Drag to reorder" [ref=f11e1139]
+                                  - cell [ref=f11e1148]:
+                                    - img "Ingredient image" [ref=f11e1149]
+                                  - 'cell "corn fresh Buy as: corn" [ref=f11e1150]':
+                                    - combobox "Ingredient" [ref=f11e1151]: corn
+                                    - textbox "Preparation" [ref=f11e1153]:
+                                      - /placeholder: Add preparation
+                                      - text: fresh
+                                    - generic [ref=f11e1154]:
+                                      - generic [ref=f11e1155]: "Buy as:"
+                                      - combobox "Buy As" [ref=f11e1156]: corn
+                                  - cell "Good match" [ref=f11e1157]
+                                  - cell [ref=f11e1160]:
+                                    - textbox "Quantity" [ref=f11e1161]: "1"
+                                  - cell [ref=f11e1162]:
+                                    - combobox "Unit" [ref=f11e1163]: cup
+                                  - cell [ref=f11e1164]:
+                                    - textbox "Size" [ref=f11e1165]
+                                  - cell [ref=f11e1166]:
+                                    - 'combobox "Store Section: Produce. Click to edit." [ref=f11e1167] [cursor=pointer]':
+                                      - generic [ref=f11e1168]: Produce
+                                  - 'cell "Type: Main" [ref=f11e1179]':
+                                    - combobox [ref=f11e1180] [cursor=pointer]: Main
+                                  - cell [ref=f11e1181]:
+                                    - button "Edit ingredient" [ref=f11e1182] [cursor=pointer]
+                                    - button "More actions" [ref=f11e1188] [cursor=pointer]
+                                - row "Edit ingredient cumin" [ref=f11e1189]:
+                                  - cell [ref=f11e1190]:
+                                    - button "Drag to reorder" [ref=f11e1191]
+                                  - cell [ref=f11e1200]:
+                                    - img "Ingredient image" [ref=f11e1201]
+                                  - 'cell "cumin chopped Buy as: onion" [ref=f11e1202]':
+                                    - combobox "Ingredient" [ref=f11e1203]: cumin
+                                    - textbox "Preparation" [ref=f11e1205]:
+                                      - /placeholder: Add preparation
+                                      - text: chopped
+                                    - generic [ref=f11e1206]:
+                                      - generic [ref=f11e1207]: "Buy as:"
+                                      - combobox "Buy As" [ref=f11e1208]: onion
+                                  - cell "Pantry staple" [ref=f11e1209]
+                                  - cell [ref=f11e1212]:
+                                    - textbox "Quantity" [ref=f11e1213]: "1"
+                                  - cell [ref=f11e1214]:
+                                    - combobox "Unit" [ref=f11e1215]: cup
+                                  - cell [ref=f11e1216]:
+                                    - textbox "Size" [ref=f11e1217]
+                                  - cell [ref=f11e1218]:
+                                    - 'combobox "Store Section: Spices. Click to edit." [ref=f11e1219] [cursor=pointer]':
+                                      - generic [ref=f11e1220]: Spices
+                                  - 'cell "Type: Main" [ref=f11e1231]':
+                                    - combobox [ref=f11e1232] [cursor=pointer]: Main
+                                  - cell [ref=f11e1233]:
+                                    - button "Edit ingredient" [ref=f11e1234] [cursor=pointer]
+                                    - button "More actions" [ref=f11e1240] [cursor=pointer]
+                              - text: · · · ·
+                        - generic [ref=f11e443]:
+                          - button "Reorder" [ref=f11e444] [cursor=pointer]
+                          - button "Group" [ref=f11e450] [cursor=pointer]
+                      - text: ", , , , , , , , , , • • • • • • • • • •"
+                    - text: No image No image No image No reflection notes yet. Add one after cooking to remember what worked or what to change next time.
+              - complementary "Recipe context" [ref=f11e455]:
+                - region "Recipe Image" [ref=f11e456]:
+                  - generic [ref=f11e459]:
+                    - generic [ref=f11e460]:
+                      - img "Corn Spoon Bread" [ref=f11e1241]
+                      - button "Remove Corn Spoon Bread from favorites" [pressed] [ref=f11e1242] [cursor=pointer]
+                    - generic [ref=f11e463]:
+                      - button "Replace Image" [ref=f11e464] [cursor=pointer]
+                      - button "AI Generate" [ref=f11e471] [cursor=pointer]
+                      - button "Remove" [ref=f11e1245] [cursor=pointer]
+                - group [ref=f11e478]:
+                  - generic "Restaurant Source Edit" [ref=f11e479] [cursor=pointer]:
+                    - generic [ref=f11e480]: Restaurant Source
+                    - button "Edit" [ref=f11e481]
+                - region [ref=f11e482]:
+                  - generic [ref=f11e483]:
+                    - heading "AI Assistant" [level=3] [ref=f11e484]
+                    - paragraph [ref=f11e489]: Complete missing recipe details with the existing AI workflow.
+                  - generic [ref=f11e1250]:
+                    - generic [ref=f11e1251]: "Missing or incomplete:"
+                    - strong [ref=f11e1252]: Description
+                  - generic [ref=f11e490]:
+                    - button "Infer Missing Details" [ref=f11e491] [cursor=pointer]
+                    - button "Regenerate Recipe" [ref=f11e497] [cursor=pointer]
+                    - button "Regenerate Ingredients" [ref=f11e498] [cursor=pointer]
+                    - group [ref=f11e499]:
+                      - generic "More AI Actions" [ref=f11e500] [cursor=pointer]
+                - group [ref=f11e501]:
+                  - generic [ref=f11e502] [cursor=pointer]:
+                    - generic [ref=f11e503]:
+                      - text: Source & Documents
+                      - button "About Source and Documents" [ref=f11e504]
+                    - button "Edit" [ref=f11e508]
+                - group [ref=f11e509]:
+                  - generic "Ingredient Gallery" [ref=f11e510] [cursor=pointer]
+                - group [ref=f11e513]:
+                  - generic "Recipe Health 1 item need attention" [ref=f11e1253] [cursor=pointer]:
+                    - generic [ref=f11e515]: Recipe Health
+                    - generic [ref=f11e1254]: 1 item need attention
+                - region "AI Confidence" [ref=f11e517]:
+                  - generic [ref=f11e518]:
+                    - generic [ref=f11e519]: AI Confidence
+                    - strong [ref=f11e520]: Not available
+                  - generic [ref=f11e521]:
+                    - progressbar "AI confidence" [ref=f11e522]
+                    - paragraph [ref=f11e523]: Confidence is calculated from source quality, extraction reliability, AI certainty, and user verification.
+                    - button "AI Quality Report" [ref=f11e524] [cursor=pointer]
