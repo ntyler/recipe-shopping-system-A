@@ -46480,14 +46480,22 @@ function recipeIngredientExpansionSelectedOptionSummary(row, control = null) {
     const controlledSummary = control?.closest?.(
         "[data-ingredient-selected-option-line-item]",
     );
-    if (controlledSummary) {
+    if (
+        controlledSummary
+        && controlledSummary.recipeIngredientOptionSourceRow !== row
+    ) {
         return controlledSummary;
     }
     if (!recipeEditIngredientColumnView.groupByStoreSection) {
         return null;
     }
+    // The implicit-default summary duplicates the parent ingredient row. Mounting
+    // the panel under that copy swaps in a differently padded row when expanded,
+    // making the visible ingredient jump down. Keep parent defaults on the stable
+    // parent row and reserve projected anchors for actual alternative components.
     return recipeIngredientSelectedOptionSummaries(row).find(summary => (
-        !summary.classList.contains("is-ingredient-column-grouped-away")
+        summary.recipeIngredientOptionSourceRow !== row
+        && !summary.classList.contains("is-ingredient-column-grouped-away")
     )) || null;
 }
 
@@ -48618,7 +48626,6 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     );
     const hidesImplicitDefaultHeaderInStoreSectionView = Boolean(
         recipeEditIngredientColumnView.groupByStoreSection
-        && !isExpanded
         && selectedChoiceUsesParentIngredientRow
     );
     const showsSelectedChoiceGroup = Boolean(

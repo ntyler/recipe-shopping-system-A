@@ -65681,7 +65681,7 @@ body.recipe-edit-standalone-page
     body.recipe-edit-standalone-page #recipeEditIngredients
         > .recipe-edit-ingredient-row.recipe-edit-substitutions-open {
         display: grid !important;
-        grid-template-rows: auto auto !important;
+        grid-template-rows: minmax(52px, auto) auto !important;
     }
 }
 
@@ -68382,13 +68382,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         display: none !important;
     }
 
-    body.recipe-edit-standalone-page #recipeEditIngredients
-        > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
-        > .recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item:has(
-            > .is-ingredient-expansion-anchor
-        ) {
-        display: grid !important;
-    }
 }
 
 @media (max-width: 767px) {
@@ -69097,7 +69090,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice.recipe-edit-substitutions-open {
-    grid-template-rows: auto auto !important;
+    grid-template-rows: minmax(64px, auto) auto !important;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
@@ -69462,8 +69455,21 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     background: color-mix(in srgb, var(--app-primary-soft) 6%, var(--app-surface));
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor
+    > .is-ingredient-column-group-projection-row {
+    grid-row: 1;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor
+    > .recipe-edit-ingredient-options-panel {
+    grid-row: 2;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients

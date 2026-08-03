@@ -1060,7 +1060,7 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     assert (
         "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice."
         "recipe-edit-substitutions-open {\n"
-        "    grid-template-rows: auto auto !important;"
+        "    grid-template-rows: minmax(64px, auto) auto !important;"
     ) in grouped_css
     assert ".recipe-edit-selected-option-toggle" in grouped_css
     assert ".has-visible-ingredient-selected-option-toggle" in grouped_css
@@ -1101,7 +1101,7 @@ def test_store_section_grouping_keeps_an_implicit_default_on_its_parent_row():
     assert '"has-selected-implicit-default-choice"' in substitution_state
     assert "hidesImplicitDefaultHeaderInStoreSectionView" in substitution_state
     assert "recipeEditIngredientColumnView.groupByStoreSection" in substitution_state
-    assert "&& !isExpanded" in substitution_state
+    assert "&& !isExpanded" not in substitution_state
     assert "&& !hidesImplicitDefaultHeaderInStoreSectionView" in substitution_state
 
 
@@ -1122,6 +1122,8 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "function recipeIngredientExpansionSelectedOptionSummary" in expansion
     assert "recipeEditIngredientColumnView.groupByStoreSection" in expansion
     assert "recipeIngredientSelectedOptionSummaries(row).find" in expansion
+    assert "controlledSummary.recipeIngredientOptionSourceRow !== row" in expansion
+    assert "summary.recipeIngredientOptionSourceRow !== row" in expansion
     assert '"is-ingredient-column-grouped-away"' in expansion
     assert "recipeIngredientExpansionSelectedOptionSummary(" in expansion
     assert "recipeIngredientExpansionAnchorFromControl" in expansion
@@ -1152,21 +1154,6 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "margin-inline: -12px;" in attached_panel
     assert "background: color-mix(" in attached_panel
     assert ".is-ingredient-expansion-anchor" in attached_panel
-    expansion_projection = attached_panel[
-        attached_panel.index(
-            "> .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor {"
-        ):
-        attached_panel.index(
-            "body.recipe-edit-standalone-page #recipeEditIngredients\n"
-            "    .recipe-edit-selected-option-line-items",
-            attached_panel.index(
-                "> .recipe-edit-ingredient-column-group-projection.is-ingredient-expansion-anchor {"
-            ),
-        )
-    ]
-    assert "display: block;" in expansion_projection
-    assert "display: grid;" not in expansion_projection
-    assert "grid-template-columns:" not in expansion_projection
 
 
 def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_position():
@@ -5760,6 +5747,11 @@ def test_mobile_implicit_default_choice_projects_the_parent_ingredient_below_its
     grouped_expanded_default = desktop_only[desktop_only.index(
         "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice"
     ):]
-    assert "> .recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item:has(" in grouped_expanded_default
-    assert "> .is-ingredient-expansion-anchor" in grouped_expanded_default
-    assert "display: grid !important;" in grouped_expanded_default[:460]
+    assert "> .recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item:has(" not in grouped_expanded_default
+
+    expansion = script[
+        script.index("function recipeIngredientExpansionSelectedOptionSummary"):
+        script.index("function recipeIngredientExpansionSourceRow")
+    ]
+    assert "controlledSummary.recipeIngredientOptionSourceRow !== row" in expansion
+    assert "summary.recipeIngredientOptionSourceRow !== row" in expansion
