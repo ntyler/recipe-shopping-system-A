@@ -687,7 +687,9 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert 'data-recipe-ingredient-inline-field="ingredient"' in selected_line_items
     assert "bindRecipeIngredientInlineEditor(row, summary);" in selected_line_items
     assert "openRecipeIngredientOptionModal(editButton)" in selected_line_items
-    assert "lineItems.hidden = expanded || !hasRenderedRows;" in selected_line_items
+    assert "const expandedAtSelectedLineItem = Boolean(" in selected_line_items
+    assert "lineItems.hidden = (expanded && !expandedAtSelectedLineItem) || !hasRenderedRows;" in selected_line_items
+    assert "projectedRows.length > 0 || expandedAtSelectedLineItem" in selected_line_items
     assert "isDefaultOption: true" in selected_choice
     assert "isDefaultOption," in selected_choice
     assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state

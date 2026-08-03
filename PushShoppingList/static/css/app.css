@@ -68381,6 +68381,14 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         .recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item {
         display: none !important;
     }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
+        > .recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item:has(
+            > .is-ingredient-expansion-anchor
+        ) {
+        display: grid !important;
+    }
 }
 
 @media (max-width: 767px) {

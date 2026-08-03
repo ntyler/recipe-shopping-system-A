@@ -32429,13 +32429,21 @@ function syncRecipeIngredientSelectedOptionLineItems(
     const needsRebuild = currentRows.length !== renderedRows.length
         || currentRows.some((sourceRow, index) => sourceRow !== renderedRows[index]);
     if (needsRebuild) {
+        const expansionPanel = row.recipeIngredientSubstitutionPanel;
+        const preservesExpandedChoice = Boolean(
+            row.recipeIngredientExpansionAnchor
+            && lineItems.contains(row.recipeIngredientExpansionAnchor)
+            && expansionPanel
+            && !expansionPanel.hidden
+        );
         if (
             row.recipeIngredientExpansionAnchor
             && lineItems.contains(row.recipeIngredientExpansionAnchor)
         ) {
             resetRecipeIngredientExpansionMount(
                 row,
-                row.recipeIngredientSubstitutionPanel,
+                expansionPanel,
+                { hide: !preservesExpandedChoice },
             );
         }
         lineItems.replaceChildren(
@@ -32446,6 +32454,20 @@ function syncRecipeIngredientSelectedOptionLineItems(
             )),
         );
         lineItems.recipeIngredientOptionSourceRows = renderedRows;
+        if (preservesExpandedChoice) {
+            const nextSummary = lineItems.querySelector(
+                ":scope > [data-ingredient-selected-option-line-item]",
+            );
+            const nextToggle = nextSummary?.querySelector(
+                "[data-ingredient-selected-option-toggle]",
+            );
+            mountRecipeIngredientExpansion(
+                row,
+                expansionPanel,
+                nextToggle || nextSummary,
+            );
+            expansionPanel.hidden = false;
+        }
     } else {
         [...lineItems.children].forEach((summary, index) => {
             const sourceRow = renderedRows[index];
@@ -32467,10 +32489,14 @@ function syncRecipeIngredientSelectedOptionLineItems(
     }
 
     const hasRenderedRows = renderedRows.length > 0;
-    lineItems.hidden = expanded || !hasRenderedRows;
+    const expandedAtSelectedLineItem = Boolean(
+        row.recipeIngredientExpansionAnchor
+        && lineItems.contains(row.recipeIngredientExpansionAnchor)
+    );
+    lineItems.hidden = (expanded && !expandedAtSelectedLineItem) || !hasRenderedRows;
     row.classList.toggle(
         "has-selected-option-line-items",
-        projectedRows.length > 0,
+        projectedRows.length > 0 || expandedAtSelectedLineItem,
     );
 }
 
@@ -46450,9 +46476,25 @@ function ensureRecipeIngredientExpansionId(row, options = {}) {
     return row.dataset.ingredientExpansionId;
 }
 
-function recipeIngredientExpansionSourceRow(row, control = null) {
-    const selectedOptionSummary = control?.closest?.(
+function recipeIngredientExpansionSelectedOptionSummary(row, control = null) {
+    const controlledSummary = control?.closest?.(
         "[data-ingredient-selected-option-line-item]",
+    );
+    if (controlledSummary) {
+        return controlledSummary;
+    }
+    if (!recipeEditIngredientColumnView.groupByStoreSection) {
+        return null;
+    }
+    return recipeIngredientSelectedOptionSummaries(row).find(summary => (
+        !summary.classList.contains("is-ingredient-column-grouped-away")
+    )) || null;
+}
+
+function recipeIngredientExpansionSourceRow(row, control = null) {
+    const selectedOptionSummary = recipeIngredientExpansionSelectedOptionSummary(
+        row,
+        control,
     );
     return selectedOptionSummary?.recipeIngredientOptionSourceRow || row;
 }
@@ -46464,8 +46506,9 @@ function recipeIngredientExpansionIdForControl(row, control = null) {
 }
 
 function recipeIngredientExpansionAnchorFromControl(row, control = null) {
-    const selectedOptionSummary = control?.closest?.(
-        "[data-ingredient-selected-option-line-item]",
+    const selectedOptionSummary = recipeIngredientExpansionSelectedOptionSummary(
+        row,
+        control,
     );
     if (
         selectedOptionSummary

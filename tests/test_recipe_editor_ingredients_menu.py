@@ -1119,6 +1119,11 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "const recipeEditExpandedIngredientIds = new Set();" in script
     assert 'fieldValue("recipe_ingredient_id")' in expansion
     assert 'fieldValue("substitution_id")' in expansion
+    assert "function recipeIngredientExpansionSelectedOptionSummary" in expansion
+    assert "recipeEditIngredientColumnView.groupByStoreSection" in expansion
+    assert "recipeIngredientSelectedOptionSummaries(row).find" in expansion
+    assert '"is-ingredient-column-grouped-away"' in expansion
+    assert "recipeIngredientExpansionSelectedOptionSummary(" in expansion
     assert "recipeIngredientExpansionAnchorFromControl" in expansion
     assert "selectedOptionSummary.closest(" in expansion
     assert '"[data-recipe-ingredient-column-group-projection]"' in expansion
@@ -5716,8 +5721,13 @@ def test_mobile_implicit_default_choice_projects_the_parent_ingredient_below_its
     assert "selectedChoice?.isDefaultOption" in sync_line_items
     assert "const renderedRows = usesParentIngredientRow ? [row] : projectedRows;" in sync_line_items
     assert '"has-mobile-implicit-default-line-item"' in sync_line_items
-    assert "lineItems.hidden = expanded || !hasRenderedRows;" in sync_line_items
-    assert "projectedRows.length > 0" in sync_line_items
+    assert "const expandedAtSelectedLineItem = Boolean(" in sync_line_items
+    assert "lineItems.contains(row.recipeIngredientExpansionAnchor)" in sync_line_items
+    assert "lineItems.hidden = (expanded && !expandedAtSelectedLineItem) || !hasRenderedRows;" in sync_line_items
+    assert "projectedRows.length > 0 || expandedAtSelectedLineItem" in sync_line_items
+    assert "const preservesExpandedChoice = Boolean(" in sync_line_items
+    assert "mountRecipeIngredientExpansion(" in sync_line_items
+    assert "nextToggle || nextSummary" in sync_line_items
 
     desktop_only = css[css.index(
         ".recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item"
@@ -5726,3 +5736,9 @@ def test_mobile_implicit_default_choice_projects_the_parent_ingredient_below_its
         ".recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item"
     )]
     assert "display: none !important;" in desktop_only[:180]
+    grouped_expanded_default = desktop_only[desktop_only.index(
+        "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice"
+    ):]
+    assert "> .recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item:has(" in grouped_expanded_default
+    assert "> .is-ingredient-expansion-anchor" in grouped_expanded_default
+    assert "display: grid !important;" in grouped_expanded_default[:460]
