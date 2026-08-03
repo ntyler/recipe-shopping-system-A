@@ -48624,14 +48624,13 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         selectedChoice?.isDefaultOption
         && recipeIngredientSelectedOptionProjectionRows(row, selectedChoice).length === 0
     );
-    const hidesImplicitDefaultHeaderInStoreSectionView = Boolean(
+    const hidesSelectedChoiceHeaderInStoreSectionView = Boolean(
         recipeEditIngredientColumnView.groupByStoreSection
-        && selectedChoiceUsesParentIngredientRow
     );
     const showsSelectedChoiceGroup = Boolean(
         alternativeCount
         && hasSelectedChoice
-        && !hidesImplicitDefaultHeaderInStoreSectionView,
+        && !hidesSelectedChoiceHeaderInStoreSectionView,
     );
     const selectedChoiceGroupHeader = showsSelectedChoiceGroup
         ? ensureRecipeIngredientSelectedChoiceGroupHeader(row)

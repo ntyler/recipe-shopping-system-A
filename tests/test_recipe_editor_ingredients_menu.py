@@ -1019,44 +1019,17 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
         "/* Ingredient editor v68: Store Section groups expose choices on each component row. */"
     ):]
     assert ".is-ingredient-store-section-grouped-choice" in grouped_css
-    assert "> .recipe-edit-selected-choice-group-header" in grouped_css
-    collapsed_header_selector = (
-        "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice:not(\n"
-        "        .recipe-edit-substitutions-open\n"
-        "    )\n"
-        "    > .recipe-edit-selected-choice-group-header {"
-    )
-    assert collapsed_header_selector in grouped_css
-    collapsed_header = grouped_css[
-        grouped_css.index(collapsed_header_selector):
-    ]
-    assert "display: none !important;" in collapsed_header[:240]
-
-    collapsed_choice_badge_selector = (
-        "> .recipe-edit-ingredient-row.has-selected-choice-group-header."
-        "is-ingredient-store-section-grouped-choice:not(\n"
-        "        .recipe-edit-substitutions-open\n"
-        "    )\n"
-        "    > .recipe-edit-selected-option-line-items\n"
-        "    .recipe-edit-ingredient-source-text.is-selected-choice:not([hidden]) {"
-    )
-    assert collapsed_choice_badge_selector in grouped_css
-    collapsed_choice_badge = grouped_css[
-        grouped_css.index(collapsed_choice_badge_selector):
-    ]
-    assert "display: inline-flex !important;" in collapsed_choice_badge[:420]
-
-    expanded_header_selector = (
+    grouped_selected_row_selector = (
         "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice."
-        "recipe-edit-substitutions-open\n"
-        "    > .recipe-edit-selected-choice-group-header:not([hidden]) {"
+        "has-selected-option-line-items\n"
+        "    > [data-ingredient-column] {"
     )
-    assert expanded_header_selector in grouped_css
-    expanded_header = grouped_css[
-        grouped_css.index(expanded_header_selector):
+    assert grouped_selected_row_selector in grouped_css
+    grouped_selected_row = grouped_css[
+        grouped_css.index(grouped_selected_row_selector):
     ]
-    assert "display: grid !important;" in expanded_header[:260]
-    assert "grid-row: 1 !important;" in expanded_header[:260]
+    assert "display: none !important;" in grouped_selected_row[:240]
+    assert "> .recipe-edit-selected-choice-group-header:not([hidden])" not in grouped_css
     assert (
         "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice."
         "recipe-edit-substitutions-open {\n"
@@ -1081,7 +1054,7 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     assert 'const action = optionsButtonExpanded ? "Collapse" : "Show";' in substitution_state
 
 
-def test_store_section_grouping_keeps_an_implicit_default_on_its_parent_row():
+def test_store_section_grouping_uses_normal_rows_without_a_choice_header():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     grouped_view = script[
         script.index("function prepareRecipeIngredientColumnViewDisplayRows"):
@@ -1099,10 +1072,10 @@ def test_store_section_grouping_keeps_an_implicit_default_on_its_parent_row():
     assert "selectedChoice?.isDefaultOption" in substitution_state
     assert "recipeIngredientSelectedOptionProjectionRows(row, selectedChoice).length === 0" in substitution_state
     assert '"has-selected-implicit-default-choice"' in substitution_state
-    assert "hidesImplicitDefaultHeaderInStoreSectionView" in substitution_state
+    assert "hidesSelectedChoiceHeaderInStoreSectionView" in substitution_state
     assert "recipeEditIngredientColumnView.groupByStoreSection" in substitution_state
-    assert "&& !isExpanded" not in substitution_state
-    assert "&& !hidesImplicitDefaultHeaderInStoreSectionView" in substitution_state
+    assert "hidesImplicitDefaultHeaderInStoreSectionView" not in substitution_state
+    assert "&& !hidesSelectedChoiceHeaderInStoreSectionView" in substitution_state
 
 
 def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
