@@ -167,8 +167,10 @@ def test_recipe_view_phone_rows_consolidate_metadata_and_preparation():
     assert "data-recipe-view-metadata" in create
     assert "showSeparatePreparation" in render
     assert 'metadata.querySelector(":scope > :not([hidden])")' in render
-    assert "grid-template-columns: 60px minmax(0, 1fr) 34px;" in mobile_css
+    assert "grid-template-columns: 82px minmax(0, 1fr) 34px;" in mobile_css
+    assert "white-space: normal;" in mobile_css
     assert ".recipe-edit-ingredient-recipe-item.has-choices" in mobile_css
+    assert ".recipe-edit-ingredient-recipe-secondary:not([hidden])" in mobile_css
     assert ".recipe-edit-ingredient-recipe-metadata:not([hidden])" in mobile_css
     assert "grid-column: 2 / -1;" in mobile_css
     assert 'content: "\\00b7  ";' in mobile_css
