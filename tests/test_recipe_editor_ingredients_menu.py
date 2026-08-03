@@ -5500,15 +5500,39 @@ def test_mobile_saved_multi_ingredient_choice_rows_do_not_share_grid_cells_or_hi
     assert "grid-auto-rows: auto;" in mobile_choice_css
     assert "> .recipe-edit-ingredient-substitution-cell::before" in mobile_choice_css
     assert "content: none !important;" in mobile_choice_css
-    assert "grid-template-columns: 48px minmax(0, 1fr) 76px !important;" in mobile_choice_css
+    assert "grid-template-columns: 40px minmax(0, 1fr) 96px !important;" in mobile_choice_css
+    assert "gap: 5px 6px !important;" in mobile_choice_css
+    assert "width: calc(100% + 20px);" in mobile_choice_css
+    assert "max-width: none !important;" in mobile_choice_css
+    assert "margin-inline: -10px;" in mobile_choice_css
     image_rule = mobile_choice_css[
         mobile_choice_css.index("> .recipe-edit-alternative-component-image-cell {"):
         mobile_choice_css.index("> .recipe-edit-alternative-component-status {")
     ]
     assert "display: flex !important;" in image_rule
     assert "grid-column: 1 !important;" in image_rule
+    assert "width: 40px !important;" in image_rule
+    assert "height: 40px !important;" in image_rule
+    actions_rule = mobile_choice_css[
+        mobile_choice_css.index("> .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions {"):
+        mobile_choice_css.rindex("> :is(")
+    ]
+    assert "width: 96px !important;" in actions_rule
     hidden_cells = mobile_choice_css[mobile_choice_css.rindex("> :is("):]
     assert ".recipe-edit-alternative-component-image-cell" not in hidden_cells
+
+
+def test_mobile_collapsed_choice_header_does_not_leave_an_orphaned_divider():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    collapsed_choice_css = css[css.index("/* Ingredient editor v89:"):]
+
+    assert "@media (max-width: 767px)" in collapsed_choice_css
+    assert "> .recipe-edit-ingredient-row.has-selected-choice-group-header:has(" in collapsed_choice_css
+    assert "> .recipe-edit-selected-option-line-items[hidden]" in collapsed_choice_css
+    assert "> .recipe-edit-ingredient-mobile-header" in collapsed_choice_css
+    assert "> .recipe-edit-selected-choice-group-header" in collapsed_choice_css
+    assert "border-bottom: 0;" in collapsed_choice_css
 
 
 def test_mobile_implicit_default_choice_projects_the_parent_ingredient_below_its_header():
