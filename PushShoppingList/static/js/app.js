@@ -31202,9 +31202,6 @@ function createRecipeIngredientReadCell(className = "", options = {}) {
         <span class="recipe-edit-ingredient-source-text"
               data-ingredient-source-text
               hidden>
-            <span class="recipe-edit-ingredient-source-status-icon" aria-hidden="true">
-                ${recipeEditSvgIcon("check")}
-            </span>
             <span class="recipe-edit-ingredient-source-label"
                   data-ingredient-source-label></span>
         </span>
@@ -48939,7 +48936,9 @@ function updateRecipeIngredientSummary(row) {
     }
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
     if (sourceText) {
-        const compactChoiceState = selectedChoiceLabel || sourceWording;
+        const compactChoiceState = selectedChoiceLabel
+            ? (selectedChoice?.isDefaultOption ? "Default selected" : "Alternative selected")
+            : sourceWording;
         sourceText.classList.toggle("is-selected-choice", Boolean(selectedChoiceLabel));
         if (sourceTextLabel) sourceTextLabel.textContent = compactChoiceState;
         sourceText.hidden = !compactChoiceState || values.substitutions.length === 0;

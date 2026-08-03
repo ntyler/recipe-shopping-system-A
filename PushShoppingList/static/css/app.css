@@ -65563,13 +65563,9 @@ body.is-resizing-store-section-master-column * {
 
 /* Ingredient editor v44: inline, atomic ingredient options. */
 body.recipe-edit-standalone-page .recipe-edit-ingredient-source-text {
-    box-sizing: border-box;
-    display: flex;
+    display: block;
     min-width: 0;
     max-width: 100%;
-    align-items: center;
-    gap: 5px;
-    padding-inline-start: 7px;
     overflow: hidden;
     color: var(--app-muted);
     font-size: 10px;
@@ -65582,29 +65578,25 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-source-text[hidden] {
     display: none;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-ingredient-source-status-icon {
-    display: none;
+body.recipe-edit-standalone-page .recipe-edit-ingredient-source-text.is-selected-choice:not([hidden]) {
     box-sizing: border-box;
-    flex: 0 0 13px;
-    width: 13px;
-    height: 13px;
+    display: inline-flex;
+    width: max-content;
+    min-height: 16px;
+    max-width: 100%;
     align-items: center;
-    justify-content: center;
-    border: 1px solid color-mix(in srgb, var(--app-primary-hover) 62%, var(--app-border));
-    border-radius: 3px;
+    justify-self: start;
+    margin-top: 2px;
+    padding: 1px 5px;
+    border: 1px solid color-mix(in srgb, var(--app-primary-hover) 54%, var(--app-border));
+    border-radius: 4px;
     background: color-mix(in srgb, var(--app-primary-soft) 74%, var(--app-surface));
     color: var(--app-primary-hover);
-}
-
-body.recipe-edit-standalone-page
-    .recipe-edit-ingredient-source-text.is-selected-choice
-    > .recipe-edit-ingredient-source-status-icon {
-    display: inline-flex;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-ingredient-source-status-icon :is(.recipe-edit-inline-icon, svg) {
-    width: 9px;
-    height: 9px;
+    font-size: 8px;
+    font-weight: 750;
+    letter-spacing: .04em;
+    line-height: 1.2;
+    text-transform: uppercase;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-source-label {
@@ -65612,6 +65604,13 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-source-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-source-text.is-selected-choice:not([hidden]) {
+        max-width: calc(100% - 7px);
+        margin-left: 7px;
+    }
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button {
