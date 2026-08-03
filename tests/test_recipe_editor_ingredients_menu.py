@@ -2631,6 +2631,10 @@ def test_recipe_editor_ingredient_modal_v14_matches_workspace_reference_without_
         rule = mobile[mobile.index(selector):]
         rule = rule[:rule.index("}")]
         assert placement in rule
+    mobile_delete = mobile[mobile.index(".recipe-edit-ingredient-modal-delete {"):]
+    mobile_delete = mobile_delete[:mobile_delete.index("}")]
+    assert "height: 30px;" in mobile_delete
+    assert "min-height: 30px !important;" in mobile_delete
     mobile_delete_label = mobile[
         mobile.index(".recipe-edit-ingredient-modal-delete-label-mobile {"):
     ]
@@ -4872,6 +4876,13 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert 'window.matchMedia("(max-width: 767px)").matches' in script
     assert 'document.body.classList.contains("screen-preview-mobile-frame")' in script
     assert script.count("setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());") == 2
+    mobile_header_setup = script[
+        script.index("function initializeRecipeIngredientMobileHeaderLayout"):
+        script.index("function collapseOtherRecipeIngredientRows")
+    ]
+    assert "const syncHeaders = event => {" in mobile_header_setup
+    assert "const shouldCollapse = recipeIngredientsShouldStartCollapsed();" in mobile_header_setup
+    assert "setRecipeIngredientsCollapsed(shouldCollapse);" in mobile_header_setup
 
     mobile_start = css.index("/* Ingredient editor v24: real mobile folding for the current card-based layout. */")
     mobile_css = css[mobile_start:]
@@ -5102,7 +5113,10 @@ def test_wide_desktop_ingredient_overview_uses_one_page_compact_grid():
 def test_desktop_ingredient_modal_has_a_full_workspace_fit_mode():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
-    compact = css[css.index("/* Ingredient editor v85:"):]
+    compact = css[
+        css.index("/* Ingredient editor v85:"):
+        css.index("/* Ingredient modal options v86:")
+    ]
     assert "@media (min-width: 1280px) and (min-height: 760px)" in compact
     assert "grid-template-rows: 62px minmax(0, 1fr) 62px;" in compact
     assert "grid-template-columns: 230px minmax(0, 1fr);" in compact
@@ -5473,3 +5487,56 @@ def test_edit_ingredient_modal_options_open_for_navigation_edits_and_errors():
         next_function = script.find("\nfunction ", start + 10)
         function_source = script[start:next_function if next_function >= 0 else None]
         assert "ensureRecipeIngredientModalOptionsExpanded(" in function_source
+
+
+def test_mobile_saved_multi_ingredient_choice_rows_do_not_share_grid_cells_or_hide_images():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    mobile_choice_css = css[css.index("/* Ingredient editor v88:"):]
+
+    assert "@media (max-width: 767px)" in mobile_choice_css
+    assert ".recipe-edit-selected-option-line-item.recipe-edit-ingredient-table-grid" in mobile_choice_css
+    assert "display: grid !important;" in mobile_choice_css
+    assert "grid-auto-rows: auto;" in mobile_choice_css
+    assert "> .recipe-edit-ingredient-substitution-cell::before" in mobile_choice_css
+    assert "content: none !important;" in mobile_choice_css
+    assert "grid-template-columns: 48px minmax(0, 1fr) 76px !important;" in mobile_choice_css
+    image_rule = mobile_choice_css[
+        mobile_choice_css.index("> .recipe-edit-alternative-component-image-cell {"):
+        mobile_choice_css.index("> .recipe-edit-alternative-component-status {")
+    ]
+    assert "display: flex !important;" in image_rule
+    assert "grid-column: 1 !important;" in image_rule
+    hidden_cells = mobile_choice_css[mobile_choice_css.rindex("> :is("):]
+    assert ".recipe-edit-alternative-component-image-cell" not in hidden_cells
+
+
+def test_mobile_implicit_default_choice_projects_the_parent_ingredient_below_its_header():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    create_line_item = script[
+        script.index("function createRecipeIngredientSelectedOptionLineItem"):
+        script.index("function resizeRecipeIngredientChoiceTitleInput")
+    ]
+    sync_line_items = script[
+        script.index("function syncRecipeIngredientSelectedOptionLineItems"):
+        script.index("function organizeRecipeEditSubstitutionOptionRow")
+    ]
+
+    assert "const usesParentIngredientRow = sourceRow === row;" in create_line_item
+    assert '"is-implicit-default-option-line-item"' in create_line_item
+    assert "openRecipeIngredientDefaultOptionModal(editButton)" in create_line_item
+    assert "selectedChoice?.isDefaultOption" in sync_line_items
+    assert "const renderedRows = usesParentIngredientRow ? [row] : projectedRows;" in sync_line_items
+    assert '"has-mobile-implicit-default-line-item"' in sync_line_items
+    assert "lineItems.hidden = expanded || !hasRenderedRows;" in sync_line_items
+    assert "projectedRows.length > 0" in sync_line_items
+
+    desktop_only = css[css.index(
+        ".recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item"
+    ):]
+    assert "@media (min-width: 768px)" in css[:css.index(
+        ".recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item"
+    )]
+    assert "display: none !important;" in desktop_only[:180]

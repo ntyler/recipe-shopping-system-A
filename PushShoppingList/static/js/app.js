@@ -31767,8 +31767,13 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
 }
 
 function createRecipeIngredientSelectedOptionLineItem(row, sourceRow) {
+    const usesParentIngredientRow = sourceRow === row;
     const summary = createRecipeIngredientOptionRowSummary(
         "recipe-edit-selected-option-line-item",
+    );
+    summary.classList.toggle(
+        "is-implicit-default-option-line-item",
+        usesParentIngredientRow,
     );
     summary.dataset.ingredientSelectedOptionLineItem = "";
     summary.recipeIngredientOptionSourceRow = sourceRow;
@@ -31794,9 +31799,12 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow) {
     if (actions) {
         actions.classList.add("recipe-edit-compact-row-actions");
         const editButton = createRecipeIngredientEditActionButton();
-        editButton.addEventListener("click", () => (
-            openRecipeIngredientOptionModal(editButton)
-        ));
+        editButton.addEventListener("click", () => {
+            if (usesParentIngredientRow) {
+                return openRecipeIngredientDefaultOptionModal(editButton);
+            }
+            return openRecipeIngredientOptionModal(editButton);
+        });
         actions.appendChild(editButton);
 
         const sourceMenuWrap = sourceRow.querySelector(
@@ -32135,10 +32143,15 @@ function syncRecipeIngredientSelectedOptionLineItems(
         row,
         selectedChoice,
     );
+    const usesParentIngredientRow = Boolean(
+        selectedChoice?.isDefaultOption
+        && projectedRows.length === 0
+    );
+    const renderedRows = usesParentIngredientRow ? [row] : projectedRows;
     let lineItems = row.querySelector(
         ":scope > [data-ingredient-selected-option-line-items]",
     );
-    if (!lineItems && projectedRows.length) {
+    if (!lineItems && renderedRows.length) {
         lineItems = document.createElement("div");
         lineItems.className = "recipe-edit-selected-option-line-items";
         lineItems.dataset.ingredientSelectedOptionLineItems = "";
@@ -32152,12 +32165,16 @@ function syncRecipeIngredientSelectedOptionLineItems(
         row.classList.remove("has-selected-option-line-items");
         return;
     }
+    lineItems.classList.toggle(
+        "has-mobile-implicit-default-line-item",
+        usesParentIngredientRow,
+    );
 
     const currentRows = Array.isArray(lineItems.recipeIngredientOptionSourceRows)
         ? lineItems.recipeIngredientOptionSourceRows
         : [];
-    const needsRebuild = currentRows.length !== projectedRows.length
-        || currentRows.some((sourceRow, index) => sourceRow !== projectedRows[index]);
+    const needsRebuild = currentRows.length !== renderedRows.length
+        || currentRows.some((sourceRow, index) => sourceRow !== renderedRows[index]);
     if (needsRebuild) {
         if (
             row.recipeIngredientExpansionAnchor
@@ -32169,14 +32186,14 @@ function syncRecipeIngredientSelectedOptionLineItems(
             );
         }
         lineItems.replaceChildren(
-            ...projectedRows.map(sourceRow => (
+            ...renderedRows.map(sourceRow => (
                 createRecipeIngredientSelectedOptionLineItem(row, sourceRow)
             )),
         );
-        lineItems.recipeIngredientOptionSourceRows = projectedRows;
+        lineItems.recipeIngredientOptionSourceRows = renderedRows;
     } else {
         [...lineItems.children].forEach((summary, index) => {
-            const sourceRow = projectedRows[index];
+            const sourceRow = renderedRows[index];
             if (!sourceRow) return;
             updateRecipeIngredientOptionRowSummary(
                 summary,
@@ -32192,11 +32209,11 @@ function syncRecipeIngredientSelectedOptionLineItems(
         });
     }
 
-    const hasProjectedRows = projectedRows.length > 0;
-    lineItems.hidden = expanded || !hasProjectedRows;
+    const hasRenderedRows = renderedRows.length > 0;
+    lineItems.hidden = expanded || !hasRenderedRows;
     row.classList.toggle(
         "has-selected-option-line-items",
-        hasProjectedRows,
+        projectedRows.length > 0,
     );
 }
 
@@ -49928,7 +49945,13 @@ function initializeRecipeIngredientMobileHeaderLayout() {
     }
 
     recipeIngredientMobileHeaderMediaQuery = window.matchMedia("(max-width: 767px)");
-    const syncHeaders = () => recipeEditIngredientRows().forEach(syncRecipeIngredientMobileHeader);
+    const syncHeaders = event => {
+        recipeEditIngredientRows().forEach(syncRecipeIngredientMobileHeader);
+        if (event && typeof event.matches === "boolean") {
+            const shouldCollapse = recipeIngredientsShouldStartCollapsed();
+            setRecipeIngredientsCollapsed(shouldCollapse);
+        }
+    };
     if (typeof recipeIngredientMobileHeaderMediaQuery.addEventListener === "function") {
         recipeIngredientMobileHeaderMediaQuery.addEventListener("change", syncHeaders);
     } else if (typeof recipeIngredientMobileHeaderMediaQuery.addListener === "function") {
