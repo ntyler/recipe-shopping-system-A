@@ -27150,10 +27150,10 @@ function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
     clearRecipeIngredientColumnViewGroupedAwayLineItems(list);
     rows.forEach(row => {
         row.classList.remove("is-ingredient-store-section-grouped-choice");
-        // Grouping changes whether an implicit original/default choice needs a
-        // separate shared header. Refresh the row after clearing the previous
-        // grouping state so its controls return to the parent ingredient row.
-        if (row.classList.contains("has-selected-implicit-default-choice")) {
+        // Grouping changes how every selected choice is presented. Refresh each
+        // choice row before projections are built so the first grouping toggle
+        // cannot retain a stale ungrouped default/alternative summary header.
+        if (row.classList.contains("has-ingredient-choice")) {
             updateRecipeIngredientSubstitutionState(row);
         }
     });

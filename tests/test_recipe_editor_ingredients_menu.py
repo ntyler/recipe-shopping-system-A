@@ -1066,7 +1066,8 @@ def test_store_section_grouping_uses_normal_rows_without_a_choice_header():
     ]
 
     assert 'row.classList.remove("is-ingredient-store-section-grouped-choice");' in grouped_view
-    assert 'row.classList.contains("has-selected-implicit-default-choice")' in grouped_view
+    assert 'row.classList.contains("has-ingredient-choice")' in grouped_view
+    assert 'row.classList.contains("has-selected-implicit-default-choice")' not in grouped_view
     assert "updateRecipeIngredientSubstitutionState(row);" in grouped_view
     assert "selectedChoiceUsesParentIngredientRow" in substitution_state
     assert "selectedChoice?.isDefaultOption" in substitution_state
