@@ -31926,11 +31926,16 @@ function bindRecipeIngredientChoiceTitleEditor(row, input) {
     }
     input.dataset.ingredientChoiceTitleBound = "true";
     input.addEventListener("focus", () => {
-        input.dataset.ingredientChoiceTitleStartValue = input.value;
+        const sourceTitle = input.dataset.ingredientChoiceSourceTitle ?? input.value;
+        input.dataset.ingredientChoiceTitleStartValue = sourceTitle;
+        input.value = sourceTitle;
+        input.title = sourceTitle;
+        resizeRecipeIngredientChoiceTitleInput(input);
     });
     input.addEventListener("input", () => {
         const sourceField = recipeIngredientDirectField(row, "source_text");
         if (sourceField) sourceField.value = input.value;
+        input.dataset.ingredientChoiceSourceTitle = input.value;
         input.title = input.value;
         resizeRecipeIngredientChoiceTitleInput(input);
         updateRecipeEditorDirtyState();
@@ -31946,6 +31951,7 @@ function bindRecipeIngredientChoiceTitleEditor(row, input) {
             const startValue = input.dataset.ingredientChoiceTitleStartValue ?? input.value;
             const sourceField = recipeIngredientDirectField(row, "source_text");
             input.value = startValue;
+            input.dataset.ingredientChoiceSourceTitle = startValue;
             if (sourceField) sourceField.value = startValue;
             input.blur();
         }
@@ -31954,6 +31960,7 @@ function bindRecipeIngredientChoiceTitleEditor(row, input) {
         const sourceField = recipeIngredientDirectField(row, "source_text");
         const nextValue = input.value.trim();
         input.value = nextValue;
+        input.dataset.ingredientChoiceSourceTitle = nextValue;
         input.title = nextValue;
         if (sourceField) sourceField.value = nextValue;
         delete input.dataset.ingredientChoiceTitleStartValue;
@@ -47903,7 +47910,7 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
             values: [originalValues],
             summary: recipeIngredientOptionItemDisplay(originalValues),
             ingredientSummary,
-            selectionLabel: "Default selected",
+            selectionLabel: "Default option selected",
             isDefaultOption: true,
         };
     }
@@ -47934,8 +47941,8 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
                 .join(" + "),
             ingredientSummary,
             selectionLabel: isDefaultOption
-                ? "Default selected"
-                : "Alternative selected",
+                ? "Default option selected"
+                : "Alternative option selected",
             isDefaultOption,
         };
     }
@@ -48390,19 +48397,19 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         const groupTitle = selectedChoiceGroupHeader.querySelector(
             "[data-ingredient-selected-choice-group-title]",
         );
-        const selectedChoiceKind = selectedLabel.toLowerCase().startsWith("default")
-            ? "Default"
-            : "Alternative";
         selectedChoiceGroupHeader.hidden = !showsSelectedChoiceGroup;
         if (groupLabel) {
-            groupLabel.textContent = `${selectedChoiceKind} INGREDIENT CHOICE`;
+            groupLabel.textContent = "INGREDIENT CHOICE";
         }
         if (groupTitle) {
             if (document.activeElement !== groupTitle) {
-                groupTitle.value = choiceTitle;
+                groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;
+                groupTitle.value = selectedLabel;
                 resizeRecipeIngredientChoiceTitleInput(groupTitle);
             }
-            groupTitle.title = choiceTitle;
+            groupTitle.title = selectedDetails
+                ? `${selectedLabel}: ${selectedDetails}`
+                : selectedLabel;
         }
         const groupEditButton = selectedChoiceGroupHeader.querySelector(
             "[data-ingredient-choice-title-edit]",

@@ -660,8 +660,8 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "defaultOptionId && group.alternativeId === defaultOptionId" in selected_choice
     assert "recipeIngredientOptionItemDisplay(value)" in selected_choice
     assert '.join(" + ");' in selected_choice
-    assert 'selectionLabel: "Default selected"' in selected_choice
-    assert '"Alternative selected"' in selected_choice
+    assert 'selectionLabel: "Default option selected"' in selected_choice
+    assert '"Alternative option selected"' in selected_choice
     assert "recipeIngredientProjectedOptionSourceRow(control)" in inline_source
     assert "fallbackRow?.recipeIngredientInlineSummarySourceRow" in inline_source
     assert "row.recipeIngredientInlineSummarySourceRow = selectedSourceRow;" in summary
@@ -692,8 +692,9 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "isDefaultOption," in selected_choice
     assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state
     assert "function ensureRecipeIngredientSelectedChoiceGroupHeader" in script
-    assert '`${selectedChoiceKind} INGREDIENT CHOICE`' in substitution_state
-    assert "groupTitle.value = choiceTitle;" in substitution_state
+    assert 'groupLabel.textContent = "INGREDIENT CHOICE";' in substitution_state
+    assert "groupTitle.value = selectedLabel;" in substitution_state
+    assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in substitution_state
     assert "document.activeElement !== groupTitle" in substitution_state
     assert '"has-selected-choice-group-header"' in substitution_state
     assert "alternativeCount && !hasSelectedChoice" in substitution_state
@@ -1247,3 +1248,30 @@ def test_standard_and_alternative_rows_share_one_column_typography_contract():
         "alternatives",
     ):
         assert f'[data-ingredient-column="{column}"]' in contract
+
+
+def test_selected_choice_header_shows_option_state_without_losing_editable_source_text():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    selection = script[
+        script.index("function recipeIngredientSelectedChoice"):
+        script.index("function setRecipeIngredientDefaultOption")
+    ]
+    title_editor = script[
+        script.index("function bindRecipeIngredientChoiceTitleEditor"):
+        script.index("function focusRecipeIngredientChoiceTitle")
+    ]
+    state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
+
+    assert 'selectionLabel: "Default option selected"' in selection
+    assert '"Alternative option selected"' in selection
+    assert 'groupLabel.textContent = "INGREDIENT CHOICE";' in state
+    assert "groupTitle.value = selectedLabel;" in state
+    assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in state
+    assert "`${selectedLabel}: ${selectedDetails}`" in state
+    assert "input.dataset.ingredientChoiceSourceTitle ?? input.value" in title_editor
+    assert "input.value = sourceTitle;" in title_editor
+    assert "input.dataset.ingredientChoiceSourceTitle = nextValue;" in title_editor
