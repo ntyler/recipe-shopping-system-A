@@ -72396,6 +72396,11 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-t
 }
 
 /* Ingredient editor v88: keep saved choice rows distinct while aligning their phone controls. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-mobile-amount {
+    display: none;
+}
+
 @media (max-width: 767px) {
     body.recipe-edit-standalone-page #recipeEditIngredients
         .recipe-edit-selected-choice-group-header
@@ -72416,7 +72421,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-t
         > .recipe-edit-selected-option-line-item.recipe-edit-ingredient-table-grid {
         box-sizing: border-box;
         display: grid !important;
-        grid-template-columns: 40px minmax(0, 1fr) 96px !important;
+        grid-template-columns: 40px minmax(0, 1fr) max-content 96px !important;
         grid-template-rows: auto auto !important;
         align-items: start;
         gap: 5px 6px !important;
@@ -72463,9 +72468,25 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-t
 
     body.recipe-edit-standalone-page #recipeEditIngredients
         .recipe-edit-selected-option-line-item
+        > .recipe-edit-selected-option-mobile-amount:not([hidden]) {
+        display: block;
+        grid-column: 3 !important;
+        grid-row: 1 !important;
+        align-self: center;
+        justify-self: end;
+        min-width: 0;
+        color: var(--app-text);
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-selected-option-line-item
         > .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions {
         display: grid !important;
-        grid-column: 3 !important;
+        grid-column: 4 !important;
         grid-row: 1 !important;
         width: 96px !important;
         min-width: 96px !important;

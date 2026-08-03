@@ -5507,9 +5507,18 @@ def test_edit_ingredient_modal_options_open_for_navigation_edits_and_errors():
 
 
 def test_mobile_saved_multi_ingredient_choice_rows_do_not_share_grid_cells_or_hide_images():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     mobile_choice_css = css[css.index("/* Ingredient editor v88:"):]
+    option_summary = script[
+        script.index("function createRecipeIngredientOptionRowSummary"):
+        script.index("const RECIPE_INGREDIENT_EDIT_TOOLTIP_ID")
+    ]
+    update_summary = script[
+        script.index("function updateRecipeIngredientOptionRowSummary"):
+        script.index("function updateRecipeIngredientAlternativeComponentSummary")
+    ]
 
     assert "@media (max-width: 767px)" in mobile_choice_css
     assert ".recipe-edit-selected-option-line-item.recipe-edit-ingredient-table-grid" in mobile_choice_css
@@ -5517,7 +5526,7 @@ def test_mobile_saved_multi_ingredient_choice_rows_do_not_share_grid_cells_or_hi
     assert "grid-auto-rows: auto;" in mobile_choice_css
     assert "> .recipe-edit-ingredient-substitution-cell::before" in mobile_choice_css
     assert "content: none !important;" in mobile_choice_css
-    assert "grid-template-columns: 40px minmax(0, 1fr) 96px !important;" in mobile_choice_css
+    assert "grid-template-columns: 40px minmax(0, 1fr) max-content 96px !important;" in mobile_choice_css
     assert "gap: 5px 6px !important;" in mobile_choice_css
     assert "width: calc(100% + 20px);" in mobile_choice_css
     assert "max-width: none !important;" in mobile_choice_css
@@ -5534,9 +5543,21 @@ def test_mobile_saved_multi_ingredient_choice_rows_do_not_share_grid_cells_or_hi
         mobile_choice_css.index("> .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions {"):
         mobile_choice_css.rindex("> :is(")
     ]
+    assert "grid-column: 4 !important;" in actions_rule
     assert "width: 96px !important;" in actions_rule
     hidden_cells = mobile_choice_css[mobile_choice_css.rindex("> :is("):]
     assert ".recipe-edit-alternative-component-image-cell" not in hidden_cells
+    assert 'class="recipe-edit-selected-option-mobile-amount"' in option_summary
+    assert "data-selected-option-mobile-amount" in option_summary
+    assert 'formatRecipeIngredientQuantityUnit(values)' in update_summary
+    assert 'mobileAmountElement.hidden = !hasMobileAmount;' in update_summary
+    mobile_amount_rule = mobile_choice_css[
+        mobile_choice_css.index("> .recipe-edit-selected-option-mobile-amount:not([hidden]) {"):
+        mobile_choice_css.index("> .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions {")
+    ]
+    assert "display: block;" in mobile_amount_rule
+    assert "grid-column: 3 !important;" in mobile_amount_rule
+    assert "white-space: nowrap;" in mobile_amount_rule
 
 
 def test_mobile_collapsed_choice_header_does_not_leave_an_orphaned_divider():

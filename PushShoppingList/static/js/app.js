@@ -31339,6 +31339,10 @@ function createRecipeIngredientOptionRowSummary(className = "") {
         <div class="recipe-edit-alternative-component-size recipe-edit-ingredient-size-summary"
              data-ingredient-column="size"
              role="cell"></div>
+        <span class="recipe-edit-selected-option-mobile-amount"
+              data-selected-option-mobile-amount
+              role="cell"
+              hidden></span>
         <div class="recipe-edit-alternative-component-store recipe-edit-ingredient-store-summary"
              data-ingredient-store-summary
              data-ingredient-column="store"
@@ -31565,6 +31569,7 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     const quantityElement = summary.querySelector("[data-alternative-component-quantity]");
     const unitElement = summary.querySelector("[data-alternative-component-unit]");
     const sizeElement = summary.querySelector("[data-alternative-component-size]");
+    const mobileAmountElement = summary.querySelector("[data-selected-option-mobile-amount]");
     const storeElement = summary.querySelector("[data-alternative-component-store]");
     const typeElement = summary.querySelector("[data-alternative-component-type]");
     const metadataElement = summary.querySelector("[data-alternative-component-metadata]");
@@ -31586,6 +31591,17 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     if (quantityElement) quantityElement.value = String(values.quantity || "").trim();
     if (unitElement) unitElement.value = String(values.unit || "").trim();
     if (sizeElement) sizeElement.value = String(values.size || "").trim();
+    if (mobileAmountElement) {
+        const mobileAmount = formatRecipeIngredientQuantityUnit(values);
+        const hasMobileAmount = mobileAmount !== "\u2014";
+        mobileAmountElement.textContent = hasMobileAmount ? mobileAmount : "";
+        mobileAmountElement.hidden = !hasMobileAmount;
+        mobileAmountElement.title = hasMobileAmount ? mobileAmount : "";
+        mobileAmountElement.setAttribute(
+            "aria-label",
+            hasMobileAmount ? `Amount: ${mobileAmount}` : "Amount not specified",
+        );
+    }
     if (storeElement) storeElement.value = String(values.store_section || "").trim();
     if (typeElement) {
         const typeValue = recipeIngredientTypeValue(values);
