@@ -4869,7 +4869,8 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
         script.index("function formatRecipeIngredientQuantityColumn")
     ]
     assert "values.size" not in quantity_unit_formatter
-    assert "recipeIngredientPluralUnit(unit, quantity, { includePieces: true })" in quantity_unit_formatter
+    assert "recipeIngredientPluralUnit(" in quantity_unit_formatter
+    assert "{ includePieces: true }" in quantity_unit_formatter
     assert 'document.querySelectorAll("[data-recipe-ingredients-collapse-toggle]")' in script
     assert 'compactButton.setAttribute("aria-expanded", String(!collapsed));' in script
     assert "function recipeIngredientsShouldStartCollapsed()" in script
@@ -4949,6 +4950,22 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     collapsed_edit = collapsed_edit[:collapsed_edit.index("}")]
     assert "display: inline-flex !important;" in collapsed_edit
     assert "display: none !important;" not in collapsed_edit
+
+
+def test_mobile_ingredient_quantity_formatter_keeps_units_for_unicode_fractions():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    formatter = script[
+        script.index("function formatRecipeIngredientQuantityUnit"):
+        script.index("function formatRecipeIngredientQuantityColumn")
+    ]
+
+    assert "const quantityTextNumber = recipeIngredientViewQuantityNumber(quantityText);" in formatter
+    assert "const quantityNumber = recipeIngredientViewQuantityNumber(quantity);" in formatter
+    assert "quantityText && quantityTextNumber === null" in formatter
+    assert "!/\\d/.test(quantity) && quantityNumber === null" in formatter
+    assert "const displayQuantity = quantityTextNumber !== null ? quantityText : quantity;" in formatter
+    assert "quantityForPluralization !== null && quantityForPluralization <= 1" in formatter
+    assert "quantityForPluralization !== null ? String(quantityForPluralization) : quantity" in formatter
 
 
 def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():

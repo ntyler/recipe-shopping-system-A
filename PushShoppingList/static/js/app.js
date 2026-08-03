@@ -29979,13 +29979,29 @@ function formatRecipeIngredientQuantityUnit(values = {}) {
     const quantityText = String(values.quantity_text || "").trim();
     const quantity = String(values.quantity || values.amount || "").trim();
     const unit = String(values.unit || "").trim();
-    const phrase = quantityText
-        || (!/\d/.test(quantity) ? quantity : "")
+    const quantityTextNumber = recipeIngredientViewQuantityNumber(quantityText);
+    const quantityNumber = recipeIngredientViewQuantityNumber(quantity);
+    const phrase = (quantityText && quantityTextNumber === null ? quantityText : "")
+        || (!/\d/.test(quantity) && quantityNumber === null ? quantity : "")
         || (/^(?:to taste|as needed)$/i.test(unit) ? unit : "");
     if (phrase) {
         return phrase;
     }
-    return [quantity, recipeIngredientPluralUnit(unit, quantity, { includePieces: true })]
+    const displayQuantity = quantityTextNumber !== null ? quantityText : quantity;
+    const quantityForPluralization = quantityTextNumber !== null
+        ? quantityTextNumber
+        : quantityNumber;
+    const unitLabel = quantityForPluralization !== null && quantityForPluralization <= 1
+        ? unit
+        : recipeIngredientPluralUnit(
+            unit,
+            quantityForPluralization !== null ? String(quantityForPluralization) : quantity,
+            { includePieces: true },
+        );
+    return [
+        displayQuantity,
+        unitLabel,
+    ]
         .filter(Boolean)
         .join(" ") || "\u2014";
 }
