@@ -1214,3 +1214,36 @@ def test_option_ingredient_pencils_use_the_standard_edit_ingredient_modal():
     assert "> .recipe-edit-inline-icon" in v53
     assert "display: inline-flex;" in v53
     assert "outline: 0;" not in v53
+
+
+def test_standard_and_alternative_rows_share_one_column_typography_contract():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    contract = css[css.index("/* Ingredient editor v92:"):]
+    for token in (
+        "--recipe-edit-ingredient-name-font-size: 13px;",
+        "--recipe-edit-ingredient-name-font-weight: 750;",
+        "--recipe-edit-ingredient-detail-font-size: 11px;",
+        "--recipe-edit-ingredient-detail-font-weight: 500;",
+        "--recipe-edit-ingredient-column-font-size: 11px;",
+        "--recipe-edit-ingredient-column-font-weight: 400;",
+        "> .recipe-edit-ingredient-row",
+        ".recipe-edit-alternative-component-summary",
+        "> [data-ingredient-column=\"ingredient\"]",
+        ".recipe-edit-ingredient-inline-name",
+        ".recipe-edit-ingredient-inline-preparation",
+        "font-family: var(--app-font-family);",
+        "font: inherit;",
+    ):
+        assert token in contract
+
+    for column in (
+        "status",
+        "quantity",
+        "unit",
+        "size",
+        "store",
+        "type",
+        "alternatives",
+    ):
+        assert f'[data-ingredient-column="{column}"]' in contract

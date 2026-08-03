@@ -72693,3 +72693,101 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-recipe-preparation::bef
         grid-row: 3;
     }
 }
+
+/* Ingredient editor v92: one typography contract for standard and choice rows. */
+body.recipe-edit-standalone-page #recipeEditIngredients {
+    --recipe-edit-ingredient-name-font-size: 13px;
+    --recipe-edit-ingredient-name-font-weight: 750;
+    --recipe-edit-ingredient-detail-font-size: 11px;
+    --recipe-edit-ingredient-detail-font-weight: 500;
+    --recipe-edit-ingredient-column-font-size: 11px;
+    --recipe-edit-ingredient-column-font-weight: 400;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > [data-ingredient-column="ingredient"]
+    > .recipe-edit-ingredient-inline-name,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > [data-ingredient-column="ingredient"]
+    > .recipe-edit-ingredient-inline-name {
+    font-family: var(--app-font-family);
+    font-size: var(--recipe-edit-ingredient-name-font-size);
+    font-weight: var(--recipe-edit-ingredient-name-font-weight);
+    line-height: 1.2;
+    letter-spacing: normal;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > [data-ingredient-column="ingredient"]
+    .recipe-edit-ingredient-inline-preparation,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > [data-ingredient-column="ingredient"]
+    .recipe-edit-ingredient-inline-preparation {
+    font-family: var(--app-font-family);
+    font-size: var(--recipe-edit-ingredient-detail-font-size);
+    font-weight: var(--recipe-edit-ingredient-detail-font-weight);
+    line-height: 1.2;
+    letter-spacing: normal;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row
+    > :is(
+        [data-ingredient-column="status"],
+        [data-ingredient-column="quantity"],
+        [data-ingredient-column="unit"],
+        [data-ingredient-column="size"],
+        [data-ingredient-column="store"],
+        [data-ingredient-column="type"],
+        [data-ingredient-column="alternatives"]
+    ),
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary
+    > :is(
+        [data-ingredient-column="status"],
+        [data-ingredient-column="quantity"],
+        [data-ingredient-column="unit"],
+        [data-ingredient-column="size"],
+        [data-ingredient-column="store"],
+        [data-ingredient-column="type"],
+        [data-ingredient-column="alternatives"]
+    ) {
+    font-family: var(--app-font-family);
+    font-size: var(--recipe-edit-ingredient-column-font-size);
+    font-weight: var(--recipe-edit-ingredient-column-font-weight);
+    line-height: 1.2;
+    letter-spacing: normal;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    :is(
+        .recipe-edit-ingredient-row,
+        .recipe-edit-alternative-component-summary
+    )
+    > :is(
+        [data-ingredient-column="status"],
+        [data-ingredient-column="quantity"],
+        [data-ingredient-column="unit"],
+        [data-ingredient-column="size"],
+        [data-ingredient-column="store"],
+        [data-ingredient-column="type"],
+        [data-ingredient-column="alternatives"]
+    )
+    :is(
+        input,
+        select,
+        button,
+        .store-section-display,
+        .store-section-badge-label,
+        [data-ingredient-read-status],
+        [data-type-trigger-label],
+        [data-ingredient-options-label],
+        [data-ingredient-options-summary]
+    ) {
+    font: inherit;
+    letter-spacing: inherit;
+}
