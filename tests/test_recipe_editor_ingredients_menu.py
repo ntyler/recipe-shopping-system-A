@@ -878,7 +878,8 @@ def test_grouped_projected_selected_components_inherit_their_choice_state_badge(
     assert "selectionStateElement.hidden = !selectionState;" in update_summary
     assert "options = {}" in create_line_item
     assert "summary.dataset.ingredientSelectedChoiceState = selectionState;" in create_line_item
-    assert 'selectedChoice.isDefaultOption ? "Default Option" : "Alternative Option"' in sync_line_items
+    assert "selectedChoice.selectionLabel" in sync_line_items
+    assert "recipeIngredientOptionTypeLabel(selectedChoice.isDefaultOption)" in sync_line_items
     assert "createRecipeIngredientSelectedOptionLineItem(row, sourceRow, {" in sync_line_items
 
 
@@ -5457,7 +5458,7 @@ def test_recipe_editor_phase_two_recipe_view_reuses_shared_rows_handlers_and_opt
     assert "recipeIngredientSelectedChoice(" in groups
     assert "group.rows.map(fieldValuesFromRow)" in groups
     assert "group.values.forEach(values =>" in script
-    assert 'label.textContent = group.isDefaultOption ? "Default option" : "Alternative option";' in script
+    assert "label.textContent = recipeIngredientOptionTypeLabel(group.isDefaultOption);" in script
     assert "recipeIngredientChoiceItemSummary(" in script
     assert "recipeEditExpandedRecipeViewIngredientIds" in toggle
     assert "scrollIntoView" not in toggle

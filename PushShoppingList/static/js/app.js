@@ -28945,7 +28945,8 @@ function renderRecipeIngredientRecipeViewSecondary(
     const notes = String(values.notes || "").trim();
     const status = recipeIngredientRecipeViewStatus(row, values);
     if (selectedChoice) {
-        const selectionLabel = selectedChoice.isDefaultOption ? "Default" : "Selected";
+        const selectionLabel = selectedChoice.selectionLabel
+            || recipeIngredientOptionTypeLabel(selectedChoice.isDefaultOption);
         append(
             `${selectionLabel}: ${selectedChoice.ingredientSummary || selectedChoice.summary || ""}`,
             "recipe-edit-ingredient-recipe-selection",
@@ -29002,7 +29003,7 @@ function renderRecipeIngredientRecipeViewChoices(
         marker.innerHTML = group.isSelected ? recipeEditSvgIcon("check") : "";
         marker.setAttribute("aria-hidden", "true");
         const label = document.createElement("span");
-        label.textContent = group.isDefaultOption ? "Default option" : "Alternative option";
+        label.textContent = recipeIngredientOptionTypeLabel(group.isDefaultOption);
         heading.append(marker, label);
         option.appendChild(heading);
 
@@ -32394,7 +32395,10 @@ function syncRecipeIngredientSelectedOptionLineItems(
         && projectedRows.length === 0
     );
     const selectionState = selectedChoice
-        ? (selectedChoice.isDefaultOption ? "Default Option" : "Alternative Option")
+        ? (
+            selectedChoice.selectionLabel
+            || recipeIngredientOptionTypeLabel(selectedChoice.isDefaultOption)
+        )
         : "";
     const renderedRows = usesParentIngredientRow ? [row] : projectedRows;
     let lineItems = row.querySelector(
@@ -48066,6 +48070,10 @@ function recipeIngredientCompactChoiceSummary(originalValues, alternativeGroups)
     };
 }
 
+function recipeIngredientOptionTypeLabel(isDefaultOption) {
+    return isDefaultOption ? "DEFAULT OPTION" : "ALTERNATIVE OPTION";
+}
+
 function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) {
     const defaultField = row ? row.querySelector('[data-field="default_option_id"]') : null;
     const originalField = row ? row.querySelector("[data-original-option-id]") : null;
@@ -48086,7 +48094,7 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
             values: [originalValues],
             summary: recipeIngredientOptionItemDisplay(originalValues),
             ingredientSummary,
-            selectionLabel: "Default Option",
+            selectionLabel: recipeIngredientOptionTypeLabel(true),
             isDefaultOption: true,
         };
     }
@@ -48116,9 +48124,7 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
                 .filter(Boolean)
                 .join(" + "),
             ingredientSummary,
-            selectionLabel: isDefaultOption
-                ? "Default Option"
-                : "Alternative Option",
+            selectionLabel: recipeIngredientOptionTypeLabel(isDefaultOption),
             isDefaultOption,
         };
     }
@@ -48575,9 +48581,7 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         );
         selectedChoiceGroupHeader.hidden = !showsSelectedChoiceGroup;
         if (groupLabel) {
-            groupLabel.textContent = selectedChoice?.isDefaultOption
-                ? "DEFAULT OPTION"
-                : "ALTERNATIVE OPTION";
+            groupLabel.textContent = selectedLabel;
         }
         if (groupTitle) {
             if (document.activeElement !== groupTitle) {

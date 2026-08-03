@@ -660,8 +660,8 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "defaultOptionId && group.alternativeId === defaultOptionId" in selected_choice
     assert "recipeIngredientOptionItemDisplay(value)" in selected_choice
     assert '.join(" + ");' in selected_choice
-    assert 'selectionLabel: "Default Option"' in selected_choice
-    assert '"Alternative Option"' in selected_choice
+    assert "selectionLabel: recipeIngredientOptionTypeLabel(true)" in selected_choice
+    assert "selectionLabel: recipeIngredientOptionTypeLabel(isDefaultOption)" in selected_choice
     assert "recipeIngredientProjectedOptionSourceRow(control)" in inline_source
     assert "fallbackRow?.recipeIngredientInlineSummarySourceRow" in inline_source
     assert "row.recipeIngredientInlineSummarySourceRow = selectedSourceRow;" in summary
@@ -670,7 +670,7 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "const selectedSourceRow = selectedChoice?.rows[0] || null;" in summary
     assert "const displayIngredientName = ingredientName;" in summary
     assert "if (readName) readName.hidden = false;" in summary
-    assert "if (readDetails) readDetails.hidden = false;" in summary
+    assert "readDetails.hidden = false;" in summary
     assert "function recipeIngredientSelectedOptionProjectionRows" in selected_line_items
     assert "return Array.isArray(selectedChoice?.rows)" in selected_line_items
     assert "? selectedChoice.rows" in selected_line_items
@@ -687,14 +687,12 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert 'data-recipe-ingredient-inline-field="ingredient"' in selected_line_items
     assert "bindRecipeIngredientInlineEditor(row, summary);" in selected_line_items
     assert "openRecipeIngredientOptionModal(editButton)" in selected_line_items
-    assert "lineItems.hidden = expanded || !hasProjectedRows;" in selected_line_items
+    assert "lineItems.hidden = expanded || !hasRenderedRows;" in selected_line_items
     assert "isDefaultOption: true" in selected_choice
     assert "isDefaultOption," in selected_choice
     assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state
     assert "function ensureRecipeIngredientSelectedChoiceGroupHeader" in script
-    assert 'groupLabel.textContent = selectedChoice?.isDefaultOption' in substitution_state
-    assert '? "DEFAULT OPTION"' in substitution_state
-    assert ': "ALTERNATIVE OPTION";' in substitution_state
+    assert "groupLabel.textContent = selectedLabel;" in substitution_state
     assert "groupTitle.value = choiceTitle;" in substitution_state
     assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in substitution_state
     assert "document.activeElement !== groupTitle" in substitution_state
@@ -1201,7 +1199,9 @@ def test_option_ingredient_pencils_use_the_standard_edit_ingredient_modal():
     ]
 
     assert "function openRecipeIngredientOptionModal(control, options = {})" in option_modal
-    assert "setRecipeIngredientEditMode(row, true, { trigger });" in option_modal
+    assert "setRecipeIngredientEditMode(row, true, {" in option_modal
+    assert "trigger," in option_modal
+    assert "restoreOtherEdits: options.restoreOtherEdits," in option_modal
     assert "function closeRecipeIngredientOptionModal(row, panel, options = {})" in option_modal
     assert "restoreRecipeIngredientEditableFieldSnapshot(" in option_modal
     assert "panel.recipeIngredientOptionSourceRow" in commit_modal
@@ -1255,6 +1255,10 @@ def test_standard_and_alternative_rows_share_one_column_typography_contract():
 def test_selected_choice_header_shows_option_state_without_losing_editable_source_text():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
+    labels = script[
+        script.index("function recipeIngredientOptionTypeLabel"):
+        script.index("function recipeIngredientSelectedChoice")
+    ]
     selection = script[
         script.index("function recipeIngredientSelectedChoice"):
         script.index("function setRecipeIngredientDefaultOption")
@@ -1268,17 +1272,58 @@ def test_selected_choice_header_shows_option_state_without_losing_editable_sourc
         script.index("function addRecipeIngredientSubstitutionRow")
     ]
 
-    assert 'selectionLabel: "Default Option"' in selection
-    assert '"Alternative Option"' in selection
-    assert 'groupLabel.textContent = selectedChoice?.isDefaultOption' in state
-    assert '? "DEFAULT OPTION"' in state
-    assert ': "ALTERNATIVE OPTION";' in state
+    assert 'return isDefaultOption ? "DEFAULT OPTION" : "ALTERNATIVE OPTION";' in labels
+    assert "selectionLabel: recipeIngredientOptionTypeLabel(true)" in selection
+    assert "selectionLabel: recipeIngredientOptionTypeLabel(isDefaultOption)" in selection
+    assert "groupLabel.textContent = selectedLabel;" in state
     assert "groupTitle.value = choiceTitle;" in state
     assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in state
+    assert "parentValues.source_text || parentValues.original_text" in state
     assert "`${selectedLabel}: ${choiceTitle} (${selectedDetails})`" in state
     assert "input.dataset.ingredientChoiceSourceTitle ?? input.value" in title_editor
     assert "input.value = sourceTitle;" in title_editor
     assert "input.dataset.ingredientChoiceSourceTitle = nextValue;" in title_editor
+
+
+def test_selected_option_type_terminology_is_shared_by_every_ingredient_choice_view():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    recipe_view = script[
+        script.index("function renderRecipeIngredientRecipeViewSecondary"):
+        script.index("function renderRecipeIngredientRecipeViewItem")
+    ]
+    projected_and_mobile_rows = script[
+        script.index("function syncRecipeIngredientSelectedOptionLineItems"):
+        script.index("function organizeRecipeEditSubstitutionOptionRow")
+    ]
+    compact_summary = script[
+        script.index("function updateRecipeIngredientSummary(row)"):
+        script.index("function recipeEditIngredientRows")
+    ]
+    option_switch = script[
+        script.index("function setRecipeIngredientDefaultOption"):
+        script.index("function createRecipeIngredientDefaultOptionSummary")
+    ]
+
+    assert "selectedChoice.selectionLabel" in recipe_view
+    assert "recipeIngredientOptionTypeLabel(group.isDefaultOption)" in recipe_view
+    assert "selectedChoice.selectionLabel" in projected_and_mobile_rows
+    assert "recipeIngredientOptionTypeLabel(selectedChoice.isDefaultOption)" in projected_and_mobile_rows
+    assert "const compactChoiceState = selectedChoiceLabel" in compact_summary
+    assert "updateRecipeIngredientSubstitutionState(row);" in option_switch
+    assert "updateRecipeIngredientSummary(row);" in option_switch
+
+    forbidden_labels = (
+        "Default selected",
+        "Alternative selected",
+        "Default option selected",
+        "Alternative option selected",
+        "Default Ingredient Choice",
+        "Alternative Ingredient Choice",
+        "Default/Alternative Ingredient Choice",
+    )
+    for forbidden_label in forbidden_labels:
+        assert forbidden_label.casefold() not in script.casefold()
 
 
 def test_compact_grouped_row_replaces_source_wording_with_selected_option_state():
