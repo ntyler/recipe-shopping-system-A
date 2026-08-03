@@ -27016,7 +27016,9 @@ function moveRecipeIngredientColumnViewSort(columnKey, direction) {
 }
 
 function recipeIngredientColumnViewSourceRow(row) {
-    return row?.recipeIngredientOptionSourceRow || row;
+    return row?.recipeIngredientOptionSourceRow
+        || row?.recipeIngredientInlineSummarySourceRow
+        || row;
 }
 
 function recipeIngredientColumnViewDisplayRows(list = null) {
@@ -32004,14 +32006,9 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
 }
 
 function createRecipeIngredientSelectedOptionLineItem(row, sourceRow, options = {}) {
-    const usesParentIngredientRow = sourceRow === row;
     const selectionState = String(options.selectionState || "").trim();
     const summary = createRecipeIngredientOptionRowSummary(
         "recipe-edit-selected-option-line-item",
-    );
-    summary.classList.toggle(
-        "is-implicit-default-option-line-item",
-        usesParentIngredientRow,
     );
     summary.dataset.ingredientSelectedOptionLineItem = "";
     summary.dataset.ingredientSelectedChoiceState = selectionState;
@@ -32039,9 +32036,6 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow, options = 
         actions.classList.add("recipe-edit-compact-row-actions");
         const editButton = createRecipeIngredientEditActionButton();
         editButton.addEventListener("click", () => {
-            if (usesParentIngredientRow) {
-                return openRecipeIngredientDefaultOptionModal(editButton);
-            }
             return openRecipeIngredientOptionModal(editButton);
         });
         actions.appendChild(editButton);
@@ -32372,10 +32366,11 @@ function ensureRecipeIngredientSelectedChoiceGroupHeader(row) {
     return header;
 }
 
-function recipeIngredientSelectedOptionProjectionRows(row, selectedChoice) {
-    return Array.isArray(selectedChoice?.rows)
+function recipeIngredientSelectedOptionProjectionRows(selectedChoice) {
+    const rows = Array.isArray(selectedChoice?.rows)
         ? selectedChoice.rows
         : [];
+    return rows.length > 1 ? rows : [];
 }
 
 function syncRecipeIngredientSelectedOptionLineItems(
@@ -32386,21 +32381,14 @@ function syncRecipeIngredientSelectedOptionLineItems(
     if (!row) {
         return;
     }
-    const projectedRows = recipeIngredientSelectedOptionProjectionRows(
-        row,
-        selectedChoice,
-    );
-    const usesParentIngredientRow = Boolean(
-        selectedChoice?.isDefaultOption
-        && projectedRows.length === 0
-    );
+    const projectedRows = recipeIngredientSelectedOptionProjectionRows(selectedChoice);
     const selectionState = selectedChoice
         ? (
             selectedChoice.selectionLabel
             || recipeIngredientOptionTypeLabel(selectedChoice.isDefaultOption)
         )
         : "";
-    const renderedRows = usesParentIngredientRow ? [row] : projectedRows;
+    const renderedRows = projectedRows;
     let lineItems = row.querySelector(
         ":scope > [data-ingredient-selected-option-line-items]",
     );
@@ -32418,11 +32406,6 @@ function syncRecipeIngredientSelectedOptionLineItems(
         row.classList.remove("has-selected-option-line-items");
         return;
     }
-    lineItems.classList.toggle(
-        "has-mobile-implicit-default-line-item",
-        usesParentIngredientRow,
-    );
-
     const currentRows = Array.isArray(lineItems.recipeIngredientOptionSourceRows)
         ? lineItems.recipeIngredientOptionSourceRows
         : [];
@@ -46489,10 +46472,8 @@ function recipeIngredientExpansionSelectedOptionSummary(row, control = null) {
     if (!recipeEditIngredientColumnView.groupByStoreSection) {
         return null;
     }
-    // The implicit-default summary duplicates the parent ingredient row. Mounting
-    // the panel under that copy swaps in a differently padded row when expanded,
-    // making the visible ingredient jump down. Keep parent defaults on the stable
-    // parent row and reserve projected anchors for actual alternative components.
+    // Single-component choices stay on the parent row. Projected anchors therefore
+    // always represent real components of a multi-ingredient selected option.
     return recipeIngredientSelectedOptionSummaries(row).find(summary => (
         summary.recipeIngredientOptionSourceRow !== row
         && !summary.classList.contains("is-ingredient-column-grouped-away")
@@ -46530,22 +46511,7 @@ function recipeIngredientExpansionAnchorFromControl(row, control = null) {
 }
 
 function recipeIngredientExpansionViewportAnchor(row, control = null) {
-    const expansionAnchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;
-    const selectedOptionLineItems = expansionAnchor?.closest?.(
-        ".recipe-edit-selected-option-line-items",
-    );
-    if (
-        expansionAnchor !== row
-        && selectedOptionLineItems?.classList.contains(
-            "has-mobile-implicit-default-line-item",
-        )
-    ) {
-        // The implicit-default projection changes from display:none to grid while
-        // the panel toggles on desktop. Measure the stable ingredient row so that
-        // its temporary zero-sized rectangle cannot move the page viewport.
-        return row;
-    }
-    return expansionAnchor;
+    return recipeIngredientExpansionAnchorFromControl(row, control) || row;
 }
 
 function recipeIngredientExpansionIsOpen(row, control = null) {
@@ -48620,9 +48586,12 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     const showsChoiceSummary = Boolean(
         alternativeCount && !hasSelectedChoice,
     );
+    const selectedChoiceProjectionRows = recipeIngredientSelectedOptionProjectionRows(
+        selectedChoice,
+    );
     const selectedChoiceUsesParentIngredientRow = Boolean(
-        selectedChoice?.isDefaultOption
-        && recipeIngredientSelectedOptionProjectionRows(row, selectedChoice).length === 0
+        hasSelectedChoice
+        && selectedChoiceProjectionRows.length === 0
     );
     const hidesSelectedChoiceHeaderInStoreSectionView = Boolean(
         recipeEditIngredientColumnView.groupByStoreSection
@@ -48630,6 +48599,7 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     const showsSelectedChoiceGroup = Boolean(
         alternativeCount
         && hasSelectedChoice
+        && !selectedChoiceUsesParentIngredientRow
         && !hidesSelectedChoiceHeaderInStoreSectionView,
     );
     const selectedChoiceGroupHeader = showsSelectedChoiceGroup
@@ -48676,14 +48646,6 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     row.classList.toggle(
         "has-selected-ingredient-choice",
         Boolean(alternativeCount && hasSelectedChoice),
-    );
-    row.classList.toggle(
-        "has-selected-implicit-default-choice",
-        Boolean(
-            alternativeCount
-            && hasSelectedChoice
-            && selectedChoiceUsesParentIngredientRow
-        ),
     );
     row.classList.toggle(
         "shows-ingredient-choice-summary",

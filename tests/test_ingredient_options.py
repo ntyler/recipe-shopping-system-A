@@ -652,6 +652,10 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
         script.index("function createRecipeIngredientSelectedOptionLineItem"):
         script.index("function organizeRecipeEditSubstitutionOptionRow")
     ]
+    column_source = script[
+        script.index("function recipeIngredientColumnViewSourceRow"):
+        script.index("function recipeIngredientColumnViewDisplayRows")
+    ]
     substitution_state = script[
         script.index("function updateRecipeIngredientSubstitutionState"):
         script.index("function addRecipeIngredientSubstitutionRow")
@@ -672,10 +676,12 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "if (readName) readName.hidden = false;" in summary
     assert "readDetails.hidden = false;" in summary
     assert "function recipeIngredientSelectedOptionProjectionRows" in selected_line_items
-    assert "return Array.isArray(selectedChoice?.rows)" in selected_line_items
+    assert "const rows = Array.isArray(selectedChoice?.rows)" in selected_line_items
     assert "? selectedChoice.rows" in selected_line_items
+    assert "return rows.length > 1 ? rows : [];" in selected_line_items
     assert "isPrimaryOriginalComponent" not in selected_line_items
     assert "recipeIngredientSelectedOptionProjectionRows(" in selected_line_items
+    assert "const renderedRows = projectedRows;" in selected_line_items
     assert "data-ingredient-selected-option-line-items" in selected_line_items
     assert "createRecipeIngredientOptionRowSummary(" in selected_line_items
     assert "summary.recipeIngredientOptionSourceRow = sourceRow;" in selected_line_items
@@ -702,6 +708,8 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "alternativeCount && !hasSelectedChoice" in substitution_state
     assert "alternativeCount && hasSelectedChoice" in substitution_state
     assert "alternativeCount && hasSelectedChoice && !isExpanded" not in substitution_state
+    assert "&& !selectedChoiceUsesParentIngredientRow" in substitution_state
+    assert "row?.recipeIngredientInlineSummarySourceRow" in column_source
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in substitution_state
     assert 'label.textContent += " · Selected";' not in substitution_state
     assert "label.textContent = selectedLabel;" not in substitution_state

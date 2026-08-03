@@ -1070,9 +1070,9 @@ def test_store_section_grouping_uses_normal_rows_without_a_choice_header():
     assert 'row.classList.contains("has-selected-implicit-default-choice")' not in grouped_view
     assert "updateRecipeIngredientSubstitutionState(row);" in grouped_view
     assert "selectedChoiceUsesParentIngredientRow" in substitution_state
-    assert "selectedChoice?.isDefaultOption" in substitution_state
-    assert "recipeIngredientSelectedOptionProjectionRows(row, selectedChoice).length === 0" in substitution_state
-    assert '"has-selected-implicit-default-choice"' in substitution_state
+    assert "selectedChoiceProjectionRows.length === 0" in substitution_state
+    assert "&& !selectedChoiceUsesParentIngredientRow" in substitution_state
+    assert '"has-selected-implicit-default-choice"' not in substitution_state
     assert "hidesSelectedChoiceHeaderInStoreSectionView" in substitution_state
     assert "recipeEditIngredientColumnView.groupByStoreSection" in substitution_state
     assert "hidesImplicitDefaultHeaderInStoreSectionView" not in substitution_state
@@ -1133,7 +1133,7 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
 def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_position():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    anchor_start = script.index("function recipeIngredientVerticalScrollContainer")
+    anchor_start = script.index("function recipeIngredientExpansionViewportAnchor")
     anchor_end = script.index("function setRecipeIngredientSubstitutionsExpanded", anchor_start)
     anchor = script[anchor_start:anchor_end]
     toggle_start = script.index("function toggleRecipeIngredientSubstitutions")
@@ -1143,11 +1143,7 @@ def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_posi
     assert "window.getComputedStyle(candidate).overflowY" in anchor
     assert "candidate.scrollHeight > candidate.clientHeight" in anchor
     assert "function recipeIngredientExpansionViewportAnchor" in anchor
-    assert "const expansionAnchor = recipeIngredientExpansionAnchorFromControl(row, control) || row;" in anchor
-    assert '".recipe-edit-selected-option-line-items"' in anchor
-    assert '"has-mobile-implicit-default-line-item"' in anchor
-    assert "expansionAnchor !== row" in anchor
-    assert "return row;" in anchor
+    assert "return recipeIngredientExpansionAnchorFromControl(row, control) || row;" in anchor
     assert "const anchor = recipeIngredientExpansionViewportAnchor(row, control);" in anchor
     assert "const previousTop = anchor.getBoundingClientRect().top;" in anchor
     assert "const result = toggleExpansion();" in anchor
@@ -5684,25 +5680,22 @@ def test_mobile_collapsed_choice_header_does_not_leave_an_orphaned_divider():
     assert "border-bottom: 0;" in collapsed_choice_css
 
 
-def test_mobile_implicit_default_choice_projects_the_parent_ingredient_below_its_header():
+def test_single_component_choice_stays_on_the_parent_row_without_a_redundant_header():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
-    create_line_item = script[
-        script.index("function createRecipeIngredientSelectedOptionLineItem"):
-        script.index("function resizeRecipeIngredientChoiceTitleInput")
-    ]
     sync_line_items = script[
-        script.index("function syncRecipeIngredientSelectedOptionLineItems"):
+        script.index("function recipeIngredientSelectedOptionProjectionRows"):
         script.index("function organizeRecipeEditSubstitutionOptionRow")
     ]
+    substitution_state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
 
-    assert "const usesParentIngredientRow = sourceRow === row;" in create_line_item
-    assert '"is-implicit-default-option-line-item"' in create_line_item
-    assert "openRecipeIngredientDefaultOptionModal(editButton)" in create_line_item
-    assert "selectedChoice?.isDefaultOption" in sync_line_items
-    assert "const renderedRows = usesParentIngredientRow ? [row] : projectedRows;" in sync_line_items
-    assert '"has-mobile-implicit-default-line-item"' in sync_line_items
+    assert "return rows.length > 1 ? rows : [];" in sync_line_items
+    assert "const renderedRows = projectedRows;" in sync_line_items
+    assert '"has-mobile-implicit-default-line-item"' not in sync_line_items
     assert "const expandedAtSelectedLineItem = Boolean(" in sync_line_items
     assert "lineItems.contains(row.recipeIngredientExpansionAnchor)" in sync_line_items
     assert "lineItems.hidden = (expanded && !expandedAtSelectedLineItem) || !hasRenderedRows;" in sync_line_items
@@ -5710,18 +5703,9 @@ def test_mobile_implicit_default_choice_projects_the_parent_ingredient_below_its
     assert "const preservesExpandedChoice = Boolean(" in sync_line_items
     assert "mountRecipeIngredientExpansion(" in sync_line_items
     assert "nextToggle || nextSummary" in sync_line_items
-
-    desktop_only = css[css.index(
-        ".recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item"
-    ):]
-    assert "@media (min-width: 768px)" in css[:css.index(
-        ".recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item"
-    )]
-    assert "display: none !important;" in desktop_only[:180]
-    grouped_expanded_default = desktop_only[desktop_only.index(
-        "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice"
-    ):]
-    assert "> .recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item:has(" not in grouped_expanded_default
+    assert "selectedChoiceProjectionRows.length === 0" in substitution_state
+    assert "&& !selectedChoiceUsesParentIngredientRow" in substitution_state
+    assert ".has-mobile-implicit-default-line-item" not in css
 
     expansion = script[
         script.index("function recipeIngredientExpansionSelectedOptionSummary"):

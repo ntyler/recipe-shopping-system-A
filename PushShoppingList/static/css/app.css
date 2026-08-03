@@ -68376,14 +68376,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     display: none !important;
 }
 
-@media (min-width: 768px) {
-    body.recipe-edit-standalone-page #recipeEditIngredients
-        .recipe-edit-selected-option-line-items.has-mobile-implicit-default-line-item {
-        display: none !important;
-    }
-
-}
-
 @media (max-width: 767px) {
     body.recipe-edit-standalone-page #recipeEditIngredients
         .recipe-edit-selected-option-line-items {
