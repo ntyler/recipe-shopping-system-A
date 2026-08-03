@@ -69072,6 +69072,15 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.has-selected-choice-group-header.is-ingredient-store-section-grouped-choice:not(
+        .recipe-edit-substitutions-open
+    )
+    > .recipe-edit-selected-option-line-items
+    .recipe-edit-ingredient-source-text.is-selected-choice:not([hidden]) {
+    display: inline-flex !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice:not(
         .recipe-edit-substitutions-open
     ) {

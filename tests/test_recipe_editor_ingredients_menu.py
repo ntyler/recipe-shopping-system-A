@@ -1032,6 +1032,20 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     ]
     assert "display: none !important;" in collapsed_header[:240]
 
+    collapsed_choice_badge_selector = (
+        "> .recipe-edit-ingredient-row.has-selected-choice-group-header."
+        "is-ingredient-store-section-grouped-choice:not(\n"
+        "        .recipe-edit-substitutions-open\n"
+        "    )\n"
+        "    > .recipe-edit-selected-option-line-items\n"
+        "    .recipe-edit-ingredient-source-text.is-selected-choice:not([hidden]) {"
+    )
+    assert collapsed_choice_badge_selector in grouped_css
+    collapsed_choice_badge = grouped_css[
+        grouped_css.index(collapsed_choice_badge_selector):
+    ]
+    assert "display: inline-flex !important;" in collapsed_choice_badge[:420]
+
     expanded_header_selector = (
         "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice."
         "recipe-edit-substitutions-open\n"
