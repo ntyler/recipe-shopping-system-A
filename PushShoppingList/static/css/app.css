@@ -65563,20 +65563,55 @@ body.is-resizing-store-section-master-column * {
 
 /* Ingredient editor v44: inline, atomic ingredient options. */
 body.recipe-edit-standalone-page .recipe-edit-ingredient-source-text {
-    display: block;
+    box-sizing: border-box;
+    display: flex;
     min-width: 0;
     max-width: 100%;
+    align-items: center;
+    gap: 5px;
+    padding-inline-start: 7px;
     overflow: hidden;
     color: var(--app-muted);
     font-size: 10px;
     font-weight: 500;
     line-height: 1.25;
-    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-source-text[hidden] {
     display: none;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-source-status-icon {
+    display: none;
+    box-sizing: border-box;
+    flex: 0 0 13px;
+    width: 13px;
+    height: 13px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in srgb, var(--app-primary-hover) 62%, var(--app-border));
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--app-primary-soft) 74%, var(--app-surface));
+    color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page
+    .recipe-edit-ingredient-source-text.is-selected-choice
+    > .recipe-edit-ingredient-source-status-icon {
+    display: inline-flex;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-source-status-icon :is(.recipe-edit-inline-icon, svg) {
+    width: 9px;
+    height: 9px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-ingredient-source-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-ingredient-options-button {

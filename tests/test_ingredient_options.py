@@ -1287,6 +1287,19 @@ def test_compact_grouped_row_replaces_source_wording_with_selected_option_state(
     assert 'const selectedChoiceLabel = String(selectedChoice?.selectionLabel || "").trim();' in summary
     assert 'const selectedChoiceDetails = String(selectedChoice?.summary || "").trim();' in summary
     assert "const compactChoiceState = selectedChoiceLabel || sourceWording;" in summary
-    assert "sourceText.textContent = compactChoiceState;" in summary
+    assert 'sourceText.classList.toggle("is-selected-choice", Boolean(selectedChoiceLabel));' in summary
+    assert "if (sourceTextLabel) sourceTextLabel.textContent = compactChoiceState;" in summary
     assert "sourceText.hidden = !compactChoiceState || values.substitutions.length === 0;" in summary
     assert "`${selectedChoiceLabel}: ${selectedChoiceDetails}`" in summary
+
+
+def test_compact_choice_state_uses_an_aligned_checked_square():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert 'class="recipe-edit-ingredient-source-status-icon" aria-hidden="true"' in script
+    assert '${recipeEditSvgIcon("check")}' in script
+    assert "padding-inline-start: 7px;" in css
+    assert ".recipe-edit-ingredient-source-status-icon {" in css
+    assert "flex: 0 0 13px;" in css
+    assert "border-radius: 3px;" in css

@@ -31201,7 +31201,13 @@ function createRecipeIngredientReadCell(className = "", options = {}) {
         </div>
         <span class="recipe-edit-ingredient-source-text"
               data-ingredient-source-text
-              hidden></span>
+              hidden>
+            <span class="recipe-edit-ingredient-source-status-icon" aria-hidden="true">
+                ${recipeEditSvgIcon("check")}
+            </span>
+            <span class="recipe-edit-ingredient-source-label"
+                  data-ingredient-source-label></span>
+        </span>
         <label class="recipe-edit-ingredient-read-buy-as">
             <span>Buy as:</span>
             <input type="text"
@@ -48835,6 +48841,9 @@ function updateRecipeIngredientSummary(row) {
     const sourceText = readCell
         ? readCell.querySelector(":scope > [data-ingredient-source-text]")
         : null;
+    const sourceTextLabel = sourceText
+        ? sourceText.querySelector("[data-ingredient-source-label]")
+        : null;
     const readBuyAs = readCell
         ? readCell.querySelector(":scope > .recipe-edit-ingredient-read-buy-as [data-ingredient-read-buy-as]")
         : null;
@@ -48931,7 +48940,8 @@ function updateRecipeIngredientSummary(row) {
     if (readStatus) readStatus.innerHTML = recipeIngredientReadStatusHtml(matchItem);
     if (sourceText) {
         const compactChoiceState = selectedChoiceLabel || sourceWording;
-        sourceText.textContent = compactChoiceState;
+        sourceText.classList.toggle("is-selected-choice", Boolean(selectedChoiceLabel));
+        if (sourceTextLabel) sourceTextLabel.textContent = compactChoiceState;
         sourceText.hidden = !compactChoiceState || values.substitutions.length === 0;
         sourceText.title = selectedChoiceLabel && selectedChoiceDetails
             ? `${selectedChoiceLabel}: ${selectedChoiceDetails}`
