@@ -4976,13 +4976,19 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
     assert "display: none !important;" not in collapsed_edit
 
 
-def test_mobile_ingredient_quantity_formatter_keeps_units_for_unicode_fractions():
+def test_mobile_ingredient_quantity_formatter_uses_plain_slash_fractions_and_keeps_units():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     formatter = script[
         script.index("function formatRecipeIngredientQuantityUnit"):
         script.index("function formatRecipeIngredientQuantityColumn")
     ]
+    normalizer = script[
+        script.index("function normalizeQuantityFractionText"):
+        script.index("function formatQuantityFraction")
+    ]
 
+    assert "const quantityText = normalizeQuantityFractionText(values.quantity_text);" in formatter
+    assert "const quantity = normalizeQuantityFractionText(values.quantity || values.amount);" in formatter
     assert "const quantityTextNumber = recipeIngredientViewQuantityNumber(quantityText);" in formatter
     assert "const quantityNumber = recipeIngredientViewQuantityNumber(quantity);" in formatter
     assert "quantityText && quantityTextNumber === null" in formatter
@@ -4990,6 +4996,9 @@ def test_mobile_ingredient_quantity_formatter_keeps_units_for_unicode_fractions(
     assert "const displayQuantity = quantityTextNumber !== null ? quantityText : quantity;" in formatter
     assert "quantityForPluralization !== null && quantityForPluralization <= 1" in formatter
     assert "quantityForPluralization !== null ? String(quantityForPluralization) : quantity" in formatter
+    for character, replacement in (("½", "1/2"), ("¾", "3/4"), ("⅓", "1/3"), ("⅔", "2/3")):
+        assert f'["{character}", "{replacement}"]' in normalizer
+    assert '.replace(new RegExp(`(\\\\d)\\\\s*${character}`, "g"), `$1 ${replacement}`)' in normalizer
 
 
 def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():

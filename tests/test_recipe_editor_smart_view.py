@@ -132,7 +132,8 @@ def test_smart_collapsed_cards_prioritize_units_sizes_and_actionable_statuses():
         "syncRecipeIngredientSmartViewImage",
     )
 
-    assert 'const quantityText = String(values.quantity_text || "").trim();' in amount
+    assert "const quantityText = normalizeQuantityFractionText(values.quantity_text);" in amount
+    assert "const quantity = normalizeQuantityFractionText(values.quantity || values.amount);" in amount
     assert 'const size = String(values.size || "").trim();' in amount
     assert 'const unit = String(values.unit || "").trim();' in amount
     assert "quantityNumber > 1" in amount
@@ -142,6 +143,35 @@ def test_smart_collapsed_cards_prioritize_units_sizes_and_actionable_statuses():
     assert "quantityNumber > 1" in name
     assert "return buyAs;" in name
     assert "recipeIngredientViewNamesDifferOnlyByCount(ingredient, buyAs)" in buy_as
+    assert 'String(values.ingredient || displayName || "").trim()' in buy_as
+
+
+def test_recipe_view_phone_rows_consolidate_metadata_and_preparation():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    css = CSS_PATH.read_text(encoding="utf-8")
+
+    create = _function(
+        script,
+        "createRecipeIngredientRecipeViewItem(row)",
+        "renderRecipeIngredientRecipeViewSecondary",
+    )
+    render = _function(
+        script,
+        "renderRecipeIngredientRecipeViewItem(item, row, values, alternativeGroups)",
+        "renderRecipeIngredientRecipeView()",
+    )
+    mobile_css = css[css.index("Ingredient editor v91:"):]
+
+    assert "data-recipe-view-name-primary" in create
+    assert "data-recipe-view-preparation" in create
+    assert "data-recipe-view-metadata" in create
+    assert "showSeparatePreparation" in render
+    assert 'metadata.querySelector(":scope > :not([hidden])")' in render
+    assert "grid-template-columns: 60px minmax(0, 1fr) 34px;" in mobile_css
+    assert ".recipe-edit-ingredient-recipe-item.has-choices" in mobile_css
+    assert ".recipe-edit-ingredient-recipe-metadata:not([hidden])" in mobile_css
+    assert "grid-column: 2 / -1;" in mobile_css
+    assert 'content: "\\00b7  ";' in mobile_css
 
 
 def test_smart_expansion_is_single_stable_view_only_state_and_accessible():

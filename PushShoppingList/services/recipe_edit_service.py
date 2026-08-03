@@ -49,6 +49,7 @@ from PushShoppingList.services.ingredient_option_service import resolve_ingredie
 from PushShoppingList.services.meal_plan_service import sync_meal_recipe_ingredients
 from PushShoppingList.services.ingredient_option_service import shopping_item_name
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
+from PushShoppingList.services.ingredient_unit_service import normalize_recipe_fraction_fields
 from PushShoppingList.services.ingredient_unit_service import normalize_recipe_unit_fields
 from PushShoppingList.services.image_variant_service import IMAGE_VARIANTS
 from PushShoppingList.services.image_variant_service import cover_image_variant_payload
@@ -9429,7 +9430,9 @@ def sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients):
 
 def _read_recipe_output_json(json_path):
     try:
-        return json.loads(json_path.read_text(encoding="utf-8"))
+        return normalize_recipe_fraction_fields(
+            json.loads(json_path.read_text(encoding="utf-8-sig"))
+        )
     except Exception:
         return None
 

@@ -8,6 +8,7 @@ from PushShoppingList.services.recipe_extract_service import (
 )
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
+from PushShoppingList.services.ingredient_unit_service import normalize_recipe_fraction_fields
 from PushShoppingList.services.recipe_master_data_service import remove_recipe_master_records_for_recipe
 from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
@@ -28,12 +29,19 @@ def load_recipe_ingredients():
         return {}
 
     try:
-        return json.loads(RECIPE_INGREDIENTS_FILE.read_text(encoding="utf-8"))
+        data = json.loads(RECIPE_INGREDIENTS_FILE.read_text(encoding="utf-8-sig"))
+        if isinstance(data, dict):
+            for recipe_data in data.values():
+                normalize_recipe_fraction_fields(recipe_data)
+        return data
     except Exception:
         return {}
 
 
 def save_recipe_ingredients(data):
+    if isinstance(data, dict):
+        for recipe_data in data.values():
+            normalize_recipe_fraction_fields(recipe_data)
     RECIPE_INGREDIENTS_FILE.write_text(
         json.dumps(data, indent=2, ensure_ascii=False),
         encoding="utf-8",

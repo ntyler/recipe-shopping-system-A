@@ -60,7 +60,9 @@ except Exception:  # pragma: no cover
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.ingredient_option_service import pdf_requirement_rows
 from PushShoppingList.services.ingredient_unit_service import canonical_unit_alias_pattern
+from PushShoppingList.services.ingredient_unit_service import normalize_fraction_text
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
+from PushShoppingList.services.ingredient_unit_service import normalize_recipe_fraction_fields
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
 from PushShoppingList.services.job_runtime_context import current_job_context
 from PushShoppingList.services.job_runtime_context import current_job_id
@@ -3063,31 +3065,7 @@ def clean_preparation_text(text):
 
 
 def clean_recipe_text(text):
-    value = html.unescape(str(text or ""))
-    replacements = {
-        "Â¼": "¼",
-        "Â½": "½",
-        "Â¾": "¾",
-        "â…": "⅐",
-        "â…‘": "⅑",
-        "â…’": "⅒",
-        "â…“": "⅓",
-        "â…”": "⅔",
-        "â…•": "⅕",
-        "â…–": "⅖",
-        "â…—": "⅗",
-        "â…˜": "⅘",
-        "â…™": "⅙",
-        "â…š": "⅚",
-        "â…›": "⅛",
-        "â…œ": "⅜",
-        "â…": "⅝",
-        "â…ž": "⅞",
-    }
-
-    for bad_value, good_value in replacements.items():
-        value = value.replace(bad_value, good_value)
-
+    value = normalize_fraction_text(html.unescape(str(text or "")))
     return re.sub(r"\s+", " ", value).strip()
 
 
@@ -10187,6 +10165,7 @@ def apply_recipe_note_substitutions_to_ingredients(ingredients, recipe_notes):
 
 def normalize_extracted_ingredient_fields(json_data, source_text=""):
     json_data = json_data if isinstance(json_data, dict) else {}
+    normalize_recipe_fraction_fields(json_data)
     trusted_source_text = ingredient_validation_source_text(json_data, source_text)
     has_source_body = ingredient_validation_has_source_body(json_data, source_text)
 
@@ -10241,7 +10220,7 @@ def normalize_extracted_ingredient_fields(json_data, source_text=""):
             repair_inline_form_choice_ingredient(item, parsed=parsed)
 
         # Deterministic normalization is the final authority after source/AI
-        # parsing. It never converts quantities or invents a missing unit.
+        # parsing. It never recalculates quantities or invents a missing unit.
         normalize_ingredient_unit_fields(item)
 
         parsed_name = clean_recipe_text(

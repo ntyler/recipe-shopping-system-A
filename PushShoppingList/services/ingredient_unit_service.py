@@ -2,8 +2,8 @@
 
 This module is intentionally independent of Flask and recipe extraction so every
 import, editor save, migration, and display surface can share the same rules.
-Quantities are never converted here; only the unit label and misplaced metadata
-are normalized.
+Quantity values are not recalculated here; Unicode fraction typography is only
+normalized to portable slash fractions before unit metadata is processed.
 """
 
 from __future__ import annotations
@@ -15,6 +15,186 @@ from fractions import Fraction
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+UNICODE_FRACTION_REPLACEMENTS = {
+    "¼": "1/4",
+    "½": "1/2",
+    "¾": "3/4",
+    "⅐": "1/7",
+    "⅑": "1/9",
+    "⅒": "1/10",
+    "⅓": "1/3",
+    "⅔": "2/3",
+    "⅕": "1/5",
+    "⅖": "2/5",
+    "⅗": "3/5",
+    "⅘": "4/5",
+    "⅙": "1/6",
+    "⅚": "5/6",
+    "⅛": "1/8",
+    "⅜": "3/8",
+    "⅝": "5/8",
+    "⅞": "7/8",
+}
+
+MOJIBAKE_FRACTION_REPLACEMENTS = {
+    "Â¼": "¼",
+    "Â½": "½",
+    "Â¾": "¾",
+    "â…": "⅐",
+    "â…‘": "⅑",
+    "â…’": "⅒",
+    "â…“": "⅓",
+    "â…”": "⅔",
+    "â…•": "⅕",
+    "â…–": "⅖",
+    "â…—": "⅗",
+    "â…˜": "⅘",
+    "â…™": "⅙",
+    "â…š": "⅚",
+    "â…›": "⅛",
+    "â…œ": "⅜",
+    "â…": "⅝",
+    "â…ž": "⅞",
+}
+
+INGREDIENT_FRACTION_TEXT_FIELDS = (
+    "quantity",
+    "quantity_text",
+    "recipe_qty",
+    "base_quantity",
+    "amount",
+    "original_text",
+    "original_recipe_text",
+    "source_text",
+    "raw_name",
+    "ingredient",
+    "name",
+    "parsed_name",
+    "normalized_name",
+    "master_normalized_name",
+    "canonical_ingredient",
+    "purchasable_item",
+    "buy_as",
+    "preparation",
+    "size",
+    "notes",
+    "warning",
+    "display",
+    "ingredient_image_prompt",
+)
+
+RECIPE_FRACTION_TEXT_FIELDS = (
+    "servings",
+    "base_servings",
+    "scaled_servings",
+    "yield",
+    "recipe_yield",
+    "description",
+    "source_notes",
+)
+
+INSTRUCTION_FRACTION_TEXT_FIELDS = (
+    "instruction",
+    "text",
+    "title",
+    "heading",
+    "notes",
+    "instruction_image_prompt",
+    "image_prompt",
+)
+
+
+def normalize_fraction_text(value):
+    """Return text with every vulgar fraction represented as ``n/d``.
+
+    A fraction attached to a whole number gains one separating space, so
+    ``1½`` and ``1 ½`` both become ``1 1/2`` instead of ``11/2``.
+    """
+    text = "" if value is None else str(value)
+    for bad_value, fraction_character in MOJIBAKE_FRACTION_REPLACEMENTS.items():
+        text = text.replace(bad_value, fraction_character)
+    for fraction_character, replacement in UNICODE_FRACTION_REPLACEMENTS.items():
+        text = re.sub(
+            rf"(?<=\d)\s*{re.escape(fraction_character)}",
+            f" {replacement}",
+            text,
+        )
+        text = text.replace(fraction_character, replacement)
+    return text.replace("⁄", "/")
+
+
+def normalize_ingredient_fraction_fields(item):
+    """Normalize fraction typography in one ingredient record in place."""
+    if not isinstance(item, dict):
+        return item
+    for field in INGREDIENT_FRACTION_TEXT_FIELDS:
+        if isinstance(item.get(field), str):
+            item[field] = normalize_fraction_text(item[field])
+    food_review = item.get("food_review")
+    if isinstance(food_review, dict):
+        for field, value in food_review.items():
+            if isinstance(value, str):
+                food_review[field] = normalize_fraction_text(value)
+    substitutions = item.get("substitutions")
+    if isinstance(substitutions, list):
+        for option in substitutions:
+            normalize_ingredient_fraction_fields(option)
+    return item
+
+
+def _normalize_fraction_record_fields(record, fields):
+    if not isinstance(record, dict):
+        return record
+    for field in fields:
+        if isinstance(record.get(field), str):
+            record[field] = normalize_fraction_text(record[field])
+    return record
+
+
+def _normalize_fraction_record_list(value, fields):
+    if not isinstance(value, list):
+        return value
+    for index, record in enumerate(value):
+        if isinstance(record, str):
+            value[index] = normalize_fraction_text(record)
+        else:
+            _normalize_fraction_record_fields(record, fields)
+    return value
+
+
+def normalize_recipe_fraction_fields(recipe_data):
+    """Normalize fraction typography in structured recipe display fields."""
+    if not isinstance(recipe_data, dict):
+        return recipe_data
+
+    _normalize_fraction_record_fields(recipe_data, RECIPE_FRACTION_TEXT_FIELDS)
+    for collection_name in ("ingredients", "ingredient_details"):
+        rows = recipe_data.get(collection_name)
+        if isinstance(rows, list):
+            for item in rows:
+                normalize_ingredient_fraction_fields(item)
+
+    scaled_ingredients = recipe_data.get("scaled_ingredients")
+    if isinstance(scaled_ingredients, dict):
+        for item in scaled_ingredients.values():
+            normalize_ingredient_fraction_fields(item)
+
+    _normalize_fraction_record_list(
+        recipe_data.get("instructions"),
+        INSTRUCTION_FRACTION_TEXT_FIELDS,
+    )
+    for notes_name in ("recipe_notes", "recipe_note_sections", "reflection_notes"):
+        _normalize_fraction_record_list(
+            recipe_data.get(notes_name),
+            ("title", "heading", "text", "note", "content"),
+        )
+
+    raw = recipe_data.get("raw")
+    if isinstance(raw, dict) and raw is not recipe_data:
+        normalize_recipe_fraction_fields(raw)
+    return recipe_data
 
 
 CANONICAL_UNITS = (
@@ -285,6 +465,7 @@ def normalize_ingredient_unit_fields(item, *, log_unrecognized=True):
     if not isinstance(item, dict):
         return item
 
+    normalize_ingredient_fraction_fields(item)
     repair_misplaced_unit_ingredient(item)
     raw_current = _clean_phrase(item.get("unit"))
     saved_raw = _clean_phrase(item.get("unit_raw") or item.get("raw_unit"))
@@ -400,9 +581,10 @@ def normalize_ingredient_unit_fields(item, *, log_unrecognized=True):
 
 
 def normalize_recipe_unit_fields(recipe_data, *, log_unrecognized=True):
-    """Apply unit-only normalization to every structured ingredient collection."""
+    """Normalize fraction typography and units in structured recipe fields."""
     if not isinstance(recipe_data, dict):
         return recipe_data
+    normalize_recipe_fraction_fields(recipe_data)
     collections = []
     for key in ("ingredients", "ingredient_details"):
         if isinstance(recipe_data.get(key), list):

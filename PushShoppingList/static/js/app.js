@@ -28744,11 +28744,18 @@ function createRecipeIngredientRecipeViewItem(row) {
     item.innerHTML = `
         <span class="recipe-edit-ingredient-recipe-amount" data-recipe-view-amount></span>
         <div class="recipe-edit-ingredient-recipe-content">
-            <strong data-recipe-view-name></strong>
+            <strong data-recipe-view-name>
+                <span data-recipe-view-name-primary></span>
+                <span class="recipe-edit-ingredient-recipe-preparation"
+                      data-recipe-view-preparation
+                      hidden></span>
+            </strong>
         </div>
-        <div class="recipe-edit-ingredient-recipe-secondary" data-recipe-view-secondary></div>
-        <span class="recipe-edit-ingredient-recipe-options" data-recipe-view-options></span>
-        <span class="recipe-edit-ingredient-recipe-store" data-recipe-view-store></span>
+        <div class="recipe-edit-ingredient-recipe-metadata" data-recipe-view-metadata>
+            <div class="recipe-edit-ingredient-recipe-secondary" data-recipe-view-secondary></div>
+            <span class="recipe-edit-ingredient-recipe-options" data-recipe-view-options></span>
+            <span class="recipe-edit-ingredient-recipe-store" data-recipe-view-store></span>
+        </div>
         <span class="recipe-edit-ingredient-recipe-disclosure-cell">
             <button type="button"
                     class="recipe-edit-ingredient-recipe-disclosure"
@@ -28895,6 +28902,9 @@ function renderRecipeIngredientRecipeViewItem(item, row, values, alternativeGrou
 
     const amount = item.querySelector("[data-recipe-view-amount]");
     const nameElement = item.querySelector("[data-recipe-view-name]");
+    const primaryNameElement = item.querySelector("[data-recipe-view-name-primary]");
+    const preparationElement = item.querySelector("[data-recipe-view-preparation]");
+    const metadata = item.querySelector("[data-recipe-view-metadata]");
     const options = item.querySelector("[data-recipe-view-options]");
     const disclosure = item.querySelector("[data-recipe-view-disclosure]");
     const disclosureCell = disclosure?.closest(".recipe-edit-ingredient-recipe-disclosure-cell");
@@ -28902,8 +28912,23 @@ function renderRecipeIngredientRecipeViewItem(item, row, values, alternativeGrou
     const choices = item.querySelector("[data-recipe-view-choices]");
     if (amount) amount.textContent = recipeIngredientViewAmount(values);
     if (nameElement) {
-        nameElement.textContent = name;
         nameElement.title = name;
+    }
+    const ingredientName = String(values.ingredient || "").trim();
+    const preparation = hasChoices ? "" : String(values.preparation || "").trim();
+    const showSeparatePreparation = Boolean(
+        ingredientName
+        && preparation
+        && !recipeIngredientComparableText(ingredientName).includes(
+            recipeIngredientComparableText(preparation),
+        )
+    );
+    if (primaryNameElement) {
+        primaryNameElement.textContent = showSeparatePreparation ? ingredientName : name;
+    }
+    if (preparationElement) {
+        preparationElement.textContent = showSeparatePreparation ? preparation : "";
+        preparationElement.hidden = !showSeparatePreparation;
     }
     renderRecipeIngredientRecipeViewSecondary(
         item.querySelector("[data-recipe-view-secondary]"),
@@ -28920,6 +28945,9 @@ function renderRecipeIngredientRecipeViewItem(item, row, values, alternativeGrou
         item.querySelector("[data-recipe-view-store]"),
         values,
     );
+    if (metadata) {
+        metadata.hidden = !metadata.querySelector(":scope > :not([hidden])");
+    }
     if (disclosure) {
         disclosure.hidden = !hasChoices;
         disclosure.setAttribute("aria-expanded", String(expanded));
@@ -29003,8 +29031,8 @@ function recipeIngredientViewQuantityNumber(value) {
 }
 
 function recipeIngredientViewAmount(values = {}) {
-    const quantityText = String(values.quantity_text || "").trim();
-    const quantity = String(values.quantity || values.amount || "").trim();
+    const quantityText = normalizeQuantityFractionText(values.quantity_text);
+    const quantity = normalizeQuantityFractionText(values.quantity || values.amount);
     const size = String(values.size || "").trim();
     const unit = String(values.unit || "").trim();
     const amount = quantityText || quantity;
@@ -29063,7 +29091,7 @@ function recipeIngredientViewName(values = {}, hasChoices = false) {
 }
 
 function recipeIngredientViewMeaningfulBuyAs(values = {}, displayName = "") {
-    const ingredient = String(displayName || values.ingredient || "").trim();
+    const ingredient = String(values.ingredient || displayName || "").trim();
     const buyAs = String(values.purchasable_item || values.buy_as || "").trim();
     if (!buyAs || recipeIngredientViewNamesDifferOnlyByCount(ingredient, buyAs)) {
         return "";
@@ -29960,8 +29988,8 @@ function recipeIngredientPluralUnit(unit, quantity, options = {}) {
 }
 
 function formatRecipeIngredientQuantity(values = {}) {
-    const quantityText = String(values.quantity_text || "").trim();
-    const quantity = String(values.quantity || values.amount || "").trim();
+    const quantityText = normalizeQuantityFractionText(values.quantity_text);
+    const quantity = normalizeQuantityFractionText(values.quantity || values.amount);
     const unit = String(values.unit || "").trim();
     const size = String(values.size || "").trim();
     const phrase = quantityText
@@ -29976,8 +30004,8 @@ function formatRecipeIngredientQuantity(values = {}) {
 }
 
 function formatRecipeIngredientQuantityUnit(values = {}) {
-    const quantityText = String(values.quantity_text || "").trim();
-    const quantity = String(values.quantity || values.amount || "").trim();
+    const quantityText = normalizeQuantityFractionText(values.quantity_text);
+    const quantity = normalizeQuantityFractionText(values.quantity || values.amount);
     const unit = String(values.unit || "").trim();
     const quantityTextNumber = recipeIngredientViewQuantityNumber(quantityText);
     const quantityNumber = recipeIngredientViewQuantityNumber(quantity);
@@ -30007,8 +30035,8 @@ function formatRecipeIngredientQuantityUnit(values = {}) {
 }
 
 function formatRecipeIngredientQuantityColumn(values = {}) {
-    const quantityText = String(values.quantity_text || "").trim();
-    const quantity = String(values.quantity || values.amount || "").trim();
+    const quantityText = normalizeQuantityFractionText(values.quantity_text);
+    const quantity = normalizeQuantityFractionText(values.quantity || values.amount);
     const unit = String(values.unit || "").trim();
     return quantityText
         || (!/\d/.test(quantity) ? quantity : "")
@@ -30018,8 +30046,8 @@ function formatRecipeIngredientQuantityColumn(values = {}) {
 }
 
 function formatRecipeIngredientUnitColumn(values = {}) {
-    const quantityText = String(values.quantity_text || "").trim();
-    const quantity = String(values.quantity || values.amount || "").trim();
+    const quantityText = normalizeQuantityFractionText(values.quantity_text);
+    const quantity = normalizeQuantityFractionText(values.quantity || values.amount);
     const unit = String(values.unit || "").trim();
     const size = String(values.size || "").trim();
     if (quantityText || (!/\d/.test(quantity) && quantity) || /^(?:to taste|as needed)$/i.test(unit)) {
@@ -55277,7 +55305,7 @@ function normalizeFoodKey(value) {
 }
 
 function scaleServingsForDisplay(servings, multiplier) {
-    const value = String(servings || "").trim();
+    const value = normalizeQuantityFractionText(servings);
 
     if (!value || multiplier === 1) {
         return value;
@@ -55354,18 +55382,52 @@ function parseQuantityFraction(value) {
 }
 
 function normalizeQuantityFractionText(value) {
-    return String(value || "")
+    let text = String(value || "")
         .trim()
         .replace(/[–—]/g, "-")
-        .replace(/Â½|½|â…½/g, "1/2")
-        .replace(/Â¼|¼|â…¼/g, "1/4")
-        .replace(/Â¾|¾|â…¾/g, "3/4")
-        .replace(/⅓|â…“/g, "1/3")
-        .replace(/⅔|â…”/g, "2/3")
-        .replace(/⅛|â…›/g, "1/8")
-        .replace(/⅜|â…œ/g, "3/8")
-        .replace(/⅝|â…/g, "5/8")
-        .replace(/⅞|â…ž/g, "7/8");
+        .replace(/Â¼/g, "¼")
+        .replace(/Â½/g, "½")
+        .replace(/Â¾/g, "¾")
+        .replace(/â…/g, "⅐")
+        .replace(/â…‘/g, "⅑")
+        .replace(/â…’/g, "⅒")
+        .replace(/â…“/g, "⅓")
+        .replace(/â…”/g, "⅔")
+        .replace(/â…•/g, "⅕")
+        .replace(/â…–/g, "⅖")
+        .replace(/â…—/g, "⅗")
+        .replace(/â…˜/g, "⅘")
+        .replace(/â…™/g, "⅙")
+        .replace(/â…š/g, "⅚")
+        .replace(/â…›/g, "⅛")
+        .replace(/â…œ/g, "⅜")
+        .replace(/â…/g, "⅝")
+        .replace(/â…ž/g, "⅞");
+    [
+        ["¼", "1/4"],
+        ["½", "1/2"],
+        ["¾", "3/4"],
+        ["⅐", "1/7"],
+        ["⅑", "1/9"],
+        ["⅒", "1/10"],
+        ["⅓", "1/3"],
+        ["⅔", "2/3"],
+        ["⅕", "1/5"],
+        ["⅖", "2/5"],
+        ["⅗", "3/5"],
+        ["⅘", "4/5"],
+        ["⅙", "1/6"],
+        ["⅚", "5/6"],
+        ["⅛", "1/8"],
+        ["⅜", "3/8"],
+        ["⅝", "5/8"],
+        ["⅞", "7/8"],
+    ].forEach(([character, replacement]) => {
+        text = text
+            .replace(new RegExp(`(\\d)\\s*${character}`, "g"), `$1 ${replacement}`)
+            .replaceAll(character, replacement);
+    });
+    return text.replaceAll("⁄", "/");
 }
 
 function formatQuantityFraction(fraction) {
