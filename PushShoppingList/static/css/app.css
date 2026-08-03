@@ -72825,3 +72825,9 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     font: inherit;
     letter-spacing: inherit;
 }
+
+/* Ingredient editor v93: optional inline fields can be hidden when empty. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    [data-recipe-ingredient-optional-field][hidden] {
+    display: none !important;
+}

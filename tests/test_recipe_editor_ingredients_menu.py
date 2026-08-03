@@ -728,6 +728,36 @@ def test_recipe_editor_requested_headers_filter_and_sort_as_combined_view_only_m
     assert '[data-recipe-ingredient-column-view-active="true"]' in css
 
 
+def test_ingredient_column_menu_can_hide_empty_optional_inline_fields():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    view_start = script.index("function recipeIngredientColumnViewDefinition")
+    view_end = script.index("function clearRecipeEditIngredientColumnDropTargets", view_start)
+    view = script[view_start:view_end]
+    read_cell = script[
+        script.index("function createRecipeIngredientReadCell"):
+        script.index("function createRecipeIngredientStatusSummary")
+    ]
+
+    assert "hideEmptyFields: false" in script
+    assert "function syncRecipeIngredientEmptyFieldVisibility()" in view
+    assert 'columnKey === "ingredient"' in view
+    assert "recipeEditIngredientColumnView.hideEmptyFields" in view
+    assert "data-recipe-ingredient-column-view-hide-empty-fields" in view
+    assert "Hide empty fields" in view
+    assert "Hides blank Preparation and Buy As inputs." in view
+    assert 'field.hidden = hideEmptyFields && empty && !field.matches(":focus-within");' in view
+    assert 'data-recipe-ingredient-optional-field="preparation"' in read_cell
+    assert 'data-recipe-ingredient-optional-field="buy-as"' in read_cell
+    assert "summary.dataset.recipeIngredientOptionalField = fieldName;" in script
+    assert "syncRecipeIngredientEmptyFieldVisibility();" in script
+
+    optional_field_css = css[css.index("/* Ingredient editor v93:"):]
+    assert "[data-recipe-ingredient-optional-field][hidden]" in optional_field_css
+    assert "display: none !important;" in optional_field_css
+
+
 def test_recipe_editor_store_section_menu_can_group_rows_without_reordering_row_nodes():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

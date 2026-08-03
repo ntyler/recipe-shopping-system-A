@@ -23002,6 +23002,7 @@ let recipeEditIngredientColumnView = {
     filterKeys: new Map(),
     sorts: [],
     groupByStoreSection: false,
+    hideEmptyFields: false,
 };
 let recipeEditIngredientMasterSearchTimer = null;
 let recipeEditIngredientMasterRequestId = 0;
@@ -27275,11 +27276,33 @@ function recipeIngredientColumnViewIsActive(columnKey = "") {
                 columnKey === "store"
                 && recipeEditIngredientColumnView.groupByStoreSection
             )
+            || (
+                columnKey === "ingredient"
+                && recipeEditIngredientColumnView.hideEmptyFields
+            )
             || Boolean(recipeIngredientColumnViewSort(columnKey));
     }
     return recipeEditIngredientColumnView.filterKeys.size > 0
         || recipeEditIngredientColumnView.groupByStoreSection
+        || recipeEditIngredientColumnView.hideEmptyFields
         || recipeIngredientColumnViewSorts().length > 0;
+}
+
+function syncRecipeIngredientEmptyFieldVisibility() {
+    const list = document.getElementById("recipeEditIngredients");
+    if (!list) return;
+    const hideEmptyFields = Boolean(recipeEditIngredientColumnView.hideEmptyFields);
+    list.classList.toggle("recipe-edit-ingredients-hide-empty-fields", hideEmptyFields);
+    list.querySelectorAll("[data-recipe-ingredient-optional-field]").forEach(field => {
+        const control = field.querySelector("input, textarea, select");
+        const empty = !String(control?.value || "").trim();
+        field.dataset.recipeIngredientOptionalFieldEmpty = String(empty);
+        if (field.dataset.recipeIngredientOptionalFieldDisabled === "true") {
+            field.hidden = true;
+            return;
+        }
+        field.hidden = hideEmptyFields && empty && !field.matches(":focus-within");
+    });
 }
 
 function recipeIngredientColumnViewSortLabel(sort = null) {
@@ -27298,20 +27321,25 @@ function recipeIngredientColumnViewSortLabel(sort = null) {
 
 function recipeIngredientColumnViewDescription() {
     const sorts = recipeIngredientColumnViewSorts();
+    let description = "";
     if (!recipeEditIngredientColumnView.groupByStoreSection) {
-        return sorts.length
+        description = sorts.length
             ? `Sorted by ${sorts.map(recipeIngredientColumnViewSortLabel).join(", then ")}`
             : "Manual recipe order";
+    } else {
+        const storeSort = recipeIngredientColumnViewSort("store");
+        const rowSorts = sorts.filter(sort => sort.columnKey !== "store");
+        const groupOrder = storeSort
+            ? recipeIngredientColumnViewSortLabel(storeSort)
+            : "manual section order";
+        const rowOrder = rowSorts.length
+            ? ` Ingredients sorted by ${rowSorts.map(recipeIngredientColumnViewSortLabel).join(", then ")} within each section`
+            : " Ingredients remain in manual recipe order within each section";
+        description = `Grouped by Store Section using ${groupOrder}.${rowOrder}`;
     }
-    const storeSort = recipeIngredientColumnViewSort("store");
-    const rowSorts = sorts.filter(sort => sort.columnKey !== "store");
-    const groupOrder = storeSort
-        ? recipeIngredientColumnViewSortLabel(storeSort)
-        : "manual section order";
-    const rowOrder = rowSorts.length
-        ? ` Ingredients sorted by ${rowSorts.map(recipeIngredientColumnViewSortLabel).join(", then ")} within each section`
-        : " Ingredients remain in manual recipe order within each section";
-    return `Grouped by Store Section using ${groupOrder}.${rowOrder}`;
+    return recipeEditIngredientColumnView.hideEmptyFields
+        ? `${description.replace(/\.$/, "")}. Empty Preparation and Buy As fields are hidden`
+        : description;
 }
 
 function ensureRecipeIngredientColumnViewEmptyState() {
@@ -27485,7 +27513,9 @@ function syncRecipeIngredientColumnViewHeaders() {
         const sorted = Boolean(sortContext);
         const grouped = columnKey === "store"
             && recipeEditIngredientColumnView.groupByStoreSection;
-        const active = Boolean(filterKeys) || sorted || grouped;
+        const hidesEmptyFields = columnKey === "ingredient"
+            && recipeEditIngredientColumnView.hideEmptyFields;
+        const active = Boolean(filterKeys) || sorted || grouped || hidesEmptyFields;
         const stateParts = [];
         if (sorted) {
             stateParts.push(
@@ -27500,6 +27530,7 @@ function syncRecipeIngredientColumnViewHeaders() {
         if (filterKeys) {
             stateParts.push(`${filterCount} value${filterCount === 1 ? "" : "s"} selected`);
         }
+        if (hidesEmptyFields) stateParts.push("empty Preparation and Buy As fields hidden");
         trigger.classList.toggle("is-active", active);
         trigger.dataset.recipeIngredientColumnViewActive = String(active);
         trigger.setAttribute(
@@ -27549,7 +27580,9 @@ function syncRecipeIngredientColumnViewHeaders() {
 }
 
 function syncRecipeIngredientColumnViewReorderAvailability(rows) {
-    const active = recipeIngredientColumnViewIsActive();
+    const active = recipeEditIngredientColumnView.filterKeys.size > 0
+        || recipeEditIngredientColumnView.groupByStoreSection
+        || recipeIngredientColumnViewSorts().length > 0;
     rows.forEach(row => {
         row.querySelectorAll(".recipe-edit-row-handle").forEach(handle => {
             handle.draggable = !active;
@@ -27614,6 +27647,7 @@ function applyRecipeIngredientColumnView(options = {}) {
     list.dataset.recipeIngredientColumnViewActive = String(active);
     const emptyState = ensureRecipeIngredientColumnViewEmptyState();
     if (emptyState) emptyState.hidden = visibleCount > 0 || !displayRows.length;
+    syncRecipeIngredientEmptyFieldVisibility();
     syncRecipeIngredientColumnViewHeaders();
     syncRecipeIngredientColumnViewReorderAvailability(displayRows);
     if (recipeEditIngredientColumnLayout) {
@@ -27637,12 +27671,16 @@ function clearRecipeIngredientColumnView(columnKey = "", options = {}) {
         if (columnKey === "store") {
             recipeEditIngredientColumnView.groupByStoreSection = false;
         }
+        if (columnKey === "ingredient") {
+            recipeEditIngredientColumnView.hideEmptyFields = false;
+        }
         setRecipeIngredientColumnViewSort(columnKey, "manual");
     } else {
         recipeEditIngredientColumnView = {
             filterKeys: new Map(),
             sorts: [],
             groupByStoreSection: false,
+            hideEmptyFields: false,
         };
     }
     applyRecipeIngredientColumnView({ announce: options.announce !== false });
@@ -27663,6 +27701,12 @@ function syncRecipeIngredientColumnViewMenuState(menu) {
     const totalCount = viewRows.length;
     const summary = menu.querySelector("[data-recipe-ingredient-column-view-summary]");
     if (summary) summary.textContent = `${visibleCount} of ${totalCount}`;
+    const hideEmptyFields = menu.querySelector(
+        "[data-recipe-ingredient-column-view-hide-empty-fields]",
+    );
+    if (hideEmptyFields) {
+        hideEmptyFields.checked = Boolean(recipeEditIngredientColumnView.hideEmptyFields);
+    }
     menu.querySelectorAll("[data-recipe-ingredient-column-view-sort]").forEach(input => {
         input.checked = input.value === currentSortMode;
     });
@@ -27757,6 +27801,20 @@ function renderRecipeIngredientColumnViewMenu(menu) {
             </div>
             <span data-recipe-ingredient-column-view-summary>${visibleCount} of ${totalCount}</span>
         </div>
+        ${columnKey === "ingredient" ? `
+            <fieldset class="recipe-edit-ingredient-column-view-group">
+                <legend>Display</legend>
+                <label class="recipe-edit-ingredient-column-view-option">
+                    <input type="checkbox"
+                           data-recipe-ingredient-column-view-hide-empty-fields
+                           ${recipeEditIngredientColumnView.hideEmptyFields ? "checked" : ""}>
+                    <span>Hide empty fields</span>
+                </label>
+                <p class="recipe-edit-ingredient-column-view-group-note">
+                    Hides blank Preparation and Buy As inputs. Filled fields remain visible and editable.
+                </p>
+            </fieldset>
+        ` : ""}
         ${columnKey === "store" ? `
             <fieldset class="recipe-edit-ingredient-column-view-group is-store-grouping">
                 <legend>Group rows</legend>
@@ -27846,6 +27904,14 @@ function renderRecipeIngredientColumnViewMenu(menu) {
             </button>
         </div>
     `;
+    menu.querySelector("[data-recipe-ingredient-column-view-hide-empty-fields]")
+        ?.addEventListener("change", event => {
+            recipeEditIngredientColumnView.hideEmptyFields = Boolean(
+                event.currentTarget.checked,
+            );
+            applyRecipeIngredientColumnView({ announce: true });
+            syncRecipeIngredientColumnViewMenuState(menu);
+        });
     menu.querySelectorAll("[data-recipe-ingredient-column-view-sort]").forEach(input => {
         input.addEventListener("change", () => {
             const mode = normalizeRecipeIngredientColumnViewSortMode(columnKey, input.value);
@@ -31198,7 +31264,8 @@ function createRecipeIngredientReadCell(className = "", options = {}) {
                data-recipe-ingredient-inline-field="ingredient"
                aria-label="Ingredient"
                autocomplete="off">
-        <div class="recipe-edit-ingredient-read-details">
+        <div class="recipe-edit-ingredient-read-details"
+             data-recipe-ingredient-optional-field="preparation">
             <input type="text"
                    class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-preparation"
                    data-recipe-ingredient-inline-field="preparation"
@@ -31212,7 +31279,8 @@ function createRecipeIngredientReadCell(className = "", options = {}) {
             <span class="recipe-edit-ingredient-source-label"
                   data-ingredient-source-label></span>
         </span>
-        <label class="recipe-edit-ingredient-read-buy-as">
+        <label class="recipe-edit-ingredient-read-buy-as"
+               data-recipe-ingredient-optional-field="buy-as">
             <span>Buy as:</span>
             <input type="text"
                    class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-buy-as"
@@ -31698,10 +31766,18 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
         metadataElement.hidden = options.showMetadata === false;
     }
     if (buyAsElement) {
+        const buyAsValue = String(values.purchasable_item || values.buy_as || "").trim();
         const showBuyAs = options.showBuyAs !== false && Boolean(buyAs);
-        buyAsElement.value = showBuyAs ? String(values.purchasable_item || values.buy_as || "") : "";
+        buyAsElement.value = options.showBuyAs === false ? "" : buyAsValue;
         const buyAsField = buyAsElement.closest(".recipe-edit-ingredient-read-buy-as");
-        if (buyAsField) buyAsField.hidden = !showBuyAs;
+        if (buyAsField) {
+            if (options.showBuyAs === false) {
+                buyAsField.dataset.recipeIngredientOptionalFieldDisabled = "true";
+            } else {
+                delete buyAsField.dataset.recipeIngredientOptionalFieldDisabled;
+            }
+            buyAsField.hidden = !showBuyAs;
+        }
     }
     if (selectionStateElement) {
         if (selectionStateLabel) selectionStateLabel.textContent = selectionState;
@@ -31714,6 +31790,7 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     if (editButton) {
         configureRecipeIngredientEditAction(editButton);
     }
+    syncRecipeIngredientEmptyFieldVisibility();
 }
 
 function updateRecipeIngredientAlternativeComponentSummary(optionRow) {
@@ -33231,6 +33308,7 @@ function syncRecipeIngredientInlineEditor(row, scope = row) {
             control.setCustomValidity(source.validationMessage || "");
         }
     });
+    syncRecipeIngredientEmptyFieldVisibility();
 }
 
 function bindRecipeIngredientInlineEditor(row, scope = row) {
@@ -33382,6 +33460,7 @@ function organizeRecipeEditIngredientRow(row) {
         const summary = document.createElement("div");
         summary.className = `recipe-edit-ingredient-mobile-detail-summary ${className}`;
         summary.dataset[dataName] = "";
+        summary.dataset.recipeIngredientOptionalField = fieldName;
         summary.setAttribute("role", "cell");
         const control = document.createElement("input");
         control.type = "text";
