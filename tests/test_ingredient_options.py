@@ -692,8 +692,8 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "isDefaultOption," in selected_choice
     assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state
     assert "function ensureRecipeIngredientSelectedChoiceGroupHeader" in script
-    assert 'groupLabel.textContent = "INGREDIENT CHOICE";' in substitution_state
-    assert "groupTitle.value = selectedLabel;" in substitution_state
+    assert 'groupLabel.textContent = `${selectedChoiceKind} INGREDIENT CHOICE`;' in substitution_state
+    assert "groupTitle.value = choiceTitle;" in substitution_state
     assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in substitution_state
     assert "document.activeElement !== groupTitle" in substitution_state
     assert '"has-selected-choice-group-header"' in substitution_state
@@ -1268,10 +1268,10 @@ def test_selected_choice_header_shows_option_state_without_losing_editable_sourc
 
     assert 'selectionLabel: "Default option selected"' in selection
     assert '"Alternative option selected"' in selection
-    assert 'groupLabel.textContent = "INGREDIENT CHOICE";' in state
-    assert "groupTitle.value = selectedLabel;" in state
+    assert 'groupLabel.textContent = `${selectedChoiceKind} INGREDIENT CHOICE`;' in state
+    assert "groupTitle.value = choiceTitle;" in state
     assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in state
-    assert "`${selectedLabel}: ${selectedDetails}`" in state
+    assert "`${selectedLabel}: ${choiceTitle} (${selectedDetails})`" in state
     assert "input.dataset.ingredientChoiceSourceTitle ?? input.value" in title_editor
     assert "input.value = sourceTitle;" in title_editor
     assert "input.dataset.ingredientChoiceSourceTitle = nextValue;" in title_editor

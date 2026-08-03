@@ -48573,19 +48573,22 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         const groupTitle = selectedChoiceGroupHeader.querySelector(
             "[data-ingredient-selected-choice-group-title]",
         );
+        const selectedChoiceKind = selectedChoice?.isDefaultOption
+            ? "Default"
+            : "Alternative";
         selectedChoiceGroupHeader.hidden = !showsSelectedChoiceGroup;
         if (groupLabel) {
-            groupLabel.textContent = "INGREDIENT CHOICE";
+            groupLabel.textContent = `${selectedChoiceKind} INGREDIENT CHOICE`;
         }
         if (groupTitle) {
             if (document.activeElement !== groupTitle) {
                 groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;
-                groupTitle.value = selectedLabel;
+                groupTitle.value = choiceTitle;
                 resizeRecipeIngredientChoiceTitleInput(groupTitle);
             }
             groupTitle.title = selectedDetails
-                ? `${selectedLabel}: ${selectedDetails}`
-                : selectedLabel;
+                ? `${selectedLabel}: ${choiceTitle} (${selectedDetails})`
+                : `${selectedLabel}: ${choiceTitle}`;
         }
         const groupEditButton = selectedChoiceGroupHeader.querySelector(
             "[data-ingredient-choice-title-edit]",
