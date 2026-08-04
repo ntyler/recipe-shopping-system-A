@@ -73418,3 +73418,12 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     width: 15px;
     height: 15px;
 }
+
+/* Ingredient editor v101: enclose each collapsed saved option as one group. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.has-selected-choice-group-header:not(
+        .recipe-edit-substitutions-open
+    ) {
+    border-radius: 8px !important;
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
