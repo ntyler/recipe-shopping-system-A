@@ -47021,18 +47021,17 @@ function recipeIngredientExpansionSelectedOptionSummary(row, control = null) {
     );
     if (
         controlledSummary
-        && controlledSummary.recipeIngredientOptionSourceRow !== row
+        && controlledSummary.recipeIngredientChoiceParentRow === row
     ) {
         return controlledSummary;
     }
     if (!recipeEditIngredientColumnView.groupByStoreSection) {
         return null;
     }
-    // Single-component choices stay on the parent row. Projected anchors therefore
-    // always represent real components of a multi-ingredient selected option.
+    // Single-component choices stay on the parent row, so any visible selected
+    // summary here represents a real component of a multi-ingredient option.
     return recipeIngredientSelectedOptionSummaries(row).find(summary => (
-        summary.recipeIngredientOptionSourceRow !== row
-        && !summary.classList.contains("is-ingredient-column-grouped-away")
+        !summary.classList.contains("is-ingredient-column-grouped-away")
     )) || null;
 }
 

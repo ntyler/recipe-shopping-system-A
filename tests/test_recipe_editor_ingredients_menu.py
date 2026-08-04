@@ -1237,8 +1237,9 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "function recipeIngredientExpansionSelectedOptionSummary" in expansion
     assert "recipeEditIngredientColumnView.groupByStoreSection" in expansion
     assert "recipeIngredientSelectedOptionSummaries(row).find" in expansion
-    assert "controlledSummary.recipeIngredientOptionSourceRow !== row" in expansion
-    assert "summary.recipeIngredientOptionSourceRow !== row" in expansion
+    assert "controlledSummary.recipeIngredientChoiceParentRow === row" in expansion
+    assert "controlledSummary.recipeIngredientOptionSourceRow !== row" not in expansion
+    assert "summary.recipeIngredientOptionSourceRow !== row" not in expansion
     assert '"is-ingredient-column-grouped-away"' in expansion
     assert "recipeIngredientExpansionSelectedOptionSummary(" in expansion
     assert "recipeIngredientExpansionAnchorFromControl" in expansion
@@ -6014,8 +6015,9 @@ def test_single_component_choice_stays_on_the_parent_row_with_the_shared_header(
         script.index("function recipeIngredientExpansionSelectedOptionSummary"):
         script.index("function recipeIngredientExpansionSourceRow")
     ]
-    assert "controlledSummary.recipeIngredientOptionSourceRow !== row" in expansion
-    assert "summary.recipeIngredientOptionSourceRow !== row" in expansion
+    assert "controlledSummary.recipeIngredientChoiceParentRow === row" in expansion
+    assert "controlledSummary.recipeIngredientOptionSourceRow !== row" not in expansion
+    assert "summary.recipeIngredientOptionSourceRow !== row" not in expansion
 
 
 def test_ingredient_modal_selected_option_header_stays_above_shared_summary_rows():
