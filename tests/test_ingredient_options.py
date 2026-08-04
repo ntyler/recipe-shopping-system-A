@@ -804,10 +804,10 @@ def test_collapsed_choice_option_count_aligns_with_desktop_row_cells():
     assert ".recipe-edit-selected-choice-group-title-input" in css
 
 
-def test_collapsed_choice_keeps_dividers_only_between_component_rows():
+def test_collapsed_choice_removes_all_internal_component_dividers():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     collapsed_divider_css = css[css.index(
-        "/* Ingredient editor v77: leave dividers only between collapsed choice ingredients. */"
+        "/* Ingredient editor v77: keep collapsed choice ingredients free of internal dividers. */"
     ):]
 
     line_items_rule_start = collapsed_divider_css.index(
@@ -817,14 +817,14 @@ def test_collapsed_choice_keeps_dividers_only_between_component_rows():
         line_items_rule_start:collapsed_divider_css.index("}", line_items_rule_start)
     ]
     assert "border-top: 0;" in line_items_rule
-    assert "> .recipe-edit-selected-option-line-item:last-child" in collapsed_divider_css
-    assert "border-bottom: 0;" in collapsed_divider_css
+    assert "> .recipe-edit-selected-option-line-item {" in collapsed_divider_css
+    assert "border-bottom: 0 !important;" in collapsed_divider_css
 
 
-def test_collapsed_saved_choice_has_one_unclipped_enclosing_outline():
+def test_collapsed_saved_choice_has_top_and_bottom_section_dividers_only():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     outline_css = css[css.index(
-        "/* Ingredient editor v101: enclose each collapsed saved option as one group. */"
+        "/* Ingredient editor v101: bracket each collapsed saved option with section dividers. */"
     ):]
     rule_start = outline_css.index(
         "> .recipe-edit-ingredient-row.has-selected-choice-group-header:not("
@@ -832,9 +832,21 @@ def test_collapsed_saved_choice_has_one_unclipped_enclosing_outline():
     rule = outline_css[rule_start:outline_css.index("}", rule_start)]
 
     assert ".recipe-edit-substitutions-open" in rule
-    assert "border-radius: 8px !important;" in rule
-    assert "box-shadow: inset 0 0 0 1px var(--app-border);" in rule
+    assert "border-top: 1px solid var(--app-border);" in rule
+    assert "border-right: 0 !important;" in rule
+    assert "border-bottom: 1px solid var(--app-border);" in rule
+    assert "border-left: 0 !important;" in rule
+    assert "border-radius: 0 !important;" in rule
+    assert "box-shadow: none;" in rule
     assert "overflow:" not in rule
+
+    header_rule_start = outline_css.index(
+        ".recipe-edit-selected-choice-group-header {"
+    )
+    header_rule = outline_css[
+        header_rule_start:outline_css.index("}", header_rule_start)
+    ]
+    assert "border-bottom: 0 !important;" in header_rule
 
 
 def test_standard_ingredient_rows_drop_dividers_without_changing_choice_outlines():
@@ -849,7 +861,8 @@ def test_standard_ingredient_rows_drop_dividers_without_changing_choice_outlines
 
     assert "border-bottom: 0 !important;" in rule
     assert ".has-selected-choice-group-header" not in rule
-    assert "box-shadow: inset 0 0 0 1px var(--app-border);" in css
+    assert "border-top: 1px solid var(--app-border);" in css
+    assert "border-bottom: 1px solid var(--app-border);" in css
 
 
 def test_collapsed_default_choice_has_one_parent_gap_before_its_ingredient_group():

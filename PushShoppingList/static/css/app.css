@@ -69841,7 +69841,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     background: var(--app-surface);
 }
 
-/* Ingredient editor v77: leave dividers only between collapsed choice ingredients. */
+/* Ingredient editor v77: keep collapsed choice ingredients free of internal dividers. */
 body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-selected-option-line-items {
     border-top: 0;
@@ -69849,8 +69849,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 
 body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-selected-option-line-items
-    > .recipe-edit-selected-option-line-item:last-child {
-    border-bottom: 0;
+    > .recipe-edit-selected-option-line-item {
+    border-bottom: 0 !important;
 }
 
 /* Ingredient editor v78: separate a collapsed default choice from its ingredient group. */
@@ -73419,13 +73419,25 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     height: 15px;
 }
 
-/* Ingredient editor v101: enclose each collapsed saved option as one group. */
+/* Ingredient editor v101: bracket each collapsed saved option with section dividers. */
 body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row.has-selected-choice-group-header:not(
         .recipe-edit-substitutions-open
     ) {
-    border-radius: 8px !important;
-    box-shadow: inset 0 0 0 1px var(--app-border);
+    border-top: 1px solid var(--app-border);
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--app-border);
+    border-left: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.has-selected-choice-group-header:not(
+        .recipe-edit-substitutions-open
+    )
+    .recipe-edit-selected-choice-group-header {
+    border-bottom: 0 !important;
 }
 
 /* Ingredient editor v102: reserve row dividers for multi-option groups. */
