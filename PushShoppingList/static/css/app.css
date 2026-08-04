@@ -73354,3 +73354,13 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     grid-column: 1 / -1 !important;
     grid-row: auto !important;
 }
+
+/* Ingredient modal options v99: modal labels follow column layout without table controls. */
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    :is(
+        .recipe-edit-ingredient-modal-selected-option-columns,
+        .recipe-edit-ingredient-modal-options-table-header
+    )
+    > [data-recipe-edit-ingredient-column-hidden="true"] {
+    display: none !important;
+}

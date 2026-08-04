@@ -33194,7 +33194,7 @@ function createRecipeIngredientModalSelectedOptionRow(
 
 function createRecipeIngredientModalSelectedOptionColumns() {
     const columns = document.createElement("div");
-    columns.className = "recipe-edit-ingredient-modal-selected-option-columns recipe-edit-ingredient-table-head";
+    columns.className = "recipe-edit-ingredient-modal-selected-option-columns recipe-edit-ingredient-table-grid";
     columns.setAttribute("role", "row");
     [
         ["media", "Drag / Image", "recipe-edit-ingredient-media-header"],
@@ -33215,8 +33215,6 @@ function createRecipeIngredientModalSelectedOptionColumns() {
         column.dataset.ingredientColumn = key;
         columns.appendChild(column);
     });
-    columns.classList.add("recipe-edit-ingredient-table-grid");
-    decorateRecipeEditIngredientColumnHeaders(columns);
     return columns;
 }
 
@@ -33227,7 +33225,7 @@ function ensureRecipeIngredientModalOptionsTableHeader(container) {
     );
     if (header) return header;
     header = document.createElement("div");
-    header.className = "recipe-edit-ingredient-modal-options-table-header";
+    header.className = "recipe-edit-ingredient-modal-options-table-header recipe-edit-ingredient-table-grid";
     header.dataset.recipeIngredientModalOptionsTableHeader = "";
     header.setAttribute("role", "row");
     [
@@ -33249,9 +33247,6 @@ function ensureRecipeIngredientModalOptionsTableHeader(container) {
         column.dataset.ingredientColumn = key;
         header.appendChild(column);
     });
-    header.classList.add("recipe-edit-ingredient-table-head");
-    header.classList.add("recipe-edit-ingredient-table-grid");
-    decorateRecipeEditIngredientColumnHeaders(header);
     const heading = container.querySelector(":scope > .recipe-edit-substitution-heading");
     if (heading) {
         heading.after(header);

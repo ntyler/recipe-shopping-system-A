@@ -5600,13 +5600,12 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert 'summary.textContent = String(selection.groupTitle || "").trim()' in sync
     assert 'list.setAttribute("aria-label", `${label.textContent} ingredients`);' in sync
     assert "function createRecipeIngredientModalSelectedOptionColumns()" in sync
-    assert 'columns.className = "recipe-edit-ingredient-modal-selected-option-columns recipe-edit-ingredient-table-head";' in sync
-    assert 'columns.classList.add("recipe-edit-ingredient-table-grid");' in sync
-    assert "decorateRecipeEditIngredientColumnHeaders(columns);" in sync
+    assert 'columns.className = "recipe-edit-ingredient-modal-selected-option-columns recipe-edit-ingredient-table-grid";' in sync
     assert "function ensureRecipeIngredientModalOptionsTableHeader(container)" in sync
+    assert 'header.className = "recipe-edit-ingredient-modal-options-table-header recipe-edit-ingredient-table-grid";' in sync
     assert 'header.dataset.recipeIngredientModalOptionsTableHeader = "";' in sync
-    assert 'header.classList.add("recipe-edit-ingredient-table-grid");' in sync
-    assert "decorateRecipeEditIngredientColumnHeaders(header);" in sync
+    assert "decorateRecipeEditIngredientColumnHeaders(" not in sync
+    assert "recipe-edit-ingredient-table-head" not in sync
     assert "ensureRecipeIngredientModalOptionsTableHeader(summary.container);" in sync
     assert ".recipe-edit-ingredient-modal-options-table-header > [data-ingredient-column]" in script
     assert "syncRecipeIngredientModalDefaultOptionControls(row, panel, summary.container);\n    applyRecipeEditIngredientColumnLayout();" in sync
@@ -5683,6 +5682,7 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert "Ingredient modal options v95: mirror the saved option-group hierarchy while keeping fields editable." in css
     assert "Ingredient modal options v96: expose Ingredient Master Data as a searchable dropdown." in css
     assert "Ingredient modal options v97: use the recipe table's columns, controls, and actions." in css
+    assert "Ingredient modal options v99: modal labels follow column layout without table controls." in css
     assert "[data-recipe-edit-ingredient-master-trigger]" in css
     assert ".recipe-edit-ingredient-modal-selected-option-control" in css
     assert '.recipe-edit-ingredient-modal-selected-option-control[aria-invalid="true"]' in css
