@@ -1298,6 +1298,21 @@ def test_standard_and_alternative_rows_share_one_column_typography_contract():
         assert f'[data-ingredient-column="{column}"]' in contract
 
 
+def test_standard_and_alternative_rows_share_one_drag_icon_size():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    selector = (
+        "body.recipe-edit-standalone-page .recipe-edit-alternative-component-summary\n"
+        "    .recipe-edit-substitution-handle\n"
+        "    svg {"
+    )
+    rule_start = css.index(selector)
+    rule = css[rule_start:css.index("}", rule_start)]
+
+    assert "width: 24px;" in rule
+    assert "height: 24px;" in rule
+
+
 def test_selected_choice_header_shows_option_state_without_losing_editable_source_text():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
