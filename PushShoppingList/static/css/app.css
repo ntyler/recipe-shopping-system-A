@@ -73161,3 +73161,181 @@ body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel
     background-repeat: no-repeat;
     background-size: 14px 14px;
 }
+
+/* Ingredient modal options v97: use the recipe table's columns, controls, and actions. */
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    :is(
+        .recipe-edit-ingredient-modal-selected-option-columns,
+        .recipe-edit-ingredient-modal-options-table-header
+    ) {
+    box-sizing: border-box;
+    display: grid !important;
+    grid-template-columns: var(--recipe-edit-ingredient-grid) !important;
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    align-items: center;
+    column-gap: var(--recipe-edit-ingredient-column-gap, 10px) !important;
+    padding: 0 12px;
+    overflow: visible;
+    border-bottom: 1px solid var(--app-border);
+    background: color-mix(in srgb, var(--app-bg-soft) 78%, var(--app-surface));
+    color: var(--app-muted);
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: .035em;
+    line-height: 1.15;
+    text-transform: uppercase;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    :is(
+        .recipe-edit-ingredient-modal-selected-option-columns,
+        .recipe-edit-ingredient-modal-options-table-header
+    )
+    > .recipe-edit-ingredient-media-header {
+    grid-column: 1 / 3;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    :is(
+        .recipe-edit-ingredient-modal-selected-option-columns,
+        .recipe-edit-ingredient-modal-options-table-header
+    )
+    > [data-ingredient-column] {
+    min-width: 0;
+    overflow: visible;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    overflow: visible;
+    background: var(--app-surface);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row.recipe-edit-ingredient-table-grid {
+    box-sizing: border-box;
+    display: grid !important;
+    grid-template-columns: var(--recipe-edit-ingredient-grid) !important;
+    width: 100%;
+    min-width: 0;
+    min-height: 76px;
+    align-items: center;
+    column-gap: var(--recipe-edit-ingredient-column-gap, 10px) !important;
+    row-gap: 0;
+    padding: 7px 12px;
+    border-top: 0;
+    border-bottom: 1px solid var(--app-border);
+    background: transparent;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row:last-child {
+    border-bottom: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row
+    > .recipe-edit-alternative-component-copy {
+    gap: 1px;
+    padding: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row
+    .recipe-edit-ingredient-modal-selected-option-control {
+    max-width: 100%;
+    border-color: transparent;
+    background-color: transparent;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row
+    :is(
+        .recipe-edit-alternative-component-store,
+        .recipe-edit-alternative-component-type
+    )
+    > .recipe-edit-ingredient-modal-selected-option-control {
+    height: 32px;
+    padding: 4px 24px 4px 7px;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row
+    .recipe-edit-alternative-component-option-spacer.has-ingredient-selected-option-toggle {
+    display: flex;
+    align-items: center;
+    overflow: visible;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row
+    .recipe-edit-selected-option-toggle {
+    width: 100%;
+    min-width: 0;
+}
+
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+        :is(
+            .recipe-edit-ingredient-modal-selected-option-columns,
+            .recipe-edit-ingredient-modal-options-table-header
+        ) {
+        display: none !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+        .recipe-edit-ingredient-modal-selected-option-row.recipe-edit-ingredient-table-grid {
+        grid-template-columns: 40px minmax(0, 1fr) !important;
+        grid-template-rows: auto !important;
+        gap: 5px 8px !important;
+        min-height: 0;
+        padding: 10px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+        .recipe-edit-ingredient-modal-selected-option-row
+        > .recipe-edit-alternative-component-handle-cell {
+        display: none !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+        .recipe-edit-ingredient-modal-selected-option-row
+        > .recipe-edit-alternative-component-image-cell {
+        grid-column: 1 !important;
+        grid-row: 1 / span 2 !important;
+        align-self: start;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+        .recipe-edit-ingredient-modal-selected-option-row
+        > :is(
+            .recipe-edit-alternative-component-copy,
+            .recipe-edit-alternative-component-status,
+            .recipe-edit-alternative-component-quantity,
+            .recipe-edit-alternative-component-unit,
+            .recipe-edit-alternative-component-size,
+            .recipe-edit-alternative-component-store,
+            .recipe-edit-alternative-component-type,
+            .recipe-edit-alternative-component-option-spacer,
+            .recipe-edit-alternative-component-actions
+        ) {
+        display: flex !important;
+        grid-column: 2 !important;
+        grid-row: auto !important;
+        width: 100%;
+        min-width: 0;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+        .recipe-edit-ingredient-modal-selected-option-row
+        > .recipe-edit-alternative-component-copy {
+        display: grid !important;
+    }
+}
