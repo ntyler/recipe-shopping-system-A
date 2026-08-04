@@ -719,7 +719,13 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "alternativeCount && !hasSelectedChoice" in substitution_state
     assert "alternativeCount && hasSelectedChoice" in substitution_state
     assert "alternativeCount && hasSelectedChoice && !isExpanded" not in substitution_state
-    assert "&& !selectedChoiceUsesParentIngredientRow" in substitution_state
+    assert "selectedChoiceUsesParentIngredientRow" not in substitution_state
+    assert (
+        "alternativeCount\n"
+        "        && hasSelectedChoice\n"
+        "        && !hidesSelectedChoiceHeaderInStoreSectionView"
+        in substitution_state
+    )
     assert "row?.recipeIngredientInlineSummarySourceRow" in column_source
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in substitution_state
     assert 'label.textContent += " · Selected";' not in substitution_state
@@ -1304,6 +1310,20 @@ def test_selected_choice_header_shows_option_state_without_losing_editable_sourc
     assert "input.dataset.ingredientChoiceSourceTitle ?? input.value" in title_editor
     assert "input.value = sourceTitle;" in title_editor
     assert "input.dataset.ingredientChoiceSourceTitle = nextValue;" in title_editor
+
+
+def test_selected_choice_header_remains_visible_for_single_ingredient_alternatives():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
+
+    assert "const showsSelectedChoiceGroup = Boolean(" in state
+    assert "alternativeCount" in state
+    assert "&& hasSelectedChoice" in state
+    assert "&& !hidesSelectedChoiceHeaderInStoreSectionView" in state
+    assert "selectedChoiceUsesParentIngredientRow" not in state
 
 
 def test_selected_option_type_terminology_is_shared_by_every_ingredient_choice_view():
