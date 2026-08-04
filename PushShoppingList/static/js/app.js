@@ -48825,7 +48825,8 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
     const parentValues = recipeIngredientChoiceParentValues(row);
     let overview = container.querySelector(":scope > [data-ingredient-choice-overview]");
     const showImplicitDefault = Boolean(
-        alternativeGroups.length || row.classList.contains("is-editing"),
+        alternativeGroups.length || row.classList.contains("is-editing")
+        || recipeIngredientExpansionIsOpen(row),
     );
     if (!showImplicitDefault) {
         overview?.remove();

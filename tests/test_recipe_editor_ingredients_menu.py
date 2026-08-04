@@ -3808,6 +3808,14 @@ def test_recipe_editor_alternative_disclosure_opens_populated_and_empty_rows_inl
     assert "ensureRecipeIngredientAlternativeCards(container)" in state
     assert "viewAll.hidden = true;" in state
 
+    choice_overview = script[
+        script.index("function ensureRecipeIngredientChoiceOverview"):
+        script.index("function materializeRecipeIngredientDefaultOption")
+    ]
+    assert "alternativeGroups.length" in choice_overview
+    assert 'row.classList.contains("is-editing")' in choice_overview
+    assert "recipeIngredientExpansionIsOpen(row)" in choice_overview
+
     visible_count_css = css[css.index("/* Ingredient editor v61:"):]
     assert "@media (min-width: 768px)" in visible_count_css
     assert "> .recipe-edit-ingredient-options-copy" in visible_count_css
