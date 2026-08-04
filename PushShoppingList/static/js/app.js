@@ -27091,6 +27091,9 @@ function syncRecipeIngredientColumnViewGroupProjection(
     const selectionState = String(
         lineItem.dataset.ingredientSelectedChoiceState || "",
     ).trim();
+    const selectionDetails = String(
+        lineItem.dataset.ingredientSelectedChoiceDetails || "",
+    ).trim();
     projection.recipeIngredientOptionSourceRow = sourceRow;
     projection.recipeIngredientColumnViewParentRow = parentRow;
     let summary = projection.querySelector(
@@ -27108,11 +27111,13 @@ function syncRecipeIngredientColumnViewGroupProjection(
         }
         summary = createRecipeIngredientSelectedOptionLineItem(parentRow, sourceRow, {
             selectionState,
+            selectionDetails,
         });
         projection.replaceChildren(summary);
     } else {
         summary.recipeIngredientChoiceParentRow = parentRow;
         summary.dataset.ingredientSelectedChoiceState = selectionState;
+        summary.dataset.ingredientSelectedChoiceDetails = selectionDetails;
         updateRecipeIngredientOptionRowSummary(
             summary,
             sourceRow,
@@ -27122,6 +27127,7 @@ function syncRecipeIngredientColumnViewGroupProjection(
                 fallbackName: "Unnamed ingredient",
                 showMetadata: false,
                 selectionState,
+                selectionDetails,
             },
         );
         syncRecipeIngredientInlineEditor(parentRow, summary);
@@ -31758,6 +31764,7 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
         ? selectionStateElement.querySelector("[data-ingredient-source-label]")
         : null;
     const selectionState = String(options.selectionState || "").trim();
+    const selectionDetails = String(options.selectionDetails || "").trim();
     const editButton = summary.querySelector(".recipe-edit-compact-row-edit");
     syncRecipeIngredientReadImageCell(
         summary.querySelector(".recipe-edit-alternative-component-image-cell"),
@@ -31852,7 +31859,9 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
         if (selectionStateLabel) selectionStateLabel.textContent = selectionState;
         selectionStateElement.classList.toggle("is-selected-choice", Boolean(selectionState));
         selectionStateElement.hidden = !selectionState;
-        selectionStateElement.title = selectionState;
+        selectionStateElement.title = selectionState && selectionDetails
+            ? `${selectionState}: ${selectionDetails}`
+            : selectionState;
     }
     const accessiblePrefix = String(options.accessiblePrefix || "Edit replacement ingredient").trim();
     summary.setAttribute("aria-label", `${accessiblePrefix} ${name}`);
@@ -32007,11 +32016,13 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
 
 function createRecipeIngredientSelectedOptionLineItem(row, sourceRow, options = {}) {
     const selectionState = String(options.selectionState || "").trim();
+    const selectionDetails = String(options.selectionDetails || "").trim();
     const summary = createRecipeIngredientOptionRowSummary(
         "recipe-edit-selected-option-line-item",
     );
     summary.dataset.ingredientSelectedOptionLineItem = "";
     summary.dataset.ingredientSelectedChoiceState = selectionState;
+    summary.dataset.ingredientSelectedChoiceDetails = selectionDetails;
     summary.recipeIngredientOptionSourceRow = sourceRow;
     summary.recipeIngredientChoiceParentRow = row;
 
@@ -32064,6 +32075,7 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow, options = 
             fallbackName: "Unnamed ingredient",
             showMetadata: false,
             selectionState,
+            selectionDetails,
         },
     );
     ensureRecipeIngredientSelectedOptionToggle(row, summary);
@@ -32388,6 +32400,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
             || recipeIngredientOptionTypeLabel(selectedChoice.isDefaultOption)
         )
         : "";
+    const selectionDetails = String(selectedChoice?.summary || "").trim();
     const renderedRows = projectedRows;
     let lineItems = row.querySelector(
         ":scope > [data-ingredient-selected-option-line-items]",
@@ -32433,6 +32446,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
             ...renderedRows.map(sourceRow => (
                 createRecipeIngredientSelectedOptionLineItem(row, sourceRow, {
                     selectionState,
+                    selectionDetails,
                 })
             )),
         );
@@ -32456,6 +32470,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
             const sourceRow = renderedRows[index];
             if (!sourceRow) return;
             summary.dataset.ingredientSelectedChoiceState = selectionState;
+            summary.dataset.ingredientSelectedChoiceDetails = selectionDetails;
             updateRecipeIngredientOptionRowSummary(
                 summary,
                 sourceRow,
@@ -32465,6 +32480,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
                     fallbackName: "Unnamed ingredient",
                     showMetadata: false,
                     selectionState,
+                    selectionDetails,
                 },
             );
             syncRecipeIngredientInlineEditor(row, summary);

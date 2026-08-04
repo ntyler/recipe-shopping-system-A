@@ -879,13 +879,18 @@ def test_grouped_projected_selected_components_inherit_their_choice_state_badge(
     sync_line_items = script[sync_start:sync_end]
 
     assert "lineItem.dataset.ingredientSelectedChoiceState" in projection
+    assert "lineItem.dataset.ingredientSelectedChoiceDetails" in projection
     assert "selectionState," in projection
+    assert "selectionDetails," in projection
     assert 'summary.querySelector("[data-ingredient-source-text]")' in update_summary
     assert 'selectionStateElement.classList.toggle("is-selected-choice", Boolean(selectionState));' in update_summary
     assert "selectionStateElement.hidden = !selectionState;" in update_summary
+    assert "`${selectionState}: ${selectionDetails}`" in update_summary
     assert "options = {}" in create_line_item
     assert "summary.dataset.ingredientSelectedChoiceState = selectionState;" in create_line_item
+    assert "summary.dataset.ingredientSelectedChoiceDetails = selectionDetails;" in create_line_item
     assert "selectedChoice.selectionLabel" in sync_line_items
+    assert "selectedChoice?.summary" in sync_line_items
     assert "recipeIngredientOptionTypeLabel(selectedChoice.isDefaultOption)" in sync_line_items
     assert "createRecipeIngredientSelectedOptionLineItem(row, sourceRow, {" in sync_line_items
 
