@@ -1927,9 +1927,13 @@ def test_ingredient_name_and_buy_as_fields_use_the_normalized_master_data_picker
     assert "function chooseRecipeIngredientMasterOption" in picker
     assert "function recipeIngredientMasterSelectedIndex" in picker
     assert "recipeIngredientProjectedOptionSourceRow(input)" in picker
+    assert "return input.recipeIngredientMasterTargetRow" in picker
+    assert "function syncRecipeIngredientModalSelectedOptionMasterControls" in picker
+    assert "function focusRecipeIngredientMasterSelectionInput" in picker
     assert 'targetField === "purchasable_item"' in picker
     assert 'setRowFieldValue(row, "purchasable_item", name, { dispatch: false });' in picker
     assert "syncRecipeIngredientPurchaseGroup(buyAsField);" in picker
+    assert "focusRecipeIngredientMasterSelectionInput(input, row, targetField, modalPanel);" in picker
     assert 'recipeIngredientDirectField(targetRow, "ingredient_id")' in picker
     for field_name in (
         "master_normalized_name",
@@ -5617,6 +5621,10 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert "function createRecipeIngredientModalSelectedOptionControl(" in sync
     assert "recipeIngredientModalSelectedOptionTargetRow(" in sync
     assert "control.dataset.recipeIngredientModalSelectedOptionField = fieldName;" in sync
+    assert "control.recipeIngredientMasterTargetRow = targetRow;" in sync
+    assert '["ingredient", "purchasable_item"].includes(fieldName)' in sync
+    assert "control.dataset.recipeIngredientMasterField = fieldName;" in sync
+    assert "bindRecipeIngredientMasterPicker(control);" in sync
     for field_name in (
         "ingredient",
         "preparation",
@@ -5666,6 +5674,8 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert ".recipe-edit-ingredient-modal-selected-option-image" in css
     assert ".recipe-edit-ingredient-modal-selected-option-store" in css
     assert "Ingredient modal options v95: mirror the saved option-group hierarchy while keeping fields editable." in css
+    assert "Ingredient modal options v96: expose Ingredient Master Data as a searchable dropdown." in css
+    assert "[data-recipe-edit-ingredient-master-trigger]" in css
     assert ".recipe-edit-ingredient-modal-selected-option-control" in css
     assert '.recipe-edit-ingredient-modal-selected-option-control[aria-invalid="true"]' in css
     assert "grid-template-columns: minmax(0, 1fr);" in css

@@ -73151,3 +73151,13 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-selected-option-c
         grid-row: 4;
     }
 }
+
+/* Ingredient modal options v96: expose Ingredient Master Data as a searchable dropdown. */
+body.recipe-edit-standalone-page dialog.recipe-edit-ingredient-edit-panel
+    [data-recipe-edit-ingredient-master-trigger] {
+    padding-right: 32px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239ca3af' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 9px center;
+    background-repeat: no-repeat;
+    background-size: 14px 14px;
+}

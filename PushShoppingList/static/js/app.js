@@ -32990,6 +32990,7 @@ function createRecipeIngredientModalSelectedOptionControl(
     control.placeholder = String(options.placeholder || "");
     control.recipeIngredientOptionSourceRow = sourceRow;
     control.recipeIngredientTargetField = targetField;
+    control.recipeIngredientMasterTargetRow = targetRow;
     ensureRecipeIngredientModalSelectedOptionSnapshot(panel, sourceRow);
 
     const syncValue = () => {
@@ -33012,6 +33013,11 @@ function createRecipeIngredientModalSelectedOptionControl(
             canonicalizeRecipeIngredientUnitControl(targetField, { allowCustom: true });
             control.value = targetField?.value || control.value;
         });
+    }
+    if (["ingredient", "purchasable_item"].includes(fieldName)) {
+        control.dataset.recipeIngredientMasterField = fieldName;
+        control.removeAttribute("list");
+        bindRecipeIngredientMasterPicker(control);
     }
     return control;
 }
@@ -45977,9 +45983,42 @@ function recipeIngredientMasterTargetRow(input) {
     if (!input) {
         return null;
     }
-    return input.closest("[data-substitution-option-row]")
+    return input.recipeIngredientMasterTargetRow
+        || input.closest("[data-substitution-option-row]")
         || recipeIngredientProjectedOptionSourceRow(input)
         || input.closest(".recipe-edit-ingredient-row");
+}
+
+function syncRecipeIngredientModalSelectedOptionMasterControls(input, targetRow, fieldNames = []) {
+    const selectedOptionRow = input?.closest(
+        ".recipe-edit-ingredient-modal-selected-option-row",
+    );
+    if (!selectedOptionRow || !targetRow) return;
+    const fields = new Set(fieldNames);
+    selectedOptionRow.querySelectorAll(
+        "[data-recipe-ingredient-modal-selected-option-field]",
+    ).forEach(control => {
+        const fieldName = control.dataset.recipeIngredientModalSelectedOptionField;
+        if (fields.size && !fields.has(fieldName)) return;
+        if (control.recipeIngredientMasterTargetRow !== targetRow) return;
+        const source = recipeIngredientDirectField(targetRow, fieldName);
+        if (!source) return;
+        control.value = source.value;
+        control.removeAttribute("aria-invalid");
+        control.title = "";
+    });
+    const modalRow = selectedOptionRow.closest(".recipe-edit-ingredient-row");
+    updateRecipeIngredientModalDirtyStatus(modalRow);
+    updateRecipeEditorDirtyState(modalRow?.closest("#recipeEditForm"));
+}
+
+function focusRecipeIngredientMasterSelectionInput(input, targetRow, fieldName, panel) {
+    const replacement = input?.isConnected
+        ? input
+        : [...(panel?.querySelectorAll(
+            `[data-recipe-ingredient-modal-selected-option-field="${fieldName}"]`,
+        ) || [])].find(control => control.recipeIngredientMasterTargetRow === targetRow);
+    replacement?.focus({ preventScroll: true });
 }
 
 function recipeIngredientMasterSelectedIndex(ingredients, targetRow, input) {
@@ -46185,6 +46224,7 @@ function chooseRecipeIngredientMasterOption(button) {
     const menu = button ? button.closest(".recipe-edit-ingredient-master-menu") : null;
     const input = menu ? menu.recipeEditAnchorButton : null;
     const row = recipeIngredientMasterTargetRow(input);
+    const modalPanel = input?.closest("[data-recipe-ingredient-edit-panel]") || null;
     const name = String(button && button.dataset.masterIngredientName || "").trim();
     if (!input || !row || !name) {
         return false;
@@ -46195,6 +46235,11 @@ function chooseRecipeIngredientMasterOption(button) {
         setRowFieldValue(row, "purchasable_item", name, { dispatch: false });
         const buyAsField = recipeIngredientDirectField(row, "purchasable_item");
         syncRecipeIngredientPurchaseGroup(buyAsField);
+        syncRecipeIngredientModalSelectedOptionMasterControls(
+            input,
+            row,
+            ["purchasable_item"],
+        );
         if (row.matches("[data-substitution-option-row]")) {
             updateRecipeIngredientSubstitutionRowSummary(row);
             updateRecipeIngredientSummary(recipeIngredientParentRowFromControl(row));
@@ -46203,7 +46248,7 @@ function chooseRecipeIngredientMasterOption(button) {
         }
         updateRecipeEditorDirtyState(row.closest("#recipeEditForm"));
         closeRecipeEditRowMenus();
-        input.focus({ preventScroll: true });
+        focusRecipeIngredientMasterSelectionInput(input, row, targetField, modalPanel);
         setRecipeEditStatus(`Selected ${name} as the Buy As ingredient. Save Recipe to keep it.`);
         return false;
     }
@@ -46246,6 +46291,13 @@ function chooseRecipeIngredientMasterOption(button) {
     Object.entries(masterFieldValues).forEach(([field, value]) => {
         setRowFieldValue(row, field, value, { dispatch: false });
     });
+    syncRecipeIngredientModalSelectedOptionMasterControls(
+        input,
+        row,
+        shouldSyncBuyAs
+            ? ["ingredient", "purchasable_item", "store_section"]
+            : ["ingredient", "store_section"],
+    );
 
     let matchDetails = {};
     try {
@@ -46277,7 +46329,7 @@ function chooseRecipeIngredientMasterOption(button) {
     }
     updateRecipeEditorDirtyState(row.closest("#recipeEditForm"));
     closeRecipeEditRowMenus();
-    input.focus({ preventScroll: true });
+    focusRecipeIngredientMasterSelectionInput(input, row, targetField, modalPanel);
     setRecipeEditStatus(`Selected ${name} from Ingredient Master Data. Save Recipe to keep it.`);
     return false;
 }
