@@ -23029,6 +23029,8 @@ const RECIPE_EDIT_CATEGORY_FIELD_NAMES = [...CATEGORY_FIELD_NAMES, RECIPE_EDIT_M
 const RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES = [...RECIPE_EDIT_CATEGORY_FIELD_NAMES, "custom_categories"];
 const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV2";
 const RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY = "ai-pantry-ingredient-view";
+const RECIPE_EDIT_INGREDIENT_DISPLAY_PREFERENCES_STORAGE_KEY =
+    "ai-pantry:recipe-editor:ingredient-display:v1";
 const RECIPE_EDIT_INGREDIENT_VIEWS = new Set(["recipe", "smart", "table"]);
 const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [
     "media",
@@ -23846,6 +23848,7 @@ async function openRecipeEditor(button, options = {}) {
         return;
     }
 
+    restoreRecipeEditIngredientDisplayPreferences();
     initRecipeEditTabs();
     initRecipeEditContextPanels();
     rememberRecipeEditorReturnState(button, url);
@@ -26494,6 +26497,63 @@ function recipeEditIngredientColumnStorageKey() {
     return userId ? `${RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY}:${userId}` : RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY;
 }
 
+function recipeEditIngredientDisplayPreferencesStorageKey() {
+    const userId = String(document.body?.dataset?.userId || "").trim();
+    return userId
+        ? `${RECIPE_EDIT_INGREDIENT_DISPLAY_PREFERENCES_STORAGE_KEY}:${encodeURIComponent(userId)}`
+        : "";
+}
+
+function normalizeRecipeEditIngredientDisplayPreferences(value) {
+    const preferences = value && typeof value === "object" && !Array.isArray(value)
+        ? value
+        : {};
+    return {
+        groupByStoreSection: typeof preferences.groupByStoreSection === "boolean"
+            ? preferences.groupByStoreSection
+            : false,
+        hideEmptyFields: typeof preferences.hideEmptyFields === "boolean"
+            ? preferences.hideEmptyFields
+            : false,
+        hideMatchingBuyAs: typeof preferences.hideMatchingBuyAs === "boolean"
+            ? preferences.hideMatchingBuyAs
+            : false,
+    };
+}
+
+function loadRecipeEditIngredientDisplayPreferences() {
+    const storageKey = recipeEditIngredientDisplayPreferencesStorageKey();
+    if (!storageKey) return normalizeRecipeEditIngredientDisplayPreferences(null);
+    try {
+        const saved = window.localStorage.getItem(storageKey);
+        return normalizeRecipeEditIngredientDisplayPreferences(saved ? JSON.parse(saved) : null);
+    } catch (_error) {
+        return normalizeRecipeEditIngredientDisplayPreferences(null);
+    }
+}
+
+function restoreRecipeEditIngredientDisplayPreferences() {
+    const preferences = loadRecipeEditIngredientDisplayPreferences();
+    recipeEditIngredientColumnView.groupByStoreSection = preferences.groupByStoreSection;
+    recipeEditIngredientColumnView.hideEmptyFields = preferences.hideEmptyFields;
+    recipeEditIngredientColumnView.hideMatchingBuyAs = preferences.hideMatchingBuyAs;
+    return preferences;
+}
+
+function saveRecipeEditIngredientDisplayPreferences() {
+    const storageKey = recipeEditIngredientDisplayPreferencesStorageKey();
+    if (!storageKey) return;
+    try {
+        window.localStorage.setItem(storageKey, JSON.stringify({
+            groupByStoreSection: Boolean(recipeEditIngredientColumnView.groupByStoreSection),
+            hideEmptyFields: Boolean(recipeEditIngredientColumnView.hideEmptyFields),
+            hideMatchingBuyAs: Boolean(recipeEditIngredientColumnView.hideMatchingBuyAs),
+        }));
+    } catch (_error) {
+        // The toggles still work for this visit when browser storage is unavailable.
+    }
+}
+
 function clampRecipeEditIngredientColumnWidth(key, value) {
     const definition = RECIPE_EDIT_INGREDIENT_COLUMNS[key];
     const numeric = Number(value);
@@ -27734,6 +27794,9 @@ function clearRecipeIngredientColumnView(columnKey = "", options = {}) {
             hideMatchingBuyAs: false,
         };
     }
+    if (!columnKey || columnKey === "store" || columnKey === "ingredient") {
+        saveRecipeEditIngredientDisplayPreferences();
+    }
     applyRecipeIngredientColumnView({ announce: options.announce !== false });
     syncRecipeIngredientColumnViewOpenMenu();
     return false;
@@ -27975,6 +28038,7 @@ function renderRecipeIngredientColumnViewMenu(menu) {
             recipeEditIngredientColumnView.hideEmptyFields = Boolean(
                 event.currentTarget.checked,
             );
+            saveRecipeEditIngredientDisplayPreferences();
             applyRecipeIngredientColumnView({ announce: true });
             syncRecipeIngredientColumnViewMenuState(menu);
         });
@@ -27983,6 +28047,7 @@ function renderRecipeIngredientColumnViewMenu(menu) {
             recipeEditIngredientColumnView.hideMatchingBuyAs = Boolean(
                 event.currentTarget.checked,
             );
+            saveRecipeEditIngredientDisplayPreferences();
             applyRecipeIngredientColumnView({ announce: true });
             syncRecipeIngredientColumnViewMenuState(menu);
         });
@@ -28010,6 +28075,7 @@ function renderRecipeIngredientColumnViewMenu(menu) {
             recipeEditIngredientColumnView.groupByStoreSection = Boolean(
                 event.currentTarget.checked,
             );
+            saveRecipeEditIngredientDisplayPreferences();
             applyRecipeIngredientColumnView({ announce: true });
             syncRecipeIngredientColumnViewOpenMenu({ render: true });
         });

@@ -819,6 +819,137 @@ def test_recipe_editor_store_section_menu_can_group_rows_without_reordering_row_
     assert "data-recipe-ingredient-column-view-menu=\"store\"" in css
 
 
+def test_recipe_editor_display_toggle_preferences_persist_per_user_and_recover_safely():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    helper_start = script.index("function recipeEditIngredientDisplayPreferencesStorageKey")
+    helper_end = script.index("function clampRecipeEditIngredientColumnWidth", helper_start)
+    helpers = script[helper_start:helper_end]
+    node = shutil.which("node")
+
+    if not node:
+        pytest.skip("Node.js is not available for the recipe editor preference regression")
+
+    harness = """
+const RECIPE_EDIT_INGREDIENT_DISPLAY_PREFERENCES_STORAGE_KEY =
+    "ai-pantry:recipe-editor:ingredient-display:v1";
+let recipeEditIngredientColumnView = {
+    filterKeys: new Map([["ingredient", new Set(["saved-filter"])]]),
+    sorts: [{ columnKey: "ingredient", mode: "az" }],
+    groupByStoreSection: false,
+    hideEmptyFields: false,
+    hideMatchingBuyAs: false,
+};
+class MemoryStorage {
+    constructor() {
+        this.values = new Map();
+    }
+    getItem(key) {
+        return this.values.has(key) ? this.values.get(key) : null;
+    }
+    setItem(key, value) {
+        this.values.set(key, String(value));
+    }
+}
+const document = { body: { dataset: { userId: "" } } };
+const window = { localStorage: new MemoryStorage() };
+""" + helpers + """
+
+const defaults = loadRecipeEditIngredientDisplayPreferences();
+
+document.body.dataset.userId = "user/a";
+recipeEditIngredientColumnView.groupByStoreSection = true;
+recipeEditIngredientColumnView.hideEmptyFields = true;
+recipeEditIngredientColumnView.hideMatchingBuyAs = true;
+saveRecipeEditIngredientDisplayPreferences();
+const userAKey = recipeEditIngredientDisplayPreferencesStorageKey();
+const savedUserA = JSON.parse(window.localStorage.getItem(userAKey));
+
+recipeEditIngredientColumnView.groupByStoreSection = false;
+recipeEditIngredientColumnView.hideEmptyFields = false;
+recipeEditIngredientColumnView.hideMatchingBuyAs = false;
+const restoredUserA = restoreRecipeEditIngredientDisplayPreferences();
+
+document.body.dataset.userId = "user/b";
+const userBKey = recipeEditIngredientDisplayPreferencesStorageKey();
+const initialUserB = restoreRecipeEditIngredientDisplayPreferences();
+recipeEditIngredientColumnView.hideEmptyFields = true;
+saveRecipeEditIngredientDisplayPreferences();
+const savedUserB = JSON.parse(window.localStorage.getItem(userBKey));
+
+document.body.dataset.userId = "user/a";
+const isolatedUserA = restoreRecipeEditIngredientDisplayPreferences();
+
+document.body.dataset.userId = "malformed-user";
+const malformedKey = recipeEditIngredientDisplayPreferencesStorageKey();
+window.localStorage.setItem(malformedKey, "{broken-json");
+const malformed = loadRecipeEditIngredientDisplayPreferences();
+window.localStorage.setItem(malformedKey, JSON.stringify({
+    groupByStoreSection: true,
+    hideEmptyFields: "yes",
+}));
+const partiallyMalformed = loadRecipeEditIngredientDisplayPreferences();
+
+document.body.dataset.userId = "missing-user";
+const missing = loadRecipeEditIngredientDisplayPreferences();
+
+process.stdout.write(JSON.stringify({
+    defaults,
+    userAKey,
+    userBKey,
+    savedUserA,
+    restoredUserA,
+    initialUserB,
+    savedUserB,
+    isolatedUserA,
+    malformed,
+    partiallyMalformed,
+    missing,
+    filterCount: recipeEditIngredientColumnView.filterKeys.size,
+    sorts: recipeEditIngredientColumnView.sorts,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    defaults = {
+        "groupByStoreSection": False,
+        "hideEmptyFields": False,
+        "hideMatchingBuyAs": False,
+    }
+    assert result["defaults"] == defaults
+    assert result["savedUserA"] == {
+        "groupByStoreSection": True,
+        "hideEmptyFields": True,
+        "hideMatchingBuyAs": True,
+    }
+    assert result["restoredUserA"] == result["savedUserA"]
+    assert result["userAKey"] != result["userBKey"]
+    assert result["initialUserB"] == defaults
+    assert result["savedUserB"] == {
+        "groupByStoreSection": False,
+        "hideEmptyFields": True,
+        "hideMatchingBuyAs": False,
+    }
+    assert result["isolatedUserA"] == result["savedUserA"]
+    assert result["malformed"] == defaults
+    assert result["partiallyMalformed"] == {
+        "groupByStoreSection": True,
+        "hideEmptyFields": False,
+        "hideMatchingBuyAs": False,
+    }
+    assert result["missing"] == defaults
+    assert result["filterCount"] == 1
+    assert result["sorts"] == [{"columnKey": "ingredient", "mode": "az"}]
+
+
 def test_store_section_grouping_projects_selected_components_into_their_own_sections():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
