@@ -5623,6 +5623,16 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     ):
         assert f'["{column_key}", "{column_name}"' in sync
     assert "function createRecipeIngredientModalSelectedOptionControl(" in sync
+    assert "function bindRecipeIngredientModalSelectedOptionPicker(control, fieldName)" in sync
+    assert "bindRecipeIngredientUnitPickerTrigger(control);" in sync
+    assert "ensureRecipeIngredientInlineStoreSectionTrigger(control, control)" in sync
+    assert "ensureRecipeIngredientInlineTypeTrigger(control, control)" in sync
+    assert 'trigger.classList.add("recipe-edit-ingredient-modal-selected-option-picker");' in sync
+    assert 'bindRecipeIngredientModalSelectedOptionPicker(unitControl, "unit");' in sync
+    assert 'bindRecipeIngredientModalSelectedOptionPicker(storeControl, "store_section");' in sync
+    assert 'bindRecipeIngredientModalSelectedOptionPicker(typeControl, "section");' in sync
+    assert 'select[data-recipe-ingredient-modal-selected-option-field="store_section"]' in script
+    assert 'select[data-recipe-ingredient-modal-selected-option-field="section"]' in script
     assert "recipeIngredientModalSelectedOptionTargetRow(" in sync
     assert "control.dataset.recipeIngredientModalSelectedOptionField = fieldName;" in sync
     assert "control.recipeIngredientMasterTargetRow = targetRow;" in sync

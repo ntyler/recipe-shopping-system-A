@@ -33007,8 +33007,17 @@ function createRecipeIngredientModalSelectedOptionControl(
         control.title = "";
         if (fieldName === "store_section") {
             syncRecipeIngredientStoreSectionControl(targetField);
+            syncRecipeIngredientStoreSectionTrigger(
+                control.recipeIngredientModalSelectedOptionTrigger,
+                control.value,
+            );
         } else if (fieldName === "section") {
             syncRecipeIngredientTypeControl(targetField);
+            syncRecipeIngredientTypeTrigger(
+                control.recipeIngredientModalSelectedOptionTrigger,
+                control,
+                control.value,
+            );
         }
         updateRecipeIngredientModalDirtyStatus(modalRow);
         updateRecipeEditorDirtyState(modalRow.closest("#recipeEditForm"));
@@ -33027,6 +33036,29 @@ function createRecipeIngredientModalSelectedOptionControl(
         bindRecipeIngredientMasterPicker(control);
     }
     return control;
+}
+
+function bindRecipeIngredientModalSelectedOptionPicker(control, fieldName) {
+    if (!control) return null;
+    if (fieldName === "unit") {
+        bindRecipeIngredientUnitPickerTrigger(control);
+        return control;
+    }
+    if (control.tagName !== "SELECT" || !["store_section", "section"].includes(fieldName)) {
+        return null;
+    }
+
+    control.dataset.recipeIngredientInlineField = fieldName;
+    const trigger = fieldName === "store_section"
+        ? ensureRecipeIngredientInlineStoreSectionTrigger(control, control)
+        : ensureRecipeIngredientInlineTypeTrigger(control, control);
+    delete control.dataset.recipeIngredientInlineField;
+    if (!trigger) return null;
+
+    trigger.classList.add("recipe-edit-ingredient-modal-selected-option-picker");
+    trigger.setAttribute("aria-label", control.getAttribute("aria-label") || fieldName);
+    control.recipeIngredientModalSelectedOptionTrigger = trigger;
+    return trigger;
 }
 
 function createRecipeIngredientModalSelectedOptionRow(
@@ -33113,12 +33145,13 @@ function createRecipeIngredientModalSelectedOptionRow(
         `Quantity for ${ingredientName}`,
         { value: values.quantity, placeholder: "Qty" },
     );
-    replaceControl(
+    const unitControl = replaceControl(
         "[data-alternative-component-unit]",
         "unit",
         `Unit for ${ingredientName}`,
         { value: values.unit, placeholder: "Unit" },
     );
+    bindRecipeIngredientModalSelectedOptionPicker(unitControl, "unit");
     replaceControl(
         "[data-alternative-component-size]",
         "size",
@@ -33127,25 +33160,29 @@ function createRecipeIngredientModalSelectedOptionRow(
     );
     const storeCell = item.querySelector(".recipe-edit-alternative-component-store");
     if (storeCell) {
-        storeCell.replaceChildren(createRecipeIngredientModalSelectedOptionControl(
+        const storeControl = createRecipeIngredientModalSelectedOptionControl(
             panel,
             modalRow,
             sourceRow,
             "store_section",
             `Store section for ${ingredientName}`,
             { value: values.store_section },
-        ));
+        );
+        storeCell.replaceChildren(storeControl);
+        bindRecipeIngredientModalSelectedOptionPicker(storeControl, "store_section");
     }
     const typeCell = item.querySelector(".recipe-edit-alternative-component-type");
     if (typeCell) {
-        typeCell.replaceChildren(createRecipeIngredientModalSelectedOptionControl(
+        const typeControl = createRecipeIngredientModalSelectedOptionControl(
             panel,
             modalRow,
             sourceRow,
             "section",
             `Type for ${ingredientName}`,
             { value: values.section },
-        ));
+        );
+        typeCell.replaceChildren(typeControl);
+        bindRecipeIngredientModalSelectedOptionPicker(typeControl, "section");
     }
 
     const optionCell = item.querySelector(".recipe-edit-alternative-component-option-spacer");
@@ -43867,9 +43904,13 @@ function recipeIngredientCustomStoreSectionNames() {
 }
 
 function refreshRecipeIngredientStoreSectionSelectOptions(scope = document) {
-    const selects = scope.matches && scope.matches('select[data-field="store_section"]')
+    const selector = [
+        'select[data-field="store_section"]',
+        'select[data-recipe-ingredient-modal-selected-option-field="store_section"]',
+    ].join(", ");
+    const selects = scope.matches && scope.matches(selector)
         ? [scope]
-        : [...scope.querySelectorAll('select[data-field="store_section"]')];
+        : [...scope.querySelectorAll(selector)];
     selects.forEach(select => {
         const selectedValue = String(select.value || "").trim();
         select.innerHTML = recipeStoreSectionOptions(selectedValue);
@@ -44430,9 +44471,13 @@ function recipeIngredientTypeOptions(selected, optional = false) {
 }
 
 function refreshRecipeIngredientTypeSelectOptions(scope = document) {
-    const selects = scope.matches && scope.matches('select[data-field="section"]')
+    const selector = [
+        'select[data-field="section"]',
+        'select[data-recipe-ingredient-modal-selected-option-field="section"]',
+    ].join(", ");
+    const selects = scope.matches && scope.matches(selector)
         ? [scope]
-        : [...scope.querySelectorAll('select[data-field="section"]')];
+        : [...scope.querySelectorAll(selector)];
     selects.forEach(select => {
         const selectedValue = String(select.value || "").trim();
         select.innerHTML = recipeIngredientTypeOptions(selectedValue);
