@@ -502,6 +502,22 @@ def test_editor_uses_nested_table_rows_instead_of_cards_or_radio_choices():
     assert ".recipe-edit-ingredient-option-group::before" in css
 
 
+def test_expanded_ingredient_row_preserves_collapsed_header_spacing():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    options_css = css[
+        css.index("/* Ingredient editor v44:"):
+        css.index("/* Ingredient editor v45:")
+    ]
+    rule_start = options_css.index(
+        "> .recipe-edit-ingredient-row.recipe-edit-substitutions-open {"
+    )
+    rule = options_css[rule_start:options_css.index("}", rule_start)]
+
+    assert "grid-template-rows: minmax(58px, auto) auto !important;" in rule
+    assert "row-gap: 8px !important;" in rule
+    assert "minmax(52px, auto)" not in rule
+
+
 def test_editor_option_selection_is_always_visible_and_directly_changeable():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

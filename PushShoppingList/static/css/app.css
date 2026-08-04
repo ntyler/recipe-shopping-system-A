@@ -65681,7 +65681,8 @@ body.recipe-edit-standalone-page
     body.recipe-edit-standalone-page #recipeEditIngredients
         > .recipe-edit-ingredient-row.recipe-edit-substitutions-open {
         display: grid !important;
-        grid-template-rows: minmax(52px, auto) auto !important;
+        grid-template-rows: minmax(58px, auto) auto !important;
+        row-gap: 8px !important;
     }
 }
 
