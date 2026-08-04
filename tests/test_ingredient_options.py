@@ -540,6 +540,23 @@ def test_editor_option_selection_is_always_visible_and_directly_changeable():
     assert ".recipe-edit-alternative-component-summary:not(:hover, :focus-within)" in css
 
 
+def test_selecting_an_option_preserves_an_open_group_after_projection_rebuild():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    selection = script[
+        script.index("function applyRecipeIngredientOptionSelection"):
+        script.index("function setRecipeIngredientOptionSelected")
+    ]
+
+    assert "const preserveExpandedOptions = !container.hidden;" in selection
+    assert selection.index("setRecipeIngredientDefaultOption(") < selection.index(
+        "if (preserveExpandedOptions)"
+    )
+    assert '"[data-ingredient-substitutions-toggle]"' in selection
+    assert "setRecipeIngredientSubstitutionsExpanded(" in selection
+    assert "optionsButton || ingredientRow" in selection
+    assert "{ restoreOtherEdits: false }" in selection
+
+
 def test_selecting_an_option_focuses_its_record_in_the_open_ingredient_modal():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     selection = script[

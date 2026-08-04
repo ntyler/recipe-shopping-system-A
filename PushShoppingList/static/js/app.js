@@ -47722,12 +47722,30 @@ function applyRecipeIngredientOptionSelection(ingredientRow, optionId) {
         return false;
     }
 
+    // Changing a multi-ingredient choice rebuilds its projected rows in the
+    // grouped store-section view. If the options panel is mounted beneath one
+    // of those projections, the stale projection cleanup moves and hides it.
+    // Remember the user's disclosure state and remount the same panel beneath
+    // the newly selected choice once the projections have settled.
+    const preserveExpandedOptions = !container.hidden;
+
     setRecipeIngredientDefaultOption(
         ingredientRow,
         alternativeGroups,
         normalizedOptionId,
         selectedGroupIndex,
     );
+    if (preserveExpandedOptions) {
+        const optionsButton = ingredientRow.querySelector(
+            "[data-ingredient-substitutions-toggle]",
+        );
+        setRecipeIngredientSubstitutionsExpanded(
+            ingredientRow,
+            optionsButton || ingredientRow,
+            true,
+            { restoreOtherEdits: false },
+        );
+    }
     return true;
 }
 
