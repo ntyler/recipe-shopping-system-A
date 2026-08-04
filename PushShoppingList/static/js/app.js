@@ -47722,9 +47722,7 @@ function setRecipeIngredientOptionSelected(button) {
         ? button.closest("[data-ingredient-choice-overview]")
         : null;
     const option = card || overview;
-    const ingredientRow = option
-        ? option.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])")
-        : null;
+    const ingredientRow = recipeIngredientParentRowFromControl(button);
     if (!option || !ingredientRow) {
         return false;
     }

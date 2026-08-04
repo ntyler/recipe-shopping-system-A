@@ -562,6 +562,17 @@ def test_selecting_an_option_focuses_its_record_in_the_open_ingredient_modal():
     assert "!options.skipUnsavedCheck && recipeIngredientModalHasChanges(row)" in option_modal
 
 
+def test_selecting_an_option_resolves_its_parent_from_projected_store_section_rows():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    selection = script[
+        script.index("function setRecipeIngredientOptionSelected"):
+        script.index("function setRecipeIngredientAlternativePreferred")
+    ]
+
+    assert "const ingredientRow = recipeIngredientParentRowFromControl(button);" in selection
+    assert 'option.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])")' not in selection
+
+
 def test_group_parent_uses_authoritative_recipe_text_and_choice_only_metadata():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
