@@ -73364,3 +73364,57 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     > [data-recipe-edit-ingredient-column-hidden="true"] {
     display: none !important;
 }
+
+/* Ingredient modal options v100: seat the edit action inside its table cell. */
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row
+    > .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions {
+    box-sizing: border-box;
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 48px !important;
+    align-self: stretch !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row
+    > .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
+    > .recipe-edit-compact-row-edit {
+    box-sizing: border-box;
+    display: inline-flex !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    align-items: center;
+    justify-content: center;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 38%, var(--app-border)) !important;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--app-primary) 8%, var(--app-surface)) !important;
+    color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row
+    > .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
+    > .recipe-edit-compact-row-edit:is(:hover, :focus-visible) {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 64%, var(--app-border)) !important;
+    background: color-mix(in srgb, var(--app-primary) 16%, var(--app-surface)) !important;
+    color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-row
+    > .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions
+    > .recipe-edit-compact-row-edit
+    :is(.recipe-edit-inline-icon, svg) {
+    width: 15px;
+    height: 15px;
+}
