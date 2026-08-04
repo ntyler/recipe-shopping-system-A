@@ -5593,7 +5593,27 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert 'label.textContent = String(selection.optionLabel || selection.prefix || "Selected option");' in sync
     assert 'summary.textContent = String(selection.groupTitle || "").trim()' in sync
     assert 'list.setAttribute("aria-label", `${label.textContent} ingredients`);' in sync
-    assert 'columns.className = "recipe-edit-ingredient-modal-selected-option-columns"' not in sync
+    assert "function createRecipeIngredientModalSelectedOptionColumns()" in sync
+    assert 'columns.className = "recipe-edit-ingredient-modal-selected-option-columns";' in sync
+    assert '["Quantity", "Unit"].forEach(label =>' in sync
+    assert "function ensureRecipeIngredientModalOptionsTableHeader(container)" in sync
+    assert 'header.dataset.recipeIngredientModalOptionsTableHeader = "";' in sync
+    assert "applyRecipeIngredientTableGridContract(header, cells);" in sync
+    assert "ensureRecipeIngredientModalOptionsTableHeader(summary.container);" in sync
+    assert ".recipe-edit-ingredient-modal-options-table-header > [data-ingredient-column]" in script
+    assert "syncRecipeIngredientModalDefaultOptionControls(row, panel, summary.container);\n    applyRecipeEditIngredientColumnLayout();" in sync
+    for column_name in (
+        "Ingredient",
+        "Status",
+        "Quantity",
+        "Unit",
+        "Size",
+        "Store Section",
+        "Type",
+        "Options",
+    ):
+        assert f'createColumn("{column_name}")' in sync
+    assert 'actions: createColumn("Actions", "is-actions")' in sync
     assert "function createRecipeIngredientModalSelectedOptionControl(" in sync
     assert "recipeIngredientModalSelectedOptionTargetRow(" in sync
     assert "control.dataset.recipeIngredientModalSelectedOptionField = fieldName;" in sync
@@ -5641,6 +5661,8 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert ".recipe-edit-ingredient-modal-selected-option-heading" in css
     assert ".recipe-edit-ingredient-modal-selected-option-row" in css
     assert ".recipe-edit-ingredient-modal-selected-option-columns" in css
+    assert ".recipe-edit-ingredient-modal-selected-option-column-amount" in css
+    assert ".recipe-edit-ingredient-modal-options-table-header" in css
     assert ".recipe-edit-ingredient-modal-selected-option-image" in css
     assert ".recipe-edit-ingredient-modal-selected-option-store" in css
     assert "Ingredient modal options v95: mirror the saved option-group hierarchy while keeping fields editable." in css

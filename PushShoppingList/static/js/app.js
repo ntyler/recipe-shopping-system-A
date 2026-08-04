@@ -28157,6 +28157,7 @@ function applyRecipeEditIngredientColumnVisibility(layout) {
         row.querySelectorAll(
             ".recipe-edit-ingredient-mobile-header > [data-ingredient-column], "
             + ".recipe-edit-selected-choice-group-header > [data-ingredient-column], "
+            + ".recipe-edit-ingredient-modal-options-table-header > [data-ingredient-column], "
             + ".recipe-edit-alternative-component-summary > [data-ingredient-column]"
         ).forEach(cell => {
             if (hidden.has(cell.dataset.ingredientColumn)) {
@@ -28207,6 +28208,7 @@ function clearRecipeEditIngredientColumnLayoutStyles() {
         row.querySelectorAll(
             ".recipe-edit-ingredient-mobile-header > [data-ingredient-column], "
             + ".recipe-edit-selected-choice-group-header > [data-ingredient-column], "
+            + ".recipe-edit-ingredient-modal-options-table-header > [data-ingredient-column], "
             + ".recipe-edit-alternative-component-summary > [data-ingredient-column]"
         ).forEach(cell => {
             delete cell.dataset.recipeEditIngredientColumnHidden;
@@ -28246,6 +28248,7 @@ function applyRecipeEditIngredientColumnLayoutToRow(row, layout, positions, minW
     row.querySelectorAll(
         ".recipe-edit-ingredient-mobile-header > [data-ingredient-column], "
         + ".recipe-edit-selected-choice-group-header > [data-ingredient-column], "
+        + ".recipe-edit-ingredient-modal-options-table-header > [data-ingredient-column], "
         + ".recipe-edit-alternative-component-summary > [data-ingredient-column]"
     ).forEach(cell => {
         const key = cell.dataset.ingredientColumn;
@@ -33137,6 +33140,77 @@ function createRecipeIngredientModalSelectedOptionRow(
     return item;
 }
 
+function createRecipeIngredientModalSelectedOptionColumns() {
+    const columns = document.createElement("div");
+    columns.className = "recipe-edit-ingredient-modal-selected-option-columns";
+    columns.setAttribute("role", "row");
+    const appendColumn = (label, className = "") => {
+        const column = document.createElement("span");
+        column.className = className;
+        column.setAttribute("role", "columnheader");
+        column.textContent = label;
+        columns.appendChild(column);
+        return column;
+    };
+    const media = appendColumn("", "is-media");
+    media.setAttribute("aria-hidden", "true");
+    appendColumn("Ingredient", "is-ingredient");
+    const amount = document.createElement("span");
+    amount.className = "recipe-edit-ingredient-modal-selected-option-column-amount";
+    amount.setAttribute("role", "presentation");
+    ["Quantity", "Unit"].forEach(label => {
+        const column = document.createElement("span");
+        column.setAttribute("role", "columnheader");
+        column.textContent = label;
+        amount.appendChild(column);
+    });
+    columns.appendChild(amount);
+    appendColumn("Store Section", "is-store");
+    appendColumn("Type", "is-type");
+    return columns;
+}
+
+function ensureRecipeIngredientModalOptionsTableHeader(container) {
+    if (!container) return null;
+    let header = container.querySelector(
+        ":scope > [data-recipe-ingredient-modal-options-table-header]",
+    );
+    if (header) return header;
+    header = document.createElement("div");
+    header.className = "recipe-edit-ingredient-modal-options-table-header";
+    header.dataset.recipeIngredientModalOptionsTableHeader = "";
+    header.setAttribute("role", "row");
+    const createColumn = (label, className = "") => {
+        const column = document.createElement("span");
+        column.className = className;
+        column.textContent = label;
+        column.setAttribute("role", "columnheader");
+        return column;
+    };
+    const cells = {
+        ingredient: createColumn("Ingredient"),
+        status: createColumn("Status"),
+        quantity: createColumn("Quantity"),
+        unit: createColumn("Unit"),
+        size: createColumn("Size"),
+        store: createColumn("Store Section"),
+        type: createColumn("Type"),
+        alternatives: createColumn("Options"),
+        actions: createColumn("Actions", "is-actions"),
+    };
+    applyRecipeIngredientTableGridContract(header, cells);
+    [...header.children].forEach(cell => {
+        if (!cell.hasAttribute("aria-hidden")) cell.setAttribute("role", "columnheader");
+    });
+    const heading = container.querySelector(":scope > .recipe-edit-substitution-heading");
+    if (heading) {
+        heading.after(header);
+    } else {
+        container.prepend(header);
+    }
+    return header;
+}
+
 function renderRecipeIngredientModalSelectedOptionPreview(panel, selection, optionCount) {
     const preview = panel?.querySelector("[data-recipe-ingredient-modal-selected-option]");
     if (!preview) return;
@@ -33192,6 +33266,7 @@ function renderRecipeIngredientModalSelectedOptionPreview(panel, selection, opti
     list.setAttribute("role", "list");
     list.setAttribute("aria-label", `${label.textContent} ingredients`);
     list.classList.toggle("is-multi-component", valuesList.length > 1);
+    list.appendChild(createRecipeIngredientModalSelectedOptionColumns());
 
     valuesList.forEach((values, index) => {
         list.appendChild(createRecipeIngredientModalSelectedOptionRow(
@@ -33352,7 +33427,9 @@ function syncRecipeIngredientModalOptions(row, panel = null) {
     }
     summary.container.hidden = false;
     summary.container.classList.add("recipe-edit-ingredient-modal-options-panel");
+    ensureRecipeIngredientModalOptionsTableHeader(summary.container);
     syncRecipeIngredientModalDefaultOptionControls(row, panel, summary.container);
+    applyRecipeEditIngredientColumnLayout();
     setRecipeIngredientModalOptionsExpanded(
         panel,
         selection.needsAttention || recipeEditIngredientModalOptionsExpanded,
