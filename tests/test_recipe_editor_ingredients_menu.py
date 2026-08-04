@@ -5875,3 +5875,24 @@ def test_single_component_choice_stays_on_the_parent_row_with_the_shared_header(
     ]
     assert "controlledSummary.recipeIngredientOptionSourceRow !== row" in expansion
     assert "summary.recipeIngredientOptionSourceRow !== row" in expansion
+
+
+def test_ingredient_modal_selected_option_header_stays_above_shared_summary_rows():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    placement = css[css.index(
+        "/* Ingredient modal options v98: keep preview headers ahead of inherited summary rows. */"
+    ):]
+
+    header_rule = placement[placement.index(
+        "> .recipe-edit-ingredient-modal-selected-option-columns {"
+    ):]
+    header_rule = header_rule[:header_rule.index("}")]
+    assert "grid-column: 1 / -1 !important;" in header_rule
+    assert "grid-row: 1 !important;" in header_rule
+
+    row_rule = placement[placement.index(
+        "> .recipe-edit-ingredient-modal-selected-option-row.recipe-edit-ingredient-table-grid {"
+    ):]
+    row_rule = row_rule[:row_rule.index("}")]
+    assert "grid-column: 1 / -1 !important;" in row_rule
+    assert "grid-row: auto !important;" in row_rule

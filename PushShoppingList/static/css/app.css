@@ -73339,3 +73339,18 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
         display: grid !important;
     }
 }
+
+/* Ingredient modal options v98: keep preview headers ahead of inherited summary rows. */
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-list
+    > .recipe-edit-ingredient-modal-selected-option-columns {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
+    .recipe-edit-ingredient-modal-selected-option-list
+    > .recipe-edit-ingredient-modal-selected-option-row.recipe-edit-ingredient-table-grid {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+}
