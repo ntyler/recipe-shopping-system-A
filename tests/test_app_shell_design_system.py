@@ -466,7 +466,9 @@ def test_recipe_edit_route_renders_exactly_one_shared_shell(monkeypatch, tmp_pat
     with app.test_client() as client:
         with client.session_transaction() as session:
             session["user_id"] = "shell-route-user"
-        response = client.get("/recipe/edit?url=https%3A%2F%2Fexample.test%2Frecipes%2Fsoup")
+        response = client.get(
+            "/recipe/edit?user_id=shell-route-user&url=https%3A%2F%2Fexample.test%2Frecipes%2Fsoup"
+        )
 
     html = response.get_data(as_text=True)
     assert response.status_code == 200

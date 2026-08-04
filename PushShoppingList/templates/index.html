@@ -198,7 +198,7 @@ data-app-initial-page="{{ initial_app_page|default('') }}"
                                     </button>
                                 </div>
                                 <a class="app-home-recipe-media"
-                                   href="{{ url_for('recipe_bp.edit_recipe_page_route', url=recipe.url) }}"
+                                   href="{{ recipe_edit_page_url(recipe.url) }}"
                                    data-recipe-url="{{ recipe.url }}"
                                    onclick="return openRecipeEditPageFromMenu(this, event)">
                                     {% if recipe.cover_image and recipe.cover_image.src %}
@@ -211,7 +211,7 @@ data-app-initial-page="{{ initial_app_page|default('') }}"
                                     {% endif %}
                                 </a>
                                 <div class="app-recipe-card-body app-home-recipe-body">
-                                    <h3><a href="{{ url_for('recipe_bp.edit_recipe_page_route', url=recipe.url) }}"
+                                    <h3><a href="{{ recipe_edit_page_url(recipe.url) }}"
                                            data-recipe-url="{{ recipe.url }}"
                                            onclick="return openRecipeEditPageFromMenu(this, event)">{{ recipe.name }}</a></h3>
                                     <div class="app-recipe-card-metadata app-home-recipe-metadata">

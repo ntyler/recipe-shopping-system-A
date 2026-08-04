@@ -861,7 +861,7 @@
                                                                             Add to current recipes
                                                                         </button>
                                                                         <a class="recipe-edit-menu-link"
-                                                                           href="{{ url_for('recipe_bp.edit_recipe_page_route', url=recipe.url) }}"
+                                                                           href="{{ recipe_edit_page_url(recipe.url) }}"
                                                                            data-recipe-url="{{ recipe.url }}"
                                                                            onclick="return openRecipeEditPageFromMenu(this, event)">
                                                                             Edit recipe

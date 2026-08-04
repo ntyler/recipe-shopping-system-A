@@ -97,6 +97,7 @@ from PushShoppingList.services.purchase_mapping_service import purchase_mapping_
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_lookup_for_items
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import recipe_url_type
+from PushShoppingList.services.recipe_url_service import recipe_edit_page_url
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
 from PushShoppingList.services.recipe_url_service import remove_recipe_url
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
@@ -678,11 +679,7 @@ def shell_context(active_public_user=None):
         preview = recipe_preview_by_key.get(normalize_recipe_url_key(meal["recipe_url"]), {})
         meal["cover_image"] = preview.get("cover_image") or {}
         linked_recipe_url = str(preview.get("url") or "").strip()
-        meal["edit_url"] = (
-            url_for("recipe_bp.edit_recipe_page_route", url=linked_recipe_url)
-            if linked_recipe_url
-            else ""
-        )
+        meal["edit_url"] = recipe_edit_page_url(linked_recipe_url)
 
     pantry_running_low = [
         item
@@ -1341,11 +1338,7 @@ def master_data_store_section_usage_route(section_id):
     for recipe in usage.get("recipes", []):
         item = dict(recipe)
         recipe_url = recipe_master_data.clean_text(item.get("recipe_url"))
-        item["edit_url"] = (
-            url_for("recipe_bp.edit_recipe_page_route", url=recipe_url)
-            if recipe_url
-            else ""
-        )
+        item["edit_url"] = recipe_edit_page_url(recipe_url)
         cover_image = (
             item.get("cover_image")
             if isinstance(item.get("cover_image"), dict)
@@ -1827,7 +1820,7 @@ def master_data_record_references_route(record_type, record_id):
     for reference in references.get("references", []):
         recipe_url = recipe_master_data.clean_text(reference.get("recipe_url"))
         reference = dict(reference)
-        reference["edit_url"] = url_for("recipe_bp.edit_recipe_page_route", url=recipe_url) if recipe_url else ""
+        reference["edit_url"] = recipe_edit_page_url(recipe_url)
         cover_image = reference.get("cover_image") if isinstance(reference.get("cover_image"), dict) else {}
         rendered_cover_image = recipe_cover_image_for_view(
             recipe_url,

@@ -4,7 +4,6 @@ import sqlite3
 import threading
 import uuid
 from urllib.parse import parse_qs
-from urllib.parse import quote
 from urllib.parse import unquote
 from urllib.parse import urlparse
 from contextlib import contextmanager
@@ -13,6 +12,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
+from PushShoppingList.services.recipe_url_service import recipe_edit_page_url
 from PushShoppingList.services.storage_service import PACKAGE_DIR
 
 
@@ -455,7 +455,7 @@ def _append_source_item(items, seen, source_type, value, detail=""):
     items.append(item)
 
 
-def _append_recipe_source_item(items, seen, value, detail="menu item", label=None):
+def _append_recipe_source_item(items, seen, value, detail="menu item", label=None, user_id=""):
     label = _safe_source_label(label) or menu_item_label_from_url(value) or _safe_source_label(value)
     if not label:
         return
@@ -470,7 +470,7 @@ def _append_recipe_source_item(items, seen, value, detail="menu item", label=Non
         "type": "recipe",
         "label": label,
         "detail": str(detail or "").strip(),
-        "url": f"/recipe/edit?url={quote(recipe_url, safe='')}",
+        "url": recipe_edit_page_url(recipe_url, user_id=user_id),
         "recipe_url": recipe_url,
     })
 
@@ -495,7 +495,13 @@ def job_source_items(job):
             if value:
                 menu_recipe_urls.append(value)
         for recipe_url in menu_recipe_urls:
-            _append_recipe_source_item(items, seen, recipe_url, label=recipe_names.get(recipe_url))
+            _append_recipe_source_item(
+                items,
+                seen,
+                recipe_url,
+                label=recipe_names.get(recipe_url),
+                user_id=job.get("user_id") or "",
+            )
         return items
 
     urls = input_payload.get("urls")

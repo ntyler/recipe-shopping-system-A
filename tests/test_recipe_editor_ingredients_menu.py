@@ -2,6 +2,8 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from urllib.parse import parse_qs
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -5542,9 +5544,9 @@ def test_recipe_menu_edit_links_to_standalone_editor_page():
     assert "await waitForNextPaint();" in script
     assert "scheduleRecipeImageProgressPoll(750);" in script
     assert "document.body.dataset.recipeEditPage" in script
-    assert "recipe_bp.edit_recipe_page_route" in current_recipes
-    assert "recipe_bp.edit_recipe_page_route" in recipe_view
-    assert "recipe_bp.edit_recipe_page_route" in cookbooks
+    assert "recipe_edit_page_url" in current_recipes
+    assert "recipe_edit_page_url" in recipe_view
+    assert "recipe_edit_page_url" in cookbooks
     assert 'target="_blank"' in current_recipes
     assert 'target="_blank"' in recipe_view
     assert 'target="_blank"' in cookbooks
@@ -5575,7 +5577,10 @@ def test_standalone_recipe_edit_page_renders_editor(monkeypatch, tmp_path):
         home_response = client.get("/")
         response = client.get(
             "/recipe/edit",
-            query_string={"url": "https://example.com/soup"},
+            query_string={
+                "user_id": "edit-page-user",
+                "url": "https://example.com/soup",
+            },
         )
 
     home_html = home_response.get_data(as_text=True)
@@ -5602,6 +5607,120 @@ def test_standalone_recipe_edit_page_renders_editor(monkeypatch, tmp_path):
     assert "Pro Plan" in edit_account
     assert "ntylerbert@gmail.com" not in edit_account
     assert 'src="https://example.com/nathaniel-avatar.jpg"' in edit_account
+
+
+def test_recipe_edit_page_canonicalizes_and_enforces_session_user_scope(monkeypatch, tmp_path):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({
+        "users": [
+            {
+                "user_id": "owner-user",
+                "username": "owner-user",
+                "email": "owner@example.com",
+                "account_status": "active",
+            },
+            {
+                "user_id": "other-user",
+                "username": "other-user",
+                "email": "other@example.com",
+                "account_status": "active",
+            },
+        ],
+    })
+    app = create_app()
+    app.config.update(TESTING=True)
+    source_url = "https://example.com/soup?size=2&next=/menu?q=hot#recipe"
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner-user"
+
+        canonicalized = client.get(
+            "/recipe/edit",
+            query_string={
+                "url": source_url,
+                "screen_preview_width": "1440",
+            },
+        )
+        location = canonicalized.headers["Location"]
+        location_query = parse_qs(urlsplit(location).query)
+
+        assert canonicalized.status_code == 302
+        assert canonicalized.headers["Cache-Control"] == "private, no-store"
+        assert location_query == {
+            "user_id": ["owner-user"],
+            "url": [source_url],
+            "screen_preview_width": ["1440"],
+        }
+        matching = client.get(location)
+        assert matching.status_code == 200
+        assert matching.headers["Cache-Control"] == "private, no-store"
+
+        blank_scope = client.get(
+            "/recipe/edit",
+            query_string={"user_id": "   ", "url": source_url},
+        )
+        assert blank_scope.status_code == 302
+        assert parse_qs(urlsplit(blank_scope.headers["Location"]).query)["user_id"] == [
+            "owner-user"
+        ]
+
+        mismatch = client.get(
+            "/recipe/edit",
+            query_string={"user_id": "other-user", "url": source_url},
+        )
+        duplicate_scope = client.get(
+            "/recipe/edit",
+            query_string=[
+                ("user_id", "owner-user"),
+                ("user_id", "other-user"),
+                ("url", source_url),
+            ],
+        )
+        missing_url = client.get(
+            "/recipe/edit",
+            query_string={"user_id": "owner-user"},
+        )
+
+        assert mismatch.status_code == 403
+        assert mismatch.headers["Cache-Control"] == "private, no-store"
+        assert "different account" in mismatch.get_data(as_text=True)
+        assert "owner-user" not in mismatch.get_data(as_text=True)
+        assert "other-user" not in mismatch.get_data(as_text=True)
+        assert duplicate_scope.status_code == 400
+        assert duplicate_scope.headers["Cache-Control"] == "private, no-store"
+        assert missing_url.status_code == 400
+        assert missing_url.headers["Cache-Control"] == "private, no-store"
+
+        with client.session_transaction() as session:
+            session.clear()
+        anonymous = client.get(
+            "/recipe/edit",
+            query_string={"user_id": "owner-user", "url": source_url},
+        )
+
+    assert anonymous.status_code == 302
+    assert anonymous.headers["Location"].endswith("/#userAccountSection")
+
+
+def test_recipe_edit_page_url_builder_retains_user_scope_after_navigation_and_save():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    helper = script[
+        script.index("function recipeEditPageUrl"):
+        script.index("function recipeEditPendingActionFromOptions")
+    ]
+    save_identity = script[
+        script.index("function updateRecipeEditorSavedIdentity"):
+        script.index("function normalizeRecipeEditorCoverImage")
+    ]
+
+    assert "new URLSearchParams()" in helper
+    assert "document.body?.dataset.userId" in helper
+    assert 'params.set("user_id", userId);' in helper
+    assert 'params.set("url", normalizedUrl);' in helper
+    assert "recipeEditPageUrl(savedSourceUrl)" in save_identity
+    assert script.count("/recipe/edit?url=") == 0
 
 
 def test_recipe_editor_has_store_section_review_controls():

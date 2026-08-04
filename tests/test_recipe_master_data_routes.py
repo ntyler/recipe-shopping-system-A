@@ -517,7 +517,9 @@ def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_
     assert admin_payload["references"][0]["recipe_url"] == "https://example.com/user-a-soup"
     assert admin_payload["references"][0]["preparation"] == "diced"
     assert admin_payload["references"][0]["notes"] == "use ripe tomatoes"
-    assert "/recipe/edit?url=https://example.com/user-a-soup" in admin_payload["references"][0]["edit_url"]
+    assert admin_payload["references"][0]["edit_url"] == (
+        "/recipe/edit?user_id=admin-user&url=https%3A%2F%2Fexample.com%2Fuser-a-soup"
+    )
     assert "/recipe_cover_image?url=https://example.com/user-a-soup" in admin_payload["references"][0]["recipe_image_url"]
     assert "/recipe_cover_image?url=https://example.com/user-a-soup" in admin_payload["references"][0]["recipe_image_full_url"]
     assert admin_payload["references"][0]["recipe_image_alt"] == "User A Soup title image"

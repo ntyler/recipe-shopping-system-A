@@ -47,6 +47,32 @@ def test_guest_start_creates_24_hour_session_cookie_and_flags(monkeypatch, tmp_p
     assert (tmp_path / "guests" / guest_session_id).is_dir()
 
 
+def test_guest_recipe_editor_links_remain_userless(monkeypatch, tmp_path):
+    configure_guest_demo_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        client.get("/guest/start")
+        userless = client.get(
+            "/recipe/edit",
+            query_string={"url": "https://example.com/guest-soup"},
+        )
+        registered_scope = client.get(
+            "/recipe/edit",
+            query_string={
+                "user_id": "registered-user",
+                "url": "https://example.com/guest-soup",
+            },
+        )
+
+    assert userless.status_code == 200
+    assert userless.headers["Cache-Control"] == "private, no-store"
+    assert 'data-user-id=""' in userless.get_data(as_text=True)
+    assert registered_scope.status_code == 403
+    assert registered_scope.headers["Cache-Control"] == "private, no-store"
+
+
 def test_guest_start_reuses_remembered_session_and_index_restores_it(monkeypatch, tmp_path):
     configure_guest_demo_paths(monkeypatch, tmp_path)
     app = create_app()

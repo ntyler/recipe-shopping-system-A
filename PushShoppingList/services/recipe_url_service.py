@@ -2,9 +2,11 @@ from pathlib import Path
 import json
 from fractions import Fraction
 from threading import Lock
+from urllib.parse import urlencode
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
 
+from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import guest_data_root
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.storage_service import scoped_package_path
@@ -16,6 +18,20 @@ URLS_FILE = scoped_package_path("urls.txt")
 RECIPE_INGREDIENTS_FILE = scoped_extractor_data_path("recipe_ingredients.json")
 url_file_lock = Lock()
 RECIPE_INGREDIENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+
+def recipe_edit_page_url(recipe_url, user_id=None):
+    """Build an editor URL scoped to the signed-in account when available."""
+    recipe_url = str(recipe_url or "").strip()
+    if not recipe_url:
+        return ""
+
+    owner_user_id = active_user_id() if user_id is None else str(user_id or "").strip()
+    query = []
+    if owner_user_id:
+        query.append(("user_id", owner_user_id))
+    query.append(("url", recipe_url))
+    return f"/recipe/edit?{urlencode(query)}"
 
 
 def load_recipe_urls():

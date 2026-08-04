@@ -376,7 +376,7 @@ def build_recipe_candidates():
             key,
             title,
             "Recipe",
-            result_url("/recipe/edit", url=recipe_url),
+            recipe_url_service.recipe_edit_page_url(recipe_url),
             secondary=secondary,
             thumbnail_url=image_value(recipe.get("cover_image")) or cover_image_url(recipe_url),
             icon="recipes",
@@ -434,7 +434,7 @@ def build_menu_candidates():
         restaurant = restaurants.get(clean_text(item.get("restaurant_id") or menu.get("restaurant_id")), {})
         section = sections.get(clean_text(item.get("menu_section_id")), {})
         recipe_url = clean_text(item.get("recipe_url"))
-        url = result_url("/recipe/edit", url=recipe_url) if recipe_url else f"/menus/{quote(menu_id, safe='')}"
+        url = recipe_url_service.recipe_edit_page_url(recipe_url) if recipe_url else f"/menus/{quote(menu_id, safe='')}"
         output.append(candidate(
             "menus",
             item_id,

@@ -374,7 +374,7 @@
                                 <div class="overflow-menu-section recipe-view-menu-section">
                                     <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe</div>
                                     <a class="recipe-edit-menu-link"
-                                       href="{{ url_for('recipe_bp.edit_recipe_page_route', url=recipe.url) }}"
+                                       href="{{ recipe_edit_page_url(recipe.url) }}"
                                        data-recipe-url="{{ recipe.url }}"
                                        onclick="return openRecipeEditPageFromMenu(this, event)">
                                         Edit recipe

@@ -39,6 +39,7 @@ from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import pending_two_factor_setup
 from PushShoppingList.services.recipe_extract_service import log_openai_startup_diagnostics
+from PushShoppingList.services.recipe_url_service import recipe_edit_page_url
 from PushShoppingList.services.job_queue_service import log_job_queue_startup_diagnostics
 
 
@@ -290,6 +291,7 @@ def create_app():
     def inject_current_user():
         return {
             "current_user": current_public_user(),
+            "recipe_edit_page_url": recipe_edit_page_url,
             "password_reset_email_configured": password_reset_email_configured(),
             "password_reset_sms_configured": password_reset_sms_configured(),
             "pending_two_factor_sign_in": bool(session.get("pending_2fa_user_id")),

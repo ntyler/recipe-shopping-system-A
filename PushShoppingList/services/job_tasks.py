@@ -21,6 +21,7 @@ from PushShoppingList.services.job_service import menu_item_label_from_url
 from PushShoppingList.services.job_service import update_job_progress
 from PushShoppingList.services.file_lock_service import workspace_write_lock
 from PushShoppingList.services.openai_model_service import model_value_for_env as active_model_value_for_env
+from PushShoppingList.services.recipe_url_service import recipe_edit_page_url
 
 
 class JobCancelled(Exception):
@@ -384,11 +385,15 @@ def progress_counts(*values):
     return None, None
 
 
-def recipe_links(urls):
+def recipe_links(urls, *, job_id="", user_id=None):
+    if user_id is None and job_id:
+        job = get_job(job_id) or {}
+        user_id = job.get("user_id") or ""
+
     return [
         {
             "label": str(url),
-            "url": f"/recipe/edit?url={url}",
+            "url": recipe_edit_page_url(url, user_id=user_id),
             "recipe_url": str(url),
         }
         for url in urls
@@ -1950,7 +1955,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             "generated_recipe_urls": created_urls,
             "skipped_recipe_urls": skipped_urls,
             "retry_failed_recipe_urls": retry_failed_recipe_urls,
-            "links": recipe_links(created_urls + skipped_urls),
+            "links": recipe_links(created_urls + skipped_urls, job_id=job_id),
             "nutrition_estimates_completed": 0,
             "nutrition_completed": 0,
             "nutrition_failed": 0,
@@ -2075,7 +2080,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             "recipe_urls": created_urls + skipped_urls,
             "generated_recipe_urls": created_urls,
             "skipped_recipe_urls": skipped_urls,
-            "links": recipe_links(created_urls + skipped_urls),
+            "links": recipe_links(created_urls + skipped_urls, job_id=job_id),
             "nutrition_estimates_completed": 0,
             "nutrition_completed": 0,
             "nutrition_failed": 0,
@@ -2585,7 +2590,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         "recipe_urls": created_urls + skipped_urls,
         "generated_recipe_urls": created_urls,
         "skipped_recipe_urls": skipped_urls,
-        "links": recipe_links(created_urls + skipped_urls),
+        "links": recipe_links(created_urls + skipped_urls, job_id=job_id),
         "nutrition_estimates_completed": nutrition_success_count,
         "nutrition_completed": nutrition_success_count,
         "nutrition_failed": nutrition_failed_count,
@@ -3192,7 +3197,7 @@ def run_menu_deferred_enrichment_job(job_id, payload):
         "ok": bool(nutrition_completed or categories_completed or pdfs_completed or uploads_completed or not (run_nutrition or run_categories or run_generated_pdfs)),
         "created_count": total,
         "recipe_urls": recipe_urls,
-        "links": recipe_links(recipe_urls),
+        "links": recipe_links(recipe_urls, job_id=job_id),
         "nutrition_estimates_completed": nutrition_completed,
         "nutrition_completed": nutrition_completed,
         "nutrition_failed": nutrition_failed,
@@ -3540,7 +3545,7 @@ def run_menu_deferred_heavy_tasks_job(job_id, payload):
         "ok": uploads_completed > 0 or pdfs_completed > 0 or nutrition_completed > 0,
         "created_count": total,
         "recipe_urls": recipe_urls,
-        "links": recipe_links(recipe_urls),
+        "links": recipe_links(recipe_urls, job_id=job_id),
         "nutrition_estimates_completed": nutrition_completed,
         "nutrition_completed": nutrition_completed,
         "pdfs_created": pdfs_completed,
@@ -3827,7 +3832,7 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
                 f"{inference_result.get('skipped', 0)} skipped, "
                 f"{inference_result.get('failed', 0)} failed."
             ),
-            "links": recipe_links(recipe_urls),
+            "links": recipe_links(recipe_urls, job_id=job_id),
         }
         return complete_job(job_id, result_payload=result_payload)
 
@@ -4064,7 +4069,7 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
         "cookbook_id": cookbook_id,
         "cookbook_name": cookbook_name,
         "recipe_urls": recipe_urls,
-        "links": recipe_links(recipe_urls),
+        "links": recipe_links(recipe_urls, job_id=job_id),
         "stage": "Complete",
         "total_items": total,
         "details_completed": details_completed,
@@ -4512,7 +4517,7 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         "failed_count": failed_items,
         "failed_items": failed_items,
         "recipe_urls": created_urls,
-        "links": recipe_links(created_urls),
+        "links": recipe_links(created_urls, job_id=job_id),
         **job_model,
     }
     should_enqueue_recipe_inference = False
@@ -4730,7 +4735,7 @@ def run_doc_photo_import_job(job_id, payload):
 
     result_payload = {
         **result,
-        "links": recipe_links(recipe_urls),
+        "links": recipe_links(recipe_urls, job_id=job_id),
     }
     update_job_progress(
         job_id,

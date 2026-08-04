@@ -5,6 +5,7 @@ from datetime import datetime
 from datetime import timezone
 from pathlib import Path
 from time import perf_counter
+from urllib.parse import urlencode
 from uuid import uuid4
 
 from flask import Blueprint
@@ -17,6 +18,7 @@ from flask import redirect
 from flask import render_template
 from flask import request
 from flask import send_file
+from flask import url_for
 from werkzeug.utils import secure_filename
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
@@ -213,6 +215,14 @@ from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import is_admin_user
 
 recipe_bp = Blueprint("recipe_bp", __name__)
+
+
+@recipe_bp.after_request
+def recipe_edit_page_cache_policy(response):
+    if request.endpoint == "recipe_bp.edit_recipe_page_route":
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["Pragma"] = "no-cache"
+    return response
 
 NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
 IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved to your account."
@@ -3532,6 +3542,28 @@ def edit_recipe_page_route():
 
     if not recipe_url:
         abort(400)
+
+    requested_user_ids = request.args.getlist("user_id")
+    if len(requested_user_ids) > 1:
+        abort(400)
+
+    requested_user_id = str(requested_user_ids[0] if requested_user_ids else "").strip()
+    session_user_id = active_user_id()
+
+    if session_user_id and not requested_user_id:
+        query = [("user_id", session_user_id)]
+        query.extend(
+            (key, value)
+            for key, value in request.args.items(multi=True)
+            if key != "user_id"
+        )
+        response = redirect(
+            f"{url_for('recipe_bp.edit_recipe_page_route')}?{urlencode(query)}"
+        )
+        return response
+
+    if requested_user_id and requested_user_id != session_user_id:
+        abort(403, description="This recipe editor link belongs to a different account.")
 
     return render_template(
         "recipe_edit_page.html",

@@ -1,6 +1,8 @@
 import json
 import os
 from pathlib import Path
+from urllib.parse import parse_qs
+from urllib.parse import urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -185,6 +187,12 @@ def test_global_search_is_authenticated_grouped_limited_and_user_scoped(monkeypa
     assert any(result["title"] == "Tomato Soup" for result in results)
     assert all("Foreign Secret" not in result["title"] for result in results)
     assert all(set(result) == {"id", "title", "type", "secondary", "url", "thumbnail_url", "icon"} for result in results)
+    recipe_result = next(result for result in results if result["title"] == "Tomato Soup")
+    assert urlsplit(recipe_result["url"]).path == "/recipe/edit"
+    assert parse_qs(urlsplit(recipe_result["url"]).query) == {
+        "user_id": ["user-one"],
+        "url": ["https://example.test/recipes/tomato-soup"],
+    }
     assert any(result["title"] == "Tomato Soup" for result in flattened_results(infix_response.get_json()))
 
 

@@ -506,10 +506,54 @@ def test_menu_generate_job_sources_link_to_recipe_item_editor(monkeypatch, tmp_p
             "type": "recipe",
             "label": "Spring Roll",
             "detail": "menu item",
-            "url": "/recipe/edit?url=https%3A%2F%2Fwww.velasiancuisine.com%2Frs%2Fmenu_home.action%3FresInput%3DRES4902%26menu_item%3Dspring-roll",
+            "url": "/recipe/edit?user_id=owner&url=https%3A%2F%2Fwww.velasiancuisine.com%2Frs%2Fmenu_home.action%3FresInput%3DRES4902%26menu_item%3Dspring-roll",
             "recipe_url": recipe_url,
         }
     ]
+
+
+def test_recipe_result_links_use_persisted_job_owner_without_request_context(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://example.com/soup?servings=4&style=hot"
+    job = job_service.create_job(
+        "recipe-import",
+        input_payload={"urls": [recipe_url]},
+        user_id="result-owner",
+        total_items=1,
+    )
+
+    links = job_tasks.recipe_links([recipe_url], job_id=job["id"])
+
+    assert links == [{
+        "label": recipe_url,
+        "url": (
+            "/recipe/edit?user_id=result-owner&"
+            "url=https%3A%2F%2Fexample.com%2Fsoup%3Fservings%3D4%26style%3Dhot"
+        ),
+        "recipe_url": recipe_url,
+    }]
+
+
+def test_guest_job_source_links_do_not_inherit_viewing_admin_scope(monkeypatch, tmp_path):
+    from flask import session
+
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://example.com/guest-soup"
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": [recipe_url]},
+        guest_session_id="guest-owner",
+        total_items=1,
+    )
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "viewing-admin"
+        payload = job_service.job_for_client(job)
+
+    assert payload["source_items"][0]["url"] == (
+        "/recipe/edit?url=https%3A%2F%2Fexample.com%2Fguest-soup"
+    )
 
 
 def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_path):
@@ -543,7 +587,7 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
     assert data["job"]["model_source"] == "default:OPENAI_MENU_FAST_RECIPE_MODEL"
     assert data["job"]["model_env_var"] == "OPENAI_MENU_FAST_RECIPE_MODEL"
     assert data["job"]["source_items"][0]["detail"] == "menu item"
-    assert data["job"]["source_items"][0]["url"].startswith("/recipe/edit?url=")
+    assert data["job"]["source_items"][0]["url"].startswith("/recipe/edit?user_id=owner&url=")
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
 
 

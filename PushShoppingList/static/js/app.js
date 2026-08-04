@@ -3293,7 +3293,7 @@ function renderJobCurrentRecipe(job) {
 
     const result = jobResultPayload(job);
     const recipeUrl = String(result.current_recipe_url || "").trim();
-    const editUrl = recipeUrl ? `/recipe/edit?url=${encodeURIComponent(recipeUrl)}` : "";
+    const editUrl = recipeEditPageUrl(recipeUrl);
     const detailHtml = editUrl
         ? `<a href="${escapeAttribute(editUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(detail)}</a>`
         : escapeHtml(detail);
@@ -3608,7 +3608,7 @@ function renderJobFailureSummary(job, itemFilter = jobActivityItemFilter) {
             <div class="job-activity-failure-list">
                 ${shownFailures.map(failure => {
                     const recipeUrl = String(failure.recipe_url || failure.source_url || failure.url || "").trim();
-                    const editUrl = recipeUrl ? `/recipe/edit?url=${encodeURIComponent(recipeUrl)}` : "";
+                    const editUrl = recipeEditPageUrl(recipeUrl);
                     const title = menuRecipeDisplayName(failure) || recipeUrl || "Menu item";
                     const titleHtml = editUrl
                         ? `<a href="${escapeAttribute(editUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
@@ -23977,7 +23977,13 @@ function recipeEditPageUrl(recipeUrl) {
         return "";
     }
 
-    return `/recipe/edit?url=${encodeURIComponent(normalizedUrl)}`;
+    const params = new URLSearchParams();
+    const userId = String(document.body?.dataset.userId || "").trim();
+    if (userId) {
+        params.set("user_id", userId);
+    }
+    params.set("url", normalizedUrl);
+    return `/recipe/edit?${params.toString()}`;
 }
 
 function recipeEditPendingActionFromOptions(recipeUrl, options = {}) {
@@ -36627,6 +36633,7 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
     }
     list.innerHTML = recipes.map(recipe => {
         const url = String(recipe.url || "").trim();
+        const editUrl = recipeEditPageUrl(url);
         const title = String(recipe.title || "Untitled Recipe").trim();
         const thumbnailUrl = String(recipe.thumbnail_url || "").trim();
         const metadata = [recipe.total_time, recipe.calories_per_serving].map(value => String(value || "").trim()).filter(Boolean);
@@ -36651,7 +36658,7 @@ function renderRecipeRestaurantUsageList(recipes = recipeRestaurantUsageRecipes)
             </span>
             <div class="recipe-edit-restaurant-usage-summary">
                 <span class="recipe-edit-restaurant-usage-title-row">
-                    <a class="recipe-edit-restaurant-usage-name" href="/recipe/edit?url=${encodeURIComponent(url)}" aria-label="Open ${escapeAttribute(title)}" title="${escapeAttribute(title)}">${escapeHtml(title)}</a>
+                    <a class="recipe-edit-restaurant-usage-name" href="${escapeAttribute(editUrl)}" aria-label="Open ${escapeAttribute(title)}" title="${escapeAttribute(title)}">${escapeHtml(title)}</a>
                     ${duplicateBadge ? `<button type="button" class="recipe-edit-restaurant-duplicate-badge" data-restaurant-duplicate-group="${escapeAttribute(duplicateGroupId)}" aria-label="Review ${escapeAttribute(duplicateBadge)} recipes named ${escapeAttribute(title)}" title="Compare these recipes" onclick="return openRecipeRestaurantDuplicateReview(this)">${escapeHtml(duplicateBadge)}</button>` : ""}
                 </span>
                 ${metadata.length ? `<span>${escapeHtml(metadata.join(" · "))}</span>` : ""}
@@ -36952,6 +36959,7 @@ function renderRecipeRestaurantDuplicateReview(data) {
     }
     records.innerHTML = (data.records || []).map((record, index) => {
         const url = String(record.source_url || record.url || "").trim();
+        const editUrl = recipeEditPageUrl(url);
         const thumbnail = String(record.thumbnail_url || "").trim();
         const cookbookNames = (record.cookbooks || []).map(item => item.cookbook_name).filter(Boolean).join(", ");
         const metadata = [record.total_time, record.calories_per_serving].filter(Boolean).join(" · ");
@@ -36982,7 +36990,7 @@ function renderRecipeRestaurantDuplicateReview(data) {
                 <div><dt>Instructions</dt><dd>${escapeHtml(record.instructions_summary || "None saved")}${record.instructions_count ? ` (${record.instructions_count})` : ""}</dd></div>
                 ${dates ? `<div><dt>Dates</dt><dd>${escapeHtml(dates)}</dd></div>` : ""}
             </dl>
-            <a href="/recipe/edit?url=${encodeURIComponent(url)}">Open Recipe</a>
+            <a href="${escapeAttribute(editUrl)}">Open Recipe</a>
         </article>`;
     }).join("");
     if (preview) {
