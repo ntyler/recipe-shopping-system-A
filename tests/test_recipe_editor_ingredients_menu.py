@@ -1149,6 +1149,7 @@ def test_store_section_grouping_moves_choice_access_to_each_component_row():
     assert "lineItems.length > 0" in grouped_view
     assert "syncRecipeIngredientSelectedOptionToggles(parentRow);" in grouped_view
     assert "function ensureRecipeIngredientSelectedOptionToggle" in toggles
+    assert '!summary.closest("[data-recipe-ingredient-edit-panel]")' in toggles
     assert 'button.dataset.ingredientSelectedOptionToggle = "";' in toggles
     assert "toggleRecipeIngredientSubstitutions(button, event)" in toggles
     assert "function syncRecipeIngredientSelectedOptionToggles" in toggles
@@ -1270,6 +1271,73 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "margin-inline: -12px;" in attached_panel
     assert "background: color-mix(" in attached_panel
     assert ".is-ingredient-expansion-anchor" in attached_panel
+
+
+def test_grouped_choice_disclosure_ignores_hidden_modal_preview_rows():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the ingredient disclosure regression harness.")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    summaries_start = script.index("function recipeIngredientSelectedOptionSummaries")
+    summaries_end = script.index("function ensureRecipeIngredientSelectedOptionToggle", summaries_start)
+    expansion_start = script.index("function recipeIngredientExpansionSelectedOptionSummary")
+    expansion_end = script.index("function recipeIngredientExpansionSourceRow", expansion_start)
+    harness = """
+const row = { id: "parent-row" };
+const otherRow = { id: "other-row" };
+const modalSummary = {
+    id: "modal",
+    recipeIngredientChoiceParentRow: row,
+    closest(selector) {
+        return selector === "[data-recipe-ingredient-edit-panel]" ? {} : null;
+    },
+    classList: { contains() { return false; } },
+};
+const tableSummary = {
+    id: "table",
+    recipeIngredientChoiceParentRow: row,
+    closest() { return null; },
+    classList: { contains() { return false; } },
+};
+const unrelatedSummary = {
+    id: "other",
+    recipeIngredientChoiceParentRow: otherRow,
+    closest() { return null; },
+    classList: { contains() { return false; } },
+};
+const sourceButton = { closest() { return null; } };
+const recipeEditIngredientColumnView = { groupByStoreSection: true };
+const document = {
+    querySelectorAll() { return [modalSummary, tableSummary, unrelatedSummary]; },
+};
+""" + script[summaries_start:summaries_end] + script[expansion_start:expansion_end] + """
+
+const summaries = recipeIngredientSelectedOptionSummaries(row);
+const fallback = recipeIngredientExpansionSelectedOptionSummary(row, sourceButton);
+document.querySelectorAll = () => [modalSummary];
+const modalOnlyFallback = recipeIngredientExpansionSelectedOptionSummary(row, sourceButton);
+process.stdout.write(JSON.stringify({
+    summaryIds: summaries.map(summary => summary.id),
+    fallbackId: fallback ? fallback.id : null,
+    modalOnlyFallbackId: modalOnlyFallback ? modalOnlyFallback.id : null,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "summaryIds": ["table"],
+        "fallbackId": "table",
+        "modalOnlyFallbackId": None,
+    }
 
 
 def test_ingredient_choice_disclosure_preserves_the_visible_header_viewport_position():

@@ -32047,7 +32047,13 @@ function recipeIngredientAlternativeRoleLabel(optionRow, values = {}) {
 function recipeIngredientSelectedOptionSummaries(row) {
     return row
         ? [...document.querySelectorAll("[data-ingredient-selected-option-line-item]")]
-            .filter(summary => summary.recipeIngredientChoiceParentRow === row)
+            .filter(summary => (
+                summary.recipeIngredientChoiceParentRow === row
+                // The edit modal renders its own selected-option preview rows. Those
+                // rows are not table disclosures and are replaced whenever the modal
+                // preview syncs, so mounting the live options panel there detaches it.
+                && !summary.closest("[data-recipe-ingredient-edit-panel]")
+            ))
         : [];
 }
 
