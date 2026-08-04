@@ -847,6 +847,13 @@ def test_store_section_grouping_projects_selected_components_into_their_own_sect
     assert "const componentSection = recipeIngredientColumnViewEntry(lineItem, \"store\");" in projection_view
     assert "if (componentSection.key === parentSection.key) return;" in projection_view
 
+    sync_start = script.index("function syncRecipeIngredientSelectedOptionLineItems")
+    sync_end = script.index("function organizeRecipeEditSubstitutionOptionRow", sync_start)
+    sync_line_items = script[sync_start:sync_end]
+    assert "const keepsGroupedSelectedRowsVisible = Boolean(" in sync_line_items
+    assert "&& recipeEditIngredientColumnView.groupByStoreSection" in sync_line_items
+    assert "&& !keepsGroupedSelectedRowsVisible" in sync_line_items
+
     assert "> .recipe-edit-ingredient-column-group-projection {" in css
     assert "> .recipe-edit-ingredient-column-group-projection.is-ingredient-column-filtered" in css
     grouped_away = css[css.index(
@@ -1069,9 +1076,7 @@ def test_store_section_grouping_uses_normal_rows_without_a_choice_header():
     assert 'row.classList.contains("has-ingredient-choice")' in grouped_view
     assert 'row.classList.contains("has-selected-implicit-default-choice")' not in grouped_view
     assert "updateRecipeIngredientSubstitutionState(row);" in grouped_view
-    assert "selectedChoiceUsesParentIngredientRow" in substitution_state
-    assert "selectedChoiceProjectionRows.length === 0" in substitution_state
-    assert "&& !selectedChoiceUsesParentIngredientRow" in substitution_state
+    assert "selectedChoiceUsesParentIngredientRow" not in substitution_state
     assert '"has-selected-implicit-default-choice"' not in substitution_state
     assert "hidesSelectedChoiceHeaderInStoreSectionView" in substitution_state
     assert "recipeEditIngredientColumnView.groupByStoreSection" in substitution_state
@@ -5708,7 +5713,7 @@ def test_mobile_collapsed_choice_header_does_not_leave_an_orphaned_divider():
     assert "border-bottom: 0;" in collapsed_choice_css
 
 
-def test_single_component_choice_stays_on_the_parent_row_without_a_redundant_header():
+def test_single_component_choice_stays_on_the_parent_row_with_the_shared_header():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -5726,13 +5731,15 @@ def test_single_component_choice_stays_on_the_parent_row_without_a_redundant_hea
     assert '"has-mobile-implicit-default-line-item"' not in sync_line_items
     assert "const expandedAtSelectedLineItem = Boolean(" in sync_line_items
     assert "lineItems.contains(row.recipeIngredientExpansionAnchor)" in sync_line_items
-    assert "lineItems.hidden = (expanded && !expandedAtSelectedLineItem) || !hasRenderedRows;" in sync_line_items
+    assert "const keepsGroupedSelectedRowsVisible = Boolean(" in sync_line_items
+    assert "&& recipeEditIngredientColumnView.groupByStoreSection" in sync_line_items
+    assert "&& !keepsGroupedSelectedRowsVisible" in sync_line_items
     assert "projectedRows.length > 0 || expandedAtSelectedLineItem" in sync_line_items
     assert "const preservesExpandedChoice = Boolean(" in sync_line_items
     assert "mountRecipeIngredientExpansion(" in sync_line_items
     assert "nextToggle || nextSummary" in sync_line_items
-    assert "selectedChoiceProjectionRows.length === 0" in substitution_state
-    assert "&& !selectedChoiceUsesParentIngredientRow" in substitution_state
+    assert "selectedChoiceUsesParentIngredientRow" not in substitution_state
+    assert "&& !hidesSelectedChoiceHeaderInStoreSectionView" in substitution_state
     assert ".has-mobile-implicit-default-line-item" not in css
 
     expansion = script[

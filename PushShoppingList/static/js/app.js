@@ -32476,7 +32476,15 @@ function syncRecipeIngredientSelectedOptionLineItems(
         row.recipeIngredientExpansionAnchor
         && lineItems.contains(row.recipeIngredientExpansionAnchor)
     );
-    lineItems.hidden = (expanded && !expandedAtSelectedLineItem) || !hasRenderedRows;
+    const keepsGroupedSelectedRowsVisible = Boolean(
+        expanded
+        && recipeEditIngredientColumnView.groupByStoreSection
+    );
+    lineItems.hidden = (
+        expanded
+        && !expandedAtSelectedLineItem
+        && !keepsGroupedSelectedRowsVisible
+    ) || !hasRenderedRows;
     row.classList.toggle(
         "has-selected-option-line-items",
         projectedRows.length > 0 || expandedAtSelectedLineItem,
