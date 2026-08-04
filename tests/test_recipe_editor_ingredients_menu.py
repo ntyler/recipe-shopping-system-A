@@ -5911,14 +5911,16 @@ def test_ingredient_modal_selected_option_header_stays_above_shared_summary_rows
 def test_ingredient_modal_selected_option_edit_action_is_centered_and_boxed():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     action_css = css[css.index(
-        "/* Ingredient modal options v100: seat the edit action inside its table cell. */"
+        "/* Ingredient modal options v100: center the edit action with the row values. */"
     ):]
 
     cell_rule = action_css[action_css.index(
         "> .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions {"
     ):]
     cell_rule = cell_rule[:cell_rule.index("}")]
-    assert "align-self: stretch !important;" in cell_rule
+    assert "height: 32px !important;" in cell_rule
+    assert "min-height: 32px !important;" in cell_rule
+    assert "align-self: center !important;" in cell_rule
     assert "align-items: center !important;" in cell_rule
     assert "justify-content: center !important;" in cell_rule
 

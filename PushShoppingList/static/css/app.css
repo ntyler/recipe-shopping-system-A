@@ -73365,7 +73365,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     display: none !important;
 }
 
-/* Ingredient modal options v100: seat the edit action inside its table cell. */
+/* Ingredient modal options v100: center the edit action with the row values. */
 body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel
     .recipe-edit-ingredient-modal-selected-option-row
     > .recipe-edit-alternative-component-actions.recipe-edit-compact-row-actions {
@@ -73373,9 +73373,9 @@ body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingre
     display: flex !important;
     width: 100% !important;
     min-width: 0 !important;
-    height: auto !important;
-    min-height: 48px !important;
-    align-self: stretch !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    align-self: center !important;
     align-items: center !important;
     justify-content: center !important;
     padding: 0 !important;
