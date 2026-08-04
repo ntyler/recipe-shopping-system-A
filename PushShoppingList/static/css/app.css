@@ -73427,3 +73427,9 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     border-radius: 8px !important;
     box-shadow: inset 0 0 0 1px var(--app-border);
 }
+
+/* Ingredient editor v102: reserve row dividers for multi-option groups. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row:not(.has-ingredient-choice) {
+    border-bottom: 0 !important;
+}

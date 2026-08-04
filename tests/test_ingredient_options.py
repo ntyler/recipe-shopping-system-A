@@ -837,6 +837,21 @@ def test_collapsed_saved_choice_has_one_unclipped_enclosing_outline():
     assert "overflow:" not in rule
 
 
+def test_standard_ingredient_rows_drop_dividers_without_changing_choice_outlines():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    divider_css = css[css.index(
+        "/* Ingredient editor v102: reserve row dividers for multi-option groups. */"
+    ):]
+    rule_start = divider_css.index(
+        "> .recipe-edit-ingredient-row:not(.has-ingredient-choice)"
+    )
+    rule = divider_css[rule_start:divider_css.index("}", rule_start)]
+
+    assert "border-bottom: 0 !important;" in rule
+    assert ".has-selected-choice-group-header" not in rule
+    assert "box-shadow: inset 0 0 0 1px var(--app-border);" in css
+
+
 def test_collapsed_default_choice_has_one_parent_gap_before_its_ingredient_group():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
