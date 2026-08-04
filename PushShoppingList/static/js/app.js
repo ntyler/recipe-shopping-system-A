@@ -30316,11 +30316,62 @@ function recipeIngredientModalHasChanges(row) {
         return false;
     }
     try {
-        return JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row)) !== panel.dataset.editSnapshot;
+        return (
+            JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row)) !== panel.dataset.editSnapshot
+            || recipeIngredientModalSelectedOptionHasChanges(panel)
+        );
     } catch (error) {
         console.warn("Unable to compare the ingredient edit values.", error);
         return true;
     }
+}
+
+function ensureRecipeIngredientModalSelectedOptionSnapshot(panel, sourceRow) {
+    if (!panel || !sourceRow) return;
+    const modalRow = panel.closest(".recipe-edit-ingredient-row");
+    if (!modalRow?.classList.contains("is-editing") || panel.hidden) return;
+    if (!(panel.recipeIngredientModalSelectedOptionSnapshots instanceof Map)) {
+        panel.recipeIngredientModalSelectedOptionSnapshots = new Map();
+    }
+    if (!panel.recipeIngredientModalSelectedOptionSnapshots.has(sourceRow)) {
+        panel.recipeIngredientModalSelectedOptionSnapshots.set(
+            sourceRow,
+            recipeIngredientEditableFieldSnapshot(sourceRow),
+        );
+    }
+}
+
+function recipeIngredientModalSelectedOptionHasChanges(panel) {
+    const snapshots = panel?.recipeIngredientModalSelectedOptionSnapshots;
+    if (!(snapshots instanceof Map)) return false;
+    return [...snapshots.entries()].some(([sourceRow, snapshot]) => (
+        sourceRow?.isConnected
+        && JSON.stringify(recipeIngredientEditableFieldSnapshot(sourceRow))
+            !== JSON.stringify(snapshot)
+    ));
+}
+
+function finishRecipeIngredientModalSelectedOptionEdits(panel, options = {}) {
+    const snapshots = panel?.recipeIngredientModalSelectedOptionSnapshots;
+    if (!(snapshots instanceof Map)) return false;
+    delete panel.recipeIngredientModalSelectedOptionSnapshots;
+    const cards = new Set();
+    snapshots.forEach((snapshot, sourceRow) => {
+        if (!sourceRow?.isConnected) return;
+        if (options.restore) {
+            restoreRecipeIngredientEditableFieldSnapshot(sourceRow, snapshot);
+        }
+        if (sourceRow.matches?.("[data-substitution-option-row]")) {
+            updateRecipeIngredientSubstitutionRowSummary(sourceRow);
+            const card = sourceRow.closest(".recipe-edit-alternative-card");
+            if (card) cards.add(card);
+        }
+    });
+    cards.forEach(card => updateRecipeIngredientAlternativeCard(
+        card,
+        Number(card.dataset.alternativeGroupIndex || 0),
+    ));
+    return true;
 }
 
 function setRecipeIngredientModalStatus(panel, state = "", message = "") {
@@ -30737,6 +30788,29 @@ function validateRecipeIngredientModal(row, panel) {
         );
         firstInvalid = firstInvalid || unit;
     }
+    const selectedOptionIngredient = [...panel.querySelectorAll(
+        '[data-recipe-ingredient-modal-selected-option-field="ingredient"]',
+    )].find(input => !String(input.value || "").trim());
+    if (selectedOptionIngredient) {
+        selectedOptionIngredient.setAttribute("aria-invalid", "true");
+        selectedOptionIngredient.title = "Ingredient Name is required.";
+        firstInvalid = firstInvalid || selectedOptionIngredient;
+    }
+    const selectedOptionUnit = [...panel.querySelectorAll(
+        '[data-recipe-ingredient-modal-selected-option-field="unit"]',
+    )].find(input => (
+        input.recipeIngredientTargetField
+        && !canonicalizeRecipeIngredientUnitControl(
+            input.recipeIngredientTargetField,
+            { allowCustom: true },
+        )
+    ));
+    if (selectedOptionUnit) {
+        selectedOptionUnit.setAttribute("aria-invalid", "true");
+        selectedOptionUnit.title = selectedOptionUnit.recipeIngredientTargetField.validationMessage
+            || "Choose a known unit, add a custom unit, or leave it blank.";
+        firstInvalid = firstInvalid || selectedOptionUnit;
+    }
     if (firstInvalid) {
         setRecipeIngredientModalError(panel, "Review the highlighted field before saving.");
         firstInvalid.focus({ preventScroll: true });
@@ -30993,7 +31067,8 @@ function setRecipeIngredientModalSaving(panel, saving) {
         "[data-recipe-ingredient-modal-save], [data-recipe-ingredient-modal-next], "
         + "[data-recipe-ingredient-modal-previous], [data-recipe-ingredient-modal-forward], "
         + "[data-recipe-ingredient-modal-close], "
-        + "[data-recipe-ingredient-modal-delete]"
+        + "[data-recipe-ingredient-modal-delete], "
+        + "[data-recipe-ingredient-modal-selected-option-field]"
     ).forEach(button => { button.disabled = Boolean(saving); });
     if (saving) setRecipeIngredientModalStatus(panel, "saving");
     if (!saving) {
@@ -31237,6 +31312,7 @@ async function commitRecipeIngredientModal(button, options = {}) {
         if (!saved) {
             return false;
         }
+        finishRecipeIngredientModalSelectedOptionEdits(panel);
         panel.dataset.editSnapshot = JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row));
         setRecipeIngredientModalStatus(panel, "saved");
         await new Promise(resolve => window.setTimeout(resolve, 320));
@@ -32793,6 +32869,9 @@ function recipeIngredientModalOptionSelection(row, summary) {
         ?.map(values => recipeIngredientSentenceCase(values.ingredient || ""))
         .filter(Boolean) || [];
     if (selectedChoice) {
+        const selectedRows = Array.isArray(selectedChoice.rows) && selectedChoice.rows.length
+            ? selectedChoice.rows
+            : (selectedChoice.values?.length === 1 ? [row] : []);
         const ingredients = selectedIngredients.length
             ? selectedIngredients
             : [String(selectedChoice.ingredientSummary || "Option").trim() || "Option"];
@@ -32801,6 +32880,7 @@ function recipeIngredientModalOptionSelection(row, summary) {
             prefix: "Selected option",
             ingredients,
             values: selectedChoice.values || [],
+            rows: selectedRows,
             needsAttention: false,
         };
     }
@@ -32812,6 +32892,7 @@ function recipeIngredientModalOptionSelection(row, summary) {
             prefix: "Selected option",
             ingredients: [defaultName],
             values: [originalValues],
+            rows: [row],
             needsAttention: false,
         };
     }
@@ -32820,6 +32901,7 @@ function recipeIngredientModalOptionSelection(row, summary) {
         prefix: "",
         ingredients: [],
         values: [],
+        rows: [],
         needsAttention: true,
     };
 }
@@ -32847,10 +32929,87 @@ function recipeIngredientModalSelectedOptionSummary(valuesList = []) {
     }).join(" + ");
 }
 
-function createRecipeIngredientModalSelectedOptionRow(values = {}) {
+function recipeIngredientModalSelectedOptionTargetRow(panel, modalRow, sourceRow) {
+    return panel?.recipeIngredientOptionSourceRow === sourceRow
+        ? modalRow
+        : sourceRow;
+}
+
+function createRecipeIngredientModalSelectedOptionControl(
+    panel,
+    modalRow,
+    sourceRow,
+    fieldName,
+    label,
+    options = {},
+) {
+    const targetRow = recipeIngredientModalSelectedOptionTargetRow(
+        panel,
+        modalRow,
+        sourceRow,
+    );
+    const targetField = recipeIngredientDirectField(targetRow, fieldName);
+    const useSelect = targetField?.tagName === "SELECT";
+    const control = useSelect
+        ? targetField.cloneNode(true)
+        : document.createElement("input");
+    if (!useSelect) {
+        control.type = "text";
+        if (fieldName === "unit") control.setAttribute("list", "recipeIngredientUnitOptions");
+    }
+    control.value = String(targetField?.value || options.value || "");
+    control.className = [
+        "recipe-edit-ingredient-modal-selected-option-control",
+        `is-${fieldName.replace(/_/g, "-")}`,
+    ].join(" ");
+    control.dataset.recipeIngredientModalSelectedOptionField = fieldName;
+    control.removeAttribute("data-field");
+    control.removeAttribute("id");
+    control.removeAttribute("name");
+    control.removeAttribute("hidden");
+    control.removeAttribute("style");
+    control.disabled = false;
+    control.autocomplete = "off";
+    control.setAttribute("aria-label", label);
+    control.placeholder = String(options.placeholder || "");
+    control.recipeIngredientOptionSourceRow = sourceRow;
+    control.recipeIngredientTargetField = targetField;
+    ensureRecipeIngredientModalSelectedOptionSnapshot(panel, sourceRow);
+
+    const syncValue = () => {
+        if (!targetField) return;
+        targetField.value = control.value;
+        control.removeAttribute("aria-invalid");
+        control.title = "";
+        if (fieldName === "store_section") {
+            syncRecipeIngredientStoreSectionControl(targetField);
+        } else if (fieldName === "section") {
+            syncRecipeIngredientTypeControl(targetField);
+        }
+        updateRecipeIngredientModalDirtyStatus(modalRow);
+        updateRecipeEditorDirtyState(modalRow.closest("#recipeEditForm"));
+    };
+    control.addEventListener(useSelect ? "change" : "input", syncValue);
+    if (!useSelect && fieldName === "unit") {
+        control.addEventListener("change", () => {
+            syncValue();
+            canonicalizeRecipeIngredientUnitControl(targetField, { allowCustom: true });
+            control.value = targetField?.value || control.value;
+        });
+    }
+    return control;
+}
+
+function createRecipeIngredientModalSelectedOptionRow(
+    panel,
+    modalRow,
+    sourceRow,
+    values = {},
+) {
     const item = document.createElement("div");
     item.className = "recipe-edit-ingredient-modal-selected-option-row";
     item.setAttribute("role", "listitem");
+    item.recipeIngredientOptionSourceRow = sourceRow;
 
     const imageWrap = document.createElement("span");
     imageWrap.className = "recipe-edit-ingredient-modal-selected-option-image";
@@ -32875,46 +33034,91 @@ function createRecipeIngredientModalSelectedOptionRow(values = {}) {
         imageWrap.appendChild(imageFallback);
     }
 
-    const identity = document.createElement("span");
+    const identity = document.createElement("div");
     identity.className = "recipe-edit-ingredient-modal-selected-option-identity";
-    const ingredient = document.createElement("strong");
-    ingredient.textContent = String(values.ingredient || "").trim() || "Unnamed ingredient";
-    const preparation = String(values.preparation || "").trim();
-    const buyAs = recipeIngredientMeaningfulBuyAs(values);
-    const detail = document.createElement("span");
-    detail.textContent = [
-        preparation,
-        buyAs ? `Buy as: ${buyAs}` : "",
-    ].filter(Boolean).join(" \u00b7 ");
-    detail.hidden = !detail.textContent;
+    const ingredientName = String(values.ingredient || "").trim() || "Unnamed ingredient";
+    const ingredient = createRecipeIngredientModalSelectedOptionControl(
+        panel,
+        modalRow,
+        sourceRow,
+        "ingredient",
+        `Ingredient name for ${ingredientName}`,
+        { value: values.ingredient, placeholder: "Ingredient" },
+    );
+    const detail = document.createElement("div");
+    detail.className = "recipe-edit-ingredient-modal-selected-option-identity-details";
+    const preparation = createRecipeIngredientModalSelectedOptionControl(
+        panel,
+        modalRow,
+        sourceRow,
+        "preparation",
+        `Preparation for ${ingredientName}`,
+        { value: values.preparation, placeholder: "Preparation" },
+    );
+    const buyAs = createRecipeIngredientModalSelectedOptionControl(
+        panel,
+        modalRow,
+        sourceRow,
+        "purchasable_item",
+        `Buy as for ${ingredientName}`,
+        { value: values.purchasable_item || values.buy_as, placeholder: "Buy as" },
+    );
+    detail.append(preparation, buyAs);
     identity.append(ingredient, detail);
 
-    const amount = document.createElement("span");
+    const amount = document.createElement("div");
     amount.className = "recipe-edit-ingredient-modal-selected-option-amount";
-    amount.textContent = formatRecipeIngredientQuantityUnit(values);
+    const quantity = createRecipeIngredientModalSelectedOptionControl(
+        panel,
+        modalRow,
+        sourceRow,
+        "quantity",
+        `Quantity for ${ingredientName}`,
+        { value: values.quantity, placeholder: "Qty" },
+    );
+    const unit = createRecipeIngredientModalSelectedOptionControl(
+        panel,
+        modalRow,
+        sourceRow,
+        "unit",
+        `Unit for ${ingredientName}`,
+        { value: values.unit, placeholder: "Unit" },
+    );
+    amount.append(quantity, unit);
 
-    const store = document.createElement("span");
+    const store = document.createElement("div");
     store.className = "recipe-edit-ingredient-modal-selected-option-store";
     const storeSection = String(values.store_section || "").trim();
     const storeLabel = recipeStoreSectionDisplayLabel(storeSection) || "Unassigned";
-    store.innerHTML = recipeIngredientStoreSectionIconHtml(storeSection);
-    const storeText = document.createElement("span");
-    storeText.textContent = storeLabel;
-    store.appendChild(storeText);
+    store.appendChild(createRecipeIngredientModalSelectedOptionControl(
+        panel,
+        modalRow,
+        sourceRow,
+        "store_section",
+        `Store section for ${ingredientName}`,
+        { value: storeSection },
+    ));
 
-    const type = document.createElement("span");
+    const type = document.createElement("div");
     type.className = "recipe-edit-ingredient-modal-selected-option-type";
-    type.textContent = recipeIngredientTypeLabel(values);
+    type.appendChild(createRecipeIngredientModalSelectedOptionControl(
+        panel,
+        modalRow,
+        sourceRow,
+        "section",
+        `Type for ${ingredientName}`,
+        { value: values.section },
+    ));
 
     item.append(imageWrap, identity, amount, store, type);
     item.setAttribute(
         "aria-label",
         [
             formatRecipeIngredientQuantityUnit(values),
-            ingredient.textContent,
-            preparation,
+            ingredientName,
+            String(values.preparation || "").trim(),
             storeLabel,
-            type.textContent,
+            recipeIngredientTypeLabel(values),
         ].filter(value => value && value !== "\u2014").join(", "),
     );
     return item;
@@ -32924,6 +33128,8 @@ function renderRecipeIngredientModalSelectedOptionPreview(panel, selection, opti
     const preview = panel?.querySelector("[data-recipe-ingredient-modal-selected-option]");
     if (!preview) return;
     const valuesList = Array.isArray(selection.values) ? selection.values : [];
+    const sourceRows = Array.isArray(selection.rows) ? selection.rows : [];
+    const modalRow = panel.closest(".recipe-edit-ingredient-row");
     preview.replaceChildren();
     preview.dataset.hasContent = String(valuesList.length > 0);
     if (!valuesList.length) {
@@ -32967,15 +33173,14 @@ function renderRecipeIngredientModalSelectedOptionPreview(panel, selection, opti
     });
     list.appendChild(columns);
 
-    valuesList.slice(0, 3).forEach(values => {
-        list.appendChild(createRecipeIngredientModalSelectedOptionRow(values));
+    valuesList.forEach((values, index) => {
+        list.appendChild(createRecipeIngredientModalSelectedOptionRow(
+            panel,
+            modalRow,
+            sourceRows[index] || modalRow,
+            values,
+        ));
     });
-    if (valuesList.length > 3) {
-        const more = document.createElement("span");
-        more.className = "recipe-edit-ingredient-modal-selected-option-more";
-        more.textContent = `+${valuesList.length - 3} more ingredient${valuesList.length - 3 === 1 ? "" : "s"}`;
-        list.appendChild(more);
-    }
     preview.append(heading, list);
 }
 
@@ -34289,6 +34494,9 @@ function closeRecipeIngredientOptionModal(row, panel, options = {}) {
             delete optionRow.dataset.ingredientMatchDetails;
         }
     }
+    finishRecipeIngredientModalSelectedOptionEdits(panel, {
+        restore: !options.commit,
+    });
     restoreRecipeIngredientOptionModalHost(row, panel);
     delete panel.recipeIngredientOptionSourceRow;
     delete panel.recipeIngredientOptionHostSnapshot;
@@ -34467,6 +34675,7 @@ function setRecipeIngredientEditMode(row, shouldEdit, options = {}) {
             }
         });
         if (!row.classList.contains("is-editing") || !panel.dataset.editSnapshot) {
+            delete panel.recipeIngredientModalSelectedOptionSnapshots;
             panel.dataset.editSnapshot = JSON.stringify(recipeIngredientModalEditableFieldSnapshot(row));
         }
     } else if (options.restore && panel.dataset.editSnapshot) {
@@ -34475,6 +34684,12 @@ function setRecipeIngredientEditMode(row, shouldEdit, options = {}) {
         } catch (error) {
             console.warn("Unable to restore the ingredient edit values.", error);
         }
+    }
+
+    if (!shouldEdit) {
+        finishRecipeIngredientModalSelectedOptionEdits(panel, {
+            restore: Boolean(options.restore),
+        });
     }
 
     row.classList.toggle("is-editing", Boolean(shouldEdit));

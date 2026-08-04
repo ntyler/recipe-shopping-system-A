@@ -5577,7 +5577,7 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert "function recipeIngredientModalOptionSelection(row, summary)" in sync
     assert "function renderRecipeIngredientModalOptionSelection(summaryElement, selection)" in sync
     assert "function recipeIngredientModalSelectedOptionSummary(valuesList = [])" in sync
-    assert "function createRecipeIngredientModalSelectedOptionRow(values = {})" in sync
+    assert "function createRecipeIngredientModalSelectedOptionRow(" in sync
     assert "function renderRecipeIngredientModalSelectedOptionPreview(panel, selection, optionCount)" in sync
     assert "function setRecipeIngredientModalOptionsExpanded(panel, expanded, options = {})" in sync
     assert "function toggleRecipeIngredientModalOptions(button)" in sync
@@ -5586,10 +5586,25 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert "selection.needsAttention || recipeEditIngredientModalOptionsExpanded" in sync
     assert 'label: `Selected option ingredients: ${ingredients.join(" + ")}`' in sync
     assert "values: selectedChoice.values || []" in sync
+    assert "rows: selectedRows" in sync
     assert 'item.className = "recipe-edit-ingredient-modal-selected-option-row"' in sync
     assert 'columns.className = "recipe-edit-ingredient-modal-selected-option-columns"' in sync
     assert '["", "Ingredient", "Quantity", "Store section", "Type"]' in sync
-    assert "valuesList.slice(0, 3).forEach" in sync
+    assert "function createRecipeIngredientModalSelectedOptionControl(" in sync
+    assert "recipeIngredientModalSelectedOptionTargetRow(" in sync
+    assert "control.dataset.recipeIngredientModalSelectedOptionField = fieldName;" in sync
+    for field_name in (
+        "ingredient",
+        "preparation",
+        "purchasable_item",
+        "quantity",
+        "unit",
+        "store_section",
+        "section",
+    ):
+        assert f'"{field_name}"' in sync
+    assert "valuesList.forEach((values, index) =>" in sync
+    assert "valuesList.slice(0, 3)" not in sync
     assert 'openButton.textContent = `View ${optionCount} option' in sync
     assert 'preview.hidden = shouldExpand || preview.dataset.hasContent !== "true";' in sync
     assert "hasChoiceGroup: optionCount > 1" in sync
@@ -5623,6 +5638,9 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert ".recipe-edit-ingredient-modal-selected-option-columns" in css
     assert ".recipe-edit-ingredient-modal-selected-option-image" in css
     assert ".recipe-edit-ingredient-modal-selected-option-store" in css
+    assert "Ingredient modal options v94: edit every selected option component in place." in css
+    assert ".recipe-edit-ingredient-modal-selected-option-control" in css
+    assert '.recipe-edit-ingredient-modal-selected-option-control[aria-invalid="true"]' in css
     assert ".recipe-edit-ingredient-modal-section.is-options.is-collapsed" in css
     assert ".recipe-edit-ingredient-modal-options-body[hidden]" in css
     assert "@media (max-width: 760px)" in modal_css
@@ -5637,6 +5655,43 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert "overflow-x: clip;" in css
     assert ".recipe-edit-ingredient-recipe-disclosure:focus-visible" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
+
+
+def test_edit_ingredient_modal_selected_option_edits_are_transactional():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    snapshots = script[
+        script.index("function recipeIngredientModalHasChanges"):
+        script.index("function setRecipeIngredientModalStatus")
+    ]
+    validation = script[
+        script.index("function validateRecipeIngredientModal"):
+        script.index("function recipeIngredientModalPersistedIndex")
+    ]
+    commit = script[
+        script.index("async function commitRecipeIngredientModal"):
+        script.index("const RECIPE_EDIT_INGREDIENT_GRID_CELL_ORDER")
+    ]
+    option_close = script[
+        script.index("function closeRecipeIngredientOptionModal"):
+        script.index("function openRecipeIngredientDefaultOptionModal")
+    ]
+    edit_mode = script[
+        script.index("function setRecipeIngredientEditMode"):
+        script.index("function saveRecipeIngredientInlineEdit")
+    ]
+
+    assert "recipeIngredientModalSelectedOptionHasChanges(panel)" in snapshots
+    assert "function ensureRecipeIngredientModalSelectedOptionSnapshot" in snapshots
+    assert "panel.recipeIngredientModalSelectedOptionSnapshots = new Map();" in snapshots
+    assert "function finishRecipeIngredientModalSelectedOptionEdits" in snapshots
+    assert "restoreRecipeIngredientEditableFieldSnapshot(sourceRow, snapshot);" in snapshots
+    assert '[data-recipe-ingredient-modal-selected-option-field="ingredient"]' in validation
+    assert '[data-recipe-ingredient-modal-selected-option-field="unit"]' in validation
+    assert "finishRecipeIngredientModalSelectedOptionEdits(panel);" in commit
+    assert "restore: !options.commit" in option_close
+    assert "delete panel.recipeIngredientModalSelectedOptionSnapshots;" in edit_mode
+    assert "restore: Boolean(options.restore)" in edit_mode
 
 
 def test_edit_ingredient_modal_options_open_for_navigation_edits_and_errors():
