@@ -5569,7 +5569,7 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert 'aria-controls="${modalOptionsBodyId}"' in modal
     assert "data-recipe-ingredient-modal-options-summary" in modal
     assert "data-recipe-ingredient-modal-selected-option" in modal
-    assert 'aria-label="Selected option preview"' in modal
+    assert 'aria-label="Selected option editor"' in modal
     assert "data-recipe-ingredient-modal-options-body" in modal
     assert "data-recipe-ingredient-modal-options-slot" in modal
 
@@ -5587,9 +5587,13 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert 'label: `Selected option ingredients: ${ingredients.join(" + ")}`' in sync
     assert "values: selectedChoice.values || []" in sync
     assert "rows: selectedRows" in sync
+    assert "optionLabel: selectedChoice.selectionLabel" in sync
+    assert "groupTitle," in sync
     assert 'item.className = "recipe-edit-ingredient-modal-selected-option-row"' in sync
-    assert 'columns.className = "recipe-edit-ingredient-modal-selected-option-columns"' in sync
-    assert '["", "Ingredient", "Quantity", "Store section", "Type"]' in sync
+    assert 'label.textContent = String(selection.optionLabel || selection.prefix || "Selected option");' in sync
+    assert 'summary.textContent = String(selection.groupTitle || "").trim()' in sync
+    assert 'list.setAttribute("aria-label", `${label.textContent} ingredients`);' in sync
+    assert 'columns.className = "recipe-edit-ingredient-modal-selected-option-columns"' not in sync
     assert "function createRecipeIngredientModalSelectedOptionControl(" in sync
     assert "recipeIngredientModalSelectedOptionTargetRow(" in sync
     assert "control.dataset.recipeIngredientModalSelectedOptionField = fieldName;" in sync
@@ -5605,7 +5609,8 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
         assert f'"{field_name}"' in sync
     assert "valuesList.forEach((values, index) =>" in sync
     assert "valuesList.slice(0, 3)" not in sync
-    assert 'openButton.textContent = `View ${optionCount} option' in sync
+    assert '<span>${optionCount} option${optionCount === 1 ? "" : "s"}</span>' in sync
+    assert 'class="recipe-edit-ingredient-modal-selected-option-open-chevron"' in sync
     assert 'preview.hidden = shouldExpand || preview.dataset.hasContent !== "true";' in sync
     assert "hasChoiceGroup: optionCount > 1" in sync
     assert "isAvailable: optionCount > 0" in sync
@@ -5638,9 +5643,11 @@ def test_edit_ingredient_modal_exposes_the_shared_option_group():
     assert ".recipe-edit-ingredient-modal-selected-option-columns" in css
     assert ".recipe-edit-ingredient-modal-selected-option-image" in css
     assert ".recipe-edit-ingredient-modal-selected-option-store" in css
-    assert "Ingredient modal options v94: edit every selected option component in place." in css
+    assert "Ingredient modal options v95: mirror the saved option-group hierarchy while keeping fields editable." in css
     assert ".recipe-edit-ingredient-modal-selected-option-control" in css
     assert '.recipe-edit-ingredient-modal-selected-option-control[aria-invalid="true"]' in css
+    assert "grid-template-columns: minmax(0, 1fr);" in css
+    assert "border: 1px solid transparent;" in css
     assert ".recipe-edit-ingredient-modal-section.is-options.is-collapsed" in css
     assert ".recipe-edit-ingredient-modal-options-body[hidden]" in css
     assert "@media (max-width: 760px)" in modal_css

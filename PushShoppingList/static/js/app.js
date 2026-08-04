@@ -32860,6 +32860,12 @@ function recipeIngredientModalOptionsSummary(row) {
 
 function recipeIngredientModalOptionSelection(row, summary) {
     const originalValues = recipeIngredientChoiceParentValues(row);
+    const groupTitle = String(
+        originalValues.source_text
+        || originalValues.original_text
+        || originalValues.ingredient
+        || "Ingredient option",
+    ).trim();
     const selectedChoice = recipeIngredientSelectedChoice(
         row,
         originalValues,
@@ -32878,6 +32884,9 @@ function recipeIngredientModalOptionSelection(row, summary) {
         return {
             label: `Selected option ingredients: ${ingredients.join(" + ")}`,
             prefix: "Selected option",
+            optionLabel: selectedChoice.selectionLabel
+                || recipeIngredientOptionTypeLabel(selectedChoice.isDefaultOption),
+            groupTitle,
             ingredients,
             values: selectedChoice.values || [],
             rows: selectedRows,
@@ -32890,6 +32899,8 @@ function recipeIngredientModalOptionSelection(row, summary) {
         return {
             label: `Selected option ingredients: ${defaultName}`,
             prefix: "Selected option",
+            optionLabel: recipeIngredientOptionTypeLabel(true),
+            groupTitle,
             ingredients: [defaultName],
             values: [originalValues],
             rows: [row],
@@ -32899,6 +32910,8 @@ function recipeIngredientModalOptionSelection(row, summary) {
     return {
         label: "Selection required",
         prefix: "",
+        optionLabel: "",
+        groupTitle: "",
         ingredients: [],
         values: [],
         rows: [],
@@ -33143,14 +33156,29 @@ function renderRecipeIngredientModalSelectedOptionPreview(panel, selection, opti
     headingCopy.className = "recipe-edit-ingredient-modal-selected-option-heading-copy";
     const label = document.createElement("span");
     label.className = "recipe-edit-ingredient-modal-selected-option-label";
-    label.textContent = "Selected option";
+    label.textContent = String(selection.optionLabel || selection.prefix || "Selected option");
     const summary = document.createElement("strong");
-    summary.textContent = recipeIngredientModalSelectedOptionSummary(valuesList);
+    summary.textContent = String(selection.groupTitle || "").trim()
+        || recipeIngredientModalSelectedOptionSummary(valuesList);
+    headingCopy.title = [
+        label.textContent,
+        summary.textContent,
+        recipeIngredientModalSelectedOptionSummary(valuesList),
+    ].filter(Boolean).join(": ");
     headingCopy.append(label, summary);
     const openButton = document.createElement("button");
     openButton.type = "button";
     openButton.className = "recipe-edit-ingredient-modal-selected-option-open";
-    openButton.textContent = `View ${optionCount} option${optionCount === 1 ? "" : "s"}`;
+    openButton.innerHTML = `
+        <span>${optionCount} option${optionCount === 1 ? "" : "s"}</span>
+        <span class="recipe-edit-ingredient-modal-selected-option-open-chevron" aria-hidden="true">
+            ${recipeEditSvgIcon("chevron-down")}
+        </span>
+    `;
+    openButton.setAttribute(
+        "aria-label",
+        `View all ${optionCount} ingredient option${optionCount === 1 ? "" : "s"}`,
+    );
     openButton.addEventListener("click", () => {
         setRecipeIngredientModalOptionsExpanded(panel, true, {
             remember: true,
@@ -33162,16 +33190,8 @@ function renderRecipeIngredientModalSelectedOptionPreview(panel, selection, opti
     const list = document.createElement("div");
     list.className = "recipe-edit-ingredient-modal-selected-option-list";
     list.setAttribute("role", "list");
-
-    const columns = document.createElement("div");
-    columns.className = "recipe-edit-ingredient-modal-selected-option-columns";
-    columns.setAttribute("aria-hidden", "true");
-    ["", "Ingredient", "Quantity", "Store section", "Type"].forEach(columnLabel => {
-        const column = document.createElement("span");
-        column.textContent = columnLabel;
-        columns.appendChild(column);
-    });
-    list.appendChild(columns);
+    list.setAttribute("aria-label", `${label.textContent} ingredients`);
+    list.classList.toggle("is-multi-component", valuesList.length > 1);
 
     valuesList.forEach((values, index) => {
         list.appendChild(createRecipeIngredientModalSelectedOptionRow(
@@ -34007,7 +34027,7 @@ function organizeRecipeEditIngredientRow(row) {
                             </div>
                             <div class="recipe-edit-ingredient-modal-selected-option"
                                  data-recipe-ingredient-modal-selected-option
-                                 aria-label="Selected option preview"
+                                 aria-label="Selected option editor"
                                  hidden></div>
                             <div id="${modalOptionsBodyId}"
                                  class="recipe-edit-ingredient-modal-options-body"
