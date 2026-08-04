@@ -41384,13 +41384,15 @@ function editFoodReviewManually() {
     return false;
 }
 
-function setRowFieldValue(row, field, value) {
+function setRowFieldValue(row, field, value, options = {}) {
     const input = row.querySelector(`[data-field="${field}"]`);
 
     if (input) {
         input.value = value;
-        const eventName = input.tagName === "SELECT" || input.type === "checkbox" ? "change" : "input";
-        input.dispatchEvent(new Event(eventName, { bubbles: true }));
+        if (options.dispatch !== false) {
+            const eventName = input.tagName === "SELECT" || input.type === "checkbox" ? "change" : "input";
+            input.dispatchEvent(new Event(eventName, { bubbles: true }));
+        }
         if (field === "store_section") {
             syncRecipeIngredientStoreSectionControl(input);
         }
@@ -45862,7 +45864,7 @@ function chooseRecipeIngredientMasterOption(button) {
 
     const targetField = String(input.dataset.recipeIngredientMasterField || "ingredient");
     if (targetField === "purchasable_item") {
-        setRowFieldValue(row, "purchasable_item", name);
+        setRowFieldValue(row, "purchasable_item", name, { dispatch: false });
         const buyAsField = recipeIngredientDirectField(row, "purchasable_item");
         syncRecipeIngredientPurchaseGroup(buyAsField);
         if (row.matches("[data-substitution-option-row]")) {
@@ -45889,28 +45891,33 @@ function chooseRecipeIngredientMasterOption(button) {
         || !String(currentBuyAs.value || "").trim()
         || recipeIngredientComparableText(currentBuyAs.value) === recipeIngredientComparableText(previousName);
 
-    setRowFieldValue(row, "ingredient", name);
-    setRowFieldValue(row, "ingredient_id", ingredientId);
-    setRowFieldValue(row, "parsed_name", name);
-    setRowFieldValue(row, "normalized_name", normalizedName);
-    setRowFieldValue(row, "master_normalized_name", normalizedName);
-    setRowFieldValue(row, "store_section", storeSection);
-    setRowFieldValue(row, "store_section_custom", "false");
-    setRowFieldValue(row, "store_section_source", "user_master_data");
-    setRowFieldValue(row, "store_section_confidence", "1");
-    setRowFieldValue(row, "store_section_user_confirmed", "true");
-    setRowFieldValue(row, "store_section_save_to_master", "false");
-    setRowFieldValue(row, "classifier_version", "2.0");
-    setRowFieldValue(row, "store_section_reason", "Selected from Ingredient Master Data.");
-    setRowFieldValue(row, "store_section_rule", "master.user_exact");
-    setRowFieldValue(row, "ingredient_image_url", imageUrl);
-    setRowFieldValue(row, "match_status", "Matched");
-    setRowFieldValue(row, "confidence", "high");
-    setRowFieldValue(row, "inferred", "false");
-    setRowFieldValue(row, "warning", "");
+    const masterFieldValues = {
+        ingredient: name,
+        ingredient_id: ingredientId,
+        parsed_name: name,
+        normalized_name: normalizedName,
+        master_normalized_name: normalizedName,
+        store_section: storeSection,
+        store_section_custom: "false",
+        store_section_source: "user_master_data",
+        store_section_confidence: "1",
+        store_section_user_confirmed: "true",
+        store_section_save_to_master: "false",
+        classifier_version: "2.0",
+        store_section_reason: "Selected from Ingredient Master Data.",
+        store_section_rule: "master.user_exact",
+        ingredient_image_url: imageUrl,
+        match_status: "Matched",
+        confidence: "high",
+        inferred: "false",
+        warning: "",
+    };
     if (shouldSyncBuyAs) {
-        setRowFieldValue(row, "purchasable_item", name);
+        masterFieldValues.purchasable_item = name;
     }
+    Object.entries(masterFieldValues).forEach(([field, value]) => {
+        setRowFieldValue(row, field, value, { dispatch: false });
+    });
 
     let matchDetails = {};
     try {

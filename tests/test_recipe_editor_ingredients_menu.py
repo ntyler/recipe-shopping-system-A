@@ -1923,7 +1923,7 @@ def test_ingredient_name_and_buy_as_fields_use_the_normalized_master_data_picker
     assert "function recipeIngredientMasterSelectedIndex" in picker
     assert "recipeIngredientProjectedOptionSourceRow(input)" in picker
     assert 'targetField === "purchasable_item"' in picker
-    assert 'setRowFieldValue(row, "purchasable_item", name);' in picker
+    assert 'setRowFieldValue(row, "purchasable_item", name, { dispatch: false });' in picker
     assert "syncRecipeIngredientPurchaseGroup(buyAsField);" in picker
     assert 'recipeIngredientDirectField(targetRow, "ingredient_id")' in picker
     for field_name in (
@@ -1948,7 +1948,7 @@ def test_ingredient_name_and_buy_as_fields_use_the_normalized_master_data_picker
         "ingredient_image_url",
         "match_status",
     ):
-        assert f'setRowFieldValue(row, "{field_name}"' in picker
+        assert f"{field_name}:" in picker
     assert 'match_source: "ingredient master data"' in picker
     assert "Manage master ingredients" in picker
     assert "ingredient.aliases" in picker
@@ -4582,6 +4582,26 @@ def test_compact_store_section_display_rebinds_when_the_selected_choice_changes(
     assert 'source.addEventListener("change", syncDisplay);' in source_resolution
     assert "bindRecipeIngredientStoreSectionDisplaySource(display, source);" in inline_sync
     assert "bindRecipeIngredientStoreSectionDisplaySource(display, source);" in inline_binding
+
+
+def test_master_ingredient_selection_batches_field_updates_before_one_summary_refresh():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    setter = script[
+        script.index("function setRowFieldValue"):
+        script.index("function recipeEditSvgIcon")
+    ]
+    selection = script[
+        script.index("function chooseRecipeIngredientMasterOption"):
+        script.index("function handleRecipeIngredientMasterKeydown")
+    ]
+
+    assert "function setRowFieldValue(row, field, value, options = {})" in setter
+    assert "if (options.dispatch !== false)" in setter
+    assert "const masterFieldValues = {" in selection
+    assert "Object.entries(masterFieldValues).forEach" in selection
+    assert "setRowFieldValue(row, field, value, { dispatch: false });" in selection
+    assert 'setRowFieldValue(row, "purchasable_item", name, { dispatch: false });' in selection
+    assert selection.count("updateRecipeIngredientSummary(") == 4
 
 
 def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional_state():
