@@ -121,6 +121,9 @@ from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.recipe_url_service import load_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
+from PushShoppingList.services.recipe_url_service import canonicalize_private_recipe_url
+from PushShoppingList.services.recipe_url_service import recipe_cover_image_url
+from PushShoppingList.services.recipe_url_service import restaurant_source_logo_url
 from PushShoppingList.services.recipe_url_service import recipe_url_type
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import save_recipe_url_name
@@ -2640,7 +2643,9 @@ def editable_menu_source_option_from_records(restaurant, menu):
         "source_menu_url": source_menu_url,
         "restaurant_cuisine_tags": recipe_menu_text_list_for_editor(restaurant.get("cuisine_tags")),
         "restaurant_phone": clean_recipe_menu_text(restaurant.get("phone")),
-        "restaurant_logo_url": clean_recipe_menu_text(restaurant.get("logo_url") or restaurant.get("logo")),
+        "restaurant_logo_url": canonicalize_private_recipe_url(
+            clean_recipe_menu_text(restaurant.get("logo_url") or restaurant.get("logo"))
+        ),
         "restaurant_rating": clean_recipe_menu_text(restaurant.get("rating")),
         "restaurant_street_address": first_recipe_menu_text(restaurant.get("address_line"), restaurant.get("full_address")),
         "restaurant_city": clean_recipe_menu_text(restaurant.get("city")),
@@ -3212,7 +3217,10 @@ def save_editable_restaurant_logo_data(restaurant_id, data_url):
     RESTAURANT_LOGO_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
     path = RESTAURANT_LOGO_UPLOAD_FOLDER / f"{safe_filename(restaurant_id)}_{uuid.uuid4().hex}{extension}"
     path.write_bytes(payload)
-    return path, f"/restaurant_source_logo?restaurant_id={quote(restaurant_id, safe='')}&v={path.stat().st_mtime_ns}"
+    return path, restaurant_source_logo_url(
+        restaurant_id,
+        version=path.stat().st_mtime_ns,
+    )
 
 
 def create_editable_restaurant(values, create_anyway=False):
@@ -3680,7 +3688,7 @@ def editable_restaurant_usage_thumbnail(recipe_url, recipe_data, recipe_meta=Non
     if not normalized:
         return {}
     if normalized.get("path") and recipe_url:
-        src = f"/recipe_cover_image?url={quote(recipe_url, safe='')}&variant=thumb"
+        src = recipe_cover_image_url(recipe_url, variant="thumb")
     else:
         src = first_recipe_menu_text(
             cover_image.get("thumb_url"),
@@ -4847,9 +4855,9 @@ def editable_recipe_cover_image(url, recipe_data, recipe_meta=None):
 
     src = ""
     if normalized.get("path") and source_url:
-        src = f"/recipe_cover_image?url={quote(source_url, safe='')}"
+        src = recipe_cover_image_url(source_url)
     elif normalized.get("url"):
-        src = normalized.get("url")
+        src = canonicalize_private_recipe_url(normalized.get("url"))
 
     variants = {}
     image_path = recipe_cover_image_file_path(normalized)
@@ -4857,9 +4865,10 @@ def editable_recipe_cover_image(url, recipe_data, recipe_meta=None):
         version = f"{int(image_path.stat().st_mtime)}-{image_path.stat().st_size}"
 
         def build_variant_url(variant, version_value):
-            return (
-                f"/recipe_cover_image?url={quote(source_url, safe='')}"
-                f"&variant={quote(variant, safe='')}&v={quote(version_value, safe='')}"
+            return recipe_cover_image_url(
+                source_url,
+                variant=variant,
+                version=version_value,
             )
 
         variants = cover_image_variant_payload(src, image_path, build_variant_url)

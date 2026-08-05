@@ -2,7 +2,10 @@ import json
 import os
 from pathlib import Path
 from urllib.parse import parse_qs
+from urllib.parse import parse_qsl
 from urllib.parse import urlsplit
+
+from bs4 import BeautifulSoup
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -150,8 +153,10 @@ def configured_app(monkeypatch, tmp_path):
         )
 
     global_search_service.clear_global_search_cache()
-    app = create_app()
-    app.config.update(TESTING=True)
+    app = create_app({
+        "TESTING": True,
+        "SECRET_KEY": "global-search-tests-deterministic-secret-key-2026",
+    })
     return app, user_data
 
 
@@ -164,6 +169,11 @@ def flattened_results(payload):
     return [result for group in payload.get("groups", []) for result in group.get("results", [])]
 
 
+def assert_private_no_store(response):
+    assert response.headers.get("Cache-Control") == "private, no-store"
+    assert response.headers.get("Pragma") == "no-cache"
+
+
 def test_global_search_is_authenticated_grouped_limited_and_user_scoped(monkeypatch, tmp_path):
     app, _user_data = configured_app(monkeypatch, tmp_path)
 
@@ -172,10 +182,22 @@ def test_global_search_is_authenticated_grouped_limited_and_user_scoped(monkeypa
         assert unauthorized.status_code == 401
 
         sign_in(client, "user-one")
-        response = client.get("/api/global-search?q=tom&limit=8&user_id=user-two")
-        infix_response = client.get("/api/global-search?q=mato&limit=8")
+        legacy_target = client.get("/api/global-search?q=tom&limit=8&user_id=user-two")
+        response = client.get(legacy_target.headers["Location"])
+        infix_response = client.get(
+            "/api/global-search?viewer_user_id=user-one&q=mato&limit=8",
+        )
 
+    assert legacy_target.status_code == 302
+    assert parse_qsl(urlsplit(legacy_target.headers["Location"]).query) == [
+        ("viewer_user_id", "user-one"),
+        ("q", "tom"),
+        ("limit", "8"),
+    ]
+    assert_private_no_store(unauthorized)
+    assert_private_no_store(legacy_target)
     assert response.status_code == 200
+    assert_private_no_store(response)
     payload = response.get_json()
     results = flattened_results(payload)
     groups = {group["key"] for group in payload["groups"]}
@@ -190,7 +212,11 @@ def test_global_search_is_authenticated_grouped_limited_and_user_scoped(monkeypa
     recipe_result = next(result for result in results if result["title"] == "Tomato Soup")
     assert urlsplit(recipe_result["url"]).path == "/recipe/edit"
     assert parse_qs(urlsplit(recipe_result["url"]).query) == {
-        "user_id": ["user-one"],
+        "viewer_user_id": ["user-one"],
+        "url": ["https://example.test/recipes/tomato-soup"],
+    }
+    assert parse_qs(urlsplit(recipe_result["thumbnail_url"]).query) == {
+        "viewer_user_id": ["user-one"],
         "url": ["https://example.test/recipes/tomato-soup"],
     }
     assert any(result["title"] == "Tomato Soup" for result in flattened_results(infix_response.get_json()))
@@ -207,7 +233,7 @@ def test_global_search_does_not_build_record_projection_below_two_characters(mon
     )
     with app.test_client() as client:
         sign_in(client, "user-one")
-        response = client.get("/api/global-search?q=r")
+        response = client.get("/api/global-search?viewer_user_id=user-one&q=r")
 
     payload = response.get_json()
     assert response.status_code == 200
@@ -261,14 +287,39 @@ def test_global_search_typed_group_order_and_header_caps():
     assert page_urls["Import Menus"] == "/#menuUrlPage"
 
 
-def test_recent_global_search_records_are_actual_sanitized_and_workspace_scoped(monkeypatch, tmp_path):
+def test_master_data_search_candidate_uses_viewer_not_target_identity(monkeypatch, tmp_path):
     app, _user_data = configured_app(monkeypatch, tmp_path)
     from flask import session
     from PushShoppingList.services import global_search_service
 
+    with app.test_request_context("/"):
+        session["user_id"] = "user-one"
+        item = global_search_service.master_data_candidate("ingredients", {
+            "id": 42,
+            "user_id": "user-two",
+            "name": "Café & Honey",
+            "normalized_name": "cafe honey",
+            "store_section": "PANTRY",
+            "usage_count": 2,
+        })
+
+    split = urlsplit(item["url"])
+    assert split.path == "/admin/master-data/ingredients"
+    assert parse_qsl(split.query) == [
+        ("viewer_user_id", "user-one"),
+        ("search", "Café & Honey"),
+    ]
+    assert "user_id" not in parse_qs(split.query)
+
+
+def test_recent_global_search_records_are_actual_sanitized_and_workspace_scoped(monkeypatch, tmp_path):
+    app, _user_data = configured_app(monkeypatch, tmp_path)
+
     with app.test_client() as client:
         sign_in(client, "user-one")
-        typed = client.get("/api/global-search?q=tomato&limit=12").get_json()
+        typed = client.get(
+            "/api/global-search?viewer_user_id=user-one&q=tomato&limit=12",
+        ).get_json()
         recipe = next(
             result
             for group in typed["groups"]
@@ -284,13 +335,22 @@ def test_recent_global_search_records_are_actual_sanitized_and_workspace_scoped(
         })
         client.post("/api/global-search/recent", json={"group": "pantry", "id": "pantry-1"})
         client.post("/api/global-search/recent", json={"group": "recipes", "id": recipe["id"]})
-        user_one_recent = client.get("/api/global-search?q=&limit=99")
+        user_one_recent_redirect = client.get(
+            "/api/global-search?viewer_user_id=user-one&q=&limit=99",
+        )
+        user_one_recent = client.get(user_one_recent_redirect.headers["Location"])
 
         with client.session_transaction() as user_two_session:
             user_two_session["user_id"] = "user-two"
-        user_two_recent = client.get("/api/global-search?q=&limit=4")
+        user_two_recent = client.get(
+            "/api/global-search?viewer_user_id=user-two",
+        )
 
     assert recorded.status_code == 200
+    assert user_one_recent_redirect.status_code == 302
+    assert parse_qsl(urlsplit(user_one_recent_redirect.headers["Location"]).query) == [
+        ("viewer_user_id", "user-one"),
+    ]
     recorded_result = recorded.get_json()["result"]
     assert recorded_result["title"] == "Tomato Soup"
     assert recorded_result["url"].startswith("/")
@@ -305,12 +365,6 @@ def test_recent_global_search_records_are_actual_sanitized_and_workspace_scoped(
     assert user_one_payload["groups"][0]["results"][1]["tracking_group"] == "pantry"
     assert user_two_recent.get_json()["groups"] == []
 
-    with app.test_request_context("/"):
-        session["is_guest"] = True
-        session["guest_session_id"] = "guest-one"
-        assert global_search_service.recent_global_search()["groups"] == []
-
-
 def test_recent_global_search_empty_read_never_builds_broad_projection(monkeypatch, tmp_path):
     app, _user_data = configured_app(monkeypatch, tmp_path)
     from PushShoppingList.services import global_search_service
@@ -322,7 +376,7 @@ def test_recent_global_search_empty_read_never_builds_broad_projection(monkeypat
     )
     with app.test_client() as client:
         sign_in(client, "user-one")
-        response = client.get("/api/global-search?q=&limit=4")
+        response = client.get("/api/global-search?viewer_user_id=user-one")
 
     assert response.status_code == 200
     assert response.get_json()["groups"] == []
@@ -362,7 +416,9 @@ def test_recent_global_search_discards_unsafe_stored_urls(monkeypatch, tmp_path)
 
     with app.test_client() as client:
         sign_in(client, "user-one")
-        payload = client.get("/api/global-search?q=&limit=4").get_json()
+        payload = client.get(
+            "/api/global-search?viewer_user_id=user-one",
+        ).get_json()
 
     assert payload["groups"] == []
 
@@ -372,7 +428,9 @@ def test_global_search_projection_rebuilds_after_scoped_source_changes(monkeypat
 
     with app.test_client() as client:
         sign_in(client, "user-one")
-        before = client.get("/api/global-search?q=dragonfruit").get_json()
+        before = client.get(
+            "/api/global-search?viewer_user_id=user-one&q=dragonfruit",
+        ).get_json()
         assert before["total_count"] == 0
 
         pantry_path = user_data / "user-one" / "pantry_inventory.json"
@@ -387,7 +445,9 @@ def test_global_search_projection_rebuilds_after_scoped_source_changes(monkeypat
         stat = pantry_path.stat()
         os.utime(pantry_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
 
-        after = client.get("/api/global-search?q=dragon").get_json()
+        after = client.get(
+            "/api/global-search?viewer_user_id=user-one&q=dragon",
+        ).get_json()
 
     assert any(result["title"] == "Dragonfruit" for result in flattened_results(after))
 
@@ -397,7 +457,9 @@ def test_full_search_results_route_renders_group_counts_and_filters(monkeypatch,
 
     with app.test_client() as client:
         sign_in(client, "user-one")
-        response = client.get("/search?q=tomato&type=recipes")
+        response = client.get(
+            "/search?viewer_user_id=user-one&q=tomato&type=recipes",
+        )
 
     html = response.get_data(as_text=True)
     assert response.status_code == 200
@@ -408,15 +470,182 @@ def test_full_search_results_route_renders_group_counts_and_filters(monkeypatch,
     assert html.count('data-app-header') == 1
 
 
+def test_registered_search_urls_canonicalize_once_and_reject_bad_viewers(monkeypatch, tmp_path):
+    app, _user_data = configured_app(monkeypatch, tmp_path)
+    complex_query = "café & honey / 50% + ?=yes"
+
+    with app.test_client() as client:
+        sign_in(client, "user-one")
+        missing = client.get(
+            "/api/global-search",
+            query_string={
+                "q": f"  {complex_query}  ",
+                "type": "RECIPES",
+                "limit": "008",
+                "user_id": "user-two",
+                "ignored": "remove-me",
+            },
+        )
+        canonical = client.get(missing.headers["Location"], follow_redirects=True)
+        blank = client.get("/search?viewer_user_id=&q=tomato")
+        mismatch = client.get(
+            "/api/global-search?viewer_user_id=USER-ONE&q=tomato",
+        )
+        duplicate = client.get(
+            "/search?viewer_user_id=user-one&viewer_user_id=user-one&q=tomato",
+        )
+
+    assert missing.status_code == 302
+    assert parse_qsl(urlsplit(missing.headers["Location"]).query) == [
+        ("viewer_user_id", "user-one"),
+        ("q", complex_query),
+        ("type", "recipes"),
+        ("limit", "8"),
+    ]
+    assert "%2525" not in missing.headers["Location"]
+    assert canonical.status_code == 200
+    assert len(canonical.history) == 0
+    assert canonical.get_json()["query"] == complex_query
+    assert {group["key"] for group in canonical.get_json()["groups"]} <= {"recipes"}
+    assert blank.status_code == 302
+    assert parse_qsl(urlsplit(blank.headers["Location"]).query) == [
+        ("viewer_user_id", "user-one"),
+        ("q", "tomato"),
+    ]
+    assert mismatch.status_code == 403
+    assert "USER-ONE" not in mismatch.get_data(as_text=True)
+    assert "user-one" not in mismatch.get_data(as_text=True)
+    assert duplicate.status_code == 400
+    for response in (missing, canonical, blank, mismatch, duplicate):
+        assert_private_no_store(response)
+
+
+def test_guest_search_stays_userless_and_anonymous_auth_behavior_is_preserved(monkeypatch, tmp_path):
+    app, _user_data = configured_app(monkeypatch, tmp_path)
+
+    with app.test_client() as client:
+        anonymous_api = client.get(
+            "/api/global-search?viewer_user_id=someone&q=tomato",
+        )
+        anonymous_page = client.get(
+            "/search?viewer_user_id=someone&q=tomato",
+        )
+        started = client.get("/guest/start")
+        guest_api = client.get("/api/global-search?q=tomato")
+        guest_page = client.get("/search?q=tomato")
+        guest_blank = client.get("/search?viewer_user_id=&q=tomato")
+        guest_supplied = client.get(
+            "/api/global-search?viewer_user_id=someone&q=tomato",
+        )
+
+    assert anonymous_api.status_code == 401
+    assert anonymous_page.status_code == 302
+    assert anonymous_page.headers["Location"].endswith("/#userAccountSection")
+    assert started.status_code == 302
+    assert guest_api.status_code == 200
+    assert guest_page.status_code == 200
+    assert guest_blank.status_code == 302
+    assert parse_qsl(urlsplit(guest_blank.headers["Location"]).query) == [("q", "tomato")]
+    assert guest_supplied.status_code == 403
+    assert "someone" not in guest_supplied.get_data(as_text=True)
+    for response in (
+        anonymous_api,
+        anonymous_page,
+        guest_api,
+        guest_page,
+        guest_blank,
+        guest_supplied,
+    ):
+        assert_private_no_store(response)
+
+
+def test_search_html_and_api_producers_keep_one_canonical_viewer(monkeypatch, tmp_path):
+    app, _user_data = configured_app(monkeypatch, tmp_path)
+
+    with app.test_client() as client:
+        sign_in(client, "user-one")
+        page = client.get(
+            "/search?viewer_user_id=user-one&q=tomato&type=recipes",
+        )
+        api = client.get(
+            "/api/global-search?viewer_user_id=user-one&q=tomato&limit=8",
+        )
+
+    soup = BeautifulSoup(page.get_data(as_text=True), "html.parser")
+    header_form = soup.select_one("[data-global-search-form]")
+    full_form = soup.select_one(".global-search-results-form")
+    assert header_form is not None
+    assert full_form is not None
+    for attribute, expected_path in (
+        ("data-global-search-endpoint", "/api/global-search"),
+        ("data-global-search-recent-url", "/api/global-search/recent"),
+        ("data-global-search-results-url", "/search"),
+    ):
+        split = urlsplit(header_form[attribute])
+        assert split.path == expected_path
+        assert parse_qsl(split.query) == [("viewer_user_id", "user-one")]
+    assert header_form["data-global-search-viewer-user-id"] == "user-one"
+    assert [field["value"] for field in header_form.select('input[name="viewer_user_id"]')] == ["user-one"]
+    assert [field["value"] for field in full_form.select('input[name="viewer_user_id"]')] == ["user-one"]
+
+    for link in soup.select(".global-search-result-filters a"):
+        params = dict(parse_qsl(urlsplit(link["href"]).query))
+        assert params["viewer_user_id"] == "user-one"
+        assert params["q"] == "tomato"
+        assert link["href"].count("viewer_user_id=") == 1
+
+    api_payload = api.get_json()
+    assert parse_qsl(urlsplit(api_payload["view_all_url"]).query) == [
+        ("viewer_user_id", "user-one"),
+        ("q", "tomato"),
+    ]
+    assert_private_no_store(page)
+    assert_private_no_store(api)
+
+
+def test_search_error_responses_and_retry_link_are_private_and_canonical(monkeypatch, tmp_path):
+    app, _user_data = configured_app(monkeypatch, tmp_path)
+    from PushShoppingList.routes import main_routes
+
+    monkeypatch.setattr(
+        main_routes,
+        "global_search",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("private failure")),
+    )
+    with app.test_client() as client:
+        sign_in(client, "user-one")
+        api = client.get(
+            "/api/global-search?viewer_user_id=user-one&q=tomato",
+        )
+        page = client.get(
+            "/search?viewer_user_id=user-one&q=tomato",
+        )
+
+    assert api.status_code == 500
+    assert "private failure" not in api.get_data(as_text=True)
+    soup = BeautifulSoup(page.get_data(as_text=True), "html.parser")
+    retry = soup.select_one(".global-search-results-error a")
+    assert retry is not None
+    assert parse_qsl(urlsplit(retry["href"]).query) == [
+        ("viewer_user_id", "user-one"),
+        ("q", "tomato"),
+    ]
+    assert_private_no_store(api)
+    assert_private_no_store(page)
+
+
 def test_shared_header_global_search_is_one_accessible_combobox():
     header = (ROOT / "PushShoppingList/templates/includes/app_header.html").read_text(encoding="utf-8")
     authenticated_pages = list((ROOT / "PushShoppingList/templates").glob("*.html"))
 
     assert header.count("data-global-search-form") == 1
     assert 'onsubmit="return submitGlobalAppSearch(this)"' in header
-    assert 'data-global-search-endpoint="/api/global-search"' in header
-    assert 'data-global-search-recent-url="/api/global-search/recent"' in header
-    assert 'data-global-search-results-url="/search"' in header
+    assert 'data-global-search-endpoint="{{ global_search_endpoint }}"' in header
+    assert 'data-global-search-recent-url="{{ global_search_recent_url }}"' in header
+    assert 'data-global-search-results-url="{{ global_search_results_url }}"' in header
+    assert 'data-global-search-viewer-user-id="{{ search_viewer_user_id }}"' in header
+    assert 'name="viewer_user_id" value="{{ search_viewer_user_id }}"' in header
+    assert 'name="q"' in header
     assert 'role="combobox"' in header
     assert 'aria-autocomplete="list"' in header
     assert 'aria-expanded="false"' in header
@@ -465,6 +694,7 @@ def test_global_search_client_debounces_groups_and_supports_keyboard_navigation(
     assert "View all results for" in search_script
     assert 'body: JSON.stringify({ group: result.trackingGroup, id: result.id })' in search_script
     assert 'credentials: "same-origin"' in search_script
+    assert 'cache: "no-store"' in search_script
     assert "keepalive: true" in search_script
     assert 'event.ctrlKey || event.metaKey || event.shiftKey || event.altKey' in search_script
     assert "innerHTML" not in search_script

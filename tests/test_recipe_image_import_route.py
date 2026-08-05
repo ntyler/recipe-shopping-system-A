@@ -1,6 +1,8 @@
 import io
 import json
 from pathlib import Path
+from urllib.parse import parse_qs
+from urllib.parse import urlsplit
 
 from flask import session
 from PIL import Image
@@ -465,7 +467,12 @@ def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
         assert editor_recipe["recipe_title"] == "Photo Rice Bowl"
         assert editor_recipe["cover_image"]["path"] == "data/uploads/meal.png"
         assert editor_recipe["cover_image"]["source"] == "uploaded_image"
-        assert editor_recipe["cover_image"]["src"].startswith("/recipe_cover_image?url=")
+        cover_url = urlsplit(editor_recipe["cover_image"]["src"])
+        assert cover_url.path == "/recipe_cover_image"
+        assert parse_qs(cover_url.query) == {
+            "viewer_user_id": [user_id],
+            "url": ["uploaded://meal.png"],
+        }
         assert [item["ingredient"] for item in editor_recipe["ingredients"]] == ["rice", "onion"]
         assert [item["instruction"] for item in editor_recipe["instructions"]] == [
             "Cook the rice.",
@@ -1220,7 +1227,8 @@ def test_remove_recipe_step_image_clears_saved_fields(monkeypatch):
     assert saved["data"]["instructions"][0]["step_image_generated_at"] == ""
 
 
-def test_remove_recipe_detail_image_route_calls_service(monkeypatch):
+def test_remove_recipe_detail_image_route_calls_service(monkeypatch, tmp_path):
+    configure_image_user(monkeypatch, tmp_path)
     app = create_app()
     captured = {}
 
@@ -1417,7 +1425,8 @@ def test_admin_can_test_local_title_image_generation_route(monkeypatch, tmp_path
     assert payload["byte_count"] == 123
 
 
-def test_generate_recipe_cover_image_route_uses_openai_usage_wrapper(monkeypatch):
+def test_generate_recipe_cover_image_route_uses_openai_usage_wrapper(monkeypatch, tmp_path):
+    configure_image_user(monkeypatch, tmp_path)
     app = create_app()
 
     monkeypatch.setattr(

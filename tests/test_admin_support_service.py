@@ -588,7 +588,7 @@ def test_device_status_route_records_active_status_for_current_user(monkeypatch,
     assert events[0]["minutes_inactive"] == 1.0
 
 
-def test_device_status_route_ignores_anonymous_payload_user_id(monkeypatch, tmp_path):
+def test_device_status_route_ignores_stale_session_and_anonymous_payload_user_ids(monkeypatch, tmp_path):
     configure_admin_support(monkeypatch, tmp_path)
     configure_device_status(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -600,6 +600,8 @@ def test_device_status_route_ignores_anonymous_payload_user_id(monkeypatch, tmp_
     app = create_app()
 
     with app.test_client() as client:
+        with client.session_transaction() as signed_session:
+            signed_session["user_id"] = "unknown-stale-account"
         response = client.post(
             "/api/device-status",
             json={
@@ -614,6 +616,8 @@ def test_device_status_route_ignores_anonymous_payload_user_id(monkeypatch, tmp_
             },
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/149.0.0.0"},
         )
+        with client.session_transaction() as signed_session:
+            assert "user_id" not in signed_session
 
     assert response.status_code == 200
     events = device_status.device_status_summary()

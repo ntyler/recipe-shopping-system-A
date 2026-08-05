@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import recipe_image_progress_service as service
+from PushShoppingList.services import user_account_service
 
 
 class RecipeImageProgressServiceTests(unittest.TestCase):
@@ -18,6 +19,21 @@ class RecipeImageProgressServiceTests(unittest.TestCase):
         )
         patcher.start()
         self.addCleanup(patcher.stop)
+        users_patcher = patch.object(
+            user_account_service,
+            "USERS_FILE",
+            Path(self.temp_dir.name) / "users.json",
+        )
+        users_patcher.start()
+        self.addCleanup(users_patcher.stop)
+        user_account_service.save_users({
+            "users": [{
+                "user_id": "image-progress-user",
+                "username": "image-progress-user",
+                "email": "image-progress@example.com",
+                "account_status": "active",
+            }],
+        })
 
     def test_tracks_running_and_finished_step_image(self):
         service.start_recipe_image_progress("step", "manual://recipe/demo", "1")

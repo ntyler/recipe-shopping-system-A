@@ -2,6 +2,25 @@ function saveScroll() {
     localStorage.setItem("scrollY", window.scrollY);
 }
 
+function withCanonicalViewerUserId(rawUrl, options = {}) {
+    const url = new URL(String(rawUrl || ""), window.location.origin);
+    const body = document.body;
+    const viewerUserId = String(
+        body && body.dataset.viewerUserId || "",
+    ).trim();
+    if (options.removeLegacyUserId) {
+        url.searchParams.delete("user_id");
+    }
+    if (url.origin !== window.location.origin || !viewerUserId) {
+        url.searchParams.delete("viewer_user_id");
+    } else {
+        url.searchParams.set("viewer_user_id", viewerUserId);
+    }
+    return url.origin === window.location.origin
+        ? `${url.pathname}${url.search}${url.hash}`
+        : url.toString();
+}
+
 function masterDataViewerUrl(rawUrl, values = {}) {
     const url = new URL(String(rawUrl || ""), window.location.origin);
     Object.entries(values || {}).forEach(([name, rawValue]) => {
@@ -14,7 +33,7 @@ function masterDataViewerUrl(rawUrl, values = {}) {
     });
     const body = document.body;
     const viewerUserId = String(
-        body && (body.dataset.viewerUserId || body.dataset.userId) || "",
+        body && body.dataset.viewerUserId || "",
     ).trim();
     if (url.origin !== window.location.origin) {
         url.searchParams.delete("viewer_user_id");
@@ -2029,7 +2048,33 @@ function globalAppSearchHighlightedTitle(title, query) {
 
 function globalAppSearchOptionUrl(form, result) {
     if (result.url) {
-        return result.url;
+        const url = new URL(result.url, window.location.origin);
+        const privatePaths = new Set([
+            "/search",
+            "/api/global-search",
+            "/api/global-search/recent",
+            "/recipe/edit",
+            "/recipe_cover_image",
+            "/recipe_archive_pdf",
+            "/restaurant_source_logo",
+        ]);
+        if (
+            url.origin === window.location.origin
+            && (privatePaths.has(url.pathname) || url.pathname.startsWith("/admin/master-data"))
+        ) {
+            const viewerUserId = String(form?.dataset.globalSearchViewerUserId || "");
+            if (viewerUserId) {
+                url.searchParams.set("viewer_user_id", viewerUserId);
+            } else {
+                url.searchParams.delete("viewer_user_id");
+            }
+            if (url.pathname === "/recipe/edit") {
+                url.searchParams.delete("user_id");
+            }
+        }
+        return url.origin === window.location.origin
+            ? `${url.pathname}${url.search}${url.hash}`
+            : url.toString();
     }
     const target = String(result.target || "");
     return `${window.location.origin}/${target ? `#${target}` : ""}`;
@@ -2305,11 +2350,10 @@ async function globalAppSearchFetchRecent(form) {
         return;
     }
     const endpoint = new URL(form.dataset.globalSearchEndpoint || "/api/global-search", window.location.origin);
-    endpoint.searchParams.set("q", "");
-    endpoint.searchParams.set("limit", String(GLOBAL_APP_SEARCH_RECENT_LIMIT));
     form._globalSearchRecentRequest = fetch(endpoint, {
         headers: { "X-Requested-With": "fetch" },
         credentials: "same-origin",
+        cache: "no-store",
     });
     try {
         const response = await form._globalSearchRecentRequest;
@@ -2344,6 +2388,7 @@ async function globalAppSearchFetch(form, query) {
         const response = await fetch(endpoint, {
             headers: { "X-Requested-With": "fetch" },
             credentials: "same-origin",
+            cache: "no-store",
             signal: controller.signal,
         });
         const payload = await response.json().catch(() => ({}));
@@ -24003,13 +24048,12 @@ function recipeEditPageUrl(recipeUrl) {
         return "";
     }
 
-    const params = new URLSearchParams();
-    const userId = String(document.body?.dataset.userId || "").trim();
-    if (userId) {
-        params.set("user_id", userId);
-    }
-    params.set("url", normalizedUrl);
-    return `/recipe/edit?${params.toString()}`;
+    const url = new URL(
+        withCanonicalViewerUserId("/recipe/edit", { removeLegacyUserId: true }),
+        window.location.origin,
+    );
+    url.searchParams.set("url", normalizedUrl);
+    return `${url.pathname}${url.search}`;
 }
 
 function recipeEditPendingActionFromOptions(recipeUrl, options = {}) {
@@ -39558,16 +39602,37 @@ function setRecipePdfFieldOpenTarget(input, link, value, openUrl, label, options
     link.setAttribute("aria-label", canOpen ? label : "No PDF value");
 }
 
+function canonicalRecipeArchivePdfKind(kind) {
+    const value = String(kind || "").trim().toLowerCase();
+    return [
+        "generated_recipe",
+        "generated",
+        "recipe",
+        "clean",
+        "clean_recipe",
+        "generated-recipe",
+    ].includes(value) ? "generated_recipe" : "";
+}
+
 function recipeArchivePdfUrl(sourceUrl, kind = "") {
-    const kindValue = String(kind || "").trim();
-    const kindQuery = kindValue ? `&kind=${encodeURIComponent(kindValue)}` : "";
-    return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}${kindQuery}`;
+    const url = new URL(withCanonicalViewerUserId("/recipe_archive_pdf"), window.location.origin);
+    url.searchParams.set("url", String(sourceUrl || ""));
+    const kindValue = canonicalRecipeArchivePdfKind(kind);
+    if (kindValue) {
+        url.searchParams.set("kind", kindValue);
+    }
+    return `${url.pathname}${url.search}`;
 }
 
 function recipeArchivePdfDownloadUrl(sourceUrl, kind = "") {
-    const kindValue = String(kind || "").trim();
-    const kindQuery = kindValue ? `&kind=${encodeURIComponent(kindValue)}` : "";
-    return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}&download=1${kindQuery}`;
+    const url = new URL(withCanonicalViewerUserId("/recipe_archive_pdf"), window.location.origin);
+    url.searchParams.set("url", String(sourceUrl || ""));
+    const kindValue = canonicalRecipeArchivePdfKind(kind);
+    if (kindValue) {
+        url.searchParams.set("kind", kindValue);
+    }
+    url.searchParams.set("download", "1");
+    return `${url.pathname}${url.search}`;
 }
 
 function openRecipeEditorPdf(link, event) {
@@ -40436,7 +40501,11 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
     images.forEach(image => {
         const nextSrc = src || (
             normalized.path && recipeEditorCurrentUrl()
-                ? `/recipe_cover_image?url=${encodeURIComponent(recipeEditorCurrentUrl())}`
+                ? (() => {
+                    const url = new URL(withCanonicalViewerUserId("/recipe_cover_image"), window.location.origin);
+                    url.searchParams.set("url", recipeEditorCurrentUrl());
+                    return `${url.pathname}${url.search}`;
+                })()
                 : ""
         );
         image.alt = alt;
@@ -40568,8 +40637,9 @@ function cacheBustRecipeCoverSrc(src) {
         return src || "";
     }
 
-    const separator = src.includes("?") ? "&" : "?";
-    return `${src}${separator}_cover=${Date.now()}`;
+    const url = new URL(withCanonicalViewerUserId(src), window.location.origin);
+    url.searchParams.set("v", String(Date.now()));
+    return `${url.pathname}${url.search}`;
 }
 
 const RECIPE_IMAGE_PROVIDER_STORAGE_KEY = "recipe-image-provider";

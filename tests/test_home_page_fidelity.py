@@ -77,7 +77,7 @@ def test_recipe_favorite_route_updates_saved_recipe_state(monkeypatch):
     assert response.get_json()["favorite"] is True
     assert read_response.status_code == 200
     assert read_response.get_json()["favorite"] is True
-    assert read_response.headers["Cache-Control"] == "no-store, no-cache, must-revalidate, private"
+    assert read_response.headers["Cache-Control"] == "private, no-store"
     assert editor_response.status_code == 200
     assert editor_response.get_json()["recipe"]["favorite"] is True
     assert saved["favorite"] is True
@@ -120,7 +120,6 @@ def test_recipe_favorite_state_synchronizes_across_home_and_editor_pages():
     assert "applyRecipeFavoriteSyncPayload" in favorite_refresh
     assert '@recipe_bp.route("/api/recipe_favorite", methods=["GET", "POST"])' in route
     assert 'data = request.args if request.method == "GET"' in route
-    assert 'response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"' in route
 
 
 def test_home_recipe_badge_uses_real_metadata_priority():

@@ -1,13 +1,18 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from urllib.parse import parse_qs
+from urllib.parse import urlsplit
 
 import pytest
 from flask import render_template
+from flask import session
 
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
 from PushShoppingList.services import cookbook_service
+from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -545,7 +550,20 @@ def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
     assert "Vel Asain Cuisine" in card_html[cookbook_index:]
 
 
-def test_uploaded_recipe_without_archive_pdf_does_not_render_dead_source_link(monkeypatch):
+def test_uploaded_recipe_without_archive_pdf_does_not_render_dead_source_link(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({
+        "users": [{
+            "user_id": "uploaded-recipe-user",
+            "username": "uploaded-recipe-user",
+            "email": "uploaded-recipe-user@example.test",
+            "account_status": "active",
+        }],
+    })
     app = create_app()
     app.config.update(TESTING=True)
     recipe_url = "uploaded://meal.png"
@@ -581,6 +599,7 @@ def test_uploaded_recipe_without_archive_pdf_does_not_render_dead_source_link(mo
         })
 
         with app.test_request_context("/"):
+            session["user_id"] = "uploaded-recipe-user"
             recipe_rows = main_routes.recipe_view_rows([{"url": recipe_url, "name": "Photo Rice Bowl"}])
             log_rows = main_routes.recipe_url_log_rows([{"url": recipe_url, "name": "Photo Rice Bowl", "quantity": 1}])
             view = main_routes.cookbook_view_for_render([])
@@ -602,7 +621,20 @@ def test_uploaded_recipe_without_archive_pdf_does_not_render_dead_source_link(mo
     assert "Photo Rice Bowl" in html
 
 
-def test_cookbook_view_uses_saved_metadata_cover_image_when_cookbook_row_lacks_one(monkeypatch):
+def test_cookbook_view_uses_saved_metadata_cover_image_when_cookbook_row_lacks_one(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({
+        "users": [{
+            "user_id": "cookbook-user",
+            "username": "cookbook-user",
+            "email": "cookbook-user@example.test",
+            "account_status": "active",
+        }],
+    })
     app = create_app()
     app.config.update(TESTING=True)
     recipe_url = (
@@ -652,6 +684,7 @@ def test_cookbook_view_uses_saved_metadata_cover_image_when_cookbook_row_lacks_o
         })
 
         with app.test_request_context("/"):
+            session["user_id"] = "cookbook-user"
             view = main_routes.cookbook_view_for_render([], image_variants=("thumb", "card"))
             html = render_template(
                 "sections/cookbooks.html",
@@ -662,9 +695,14 @@ def test_cookbook_view_uses_saved_metadata_cover_image_when_cookbook_row_lacks_o
 
     recipe = view["cookbooks"][0]["recipes"][0]
     assert recipe["cover_image"]["alt"] == "Spring Roll"
-    assert recipe["cover_image"]["src"].startswith("/recipe_cover_image?url=")
+    cover_url = urlsplit(recipe["cover_image"]["src"])
+    assert cover_url.path == "/recipe_cover_image"
+    assert parse_qs(cover_url.query) == {
+        "viewer_user_id": ["cookbook-user"],
+        "url": [recipe_url],
+    }
     assert "recipe-url-summary-row-with-cover" in html
-    assert 'data-deferred-src="/recipe_cover_image?url=' in html
+    assert 'data-deferred-src="/recipe_cover_image?viewer_user_id=cookbook-user&amp;url=' in html
 
 
 def test_cookbook_view_generated_recipe_clears_stale_stub_state(monkeypatch):

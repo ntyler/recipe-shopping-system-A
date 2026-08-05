@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from app import app
+from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -320,7 +322,17 @@ def test_ai_pantry_entry_forms_share_panel_layout():
     assert ".ai-pantry-submit-btn {" in css
 
 
-def test_ai_pantry_inventory_renders_inventory_heading():
+def test_ai_pantry_inventory_renders_inventory_heading(monkeypatch, tmp_path):
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    user_account_service.save_users({
+        "users": [{
+            "user_id": "pantry-user",
+            "email": "pantry@example.com",
+            "username": "pantry-user",
+            "account_status": "active",
+        }],
+    })
     with app.test_client() as client:
         with client.session_transaction() as sess:
             sess["user_id"] = "pantry-user"

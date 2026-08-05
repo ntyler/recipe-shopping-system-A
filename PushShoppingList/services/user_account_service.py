@@ -9,6 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import requests
+from flask import g
 from flask import has_request_context
 from flask import session
 from werkzeug.security import check_password_hash
@@ -557,11 +558,17 @@ def current_user():
     if not has_request_context():
         return None
 
+    if session.get("is_guest"):
+        g.authenticated_user_id = ""
+        return None
+
     user_id = session.get("user_id")
     if not user_id:
+        g.authenticated_user_id = ""
         return None
 
     user = find_user_by_id(user_id)
+    g.authenticated_user_id = str((user or {}).get("user_id") or "")
 
     topic = notification_topic(user or {})
 

@@ -9,6 +9,8 @@ from PushShoppingList.services import menu_mega_json_service
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import storage_service
+from PushShoppingList.services import guest_session_service
+from PushShoppingList.services import user_account_service
 from PushShoppingList.routes import main_routes
 
 
@@ -1003,6 +1005,21 @@ def test_restaurant_directory_lists_searches_and_loads_stable_records(monkeypatc
 def test_restaurant_directory_is_isolated_by_user_and_guest_scope(monkeypatch, tmp_path):
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
     monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    monkeypatch.setattr(guest_session_service, "GUEST_SESSIONS_FILE", tmp_path / "guest_sessions.json")
+    monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guests")
+    user_account_service.save_users({
+        "users": [
+            {
+                "user_id": user_id,
+                "username": user_id,
+                "email": f"{user_id}@example.com",
+                "account_status": "active",
+            }
+            for user_id in ("user-a", "user-b")
+        ],
+    })
+    guest_record = guest_session_service.create_guest_session()
     app = Flask(__name__)
     app.secret_key = "restaurant-scope-test"
 
@@ -1025,12 +1042,12 @@ def test_restaurant_directory_is_isolated_by_user_and_guest_scope(monkeypatch, t
     with app.test_request_context("/"):
         session["user_id"] = "stale-user"
         session["is_guest"] = True
-        session["guest_session_id"] = "guest-a"
+        session["guest_session_id"] = guest_record["id"]
         assert recipe_edit_service.list_editable_restaurants()["restaurants"] == []
         recipe_edit_service.create_editable_restaurant({"restaurant_name": "Guest Grill"})
         stored = menu_store_service.load_menu_store()["restaurants"][0]
         assert stored["owner_user_id"] is None
-        assert stored["account_scope"] == "guest:guest-a"
+        assert stored["account_scope"] == f"guest:{guest_record['id']}"
 
     with app.test_request_context("/"):
         session["user_id"] = "user-a"

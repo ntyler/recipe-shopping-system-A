@@ -47,7 +47,8 @@ def test_index_uses_phase_one_app_shell_without_removing_existing_controls():
     assert "app-global-search-shortcut" in header
     assert "Ctrl + K" in header
     assert 'onsubmit="return submitGlobalAppSearch(this)"' in header
-    assert 'data-global-search-endpoint="/api/global-search"' in header
+    assert 'data-global-search-endpoint="{{ global_search_endpoint }}"' in header
+    assert 'data-global-search-viewer-user-id="{{ search_viewer_user_id }}"' in header
     assert 'role="combobox"' in header
     assert 'role="listbox"' in header
     assert "<datalist" not in header
@@ -467,7 +468,7 @@ def test_recipe_edit_route_renders_exactly_one_shared_shell(monkeypatch, tmp_pat
         with client.session_transaction() as session:
             session["user_id"] = "shell-route-user"
         response = client.get(
-            "/recipe/edit?user_id=shell-route-user&url=https%3A%2F%2Fexample.test%2Frecipes%2Fsoup"
+            "/recipe/edit?viewer_user_id=shell-route-user&url=https%3A%2F%2Fexample.test%2Frecipes%2Fsoup"
         )
 
     html = response.get_data(as_text=True)

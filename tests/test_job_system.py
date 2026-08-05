@@ -20,6 +20,7 @@ from PushShoppingList.services import recipe_ingredient_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import recipe_url_service
 from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +30,19 @@ def configure_job_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(job_service, "JOBS_DB_PATH", tmp_path / "jobs.sqlite3")
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
     monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({
+        "users": [
+            {
+                "user_id": user_id,
+                "username": user_id,
+                "email": f"{user_id}@example.com",
+                "account_status": "active",
+                "admin_access_enabled": user_id == "viewing-admin",
+            }
+            for user_id in ("owner", "other", "viewing-admin", "result-owner")
+        ],
+    })
     monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guests")
     output_folder = tmp_path / "extractor" / "output"
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -168,7 +182,7 @@ def test_job_queue_debug_route_returns_readiness(monkeypatch, tmp_path):
 
     with app.test_client() as client:
         with client.session_transaction() as session:
-            session["user_id"] = "owner"
+            session["user_id"] = "viewing-admin"
 
         response = client.get(
             "/api/debug/job-queue",
@@ -506,7 +520,7 @@ def test_menu_generate_job_sources_link_to_recipe_item_editor(monkeypatch, tmp_p
             "type": "recipe",
             "label": "Spring Roll",
             "detail": "menu item",
-            "url": "/recipe/edit?user_id=owner&url=https%3A%2F%2Fwww.velasiancuisine.com%2Frs%2Fmenu_home.action%3FresInput%3DRES4902%26menu_item%3Dspring-roll",
+            "url": "/recipe/edit?viewer_user_id=owner&url=https%3A%2F%2Fwww.velasiancuisine.com%2Frs%2Fmenu_home.action%3FresInput%3DRES4902%26menu_item%3Dspring-roll",
             "recipe_url": recipe_url,
         }
     ]
@@ -527,7 +541,7 @@ def test_recipe_result_links_use_persisted_job_owner_without_request_context(mon
     assert links == [{
         "label": recipe_url,
         "url": (
-            "/recipe/edit?user_id=result-owner&"
+            "/recipe/edit?viewer_user_id=result-owner&"
             "url=https%3A%2F%2Fexample.com%2Fsoup%3Fservings%3D4%26style%3Dhot"
         ),
         "recipe_url": recipe_url,
@@ -587,7 +601,9 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
     assert data["job"]["model_source"] == "default:OPENAI_MENU_FAST_RECIPE_MODEL"
     assert data["job"]["model_env_var"] == "OPENAI_MENU_FAST_RECIPE_MODEL"
     assert data["job"]["source_items"][0]["detail"] == "menu item"
-    assert data["job"]["source_items"][0]["url"].startswith("/recipe/edit?user_id=owner&url=")
+    assert data["job"]["source_items"][0]["url"].startswith(
+        "/recipe/edit?viewer_user_id=owner&url="
+    )
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
 
 

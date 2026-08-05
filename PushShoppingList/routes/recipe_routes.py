@@ -5,7 +5,8 @@ from datetime import datetime
 from datetime import timezone
 from pathlib import Path
 from time import perf_counter
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 from flask import Blueprint
@@ -175,7 +176,10 @@ from PushShoppingList.services.recipe_url_service import add_recipe_urls
 from PushShoppingList.services.recipe_url_service import load_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
+from PushShoppingList.services.recipe_url_service import recipe_archive_pdf_url
+from PushShoppingList.services.recipe_url_service import recipe_cover_image_url
 from PushShoppingList.services.recipe_url_service import remove_recipe_url
+from PushShoppingList.services.recipe_url_service import restaurant_source_logo_url
 from PushShoppingList.services.recipe_url_service import save_recipe_url_name
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_quantity_service import update_recipe_ingredient_quantity
@@ -183,7 +187,6 @@ from PushShoppingList.services.recipe_quantity_service import update_recipe_quan
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.guest_session_service import is_guest_session
 from PushShoppingList.services.image_variant_service import ensure_webp_variant
-from PushShoppingList.services.image_variant_service import generated_static_cache_seconds
 from PushShoppingList.services.image_variant_service import image_mimetype_for_path
 from PushShoppingList.services.job_queue_service import enqueue_job
 from PushShoppingList.services.job_queue_service import inline_jobs_enabled
@@ -207,6 +210,10 @@ from PushShoppingList.services.openai_usage_service import openai_usage_dashboar
 from PushShoppingList.services.openai_usage_service import record_app_activity
 from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_model_service import model_value_for_env as active_model_value_for_env
+from PushShoppingList.services.request_security_service import apply_private_no_store
+from PushShoppingList.services.request_security_service import build_canonical_url
+from PushShoppingList.services.request_security_service import reject_duplicate_parameters
+from PushShoppingList.services.request_security_service import validate_authenticated_viewer
 from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import workspace_data_root
@@ -217,12 +224,77 @@ from PushShoppingList.services.user_account_service import is_admin_user
 recipe_bp = Blueprint("recipe_bp", __name__)
 
 
+PRIVATE_RECIPE_RESOURCE_ENDPOINTS = {
+    "recipe_bp.edit_recipe_page_route",
+    "recipe_bp.recipe_archive_pdf_route",
+    "recipe_bp.recipe_cover_image_route",
+    "recipe_bp.restaurant_source_logo_route",
+}
+
+
+@recipe_bp.app_context_processor
+def inject_private_recipe_url_builders():
+    return {
+        "recipe_archive_pdf_url": recipe_archive_pdf_url,
+        "recipe_cover_image_url": recipe_cover_image_url,
+        "restaurant_source_logo_url": restaurant_source_logo_url,
+    }
+
+
 @recipe_bp.after_request
-def recipe_edit_page_cache_policy(response):
-    if request.endpoint == "recipe_bp.edit_recipe_page_route":
-        response.headers["Cache-Control"] = "private, no-store"
-        response.headers["Pragma"] = "no-cache"
+def recipe_private_resource_cache_policy(response):
+    if request.endpoint in PRIVATE_RECIPE_RESOURCE_ENDPOINTS:
+        return apply_private_no_store(response)
     return response
+
+
+def _request_matches_canonical_url(canonical_url):
+    """Compare decoded query pairs so equivalent encoding does not redirect."""
+
+    parsed = urlsplit(canonical_url)
+    requested_pairs = [
+        (str(key), "" if value is None else str(value))
+        for key, value in request.args.items(multi=True)
+    ]
+    return request.path == parsed.path and requested_pairs == parse_qsl(
+        parsed.query,
+        keep_blank_values=True,
+    )
+
+
+def _canonical_private_recipe_resource(
+    endpoint,
+    *,
+    duplicate_keys=(),
+    allowed_keys=(),
+    remove_keys=(),
+    overrides=None,
+    defaults=None,
+):
+    """Validate the viewer and canonicalize one session-resolved resource."""
+
+    identity_keys = ("viewer_user_id", "user_id", "scope", "target_user_id")
+    reject_duplicate_parameters(
+        request.args,
+        *identity_keys,
+        *duplicate_keys,
+    )
+    viewer = validate_authenticated_viewer(request.args)
+    canonical_overrides = {
+        "viewer_user_id": viewer.viewer_user_id,
+        **dict(overrides or {}),
+    }
+    canonical_url = build_canonical_url(
+        url_for(endpoint),
+        parameters=request.args,
+        remove_keys=(*identity_keys[1:], *remove_keys),
+        overrides=canonical_overrides,
+        allowed_keys=("viewer_user_id", *allowed_keys),
+        defaults=defaults,
+    )
+    if not _request_matches_canonical_url(canonical_url):
+        return viewer, redirect(canonical_url)
+    return viewer, None
 
 NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
 IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved to your account."
@@ -3538,32 +3610,49 @@ def api_cancel_extract_route():
 
 @recipe_bp.route("/recipe/edit", methods=["GET"])
 def edit_recipe_page_route():
+    reject_duplicate_parameters(
+        request.args,
+        "viewer_user_id",
+        "user_id",
+        "scope",
+        "target_user_id",
+        "url",
+    )
     recipe_url = str(request.args.get("url", "") or "").strip()
 
     if not recipe_url:
         abort(400)
 
-    requested_user_ids = request.args.getlist("user_id")
-    if len(requested_user_ids) > 1:
+    viewer_values = request.args.getlist("viewer_user_id")
+    legacy_values = request.args.getlist("user_id")
+    supplied_viewer_user_id = str(viewer_values[0] if viewer_values else "")
+    legacy_user_id = str(legacy_values[0] if legacy_values else "")
+    if (
+        supplied_viewer_user_id.strip()
+        and legacy_user_id.strip()
+        and supplied_viewer_user_id != legacy_user_id
+    ):
         abort(400)
 
-    requested_user_id = str(requested_user_ids[0] if requested_user_ids else "").strip()
-    session_user_id = active_user_id()
+    viewer = validate_authenticated_viewer(request.args)
+    if legacy_user_id.strip() and (
+        viewer.is_guest
+        or not viewer.viewer_user_id
+        or legacy_user_id != viewer.viewer_user_id
+    ):
+        abort(403)
 
-    if session_user_id and not requested_user_id:
-        query = [("user_id", session_user_id)]
-        query.extend(
-            (key, value)
-            for key, value in request.args.items(multi=True)
-            if key != "user_id"
-        )
-        response = redirect(
-            f"{url_for('recipe_bp.edit_recipe_page_route')}?{urlencode(query)}"
-        )
-        return response
-
-    if requested_user_id and requested_user_id != session_user_id:
-        abort(403, description="This recipe editor link belongs to a different account.")
+    canonical_url = build_canonical_url(
+        url_for("recipe_bp.edit_recipe_page_route"),
+        parameters=request.args,
+        remove_keys=("user_id", "scope", "target_user_id"),
+        overrides={
+            "viewer_user_id": viewer.viewer_user_id,
+            "url": recipe_url,
+        },
+    )
+    if not _request_matches_canonical_url(canonical_url):
+        return redirect(canonical_url)
 
     return render_template(
         "recipe_edit_page.html",
@@ -3749,7 +3838,21 @@ def update_recipe_source_documents_route():
 
 @recipe_bp.route("/restaurant_source_logo", methods=["GET"])
 def restaurant_source_logo_route():
-    logo_path = editable_restaurant_logo_file_path(request.args.get("restaurant_id"))
+    restaurant_id = str(request.args.get("restaurant_id") or "").strip()
+    version = str(request.args.get("v") or "").strip()
+    _viewer, canonical_redirect = _canonical_private_recipe_resource(
+        "recipe_bp.restaurant_source_logo_route",
+        duplicate_keys=("restaurant_id", "v"),
+        allowed_keys=("restaurant_id", "v"),
+        overrides={
+            "restaurant_id": restaurant_id,
+            "v": version,
+        },
+    )
+    if canonical_redirect:
+        return canonical_redirect
+
+    logo_path = editable_restaurant_logo_file_path(restaurant_id)
     if not logo_path:
         abort(404)
     return send_file(logo_path, mimetype=image_mimetype_for_path(logo_path), as_attachment=False, max_age=0)
@@ -4445,13 +4548,11 @@ def api_recipe_favorite_route():
     else:
         favorite = bool(recipe_data.get("favorite"))
 
-    response = jsonify({
+    return jsonify({
         "ok": True,
         "favorite": favorite,
         "url": recipe_data.get("source_url") or url,
     })
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
-    return response
 
 
 @recipe_bp.route("/api/recipe_pdf/delete", methods=["POST"])
@@ -4518,8 +4619,28 @@ def recipe_pdf_link_route():
 @recipe_bp.route("/recipe_archive_pdf", methods=["GET"])
 def recipe_archive_pdf_route():
     url = str(request.args.get("url", "") or "").strip()
-    wants_download = str(request.args.get("download", "") or "").strip().lower() in {"1", "true", "yes"}
-    kind = normalize_pdf_kind(request.args.get("kind") or request.args.get("pdf_kind") or "")
+    raw_download = str(request.args.get("download", "") or "").strip().lower()
+    wants_download = raw_download in {"1", "true", "yes"}
+    if "kind" in request.args and "pdf_kind" in request.args:
+        abort(400)
+    raw_kind = request.args.get("kind") or request.args.get("pdf_kind") or ""
+    kind = normalize_pdf_kind(raw_kind)
+    canonical_kind = kind if kind == "generated_recipe" else ""
+    version = str(request.args.get("v", "") or "").strip()
+    _viewer, canonical_redirect = _canonical_private_recipe_resource(
+        "recipe_bp.recipe_archive_pdf_route",
+        duplicate_keys=("url", "kind", "pdf_kind", "download", "v"),
+        allowed_keys=("url", "kind", "download", "v"),
+        remove_keys=("pdf_kind",),
+        overrides={
+            "url": url,
+            "kind": canonical_kind,
+            "download": "1" if wants_download else "",
+            "v": version,
+        },
+    )
+    if canonical_redirect:
+        return canonical_redirect
 
     if not url:
         abort(404)
@@ -4570,6 +4691,21 @@ def recipe_archive_pdf_route():
 def recipe_cover_image_route():
     url = str(request.args.get("url", "") or "").strip()
     variant = str(request.args.get("variant", "") or "").strip().lower()
+    if variant == "original":
+        variant = ""
+    version = str(request.args.get("v", "") or "").strip()
+    _viewer, canonical_redirect = _canonical_private_recipe_resource(
+        "recipe_bp.recipe_cover_image_route",
+        duplicate_keys=("url", "variant", "v"),
+        allowed_keys=("url", "variant", "v"),
+        overrides={
+            "url": url,
+            "variant": variant,
+            "v": version,
+        },
+    )
+    if canonical_redirect:
+        return canonical_redirect
 
     if not url:
         abort(404)
@@ -4591,7 +4727,7 @@ def recipe_cover_image_route():
             mimetype="image/webp",
             as_attachment=False,
             download_name=variant_path.name,
-            max_age=generated_static_cache_seconds(),
+            max_age=0,
         )
 
     return send_file(

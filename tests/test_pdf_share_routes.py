@@ -5,6 +5,7 @@ import PushShoppingList.app as app_module
 from PushShoppingList.routes import pdf_routes
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import pdf_share_service
+from PushShoppingList.services import request_security_service
 
 
 def configure_pdf_share_routes(monkeypatch, tmp_path, current_user=None):
@@ -55,6 +56,9 @@ def test_pdf_share_routes_create_serve_and_revoke(monkeypatch, tmp_path):
         assert public_response.status_code == 200
         assert public_response.mimetype == "application/pdf"
         assert public_response.data.startswith(b"%PDF")
+        assert "viewer_user_id" not in create_data["share_url"]
+        assert public_response.headers["Cache-Control"] == "private, no-store"
+        assert public_response.headers["Pragma"] == "no-cache"
 
         stored_record = pdf_share_service.find_share_record(create_data["token"])
         assert stored_record["access_count"] == 1
@@ -240,11 +244,16 @@ def test_local_recipe_pdf_download_requires_admin(monkeypatch, tmp_path):
     pdf_path = tmp_path / "local-recipe.pdf"
     pdf_path.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
     monkeypatch.setattr(recipe_routes, "recipe_archive_pdf_path", lambda url: pdf_path)
-    monkeypatch.setattr(recipe_routes, "current_user", lambda: {"email": "cook@example.com"})
+    user = {"user_id": "cook-user", "email": "cook@example.com"}
+    monkeypatch.setattr(app_module, "current_user", lambda: user)
+    monkeypatch.setattr(request_security_service, "current_user", lambda: user)
+    monkeypatch.setattr(recipe_routes, "current_user", lambda: user)
     monkeypatch.setattr(recipe_routes, "is_admin_user", lambda user: False)
 
     with app.test_client() as client:
-        response = client.get("/recipe_archive_pdf?url=manual%3A%2F%2Frecipe%2Ftest&download=1")
+        response = client.get(
+            "/recipe_archive_pdf?viewer_user_id=cook-user&url=manual%3A%2F%2Frecipe%2Ftest&download=1"
+        )
 
     assert response.status_code == 403
 
@@ -253,11 +262,16 @@ def test_admin_can_download_local_recipe_pdf(monkeypatch, tmp_path):
     pdf_path = tmp_path / "local-recipe.pdf"
     pdf_path.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
     monkeypatch.setattr(recipe_routes, "recipe_pdf_path", lambda url, kind="": pdf_path)
-    monkeypatch.setattr(recipe_routes, "current_user", lambda: {"email": "admin@example.com"})
+    user = {"user_id": "admin-user", "email": "admin@example.com"}
+    monkeypatch.setattr(app_module, "current_user", lambda: user)
+    monkeypatch.setattr(request_security_service, "current_user", lambda: user)
+    monkeypatch.setattr(recipe_routes, "current_user", lambda: user)
     monkeypatch.setattr(recipe_routes, "is_admin_user", lambda user: True)
 
     with app.test_client() as client:
-        response = client.get("/recipe_archive_pdf?url=manual%3A%2F%2Frecipe%2Ftest&download=1")
+        response = client.get(
+            "/recipe_archive_pdf?viewer_user_id=admin-user&url=manual%3A%2F%2Frecipe%2Ftest&download=1"
+        )
 
     assert response.status_code == 200
     assert response.mimetype == "application/pdf"

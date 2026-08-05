@@ -27,6 +27,7 @@ from bs4 import BeautifulSoup
 from PushShoppingList.services import menu_store_service
 from PushShoppingList.services.file_lock_service import workspace_write_lock
 from PushShoppingList.services.recipe_extract_service import menu_page_request_headers
+from PushShoppingList.services.recipe_url_service import restaurant_source_logo_url
 from PushShoppingList.services.restaurant_hours_service import normalize_weekly_hours
 from PushShoppingList.services.restaurant_hours_service import weekly_hours_to_text
 from PushShoppingList.services.storage_service import active_user_id
@@ -1953,7 +1954,10 @@ def _store_approved_logo(candidate, restaurant_id):
         safe_id = re.sub(r"[^a-zA-Z0-9_-]+", "_", restaurant_id).strip("_") or "restaurant"
         path = folder / f"{safe_id}_{uuid.uuid4().hex}.svg"
         path.write_bytes(payload)
-        logo_url = f"/restaurant_source_logo?restaurant_id={quote(restaurant_id, safe='')}&v={path.stat().st_mtime_ns}"
+        logo_url = restaurant_source_logo_url(
+            restaurant_id,
+            version=path.stat().st_mtime_ns,
+        )
         return {"logo_url": logo_url, "logo_path": str(path), "logo_thumbnail_path": str(path), "original_url": final_url}
     encoded = base64.b64encode(payload).decode("ascii")
     path, logo_url = recipe_edit_service.save_editable_restaurant_logo_data(

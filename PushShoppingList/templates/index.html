@@ -44,6 +44,7 @@
 {% block app_body_attributes %}
 data-performance-diagnostics="{{ '1' if performance_diagnostics_enabled else '0' }}"
 data-user-id="{{ current_user.user_id if current_user else '' }}"
+data-viewer-user-id="{{ current_user.user_id if current_user else '' }}"
 data-app-initial-page="{{ initial_app_page|default('') }}"
 {% endblock %}
 

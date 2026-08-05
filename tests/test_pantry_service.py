@@ -14,6 +14,23 @@ from PushShoppingList.services import user_account_service as accounts
 
 def configure_scoped_data(monkeypatch, tmp_path):
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "user_data")
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
+    accounts.save_users({
+        "users": [
+            {
+                "user_id": user_id,
+                "username": user_id,
+                "email": f"{user_id}@example.com",
+                "account_status": "active",
+            }
+            for user_id in (
+                "pantry-user",
+                "pantry-user-a",
+                "pantry-user-b",
+                "pantry-route-user",
+            )
+        ],
+    })
 
 
 def configure_users_file(monkeypatch, tmp_path):

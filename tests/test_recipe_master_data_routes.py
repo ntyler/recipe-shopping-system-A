@@ -541,14 +541,23 @@ def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_
     assert admin_payload["references"][0]["recipe_url"] == "https://example.com/user-a-soup"
     assert admin_payload["references"][0]["preparation"] == "diced"
     assert admin_payload["references"][0]["notes"] == "use ripe tomatoes"
-    assert admin_payload["references"][0]["edit_url"] == (
-        "/recipe/edit?user_id=admin-user&url=https%3A%2F%2Fexample.com%2Fuser-a-soup"
-    )
-    assert "/recipe_cover_image?url=https://example.com/user-a-soup" in admin_payload["references"][0]["recipe_image_url"]
-    assert "/recipe_cover_image?url=https://example.com/user-a-soup" in admin_payload["references"][0]["recipe_image_full_url"]
+    assert admin_payload["references"][0]["edit_url"] == ""
+    for image_key in ("recipe_image_url", "recipe_image_full_url"):
+        image_url = urlsplit(admin_payload["references"][0][image_key])
+        assert image_url.path == "/recipe_cover_image"
+        assert dict(parse_qsl(image_url.query)) == {
+            "viewer_user_id": "admin-user",
+            "url": "https://example.com/user-a-soup",
+        }
     assert admin_payload["references"][0]["recipe_image_alt"] == "User A Soup title image"
     assert own_response.status_code == 200
     assert own_payload["record"]["name"] == "Tomato"
+    own_edit_url = urlsplit(own_payload["references"][0]["edit_url"])
+    assert own_edit_url.path == "/recipe/edit"
+    assert parse_qsl(own_edit_url.query) == [
+        ("viewer_user_id", "user-a"),
+        ("url", "https://example.com/user-a-soup"),
+    ]
     assert blocked_response.status_code == 404
     assert blocked_payload["ok"] is False
 

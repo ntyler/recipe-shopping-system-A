@@ -179,7 +179,8 @@ def test_recipe_overflow_menus_include_source_pdf_near_recipe_pdf():
         assert template.index(recipe_pdf_class) < template.index(source_pdf_class)
         assert "Open recipe PDF" in template
         assert "Open source PDF" in template
-        assert "kind='webpage_backup'" in template
+        assert "recipe_archive_pdf_url(recipe.url" in template
+        assert "kind='webpage_backup'" not in template
 
 
 def test_recipe_imports_queue_generated_recipe_pdf_creation():

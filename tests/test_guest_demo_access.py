@@ -4,6 +4,7 @@ from PushShoppingList.app import create_app
 from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import job_service
 from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service
 
 
 def configure_guest_demo_paths(monkeypatch, tmp_path):
@@ -12,6 +13,8 @@ def configure_guest_demo_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(job_service, "JOBS_DB_PATH", tmp_path / "jobs.sqlite3")
     monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({"users": []})
     monkeypatch.setenv("JOB_QUEUE_MODE", "inline")
 
 
@@ -61,12 +64,13 @@ def test_guest_recipe_editor_links_remain_userless(monkeypatch, tmp_path):
         registered_scope = client.get(
             "/recipe/edit",
             query_string={
-                "user_id": "registered-user",
+                "viewer_user_id": "registered-user",
                 "url": "https://example.com/guest-soup",
             },
         )
 
     assert userless.status_code == 200
+    assert "viewer_user_id" not in userless.request.query_string.decode("utf-8")
     assert userless.headers["Cache-Control"] == "private, no-store"
     assert 'data-user-id=""' in userless.get_data(as_text=True)
     assert registered_scope.status_code == 403
@@ -293,12 +297,20 @@ def test_guest_session_can_run_recipe_url_import_api(monkeypatch, tmp_path):
     assert guest_files
 
 
-def test_session_scoped_demo_account_can_run_recipe_url_import_api(monkeypatch, tmp_path):
+def test_registered_session_account_can_run_recipe_url_import_api(monkeypatch, tmp_path):
     configure_guest_demo_paths(monkeypatch, tmp_path)
 
     from PushShoppingList.routes import recipe_routes
 
     demo_user_id = "demo-session-account"
+    user_account_service.save_users({
+        "users": [{
+            "user_id": demo_user_id,
+            "username": demo_user_id,
+            "email": "demo-session@example.com",
+            "account_status": "active",
+        }],
+    })
     recipe_url = "https://example.com/demo-session-recipe"
     monkeypatch.setattr(
         recipe_routes,

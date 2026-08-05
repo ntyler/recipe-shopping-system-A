@@ -2,11 +2,12 @@ from pathlib import Path
 import json
 from fractions import Fraction
 from threading import Lock
-from urllib.parse import urlencode
+from urllib.parse import parse_qs
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
 
-from PushShoppingList.services.storage_service import active_user_id
+from PushShoppingList.services.request_security_service import build_canonical_url
+from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.storage_service import guest_data_root
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.storage_service import scoped_package_path
@@ -20,18 +21,142 @@ url_file_lock = Lock()
 RECIPE_INGREDIENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
-def recipe_edit_page_url(recipe_url, user_id=None):
-    """Build an editor URL scoped to the signed-in account when available."""
+def _private_viewer_user_id(viewer_user_id=None):
+    """Return a viewer assertion without using it as workspace authority."""
+
+    if viewer_user_id is None:
+        return str((current_user() or {}).get("user_id") or "")
+    return str(viewer_user_id or "").strip()
+
+
+def _private_recipe_url(path, *, viewer_user_id=None, **parameters):
+    overrides = {
+        "viewer_user_id": _private_viewer_user_id(viewer_user_id),
+        **parameters,
+    }
+    return build_canonical_url(path, overrides=overrides)
+
+
+def recipe_edit_page_url(recipe_url, viewer_user_id=None):
+    """Build the canonical editor URL for the active registered viewer."""
     recipe_url = str(recipe_url or "").strip()
     if not recipe_url:
         return ""
 
-    owner_user_id = active_user_id() if user_id is None else str(user_id or "").strip()
-    query = []
-    if owner_user_id:
-        query.append(("user_id", owner_user_id))
-    query.append(("url", recipe_url))
-    return f"/recipe/edit?{urlencode(query)}"
+    return _private_recipe_url(
+        "/recipe/edit",
+        viewer_user_id=viewer_user_id,
+        url=recipe_url,
+    )
+
+
+def recipe_cover_image_url(recipe_url, *, variant="", version="", viewer_user_id=None):
+    recipe_url = str(recipe_url or "").strip()
+    if not recipe_url:
+        return ""
+    variant = str(variant or "").strip().lower()
+    if variant == "original":
+        variant = ""
+    return _private_recipe_url(
+        "/recipe_cover_image",
+        viewer_user_id=viewer_user_id,
+        url=recipe_url,
+        variant=variant,
+        v=str(version or "").strip(),
+    )
+
+
+def recipe_archive_pdf_url(
+    recipe_url,
+    *,
+    kind="",
+    download=False,
+    version="",
+    viewer_user_id=None,
+):
+    recipe_url = str(recipe_url or "").strip()
+    if not recipe_url:
+        return ""
+    kind = str(kind or "").strip().lower()
+    kind = (
+        "generated_recipe"
+        if kind in {
+            "generated_recipe",
+            "generated",
+            "recipe",
+            "clean",
+            "clean_recipe",
+            "generated-recipe",
+        }
+        else ""
+    )
+    return _private_recipe_url(
+        "/recipe_archive_pdf",
+        viewer_user_id=viewer_user_id,
+        url=recipe_url,
+        kind=kind,
+        download="1" if download else "",
+        v=str(version or "").strip(),
+    )
+
+
+def restaurant_source_logo_url(restaurant_id, *, version="", viewer_user_id=None):
+    restaurant_id = str(restaurant_id or "").strip()
+    if not restaurant_id:
+        return ""
+    return _private_recipe_url(
+        "/restaurant_source_logo",
+        viewer_user_id=viewer_user_id,
+        restaurant_id=restaurant_id,
+        v=str(version or "").strip(),
+    )
+
+
+def canonicalize_private_recipe_url(value, *, viewer_user_id=None):
+    """Refresh a stored private recipe URL for the active resolved viewer."""
+
+    value = str(value or "").strip()
+    if not value:
+        return ""
+
+    parsed = urlparse(value)
+    if parsed.scheme or parsed.netloc:
+        return value
+
+    parameters = parse_qs(parsed.query, keep_blank_values=True)
+
+    def first(name):
+        values = parameters.get(name) or []
+        return str(values[0] if values else "")
+
+    if parsed.path == "/recipe/edit":
+        return recipe_edit_page_url(
+            first("url"),
+            viewer_user_id=viewer_user_id,
+        ) or value
+    if parsed.path == "/recipe_cover_image":
+        return recipe_cover_image_url(
+            first("url"),
+            variant=first("variant"),
+            version=first("v"),
+            viewer_user_id=viewer_user_id,
+        ) or value
+    if parsed.path == "/recipe_archive_pdf":
+        return recipe_archive_pdf_url(
+            first("url"),
+            kind=first("kind") or first("pdf_kind"),
+            download=first("download").strip().lower() in {"1", "true", "yes"},
+            version=first("v"),
+            viewer_user_id=viewer_user_id,
+        ) or value
+    if parsed.path == "/restaurant_source_logo":
+        return restaurant_source_logo_url(
+            first("restaurant_id"),
+            version=first("v"),
+            viewer_user_id=viewer_user_id,
+        ) or value
+
+    return value
 
 
 def load_recipe_urls():

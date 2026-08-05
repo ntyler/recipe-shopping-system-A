@@ -727,6 +727,8 @@ def test_javascript_navigation_uses_shared_canonical_viewer_url_builders():
     )
     assert "function filterRedirectUrl(filterForm)" in master_script
     assert "function initMasterDataFilterForm()" in master_script
+    assert "body.dataset.viewerUserId" in master_script
+    assert "body.dataset.viewerUserId || body.dataset.userId" not in master_script
     assert "targetUser.disabled = !selectingUser;" in master_script
     assert (
         "window.location.assign(filterRedirectUrl(filterForm));"

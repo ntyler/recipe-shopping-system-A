@@ -539,7 +539,7 @@ def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_m
         assert 'onclick="return jumpToRecipeViewRecipe(this, event)"' in preview_html
         assert 'class="app-home-meal-thumb-link"' in preview_html
         assert (
-            f'href="/recipe/edit?user_id={user_id}&amp;url=recipe%3A%2F%2Fsoup"'
+            f'href="/recipe/edit?viewer_user_id={user_id}&amp;url=recipe%3A%2F%2Fsoup"'
             in preview_html
         )
         assert 'aria-label="Edit recipe: Weeknight Soup"' in preview_html

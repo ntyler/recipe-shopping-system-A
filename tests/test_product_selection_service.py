@@ -644,15 +644,34 @@ class ProductSelectionServiceTest(unittest.TestCase):
             self.assertEqual(moved_recipe["sections"]["MISC"][0]["quantity_display"], "2 cans")
 
     def test_cookbook_view_for_render_adds_cover_image_src_for_saved_recipes(self):
+        from flask import session
         from PushShoppingList.app import create_app
         from PushShoppingList.routes import main_routes
         from PushShoppingList.services import cookbook_service
+        from PushShoppingList.services import storage_service
+        from PushShoppingList.services import user_account_service
 
         with TemporaryDirectory() as temp_dir, patch.object(
             cookbook_service,
             "COOKBOOKS_FILE",
             Path(temp_dir) / "cookbooks.json",
+        ), patch.object(
+            user_account_service,
+            "USERS_FILE",
+            Path(temp_dir) / "users.json",
+        ), patch.object(
+            storage_service,
+            "USER_DATA_DIR",
+            Path(temp_dir) / "user-data",
         ):
+            user_account_service.save_users({
+                "users": [{
+                    "user_id": "render-user",
+                    "email": "render@example.com",
+                    "username": "render-user",
+                    "account_status": "active",
+                }],
+            })
             recipe_rows = [{
                 "name": "Skillet Chili",
                 "url": "https://example.com/chili",
@@ -674,6 +693,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
             app = create_app()
             app.config["TESTING"] = True
             with app.test_request_context("/"):
+                session["user_id"] = "render-user"
                 view = main_routes.cookbook_view_for_render([])
 
             dinner = view["cookbooks"][0]

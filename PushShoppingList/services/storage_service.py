@@ -2,6 +2,7 @@ import os
 import re
 from pathlib import Path
 
+from flask import g
 from flask import has_request_context
 from flask import session
 
@@ -17,15 +18,36 @@ def active_user_id():
     if not has_request_context():
         return ""
 
-    return str(session.get("user_id") or "").strip()
+    if getattr(g, "session_identity_validated", False):
+        return str(getattr(g, "authenticated_user_id", "") or "").strip()
+
+    if session.get("is_guest"):
+        return ""
+
+    session_user_id = str(session.get("user_id") or "").strip()
+    if not session_user_id:
+        return ""
+
+    # Imported lazily to avoid the user-account module's storage constants
+    # creating an import cycle during module initialization.
+    from PushShoppingList.services.user_account_service import find_user_by_id
+
+    user = find_user_by_id(session_user_id)
+    return str((user or {}).get("user_id") or "").strip()
 
 
 def active_guest_session_id():
     """Return the active guest session id for request-scoped temporary data."""
-    if not has_request_context() or not session.get("is_guest"):
+    if not has_request_context():
         return ""
 
-    return str(session.get("guest_session_id") or "").strip()
+    if getattr(g, "session_identity_validated", False):
+        return str(getattr(g, "authenticated_guest_session_id", "") or "").strip()
+
+    from PushShoppingList.services.guest_session_service import get_current_guest_session
+
+    guest_record = get_current_guest_session()
+    return str((guest_record or {}).get("id") or "").strip()
 
 
 def safe_user_id(user_id):
@@ -36,6 +58,8 @@ def user_data_root(user_id=None):
     user_id = safe_user_id(user_id or active_user_id())
 
     if not user_id:
+        if has_request_context():
+            raise RuntimeError("No authenticated user workspace is active.")
         return PACKAGE_DIR
 
     root = USER_DATA_DIR / user_id
@@ -47,6 +71,8 @@ def guest_data_root(guest_session_id=None):
     guest_session_id = safe_user_id(guest_session_id or active_guest_session_id())
 
     if not guest_session_id:
+        if has_request_context():
+            raise RuntimeError("No authenticated guest workspace is active.")
         return PACKAGE_DIR
 
     root = GUEST_DATA_DIR / guest_session_id
@@ -70,6 +96,8 @@ def extractor_root(user_id=None):
     user_id = safe_user_id(user_id or active_user_id())
 
     if not user_id:
+        if has_request_context():
+            raise RuntimeError("No authenticated recipe workspace is active.")
         return LEGACY_EXTRACTOR_DIR
 
     root = user_data_root(user_id) / "recipe-extractor"

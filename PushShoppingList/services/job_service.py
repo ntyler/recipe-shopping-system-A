@@ -470,7 +470,7 @@ def _append_recipe_source_item(items, seen, value, detail="menu item", label=Non
         "type": "recipe",
         "label": label,
         "detail": str(detail or "").strip(),
-        "url": recipe_edit_page_url(recipe_url, user_id=user_id),
+        "url": recipe_edit_page_url(recipe_url, viewer_user_id=user_id),
         "recipe_url": recipe_url,
     })
 

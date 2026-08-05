@@ -19,6 +19,9 @@
             {% endif %}
         </div>
         <form class="global-search-results-form" action="{{ url_for('main_bp.global_search_results_route') }}" method="get" role="search">
+            {% if search_viewer_user_id %}
+            <input type="hidden" name="viewer_user_id" value="{{ search_viewer_user_id }}">
+            {% endif %}
             <label for="globalSearchResultsQuery">Search AI Pantry</label>
             <div>
                 <input id="globalSearchResultsQuery"
@@ -35,10 +38,10 @@
 
     {% if search_payload.available_groups %}
     <nav class="global-search-result-filters" aria-label="Filter search results by type">
-        <a href="{{ url_for('main_bp.global_search_results_route', q=search_payload.query) }}"
+        <a href="{{ url_for('main_bp.global_search_results_route', viewer_user_id=search_viewer_user_id or none, q=search_payload.query or none) }}"
            {% if not search_type_filter %}aria-current="page"{% endif %}>All <span>{{ search_payload.all_total_count|default(search_payload.total_count) }}</span></a>
         {% for filter_group in search_payload.available_groups %}
-        <a href="{{ url_for('main_bp.global_search_results_route', q=search_payload.query, type=filter_group.key) }}"
+        <a href="{{ url_for('main_bp.global_search_results_route', viewer_user_id=search_viewer_user_id or none, q=search_payload.query or none, type=filter_group.key) }}"
            {% if search_type_filter == filter_group.key %}aria-current="page"{% endif %}>
             {{ filter_group.label|title }} <span>{{ filter_group.count }}</span>
         </a>
@@ -50,7 +53,7 @@
     <div class="global-search-results-state global-search-results-error" role="alert">
         <h2>Search unavailable</h2>
         <p>{{ search_error }}</p>
-        <a href="{{ url_for('main_bp.global_search_results_route', q=search_payload.query) }}">Try again</a>
+        <a href="{{ url_for('main_bp.global_search_results_route', viewer_user_id=search_viewer_user_id or none, q=search_payload.query or none) }}">Try again</a>
     </div>
     {% elif search_payload.query_too_short %}
     <div class="global-search-results-state">

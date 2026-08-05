@@ -2,6 +2,7 @@ from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
 from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service
 
 
 def configure_auth_paths(monkeypatch, tmp_path):
@@ -9,9 +10,11 @@ def configure_auth_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guests")
     monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({"users": []})
 
 
-def test_logged_out_visible_lazy_sections_load_workspace_data(monkeypatch, tmp_path):
+def test_logged_out_lazy_sections_require_authentication_without_rendering_workspace_data(monkeypatch, tmp_path):
     configure_auth_paths(monkeypatch, tmp_path)
     app = create_app()
     app.config.update(TESTING=True)
@@ -28,22 +31,15 @@ def test_logged_out_visible_lazy_sections_load_workspace_data(monkeypatch, tmp_p
             )
         }
 
-    expected_roots = {
-        "/sections/current-recipes": 'id="currentRecipeUrlLogCard"',
-        "/sections/cookbooks": 'id="cookbooksCard"',
-        "/sections/rules": 'id="rulesCard"',
-        "/sections/store-options": 'id="storeOptionsSection"',
-        "/sections/recipe-view": 'id="shoppingViewsSection"',
-    }
     for path, response in responses.items():
-        html = response.get_data(as_text=True)
-        assert response.status_code == 200
-        assert response.content_type.startswith("text/html")
-        assert expected_roots[path] in html
-        assert "<h1>Shopping List</h1>" not in html
+        assert response.status_code == 401
+        assert response.is_json
+        assert response.get_json()["error"] == "Sign in before managing this workspace."
+        assert response.headers["Cache-Control"] == "private, no-store"
+        assert response.headers["Pragma"] == "no-cache"
 
 
-def test_logged_out_store_options_section_is_read_only_and_sanitized(monkeypatch, tmp_path):
+def test_logged_out_store_options_never_loads_or_exposes_legacy_credentials(monkeypatch, tmp_path):
     configure_auth_paths(monkeypatch, tmp_path)
     monkeypatch.setattr(
         main_routes,
@@ -68,16 +64,40 @@ def test_logged_out_store_options_section_is_read_only_and_sanitized(monkeypatch
         response = client.get("/sections/store-options")
 
     html = response.get_data(as_text=True)
-    assert response.status_code == 200
-    assert response.content_type.startswith("text/html")
-    assert 'id="storeOptionsSection"' in html
-    assert 'data-store-can-toggle="false"' in html
-    assert 'data-store-can-edit-credentials="false"' in html
-    assert 'data-store-public-view="true"' in html
-    assert "Secret Store" in html
+    assert response.status_code == 401
+    assert "Secret Store" not in html
     assert "secret@example.com" not in html
     assert "top-secret-password" not in html
-    assert "<h1>Shopping List</h1>" not in html
+    assert response.headers["Cache-Control"] == "private, no-store"
+
+
+def test_registered_and_guest_lazy_sections_use_only_their_explicit_workspaces(monkeypatch, tmp_path):
+    configure_auth_paths(monkeypatch, tmp_path)
+    user_account_service.save_users({
+        "users": [{
+            "user_id": "registered-user",
+            "username": "registered-user",
+            "email": "registered@example.com",
+            "account_status": "active",
+        }],
+    })
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as signed_session:
+            signed_session["user_id"] = "registered-user"
+        registered = client.get("/sections/current-recipes")
+
+    with app.test_client() as client:
+        client.get("/guest/start")
+        guest = client.get("/sections/current-recipes")
+        with client.session_transaction() as guest_session:
+            assert "user_id" not in guest_session
+
+    for response in (registered, guest):
+        assert response.status_code == 200
+        assert 'id="currentRecipeUrlLogCard"' in response.get_data(as_text=True)
+        assert response.headers["Cache-Control"] == "private, no-store"
 
 
 def test_logged_out_index_uses_standalone_auth_instead_of_workspace(monkeypatch, tmp_path):

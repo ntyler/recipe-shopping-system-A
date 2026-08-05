@@ -32,7 +32,7 @@
 
     function masterDataViewerUserId() {
         const body = document.body;
-        return text(body && (body.dataset.viewerUserId || body.dataset.userId)).trim();
+        return text(body && body.dataset.viewerUserId).trim();
     }
 
     function canonicalMasterDataUrl(rawUrl, values = {}) {

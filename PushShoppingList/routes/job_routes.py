@@ -1,8 +1,8 @@
-import os
 from pathlib import Path
 from uuid import uuid4
 
 from flask import Blueprint
+from flask import current_app
 from flask import jsonify
 from flask import request
 from werkzeug.utils import secure_filename
@@ -271,6 +271,26 @@ def start_menu_import_job_route():
 
 @job_bp.route("/api/debug/job-queue", methods=["GET"])
 def debug_job_queue_route():
+    actor = actor_context()
+    if not actor["is_admin"]:
+        return jsonify({
+            "ok": False,
+            "error": "Admin access is required.",
+        }), 403
+
+    environment = str(
+        current_app.config.get("SHOPPING_APP_ENV") or ""
+    ).strip().lower()
+    debug_environment = bool(
+        current_app.testing
+        or environment in {"development", "dev", "testing", "test", "local"}
+    )
+    if not debug_environment:
+        return jsonify({
+            "ok": False,
+            "error": "Debug diagnostics are unavailable.",
+        }), 404
+
     return jsonify({
         "ok": True,
         "job_queue": redis_queue_readiness(check_connection=True),
@@ -815,7 +835,21 @@ def job_status_route(job_id):
 @job_bp.route("/api/jobs/recent", methods=["GET", "DELETE"])
 def recent_jobs_route():
     actor = actor_context()
-    include_all = actor["is_admin"] and request.args.get("scope") == "all"
+    scope_values = request.args.getlist("scope")
+    if len(scope_values) > 1:
+        return jsonify({
+            "ok": False,
+            "error": "Duplicate scope parameters are not allowed.",
+        }), 400
+
+    requested_scope = str(scope_values[0] if scope_values else "mine").strip().lower() or "mine"
+    if requested_scope == "all" and not actor["is_admin"]:
+        return jsonify({
+            "ok": False,
+            "error": "Admin access is required.",
+        }), 403
+
+    include_all = requested_scope == "all"
     try:
         limit = int(request.args.get("limit", "25"))
     except ValueError:

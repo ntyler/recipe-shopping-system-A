@@ -249,8 +249,16 @@ Open a new terminal after using `setx`.
 From the repo root:
 
 ```powershell
+$env:SHOPPING_APP_ENV="development"
+$env:SHOPPING_APP_SECRET_KEY=(C:\Python39\python.exe -c "import secrets; print(secrets.token_urlsafe(48))")
 C:\Python39\python.exe app.py
 ```
+
+Set a stable, unique `SHOPPING_APP_SECRET_KEY` anywhere signed-in sessions must
+survive process restarts. Production startup fails closed when the key is
+missing, weak, or a known placeholder. Explicit local development can omit the
+key; the app then warns and generates a secure ephemeral key, which resets all
+sessions on restart.
 
 Then open:
 

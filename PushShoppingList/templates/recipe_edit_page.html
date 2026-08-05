@@ -10,6 +10,7 @@
 data-recipe-edit-page="true"
 data-recipe-edit-url="{{ recipe_url }}"
 data-user-id="{{ current_user.user_id if current_user else '' }}"
+data-viewer-user-id="{{ current_user.user_id if current_user else '' }}"
 {% endblock %}
 
 {% block app_content_attributes %}aria-label="Recipe editor"{% endblock %}

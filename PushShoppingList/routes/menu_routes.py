@@ -352,9 +352,15 @@ def menu_import_generate_route():
 @menu_bp.route("/menu-import/status/<job_id>", methods=["GET"])
 def menu_import_status_route(job_id):
     progress = load_progress()
+    if not progress or str(progress.get("job_id") or "") != str(job_id or ""):
+        return jsonify({
+            "ok": False,
+            "error": "Import status not found.",
+        }), 404
+
     return jsonify({
-        "ok": bool(progress),
-        "job_id": job_id,
+        "ok": True,
+        "job_id": str(progress.get("job_id") or ""),
         "progress": progress,
     })
 

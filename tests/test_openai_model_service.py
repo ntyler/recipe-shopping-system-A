@@ -4,12 +4,16 @@ import re
 import sys
 from pathlib import Path
 
+from flask import Flask
+from flask import session
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from PushShoppingList.services import openai_model_service as models
 from PushShoppingList.services import ingredient_store_section_review_service as store_section_review
+from PushShoppingList.services import user_account_service
 
 
 ADMIN_USER = {"email": "admin@example.com"}
@@ -117,6 +121,28 @@ def test_dashboard_includes_all_openai_model_environment_variables(monkeypatch, 
     assert rows["OPENAI_PANTRY_IMAGE_MODEL"]["usage"]["href"] == "/#pantryPage"
     assert all(row["usage"]["title"] for row in dashboard["rows"])
     assert all(row["usage"]["href"] for row in dashboard["rows"])
+
+
+def test_openai_usage_master_data_links_include_the_authenticated_viewer(monkeypatch, tmp_path):
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({
+        "users": [{
+            "user_id": "viewer-user",
+            "email": "viewer@example.com",
+            "username": "viewer",
+            "account_status": "active",
+        }],
+    })
+    app = Flask(__name__)
+    app.secret_key = "deterministic-request-context-test-key"
+
+    with app.test_request_context("/"):
+        session["user_id"] = "viewer-user"
+        usage = models.openai_model_usage("OPENAI_INGREDIENT_REVIEW_MODEL")
+
+    assert usage["href"] == (
+        "/admin/master-data/ingredients?viewer_user_id=viewer-user"
+    )
 
 
 def test_dashboard_registry_covers_model_variables_referenced_by_the_application(monkeypatch, tmp_path):

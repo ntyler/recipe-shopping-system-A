@@ -101,6 +101,9 @@ from PushShoppingList.services.purchase_mapping_service import purchase_mapping_
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import recipe_url_type
 from PushShoppingList.services.recipe_url_service import recipe_edit_page_url
+from PushShoppingList.services.recipe_url_service import canonicalize_private_recipe_url
+from PushShoppingList.services.recipe_url_service import recipe_archive_pdf_url
+from PushShoppingList.services.recipe_url_service import recipe_cover_image_url
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
 from PushShoppingList.services.recipe_url_service import remove_recipe_url
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
@@ -160,8 +163,13 @@ from PushShoppingList.services.meal_plan_service import planned_servings_from_yi
 from PushShoppingList.services.meal_plan_service import update_meal_ingredient_option_selections
 from PushShoppingList.services.global_search_service import global_search
 from PushShoppingList.services.global_search_service import ACTUAL_RECORD_GROUPS
+from PushShoppingList.services.global_search_service import DEFAULT_RESULT_LIMIT
+from PushShoppingList.services.global_search_service import GROUP_LABELS
+from PushShoppingList.services.global_search_service import MAX_RESULT_LIMIT
 from PushShoppingList.services.global_search_service import recent_global_search
 from PushShoppingList.services.global_search_service import record_recent_global_search_result
+from PushShoppingList.services.request_security_service import build_canonical_url
+from PushShoppingList.services.request_security_service import validate_authenticated_viewer
 from PushShoppingList.services.job_service import job_for_client
 from PushShoppingList.services.job_service import recent_jobs
 from PushShoppingList.services.legal_content import legal_document as get_legal_document
@@ -2000,7 +2008,18 @@ def master_data_record_references_route(record_type, record_id):
     for reference in references.get("references", []):
         recipe_url = recipe_master_data.clean_text(reference.get("recipe_url"))
         reference = dict(reference)
-        reference["edit_url"] = recipe_edit_page_url(recipe_url)
+        reference_owner_user_id = str(reference.get("user_id") or "")
+        active_viewer_user_id = str((active_public_user or {}).get("user_id") or "")
+        # An administrator can inspect another account's master-data
+        # references, but /recipe/edit always resolves the signed-in viewer's
+        # workspace. Emitting an admin-viewer editor URL here would therefore
+        # open an unrelated recipe (or an empty editor) and misrepresent the
+        # selected target scope.
+        reference["edit_url"] = (
+            recipe_edit_page_url(recipe_url)
+            if reference_owner_user_id == active_viewer_user_id
+            else ""
+        )
         cover_image = reference.get("cover_image") if isinstance(reference.get("cover_image"), dict) else {}
         rendered_cover_image = recipe_cover_image_for_view(
             recipe_url,
@@ -2453,13 +2472,8 @@ def api_device_stale_route():
 @main_bp.route("/api/device-status", methods=["POST"])
 def api_device_status_route():
     payload = request.get_json(silent=True) or {}
-    active_public_user = current_public_user() or {}
-    user_id = str(
-        active_public_user.get("user_id")
-        or session.get("user_id")
-        or ""
-    ).strip()
-    guest_session_id = str(session.get("guest_session_id") or "").strip()
+    user_id = str(active_user_id() or "").strip()
+    guest_session_id = str(active_guest_session_id() or "").strip()
     if not user_id:
         payload = dict(payload)
         payload.pop("user_id", None)
@@ -3357,11 +3371,10 @@ def recipe_cover_image_variant_payload(recipe_url, cover_image, original_src, va
         return local_static_image_variants(original_src, variants=variants)
 
     def build_url(variant, version):
-        return url_for(
-            "recipe_bp.recipe_cover_image_route",
-            url=recipe_url,
+        return recipe_cover_image_url(
+            recipe_url,
             variant=variant,
-            v=version,
+            version=version,
         )
 
     return build_cover_image_variant_payload(original_src, image_path, build_url, variants=variants)
@@ -3370,11 +3383,40 @@ def recipe_cover_image_variant_payload(recipe_url, cover_image, original_src, va
 def recipe_cover_image_src(recipe_url, cover_image):
     if cover_image.get("path"):
         try:
-            return url_for("recipe_bp.recipe_cover_image_route", url=recipe_url)
+            return recipe_cover_image_url(recipe_url)
         except RuntimeError:
             return ""
 
-    return str(cover_image.get("url") or "").strip()
+    return canonicalize_private_recipe_url(cover_image.get("url"))
+
+
+def canonicalize_recipe_cover_image_payload(cover_image):
+    """Refresh legacy rendered image links before returning them to a viewer."""
+
+    result = dict(cover_image) if isinstance(cover_image, dict) else {}
+    for field in (
+        "url",
+        "src",
+        "thumb_url",
+        "card_url",
+        "detail_url",
+        "display_url",
+        "full_url",
+    ):
+        if result.get(field):
+            result[field] = canonicalize_private_recipe_url(result[field])
+
+    srcset = str(result.get("srcset") or "").strip()
+    if "/recipe_cover_image" in srcset:
+        entries = []
+        for entry in srcset.split(","):
+            parts = entry.strip().split()
+            if parts:
+                parts[0] = canonicalize_private_recipe_url(parts[0])
+                entries.append(" ".join(parts))
+        result["srcset"] = ", ".join(entries)
+
+    return result
 
 
 def cookbook_cover_image_for_view(recipe, recipe_data=None, recipe_meta=None, variants=None):
@@ -3387,7 +3429,7 @@ def cookbook_cover_image_for_view(recipe, recipe_data=None, recipe_meta=None, va
         if cover_image.get("src"):
             alt = str(cover_image.get("alt") or recipe.get("name") or "Recipe cover image").strip()
             return {
-                **cover_image,
+                **canonicalize_recipe_cover_image_payload(cover_image),
                 "alt": alt,
             }
 
@@ -3541,7 +3583,7 @@ def multipliers_match(left, right):
 
 def recipe_source_href(recipe_url):
     if imported_recipe_uses_pdf_path(recipe_url):
-        return url_for("recipe_bp.recipe_archive_pdf_route", url=recipe_url)
+        return recipe_archive_pdf_url(recipe_url)
 
     return recipe_url if recipe_source_href_is_openable(recipe_url) else ""
 
@@ -4514,20 +4556,95 @@ def privacy_route():
     return render_template("legal_page.html", **legal_page_context("privacy"))
 
 
+def clean_global_search_query(value):
+    """Normalize decoded search text before the canonical encoding pass."""
+
+    return " ".join(str(value or "").strip().split())[:160]
+
+
+def clean_global_search_group(value):
+    group = str(value or "").strip().lower()
+    return group if group in GROUP_LABELS else ""
+
+
+def clean_global_search_limit(value, *, query):
+    """Return the effective compact-search limit and its canonical value."""
+
+    default = DEFAULT_RESULT_LIMIT if query else 4
+    maximum = MAX_RESULT_LIMIT if query else 4
+    try:
+        limit = int(str(value).strip())
+    except (TypeError, ValueError):
+        limit = default
+    return max(1, min(maximum, limit)), default
+
+
+def canonical_global_search_request(*, api):
+    """Validate viewer identity and normalize one global-search GET URL."""
+
+    viewer = validate_authenticated_viewer(request.args)
+    query = clean_global_search_query(request.args.get("q"))
+    group_filter = clean_global_search_group(request.args.get("type"))
+    if api and not query:
+        # An empty API query returns recent records, so a record type is not a
+        # meaningful filter and must not survive in a canonical URL.
+        group_filter = ""
+
+    overrides = [
+        ("viewer_user_id", viewer.viewer_user_id),
+        ("q", query),
+        ("type", group_filter),
+    ]
+    allowed_keys = {"viewer_user_id", "q", "type"}
+    limit = DEFAULT_RESULT_LIMIT
+    if api:
+        limit, default_limit = clean_global_search_limit(
+            request.args.get("limit"),
+            query=query,
+        )
+        overrides.append(("limit", "" if limit == default_limit else str(limit)))
+        allowed_keys.add("limit")
+
+    canonical_url = build_canonical_url(
+        request.path,
+        parameters=request.args,
+        overrides=overrides,
+        allowed_keys=allowed_keys,
+    )
+    requested_url = request.full_path[:-1] if request.full_path.endswith("?") else request.full_path
+    return {
+        "viewer_user_id": viewer.viewer_user_id,
+        "query": query,
+        "group_filter": group_filter,
+        "limit": limit,
+        "redirect": redirect(canonical_url) if requested_url != canonical_url else None,
+    }
+
+
 @main_bp.route("/api/global-search", methods=["GET"])
 def global_search_route():
     """Return a compact, active-workspace-only result set for AppHeader."""
-    if not active_user_id() and not active_guest_session_id():
+    if not current_public_user() and not is_guest_session():
         return jsonify({"ok": False, "error": "Sign in to search AI Pantry."}), 401
 
-    query = str(request.args.get("q") or "")
-    limit = request.args.get("limit", 10)
+    canonical_request = canonical_global_search_request(api=True)
+    if canonical_request["redirect"] is not None:
+        return canonical_request["redirect"]
+
+    query = canonical_request["query"]
+    group_filter = canonical_request["group_filter"]
+    limit = canonical_request["limit"]
     try:
         if not query.strip():
             return jsonify(recent_global_search(limit=limit))
         # Header page shortcuts are sourced from the rendered shared Sidebar so
         # their SPA handlers remain intact. The API supplies record results only.
-        return jsonify(global_search(query, limit=limit, include_pages=False))
+        return jsonify(global_search(
+            query,
+            limit=limit,
+            group_filter=[group_filter] if group_filter else None,
+            include_pages=False,
+        ))
     except Exception:
         current_app.logger.exception("Global application search failed")
         return jsonify({
@@ -4540,8 +4657,11 @@ def global_search_route():
 @main_bp.route("/api/global-search/recent", methods=["POST"])
 def record_global_search_recent_route():
     """Record a clicked, server-resolved result in the active workspace."""
-    if not active_user_id() and not active_guest_session_id():
+    if not current_public_user() and not is_guest_session():
         return jsonify({"ok": False, "error": "Sign in to update recent search records."}), 401
+    # POST requests are not redirected for a missing assertion, but any
+    # producer-supplied assertion must still match the resolved session.
+    validate_authenticated_viewer(request.args)
 
     payload = request.get_json(silent=True) or {}
     if not isinstance(payload, dict):
@@ -4564,11 +4684,16 @@ def record_global_search_recent_route():
 @main_bp.route("/search", methods=["GET"])
 def global_search_results_route():
     """Render the grouped full-results view for the active workspace."""
-    if not active_user_id() and not active_guest_session_id():
+    if not current_public_user() and not is_guest_session():
         return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
-    query = str(request.args.get("q") or "")
-    group_filter = str(request.args.get("type") or "").strip().lower()
+    canonical_request = canonical_global_search_request(api=False)
+    if canonical_request["redirect"] is not None:
+        return canonical_request["redirect"]
+
+    query = canonical_request["query"]
+    group_filter = canonical_request["group_filter"]
+    viewer_user_id = canonical_request["viewer_user_id"]
     try:
         search_payload = global_search(
             query,
@@ -4592,6 +4717,7 @@ def global_search_results_route():
         search_payload=search_payload,
         search_error=search_error,
         search_type_filter=group_filter,
+        search_viewer_user_id=viewer_user_id,
         current_user=current_public_user(),
         is_guest_demo=is_guest_session(),
         app_css_version=static_asset_version("css/app.css"),

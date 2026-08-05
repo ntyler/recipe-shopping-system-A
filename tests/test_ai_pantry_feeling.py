@@ -6,16 +6,15 @@ from app import app
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_ai_pantry_cook_feeling_section_is_rendered():
+def test_ai_pantry_cook_feeling_section_is_not_exposed_on_the_anonymous_landing_page():
     with app.test_client() as client:
         response = client.get("/")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "#aiPantryCookWhatImFeeling" in html
-    assert "Cook What I'm Feeling" in html
-    assert "pantryFeelingInput" in html
-    assert "pantryFeelingPromptOutput" in html
+    assert "#aiPantryCookWhatImFeeling" not in html
+    assert "pantryFeelingInput" not in html
+    assert "pantryFeelingPromptOutput" not in html
 
 
 def test_ai_pantry_cook_feeling_assets_are_wired():

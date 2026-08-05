@@ -1,6 +1,8 @@
 import os
 import mimetypes
 import gzip
+import secrets
+import warnings
 from datetime import timedelta
 
 from flask import Flask
@@ -33,6 +35,7 @@ from PushShoppingList.services.guest_session_service import remembered_guest_coo
 from PushShoppingList.services.guest_session_service import restore_guest_session_from_cookie
 from PushShoppingList.services.image_variant_service import generated_static_cache_seconds
 from PushShoppingList.services.image_variant_service import is_cacheable_generated_static_path
+from PushShoppingList.services.request_security_service import apply_private_no_store
 from PushShoppingList.services.sms_service import password_reset_sms_configured
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import current_user
@@ -52,13 +55,9 @@ PUBLIC_ENDPOINTS = {
     "main_bp.privacy_route",
     "main_bp.api_device_stale_route",
     "main_bp.api_device_status_route",
-    "main_bp.current_recipes_section",
-    "main_bp.cookbooks_section",
-    "main_bp.recipe_view_section",
-    "main_bp.rules_section",
-    "main_bp.store_options_section",
     "static",
     "account_bp.firebase_session_route",
+    "account_bp.firebase_account_exists_route",
     "account_bp.firebase_login_route",
     "account_bp.firebase_logout_route",
     "account_bp.guest_start_route",
@@ -70,14 +69,15 @@ PUBLIC_ENDPOINTS = {
     "account_bp.sign_in_route",
     "account_bp.verify_two_factor_route",
     "account_bp.cancel_two_factor_sign_in_route",
+    "account_bp.request_two_factor_recovery_route",
     "account_bp.open_two_factor_recovery_route",
     "account_bp.complete_two_factor_recovery_route",
     "account_bp.request_password_reset_route",
     "account_bp.open_password_reset_route",
     "account_bp.complete_password_reset_route",
+    "account_bp.open_account_delete_route",
+    "account_bp.complete_account_delete_route",
     "account_bp.sign_out_route",
-    "recipe_bp.recipe_archive_pdf_route",
-    "recipe_bp.recipe_cover_image_route",
     "pdf_bp.share_pdf_route",
     "pdf_bp.download_shared_pdf_route",
     "feedback_bp.submit_feedback_route",
@@ -85,6 +85,8 @@ PUBLIC_ENDPOINTS = {
 
 GUEST_BLOCKED_ENDPOINTS = {
     "account_bp.open_admin_support_record_route",
+    "account_bp.update_admin_access_route",
+    "account_bp.delete_expired_guest_demos_route",
     "account_bp.update_profile_route",
     "account_bp.update_notification_settings_route",
     "account_bp.start_device_notification_subscription_route",
@@ -99,12 +101,14 @@ GUEST_BLOCKED_ENDPOINTS = {
     "account_bp.cancel_two_factor_setup_route",
     "account_bp.disable_two_factor_route",
     "account_bp.regenerate_two_factor_backup_codes_route",
+    "account_bp.request_two_factor_recovery_route",
     "main_bp.update_chatgpt_models_route",
     "store_bp.add_store_route",
     "store_bp.delete_store_route",
 }
 
 PROTECTED_BLUEPRINTS = {
+    "account_bp",
     "main_bp",
     "pantry_bp",
     "pdf_bp",
@@ -130,6 +134,106 @@ ADMIN_ENDPOINTS = {
     "main_bp.recipe_master_data_backfill_status_route",
     "feedback_bp.update_feedback_admin_route",
 }
+
+
+KNOWN_INSECURE_SECRET_KEYS = frozenset({
+    "dev-shopping-list-session-key",
+    "replace-with-random-local-secret",
+    "replace-with-a-random-secret",
+    "change-me",
+    "changeme",
+    "secret",
+})
+PRODUCTION_ENVIRONMENTS = frozenset({"production", "prod"})
+DEVELOPMENT_ENVIRONMENTS = frozenset({"development", "dev", "local"})
+TEST_ENVIRONMENTS = frozenset({"testing", "test"})
+MINIMUM_SECRET_KEY_LENGTH = 32
+
+
+def runtime_environment(config=None):
+    config = config or {}
+    return str(
+        config.get("SHOPPING_APP_ENV")
+        or os.getenv("SHOPPING_APP_ENV")
+        or os.getenv("FLASK_ENV")
+        or "production"
+    ).strip().lower()
+
+
+def secret_key_is_acceptable(value):
+    value = str(value or "").strip()
+    return bool(
+        len(value) >= MINIMUM_SECRET_KEY_LENGTH
+        and value.lower() not in KNOWN_INSECURE_SECRET_KEYS
+        and len(set(value)) >= 8
+    )
+
+
+def configure_session_security(app, supplied_config=None):
+    """Configure signing and cookie security before the app accepts requests."""
+
+    supplied_config = supplied_config or {}
+    environment = runtime_environment(supplied_config)
+    testing = bool(supplied_config.get("TESTING")) or environment in TEST_ENVIRONMENTS
+    development = environment in DEVELOPMENT_ENVIRONMENTS
+    production = not testing and not development
+    configured_key = supplied_config.get("SECRET_KEY") or os.getenv("SHOPPING_APP_SECRET_KEY")
+
+    if testing:
+        if not secret_key_is_acceptable(configured_key):
+            raise RuntimeError(
+                "Testing requires an explicit deterministic SECRET_KEY or "
+                "SHOPPING_APP_SECRET_KEY of at least 32 nontrivial characters."
+            )
+    elif production:
+        if not secret_key_is_acceptable(configured_key):
+            raise RuntimeError(
+                "SHOPPING_APP_SECRET_KEY is required in production and must be "
+                "at least 32 nontrivial characters without using a known default."
+            )
+    elif not secret_key_is_acceptable(configured_key):
+        configured_key = secrets.token_urlsafe(48)
+        warnings.warn(
+            "SHOPPING_APP_SECRET_KEY is not securely configured; using an "
+            "ephemeral local-development key. Signed-in sessions will reset "
+            "when this process restarts.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
+    app.config.update(
+        SECRET_KEY=str(configured_key),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=production,
+        SHOPPING_APP_ENV=environment,
+    )
+
+
+REGISTERED_SESSION_IDENTITY_KEYS = frozenset({
+    "user_id",
+    "firebase_uid",
+    "email",
+    "display_name",
+    "picture",
+    "provider",
+    "is_admin",
+    "pending_2fa_user_id",
+    "pending_2fa_provider",
+    "pending_2fa_context",
+    "two_factor_backup_codes",
+    "phone_verification_code",
+    "admin_support_selected_user",
+    "admin_support_reason",
+    "admin_support_errors",
+})
+
+
+def clear_invalid_registered_session_identity():
+    """Remove stale account state without disturbing an explicit guest session."""
+
+    for key in REGISTERED_SESSION_IDENTITY_KEYS:
+        session.pop(key, None)
 
 
 def wants_json_response():
@@ -215,16 +319,17 @@ def gzip_response_if_supported(response):
     return response
 
 
-def create_app():
+def create_app(config=None):
     app = Flask(
         __name__,
         template_folder="templates",
         static_folder="static",
     )
-    # Flask sessions keep the signed-in user id across refreshes.
-    app.secret_key = os.getenv("SHOPPING_APP_SECRET_KEY", "dev-shopping-list-session-key")
+    config = dict(config or {})
+    if config:
+        app.config.update(config)
+    configure_session_security(app, config)
     app.permanent_session_lifetime = timedelta(days=30)
-    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     log_openai_startup_diagnostics(
         debug_mode=app.debug,
         reloader_mode=os.environ.get("WERKZEUG_RUN_MAIN") == "true",
@@ -249,15 +354,34 @@ def create_app():
 
         endpoint = request.endpoint or ""
         g.clear_guest_demo_cookie = False
+        g.session_identity_validated = False
+        g.authenticated_user_id = ""
+        g.authenticated_guest_session_id = ""
 
         cleanup_expired_guest_sessions()
 
         if session.get("is_guest") and not get_current_guest_session():
+            if str(session.get("user_id") or "").strip():
+                clear_invalid_registered_session_identity()
             g.clear_guest_demo_cookie = True
             if endpoint != "account_bp.guest_expired_route":
                 return redirect(url_for("account_bp.guest_expired_route"))
 
-        if not current_user() and not session.get("is_guest"):
+        raw_session_user_id = str(session.get("user_id") or "").strip()
+        stale_registered_identity = False
+        if session.get("is_guest"):
+            # Guest workspaces are intentionally userless, including when a
+            # stale or malformed signed session contains both identity modes.
+            if raw_session_user_id:
+                clear_invalid_registered_session_identity()
+            user = None
+        else:
+            user = current_user()
+            if raw_session_user_id and not user:
+                clear_invalid_registered_session_identity()
+                stale_registered_identity = True
+
+        if not user and not session.get("is_guest") and not stale_registered_identity:
             remembered_status = remembered_guest_cookie_status(request.cookies.get(GUEST_COOKIE_NAME, ""))
             if remembered_status == "valid":
                 restore_guest_session_from_cookie(request.cookies.get(GUEST_COOKIE_NAME, ""))
@@ -266,6 +390,25 @@ def create_app():
                 if remembered_status == "expired" and endpoint == "main_bp.index":
                     return redirect(url_for("account_bp.guest_expired_route"))
 
+        guest_active = is_guest_session()
+        if guest_active:
+            user = None
+        elif not user:
+            user = current_user()
+
+        g.authenticated_user_id = str((user or {}).get("user_id") or "")
+        g.authenticated_guest_session_id = str(
+            session.get("guest_session_id") or ""
+        ) if guest_active else ""
+        g.session_identity_validated = True
+
+        # Guest restrictions must run before the public-endpoint exit because
+        # a few token/opening routes are intentionally public to signed-out
+        # users yet still mutate full accounts and must be unavailable to a
+        # guest workspace.
+        if guest_active and (endpoint in GUEST_BLOCKED_ENDPOINTS or endpoint in ADMIN_ENDPOINTS):
+            return guest_restricted_response()
+
         if endpoint in PUBLIC_ENDPOINTS:
             return None
 
@@ -273,14 +416,8 @@ def create_app():
         if blueprint not in PROTECTED_BLUEPRINTS:
             return None
 
-        user = current_user()
-        full_account_active = bool(user or session.get("user_id"))
-        guest_active = is_guest_session()
-        if not full_account_active and not guest_active:
+        if not user and not guest_active:
             return auth_required_response()
-
-        if guest_active and (endpoint in GUEST_BLOCKED_ENDPOINTS or endpoint in ADMIN_ENDPOINTS):
-            return guest_restricted_response()
 
         if endpoint in ADMIN_ENDPOINTS and not is_admin_user(user):
             return admin_required_response()
@@ -327,18 +464,15 @@ def create_app():
             response.headers["Cache-Control"] = (
                 f"public, max-age={generated_static_cache_seconds()}, immutable"
             )
-
-        if (
-            request.path == "/admin/master-data"
-            or request.path.startswith("/admin/master-data/")
-            or request.path == "/api/master-data"
-            or request.path.startswith("/api/master-data/")
-        ):
-            # These pages and APIs resolve their workspace from the signed
-            # Flask session. Protect successful responses as well as auth and
-            # canonical redirects/errors returned before a route runs.
-            response.headers["Cache-Control"] = "private, no-store"
-            response.headers["Pragma"] = "no-cache"
+        elif request.endpoint != "static":
+            # Dynamic routes may depend on the signed Flask session even when
+            # they return redirects, errors, JSON, or binary files. A single
+            # authoritative policy prevents one route/status branch from
+            # accidentally retaining private workspace data in a browser or
+            # intermediary cache. Truly static files keep Flask's normal
+            # asset policy; generated static bytes retain their immutable URL
+            # policy above.
+            apply_private_no_store(response)
 
         if getattr(g, "clear_guest_demo_cookie", False):
             clear_guest_cookie(response)

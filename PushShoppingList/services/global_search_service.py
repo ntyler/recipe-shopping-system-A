@@ -16,7 +16,6 @@ import re
 import threading
 import unicodedata
 from urllib.parse import quote
-from urllib.parse import urlencode
 from urllib.parse import urlsplit
 
 from PushShoppingList.services import cookbook_service
@@ -31,6 +30,8 @@ from PushShoppingList.services import recipe_url_service
 from PushShoppingList.services import shopping_list_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import store_settings_service
+from PushShoppingList.services.request_security_service import build_canonical_url
+from PushShoppingList.services.user_account_service import current_user
 
 
 MIN_QUERY_LENGTH = 2
@@ -116,12 +117,24 @@ def first_text(*values):
 
 
 def result_url(path, **query):
-    cleaned = {key: value for key, value in query.items() if value not in (None, "")}
-    return f"{path}?{urlencode(cleaned)}" if cleaned else path
+    return build_canonical_url(path, overrides=query)
+
+
+def registered_viewer_user_id():
+    """Return only a resolved registered viewer assertion, never a raw session id."""
+
+    return str((current_user() or {}).get("user_id") or "")
+
+
+def private_result_url(path, **query):
+    return build_canonical_url(
+        path,
+        overrides={"viewer_user_id": registered_viewer_user_id(), **query},
+    )
 
 
 def cover_image_url(recipe_url):
-    return result_url("/recipe_cover_image", url=recipe_url) if recipe_url else ""
+    return recipe_url_service.recipe_cover_image_url(recipe_url)
 
 
 def candidate(
@@ -625,7 +638,7 @@ def master_data_candidate(group, row):
         result_type,
         master_data_url_service.build_master_data_url(
             route_kind,
-            viewer_user_id=storage_service.active_user_id(),
+            viewer_user_id=registered_viewer_user_id(),
             overrides={"search": row.get("name")},
         ),
         secondary=result_context(
@@ -733,12 +746,24 @@ def sanitize_relative_result_url(value):
     return value
 
 
+def canonicalize_private_result_url(value):
+    """Refresh stored private links for the active viewer without changing scope."""
+
+    value = sanitize_relative_result_url(value)
+    if not value:
+        return ""
+    return recipe_url_service.canonicalize_private_recipe_url(
+        value,
+        viewer_user_id=registered_viewer_user_id(),
+    )
+
+
 def sanitize_thumbnail_url(value):
     value = str(value or "").strip()
     if not value or len(value) > 2048 or any(ord(character) < 32 for character in value):
         return ""
     if value.startswith("/"):
-        return sanitize_relative_result_url(value)
+        return canonicalize_private_result_url(value)
     try:
         parsed = urlsplit(value)
     except ValueError:
@@ -753,7 +778,7 @@ def sanitize_public_result(value):
     result_id = clean_text(value.get("id"))[:240]
     title = clean_text(value.get("title"))[:240]
     result_type = clean_text(value.get("type"))[:80]
-    url = sanitize_relative_result_url(value.get("url"))
+    url = canonicalize_private_result_url(value.get("url"))
     if not result_id or not title or not result_type or not url:
         return None
     icon = clean_text(value.get("icon")).lower()[:40]
@@ -905,7 +930,7 @@ def recent_global_search(limit=4):
         "all_total_count": len(results),
         "groups": groups,
         "available_groups": [],
-        "view_all_url": "/search",
+        "view_all_url": private_result_url("/search"),
     }
 
 
@@ -1025,5 +1050,5 @@ def global_search(query, limit=DEFAULT_RESULT_LIMIT, group_filter=None, full=Fal
             for group, label in GROUPS
             if counts.get(group, 0)
         ],
-        "view_all_url": result_url("/search", q=query),
+        "view_all_url": private_result_url("/search", q=query),
     }

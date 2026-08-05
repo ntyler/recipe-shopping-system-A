@@ -393,7 +393,7 @@ def recipe_links(urls, *, job_id="", user_id=None):
     return [
         {
             "label": str(url),
-            "url": recipe_edit_page_url(url, user_id=user_id),
+            "url": recipe_edit_page_url(url, viewer_user_id=user_id),
             "recipe_url": str(url),
         }
         for url in urls

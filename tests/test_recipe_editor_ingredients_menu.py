@@ -2125,7 +2125,9 @@ def test_ingredient_name_and_buy_as_fields_use_the_normalized_master_data_picker
     assert 'menu.setAttribute("role", "listbox");' in picker
     assert 'input.setAttribute("role", "combobox");' in picker
     assert 'input.setAttribute("aria-autocomplete", "list");' in picker
-    assert 'fetch(`/api/master-data/ingredients/options?${params.toString()}`' in picker
+    assert 'const requestUrl = masterDataViewerUrl(' in picker
+    assert '"/api/master-data/ingredients/options"' in picker
+    assert "const response = await fetch(requestUrl" in picker
     assert "function chooseRecipeIngredientMasterOption" in picker
     assert "function recipeIngredientMasterSelectedIndex" in picker
     assert "recipeIngredientProjectedOptionSourceRow(input)" in picker
@@ -5579,7 +5581,7 @@ def test_standalone_recipe_edit_page_renders_editor(monkeypatch, tmp_path):
         response = client.get(
             "/recipe/edit",
             query_string={
-                "user_id": "edit-page-user",
+                "viewer_user_id": "edit-page-user",
                 "url": "https://example.com/soup",
             },
         )
@@ -5650,7 +5652,7 @@ def test_recipe_edit_page_canonicalizes_and_enforces_session_user_scope(monkeypa
         assert canonicalized.status_code == 302
         assert canonicalized.headers["Cache-Control"] == "private, no-store"
         assert location_query == {
-            "user_id": ["owner-user"],
+            "viewer_user_id": ["owner-user"],
             "url": [source_url],
             "screen_preview_width": ["1440"],
         }
@@ -5660,37 +5662,66 @@ def test_recipe_edit_page_canonicalizes_and_enforces_session_user_scope(monkeypa
 
         blank_scope = client.get(
             "/recipe/edit",
-            query_string={"user_id": "   ", "url": source_url},
+            query_string={"viewer_user_id": "   ", "url": source_url},
         )
         assert blank_scope.status_code == 302
-        assert parse_qs(urlsplit(blank_scope.headers["Location"]).query)["user_id"] == [
+        assert parse_qs(urlsplit(blank_scope.headers["Location"]).query)["viewer_user_id"] == [
             "owner-user"
         ]
 
+        legacy = client.get(
+            "/recipe/edit",
+            query_string={"user_id": "owner-user", "url": source_url},
+        )
+        assert legacy.status_code == 302
+        legacy_query = parse_qs(urlsplit(legacy.headers["Location"]).query)
+        assert legacy_query == {
+            "viewer_user_id": ["owner-user"],
+            "url": [source_url],
+        }
+        assert client.get(legacy.headers["Location"]).status_code == 200
+
         mismatch = client.get(
             "/recipe/edit",
-            query_string={"user_id": "other-user", "url": source_url},
+            query_string={"viewer_user_id": "other-user", "url": source_url},
         )
         duplicate_scope = client.get(
             "/recipe/edit",
             query_string=[
-                ("user_id", "owner-user"),
-                ("user_id", "other-user"),
+                ("viewer_user_id", "owner-user"),
+                ("viewer_user_id", "other-user"),
                 ("url", source_url),
             ],
         )
+        duplicate_legacy_scope = client.get(
+            "/recipe/edit",
+            query_string=[
+                ("user_id", "owner-user"),
+                ("user_id", "owner-user"),
+                ("url", source_url),
+            ],
+        )
+        conflicting_scope = client.get(
+            "/recipe/edit",
+            query_string={
+                "viewer_user_id": "owner-user",
+                "user_id": "other-user",
+                "url": source_url,
+            },
+        )
         missing_url = client.get(
             "/recipe/edit",
-            query_string={"user_id": "owner-user"},
+            query_string={"viewer_user_id": "owner-user"},
         )
 
         assert mismatch.status_code == 403
         assert mismatch.headers["Cache-Control"] == "private, no-store"
-        assert "different account" in mismatch.get_data(as_text=True)
         assert "owner-user" not in mismatch.get_data(as_text=True)
         assert "other-user" not in mismatch.get_data(as_text=True)
         assert duplicate_scope.status_code == 400
         assert duplicate_scope.headers["Cache-Control"] == "private, no-store"
+        assert duplicate_legacy_scope.status_code == 400
+        assert conflicting_scope.status_code == 400
         assert missing_url.status_code == 400
         assert missing_url.headers["Cache-Control"] == "private, no-store"
 
@@ -5698,7 +5729,7 @@ def test_recipe_edit_page_canonicalizes_and_enforces_session_user_scope(monkeypa
             session.clear()
         anonymous = client.get(
             "/recipe/edit",
-            query_string={"user_id": "owner-user", "url": source_url},
+            query_string={"viewer_user_id": "owner-user", "url": source_url},
         )
 
     assert anonymous.status_code == 302
@@ -5707,6 +5738,9 @@ def test_recipe_edit_page_canonicalizes_and_enforces_session_user_scope(monkeypa
 
 def test_recipe_edit_page_url_builder_retains_user_scope_after_navigation_and_save():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    editor_page = (ROOT / "PushShoppingList/templates/recipe_edit_page.html").read_text(
+        encoding="utf-8",
+    )
     helper = script[
         script.index("function recipeEditPageUrl"):
         script.index("function recipeEditPendingActionFromOptions")
@@ -5716,10 +5750,11 @@ def test_recipe_edit_page_url_builder_retains_user_scope_after_navigation_and_sa
         script.index("function normalizeRecipeEditorCoverImage")
     ]
 
-    assert "new URLSearchParams()" in helper
-    assert "document.body?.dataset.userId" in helper
-    assert 'params.set("user_id", userId);' in helper
-    assert 'params.set("url", normalizedUrl);' in helper
+    assert "withCanonicalViewerUserId" in helper
+    assert "removeLegacyUserId: true" in helper
+    assert 'url.searchParams.set("url", normalizedUrl);' in helper
+    assert "dataset.userId" not in helper
+    assert 'data-viewer-user-id="{{ current_user.user_id if current_user else \'\' }}"' in editor_page
     assert "recipeEditPageUrl(savedSourceUrl)" in save_identity
     assert script.count("/recipe/edit?url=") == 0
 

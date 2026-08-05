@@ -7,6 +7,12 @@ from flask import Flask
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
+from PushShoppingList.services import recipe_ingredient_service
+from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service
+
+
+RECIPE_SAVE_TEST_USER_ID = "recipe-save-test-user"
 
 
 def configure_recipe_save_storage(monkeypatch, tmp_path):
@@ -17,7 +23,18 @@ def configure_recipe_save_storage(monkeypatch, tmp_path):
 
     monkeypatch.setattr(recipe_edit_service, "OUTPUT_FOLDER", output_dir)
     monkeypatch.setattr(recipe_extract_service, "OUTPUT_FOLDER", output_dir)
+    monkeypatch.setattr(recipe_ingredient_service, "OUTPUT_FOLDER", output_dir)
     monkeypatch.setattr(recipe_extract_service, "PDF_FOLDER", pdf_dir)
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "user-data")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({
+        "users": [{
+            "user_id": RECIPE_SAVE_TEST_USER_ID,
+            "email": "recipe-save@example.com",
+            "username": RECIPE_SAVE_TEST_USER_ID,
+            "account_status": "active",
+        }],
+    })
     monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: {})
     monkeypatch.setattr(recipe_edit_service, "cookbook_recipe_assignment_for_url", lambda _url: {})
     monkeypatch.setattr(recipe_edit_service, "load_food_rules", lambda: {"require": [], "avoid": []})
@@ -42,7 +59,10 @@ def recipe_route_client():
     app = Flask("recipe-save-backend-tests")
     app.config.update(TESTING=True, SECRET_KEY="recipe-save-tests")
     app.register_blueprint(recipe_routes.recipe_bp)
-    return app.test_client()
+    client = app.test_client()
+    with client.session_transaction() as signed_session:
+        signed_session["user_id"] = RECIPE_SAVE_TEST_USER_ID
+    return client
 
 
 def editable_payload(source_url, **overrides):
