@@ -310,6 +310,17 @@ def test_live_payload_preserves_nested_ids_order_and_metadata():
     assert '/^(?:not available|n\\/?a|none|null)$/i' in script
 
 
+def test_recipe_row_field_updates_do_not_target_nested_option_fields():
+    script = read_text("PushShoppingList/static/js/app.js")
+    helper = script[
+        script.index("function setRowFieldValue"):
+        script.index("function recipeEditSvgIcon", script.index("function setRowFieldValue"))
+    ]
+
+    assert "recipeIngredientDirectField(row, field)" in helper
+    assert 'row.querySelector(`[data-field="${field}"]`)' not in helper
+
+
 def test_save_loading_validation_and_error_styles_are_visible():
     css = read_text("PushShoppingList/static/css/app.css")
 

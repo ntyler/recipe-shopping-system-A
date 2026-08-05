@@ -29612,24 +29612,27 @@ function renderRecipeIngredientSmartViewDetails(
     values,
     alternativeGroups,
     choiceGroups,
+    options = {},
 ) {
     if (!container) return;
     container.replaceChildren();
     if (choiceGroups.length) {
-        const options = document.createElement("div");
-        options.className = "recipe-edit-ingredient-smart-options";
-        options.setAttribute("role", "radiogroup");
-        options.setAttribute(
+        const choiceParentValues = options.choiceParentValues || values;
+        const choiceAlternativeGroups = options.choiceAlternativeGroups || alternativeGroups;
+        const optionList = document.createElement("div");
+        optionList.className = "recipe-edit-ingredient-smart-options";
+        optionList.setAttribute("role", "radiogroup");
+        optionList.setAttribute(
             "aria-label",
-            `Ingredient options for ${recipeIngredientRecipeViewName(values, true) || "ingredient"}`,
+            `Ingredient options for ${recipeIngredientRecipeViewName(choiceParentValues, true) || "ingredient"}`,
         );
         renderRecipeIngredientSmartViewOptions(
-            options,
-            values,
-            alternativeGroups,
+            optionList,
+            choiceParentValues,
+            choiceAlternativeGroups,
             choiceGroups,
         );
-        container.appendChild(options);
+        container.appendChild(optionList);
     }
 
     const details = document.createElement("dl");
@@ -29694,14 +29697,44 @@ function syncRecipeIngredientSmartViewCardExpanded(card, expanded) {
     }
 }
 
-function renderRecipeIngredientSmartViewCard(card, row, values, alternativeGroups) {
-    const key = ensureRecipeIngredientExpansionId(row);
-    const choice = recipeIngredientRecipeViewChoiceGroups(row, values, alternativeGroups);
+function renderRecipeIngredientSmartViewCard(
+    card,
+    row,
+    values,
+    alternativeGroups,
+    options = {},
+) {
+    const key = String(options.key || ensureRecipeIngredientExpansionId(row));
+    const sourceRow = options.sourceRow || row;
+    const choiceParentValues = options.choiceParentValues || values;
+    const choiceAlternativeGroups = options.choiceAlternativeGroups || alternativeGroups;
+    const showsChoiceControls = options.showChoiceControls !== false;
+    const choice = showsChoiceControls
+        ? recipeIngredientRecipeViewChoiceGroups(
+            row,
+            choiceParentValues,
+            choiceAlternativeGroups,
+        )
+        : { groups: [], selectedChoice: null, summary: { label: "" } };
+    const isProjectedChoiceComponent = Boolean(
+        options.isProjectedChoiceComponent && sourceRow !== row,
+    );
     const name = recipeIngredientSentenceCase(
-        recipeIngredientViewName(values, choice.groups.length > 0),
+        isProjectedChoiceComponent
+            ? recipeIngredientChoiceItemSummary(
+                values,
+                choiceParentValues,
+                choiceAlternativeGroups,
+            )
+            : recipeIngredientViewName(values, choice.groups.length > 0),
     ) || "Unnamed ingredient";
     card.dataset.smartViewIngredientId = key;
-    card.recipeIngredientSourceRow = row;
+    card.recipeIngredientSourceRow = sourceRow;
+    card.recipeIngredientChoiceParentRow = row;
+    card.classList.toggle(
+        "is-selected-choice-component",
+        isProjectedChoiceComponent,
+    );
 
     const nameElement = card.querySelector("[data-smart-view-name]");
     if (nameElement) {
@@ -29720,7 +29753,7 @@ function renderRecipeIngredientSmartViewCard(card, row, values, alternativeGroup
     }
     const status = card.querySelector("[data-smart-view-status]");
     if (status) {
-        const statusDetails = recipeIngredientRecipeViewStatus(row, values);
+        const statusDetails = recipeIngredientRecipeViewStatus(sourceRow, values);
         status.replaceChildren();
         if (statusDetails) {
             const statusLabel = document.createElement("span");
@@ -29754,11 +29787,57 @@ function renderRecipeIngredientSmartViewCard(card, row, values, alternativeGroup
         values,
         alternativeGroups,
         choice.groups,
+        {
+            choiceParentValues,
+            choiceAlternativeGroups,
+        },
     );
     syncRecipeIngredientSmartViewCardExpanded(
         card,
         recipeEditExpandedSmartViewIngredientId === key,
     );
+}
+
+function recipeIngredientSmartViewEntries(row, values, alternativeGroups) {
+    const parentKey = ensureRecipeIngredientExpansionId(row);
+    const choice = recipeIngredientRecipeViewChoiceGroups(
+        row,
+        values,
+        alternativeGroups,
+    );
+    // Match the table view without changing the canonical save shape: the
+    // selected nested rows become cards, while the parent remains the choice
+    // owner used for switching options and serialization.
+    const projectedRows = recipeIngredientSelectedOptionProjectionRows(
+        choice.selectedChoice,
+    );
+    if (!projectedRows.length) {
+        return [{
+            key: parentKey,
+            row,
+            sourceRow: row,
+            values,
+            alternativeGroups,
+            choiceParentValues: values,
+            choiceAlternativeGroups: alternativeGroups,
+            showChoiceControls: true,
+            isProjectedChoiceComponent: false,
+        }];
+    }
+
+    return projectedRows.map((sourceRow, componentIndex) => ({
+        key: componentIndex === 0
+            ? parentKey
+            : `${parentKey}:selected-choice-component:${componentIndex}`,
+        row,
+        sourceRow,
+        values: fieldValuesFromRow(sourceRow),
+        alternativeGroups: componentIndex === 0 ? alternativeGroups : [],
+        choiceParentValues: values,
+        choiceAlternativeGroups: alternativeGroups,
+        showChoiceControls: componentIndex === 0,
+        isProjectedChoiceComponent: true,
+    }));
 }
 
 function layoutRecipeIngredientSmartView() {
@@ -29826,24 +29905,48 @@ function renderRecipeIngredientSmartView() {
     const existingCards = new Map(
         [...grid.children].map(card => [card.dataset.smartViewIngredientId || "", card]),
     );
-    const rows = recipeEditIngredientRows().map(row => {
+    const entries = recipeEditIngredientRows().flatMap(row => {
         const values = fieldValuesFromRow(row);
         const alternativeGroups = recipeIngredientSubstitutionDomGroups(
             [...row.querySelectorAll("[data-substitution-option-row]")],
         );
-        return { row, values, alternativeGroups };
-    }).filter(({ values, alternativeGroups }) => (
-        recipeIngredientRecipeViewHasContent(values, alternativeGroups)
-    ));
+        if (!recipeIngredientRecipeViewHasContent(values, alternativeGroups)) {
+            return [];
+        }
+        return recipeIngredientSmartViewEntries(row, values, alternativeGroups);
+    });
     const liveKeys = new Set();
 
-    rows.forEach(({ row, values, alternativeGroups }) => {
-        const key = ensureRecipeIngredientExpansionId(row);
+    entries.forEach(entry => {
+        const {
+            key,
+            row,
+            sourceRow,
+            values,
+            alternativeGroups,
+            choiceParentValues,
+            choiceAlternativeGroups,
+            showChoiceControls,
+            isProjectedChoiceComponent,
+        } = entry;
         liveKeys.add(key);
         let card = existingCards.get(key);
         if (!card) card = createRecipeIngredientSmartViewCard(row);
         existingCards.delete(key);
-        renderRecipeIngredientSmartViewCard(card, row, values, alternativeGroups);
+        renderRecipeIngredientSmartViewCard(
+            card,
+            row,
+            values,
+            alternativeGroups,
+            {
+                key,
+                sourceRow,
+                choiceParentValues,
+                choiceAlternativeGroups,
+                showChoiceControls,
+                isProjectedChoiceComponent,
+            },
+        );
         grid.appendChild(card);
     });
     existingCards.forEach(card => card.remove());
@@ -29853,7 +29956,7 @@ function renderRecipeIngredientSmartView() {
     ) {
         recipeEditExpandedSmartViewIngredientId = "";
     }
-    const hasRows = rows.length > 0;
+    const hasRows = entries.length > 0;
     grid.hidden = !hasRows;
     empty.hidden = hasRows;
     add.hidden = !hasRows;
@@ -29885,7 +29988,8 @@ function selectRecipeIngredientSmartViewOption(button, event = null) {
         event.stopPropagation();
     }
     const card = button ? button.closest("[data-smart-view-ingredient-id]") : null;
-    const row = card?.recipeIngredientSourceRow;
+    const row = card?.recipeIngredientChoiceParentRow
+        || card?.recipeIngredientSourceRow;
     const optionId = String(button?.dataset.smartViewOptionId || "").trim();
     if (!card || !row || !row.isConnected || !optionId) return false;
 
@@ -29930,10 +30034,17 @@ function navigateRecipeIngredientSmartViewOptions(button, event) {
 
 function editRecipeIngredientFromSmartView(button) {
     const card = button ? button.closest("[data-smart-view-ingredient-id]") : null;
-    const row = card?.recipeIngredientSourceRow;
-    if (!row || !row.isConnected) return false;
+    const sourceRow = card?.recipeIngredientSourceRow;
+    const row = card?.recipeIngredientChoiceParentRow || sourceRow;
+    if (!row || !row.isConnected || !sourceRow || !sourceRow.isConnected) return false;
     recipeEditIngredientModalReturnView = recipeEditIngredientView;
     setRecipeEditIngredientView("table", { persist: false });
+    if (sourceRow !== row) {
+        return openRecipeIngredientOptionModal(button, {
+            optionRow: sourceRow,
+            trigger: button,
+        });
+    }
     return setRecipeIngredientEditMode(row, true, { trigger: button });
 }
 
@@ -41964,7 +42075,7 @@ function editFoodReviewManually() {
 }
 
 function setRowFieldValue(row, field, value, options = {}) {
-    const input = row.querySelector(`[data-field="${field}"]`);
+    const input = recipeIngredientDirectField(row, field);
 
     if (input) {
         input.value = value;

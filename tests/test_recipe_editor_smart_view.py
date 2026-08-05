@@ -1,4 +1,9 @@
+import json
 from pathlib import Path
+import shutil
+import subprocess
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,10 +44,10 @@ def test_smart_view_replaces_the_placeholder_and_reuses_shared_actions():
     assert ingredient_section.count("data-recipe-ingredient-smart-add") == 1
     assert ingredient_section.count("addRecipeIngredientFromCurrentView()") == 5
 
-    assert "recipeEditIngredientRows().map(row =>" in render
+    assert "recipeEditIngredientRows().flatMap(row =>" in render
     assert "fieldValuesFromRow(row)" in render
     assert "recipeIngredientSubstitutionDomGroups(" in render
-    assert "ensureRecipeIngredientExpansionId(row)" in render
+    assert "recipeIngredientSmartViewEntries(row, values, alternativeGroups)" in render
     assert "existingCards.get(key)" in render
     assert "grid.appendChild(card)" in render
     assert "fetch(" not in render
@@ -65,7 +70,7 @@ def test_smart_cards_reuse_images_status_store_sections_and_structured_options()
     )
     card = _function(
         script,
-        "renderRecipeIngredientSmartViewCard(card, row, values, alternativeGroups)",
+        "renderRecipeIngredientSmartViewCard(",
         "layoutRecipeIngredientSmartView",
     )
     options = _function(
@@ -87,10 +92,13 @@ def test_smart_cards_reuse_images_status_store_sections_and_structured_options()
     assert "initDeferredImages(imageCell)" in image
     assert 'image.alt = "";' in image
 
-    assert "recipeIngredientRecipeViewChoiceGroups(row, values, alternativeGroups)" in card
+    assert "choiceParentValues" in card
+    assert "choiceAlternativeGroups" in card
+    assert "recipeIngredientRecipeViewChoiceGroups(" in card
+    assert "recipeIngredientChoiceItemSummary(" in card
     assert "recipeIngredientViewName(values, choice.groups.length > 0)" in card
     assert "recipeIngredientViewAmount(values)" in card
-    assert "recipeIngredientRecipeViewStatus(row, values)" in card
+    assert "recipeIngredientRecipeViewStatus(sourceRow, values)" in card
     assert "status.hidden = !statusDetails;" in card
     assert "renderRecipeIngredientRecipeViewStore(" in card
 
@@ -247,6 +255,262 @@ def test_smart_projection_refreshes_with_row_edits_and_reordering():
     assert 'const tableIsActive = view === "table";' in actions
 
 
+def test_smart_view_projects_the_selected_choice_components_as_main_cards():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the Smart View projection regression")
+
+    projection = _function(
+        script,
+        "recipeIngredientSmartViewEntries(row, values, alternativeGroups)",
+        "layoutRecipeIngredientSmartView",
+    )
+    selected_rows = _function(
+        script,
+        "recipeIngredientSelectedOptionProjectionRows(selectedChoice)",
+        "syncRecipeIngredientSelectedOptionLineItems",
+    )
+    harness = """
+const parentRow = { id: "corn-choice" };
+const components = [
+    { id: "fresh-corn", values: { ingredient: "corn", preparation: "fresh" } },
+    { id: "cumin", values: { ingredient: "cumin" } },
+    { id: "onion", values: { ingredient: "onion" } },
+];
+let selectedRows = components;
+function ensureRecipeIngredientExpansionId() { return "ingredient-corn"; }
+function recipeIngredientRecipeViewChoiceGroups() {
+    return { selectedChoice: { rows: selectedRows } };
+}
+function fieldValuesFromRow(row) { return row.values; }
+""" + selected_rows + projection + """
+
+const projected = recipeIngredientSmartViewEntries(
+    parentRow,
+    { ingredient: "corn", preparation: "fresh" },
+    [{ alternativeId: "fresh", rows: components }],
+);
+selectedRows = [components[0]];
+const singleComponent = recipeIngredientSmartViewEntries(
+    parentRow,
+    { ingredient: "corn", preparation: "fresh" },
+    [{ alternativeId: "fresh", rows: components }],
+);
+process.stdout.write(JSON.stringify({
+    projected: projected.map(entry => ({
+        key: entry.key,
+        source: entry.sourceRow.id,
+        ingredient: entry.values.ingredient,
+        showChoiceControls: entry.showChoiceControls,
+        projected: entry.isProjectedChoiceComponent,
+    })),
+    singleComponent: singleComponent.map(entry => ({
+        key: entry.key,
+        source: entry.sourceRow.id,
+        projected: entry.isProjectedChoiceComponent,
+    })),
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "projected": [
+            {
+                "key": "ingredient-corn",
+                "source": "fresh-corn",
+                "ingredient": "corn",
+                "showChoiceControls": True,
+                "projected": True,
+            },
+            {
+                "key": "ingredient-corn:selected-choice-component:1",
+                "source": "cumin",
+                "ingredient": "cumin",
+                "showChoiceControls": False,
+                "projected": True,
+            },
+            {
+                "key": "ingredient-corn:selected-choice-component:2",
+                "source": "onion",
+                "ingredient": "onion",
+                "showChoiceControls": False,
+                "projected": True,
+            },
+        ],
+        "singleComponent": [
+            {
+                "key": "ingredient-corn",
+                "source": "corn-choice",
+                "projected": False,
+            },
+        ],
+    }
+
+
+def test_smart_view_switching_choices_replaces_stale_projected_cards():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the Smart View switching regression")
+
+    projection = _function(
+        script,
+        "recipeIngredientSmartViewEntries(row, values, alternativeGroups)",
+        "layoutRecipeIngredientSmartView",
+    )
+    selected_rows = _function(
+        script,
+        "recipeIngredientSelectedOptionProjectionRows(selectedChoice)",
+        "syncRecipeIngredientSelectedOptionLineItems",
+    )
+    render = _function(
+        script,
+        "renderRecipeIngredientSmartView()",
+        "toggleRecipeIngredientSmartView",
+    )
+    harness = """
+const freshRows = [
+    { id: "fresh-corn", values: { ingredient: "corn", preparation: "fresh" } },
+    { id: "cumin", values: { ingredient: "cumin", preparation: "" } },
+    { id: "fresh-onion", values: { ingredient: "onion", preparation: "" } },
+];
+const frozenRows = [
+    { id: "frozen-corn", values: { ingredient: "corn", preparation: "frozen" } },
+    { id: "frozen-onion", values: { ingredient: "onion", preparation: "" } },
+];
+const parentRow = {
+    id: "corn-choice",
+    values: { ingredient: "corn", preparation: "fresh" },
+    querySelectorAll() { return [...freshRows, ...frozenRows]; },
+};
+const groups = [
+    { alternativeId: "fresh", rows: freshRows },
+    { alternativeId: "frozen", rows: frozenRows },
+];
+let selectedRows = freshRows;
+let recipeEditExpandedSmartViewIngredientId = "";
+let createdCardCount = 0;
+const removedKeys = [];
+const grid = {
+    children: [],
+    hidden: false,
+    appendChild(card) {
+        const currentIndex = this.children.indexOf(card);
+        if (currentIndex >= 0) this.children.splice(currentIndex, 1);
+        this.children.push(card);
+        card.parentElement = this;
+        card.isConnected = true;
+    },
+};
+const empty = { hidden: true };
+const add = { hidden: false };
+const document = {
+    querySelector(selector) {
+        if (selector === "[data-recipe-ingredient-smart-grid]") return grid;
+        if (selector === "[data-recipe-ingredient-smart-empty]") return empty;
+        if (selector === "[data-recipe-ingredient-smart-add]") return add;
+        return null;
+    },
+};
+function ensureRecipeIngredientExpansionId() { return "ingredient-corn"; }
+function recipeIngredientRecipeViewChoiceGroups() {
+    return { selectedChoice: { rows: selectedRows } };
+}
+function fieldValuesFromRow(row) { return row.values; }
+function recipeEditIngredientRows() { return [parentRow]; }
+function recipeIngredientSubstitutionDomGroups() { return groups; }
+function recipeIngredientRecipeViewHasContent() { return true; }
+function createRecipeIngredientSmartViewCard() {
+    createdCardCount += 1;
+    return {
+        dataset: {},
+        isConnected: true,
+        remove() {
+            removedKeys.push(this.dataset.smartViewIngredientId);
+            const index = grid.children.indexOf(this);
+            if (index >= 0) grid.children.splice(index, 1);
+            this.isConnected = false;
+        },
+    };
+}
+function renderRecipeIngredientSmartViewCard(card, row, values, alternatives, options) {
+    card.dataset.smartViewIngredientId = options.key;
+    card.renderedIngredient = values.ingredient;
+    card.renderedPreparation = values.preparation || "";
+    card.recipeIngredientSourceRow = options.sourceRow;
+}
+function initRecipeIngredientSmartViewLayout() {}
+function scheduleRecipeIngredientSmartViewLayout() {}
+""" + selected_rows + projection + render + """
+
+function snapshot() {
+    return grid.children.map(card => ({
+        key: card.dataset.smartViewIngredientId,
+        ingredient: card.renderedIngredient,
+        preparation: card.renderedPreparation,
+        source: card.recipeIngredientSourceRow.id,
+    }));
+}
+renderRecipeIngredientSmartView();
+const fresh = snapshot();
+selectedRows = frozenRows;
+renderRecipeIngredientSmartView();
+const frozen = snapshot();
+selectedRows = freshRows;
+renderRecipeIngredientSmartView();
+const freshAgain = snapshot();
+process.stdout.write(JSON.stringify({
+    fresh,
+    frozen,
+    freshAgain,
+    removedKeys,
+    createdCardCount,
+    canonicalRowCount: recipeEditIngredientRows().length,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert [item["source"] for item in result["fresh"]] == [
+        "fresh-corn",
+        "cumin",
+        "fresh-onion",
+    ]
+    assert [item["source"] for item in result["frozen"]] == [
+        "frozen-corn",
+        "frozen-onion",
+    ]
+    assert [item["source"] for item in result["freshAgain"]] == [
+        "fresh-corn",
+        "cumin",
+        "fresh-onion",
+    ]
+    assert len({item["key"] for item in result["fresh"]}) == 3
+    assert len({item["key"] for item in result["frozen"]}) == 2
+    assert result["removedKeys"] == [
+        "ingredient-corn:selected-choice-component:2",
+    ]
+    assert result["createdCardCount"] == 4
+    assert result["canonicalRowCount"] == 1
+
+
 def test_smart_option_sets_select_through_shared_choice_state_and_support_keyboard():
     script = SCRIPT_PATH.read_text(encoding="utf-8")
     css = CSS_PATH.read_text(encoding="utf-8")
@@ -293,8 +557,9 @@ def test_smart_option_sets_select_through_shared_choice_state_and_support_keyboa
     assert "group.values.forEach(values =>" in option
     assert 'option.addEventListener("click"' in option
     assert 'option.addEventListener("keydown"' in option
-    assert 'options.setAttribute("role", "radiogroup")' in details
+    assert 'optionList.setAttribute("role", "radiogroup")' in details
 
+    assert "card?.recipeIngredientChoiceParentRow" in select
     assert "card?.recipeIngredientSourceRow" in select
     assert "applyRecipeIngredientOptionSelection(row, optionId)" in select
     assert 'setRecipeEditStatus("Ingredient option selected. Save Recipe to keep it.")' in select
