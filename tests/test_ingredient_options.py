@@ -1358,6 +1358,25 @@ def test_standard_and_alternative_rows_share_one_column_typography_contract():
         assert f'[data-ingredient-column="{column}"]' in contract
 
 
+def test_every_alternatives_value_uses_the_shared_column_typography():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    contract = css[css.index("/* Ingredient editor v103:"):]
+    for token in (
+        '[data-ingredient-column="alternatives"]',
+        ".recipe-edit-ingredient-options-button",
+        ".recipe-edit-ingredient-options-copy",
+        "[data-ingredient-options-label]",
+        "[data-ingredient-options-summary]",
+        "font-family: var(--app-font-family) !important;",
+        "font-size: var(--recipe-edit-ingredient-column-font-size) !important;",
+        "font-weight: var(--recipe-edit-ingredient-column-font-weight) !important;",
+        "line-height: 1.2 !important;",
+        "letter-spacing: normal !important;",
+    ):
+        assert token in contract
+
+
 def test_standard_and_alternative_rows_share_one_drag_icon_size():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 

@@ -73664,3 +73664,21 @@ body.recipe-edit-standalone-page .recipe-edit-standalone-shell {
         font-size: 12px;
     }
 }
+
+/* Ingredient editor v103: keep every Alternatives value typographically consistent. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    [data-ingredient-column="alternatives"],
+body.recipe-edit-standalone-page #recipeEditIngredients
+    [data-ingredient-column="alternatives"]
+    :is(
+        .recipe-edit-ingredient-options-button,
+        .recipe-edit-ingredient-options-copy,
+        [data-ingredient-options-label],
+        [data-ingredient-options-summary]
+    ) {
+    font-family: var(--app-font-family) !important;
+    font-size: var(--recipe-edit-ingredient-column-font-size) !important;
+    font-weight: var(--recipe-edit-ingredient-column-font-weight) !important;
+    line-height: 1.2 !important;
+    letter-spacing: normal !important;
+}
