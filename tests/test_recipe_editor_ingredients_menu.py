@@ -420,6 +420,20 @@ def test_active_standalone_desktop_ingredient_thumbnails_use_size_variables():
     desktop_grid_rules = css[v75_start:v75_end]
     assert desktop_grid_rules.count("var(--recipe-edit-thumbnail-slot, 66px)") == 2
 
+    option_image_selector = (
+        "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+        "    .recipe-edit-alternative-component-summary\n"
+        "    > .recipe-edit-alternative-component-image-cell {"
+    )
+    v51_start = css.index("/* Ingredient editor v51:")
+    option_image_start = css.index(option_image_selector, v51_start)
+    option_image_end = css.index("\n}", option_image_start)
+    option_image_rule = css[option_image_start:option_image_end]
+
+    for property_name in ("width", "min-width", "max-width", "height", "min-height"):
+        assert f"{property_name}: var(--recipe-edit-thumbnail-size, 64px) !important;" in option_image_rule
+    assert "48px" not in option_image_rule
+
 
 def test_recipe_editor_row_image_tools_toggle_is_wired():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")

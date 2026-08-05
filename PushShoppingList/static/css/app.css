@@ -67789,11 +67789,11 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .recipe-edit-alternative-component-summary
     > .recipe-edit-alternative-component-image-cell {
     box-sizing: border-box;
-    width: 48px !important;
-    min-width: 48px !important;
-    max-width: 48px !important;
-    height: 48px !important;
-    min-height: 48px !important;
+    width: var(--recipe-edit-thumbnail-size, 64px) !important;
+    min-width: var(--recipe-edit-thumbnail-size, 64px) !important;
+    max-width: var(--recipe-edit-thumbnail-size, 64px) !important;
+    height: var(--recipe-edit-thumbnail-size, 64px) !important;
+    min-height: var(--recipe-edit-thumbnail-size, 64px) !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden;
