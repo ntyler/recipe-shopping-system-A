@@ -70381,16 +70381,17 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-section.is-option
     }
 }
 
-/* Ingredient editor v80: shared desktop ingredient view switcher. */
+/* Ingredient editor v80: shared ingredient view switcher in the section toolbar. */
 body.recipe-edit-standalone-page .recipe-edit-ingredient-view-switcher-row {
     display: flex;
+    flex: 1 1 auto;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    padding: 12px 16px;
+    width: auto;
+    min-width: 260px;
+    margin: 0 auto;
+    padding: 0 16px;
     box-sizing: border-box;
-    border-bottom: 1px solid var(--app-border);
-    background: var(--app-surface);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-view-switcher {
@@ -70434,6 +70435,29 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-view-tab.is-active {
     background: var(--app-surface);
     color: var(--app-primary-hover);
     box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+}
+
+@container recipe-editor-workspace (max-width: 760px) {
+    body.recipe-edit-standalone-page .recipe-edit-ingredients-section > .ingredients-toolbar {
+        flex-wrap: wrap;
+        row-gap: 6px;
+    }
+
+    body.recipe-edit-standalone-page .ingredients-toolbar > .recipe-edit-ingredient-view-switcher-row {
+        order: 3;
+        flex-basis: 100%;
+        min-width: 0;
+        padding: 0;
+    }
+
+    body.recipe-edit-standalone-page .ingredients-toolbar .recipe-edit-ingredient-view-switcher {
+        width: 100%;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    body.recipe-edit-standalone-page .ingredients-toolbar .recipe-edit-ingredient-view-tab {
+        min-width: 0;
+    }
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-view-panel[hidden],

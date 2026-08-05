@@ -1765,6 +1765,44 @@
                             <p>Add, edit, and organize recipe ingredients.</p>
                         </div>
                     </div>
+                    <div class="recipe-edit-ingredient-view-switcher-row">
+                        <div class="recipe-edit-ingredient-view-switcher"
+                             role="tablist"
+                             aria-label="Ingredient view"
+                             aria-orientation="horizontal"
+                             data-recipe-ingredient-view-switcher>
+                            <button type="button"
+                                    id="recipeEditIngredientViewTabRecipe"
+                                    class="recipe-edit-ingredient-view-tab"
+                                    role="tab"
+                                    aria-selected="false"
+                                    aria-controls="recipeEditIngredientViewRecipe"
+                                    tabindex="-1"
+                                    data-recipe-ingredient-view-tab="recipe">
+                                Recipe
+                            </button>
+                            <button type="button"
+                                    id="recipeEditIngredientViewTabSmart"
+                                    class="recipe-edit-ingredient-view-tab"
+                                    role="tab"
+                                    aria-selected="false"
+                                    aria-controls="recipeEditIngredientViewSmart"
+                                    tabindex="-1"
+                                    data-recipe-ingredient-view-tab="smart">
+                                Smart
+                            </button>
+                            <button type="button"
+                                    id="recipeEditIngredientViewTabTable"
+                                    class="recipe-edit-ingredient-view-tab is-active"
+                                    role="tab"
+                                    aria-selected="true"
+                                    aria-controls="recipeEditIngredientViewTable"
+                                    tabindex="0"
+                                    data-recipe-ingredient-view-tab="table">
+                                Table
+                            </button>
+                        </div>
+                    </div>
                     <div class="recipe-edit-section-actions recipe-edit-ingredient-actions ingredients-toolbar-actions">
                         <div class="recipe-edit-section-menu-wrap recipe-edit-ingredient-column-menu-wrap"
                              data-recipe-ingredient-table-action>
@@ -1915,44 +1953,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <div class="recipe-edit-ingredient-view-switcher-row">
-                    <div class="recipe-edit-ingredient-view-switcher"
-                         role="tablist"
-                         aria-label="Ingredient view"
-                         aria-orientation="horizontal"
-                         data-recipe-ingredient-view-switcher>
-                        <button type="button"
-                                id="recipeEditIngredientViewTabRecipe"
-                                class="recipe-edit-ingredient-view-tab"
-                                role="tab"
-                                aria-selected="false"
-                                aria-controls="recipeEditIngredientViewRecipe"
-                                tabindex="-1"
-                                data-recipe-ingredient-view-tab="recipe">
-                            Recipe
-                        </button>
-                        <button type="button"
-                                id="recipeEditIngredientViewTabSmart"
-                                class="recipe-edit-ingredient-view-tab"
-                                role="tab"
-                                aria-selected="false"
-                                aria-controls="recipeEditIngredientViewSmart"
-                                tabindex="-1"
-                                data-recipe-ingredient-view-tab="smart">
-                            Smart
-                        </button>
-                        <button type="button"
-                                id="recipeEditIngredientViewTabTable"
-                                class="recipe-edit-ingredient-view-tab is-active"
-                                role="tab"
-                                aria-selected="true"
-                                aria-controls="recipeEditIngredientViewTable"
-                                tabindex="0"
-                                data-recipe-ingredient-view-tab="table">
-                            Table
-                        </button>
                     </div>
                 </div>
                 <div id="recipeEditIngredientViewTable"

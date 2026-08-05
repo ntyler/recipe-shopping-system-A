@@ -5433,6 +5433,30 @@ def test_ingredients_toolbar_places_equal_height_columns_before_add():
     assert "height: 34px;" in shared_height
 
 
+def test_ingredient_view_switcher_is_centered_inside_the_ingredients_toolbar():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8",
+    )
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    panel_start = template.index('id="recipeEditPanelIngredients"')
+    panel_end = template.index('id="recipeEditPanelEquipment"', panel_start)
+    ingredient_section = template[panel_start:panel_end]
+    title_index = ingredient_section.index('id="recipeEditIngredientsTitle"')
+    switcher_index = ingredient_section.index('class="recipe-edit-ingredient-view-switcher-row"')
+    actions_index = ingredient_section.index(
+        'class="recipe-edit-section-actions recipe-edit-ingredient-actions ingredients-toolbar-actions"'
+    )
+    table_panel_index = ingredient_section.index('id="recipeEditIngredientViewTable"')
+
+    assert title_index < switcher_index < actions_index < table_panel_index
+    assert ingredient_section.count('class="recipe-edit-ingredient-view-switcher-row"') == 1
+    switcher_css = css[css.index("/* Ingredient editor v80:"):]
+    assert "flex: 1 1 auto;" in switcher_css
+    assert "@container recipe-editor-workspace (max-width: 760px)" in switcher_css
+    assert "flex-basis: 100%;" in switcher_css
+
+
 def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",
