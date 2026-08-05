@@ -100,6 +100,7 @@ def test_smart_cards_reuse_images_status_store_sections_and_structured_options()
     assert "recipeIngredientViewAmount(values)" in card
     assert "recipeIngredientRecipeViewStatus(sourceRow, values)" in card
     assert "status.hidden = !statusDetails;" in card
+    assert 'optionCount.textContent = choice.groups.length ? choice.summary.label : "";' in card
     assert "renderRecipeIngredientRecipeViewStore(" in card
 
     assert 'const defaultGroups = choiceGroups.filter(group => group.isDefaultOption);' in options
@@ -266,6 +267,8 @@ def test_smart_view_projects_the_selected_choice_components_as_main_cards():
         "recipeIngredientSmartViewEntries(row, values, alternativeGroups)",
         "layoutRecipeIngredientSmartView",
     )
+    assert "showChoiceControls: true" in projection
+    assert "showChoiceControls: componentIndex === 0" not in projection
     selected_rows = _function(
         script,
         "recipeIngredientSelectedOptionProjectionRows(selectedChoice)",
@@ -335,14 +338,14 @@ process.stdout.write(JSON.stringify({
                 "key": "ingredient-corn:selected-choice-component:1",
                 "source": "cumin",
                 "ingredient": "cumin",
-                "showChoiceControls": False,
+                "showChoiceControls": True,
                 "projected": True,
             },
             {
                 "key": "ingredient-corn:selected-choice-component:2",
                 "source": "onion",
                 "ingredient": "onion",
-                "showChoiceControls": False,
+                "showChoiceControls": True,
                 "projected": True,
             },
         ],
@@ -579,3 +582,102 @@ def test_smart_option_sets_select_through_shared_choice_state_and_support_keyboa
     assert "updateRecipeEditorDirtyState();" in shared_mutation
     assert "smartViewIngredients" not in select
     assert ".recipe-edit-ingredient-smart-option:focus-visible" in css
+
+
+def test_smart_choice_focus_moves_to_surviving_component_when_selection_shrinks():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the Smart View focus regression")
+
+    select = _function(
+        script,
+        "selectRecipeIngredientSmartViewOption(button, event = null)",
+        "navigateRecipeIngredientSmartViewOptions",
+    )
+    harness = """
+const row = { id: "corn-choice", isConnected: true, values: { ingredient: "corn" } };
+const oldOnionRow = { id: "fresh-onion", values: { ingredient: "onion" } };
+const frozenCornRow = { id: "frozen-corn", values: { ingredient: "corn" } };
+const frozenOnionRow = { id: "frozen-onion", values: { ingredient: "onion" } };
+let focusedCard = "";
+let expandedCard = "";
+let layoutCount = 0;
+let statusText = "";
+let recipeEditExpandedSmartViewIngredientId = "";
+function makeCard(key, sourceRow, expanded = false) {
+    const state = { expanded };
+    const option = {
+        dataset: { smartViewOptionId: "frozen" },
+        focus() { focusedCard = key; },
+    };
+    return {
+        dataset: { smartViewIngredientId: key },
+        recipeIngredientChoiceParentRow: row,
+        recipeIngredientSourceRow: sourceRow,
+        isConnected: true,
+        classList: {
+            contains(name) { return name === "is-expanded" && state.expanded; },
+        },
+        querySelectorAll() { return [option]; },
+        setExpanded(value) { state.expanded = value; },
+    };
+}
+const oldCard = makeCard("ingredient-corn:selected-choice-component:2", oldOnionRow, true);
+const frozenCornCard = makeCard("ingredient-corn", frozenCornRow);
+const frozenOnionCard = makeCard(
+    "ingredient-corn:selected-choice-component:1",
+    frozenOnionRow,
+);
+const grid = { children: [oldCard] };
+const button = {
+    dataset: { smartViewOptionId: "frozen" },
+    closest() { return oldCard; },
+};
+const document = {
+    querySelector(selector) {
+        return selector === "[data-recipe-ingredient-smart-grid]" ? grid : null;
+    },
+};
+const window = { requestAnimationFrame(callback) { callback(); } };
+function fieldValuesFromRow(sourceRow) { return sourceRow.values; }
+function recipeIngredientComparableText(value) { return String(value || "").trim().toLowerCase(); }
+function applyRecipeIngredientOptionSelection() {
+    oldCard.isConnected = false;
+    grid.children = [frozenCornCard, frozenOnionCard];
+    return true;
+}
+function syncRecipeIngredientSmartViewCardExpanded(card, expanded) {
+    card.setExpanded(expanded);
+    if (expanded) expandedCard = card.dataset.smartViewIngredientId;
+}
+function scheduleRecipeIngredientSmartViewLayout() { layoutCount += 1; }
+function setRecipeEditStatus(value) { statusText = value; }
+""" + select + """
+
+selectRecipeIngredientSmartViewOption(button);
+process.stdout.write(JSON.stringify({
+    focusedCard,
+    expandedCard,
+    expandedId: recipeEditExpandedSmartViewIngredientId,
+    layoutCount,
+    statusText,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "focusedCard": "ingredient-corn:selected-choice-component:1",
+        "expandedCard": "ingredient-corn:selected-choice-component:1",
+        "expandedId": "ingredient-corn:selected-choice-component:1",
+        "layoutCount": 1,
+        "statusText": "Ingredient option selected. Save Recipe to keep it.",
+    }

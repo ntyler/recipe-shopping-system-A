@@ -29835,7 +29835,7 @@ function recipeIngredientSmartViewEntries(row, values, alternativeGroups) {
         alternativeGroups: componentIndex === 0 ? alternativeGroups : [],
         choiceParentValues: values,
         choiceAlternativeGroups: alternativeGroups,
-        showChoiceControls: componentIndex === 0,
+        showChoiceControls: true,
         isProjectedChoiceComponent: true,
     }));
 }
@@ -29992,12 +29992,48 @@ function selectRecipeIngredientSmartViewOption(button, event = null) {
         || card?.recipeIngredientSourceRow;
     const optionId = String(button?.dataset.smartViewOptionId || "").trim();
     if (!card || !row || !row.isConnected || !optionId) return false;
+    const sourceIngredientKey = recipeIngredientComparableText(
+        fieldValuesFromRow(card.recipeIngredientSourceRow || row).ingredient,
+    );
+    const wasExpanded = card.classList.contains("is-expanded");
 
     if (!applyRecipeIngredientOptionSelection(row, optionId)) return false;
+    const grid = document.querySelector("[data-recipe-ingredient-smart-grid]");
+    const choiceCards = grid
+        ? [...grid.children].filter(candidate => (
+            candidate.recipeIngredientChoiceParentRow === row
+        ))
+        : [];
+    const focusCard = card.isConnected
+        ? card
+        : (
+            choiceCards.find(candidate => (
+                sourceIngredientKey
+                && recipeIngredientComparableText(
+                    fieldValuesFromRow(
+                        candidate.recipeIngredientSourceRow || row,
+                    ).ingredient,
+                ) === sourceIngredientKey
+            ))
+            || choiceCards[0]
+            || null
+        );
+    if (wasExpanded && focusCard) {
+        const openCard = choiceCards.find(candidate => (
+            candidate !== focusCard
+            && candidate.classList.contains("is-expanded")
+        ));
+        if (openCard) syncRecipeIngredientSmartViewCardExpanded(openCard, false);
+        recipeEditExpandedSmartViewIngredientId = String(
+            focusCard.dataset.smartViewIngredientId || "",
+        );
+        syncRecipeIngredientSmartViewCardExpanded(focusCard, true);
+        scheduleRecipeIngredientSmartViewLayout();
+    }
     setRecipeEditStatus("Ingredient option selected. Save Recipe to keep it.");
     window.requestAnimationFrame(() => {
-        if (!card.isConnected) return;
-        const selectedOption = [...card.querySelectorAll("[data-smart-view-option-id]")]
+        if (!focusCard?.isConnected) return;
+        const selectedOption = [...focusCard.querySelectorAll("[data-smart-view-option-id]")]
             .find(option => option.dataset.smartViewOptionId === optionId);
         selectedOption?.focus({ preventScroll: true });
     });
