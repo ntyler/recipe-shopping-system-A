@@ -1812,6 +1812,37 @@ def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     assert "@media (max-width: 767px)" in css
 
 
+def test_recipe_editor_is_readable_at_native_desktop_zoom():
+    css = read_text("PushShoppingList/static/css/app.css")
+    marker = "/* Recipe workspace v16: native-zoom readability and container-aware context rail. */"
+    readable = css[css.index(marker):]
+
+    assert "container: recipe-editor-workspace / inline-size;" in readable
+    assert "grid-template-columns: minmax(0, 1fr) minmax(300px, 320px);" in readable
+    assert "@container recipe-editor-workspace (max-width: 1450px)" in readable
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in readable
+    assert "@container recipe-editor-workspace (max-width: 900px)" in readable
+    assert "overflow-x: auto;" in readable
+    assert "@container recipe-editor-workspace (max-width: 760px)" in readable
+
+    desktop = readable[readable.index("@media (min-width: 768px)"):]
+    for declaration in (
+        "--recipe-edit-ingredient-name-font-size: 14px;",
+        "--recipe-edit-ingredient-detail-font-size: 12px;",
+        "--recipe-edit-ingredient-column-font-size: 13px;",
+        "--recipe-edit-ingredient-column-font-weight: 500;",
+        "min-height: 80px !important;",
+    ):
+        assert declaration in desktop
+
+    assert ".recipe-edit-ingredient-table-head > [role=\"columnheader\"]" in desktop
+    assert ".recipe-edit-document-row :is(strong, span)" in desktop
+    assert ".recipe-edit-confidence-body p" in desktop
+    assert ".recipe-edit-health-attention" in desktop
+    assert desktop.count("font-size: 12px;") >= 8
+    assert "font-size: 14px;" in desktop
+
+
 def test_recipe_editor_wide_workspace_preserves_exactly_two_content_columns():
     css = read_text("PushShoppingList/static/css/app.css")
 

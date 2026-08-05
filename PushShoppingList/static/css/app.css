@@ -73446,3 +73446,227 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row:not(.has-ingredient-choice) {
     border-bottom: 0 !important;
 }
+
+/* Recipe workspace v16: native-zoom readability and container-aware context rail. */
+body.recipe-edit-standalone-page .recipe-edit-standalone-shell {
+    container: recipe-editor-workspace / inline-size;
+}
+
+@media (min-width: 1100px) {
+    body.recipe-edit-standalone-page .recipe-edit-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 320px);
+        gap: 20px;
+    }
+}
+
+@container recipe-editor-workspace (max-width: 1450px) {
+    body.recipe-edit-standalone-page .recipe-edit-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-main-workspace {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-context-sidebar {
+        grid-column: 1;
+        grid-row: 2;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-context-sidebar > * {
+        min-width: 0;
+    }
+}
+
+@container recipe-editor-workspace (max-width: 900px) {
+    body.recipe-edit-standalone-page .recipe-edit-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-header-actions {
+        width: 100%;
+        max-width: 100%;
+        margin-inline-start: 0;
+        justify-content: flex-start;
+        padding-bottom: 2px;
+        overflow-x: auto;
+    }
+}
+
+@container recipe-editor-workspace (max-width: 760px) {
+    body.recipe-edit-standalone-page .recipe-edit-context-sidebar {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page .recipe-edit-breadcrumb {
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-header-actions :is(
+        .recipe-edit-preview-button,
+        .recipe-edit-header-pdf-button,
+        .recipe-edit-header-cancel,
+        .recipe-edit-header-save
+    ) {
+        height: 42px;
+        min-height: 42px;
+        padding-inline: 15px;
+        font-size: 13px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-header-menu-btn {
+        width: 42px;
+        min-width: 42px;
+        height: 42px;
+        min-height: 42px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-tab {
+        font-size: 14px;
+    }
+
+    body.recipe-edit-standalone-page .ingredients-toolbar .recipe-edit-section-title h3 {
+        font-size: 15px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredients-section :is(
+        .recipe-edit-add-ingredient-button,
+        .recipe-edit-ingredient-columns-button,
+        .recipe-edit-ingredient-utility-action
+    ) {
+        min-height: 40px;
+        height: 40px;
+        font-size: 13px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-view-tab {
+        min-height: 36px;
+        font-size: 13px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head {
+        min-height: 46px;
+        font-size: 11px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head > [role="columnheader"] {
+        font-size: 11px;
+        line-height: 1.25;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients {
+        --recipe-edit-ingredient-name-font-size: 14px;
+        --recipe-edit-ingredient-detail-font-size: 12px;
+        --recipe-edit-ingredient-column-font-size: 13px;
+        --recipe-edit-ingredient-column-font-weight: 500;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row {
+        min-height: 80px !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row
+        .recipe-edit-ingredient-inline-control {
+        height: 36px;
+        min-height: 36px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-inline-preparation {
+        height: 24px;
+        min-height: 24px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-read-buy-as {
+        font-size: 12px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-read-buy-as
+        > .recipe-edit-ingredient-inline-buy-as {
+        height: 18px !important;
+        min-height: 18px !important;
+        font-size: 12px !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        .recipe-edit-ingredient-read-optional:not([hidden]) {
+        font-size: 10px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-summary-identity :is(
+        .recipe-edit-tag-chip,
+        .recipe-edit-tag-add
+    ) {
+        font-size: 12px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-heading {
+        font-size: 11px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-metadata-strip
+        .recipe-edit-metadata-unit {
+        font-size: 11px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-source-files-summary {
+        font-size: 12px;
+    }
+
+    body.recipe-edit-standalone-page :is(
+        .recipe-edit-context-card-heading,
+        .recipe-edit-context-card > summary,
+        .recipe-edit-health-card > .recipe-edit-context-card-heading,
+        .recipe-edit-confidence-card > .recipe-edit-context-card-heading
+    ) {
+        min-height: 46px;
+        font-size: 14px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-confidence-card
+        .recipe-edit-context-card-heading strong {
+        font-size: 14px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-document-row :is(strong, span),
+    body.recipe-edit-standalone-page .recipe-edit-document-open,
+    body.recipe-edit-standalone-page .recipe-edit-restaurant-detail,
+    body.recipe-edit-standalone-page .recipe-edit-restaurant-actions a {
+        font-size: 12px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-health-attention {
+        font-size: 11px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-health-row,
+    body.recipe-edit-standalone-page .recipe-edit-confidence-body p,
+    body.recipe-edit-standalone-page .recipe-edit-gallery-toggle {
+        font-size: 12px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditAiAnalysisButton {
+        min-height: 40px;
+        font-size: 12px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-ai-assistant-heading p,
+    body.recipe-edit-standalone-page .recipe-edit-ai-missing-fields,
+    body.recipe-edit-standalone-page .recipe-edit-ai-missing-fields strong,
+    body.recipe-edit-standalone-page .recipe-edit-ai-assistant-card .recipe-edit-ai-secondary,
+    body.recipe-edit-standalone-page .recipe-edit-ai-assistant-card .recipe-edit-ai-advanced > summary {
+        font-size: 12px;
+    }
+}
