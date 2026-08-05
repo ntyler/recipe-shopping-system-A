@@ -693,7 +693,7 @@ def ensure_uploaded_recipe_nutrition_estimate(recipe_url):
     }
 
 
-def create_recipe_pdf_from_url(recipe_url):
+def create_recipe_pdf_from_url(recipe_url, *, overwrite_r2=False):
     recipe_url = str(recipe_url or "").strip()
 
     if not recipe_url:
@@ -722,7 +722,11 @@ def create_recipe_pdf_from_url(recipe_url):
             "success": False,
         }
 
-    result = create_editable_recipe_pdf(recipe_url)
+    result = (
+        create_editable_recipe_pdf(recipe_url, overwrite_r2=True)
+        if overwrite_r2
+        else create_editable_recipe_pdf(recipe_url)
+    )
     if result.get("ok"):
         try:
             loaded_recipe = load_editable_recipe(recipe_url) or {}

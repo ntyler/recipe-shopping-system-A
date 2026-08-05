@@ -25828,8 +25828,11 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
     const generatedCloudflareLink = document.getElementById("recipeEditGeneratedCloudflarePdfUrlLink");
     const pdfButton = document.getElementById("recipeEditPdfButton");
     const pdfMobileButton = document.getElementById("recipeEditPdfButtonMobile");
+    const headerPdfAction = document.getElementById("recipeEditHeaderOpenPdfAction");
     const sourcePdfButton = document.getElementById("recipeEditSourcePdfButton");
     const sourcePdfMobileButton = document.getElementById("recipeEditSourcePdfButtonMobile");
+    const headerSourcePdfAction = document.getElementById("recipeEditHeaderOpenSourcePdfAction");
+    const headerGeneratePdfAction = document.getElementById("recipeEditHeaderGeneratePdfAction");
     const pdfPanelButton = document.getElementById("recipeEditPdfButtonPanel");
     const pdfMenuButton = document.getElementById("recipeEditPdfMenuButton");
     const localPdfDownloadButton = document.getElementById("recipeEditLocalPdfDownloadButton");
@@ -25884,7 +25887,7 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
         updateInput: updateInputValues,
     });
 
-    [pdfButton, pdfMobileButton].forEach((button) => {
+    [pdfButton, pdfMobileButton, headerPdfAction].forEach((button) => {
         if (button) {
             button.hidden = !generatedOpenUrl;
             button.href = generatedOpenUrl || "#";
@@ -25900,7 +25903,7 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
         }
     });
 
-    [sourcePdfButton, sourcePdfMobileButton].forEach((button) => {
+    [sourcePdfButton, sourcePdfMobileButton, headerSourcePdfAction].forEach((button) => {
         if (button) {
             button.hidden = !sourceOpenUrl;
             button.href = sourceOpenUrl || "#";
@@ -25936,6 +25939,20 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
         button.title = requiresServingEstimate ? createPdfUnavailableReason : "Create recipe PDF";
         button.setAttribute("aria-label", requiresServingEstimate ? createPdfUnavailableReason : "Create recipe PDF");
     });
+    if (headerGeneratePdfAction) {
+        const actionLabel = hasGeneratedPdf ? "Regenerate recipe PDF" : "Generate recipe PDF";
+        const actionBusy = headerGeneratePdfAction.getAttribute("aria-busy") === "true";
+        headerGeneratePdfAction.hidden = false;
+        headerGeneratePdfAction.disabled = actionBusy || requiresServingEstimate;
+        if (!actionBusy) {
+            headerGeneratePdfAction.textContent = actionLabel;
+            headerGeneratePdfAction.title = requiresServingEstimate ? createPdfUnavailableReason : actionLabel;
+            headerGeneratePdfAction.setAttribute(
+                "aria-label",
+                requiresServingEstimate ? createPdfUnavailableReason : actionLabel
+            );
+        }
+    }
     syncRecipeEditDocumentRows();
 }
 
@@ -35105,18 +35122,8 @@ function cancelRecipeIngredientInlineEdit(button) {
 
 function organizeRecipeEditHeaderActions() {
     const actions = document.querySelector(".recipe-edit-header-actions");
-    const menuWrap = actions ? actions.querySelector(".recipe-edit-header-menu-wrap") : null;
-    const createPdf = document.getElementById("recipeEditCreatePdfButton");
     const menuOrder = document.getElementById("recipeEditMenuOrderButton");
     const headerMenu = actions ? actions.querySelector(".recipe-edit-header-image-menu") : null;
-    if (actions && createPdf && menuWrap) {
-        createPdf.classList.add("recipe-edit-header-pdf-button", "recipe-edit-header-create-pdf-button");
-        const pdfButton = document.getElementById("recipeEditPdfButton");
-        createPdf.innerHTML = pdfButton
-            ? pdfButton.innerHTML
-            : '<span>Recipe PDF</span>';
-        actions.insertBefore(createPdf, menuWrap);
-    }
     if (headerMenu && menuOrder) {
         const recipeSection = Array.from(headerMenu.querySelectorAll(".overflow-menu-section"))
             .find(section => /Recipe/i.test((section.querySelector(".overflow-menu-section-title") || {}).textContent || ""));
@@ -54527,6 +54534,10 @@ async function createRecipeEditorPdf(button) {
     let submittedSnapshot = "";
     let savedBaselineSnapshot = "";
     const previousSavedSnapshot = form ? recipeEditSavedFormSnapshots.get(form) || "" : "";
+    const existingPdfFields = currentRecipeEditorPdfFieldValues();
+    const regenerateExistingPdf = Boolean(
+        existingPdfFields.generated_pdf_path || existingPdfFields.generated_cloudflare_pdf_url
+    );
 
     if (!form) {
         setRecipeEditStatus("Unable to create the PDF because the recipe form is unavailable.", true);
@@ -54542,7 +54553,8 @@ async function createRecipeEditorPdf(button) {
 
     if (button) {
         button.disabled = true;
-        button.textContent = "Creating...";
+        button.setAttribute("aria-busy", "true");
+        button.textContent = regenerateExistingPdf ? "Regenerating..." : "Generating...";
     }
 
     try {
@@ -54613,7 +54625,9 @@ async function createRecipeEditorPdf(button) {
         }
 
         setRecipeEditStatus("Generating PDF...");
-        const pdfData = await createRecipePdfForSource(sourceUrl);
+        const pdfData = await createRecipePdfForSource(sourceUrl, {
+            overwriteR2: regenerateExistingPdf,
+        });
         finalPdfData = pdfData;
 
         if (!pdfData.pdf_public_url) {
@@ -54680,7 +54694,13 @@ async function createRecipeEditorPdf(button) {
         setRecipeEditorSavingState(currentForm, false);
         if (button && button.isConnected) {
             button.disabled = false;
-            if (originalHtml) {
+            button.removeAttribute("aria-busy");
+            if (button.hasAttribute("data-recipe-editor-pdf-generate-action")) {
+                const fields = currentRecipeEditorPdfFieldValues();
+                button.textContent = fields.generated_pdf_path || fields.generated_cloudflare_pdf_url
+                    ? "Regenerate recipe PDF"
+                    : "Generate recipe PDF";
+            } else if (originalHtml) {
                 button.innerHTML = originalHtml;
             } else {
                 button.textContent = "Create recipe PDF";
@@ -54691,8 +54711,8 @@ async function createRecipeEditorPdf(button) {
     return false;
 }
 
-async function createRecipePdfForSource(sourceUrl) {
-    return createRecipePdfFromSavedRecipe(sourceUrl);
+async function createRecipePdfForSource(sourceUrl, options = {}) {
+    return createRecipePdfFromSavedRecipe(sourceUrl, options);
 }
 
 function recipePdfDataCloudflareUrl(data = {}) {
@@ -54777,10 +54797,11 @@ async function createRecipePdfFromSourceUrl(sourceUrl) {
     return pdfData;
 }
 
-async function createRecipePdfFromSavedRecipe(sourceUrl) {
+async function createRecipePdfFromSavedRecipe(sourceUrl, options = {}) {
     const startData = await startBackgroundJob("/api/jobs/create-recipe-pdf", {
         payload: {
             url: sourceUrl,
+            overwrite_r2: options.overwriteR2 === true,
         },
     });
     const finishedJob = await waitForJobCompletion(startData.job_id, {

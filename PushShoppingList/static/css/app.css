@@ -52671,11 +52671,11 @@ body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredien
 body.recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > .recipe-ingredient-image-panel {
     grid-column: 2 !important;
     align-self: center;
-    width: 48px !important;
-    min-width: 48px !important;
-    max-width: 48px !important;
-    height: 48px !important;
-    min-height: 48px !important;
+    width: var(--recipe-edit-thumbnail-size, 64px) !important;
+    min-width: var(--recipe-edit-thumbnail-size, 64px) !important;
+    max-width: var(--recipe-edit-thumbnail-size, 64px) !important;
+    height: var(--recipe-edit-thumbnail-size, 64px) !important;
+    min-height: var(--recipe-edit-thumbnail-size, 64px) !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden;
@@ -69713,7 +69713,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     body.recipe-edit-standalone-page .recipe-edit-ingredient-table-scroll {
         --recipe-edit-ingredient-grid:
             28px
-            42px
+            var(--recipe-edit-thumbnail-slot, 66px)
             minmax(130px, 2.4fr)
             minmax(62px, .8fr)
             minmax(52px, .6fr)
@@ -69730,7 +69730,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         body.recipe-edit-standalone-page #recipeEditIngredients {
             --recipe-edit-ingredient-grid:
                 28px
-                48px
+                var(--recipe-edit-thumbnail-slot, 66px)
                 minmax(110px, 1fr)
                 52px
                 56px

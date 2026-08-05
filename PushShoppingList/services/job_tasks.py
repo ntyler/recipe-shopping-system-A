@@ -4854,7 +4854,11 @@ def run_create_recipe_pdf_job(job_id, payload):
 
     update_job_progress(job_id, current_step="Generating recipe PDF", total_items=1, progress_percent=20)
     with workspace_write_lock("recipe-pdfs"):
-        result = create_recipe_pdf_from_url(recipe_url)
+        result = (
+            create_recipe_pdf_from_url(recipe_url, overwrite_r2=True)
+            if payload.get("overwrite_r2") is True
+            else create_recipe_pdf_from_url(recipe_url)
+        )
     if not result.get("ok"):
         return fail_job(job_id, result.get("error") or "Unable to create recipe PDF.", result_payload=result)
 

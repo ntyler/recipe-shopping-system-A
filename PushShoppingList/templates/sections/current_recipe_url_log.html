@@ -703,26 +703,52 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="overflow-menu-section">
-                                <div class="overflow-menu-section-title">Show or Hide Images</div>
-                                <button type="button"
-                                        class="recipe-view-behavior-toggle"
-                                        data-view-behavior-input="showImagesByDefaultToggle"
-                                        aria-pressed="true"
-                                        onclick="return toggleViewBehaviorMenuSetting(this)">
-                                    Show all recipe images by default
-                                </button>
-                                <button type="button"
-                                        onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'all' })">
-                                    Show all recipe images
-                                </button>
-                                <button type="button"
-                                        onclick="return setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'all' })">
-                                    Hide all recipe images
-                                </button>
+                            <div class="overflow-menu-section" data-recipe-header-documents-menu>
+                                <div class="overflow-menu-section-title">Recipe Documents</div>
+                                <div class="recipe-view-generate-submenu-row">
+                                    <button type="button"
+                                            class="recipe-view-generate-submenu-toggle"
+                                            aria-haspopup="menu"
+                                            aria-expanded="false"
+                                            onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                                        PDF &amp; source documents...
+                                    </button>
+                                    <div class="overflow-submenu recipe-view-generate-submenu" hidden>
+                                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe documents</div>
+                                        <button type="button"
+                                                id="recipeEditHeaderGeneratePdfAction"
+                                                data-recipe-editor-pdf-generate-action
+                                                onclick="return createRecipeEditorPdf(this)">
+                                            Generate recipe PDF
+                                        </button>
+                                        <a id="recipeEditHeaderOpenPdfAction"
+                                           class="recipe-edit-menu-link"
+                                           href="#"
+                                           target="_blank"
+                                           rel="noopener noreferrer"
+                                           onclick="return openRecipeEditorPdf(this, event)"
+                                           hidden>
+                                            Open recipe PDF
+                                        </a>
+                                        <a id="recipeEditHeaderOpenSourcePdfAction"
+                                           class="recipe-edit-menu-link"
+                                           href="#"
+                                           target="_blank"
+                                           rel="noopener noreferrer"
+                                           onclick="return openRecipeEditorPdf(this, event)"
+                                           hidden>
+                                            Open source PDF
+                                        </a>
+                                        <button type="button"
+                                                data-recipe-editor-source-documents-action
+                                                onclick="closeRecipeEditRowMenus(); return editRecipeSourceDocuments(this, event)">
+                                            Manage Source &amp; Documents...
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="overflow-menu-section recipe-edit-thumbnail-size-section">
-                                <div class="overflow-menu-section-title">Thumbnail Size</div>
+                                <div class="overflow-menu-section-title">Ingredient &amp; Equipment Thumbnails</div>
                                 <div class="recipe-edit-thumbnail-size-controls" data-recipe-thumbnail-size-controls>
                                     <button type="button"
                                             class="recipe-edit-thumbnail-size-button"

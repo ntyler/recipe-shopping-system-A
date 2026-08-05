@@ -1,5 +1,6 @@
 import json
 import threading
+from contextlib import nullcontext
 from datetime import timedelta
 from pathlib import Path
 
@@ -403,6 +404,64 @@ def test_pdf_cleanup_marks_completed_job_result_without_reordering_history(
     assert updated["result_payload"]["pdf_deleted_with_recipe"] is True
     assert updated["result_payload"]["links"][0]["pdf_result_status"] == "deleted_with_recipe"
     assert updated["result_payload"]["links"][0]["pdf_deleted_with_recipe"] is True
+
+
+@pytest.mark.parametrize(
+    ("payload_extra", "expected_kwargs"),
+    [
+        ({"overwrite_r2": True}, {"overwrite_r2": True}),
+        ({}, {}),
+    ],
+)
+def test_create_recipe_pdf_job_forwards_explicit_overwrite_and_preserves_default(
+    monkeypatch,
+    tmp_path,
+    payload_extra,
+    expected_kwargs,
+):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://example.com/corn-spoon-bread"
+    payload = {"url": recipe_url, **payload_extra}
+    job = job_service.create_job(
+        "create-recipe-pdf",
+        input_payload=payload,
+        user_id="owner",
+        total_items=1,
+    )
+    calls = []
+
+    def fake_create_recipe_pdf_from_url(url, **kwargs):
+        calls.append((url, kwargs))
+        return {
+            "ok": True,
+            "generated_cloudflare_pdf_url": "https://cdn.example.com/corn-spoon-bread.pdf",
+        }
+
+    monkeypatch.setattr(recipe_routes, "create_recipe_pdf_from_url", fake_create_recipe_pdf_from_url)
+    monkeypatch.setattr(job_tasks, "workspace_write_lock", lambda _name: nullcontext())
+
+    finished = job_tasks.run_create_recipe_pdf_job(job["id"], payload)
+
+    assert finished["status"] == "completed"
+    assert finished["result_payload"]["ok"] is True
+    assert calls == [(recipe_url, expected_kwargs)]
+
+
+def test_create_recipe_pdf_helper_forwards_explicit_r2_overwrite(monkeypatch):
+    recipe_url = "https://example.com/corn-spoon-bread"
+    calls = []
+
+    def fake_create_editable_recipe_pdf(url, **kwargs):
+        calls.append((url, kwargs))
+        return {"ok": True}
+
+    monkeypatch.setattr(recipe_routes, "create_editable_recipe_pdf", fake_create_editable_recipe_pdf)
+    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda _url: {})
+
+    result = recipe_routes.create_recipe_pdf_from_url(recipe_url, overwrite_r2=True)
+
+    assert result["ok"] is True
+    assert calls == [(recipe_url, {"overwrite_r2": True})]
 
 
 def test_job_for_client_includes_duration_details():

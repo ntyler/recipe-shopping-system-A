@@ -86,6 +86,29 @@ def test_ingredients_header_has_image_overflow_menu():
     assert "editFoodReviewManually" in script
 
 
+def test_recipe_editor_header_omits_global_image_visibility_but_keeps_section_controls():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8",
+    )
+    menu_start = template.index("recipe-edit-header-image-menu")
+    menu_end = template.index(
+        '<button type="button" class="recipe-edit-cancel recipe-edit-header-cancel"',
+        menu_start,
+    )
+    header_menu = template[menu_start:menu_end]
+
+    assert "Show or Hide Images" not in header_menu
+    assert "Show all recipe images by default" not in header_menu
+    assert "Show all recipe images" not in header_menu
+    assert "Hide all recipe images" not in header_menu
+    assert "setRecipeEditorImagesVisibleFromMenu" not in header_menu
+
+    assert "setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'equipment' })" in template
+    assert "setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'equipment' })" in template
+    assert "setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'instructions' })" in template
+    assert "setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'instructions' })" in template
+
+
 def test_recipe_editor_ingredient_alternatives_are_wired_without_changing_collection_shape():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -374,6 +397,28 @@ def test_recipe_editor_thumbnail_size_controls_are_wired():
     assert "--recipe-edit-thumbnail-slot: 66px;" in css
     assert "var(--recipe-edit-thumbnail-size, 64px)" in css
     assert "var(--recipe-edit-thumbnail-slot, 66px)" in css
+
+
+def test_active_standalone_desktop_ingredient_thumbnails_use_size_variables():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    v10_start = css.index("/* Ingredient editor v10:")
+    panel_selector = (
+        "body.recipe-edit-standalone-page #recipeEditIngredients > "
+        ".recipe-edit-ingredient-row > .recipe-ingredient-image-panel {"
+    )
+    panel_start = css.index(panel_selector, v10_start)
+    panel_end = css.index("\n}", panel_start)
+    panel_rule = css[panel_start:panel_end]
+
+    for property_name in ("width", "min-width", "max-width", "height", "min-height"):
+        assert f"{property_name}: var(--recipe-edit-thumbnail-size" in panel_rule
+    assert "48px" not in panel_rule
+
+    v75_start = css.index("/* Ingredient editor v75:")
+    v75_end = css.index("/* Ingredient editor v76:", v75_start)
+    desktop_grid_rules = css[v75_start:v75_end]
+    assert desktop_grid_rules.count("var(--recipe-edit-thumbnail-slot, 66px)") == 2
 
 
 def test_recipe_editor_row_image_tools_toggle_is_wired():

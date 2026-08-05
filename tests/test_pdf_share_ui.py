@@ -160,6 +160,41 @@ def test_recipe_editor_header_orders_menu_icon_after_source_pdf():
     assert header_actions.index('id="recipeEditSourcePdfButton"') < header_actions.index('id="recipeEditMenuOrderButton"')
 
 
+def test_recipe_editor_header_overflow_has_persistent_recipe_documents_actions():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    js = read_text("PushShoppingList/static/js/app.js")
+    menu_start = template.index("data-recipe-header-documents-menu")
+    menu_end = template.index(
+        '<div class="overflow-menu-section recipe-edit-thumbnail-size-section">',
+        menu_start,
+    )
+    documents_menu = template[menu_start:menu_end]
+
+    assert "Recipe Documents" in documents_menu
+    assert "recipe-view-generate-submenu-toggle" in documents_menu
+    assert "toggleRecipeViewGenerateSubmenu(this, event)" in documents_menu
+    assert "overflow-submenu recipe-view-generate-submenu" in documents_menu
+
+    generate_marker = "data-recipe-editor-pdf-generate-action"
+    generate_marker_index = documents_menu.index(generate_marker)
+    generate_tag_start = documents_menu.rfind("<button", 0, generate_marker_index)
+    generate_tag_end = documents_menu.index(">", generate_marker_index)
+    generate_tag = documents_menu[generate_tag_start:generate_tag_end]
+    assert "hidden" not in generate_tag
+    assert "createRecipeEditorPdf(this)" in documents_menu
+    assert "Generate recipe PDF" in documents_menu
+
+    assert "data-recipe-editor-source-documents-action" in documents_menu
+    assert "Manage Source &amp; Documents" in documents_menu
+    assert "editRecipeSourceDocuments(this, event)" in documents_menu
+
+    controls_start = js.index("function updateRecipeEditorPdfControls")
+    controls_end = js.index("function syncRecipeEditSourceFilesDetails", controls_start)
+    controls = js[controls_start:controls_end]
+    assert "headerGeneratePdfAction.hidden = false;" in controls
+    assert 'hasGeneratedPdf ? "Regenerate recipe PDF" : "Generate recipe PDF"' in controls
+
+
 def test_recipe_overflow_menus_include_source_pdf_near_recipe_pdf():
     current_recipe_template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     cookbook_template = read_text("PushShoppingList/templates/sections/cookbooks.html")
