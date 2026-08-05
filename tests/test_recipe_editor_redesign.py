@@ -1037,7 +1037,7 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     css = read_text("PushShoppingList/static/css/app.css")
 
     tab_list_start = template.index('<div class="recipe-edit-tab-list"')
-    tab_list_end = template.index('<div class="recipe-edit-ingredient-view-switcher"', tab_list_start)
+    tab_list_end = template.index("</div>", tab_list_start)
     tab_list = template[tab_list_start:tab_list_end]
     expected_tabs = ["ingredients", "instructions", "equipment", "nutrition", "notes"]
 
@@ -1047,6 +1047,7 @@ def test_recipe_editor_keeps_five_tabs_and_table_overflow_inside_the_workspace()
     )
     assert tab_list.count('aria-selected="true"') == 1
     assert 'data-recipe-edit-tab="ingredients"' in tab_list[:tab_list.index('aria-selected="false"')]
+    assert "recipe-edit-ingredient-view-switcher" not in template
 
     v4_css = css[css.index("/* Recipe workspace v4: homepage alignment and compact tab editors. */"):]
     tab_rule_start = v4_css.index(".recipe-edit-standalone-page .recipe-edit-tab-list {")

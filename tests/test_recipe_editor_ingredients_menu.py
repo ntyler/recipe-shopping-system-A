@@ -5408,18 +5408,22 @@ def test_mobile_ingredient_quantity_formatter_uses_plain_slash_fractions_and_kee
     assert '.replace(new RegExp(`(\\\\d)\\\\s*${character}`, "g"), `$1 ${replacement}`)' in normalizer
 
 
-def test_ingredients_toolbar_places_equal_height_columns_before_add():
+def test_ingredients_toolbar_places_equal_height_columns_view_add_and_overflow_in_order():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",
     )
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
-    actions_start = template.index("recipe-edit-ingredient-actions ingredients-toolbar-actions")
-    actions_end = template.index("recipe-edit-ingredients-menu-wrap", actions_start)
-    toolbar_actions = template[actions_start:actions_end]
-    assert toolbar_actions.index("recipe-edit-ingredient-column-menu-wrap") < toolbar_actions.index(
-        "recipe-edit-add-ingredient-button"
-    )
+    soup = BeautifulSoup(template, "html.parser")
+    toolbar = soup.select_one("#recipeEditPanelIngredients > .ingredients-toolbar")
+    actions = toolbar.select_one(":scope > .ingredients-toolbar-actions")
+    children = [child for child in actions.children if getattr(child, "name", None)]
+    columns = actions.select_one(":scope > .recipe-edit-ingredient-column-menu-wrap")
+    view = actions.select_one(":scope > .recipe-edit-ingredient-view-menu-wrap")
+    add = actions.select_one(":scope > .recipe-edit-add-ingredient-button")
+    overflow = actions.select_one(":scope > .recipe-edit-ingredients-menu-wrap")
+
+    assert children[:4] == [columns, view, add, overflow]
 
     desktop_start = css.index("@media (min-width: 768px)")
     desktop_css = css[desktop_start:]
@@ -5430,11 +5434,12 @@ def test_ingredients_toolbar_places_equal_height_columns_before_add():
     shared_height = desktop_css[shared_height_start:shared_height_end]
     assert ".recipe-edit-add-ingredient-button," in shared_height
     assert ".recipe-edit-ingredient-columns-button" in shared_height
+    assert ".recipe-edit-ingredient-view-button" in shared_height
     assert "min-height: 34px;" in shared_height
     assert "height: 34px;" in shared_height
 
 
-def test_ingredient_view_switcher_is_right_aligned_beside_the_section_tabs():
+def test_ingredient_view_menu_replaces_upper_switcher_and_stays_inside_ingredients_toolbar():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",
     )
@@ -5445,25 +5450,39 @@ def test_ingredient_view_switcher_is_right_aligned_beside_the_section_tabs():
     tab_bar = soup.select_one(".recipe-edit-tab-bar")
     assert tab_bar is not None
     section_tablist = tab_bar.select_one(".recipe-edit-tab-list")
-    ingredient_view_tablist = tab_bar.select_one(".recipe-edit-ingredient-view-switcher")
     ingredient_toolbar = soup.select_one("#recipeEditPanelIngredients > .ingredients-toolbar")
+    ingredient_view_trigger = ingredient_toolbar.select_one("[data-recipe-ingredient-view-trigger]")
+    ingredient_view_menu = ingredient_toolbar.select_one("[data-recipe-ingredient-view-menu]")
 
     assert section_tablist is not None
-    assert ingredient_view_tablist is not None
     assert ingredient_toolbar is not None
     assert section_tablist.parent is tab_bar
-    assert ingredient_view_tablist.parent is tab_bar
     assert section_tablist.get("role") == "tablist"
-    assert ingredient_view_tablist.get("role") == "tablist"
-    assert ingredient_view_tablist.get("aria-label") == "Ingredient view"
-    assert ingredient_toolbar.select_one("[data-recipe-ingredient-view-switcher]") is None
+    assert [tab.get_text(strip=True) for tab in section_tablist.select('[role="tab"]')] == [
+        "Ingredients",
+        "Instructions",
+        "Equipment",
+        "Nutrition",
+        "Notes",
+    ]
+    assert tab_bar.select_one(".recipe-edit-ingredient-view-switcher") is None
+    assert ingredient_view_trigger is not None
+    assert ingredient_view_trigger.get("aria-haspopup") == "menu"
+    assert ingredient_view_trigger.get("aria-expanded") == "false"
+    assert ingredient_view_menu.get("role") == "menu"
+    assert ingredient_view_menu.get("aria-label") == "Ingredient view"
+    options = ingredient_view_menu.select('[role="menuitemradio"]')
+    assert [option.get_text(strip=True).replace("✓", "") for option in options] == [
+        "Recipe",
+        "Smart",
+        "Table",
+    ]
+    assert [option.get("aria-checked") for option in options] == ["false", "false", "true"]
 
     tab_bar_start = template.index('class="recipe-edit-tab-bar"')
     tab_list_start = template.index('class="recipe-edit-tab-list"', tab_bar_start)
     tab_list_end = template.index("</div>", tab_list_start)
-    switcher_index = template.index('class="recipe-edit-ingredient-view-switcher"', tab_list_end)
-    switcher_end = template.index("</div>", switcher_index)
-    panels_index = template.index('class="recipe-edit-tab-panels"', switcher_end)
+    panels_index = template.index('class="recipe-edit-tab-panels"', tab_list_end)
     panel_start = template.index('id="recipeEditPanelIngredients"')
     panel_end = template.index('id="recipeEditPanelEquipment"', panel_start)
     ingredient_section = template[panel_start:panel_end]
@@ -5473,32 +5492,31 @@ def test_ingredient_view_switcher_is_right_aligned_beside_the_section_tabs():
     )
     table_panel_index = ingredient_section.index('id="recipeEditIngredientViewTable"')
 
-    assert tab_bar_start < tab_list_start < tab_list_end < switcher_index < switcher_end < panels_index
-    assert template.count('class="recipe-edit-ingredient-view-switcher"') == 1
-    assert 'data-recipe-ingredient-view-switcher' not in ingredient_section
+    assert tab_bar_start < tab_list_start < tab_list_end < panels_index
+    assert "recipe-edit-ingredient-view-switcher" not in template
     assert title_index < actions_index < table_panel_index
     toolbar = ingredient_section[:table_panel_index]
     assert toolbar.index('id="recipeEditIngredientsTitle"') < toolbar.index(
         "recipe-edit-ingredient-column-menu-wrap"
     )
     assert toolbar.index("recipe-edit-ingredient-column-menu-wrap") < toolbar.index(
+        "recipe-edit-ingredient-view-menu-wrap"
+    )
+    assert toolbar.index("recipe-edit-ingredient-view-menu-wrap") < toolbar.index(
         "recipe-edit-add-ingredient-button"
     )
     assert toolbar.index("recipe-edit-add-ingredient-button") < toolbar.index(
         "recipe-edit-ingredients-menu-wrap"
     )
-    switcher_css = css[css.index("/* Ingredient editor v80:"):]
-    assert "grid-template-columns: minmax(0, 1fr) auto;" in switcher_css
-    assert "height: 32px;" in switcher_css
-    assert "margin-inline-start: auto;" in switcher_css
-    assert "@container recipe-editor-workspace (max-width: 760px)" in switcher_css
-    assert "grid-template-columns: minmax(0, 1fr);" in switcher_css
-    assert "grid-row: 2;" in switcher_css
-    assert ".recipe-edit-ingredient-view-switcher[hidden]" in switcher_css
-    assert 'ingredientViewSwitcher.hidden = activeKey !== "ingredients";' in script
+    menu_css = css[css.index("/* Ingredient editor v80:"):]
+    assert ".recipe-edit-ingredient-view-menu > [role=\"menuitemradio\"]" in menu_css
+    assert '[role="menuitemradio"]:focus-visible' in menu_css
+    assert '[role="menuitemradio"][aria-checked="true"]' in menu_css
+    assert ".recipe-edit-ingredient-view-switcher" not in menu_css
+    assert 'tabsRoot.querySelector("[data-recipe-ingredient-view-switcher]")' not in script
 
 
-def test_recipe_editor_tab_switchers_keep_separate_keyboard_and_visibility_behavior():
+def test_recipe_editor_section_tabs_and_view_menu_keep_keyboard_focus_and_visibility_behavior():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for the recipe editor tab regression harness.")
@@ -5506,8 +5524,8 @@ def test_recipe_editor_tab_switchers_keep_separate_keyboard_and_visibility_behav
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     section_tabs_start = script.index("function recipeEditTabKey(value)")
     section_tabs_end = script.index("function initRecipeEditTabs()", section_tabs_start)
-    ingredient_keys_start = script.index("function handleRecipeEditIngredientViewKeydown(event)")
-    ingredient_keys_end = script.index("function initRecipeEditIngredientViews()", ingredient_keys_start)
+    ingredient_menu_start = script.index("function recipeEditIngredientViewMenuItems(menu)")
+    ingredient_menu_end = script.index("function initRecipeEditIngredientViews()", ingredient_menu_start)
     harness = """
 function makeClassList() {
     const values = new Set();
@@ -5535,18 +5553,21 @@ const sectionPanels = sectionTabs.map(tab => ({
     dataset: { recipeEditTabPanel: tab.dataset.recipeEditTab },
     hidden: false,
 }));
-const ingredientSwitcher = { hidden: false };
 const tabsRoot = {
     querySelectorAll(selector) {
         if (selector === "[data-recipe-edit-tab]") return sectionTabs;
         if (selector === "[data-recipe-edit-tab-panel]") return sectionPanels;
         return [];
     },
+};
+let viewTrigger = null;
+const document = {
     querySelector(selector) {
-        return selector === "[data-recipe-ingredient-view-switcher]" ? ingredientSwitcher : null;
+        if (selector === "[data-recipe-edit-tabs]") return tabsRoot;
+        if (selector === "[data-recipe-ingredient-view-trigger]") return viewTrigger;
+        return null;
     },
 };
-const document = { querySelector() { return tabsRoot; } };
 function clearRecipeIngredientScrollReserve() {}
 function appMainScrollRegion() { return null; }
 function updateRecipeEditStickyOffsets() {}
@@ -5554,45 +5575,139 @@ function updateRecipeEditStickyOffsets() {}
 
 setRecipeEditActiveTab("instructions", { focus: true });
 const instructionsState = {
-    switcherHidden: ingredientSwitcher.hidden,
+    viewVisible: !sectionPanels[0].hidden,
     selected: sectionTabs.filter(tab => tab.attributes["aria-selected"] === "true").map(tab => tab.dataset.recipeEditTab),
     visiblePanels: sectionPanels.filter(panel => !panel.hidden).map(panel => panel.dataset.recipeEditTabPanel),
     focused: sectionTabs.filter(tab => tab.focused).map(tab => tab.dataset.recipeEditTab),
 };
 setRecipeEditActiveTab("ingredients");
 const ingredientsState = {
-    switcherHidden: ingredientSwitcher.hidden,
+    viewVisible: !sectionPanels[0].hidden,
     selected: sectionTabs.filter(tab => tab.attributes["aria-selected"] === "true").map(tab => tab.dataset.recipeEditTab),
     visiblePanels: sectionPanels.filter(panel => !panel.hidden).map(panel => panel.dataset.recipeEditTabPanel),
 };
 
-const ingredientViewCalls = [];
-function setRecipeEditIngredientView(view, options) {
-    ingredientViewCalls.push({ view, focus: options.focus });
+function makeViewItem(view, checked = false) {
+    return {
+        dataset: { recipeIngredientViewOption: view },
+        attributes: { "aria-checked": checked ? "true" : "false" },
+        focused: false,
+        getAttribute(name) { return this.attributes[name]; },
+        setAttribute(name, value) { this.attributes[name] = value; },
+        closest(selector) {
+            return selector === "[data-recipe-ingredient-view-menu]" ? ingredientMenu : null;
+        },
+        focus() {
+            ingredientItems.forEach(item => { item.focused = false; });
+            this.focused = true;
+        },
+    };
 }
-const ingredientTabs = ["recipe", "smart", "table"].map(view => ({
-    dataset: { recipeIngredientViewTab: view },
-    closest() { return ingredientTablist; },
-}));
-const ingredientTablist = {
-    querySelectorAll() { return ingredientTabs; },
+const ingredientItems = [
+    makeViewItem("recipe"),
+    makeViewItem("smart"),
+    makeViewItem("table", true),
+];
+const viewWrap = {
+    querySelector(selector) {
+        return selector === "[data-recipe-ingredient-view-menu]" ? ingredientMenu : null;
+    },
 };
-""" + script[ingredient_keys_start:ingredient_keys_end] + """
-let prevented = false;
-handleRecipeEditIngredientViewKeydown({
-    currentTarget: ingredientTabs[1],
-    key: "ArrowRight",
-    altKey: false,
-    ctrlKey: false,
-    metaKey: false,
-    preventDefault() { prevented = true; },
-});
+viewTrigger = {
+    attributes: { "aria-expanded": "false" },
+    focused: false,
+    closest(selector) { return selector === ".recipe-edit-ingredient-view-menu-wrap" ? viewWrap : null; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    focus() { this.focused = true; },
+};
+const ingredientMenu = {
+    hidden: true,
+    dataset: {},
+    recipeEditAnchorButton: viewTrigger,
+    querySelectorAll(selector) {
+        return selector === "[data-recipe-ingredient-view-option]" ? ingredientItems : [];
+    },
+};
+const ingredientViewCalls = [];
+function toggleRecipeEditSectionMenu(button, event) {
+    ingredientMenu.hidden = !ingredientMenu.hidden;
+    button.setAttribute("aria-expanded", String(!ingredientMenu.hidden));
+}
+function closeRecipeEditRowMenus() {
+    ingredientMenu.hidden = true;
+    viewTrigger.setAttribute("aria-expanded", "false");
+}
+function setRecipeEditIngredientView(view) {
+    ingredientViewCalls.push(view);
+    ingredientItems.forEach(item => item.setAttribute(
+        "aria-checked",
+        String(item.dataset.recipeIngredientViewOption === view),
+    ));
+}
+""" + script[ingredient_menu_start:ingredient_menu_end] + """
+
+function keyEvent(currentTarget, key) {
+    return {
+        currentTarget,
+        key,
+        altKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        prevented: false,
+        stopped: false,
+        preventDefault() { this.prevented = true; },
+        stopPropagation() { this.stopped = true; },
+    };
+}
+
+const enterOpen = keyEvent(viewTrigger, "Enter");
+handleRecipeEditIngredientViewButtonKeydown(enterOpen);
+const enterState = {
+    open: !ingredientMenu.hidden,
+    expanded: viewTrigger.attributes["aria-expanded"],
+    focused: ingredientItems.filter(item => item.focused).map(item => item.dataset.recipeIngredientViewOption),
+    prevented: enterOpen.prevented,
+};
+closeRecipeEditRowMenus();
+const spaceOpen = keyEvent(viewTrigger, " ");
+handleRecipeEditIngredientViewButtonKeydown(spaceOpen);
+const spaceState = { open: !ingredientMenu.hidden, prevented: spaceOpen.prevented };
+const down = keyEvent(ingredientItems[2], "ArrowDown");
+handleRecipeEditIngredientViewMenuKeydown(down);
+const afterDown = ingredientItems.find(item => item.focused).dataset.recipeIngredientViewOption;
+const up = keyEvent(ingredientItems[0], "ArrowUp");
+handleRecipeEditIngredientViewMenuKeydown(up);
+const afterUp = ingredientItems.find(item => item.focused).dataset.recipeIngredientViewOption;
+viewTrigger.focused = false;
+const escape = keyEvent(ingredientItems[2], "Escape");
+handleRecipeEditIngredientViewMenuKeydown(escape);
+const escapeState = {
+    open: !ingredientMenu.hidden,
+    triggerFocused: viewTrigger.focused,
+    prevented: escape.prevented,
+    stopped: escape.stopped,
+};
+ingredientMenu.hidden = false;
+viewTrigger.focused = false;
+const chooseSmart = keyEvent(ingredientItems[1], "Enter");
+handleRecipeEditIngredientViewMenuKeydown(chooseSmart);
+const chooseState = {
+    calls: ingredientViewCalls,
+    checked: ingredientItems.filter(item => item.attributes["aria-checked"] === "true")
+        .map(item => item.dataset.recipeIngredientViewOption),
+    open: !ingredientMenu.hidden,
+    triggerFocused: viewTrigger.focused,
+};
 
 process.stdout.write(JSON.stringify({
     instructionsState,
     ingredientsState,
-    ingredientViewCalls,
-    prevented,
+    enterState,
+    spaceState,
+    afterDown,
+    afterUp,
+    escapeState,
+    chooseState,
 }));
 """
     completed = subprocess.run(
@@ -5607,21 +5722,40 @@ process.stdout.write(JSON.stringify({
     assert completed.returncode == 0, completed.stderr
     result = json.loads(completed.stdout)
     assert result["instructionsState"] == {
-        "switcherHidden": True,
+        "viewVisible": False,
         "selected": ["instructions"],
         "visiblePanels": ["instructions"],
         "focused": ["instructions"],
     }
     assert result["ingredientsState"] == {
-        "switcherHidden": False,
+        "viewVisible": True,
         "selected": ["ingredients"],
         "visiblePanels": ["ingredients"],
     }
-    assert result["ingredientViewCalls"] == [{"view": "table", "focus": True}]
-    assert result["prevented"] is True
+    assert result["enterState"] == {
+        "open": True,
+        "expanded": "true",
+        "focused": ["table"],
+        "prevented": True,
+    }
+    assert result["spaceState"] == {"open": True, "prevented": True}
+    assert result["afterDown"] == "recipe"
+    assert result["afterUp"] == "table"
+    assert result["escapeState"] == {
+        "open": False,
+        "triggerFocused": True,
+        "prevented": True,
+        "stopped": True,
+    }
+    assert result["chooseState"] == {
+        "calls": ["smart"],
+        "checked": ["smart"],
+        "open": False,
+        "triggerFocused": True,
+    }
 
 
-def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():
+def test_mobile_ingredients_toolbar_shows_icon_only_columns_and_view_controls_with_labels():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",
     )
@@ -5631,6 +5765,10 @@ def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():
     assert 'class="recipe-edit-ingredient-columns-label">Columns</span>' in template
     assert 'class="recipe-edit-ingredient-columns-desktop-action"' in template
     assert '{{ shell.svg_icon("columns") }}' in template
+    assert 'class="recipe-edit-ingredient-view-label">View</span>' in template
+    assert '{{ shell.svg_icon("eye") }}' in template
+    assert 'aria-label="Choose ingredient view"' in template
+    assert 'title="Choose ingredient view"' in template
 
     mobile_start = css.index("/* Ingredient editor v24: real mobile folding for the current card-based layout. */")
     mobile_css = css[mobile_start:]
@@ -5642,6 +5780,9 @@ def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():
     assert "visibility: visible;" in mobile_css
     assert ".recipe-edit-ingredient-columns-label," in mobile_css
     assert ".recipe-edit-columns-chevron" in mobile_css
+    assert ".recipe-edit-ingredient-view-button" in mobile_css
+    assert ".recipe-edit-ingredient-view-label," in mobile_css
+    assert ".recipe-edit-view-chevron" in mobile_css
     assert ".recipe-edit-ingredient-columns-desktop-action" in mobile_css
 
     visibility_start = script.index("function setRecipeEditIngredientColumnVisibility")
@@ -6048,6 +6189,59 @@ def test_recipe_editor_has_store_section_review_controls():
     assert '@recipe_bp.route("/api/recipe/review_store_sections", methods=["POST"])' in routes
 
 
+def test_recipe_editor_view_defaults_to_table_and_restores_and_saves_the_existing_preference():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the ingredient view preference regression harness.")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    preference_start = script.index("function normalizeRecipeEditIngredientView(value)")
+    preference_end = script.index("function addEmptyRecipeIngredientRow()", preference_start)
+    harness = r"""
+const RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY = "ai-pantry-ingredient-view";
+const RECIPE_EDIT_INGREDIENT_VIEWS = new Set(["recipe", "smart", "table"]);
+let storedValue = null;
+const writes = [];
+const window = {
+    localStorage: {
+        getItem(key) {
+            if (key !== RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY) throw new Error("unexpected key");
+            return storedValue;
+        },
+        setItem(key, value) {
+            writes.push([key, value]);
+            storedValue = value;
+        },
+    },
+};
+""" + script[preference_start:preference_end] + r"""
+const defaultView = loadRecipeEditIngredientView();
+storedValue = "smart";
+const savedView = loadRecipeEditIngredientView();
+storedValue = "unsupported";
+const invalidView = loadRecipeEditIngredientView();
+saveRecipeEditIngredientView("recipe");
+process.stdout.write(JSON.stringify({ defaultView, savedView, invalidView, storedValue, writes }));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "defaultView": "table",
+        "savedView": "smart",
+        "invalidView": "table",
+        "storedValue": "recipe",
+        "writes": [["ai-pantry-ingredient-view", "recipe"]],
+    }
+
+
 def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_recipe_projection():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",
@@ -6062,19 +6256,25 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
     tab_bar_end = template.index('class="recipe-edit-tab-panels"', tab_bar_start)
     tab_bar = template[tab_bar_start:tab_bar_end]
     switch_start = script.index("function setRecipeEditIngredientView(value, options = {})")
-    switch_end = script.index("function handleRecipeEditIngredientViewKeydown", switch_start)
+    switch_end = script.index("function recipeEditIngredientViewMenuItems", switch_start)
     switch_function = script[switch_start:switch_end]
     collect_start = script.index("function collectRecipeIngredientRows()")
     collect_end = script.index("function collectRecipeNutritionRows()", collect_start)
     collect_function = script[collect_start:collect_end]
 
     assert 'role="tablist"' in tab_bar
-    assert 'aria-label="Ingredient view"' in tab_bar
+    assert 'aria-label="Ingredient view"' not in tab_bar
+    assert "recipe-edit-ingredient-view-switcher" not in tab_bar
+    assert 'data-recipe-ingredient-view-trigger' in ingredient_section
+    assert 'aria-haspopup="menu"' in ingredient_section
+    assert 'data-recipe-ingredient-view-menu' in ingredient_section
+    assert 'role="menu"' in ingredient_section
     for view in ("recipe", "smart", "table"):
-        assert f'data-recipe-ingredient-view-tab="{view}"' in tab_bar
+        assert f'data-recipe-ingredient-view-option="{view}"' in ingredient_section
         assert f'data-recipe-ingredient-view-panel="{view}"' in ingredient_section
-    assert 'data-recipe-ingredient-view-tab="table"' in tab_bar
-    assert 'aria-selected="true"' in tab_bar
+        assert f'aria-label="{view.title()} ingredient view"' in ingredient_section
+    assert ingredient_section.count('role="menuitemradio"') == 3
+    assert ingredient_section.count('aria-checked="true"') == 1
     assert ingredient_section.count('id="recipeEditIngredients"') == 1
     assert "Recipe View will be implemented in Phase 2." not in ingredient_section
     assert "Smart View will be implemented in Phase 3." not in ingredient_section
@@ -6096,9 +6296,8 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
     assert script.count("addEmptyRecipeIngredientRow();") == 2
     assert 'if (recipeEditIngredientView === "table")' in script
     assert "addRecipeIngredientRow({}, { expanded: false });" in script
-    assert 'tab.addEventListener("keydown", handleRecipeEditIngredientViewKeydown);' in script
-    assert 'switcher.querySelectorAll("[data-recipe-ingredient-view-tab]")' in switch_function
-    assert "const activeTab = switcher.querySelector(" in switch_function
+    assert 'menu.querySelectorAll("[data-recipe-ingredient-view-option]")' in switch_function
+    assert 'option.setAttribute("aria-checked", selected ? "true" : "false");' in switch_function
     assert 'panel.hidden = panel.dataset.recipeIngredientViewPanel !== view;' in switch_function
     assert "syncRecipeEditIngredientViewActions(section, view);" in switch_function
     assert 'view === "smart"' in switch_function
@@ -6109,8 +6308,8 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
 
     assert "return recipeEditIngredientRows()" in collect_function
     assert 'document.getElementById("recipeEditIngredients")' in script
-    assert ".recipe-edit-ingredient-view-switcher" in css
-    assert ".recipe-edit-ingredient-view-tab:focus-visible" in css
+    assert ".recipe-edit-ingredient-view-menu" in css
+    assert '[role="menuitemradio"]:focus-visible' in css
     assert "[data-recipe-ingredient-table-action][hidden]" in css
 
 

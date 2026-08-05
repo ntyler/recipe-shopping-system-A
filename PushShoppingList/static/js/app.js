@@ -26011,13 +26011,6 @@ function setRecipeEditActiveTab(tabKey, options = {}) {
         panel.hidden = recipeEditTabKey(panel.dataset.recipeEditTabPanel) !== activeKey;
     });
 
-    const ingredientViewSwitcher = tabsRoot.querySelector(
-        "[data-recipe-ingredient-view-switcher]",
-    );
-    if (ingredientViewSwitcher) {
-        ingredientViewSwitcher.hidden = activeKey !== "ingredients";
-    }
-
     updateRecipeEditStickyOffsets();
     return true;
 }
@@ -30134,8 +30127,8 @@ function addRecipeIngredientFromCurrentView() {
 
 function setRecipeEditIngredientView(value, options = {}) {
     const section = document.querySelector(".recipe-edit-ingredients-section");
-    const switcher = document.querySelector("[data-recipe-ingredient-view-switcher]");
-    if (!section || !switcher) return false;
+    const menu = document.querySelector("[data-recipe-ingredient-view-menu]");
+    if (!section || !menu) return false;
 
     const view = normalizeRecipeEditIngredientView(value);
     const scrollState = recipeEditIngredientViewScrollState();
@@ -30157,11 +30150,10 @@ function setRecipeEditIngredientView(value, options = {}) {
     } else if (view === "smart") {
         renderRecipeIngredientSmartView();
     }
-    switcher.querySelectorAll("[data-recipe-ingredient-view-tab]").forEach(tab => {
-        const selected = tab.dataset.recipeIngredientViewTab === view;
-        tab.classList.toggle("is-active", selected);
-        tab.setAttribute("aria-selected", selected ? "true" : "false");
-        tab.tabIndex = selected ? 0 : -1;
+    menu.querySelectorAll("[data-recipe-ingredient-view-option]").forEach(option => {
+        const selected = option.dataset.recipeIngredientViewOption === view;
+        option.classList.toggle("is-active", selected);
+        option.setAttribute("aria-checked", selected ? "true" : "false");
     });
     section.querySelectorAll("[data-recipe-ingredient-view-panel]").forEach(panel => {
         panel.hidden = panel.dataset.recipeIngredientViewPanel !== view;
@@ -30173,10 +30165,8 @@ function setRecipeEditIngredientView(value, options = {}) {
     }
 
     if (options.focus === true) {
-        const activeTab = switcher.querySelector(
-            `[data-recipe-ingredient-view-tab="${view}"]`,
-        );
-        if (activeTab) activeTab.focus({ preventScroll: true });
+        const trigger = document.querySelector("[data-recipe-ingredient-view-trigger]");
+        if (trigger) trigger.focus({ preventScroll: true });
     }
 
     restoreRecipeEditIngredientViewScroll(scrollState);
@@ -30190,47 +30180,103 @@ function setRecipeEditIngredientView(value, options = {}) {
     return false;
 }
 
-function handleRecipeEditIngredientViewKeydown(event) {
-    if (!event || event.altKey || event.ctrlKey || event.metaKey) return;
-    const tab = event.currentTarget;
-    const tablist = tab ? tab.closest("[data-recipe-ingredient-view-switcher]") : null;
-    const tabs = tablist
-        ? [...tablist.querySelectorAll("[data-recipe-ingredient-view-tab]")]
+function recipeEditIngredientViewMenuItems(menu) {
+    return menu
+        ? [...menu.querySelectorAll("[data-recipe-ingredient-view-option]")]
         : [];
-    const currentIndex = tabs.indexOf(tab);
-    let nextIndex = currentIndex;
+}
 
-    if (event.key === "ArrowRight") {
-        nextIndex = (currentIndex + 1) % tabs.length;
-    } else if (event.key === "ArrowLeft") {
-        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+function focusRecipeEditIngredientViewMenuItem(menu, target = "selected") {
+    const items = recipeEditIngredientViewMenuItems(menu);
+    if (!items.length) return false;
+    let index = items.findIndex(item => item.getAttribute("aria-checked") === "true");
+    if (target === "first") index = 0;
+    if (target === "last") index = items.length - 1;
+    if (index < 0) index = 0;
+    menu.dataset.activeIndex = String(index);
+    items[index].focus({ preventScroll: true });
+    return true;
+}
+
+function toggleRecipeEditIngredientViewMenu(button, event = null, focusTarget = "selected") {
+    const wrap = button ? button.closest(".recipe-edit-ingredient-view-menu-wrap") : null;
+    const menu = wrap ? wrap.querySelector("[data-recipe-ingredient-view-menu]") : null;
+    const shouldOpen = Boolean(menu && menu.hidden);
+    toggleRecipeEditSectionMenu(button, event);
+    if (shouldOpen && menu && !menu.hidden) {
+        focusRecipeEditIngredientViewMenuItem(menu, focusTarget);
+    }
+    return false;
+}
+
+function handleRecipeEditIngredientViewButtonKeydown(event) {
+    if (!event || event.altKey || event.ctrlKey || event.metaKey) return true;
+    const focusTarget = event.key === "ArrowDown"
+        ? "first"
+        : event.key === "ArrowUp"
+            ? "last"
+            : "selected";
+    if (!["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) return true;
+    event.preventDefault();
+    return toggleRecipeEditIngredientViewMenu(event.currentTarget, event, focusTarget);
+}
+
+function handleRecipeEditIngredientViewMenuKeydown(event) {
+    if (!event || event.altKey || event.ctrlKey || event.metaKey) return true;
+    const item = event.currentTarget;
+    const menu = item ? item.closest("[data-recipe-ingredient-view-menu]") : null;
+    const items = recipeEditIngredientViewMenuItems(menu);
+    const currentIndex = items.indexOf(item);
+    let nextIndex = -1;
+
+    if (event.key === "ArrowDown") {
+        nextIndex = (currentIndex + 1) % items.length;
+    } else if (event.key === "ArrowUp") {
+        nextIndex = (currentIndex - 1 + items.length) % items.length;
     } else if (event.key === "Home") {
         nextIndex = 0;
     } else if (event.key === "End") {
-        nextIndex = tabs.length - 1;
+        nextIndex = items.length - 1;
+    } else if (event.key === "Escape") {
+        const trigger = menu?.recipeEditAnchorButton
+            || document.querySelector("[data-recipe-ingredient-view-trigger]");
+        event.preventDefault();
+        event.stopPropagation();
+        closeRecipeEditRowMenus();
+        if (trigger) trigger.focus({ preventScroll: true });
+        return false;
+    } else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        return chooseRecipeEditIngredientView(item);
+    } else if (event.key === "Tab") {
+        closeRecipeEditRowMenus();
+        return true;
     } else {
-        return;
+        return true;
     }
 
-    event.preventDefault();
-    const nextTab = tabs[nextIndex];
-    if (nextTab) {
-        setRecipeEditIngredientView(nextTab.dataset.recipeIngredientViewTab, { focus: true });
+    if (nextIndex >= 0 && items[nextIndex]) {
+        event.preventDefault();
+        menu.dataset.activeIndex = String(nextIndex);
+        items[nextIndex].focus({ preventScroll: true });
     }
+    return false;
+}
+
+function chooseRecipeEditIngredientView(button) {
+    const menu = button ? button.closest("[data-recipe-ingredient-view-menu]") : null;
+    const trigger = menu?.recipeEditAnchorButton
+        || document.querySelector("[data-recipe-ingredient-view-trigger]");
+    const view = button?.dataset.recipeIngredientViewOption;
+    setRecipeEditIngredientView(view);
+    closeRecipeEditRowMenus();
+    if (trigger) trigger.focus({ preventScroll: true });
+    return false;
 }
 
 function initRecipeEditIngredientViews() {
-    const switcher = document.querySelector("[data-recipe-ingredient-view-switcher]");
-    if (!switcher) return;
-
-    switcher.querySelectorAll("[data-recipe-ingredient-view-tab]").forEach(tab => {
-        if (tab.dataset.recipeIngredientViewBound === "true") return;
-        tab.dataset.recipeIngredientViewBound = "true";
-        tab.addEventListener("click", () => {
-            setRecipeEditIngredientView(tab.dataset.recipeIngredientViewTab);
-        });
-        tab.addEventListener("keydown", handleRecipeEditIngredientViewKeydown);
-    });
+    const menu = document.querySelector("[data-recipe-ingredient-view-menu]");
+    if (!menu) return;
     setRecipeEditIngredientView(loadRecipeEditIngredientView(), { persist: false });
 }
 
