@@ -29430,7 +29430,7 @@ function syncRecipeIngredientSmartViewImage(imageCell, values = {}) {
     image.loading = "lazy";
     image.decoding = "async";
     image.fetchPriority = "low";
-    image.sizes = "64px";
+    image.sizes = `${recipeImageThumbnailSize}px`;
     image.dataset.fullSrc = imageUrl;
 
     const fallback = document.createElement("span");
@@ -40949,6 +40949,9 @@ function applyRecipeImageThumbnailSize(size, options = {}) {
     recipeImageThumbnailSize = normalizedSize;
     document.documentElement.style.setProperty("--recipe-edit-thumbnail-size", `${normalizedSize}px`);
     document.documentElement.style.setProperty("--recipe-edit-thumbnail-slot", `${normalizedSize + 2}px`);
+    document.querySelectorAll(".recipe-edit-ingredient-smart-image > img").forEach(image => {
+        image.sizes = `${normalizedSize}px`;
+    });
 
     if (options.persist) {
         try {
@@ -40961,6 +40964,7 @@ function applyRecipeImageThumbnailSize(size, options = {}) {
     }
 
     updateRecipeImageThumbnailSizeControls(normalizedSize);
+    scheduleRecipeIngredientSmartViewLayout();
     return normalizedSize;
 }
 

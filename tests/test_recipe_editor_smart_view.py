@@ -18,6 +18,13 @@ def _function(script, name, next_name):
     return script[start:end]
 
 
+def _css_rule(css, selector, start=0):
+    rule_start = css.index(selector, start)
+    declaration_start = css.index("{", rule_start)
+    rule_end = css.index("\n}", declaration_start)
+    return css[rule_start:rule_end]
+
+
 def test_smart_view_replaces_the_placeholder_and_reuses_shared_actions():
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     script = SCRIPT_PATH.read_text(encoding="utf-8")
@@ -91,6 +98,7 @@ def test_smart_cards_reuse_images_status_store_sections_and_structured_options()
     assert "handleRecipeIngredientReadImageError(image)" in script
     assert "initDeferredImages(imageCell)" in image
     assert 'image.alt = "";' in image
+    assert "image.sizes = `${recipeImageThumbnailSize}px`;" in image
 
     assert "choiceParentValues" in card
     assert "choiceAlternativeGroups" in card
@@ -120,6 +128,267 @@ def test_smart_cards_reuse_images_status_store_sections_and_structured_options()
     assert '"Type"' in details
     assert "recipeIngredientTypeLabel(values)" in details
     assert 'notes || "Click to add notes\\u2026"' in details
+
+
+def test_smart_thumbnail_layout_is_variable_driven_and_keeps_interface_icons_fixed():
+    css = CSS_PATH.read_text(encoding="utf-8")
+    smart_css = css[css.index("Ingredient editor v82:"):css.index("Ingredient editor v83:")]
+    mobile_css = smart_css[smart_css.index("@media (max-width: 760px)"):]
+    desktop_header = _css_rule(
+        smart_css,
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-header",
+    )
+    mobile_header = _css_rule(
+        mobile_css,
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-header",
+    )
+    image_rule = _css_rule(
+        smart_css,
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-image {",
+    )
+
+    assert "calc(var(--recipe-edit-thumbnail-size, 64px) + 2px)" in desktop_header
+    assert "max(78px, calc(var(--recipe-edit-thumbnail-size, 64px) + 22px))" in desktop_header
+    assert "width: var(--recipe-edit-thumbnail-size, 64px);" in image_rule
+    assert "height: var(--recipe-edit-thumbnail-size, 64px);" in image_rule
+    assert "calc(var(--recipe-edit-thumbnail-size, 64px) + 2px)" in mobile_header
+    assert "60px" not in desktop_header + image_rule
+    assert "54px" not in mobile_header
+
+    fallback_icon = _css_rule(
+        smart_css,
+        "> .recipe-edit-substitution-image-fallback :is(.recipe-edit-inline-icon, svg)",
+    )
+    action_buttons = _css_rule(
+        smart_css,
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-edit,",
+    )
+    action_icons = _css_rule(
+        smart_css,
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-edit .recipe-edit-inline-icon,",
+    )
+    store_icons = _css_rule(
+        smart_css,
+        ".recipe-edit-store-section-icon {",
+    )
+    detail_icons = _css_rule(
+        smart_css,
+        ":is(.recipe-edit-store-section-icon, .recipe-edit-inline-icon, svg)",
+    )
+    option_marker = _css_rule(
+        smart_css,
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-option-marker {",
+    )
+    option_marker_icon = _css_rule(
+        smart_css,
+        ".recipe-edit-ingredient-smart-option-marker\n    .recipe-edit-inline-icon",
+    )
+
+    assert "width: 22px;" in fallback_icon and "height: 22px;" in fallback_icon
+    assert "width: 34px;" in action_buttons and "height: 34px;" in action_buttons
+    assert "width: 15px;" in action_icons and "height: 15px;" in action_icons
+    assert "width: 12px;" in store_icons and "height: 12px;" in store_icons
+    assert "width: 13px;" in detail_icons and "height: 13px;" in detail_icons
+    assert "width: 14px;" in option_marker and "height: 14px;" in option_marker
+    assert "width: 10px;" in option_marker_icon and "height: 10px;" in option_marker_icon
+    for fixed_icon_rule in (
+        fallback_icon,
+        action_buttons,
+        action_icons,
+        store_icons,
+        detail_icons,
+        option_marker,
+        option_marker_icon,
+    ):
+        assert "--recipe-edit-thumbnail-size" not in fixed_icon_rule
+
+
+def test_smart_thumbnail_setting_updates_image_hints_persists_and_relayouts():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the Smart thumbnail runtime regression")
+
+    normalize = _function(
+        script,
+        "normalizeRecipeImageThumbnailSize(value)",
+        "rememberedRecipeImageThumbnailSize",
+    )
+    schedule = _function(
+        script,
+        "scheduleRecipeIngredientSmartViewLayout()",
+        "initRecipeIngredientSmartViewLayout",
+    )
+    apply_size = _function(
+        script,
+        "applyRecipeImageThumbnailSize(size, options = {})",
+        "initRecipeImageThumbnailSizeControls",
+    )
+    reset_size = _function(
+        script,
+        "resetRecipeImageThumbnailSize(button)",
+        "recipeImageProviderFieldHtml",
+    )
+    harness = r"""
+const RECIPE_IMAGE_THUMBNAIL_SIZE_STORAGE_KEY = "recipe-image-thumbnail-size";
+const RECIPE_IMAGE_THUMBNAIL_DEFAULT_SIZE = 64;
+const RECIPE_IMAGE_THUMBNAIL_MIN_SIZE = 32;
+const RECIPE_IMAGE_THUMBNAIL_MAX_SIZE = 80;
+const RECIPE_IMAGE_THUMBNAIL_STEP_SIZE = 8;
+let recipeImageThumbnailSize = RECIPE_IMAGE_THUMBNAIL_DEFAULT_SIZE;
+let recipeEditIngredientSmartViewLayoutFrame = 0;
+let layoutCount = 0;
+let nextFrameId = 0;
+const frames = [];
+const styleValues = {};
+const storageWrites = [];
+const smartImages = [{ sizes: "64px" }, { sizes: "64px" }];
+const recipeViewImage = { sizes: "120px" };
+const equipmentImage = { sizes: "120px" };
+const instructionImage = { sizes: "(max-width: 900px) 92vw, 720px" };
+const labels = [{ textContent: "64px" }, { textContent: "64px" }];
+const decreaseButtons = [{ disabled: false }];
+const increaseButtons = [{ disabled: false }];
+const window = {
+    requestAnimationFrame(callback) {
+        frames.push(callback);
+        nextFrameId += 1;
+        return nextFrameId;
+    },
+    localStorage: {
+        setItem(key, value) { storageWrites.push([key, value]); },
+    },
+};
+const document = {
+    documentElement: {
+        style: {
+            setProperty(name, value) { styleValues[name] = value; },
+        },
+    },
+    querySelectorAll(selector) {
+        if (selector === ".recipe-edit-ingredient-smart-image > img") return smartImages;
+        if (selector === "[data-recipe-thumbnail-size-value]") return labels;
+        if (selector === "[data-recipe-thumbnail-size-decrease]") return decreaseButtons;
+        if (selector === "[data-recipe-thumbnail-size-increase]") return increaseButtons;
+        throw new Error(`Unexpected selector: ${selector}`);
+    },
+};
+function layoutRecipeIngredientSmartView() {
+    recipeEditIngredientSmartViewLayoutFrame = 0;
+    layoutCount += 1;
+}
+function updateRecipeImageThumbnailSizeControls(size = recipeImageThumbnailSize) {
+    document.querySelectorAll("[data-recipe-thumbnail-size-value]").forEach(label => {
+        label.textContent = `${size}px`;
+    });
+    document.querySelectorAll("[data-recipe-thumbnail-size-decrease]").forEach(button => {
+        button.disabled = size <= RECIPE_IMAGE_THUMBNAIL_MIN_SIZE;
+    });
+    document.querySelectorAll("[data-recipe-thumbnail-size-increase]").forEach(button => {
+        button.disabled = size >= RECIPE_IMAGE_THUMBNAIL_MAX_SIZE;
+    });
+}
+function drainFrame() {
+    const callback = frames.shift();
+    if (!callback) throw new Error("Expected a scheduled Smart-grid layout frame");
+    callback();
+}
+""" + normalize + schedule + apply_size + reset_size + r"""
+
+const states = [];
+applyRecipeImageThumbnailSize(32, { persist: true });
+states.push({
+    size: recipeImageThumbnailSize,
+    imageSizes: smartImages.map(image => image.sizes),
+    label: labels[0].textContent,
+    decreaseDisabled: decreaseButtons[0].disabled,
+    increaseDisabled: increaseButtons[0].disabled,
+    queuedLayouts: frames.length,
+});
+drainFrame();
+
+applyRecipeImageThumbnailSize(80, { persist: true });
+states.push({
+    size: recipeImageThumbnailSize,
+    imageSizes: smartImages.map(image => image.sizes),
+    label: labels[0].textContent,
+    decreaseDisabled: decreaseButtons[0].disabled,
+    increaseDisabled: increaseButtons[0].disabled,
+    queuedLayouts: frames.length,
+});
+drainFrame();
+
+resetRecipeImageThumbnailSize();
+states.push({
+    size: recipeImageThumbnailSize,
+    imageSizes: smartImages.map(image => image.sizes),
+    label: labels[0].textContent,
+    decreaseDisabled: decreaseButtons[0].disabled,
+    increaseDisabled: increaseButtons[0].disabled,
+    queuedLayouts: frames.length,
+});
+drainFrame();
+
+process.stdout.write(JSON.stringify({
+    states,
+    styleValues,
+    storageWrites,
+    layoutCount,
+    otherImageSizes: [recipeViewImage.sizes, equipmentImage.sizes, instructionImage.sizes],
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["states"] == [
+        {
+            "size": 32,
+            "imageSizes": ["32px", "32px"],
+            "label": "32px",
+            "decreaseDisabled": True,
+            "increaseDisabled": False,
+            "queuedLayouts": 1,
+        },
+        {
+            "size": 80,
+            "imageSizes": ["80px", "80px"],
+            "label": "80px",
+            "decreaseDisabled": False,
+            "increaseDisabled": True,
+            "queuedLayouts": 1,
+        },
+        {
+            "size": 64,
+            "imageSizes": ["64px", "64px"],
+            "label": "64px",
+            "decreaseDisabled": False,
+            "increaseDisabled": False,
+            "queuedLayouts": 1,
+        },
+    ]
+    assert result["styleValues"] == {
+        "--recipe-edit-thumbnail-size": "64px",
+        "--recipe-edit-thumbnail-slot": "66px",
+    }
+    assert result["storageWrites"] == [
+        ["recipe-image-thumbnail-size", "32"],
+        ["recipe-image-thumbnail-size", "80"],
+        ["recipe-image-thumbnail-size", "64"],
+    ]
+    assert result["layoutCount"] == 3
+    assert result["otherImageSizes"] == [
+        "120px",
+        "120px",
+        "(max-width: 900px) 92vw, 720px",
+    ]
 
 
 def test_smart_collapsed_cards_prioritize_units_sizes_and_actionable_statuses():
