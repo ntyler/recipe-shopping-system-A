@@ -7,6 +7,9 @@ from datetime import datetime
 from datetime import timezone
 from pathlib import Path
 
+from PushShoppingList.services import master_data_url_service
+from PushShoppingList.services import storage_service
+
 
 PACKAGE_DIR = Path(__file__).resolve().parent.parent
 MODEL_OVERRIDES_FILE = Path(
@@ -366,10 +369,16 @@ def openai_model_usage(env_var):
         "href": "/#userAccountSection",
         "surfaces": ("AI feature",),
     }
-    return {
+    rendered_usage = {
         **usage,
         "surfaces": list(usage.get("surfaces") or []),
     }
+    if rendered_usage.get("href") == "/admin/master-data/ingredients":
+        rendered_usage["href"] = master_data_url_service.build_master_data_url(
+            "ingredients",
+            viewer_user_id=storage_service.active_user_id(),
+        )
+    return rendered_usage
 
 DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_MENU_MODEL": "gpt-5.5",

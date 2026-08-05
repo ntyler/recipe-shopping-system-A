@@ -355,19 +355,19 @@
                             <div class="user-account-menu-section-title">RECIPE DATA</div>
                             <a class="user-account-menu-item"
                                role="menuitem"
-                               href="{{ url_for('main_bp.master_data_ingredients_route') }}">
+                               href="{{ url_for('main_bp.master_data_ingredients_route', viewer_user_id=current_user.user_id if current_user else none) }}">
                                 <span class="user-account-menu-item-icon" aria-hidden="true">I</span>
                                 <span class="user-account-menu-item-label">Ingredient Master Data</span>
                             </a>
                             <a class="user-account-menu-item"
                                role="menuitem"
-                               href="{{ url_for('main_bp.master_data_equipment_route') }}">
+                               href="{{ url_for('main_bp.master_data_equipment_route', viewer_user_id=current_user.user_id if current_user else none) }}">
                                 <span class="user-account-menu-item-icon" aria-hidden="true">E</span>
                                 <span class="user-account-menu-item-label">Equipment Master Data</span>
                             </a>
                             <a class="user-account-menu-item"
                                role="menuitem"
-                               href="{{ url_for('main_bp.master_data_store_sections_route') }}">
+                               href="{{ url_for('main_bp.master_data_store_sections_route', viewer_user_id=current_user.user_id if current_user else none) }}">
                                 <span class="user-account-menu-item-icon" aria-hidden="true">S</span>
                                 <span class="user-account-menu-item-label">Store Sections</span>
                             </a>

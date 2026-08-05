@@ -7,11 +7,13 @@ from datetime import date
 from datetime import datetime
 from datetime import timezone
 from fractions import Fraction
+from urllib.parse import parse_qsl
 from urllib.parse import urlparse
 
 import requests
 from openai import OpenAI
 from flask import Blueprint
+from flask import abort
 from flask import current_app
 from flask import g
 from flask import jsonify
@@ -26,6 +28,7 @@ from flask import url_for
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services import recipe_master_data_service as recipe_master_data
 from PushShoppingList.services import recipe_master_image_service as recipe_master_images
+from PushShoppingList.services import master_data_url_service
 from PushShoppingList.services import ingredient_store_section_review_service as ingredient_store_section_reviews
 from PushShoppingList.services import ingredient_duplicate_review_service as ingredient_duplicate_reviews
 from PushShoppingList.services.food_rules_service import load_food_rules
@@ -199,6 +202,50 @@ MASTER_DATA_PAGE_CONFIG = {
         "count_func": recipe_master_data.count_equipment,
     },
 }
+
+
+def validate_master_data_viewer_scope():
+    """Validate an optional viewer query value against the Flask session."""
+
+    if hasattr(g, "master_data_viewer_user_id"):
+        return g.master_data_viewer_user_id
+    viewer_values = request.args.getlist("viewer_user_id")
+    if len(viewer_values) > 1:
+        abort(400)
+    session_viewer_user_id = active_user_id()
+    supplied_viewer_user_id = str(viewer_values[0]) if viewer_values else ""
+    if supplied_viewer_user_id.strip() and (
+        (
+            session_viewer_user_id
+            and supplied_viewer_user_id != session_viewer_user_id
+        )
+        or (is_guest_session() and not session_viewer_user_id)
+    ):
+        abort(403)
+
+    g.master_data_viewer_user_id = session_viewer_user_id
+    return session_viewer_user_id
+
+
+@main_bp.before_request
+def validate_optional_master_data_viewer_parameter():
+    """Reject supplied viewer values that conflict with the signed session.
+
+    Master-data HTML GET routes additionally require the viewer and redirect
+    old/missing URLs below. APIs and mutation actions remain backward
+    compatible when it is absent, while never trusting a supplied value.
+    """
+
+    if not (
+        request.path == "/admin/master-data"
+        or request.path.startswith("/admin/master-data/")
+        or request.path == "/api/master-data"
+        or request.path.startswith("/api/master-data/")
+    ):
+        return None
+
+    validate_master_data_viewer_scope()
+    return None
 
 
 def request_local_calendar_date():
@@ -857,20 +904,60 @@ def enrich_master_data_rows_with_users(rows, user_identities):
     return enriched
 
 
-def master_data_scope(is_admin):
+MASTER_DATA_PAGE_ENDPOINTS = {
+    "ingredients": "main_bp.master_data_ingredients_route",
+    "equipment": "main_bp.master_data_equipment_route",
+    "store_sections": "main_bp.master_data_store_sections_route",
+}
+
+
+def master_data_query_values(values, name):
+    if hasattr(values, "getlist"):
+        return list(values.getlist(name))
+    if isinstance(values, dict):
+        value = values.get(name)
+        return list(value) if isinstance(value, (list, tuple)) else [value] if value is not None else []
+
+    found = []
+    for key, value in values or ():
+        if str(key) == name:
+            found.append(value)
+    return found
+
+
+def master_data_registered_user_ids():
+    return {
+        str(user.get("user_id") or "")
+        for user in load_users().get("users", [])
+        if isinstance(user, dict) and str(user.get("user_id") or "")
+    }
+
+
+def validate_master_data_target_scope(is_admin, values=None, *, allow_admin_scope=True):
+    """Resolve an optional admin target without changing viewer authority."""
+
+    values = request.args if values is None else values
+    target_values = master_data_query_values(values, "user_id")
+    if len(target_values) > 1:
+        abort(400)
+
     current_scope_user_id = recipe_master_data.scoped_recipe_user_id()
-    requested_user_id = str(request.args.get("user_id") or "").strip()
-    requested_scope = str(request.args.get("scope") or "mine").strip().lower()
+    requested_user_id = str(target_values[0] or "").strip() if target_values else ""
+    requested_scope = str(
+        (master_data_query_values(values, "scope") or ["mine"])[0] or "mine"
+    ).strip().lower()
+    scope_was_supplied = bool(master_data_query_values(values, "scope"))
 
-    if is_admin and requested_user_id:
-        return {
-            "user_id": requested_user_id,
-            "include_all_users": False,
-            "scope": "user",
-            "current_scope_user_id": current_scope_user_id,
-        }
+    mine = {
+        "user_id": current_scope_user_id,
+        "include_all_users": False,
+        "scope": "mine",
+        "current_scope_user_id": current_scope_user_id,
+    }
+    if not is_admin or not allow_admin_scope:
+        return mine
 
-    if is_admin and requested_scope == "all":
+    if requested_scope == "all":
         return {
             "user_id": "",
             "include_all_users": True,
@@ -878,82 +965,139 @@ def master_data_scope(is_admin):
             "current_scope_user_id": current_scope_user_id,
         }
 
-    return {
-        "user_id": current_scope_user_id,
-        "include_all_users": False,
+    # Before explicit scopes were introduced, generated admin bookmarks used
+    # only ?user_id=<target>. Preserve those bookmarks without making user_id
+    # authoritative for non-admin sessions.
+    legacy_user_scope = bool(requested_user_id and not scope_was_supplied)
+    if requested_scope == "user" or legacy_user_scope:
+        if not requested_user_id or requested_user_id not in master_data_registered_user_ids():
+            abort(400)
+        return {
+            "user_id": requested_user_id,
+            "include_all_users": False,
+            "scope": "user",
+            "current_scope_user_id": current_scope_user_id,
+        }
+
+    return mine
+
+
+def master_data_scope(is_admin):
+    return validate_master_data_target_scope(is_admin, request.args)
+
+
+def build_canonical_master_data_url(
+    page,
+    *,
+    parameters=None,
+    scope_info=None,
+    overrides=None,
+):
+    scope_info = scope_info or {
         "scope": "mine",
-        "current_scope_user_id": current_scope_user_id,
+        "user_id": recipe_master_data.scoped_recipe_user_id(),
     }
+    viewer_user_id = str(scope_info.get("viewer_user_id") or active_user_id() or "")
+    if is_guest_session():
+        viewer_user_id = ""
+    return master_data_url_service.build_master_data_url(
+        page,
+        parameters=parameters,
+        viewer_user_id=viewer_user_id,
+        scope=scope_info.get("scope") or "mine",
+        target_user_id=(
+            scope_info.get("user_id")
+            if scope_info.get("scope") == "user"
+            else ""
+        ),
+        overrides=overrides,
+        base_path=url_for(MASTER_DATA_PAGE_ENDPOINTS[page]),
+    )
+
+
+def canonicalize_master_data_redirect_url(
+    redirect_url,
+    *,
+    default_page="ingredients",
+    fallback_scope_info=None,
+):
+    """Return a safe canonical page URL for mutation responses."""
+
+    raw_url = str(redirect_url or "").strip()
+    parsed = urlparse(raw_url)
+    page_by_path = {
+        url_for(endpoint): page
+        for page, endpoint in MASTER_DATA_PAGE_ENDPOINTS.items()
+    }
+    page = page_by_path.get(parsed.path) if not parsed.scheme and not parsed.netloc else None
+    parameters = parse_qsl(parsed.query, keep_blank_values=True) if page else None
+
+    if page:
+        scope_info = validate_master_data_target_scope(
+            is_admin_user(current_public_user()),
+            parameters,
+            allow_admin_scope=page != "store_sections",
+        )
+    else:
+        page = default_page
+        scope_info = fallback_scope_info or {
+            "scope": "mine",
+            "user_id": recipe_master_data.scoped_recipe_user_id(),
+            "current_scope_user_id": recipe_master_data.scoped_recipe_user_id(),
+        }
+
+    scope_info = dict(scope_info)
+    scope_info["viewer_user_id"] = active_user_id()
+    return build_canonical_master_data_url(
+        page,
+        parameters=parameters,
+        scope_info=scope_info,
+    )
+
+
+def validate_canonical_master_data_page_request(page, *, allow_admin_scope=True):
+    """Validate the viewer and return the canonical target scope/redirect."""
+
+    session_viewer_user_id = validate_master_data_viewer_scope()
+
+    active_public_user = current_public_user()
+    scope_info = validate_master_data_target_scope(
+        is_admin_user(active_public_user),
+        request.args,
+        allow_admin_scope=allow_admin_scope,
+    )
+    scope_info["viewer_user_id"] = session_viewer_user_id
+
+    canonical_url = build_canonical_master_data_url(
+        page,
+        parameters=request.args,
+        scope_info=scope_info,
+    )
+    requested_url = request.full_path[:-1] if request.full_path.endswith("?") else request.full_path
+    if requested_url != canonical_url:
+        return scope_info, redirect(canonical_url)
+    return scope_info, None
 
 
 def ingredient_duplicate_review_workspace(active_public_user, values):
     values = values if isinstance(values, dict) or hasattr(values, "get") else {}
-    current_scope_user_id = recipe_master_data.scoped_recipe_user_id()
-    if is_admin_user(active_public_user):
-        requested_user_id = recipe_master_data.clean_text(values.get("user_id"))
-        requested_scope = recipe_master_data.clean_text(values.get("scope")).lower()
-        if requested_user_id:
-            return requested_user_id
-        if requested_scope == "all":
-            return ""
-    return current_scope_user_id
-
-
-def master_data_query_args(search, sort, limit, scope_info, page=None, store_section=None, equipment_section=None):
-    query_args = {
-        "sort": sort,
-        "limit": limit,
-    }
-
-    if search:
-        query_args["search"] = search
-
-    if scope_info["scope"] == "all":
-        query_args["scope"] = "all"
-    elif scope_info["scope"] == "user" and scope_info["user_id"]:
-        query_args["user_id"] = scope_info["user_id"]
-
-    if store_section:
-        query_args["store_section"] = store_section
-    if equipment_section:
-        query_args["equipment_section"] = equipment_section
-
-    if page and page > 1:
-        query_args["page"] = page
-
-    return query_args
+    scope_info = validate_master_data_target_scope(
+        is_admin_user(active_public_user),
+        values,
+    )
+    return "" if scope_info["scope"] == "all" else scope_info["user_id"]
 
 
 def master_data_form_scope():
-    requested_scope = recipe_master_data.clean_text(request.form.get("scope")).lower() or "mine"
-    requested_user_id = recipe_master_data.clean_text(request.form.get("user_id"))
-    current_scope_user_id = recipe_master_data.scoped_recipe_user_id()
-
-    if requested_scope == "all":
-        return {
-            "scope": "all",
-            "user_id": "",
-            "include_all_users": True,
-            "current_scope_user_id": current_scope_user_id,
-        }
-
-    if requested_scope == "user" and requested_user_id:
-        return {
-            "scope": "user",
-            "user_id": requested_user_id,
-            "include_all_users": False,
-            "current_scope_user_id": current_scope_user_id,
-        }
-
-    return {
-        "scope": "mine",
-        "user_id": current_scope_user_id,
-        "include_all_users": False,
-        "current_scope_user_id": current_scope_user_id,
-    }
+    scope_info = validate_master_data_target_scope(
+        is_admin_user(current_public_user()),
+        request.form,
+    )
+    scope_info["viewer_user_id"] = active_user_id()
+    return scope_info
 
 
-def master_data_context(record_type):
+def master_data_context(record_type, scope_info=None):
     config = MASTER_DATA_PAGE_CONFIG[record_type]
     active_public_user = current_public_user()
     is_admin = is_admin_user(active_public_user)
@@ -965,7 +1109,7 @@ def master_data_context(record_type):
     limit = int_query_arg("limit", 100, minimum=1, maximum=500)
     page = int_query_arg("page", 1, minimum=1)
     offset = (page - 1) * limit
-    scope_info = master_data_scope(is_admin)
+    scope_info = scope_info or master_data_scope(is_admin)
     store_section = ""
     store_section_details = []
     if record_type == "ingredients":
@@ -1004,7 +1148,12 @@ def master_data_context(record_type):
             equipment_section=equipment_section if record_type == "equipment" else None,
         )
         if is_admin:
-            available_user_ids = recipe_master_data.recipe_master_user_ids()
+            registered_user_ids = master_data_registered_user_ids()
+            available_user_ids = [
+                user_id
+                for user_id in recipe_master_data.recipe_master_user_ids()
+                if user_id in registered_user_ids
+            ]
 
     latest_ingredient_merge = None
     latest_store_section_reclassification = None
@@ -1060,45 +1209,59 @@ def master_data_context(record_type):
     )
 
     endpoint = config["route_endpoint"]
+    page_name = record_type
+    canonical_overrides = {
+        "search": search or None,
+        "sort": sort,
+        "limit": limit,
+        "store_section": store_section if record_type == "ingredients" else None,
+        "equipment_section": equipment_section if record_type == "equipment" else None,
+    }
     prev_url = None
     next_url = None
     if page > 1:
-        prev_url = url_for(
-            endpoint,
-            **master_data_query_args(
-                search,
-                sort,
-                limit,
-                scope_info,
-                page=page - 1,
-                store_section=store_section,
-                equipment_section=equipment_section,
-            ),
+        prev_url = build_canonical_master_data_url(
+            page_name,
+            parameters=request.args,
+            scope_info=scope_info,
+            overrides={**canonical_overrides, "page": page - 1},
         )
     if page < total_pages:
-        next_url = url_for(
-            endpoint,
-            **master_data_query_args(
-                search,
-                sort,
-                limit,
-                scope_info,
-                page=page + 1,
-                store_section=store_section,
-                equipment_section=equipment_section,
-            ),
+        next_url = build_canonical_master_data_url(
+            page_name,
+            parameters=request.args,
+            scope_info=scope_info,
+            overrides={**canonical_overrides, "page": page + 1},
         )
-    current_url = url_for(
-        endpoint,
-        **master_data_query_args(
-            search,
-            sort,
-            limit,
-            scope_info,
-            page=page if page > 1 else None,
-            store_section=store_section,
-            equipment_section=equipment_section,
-        ),
+    current_url = build_canonical_master_data_url(
+        page_name,
+        parameters=request.args,
+        scope_info=scope_info,
+        overrides={
+            **canonical_overrides,
+            "page": page if page > 1 else None,
+        },
+    )
+
+    ingredient_url = build_canonical_master_data_url(
+        "ingredients",
+        parameters=request.args,
+        scope_info=scope_info,
+        overrides={"equipment_section": None},
+    )
+    equipment_url = build_canonical_master_data_url(
+        "equipment",
+        parameters=request.args,
+        scope_info=scope_info,
+        overrides={"store_section": None},
+    )
+    store_section_url = build_canonical_master_data_url(
+        "store_sections",
+        scope_info={
+            "scope": "mine",
+            "user_id": scope_info["current_scope_user_id"],
+            "viewer_user_id": scope_info.get("viewer_user_id") or active_user_id(),
+        },
     )
 
     row_groups = []
@@ -1186,6 +1349,7 @@ def master_data_context(record_type):
         "db_status": status,
         "is_admin": is_admin,
         "scope": scope_info["scope"],
+        "viewer_user_id": scope_info.get("viewer_user_id") or active_user_id(),
         "scope_user_id": scope_info["user_id"],
         "current_scope_user_id": scope_info["current_scope_user_id"],
         "available_user_ids": available_user_ids,
@@ -1193,9 +1357,9 @@ def master_data_context(record_type):
         "current_scope_user": current_scope_user,
         "scope_user": scope_user,
         "messages": session.pop("recipe_master_data_messages", []),
-        "ingredient_url": url_for("main_bp.master_data_ingredients_route"),
-        "equipment_url": url_for("main_bp.master_data_equipment_route"),
-        "store_section_url": url_for("main_bp.master_data_store_sections_route"),
+        "ingredient_url": ingredient_url,
+        "equipment_url": equipment_url,
+        "store_section_url": store_section_url,
         "backfill_status_url": url_for("main_bp.recipe_master_data_backfill_status_route"),
         "image_generation_url": url_for("main_bp.recipe_master_data_generate_missing_images_route"),
         "image_generation_status_url": url_for("main_bp.recipe_master_data_image_generation_status_route"),
@@ -1241,10 +1405,10 @@ def master_data_context(record_type):
     }
 
 
-def render_master_data_page(record_type):
+def render_master_data_page(record_type, scope_info):
     return render_template(
         "master_data.html",
-        master_data=master_data_context(record_type),
+        master_data=master_data_context(record_type, scope_info),
         current_user=current_public_user(),
         is_guest_demo=is_guest_session(),
         app_css_version=static_asset_version("css/app.css"),
@@ -1255,16 +1419,23 @@ def render_master_data_page(record_type):
 
 @main_bp.route("/admin/master-data/ingredients")
 def master_data_ingredients_route():
-    return render_master_data_page("ingredients")
+    scope_info, canonical_redirect = validate_canonical_master_data_page_request("ingredients")
+    if canonical_redirect:
+        return canonical_redirect
+    return render_master_data_page("ingredients", scope_info)
 
 
 @main_bp.route("/admin/master-data/equipment")
 def master_data_equipment_route():
-    return render_master_data_page("equipment")
+    scope_info, canonical_redirect = validate_canonical_master_data_page_request("equipment")
+    if canonical_redirect:
+        return canonical_redirect
+    return render_master_data_page("equipment", scope_info)
 
 
 def store_section_master_data_context():
     user_id = recipe_master_data.scoped_recipe_user_id()
+    viewer_user_id = active_user_id()
     sections = recipe_master_data.ingredient_store_section_details(
         user_id=user_id,
         include_inactive=True,
@@ -1274,6 +1445,7 @@ def store_section_master_data_context():
     return {
         "title": "Store Sections",
         "record_type": "store_sections",
+        "viewer_user_id": viewer_user_id,
         "scope_user_id": user_id,
         "sections": sections,
         "active_count": len(active_sections),
@@ -1288,15 +1460,21 @@ def store_section_master_data_context():
         ),
         "icon_options": recipe_master_data.INGREDIENT_STORE_SECTION_ICON_OPTIONS,
         "messages": session.pop("recipe_master_data_messages", []),
-        "ingredient_url": url_for("main_bp.master_data_ingredients_route"),
-        "equipment_url": url_for("main_bp.master_data_equipment_route"),
-        "store_section_url": url_for("main_bp.master_data_store_sections_route"),
-        "create_url": url_for("main_bp.create_master_data_store_section_route"),
+        "ingredient_url": build_canonical_master_data_url("ingredients"),
+        "equipment_url": build_canonical_master_data_url("equipment"),
+        "store_section_url": build_canonical_master_data_url("store_sections"),
+        "create_url": build_canonical_master_data_url("store_sections"),
     }
 
 
 @main_bp.route("/admin/master-data/store-sections")
 def master_data_store_sections_route():
+    _scope_info, canonical_redirect = validate_canonical_master_data_page_request(
+        "store_sections",
+        allow_admin_scope=False,
+    )
+    if canonical_redirect:
+        return canonical_redirect
     return render_template(
         "store_sections.html",
         master_data=store_section_master_data_context(),
@@ -1326,11 +1504,13 @@ def master_data_store_section_usage_route(section_id):
     ingredients = []
     for ingredient in usage.get("ingredients", []):
         item = dict(ingredient)
-        item["manage_url"] = url_for(
-            "main_bp.master_data_ingredients_route",
-            store_section=section_key,
-            search=item.get("name") or "",
-            sort="name_asc",
+        item["manage_url"] = build_canonical_master_data_url(
+            "ingredients",
+            overrides={
+                "store_section": section_key,
+                "search": item.get("name") or None,
+                "sort": "name_asc",
+            },
         )
         ingredients.append(item)
 
@@ -1408,7 +1588,7 @@ def create_master_data_store_section_route():
         result,
         success_prefix="Store Section created: {name}.",
     )
-    return redirect(url_for("main_bp.master_data_store_sections_route"))
+    return redirect(build_canonical_master_data_url("store_sections"))
 
 
 @main_bp.route("/admin/master-data/store-sections/<int:section_id>", methods=["POST"])
@@ -1440,7 +1620,7 @@ def update_master_data_store_section_route(section_id):
         result,
         success_prefix=action_messages.get(action, "Store Section updated: {name}."),
     )
-    return redirect(url_for("main_bp.master_data_store_sections_route"))
+    return redirect(build_canonical_master_data_url("store_sections"))
 
 
 @main_bp.route("/api/master-data/ingredients/options")
@@ -1478,7 +1658,7 @@ def ingredient_master_options_route():
             }
             for row in rows
         ],
-        "manage_url": url_for("main_bp.master_data_ingredients_route"),
+        "manage_url": build_canonical_master_data_url("ingredients"),
     })
 
 
@@ -1873,6 +2053,10 @@ def update_ingredient_master_record_route(ingredient_id):
     allow_other_users = is_admin_user(active_public_user)
     payload = request.get_json(silent=True) if request.is_json else request.form
     payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    redirect_url = canonicalize_master_data_redirect_url(
+        payload.get("redirect_url"),
+        default_page="ingredients",
+    )
     result = recipe_master_data.update_ingredient_master_record(
         ingredient_id,
         payload.get("name"),
@@ -1880,10 +2064,6 @@ def update_ingredient_master_record_route(ingredient_id):
         payload.get("store_section"),
         allow_other_users=allow_other_users,
     )
-    redirect_url = recipe_master_data.clean_text(payload.get("redirect_url"))
-    if not redirect_url.startswith("/") or redirect_url.startswith("//"):
-        redirect_url = url_for("main_bp.master_data_ingredients_route")
-
     if result.get("ok"):
         if result.get("changed"):
             message = f"Ingredient master record updated: {result.get('name')}."
@@ -1988,15 +2168,15 @@ def merge_ingredient_master_record_route(ingredient_id):
     allow_other_users = is_admin_user(active_public_user)
     payload = request.get_json(silent=True) if request.is_json else request.form
     payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    redirect_url = canonicalize_master_data_redirect_url(
+        payload.get("redirect_url"),
+        default_page="ingredients",
+    )
     result = recipe_master_data.merge_ingredient_master_records(
         ingredient_id,
         payload.get("target_ingredient_id"),
         allow_other_users=allow_other_users,
     )
-    redirect_url = recipe_master_data.clean_text(payload.get("redirect_url"))
-    if not redirect_url.startswith("/") or redirect_url.startswith("//"):
-        redirect_url = url_for("main_bp.master_data_ingredients_route")
-
     if result.get("ok"):
         moved_count = int(result.get("moved_reference_count") or 0)
         message = (
@@ -2036,15 +2216,15 @@ def merge_ingredient_master_record_route(ingredient_id):
 def update_ingredient_master_store_section_route(ingredient_id):
     active_public_user = current_public_user()
     allow_other_users = is_admin_user(active_public_user)
+    redirect_url = canonicalize_master_data_redirect_url(
+        request.form.get("redirect_url"),
+        default_page="ingredients",
+    )
     result = recipe_master_data.update_ingredient_store_section(
         ingredient_id,
         request.form.get("store_section"),
         allow_other_users=allow_other_users,
     )
-    redirect_url = recipe_master_data.clean_text(request.form.get("redirect_url"))
-    if not redirect_url.startswith("/") or redirect_url.startswith("//"):
-        redirect_url = url_for("main_bp.master_data_ingredients_route")
-
     if result.get("ok"):
         section = result.get("store_section") or "MISC"
         if result.get("changed"):
@@ -2091,6 +2271,12 @@ def recipe_master_data_backfill_route():
     record_type = str(request.form.get("record_type") or "ingredients").strip()
     if record_type not in MASTER_DATA_PAGE_CONFIG:
         record_type = "ingredients"
+    scope_info = master_data_form_scope()
+    redirect_url = canonicalize_master_data_redirect_url(
+        request.form.get("redirect_url"),
+        default_page=record_type,
+        fallback_scope_info=scope_info,
+    )
 
     include_legacy = str(request.form.get("include_legacy") or "").strip().lower() in {"1", "true", "yes", "on"}
     force = str(request.form.get("force") or "").strip().lower() in {"1", "true", "yes", "on"}
@@ -2139,7 +2325,6 @@ def recipe_master_data_backfill_route():
             {"error": message},
         )
 
-    redirect_url = url_for(MASTER_DATA_PAGE_CONFIG[record_type]["route_endpoint"])
     progress = recipe_master_data.recipe_master_backfill_progress(job_id)
 
     session["recipe_master_data_messages"] = [{
@@ -2206,6 +2391,11 @@ def recipe_master_data_generate_missing_images_route():
         }), 400
 
     scope_info = master_data_form_scope()
+    redirect_url = canonicalize_master_data_redirect_url(
+        request.form.get("redirect_url"),
+        default_page=record_type,
+        fallback_scope_info=scope_info,
+    )
 
     job_id = recipe_master_data.clean_text(request.form.get("job_id")) or uuid.uuid4().hex
     search = recipe_master_data.clean_text(request.form.get("search"))
@@ -2225,8 +2415,7 @@ def recipe_master_data_generate_missing_images_route():
         "scope": scope_info["scope"],
         "user_id": scope_info["user_id"],
         "include_all_users": scope_info["include_all_users"],
-        "redirect_url": recipe_master_data.clean_text(request.form.get("redirect_url"))
-        or url_for(MASTER_DATA_PAGE_CONFIG[record_type]["route_endpoint"]),
+        "redirect_url": redirect_url,
     })
 
 

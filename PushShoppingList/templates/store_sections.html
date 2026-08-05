@@ -80,7 +80,8 @@
 {% endmacro %}
 
 {% block app_body_attributes %}
-data-user-id="{{ master_data.scope_user_id }}"
+data-user-id="{{ master_data.viewer_user_id }}"
+data-viewer-user-id="{{ master_data.viewer_user_id }}"
 {% endblock %}
 
 {% block app_content %}
@@ -402,7 +403,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                                     class="store-section-master-usage-button"
                                     data-store-section-master-usage-open
                                     data-store-section-master-usage-kind="ingredients"
-                                    data-store-section-master-usage-url="{{ url_for('main_bp.master_data_store_section_usage_route', section_id=section.id) }}"
+                                    data-store-section-master-usage-url="{{ url_for('main_bp.master_data_store_section_usage_route', section_id=section.id, viewer_user_id=master_data.viewer_user_id or none) }}"
                                     aria-haspopup="dialog"
                                     aria-controls="storeSectionMasterUsageDialog"
                                     {% if not section.ingredient_count %}disabled{% endif %}
@@ -414,7 +415,7 @@ data-user-id="{{ master_data.scope_user_id }}"
                                     class="store-section-master-usage-button"
                                     data-store-section-master-usage-open
                                     data-store-section-master-usage-kind="recipes"
-                                    data-store-section-master-usage-url="{{ url_for('main_bp.master_data_store_section_usage_route', section_id=section.id) }}"
+                                    data-store-section-master-usage-url="{{ url_for('main_bp.master_data_store_section_usage_route', section_id=section.id, viewer_user_id=master_data.viewer_user_id or none) }}"
                                     aria-haspopup="dialog"
                                     aria-controls="storeSectionMasterUsageDialog"
                                     {% if not section.recipe_reference_count %}disabled{% endif %}

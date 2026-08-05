@@ -4557,7 +4557,8 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert "recipe-edit-store-section-menu-footer" in script
     assert "Add custom section…" in script
     assert "Manage Store Sections…" in script
-    assert 'href="/admin/master-data/store-sections"' in script
+    assert 'masterDataViewerUrl("/admin/master-data/store-sections")' in script
+    assert 'href="/admin/master-data/store-sections"' not in script
     assert 'target="_blank"' in script
     assert 'rel="noopener"' in script
     assert 'aria-label="Manage Store Sections in a new tab"' in script

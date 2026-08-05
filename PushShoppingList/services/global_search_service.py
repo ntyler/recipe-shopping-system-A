@@ -22,6 +22,7 @@ from urllib.parse import urlsplit
 from PushShoppingList.services import cookbook_service
 from PushShoppingList.services import home_store_location_service
 from PushShoppingList.services import meal_plan_service
+from PushShoppingList.services import master_data_url_service
 from PushShoppingList.services import menu_store_service
 from PushShoppingList.services import pantry_service
 from PushShoppingList.services import recipe_ingredient_service
@@ -622,7 +623,11 @@ def master_data_candidate(group, row):
         row.get("id"),
         row.get("name"),
         result_type,
-        result_url(f"/admin/master-data/{route_kind}", search=row.get("name")),
+        master_data_url_service.build_master_data_url(
+            route_kind,
+            viewer_user_id=storage_service.active_user_id(),
+            overrides={"search": row.get("name")},
+        ),
         secondary=result_context(
             section,
             f"Used by {usage_count} recipe{'s' if usage_count != 1 else ''}",

@@ -4,7 +4,16 @@
 {% set app_active_nav_item = "settings" %}
 {% set app_search_id = "masterDataGlobalSearch" %}
 {% set app_content_class = "master-data-app-content" %}
-{% macro master_data_reference_url(row, master_data) -%}{{ url_for('main_bp.master_data_record_references_route', record_type=master_data.record_type, record_id=row.id) }}{% if master_data.scope == 'all' %}?scope=all{% elif master_data.scope == 'user' and master_data.scope_user_id %}?scope=user&user_id={{ master_data.scope_user_id|urlencode }}{% endif %}{%- endmacro %}
+{% macro master_data_reference_url(row, master_data) -%}
+    {{- url_for(
+        'main_bp.master_data_record_references_route',
+        record_type=master_data.record_type,
+        record_id=row.id,
+        viewer_user_id=master_data.viewer_user_id or none,
+        scope=master_data.scope if master_data.scope in ['all', 'user'] else none,
+        user_id=master_data.scope_user_id if master_data.scope == 'user' else none
+    ) -}}
+{%- endmacro %}
 {% macro render_master_data_row(row, master_data) -%}
     {% set reference_row_id = 'masterDataReferences-' ~ master_data.record_type ~ '-' ~ row.id %}
     {% set ingredient_form_id = 'masterDataIngredientForm-' ~ row.id %}
@@ -72,7 +81,7 @@
                                 data-source-name="{{ row.name }}"
                                 data-source-normalized-name="{{ row.normalized_name }}"
                                 data-source-usage-count="{{ row.usage_count }}"
-                                data-merge-options-url="{{ url_for('main_bp.ingredient_master_merge_options_route', ingredient_id=row.id) }}"
+                                data-merge-options-url="{{ url_for('main_bp.ingredient_master_merge_options_route', ingredient_id=row.id, viewer_user_id=master_data.viewer_user_id or none) }}"
                                 data-merge-url="{{ url_for('main_bp.merge_ingredient_master_record_route', ingredient_id=row.id) }}"
                                 aria-controls="masterDataIngredientMergeDialog">
                             Merge duplicate
@@ -194,6 +203,10 @@
         </tr>
     {% endif %}
 {%- endmacro %}
+{% block app_body_attributes %}
+data-user-id="{{ master_data.viewer_user_id }}"
+data-viewer-user-id="{{ master_data.viewer_user_id }}"
+{% endblock %}
 {% block app_content %}
     <section class="master-data-page" aria-labelledby="masterDataTitle">
         <header class="master-data-header">
@@ -228,6 +241,11 @@
         <form class="master-data-filter-form {% if master_data.record_type == 'ingredients' %}master-data-filter-form--ingredients{% endif %}"
               method="GET"
               action="{{ url_for(master_data.route_endpoint) }}">
+            {% if master_data.viewer_user_id %}
+                <input type="hidden"
+                       name="viewer_user_id"
+                       value="{{ master_data.viewer_user_id }}">
+            {% endif %}
             <label class="master-data-search-field">
                 <span>Search</span>
                 <input type="search"
@@ -238,7 +256,7 @@
             {% if master_data.is_admin %}
                 <label class="master-data-scope-filter-field">
                     <span>Scope</span>
-                    <select name="scope">
+                    <select name="scope" data-master-scope-filter>
                         <option value="mine" {% if master_data.scope == 'mine' %}selected{% endif %}>My data</option>
                         <option value="all" {% if master_data.scope == 'all' %}selected{% endif %}>All users</option>
                         <option value="user" {% if master_data.scope == 'user' %}selected{% endif %}>Specific user</option>
@@ -251,7 +269,9 @@
                            value="{% if master_data.scope == 'user' %}{{ master_data.scope_user_id }}{% endif %}"
                            list="masterDataUserIds"
                            placeholder="{{ master_data.current_scope_user.label }}"
-                           aria-describedby="masterDataUserHint">
+                           aria-describedby="masterDataUserHint"
+                           data-master-target-user-filter
+                           {% if master_data.scope == 'user' %}required{% else %}disabled{% endif %}>
                     <datalist id="masterDataUserIds">
                         {% for user in master_data.available_users %}
                             <option value="{{ user.user_id }}" label="{{ user.label }}">{{ user.label }}</option>
@@ -345,7 +365,7 @@
                      data-scope="{{ master_data.scope }}"
                      data-user-id="{{ master_data.scope_user_id }}"
                      data-undo-url="{{ master_data.ingredient_store_section_undo_url }}"
-                     data-undo-preview-url="{{ url_for('main_bp.preview_misc_ingredient_reclassification_undo_route') }}"
+                     data-undo-preview-url="{{ url_for('main_bp.preview_misc_ingredient_reclassification_undo_route', viewer_user_id=master_data.viewer_user_id or none) }}"
                      data-undo-available="{{ 'true' if master_data.latest_store_section_reclassification else 'false' }}"
                      data-undo-batch-id="{{ master_data.latest_store_section_reclassification.batch_id if master_data.latest_store_section_reclassification else '' }}"
                      aria-live="polite">
@@ -602,6 +622,7 @@
                   method="POST"
                   action="{{ url_for('main_bp.recipe_master_data_backfill_route') }}">
                 <input type="hidden" name="record_type" value="{{ master_data.record_type }}">
+                <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
                 <div>
                     <strong>Backfill normalized data</strong>
                     <span>Uses existing recipe JSON and the current recipe master service.</span>
@@ -653,8 +674,9 @@
                       action="{{ master_data.image_generation_url }}">
                     <input type="hidden" name="record_type" value="{{ master_data.record_type }}">
                     <input type="hidden" name="scope" value="{{ master_data.scope }}">
-                    <input type="hidden" name="user_id"
-                           value="{% if master_data.scope == 'user' %}{{ master_data.scope_user_id }}{% elif master_data.scope == 'mine' %}{{ master_data.current_scope_user_id }}{% endif %}">
+                    {% if master_data.scope == 'user' %}
+                        <input type="hidden" name="user_id" value="{{ master_data.scope_user_id }}">
+                    {% endif %}
                     <input type="hidden" name="search" value="{{ master_data.search }}">
                     <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
                     <div>

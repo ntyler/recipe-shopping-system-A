@@ -328,6 +328,18 @@ def create_app():
                 f"public, max-age={generated_static_cache_seconds()}, immutable"
             )
 
+        if (
+            request.path == "/admin/master-data"
+            or request.path.startswith("/admin/master-data/")
+            or request.path == "/api/master-data"
+            or request.path.startswith("/api/master-data/")
+        ):
+            # These pages and APIs resolve their workspace from the signed
+            # Flask session. Protect successful responses as well as auth and
+            # canonical redirects/errors returned before a route runs.
+            response.headers["Cache-Control"] = "private, no-store"
+            response.headers["Pragma"] = "no-cache"
+
         if getattr(g, "clear_guest_demo_cookie", False):
             clear_guest_cookie(response)
 

@@ -2,6 +2,32 @@ function saveScroll() {
     localStorage.setItem("scrollY", window.scrollY);
 }
 
+function masterDataViewerUrl(rawUrl, values = {}) {
+    const url = new URL(String(rawUrl || ""), window.location.origin);
+    Object.entries(values || {}).forEach(([name, rawValue]) => {
+        const value = String(rawValue == null ? "" : rawValue);
+        if (value.trim()) {
+            url.searchParams.set(name, value);
+        } else {
+            url.searchParams.delete(name);
+        }
+    });
+    const body = document.body;
+    const viewerUserId = String(
+        body && (body.dataset.viewerUserId || body.dataset.userId) || "",
+    ).trim();
+    if (url.origin !== window.location.origin) {
+        url.searchParams.delete("viewer_user_id");
+    } else if (viewerUserId) {
+        url.searchParams.set("viewer_user_id", viewerUserId);
+    } else {
+        url.searchParams.delete("viewer_user_id");
+    }
+    return url.origin === window.location.origin
+        ? `${url.pathname}${url.search}${url.hash}`
+        : url.toString();
+}
+
 function supportPublicConfigFromPage() {
     const fallback = {
         supportEmail: "support@recipeshoppinglist.com",
@@ -28027,7 +28053,7 @@ function renderRecipeIngredientColumnViewMenu(menu) {
         </fieldset>
         <div class="recipe-edit-ingredient-column-view-footer">
             ${columnKey === "store" ? `
-                <a href="/admin/master-data/store-sections"
+                <a href="${escapeAttribute(masterDataViewerUrl("/admin/master-data/store-sections"))}"
                    class="recipe-edit-ingredient-column-view-manage">
                     Manage Store Sections
                 </a>
@@ -43591,7 +43617,9 @@ function initStoreSectionMasterUsageDialog() {
             0,
             Number(item?.recipe_reference_count) || 0,
         );
-        const manageUrl = String(item?.manage_url || "");
+        const manageUrl = item?.manage_url
+            ? masterDataViewerUrl(item.manage_url)
+            : "";
         const content = `
             ${usageResultVisualHtml({ imageUrl: item?.image_url })}
             <span class="store-section-master-usage-result-copy">
@@ -44243,7 +44271,7 @@ function renderRecipeIngredientStoreSectionMenu(menu, select) {
                     ${recipeEditSvgIcon("plus")}
                     <span class="recipe-edit-store-section-option-label">Add custom section…</span>
                 </button>
-                <a href="/admin/master-data/store-sections"
+                <a href="${escapeAttribute(masterDataViewerUrl("/admin/master-data/store-sections"))}"
                    target="_blank"
                    rel="noopener"
                    class="recipe-edit-store-section-option recipe-edit-store-section-manage-option"
@@ -46285,7 +46313,9 @@ function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) 
         }).join("");
     }
 
-    const manageUrl = String(data.manage_url || "/admin/master-data/ingredients");
+    const manageUrl = masterDataViewerUrl(
+        data.manage_url || "/admin/master-data/ingredients",
+    );
     menu.innerHTML = `
         <div class="recipe-edit-ingredient-master-heading">
             <strong>Ingredient Master Data</strong>
@@ -46319,8 +46349,11 @@ async function loadRecipeIngredientMasterOptions(menu, input) {
     menu.dataset.masterRequestId = String(requestId);
     renderRecipeIngredientMasterMenu(menu, input, {}, { query, loading: true });
     try {
-        const params = new URLSearchParams({ search: query, limit: "20" });
-        const response = await fetch(`/api/master-data/ingredients/options?${params.toString()}`, {
+        const requestUrl = masterDataViewerUrl(
+            "/api/master-data/ingredients/options",
+            { search: query, limit: "20" },
+        );
+        const response = await fetch(requestUrl, {
             headers: {
                 Accept: "application/json",
                 "X-Requested-With": "fetch",

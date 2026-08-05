@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+from urllib.parse import parse_qsl
+from urllib.parse import urlsplit
 
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
@@ -60,6 +62,28 @@ def configure_master_data_app(monkeypatch, tmp_path):
 def sign_in(client, user_id):
     with client.session_transaction() as session:
         session["user_id"] = user_id
+
+    # Most tests in this module exercise the rendered page rather than the
+    # canonicalization hop itself. Preserve their intent by following the one
+    # expected compatibility redirect for legacy master-data bookmarks. The
+    # canonical URL behavior is asserted directly in
+    # test_master_data_canonical_urls.py.
+    if not getattr(client, "_master_data_get_follows_canonical", False):
+        raw_get = client.get
+
+        def get_with_canonical_redirect(*args, **kwargs):
+            target = args[0] if args else kwargs.get("path", "")
+            path = urlsplit(str(target or "")).path
+            if path in {
+                "/admin/master-data/ingredients",
+                "/admin/master-data/equipment",
+                "/admin/master-data/store-sections",
+            }:
+                kwargs.setdefault("follow_redirects", True)
+            return raw_get(*args, **kwargs)
+
+        client.get = get_with_canonical_redirect
+        client._master_data_get_follows_canonical = True
 
 
 def seed_master_records():
@@ -736,7 +760,9 @@ def test_ingredient_master_options_are_scoped_for_recipe_editor(monkeypatch, tmp
     payload = response.get_json()
     assert response.status_code == 200
     assert payload["ok"] is True
-    assert payload["manage_url"] == "/admin/master-data/ingredients"
+    manage_url = urlsplit(payload["manage_url"])
+    assert manage_url.path == "/admin/master-data/ingredients"
+    assert parse_qsl(manage_url.query) == [("viewer_user_id", "user-a")]
     assert payload["ingredients"] == [{
         "ingredient_id": payload["ingredients"][0]["ingredient_id"],
         "name": "Tomato",
@@ -806,7 +832,12 @@ def test_ingredient_master_merge_routes_scope_candidates_and_resolve_aliases(mon
     assert merge_response.status_code == 200
     assert merge_payload["result"]["target_ingredient_id"] == target["id"]
     assert merge_payload["result"]["moved_reference_count"] == 1
-    assert merge_payload["redirect_url"] == "/admin/master-data/ingredients?search=potato"
+    merge_redirect = urlsplit(merge_payload["redirect_url"])
+    assert merge_redirect.path == "/admin/master-data/ingredients"
+    assert dict(parse_qsl(merge_redirect.query)) == {
+        "viewer_user_id": "user-a",
+        "search": "potato",
+    }
     assert picker_response.status_code == 200
     assert [row["name"] for row in picker_payload["ingredients"]] == ["Potato"]
     assert picker_payload["ingredients"][0]["usage_count"] == 2
@@ -1494,7 +1525,7 @@ def test_master_data_store_section_batch_save_is_wired():
     assert "currentMasterRecordFieldValue(field) !== originalMasterRecordFieldValue(field)" in script
     assert "initMasterDataStoreSectionBatchSave();" in script
     assert '"X-Requested-With": "fetch"' in script
-    assert "window.location.assign(window.location.href)" in script
+    assert "window.location.assign(canonicalMasterDataUrl(window.location.href).toString())" in script
 
     assert ".master-data-store-section-save-panel" in css
     assert ".master-data-store-section-save-panel.has-changes" in css
@@ -1717,7 +1748,7 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "preview.can_undo_now === false" in undo_block
     assert "window.location.reload();" not in undo_block
     assert "data-master-duplicate-references-open" in script
-    assert 'url.searchParams.set("limit", "500")' in script
+    assert 'return canonicalMasterDataUrl(url, { ...context, limit: "500" }).toString();' in script
     assert 'card.dataset.highConfidenceDuplicate' in script
     assert 'card.dataset.mergeBlocked' in script
     assert "Needs data repair" in script
@@ -1918,9 +1949,9 @@ def test_account_menu_links_to_master_data_pages(monkeypatch, tmp_path):
     assert "Ingredient Master Data" in html
     assert "Equipment Master Data" in html
     assert "Store Sections" in html
-    assert "/admin/master-data/ingredients" in html
-    assert "/admin/master-data/equipment" in html
-    assert "/admin/master-data/store-sections" in html
+    assert "/admin/master-data/ingredients?viewer_user_id=user-a" in html
+    assert "/admin/master-data/equipment?viewer_user_id=user-a" in html
+    assert "/admin/master-data/store-sections?viewer_user_id=user-a" in html
 
 
 def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_path):
@@ -2404,7 +2435,8 @@ def test_recipe_editor_store_section_menu_links_to_management_page():
     page = Path("PushShoppingList/templates/store_sections.html").read_text(encoding="utf-8")
 
     assert "Manage Store Sections" in script
-    assert 'href="/admin/master-data/store-sections"' in script
+    assert 'masterDataViewerUrl("/admin/master-data/store-sections")' in script
+    assert 'href="/admin/master-data/store-sections"' not in script
     assert "Store Sections" in template
     assert "store_section_url" in template
     assert "Store Sections" in page

@@ -30,6 +30,51 @@
         return String(value == null ? "" : value);
     }
 
+    function masterDataViewerUserId() {
+        const body = document.body;
+        return text(body && (body.dataset.viewerUserId || body.dataset.userId)).trim();
+    }
+
+    function canonicalMasterDataUrl(rawUrl, values = {}) {
+        const url = new URL(rawUrl || window.location.href, window.location.href);
+
+        Object.entries(values || {}).forEach(([name, rawValue]) => {
+            const value = text(rawValue);
+            if (value.trim()) {
+                url.searchParams.set(name, value);
+            } else {
+                url.searchParams.delete(name);
+            }
+        });
+
+        const nonBlankEntries = [...url.searchParams.entries()].filter(([, value]) => (
+            text(value).trim()
+        ));
+        url.search = "";
+        nonBlankEntries.forEach(([name, value]) => {
+            url.searchParams.append(name, value);
+        });
+
+        const scope = text(url.searchParams.get("scope")).trim().toLowerCase();
+        if (!scope || scope === "mine") {
+            url.searchParams.delete("scope");
+        }
+        if (scope !== "user") {
+            url.searchParams.delete("user_id");
+        }
+        if (text(url.searchParams.get("page")).trim() === "1") {
+            url.searchParams.delete("page");
+        }
+
+        const viewerUserId = masterDataViewerUserId();
+        if (viewerUserId) {
+            url.searchParams.set("viewer_user_id", viewerUserId);
+        } else {
+            url.searchParams.delete("viewer_user_id");
+        }
+        return url;
+    }
+
     function stateLabel(value) {
         const labels = {
             starting: "Starting",
@@ -318,17 +363,40 @@
     }
 
     function filterRedirectUrl(filterForm) {
-        const url = new URL(filterForm.getAttribute("action") || window.location.href, window.location.href);
+        const values = {};
         const formData = new FormData(filterForm);
         for (const [name, rawValue] of formData.entries()) {
-            const value = text(rawValue).trim();
-            if (value) {
-                url.searchParams.set(name, value);
-            } else {
-                url.searchParams.delete(name);
-            }
+            values[name] = text(rawValue);
         }
+        const url = canonicalMasterDataUrl(
+            filterForm.getAttribute("action") || window.location.href,
+            values
+        );
         return `${url.pathname}${url.search}${url.hash}`;
+    }
+
+    function syncMasterDataTargetUserControl(filterForm) {
+        if (!filterForm) return;
+        const scope = filterForm.querySelector("[data-master-scope-filter]");
+        const targetUser = filterForm.querySelector("[data-master-target-user-filter]");
+        if (!scope || !targetUser) return;
+        const selectingUser = text(scope.value).trim().toLowerCase() === "user";
+        targetUser.disabled = !selectingUser;
+        targetUser.required = selectingUser;
+    }
+
+    function initMasterDataFilterForm() {
+        const filterForm = document.querySelector(".master-data-filter-form");
+        if (!filterForm) return;
+        const scope = filterForm.querySelector("[data-master-scope-filter]");
+        syncMasterDataTargetUserControl(filterForm);
+        if (scope) {
+            scope.addEventListener("change", () => syncMasterDataTargetUserControl(filterForm));
+        }
+        filterForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            window.location.assign(filterRedirectUrl(filterForm));
+        });
     }
 
     function syncImageFormFromFilters(form) {
@@ -753,7 +821,7 @@
 
         setReferenceLoading(panel);
         try {
-            const response = await fetch(referenceUrl, {
+            const response = await fetch(canonicalMasterDataUrl(referenceUrl).toString(), {
                 headers: {
                     Accept: "application/json",
                     "X-Requested-With": "fetch",
@@ -1135,7 +1203,7 @@
         );
 
         window.setTimeout(() => {
-            window.location.assign(window.location.href);
+            window.location.assign(canonicalMasterDataUrl(window.location.href).toString());
         }, 700);
     }
 
@@ -1463,8 +1531,11 @@
             renderMasterDataMergeOptions([], "Loading canonical ingredients...");
             setMasterDataMergeError("");
             try {
-                const params = new URLSearchParams({ search: queryValue, limit: "20" });
-                const response = await fetch(`${optionsUrl}?${params.toString()}`, {
+                const requestUrl = canonicalMasterDataUrl(optionsUrl, {
+                    search: queryValue,
+                    limit: "20",
+                });
+                const response = await fetch(requestUrl.toString(), {
                     headers: {
                         Accept: "application/json",
                         "X-Requested-With": "fetch",
@@ -1592,7 +1663,9 @@
                 console.debug("Unable to notify other tabs about the ingredient merge.", storageError);
             }
             window.setTimeout(() => {
-                window.location.assign(data.redirect_url || window.location.href);
+                window.location.assign(
+                    canonicalMasterDataUrl(data.redirect_url || window.location.href).toString()
+                );
             }, 650);
         } catch (error) {
             setMasterDataMergeBusy(false);
@@ -1772,7 +1845,7 @@
     }
 
     async function refreshMasterDataRecordResults() {
-        const response = await fetch(window.location.href, {
+        const response = await fetch(canonicalMasterDataUrl(window.location.href).toString(), {
             headers: { Accept: "text/html", "X-Requested-With": "fetch" },
         });
         if (!response.ok) {
@@ -2030,14 +2103,11 @@
 
     function masterDataReviewHistoryUrl() {
         const duplicateEls = masterDataDuplicateElements();
-        const url = new URL(
-            text(duplicateEls.panel && duplicateEls.panel.dataset.reviewHistoryUrl),
-            window.location.origin
-        );
         const context = masterDataDuplicateRequestContext();
-        if (context.scope) url.searchParams.set("scope", context.scope);
-        if (context.user_id) url.searchParams.set("user_id", context.user_id);
-        return url.toString();
+        return canonicalMasterDataUrl(
+            text(duplicateEls.panel && duplicateEls.panel.dataset.reviewHistoryUrl),
+            context
+        ).toString();
     }
 
     function masterDataReviewHistoryItem(decision) {
@@ -2449,11 +2519,14 @@
             els.confirm.textContent = "Undo this merge";
         }
         try {
-            const url = new URL(text(duplicateEls.panel.dataset.undoMergePreviewUrl), window.location.origin);
             const context = masterDataDuplicateRequestContext();
-            if (context.scope) url.searchParams.set("scope", context.scope);
-            if (context.user_id) url.searchParams.set("user_id", context.user_id);
-            if (Number(mergeId) > 0) url.searchParams.set("merge_id", String(Number(mergeId)));
+            const url = canonicalMasterDataUrl(
+                text(duplicateEls.panel.dataset.undoMergePreviewUrl),
+                {
+                    ...context,
+                    merge_id: Number(mergeId) > 0 ? String(Number(mergeId)) : "",
+                }
+            );
             const response = await fetch(url.toString(), {
                 headers: { Accept: "application/json", "X-Requested-With": "fetch" },
             });
@@ -2733,13 +2806,10 @@
 
     function masterDataDuplicateReferenceUrl(ingredientId) {
         const els = masterDataDuplicateElements();
-        const url = new URL(text(els.panel && els.panel.dataset.referenceUrl), window.location.origin);
+        const url = canonicalMasterDataUrl(text(els.panel && els.panel.dataset.referenceUrl));
         url.pathname = url.pathname.replace(/\/0\/references$/, `/${Number(ingredientId) || 0}/references`);
         const context = masterDataDuplicateRequestContext();
-        if (context.scope) url.searchParams.set("scope", context.scope);
-        if (context.user_id) url.searchParams.set("user_id", context.user_id);
-        url.searchParams.set("limit", "500");
-        return url.toString();
+        return canonicalMasterDataUrl(url, { ...context, limit: "500" }).toString();
     }
 
     function renderMasterDataDuplicateReferenceColumn(column, data) {
@@ -3299,11 +3369,11 @@
 
     function duplicateReviewsUrl() {
         const els = masterDataDuplicateElements();
-        const url = new URL(text(els.panel && els.panel.dataset.reviewsUrl), window.location.origin);
         const context = masterDataDuplicateRequestContext();
-        if (context.scope) url.searchParams.set("scope", context.scope);
-        if (context.user_id) url.searchParams.set("user_id", context.user_id);
-        return url.toString();
+        return canonicalMasterDataUrl(
+            text(els.panel && els.panel.dataset.reviewsUrl),
+            context
+        ).toString();
     }
 
     async function loadMasterDataDuplicateReviews() {
@@ -3790,8 +3860,7 @@
             return;
         }
 
-        const url = new URL(statusUrl, window.location.href);
-        url.searchParams.set("job_id", jobId);
+        const url = canonicalMasterDataUrl(statusUrl, { job_id: jobId });
 
         try {
             const response = await fetch(url.toString(), {
@@ -3829,8 +3898,7 @@
             return;
         }
 
-        const url = new URL(statusUrl, window.location.href);
-        url.searchParams.set("job_id", jobId);
+        const url = canonicalMasterDataUrl(statusUrl, { job_id: jobId });
 
         try {
             const response = await fetch(url.toString(), {
@@ -3850,7 +3918,11 @@
                         if (data.progress.status === "complete") {
                             window.clearTimeout(imageRefreshTimer);
                             imageRefreshTimer = window.setTimeout(() => {
-                                window.location.assign(form.dataset.imageRedirectUrl || window.location.href);
+                                window.location.assign(
+                                    canonicalMasterDataUrl(
+                                        form.dataset.imageRedirectUrl || window.location.href
+                                    ).toString()
+                                );
                             }, REFRESH_DELAY_MS);
                         }
                     }
@@ -3907,7 +3979,7 @@
             window.clearTimeout(pollTimer);
             if (data.redirect_url) {
                 window.setTimeout(() => {
-                    window.location.assign(data.redirect_url);
+                    window.location.assign(canonicalMasterDataUrl(data.redirect_url).toString());
                 }, REFRESH_DELAY_MS);
             } else {
                 setBusy(form, false);
@@ -3968,7 +4040,11 @@
                 if (data.progress.status === "complete") {
                     window.clearTimeout(imageRefreshTimer);
                     imageRefreshTimer = window.setTimeout(() => {
-                        window.location.assign(form.dataset.imageRedirectUrl || window.location.href);
+                        window.location.assign(
+                            canonicalMasterDataUrl(
+                                form.dataset.imageRedirectUrl || window.location.href
+                            ).toString()
+                        );
                     }, REFRESH_DELAY_MS);
                 }
             }
@@ -4229,14 +4305,15 @@
         const rawUrl = text(panel && panel.dataset.referenceUrl).trim();
         if (!rawUrl) return "";
         try {
-            const url = new URL(rawUrl, window.location.origin);
+            const url = canonicalMasterDataUrl(rawUrl);
             url.pathname = url.pathname.replace(/\/0\/references$/, `/${Number(ingredientId) || 0}/references`);
             const scope = text(panel.dataset.scope).trim();
             const userId = text(panel.dataset.userId).trim();
-            if (scope) url.searchParams.set("scope", scope);
-            if (userId) url.searchParams.set("user_id", userId);
-            url.searchParams.set("limit", "500");
-            return url.toString();
+            return canonicalMasterDataUrl(url, {
+                scope,
+                user_id: userId,
+                limit: "500",
+            }).toString();
         } catch (error) {
             return "";
         }
@@ -5122,11 +5199,10 @@
             els.confirm.textContent = "Undo this decision";
         }
         try {
-            const url = new URL(panel.dataset.undoPreviewUrl, window.location.origin);
-            if (Number(batchId) > 0) url.searchParams.set("batch_id", String(Number(batchId)));
-            if (Number(ingredientId) > 0) {
-                url.searchParams.set("ingredient_id", String(Number(ingredientId)));
-            }
+            const url = canonicalMasterDataUrl(panel.dataset.undoPreviewUrl, {
+                batch_id: Number(batchId) > 0 ? String(Number(batchId)) : "",
+                ingredient_id: Number(ingredientId) > 0 ? String(Number(ingredientId)) : "",
+            });
             const response = await fetch(url.toString(), {
                 headers: { Accept: "application/json", "X-Requested-With": "fetch" },
             });
@@ -5438,6 +5514,7 @@
     }
 
     function initMasterDataPage() {
+        initMasterDataFilterForm();
         initMasterDataMaintenance();
         initMasterDataReferences();
         initMasterDataThumbnailSizeControls();
