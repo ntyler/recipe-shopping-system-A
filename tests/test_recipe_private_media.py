@@ -285,6 +285,40 @@ def test_recipe_archive_pdf_canonicalizes_redirects_errors_and_sensitive_paramet
         assert_private_no_store(not_found)
 
 
+def test_recipe_archive_pdf_does_not_serve_invalid_local_fallback(monkeypatch, tmp_path):
+    app = configured_app(monkeypatch, tmp_path)
+    invalid_pdf = tmp_path / "invalid-generated.pdf"
+    invalid_pdf.write_bytes(b"%PDF-1.4\nERR_FILE_NOT_FOUND\n%%EOF\n")
+    monkeypatch.setattr(recipe_routes, "recipe_pdf_path", lambda *_args: invalid_pdf)
+    monkeypatch.setattr(
+        recipe_routes,
+        "ensure_recipe_pdf_cloudflare_link",
+        lambda *_args, **_kwargs: {
+            "ok": False,
+            "success": False,
+            "code": "local_pdf_invalid",
+            "public_url": "",
+            "error": "The local PDF contains a Chrome error page and was not uploaded.",
+        },
+    )
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.get(
+            "/recipe_archive_pdf",
+            query_string={
+                "viewer_user_id": "user-a",
+                "url": SOURCE_URL,
+                "kind": "generated_recipe",
+            },
+        )
+
+    assert response.status_code == 409
+    assert "Chrome error page" in response.get_data(as_text=True)
+    assert not response.data.startswith(b"%PDF")
+    assert_private_no_store(response)
+
+
 def test_restaurant_logo_is_private_and_rejects_duplicate_resource_ids(
     monkeypatch,
     tmp_path,

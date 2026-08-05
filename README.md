@@ -174,6 +174,21 @@ Public PDF links are built as `R2_PUBLIC_BASE_URL + "/" + r2_object_key`. Do not
 
 Set `DELETE_LOCAL_PDF_AFTER_UPLOAD=1` only if you want generated local PDFs removed after a successful Cloudflare R2 upload.
 
+Audit generated-recipe PDFs without changing R2 (the default and recommended first step):
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m PushShoppingList.scripts.repair_generated_recipe_pdfs
+```
+
+The audit writes `output/pdf/generated-recipe-pdf-repair-report.json`. It detects Chrome error pages and, where a saved recipe can be mapped unambiguously, PDFs that do not contain the intended recipe title and content. After reviewing that report and explicitly approving production repair, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m PushShoppingList.scripts.repair_generated_recipe_pdfs --apply --confirm-r2-overwrite
+```
+
+The repair is resumable through `output/pdf/generated-recipe-pdf-repair-state.jsonl`. It validates regenerated recipe content before conditionally overwriting the existing deterministic key at its expected ETag, verifies the replacement remotely, reconciles metadata after an interrupted run, and never deletes the R2 object first.
+
 Optional recipe-fetch controls:
 
 ```powershell

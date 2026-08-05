@@ -5,11 +5,13 @@ import html
 import base64
 import contextvars
 import io
+import hashlib
 import mimetypes
 import imghdr
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unicodedata
@@ -783,6 +785,36 @@ PDF_MARGIN_RIGHT_IN = 0.45
 PDF_BASE_SCALE = 0.92
 PDF_MAX_CONTINUOUS_HEIGHT_IN = 200
 PDF_MIN_CONTINUOUS_SCALE = 0.1
+PDF_MIN_VALID_BYTES = 512
+PDF_VALIDATION_VERSION = "generated_recipe_v2"
+_PDF_FINALIZE_LOCKS = tuple(threading.RLock() for _ in range(32))
+BROWSER_ERROR_TEXT_PATTERNS = (
+    r"\b(?:net::)?err_[a-z0-9_]+\b",
+    r"\byour file couldn['’]t be accessed\b",
+    r"\bthis site can['’]t be reached\b",
+    r"\byour connection is not private\b",
+    r"\bthe webpage is not available\b",
+    r"\bthere is no internet connection\b",
+)
+BROWSER_ERROR_DOCUMENT_MARKERS = (
+    "chrome-error://chromewebdata",
+    "id=\"main-frame-error\"",
+    "class=\"neterror\"",
+    "data-error-code=\"err_",
+)
+BROWSER_ERROR_COMPACT_CODES = {
+    "ERRFILENOTFOUND": "ERR_FILE_NOT_FOUND",
+    "ERRACCESSDENIED": "ERR_ACCESS_DENIED",
+    "ERRNAMENOTRESOLVED": "ERR_NAME_NOT_RESOLVED",
+    "ERRCONNECTIONREFUSED": "ERR_CONNECTION_REFUSED",
+    "ERRCONNECTIONRESET": "ERR_CONNECTION_RESET",
+    "ERRCONNECTIONCLOSED": "ERR_CONNECTION_CLOSED",
+    "ERRINTERNETDISCONNECTED": "ERR_INTERNET_DISCONNECTED",
+    "ERRTIMEDOUT": "ERR_TIMED_OUT",
+    "ERRABORTED": "ERR_ABORTED",
+    "ERRFAILED": "ERR_FAILED",
+    "ERRBLOCKEDBYCLIENT": "ERR_BLOCKED_BY_CLIENT",
+}
 INGREDIENT_STORE_SECTIONS = {
     "produce": "PRODUCE",
     "beef": "MEAT & SEAFOOD",
@@ -1291,19 +1323,85 @@ def set_vision_debug_exception(debug, exc):
     return exception_type, exception_message
 
 
-def safe_filename(text):
-    text = re.sub(r"https?://", "", text)
+def _sanitized_filename_text(text):
+    text = re.sub(r"https?://", "", str(text or ""))
     text = re.sub(r"www\.", "", text)
     text = re.sub(r"[^a-zA-Z0-9_-]+", "_", text)
-    return text.strip("_")[:120] or "recipe"
+    return text.strip("_") or "recipe"
 
 
-def recipe_archive_pdf_path(recipe_url):
+def safe_filename(text):
+    """Return the legacy deterministic filename used by saved records and R2 keys."""
+    return _sanitized_filename_text(text)[:120]
+
+
+def safe_unique_filename(text, max_length=120, hash_length=12):
+    """Return a collision-resistant name for new local or temporary identities."""
+    max_length = max(int(max_length or 120), 16)
+    hash_length = min(max(int(hash_length or 12), 8), 32, max_length - 2)
+    digest = hashlib.sha256(str(text or "").encode("utf-8")).hexdigest()[:hash_length]
+    suffix = f"_{digest}"
+    prefix = _sanitized_filename_text(text)[: max_length - len(suffix)].rstrip("_")
+    return f"{prefix or 'recipe'}{suffix}"
+
+
+def legacy_recipe_identity_is_saved(recipe_url, output_folder=None):
+    output_folder = Path(output_folder) if output_folder is not None else OUTPUT_FOLDER
+    legacy_output_path = output_folder / f"{safe_filename(recipe_url)}.json"
+    if not legacy_output_path.exists():
+        return False
+
+    try:
+        payload = json.loads(legacy_output_path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+
+    if not isinstance(payload, dict):
+        return False
+    expected = str(recipe_url or "").strip()
+    saved_identities = (
+        str(payload.get(key) or "").strip()
+        for key in ("source_url", "url", "original_url")
+    )
+    return any(identity == expected for identity in saved_identities if identity)
+
+
+def recipe_internal_filename(recipe_url, output_folder=None):
+    """Resolve a compatible legacy name or a hashed name for a new long identity."""
+    if len(_sanitized_filename_text(recipe_url)) <= 120:
+        return safe_filename(recipe_url)
+    if legacy_recipe_identity_is_saved(recipe_url, output_folder=output_folder):
+        return safe_filename(recipe_url)
+    return safe_unique_filename(recipe_url, max_length=80)
+
+
+def recipe_output_json_path(recipe_url, output_folder=None):
+    output_folder = Path(output_folder) if output_folder is not None else OUTPUT_FOLDER
+    return output_folder / f"{recipe_internal_filename(recipe_url, output_folder=output_folder)}.json"
+
+
+def legacy_recipe_archive_pdf_path(recipe_url):
     return PDF_FOLDER / f"{safe_filename(recipe_url)}.pdf"
 
 
-def generated_recipe_pdf_path(recipe_url):
+def legacy_generated_recipe_pdf_path(recipe_url):
     return PDF_FOLDER / f"{safe_filename(recipe_url)}_generated_recipe.pdf"
+
+
+def legacy_recipe_pdf_path(recipe_url, pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
+    return (
+        legacy_generated_recipe_pdf_path(recipe_url)
+        if pdf_kind == PDF_KIND_GENERATED_RECIPE
+        else legacy_recipe_archive_pdf_path(recipe_url)
+    )
+
+
+def recipe_archive_pdf_path(recipe_url):
+    return PDF_FOLDER / f"{recipe_internal_filename(recipe_url)}.pdf"
+
+
+def generated_recipe_pdf_path(recipe_url):
+    return PDF_FOLDER / f"{recipe_internal_filename(recipe_url)}_generated_recipe.pdf"
 
 
 def recipe_pdf_path(recipe_url, pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
@@ -1696,24 +1794,63 @@ def attach_cloudflare_pdf_metadata(
     if not object_key or not public_url:
         return json_data
 
-    uploaded_at = utc_iso_now()
-    bucket = str(upload_result.get("bucket") or os.getenv("R2_BUCKET_NAME", "")).strip()
+    pdf_metadata = json_data.get("pdf") if isinstance(json_data.get("pdf"), dict) else {}
+    existing_kind_metadata = (
+        pdf_metadata.get(pdf_kind)
+        if isinstance(pdf_metadata.get(pdf_kind), dict)
+        else {}
+    )
+    existing_r2_metadata = (
+        existing_kind_metadata.get("cloudflare_r2")
+        if isinstance(existing_kind_metadata.get("cloudflare_r2"), dict)
+        else {}
+    )
+    duplicate_object = upload_result.get("code") == "duplicate_object"
+    uploaded_at = str(upload_result.get("uploaded_at") or "").strip()
+    if duplicate_object:
+        uploaded_at = str(
+            json_data.get(f"{prefix}_uploaded_at")
+            or existing_kind_metadata.get("uploaded_at")
+            or existing_r2_metadata.get("uploaded_at")
+            or uploaded_at
+            or ""
+        ).strip()
+    elif not uploaded_at:
+        uploaded_at = utc_iso_now()
+    bucket = str(
+        upload_result.get("bucket")
+        or existing_r2_metadata.get("bucket")
+        or os.getenv("R2_BUCKET_NAME", "")
+    ).strip()
+    etag = str(upload_result.get("etag") or existing_kind_metadata.get("etag") or "").strip()
+    sha256 = str(upload_result.get("sha256") or existing_kind_metadata.get("sha256") or "").strip().lower()
+    try:
+        size_bytes = max(int(upload_result.get("size_bytes") or existing_kind_metadata.get("size_bytes") or 0), 0)
+    except (TypeError, ValueError):
+        size_bytes = 0
     kind_metadata = {
+        **(existing_kind_metadata if duplicate_object else {}),
         "local_path": local_path,
         "r2_object_key": object_key,
         "r2_public_url": public_url,
         "uploaded_at": uploaded_at,
         "cloud_status": "uploaded",
+        "etag": etag,
+        "sha256": sha256,
+        "size_bytes": size_bytes,
         "cloudflare_r2": {
+            **(existing_r2_metadata if duplicate_object else {}),
             "provider": "cloudflare_r2",
             "bucket": bucket,
             "object_key": object_key,
             "public_url": public_url,
             "uploaded_at": uploaded_at,
             "cloud_status": "uploaded",
+            "etag": etag,
+            "sha256": sha256,
+            "size_bytes": size_bytes,
         },
     }
-    pdf_metadata = json_data.get("pdf") if isinstance(json_data.get("pdf"), dict) else {}
     pdf_metadata[pdf_kind] = kind_metadata
 
     if pdf_kind == PDF_KIND_WEBPAGE_BACKUP:
@@ -1722,6 +1859,9 @@ def attach_cloudflare_pdf_metadata(
         pdf_metadata["r2_public_url"] = public_url
         pdf_metadata["uploaded_at"] = uploaded_at
         pdf_metadata["cloud_status"] = "uploaded"
+        pdf_metadata["etag"] = etag
+        pdf_metadata["sha256"] = sha256
+        pdf_metadata["size_bytes"] = size_bytes
         pdf_metadata["cloudflare_r2"] = kind_metadata["cloudflare_r2"]
 
     json_data["pdf"] = pdf_metadata
@@ -1781,11 +1921,47 @@ def maybe_upload_recipe_archive_pdf_to_cloudflare(recipe_url, progress_callback=
             "Saving the PDF archive to Cloudflare R2 and preparing a public link.",
         )
 
-    upload_result = cloudflare_r2_storage.upload_pdf(pdf_path)
+    object_key_path = (
+        legacy_recipe_archive_pdf_path(recipe_url)
+        if legacy_recipe_identity_is_saved(recipe_url)
+        else pdf_path
+    )
+    stable_object_key = cloudflare_r2_storage.object_key_for_pdf(object_key_path)
+    upload_result = cloudflare_r2_storage.upload_pdf(
+        pdf_path,
+        object_key=stable_object_key,
+    )
 
-    if cloudflare_pdf_upload_is_usable(upload_result):
+    if upload_result.get("ok"):
+        upload_result["fresh_upload"] = True
+        upload_result["already_exists"] = False
         delete_local_pdf_after_cloudflare_upload(pdf_path)
         return upload_result
+
+    if upload_result.get("code") == "duplicate_object":
+        remote = cloudflare_r2_storage.head_pdf_object(
+            upload_result.get("object_key") or stable_object_key
+        )
+        if remote.get("ok") and remote.get("exists"):
+            upload_result.update({
+                "bucket": remote.get("bucket", ""),
+                "uploaded_at": remote.get("uploaded_at", ""),
+                "etag": remote.get("etag", ""),
+                "sha256": remote.get("sha256", ""),
+                "size_bytes": remote.get("size_bytes", 0),
+                "verified": True,
+                "fresh_upload": False,
+                "already_exists": True,
+                "remote_metadata": remote,
+            })
+            return upload_result
+
+        upload_result["code"] = "duplicate_verification_failed"
+        upload_result["error"] = (
+            remote.get("error")
+            or "The existing Cloudflare R2 PDF could not be verified."
+        )
+        upload_result["remote_metadata"] = remote
 
     print(f"Cloudflare R2 recipe PDF upload failed: {upload_result.get('error', 'Unknown error')}")
 
@@ -5189,6 +5365,67 @@ def wait_for_browser_document(driver, timeout_seconds=8):
         time.sleep(0.25)
 
 
+def browser_error_page_details(page_source="", current_url="", title=""):
+    page_source = str(page_source or "")
+    current_url = str(current_url or "")
+    title = str(title or "")
+    combined_text = "\n".join((current_url, title, page_source))
+    lowered = combined_text.lower()
+    compact_upper = re.sub(r"[^A-Z0-9]+", "", combined_text.upper())
+    marker = next(
+        (candidate for candidate in BROWSER_ERROR_DOCUMENT_MARKERS if candidate in lowered),
+        "",
+    )
+    pattern_match = next(
+        (
+            match
+            for pattern in BROWSER_ERROR_TEXT_PATTERNS
+            if (match := re.search(pattern, combined_text, flags=re.IGNORECASE))
+        ),
+        None,
+    )
+    code_match = re.search(r"\b(?:net::)?(err_[a-z0-9_]+)\b", combined_text, flags=re.IGNORECASE)
+    compact_code_key = next(
+        (candidate for candidate in BROWSER_ERROR_COMPACT_CODES if candidate in compact_upper),
+        "",
+    )
+    compact_code = BROWSER_ERROR_COMPACT_CODES.get(compact_code_key, "")
+    is_error = bool(marker or pattern_match or compact_code)
+    return {
+        "is_error": is_error,
+        "marker": marker or (pattern_match.group(0) if pattern_match else "") or compact_code,
+        "error_code": compact_code or (code_match.group(1).upper() if code_match else ""),
+        "current_url": current_url,
+        "title": title,
+    }
+
+
+def browser_page_load_error(driver):
+    def attribute_value(name):
+        try:
+            return getattr(driver, name, "")
+        except Exception:
+            return ""
+
+    return browser_error_page_details(
+        page_source=attribute_value("page_source"),
+        current_url=attribute_value("current_url"),
+        title=attribute_value("title"),
+    )
+
+
+def ensure_browser_page_is_printable(driver, target=""):
+    details = browser_page_load_error(driver)
+    if not details.get("is_error"):
+        return details
+
+    error_code = details.get("error_code") or details.get("marker") or "browser load failure"
+    raise RuntimeError(
+        f"Chrome could not load the PDF source ({error_code})"
+        + (f": {target}" if target else ".")
+    )
+
+
 def prepare_page_for_pdf_print(driver):
     wait_for_browser_document(driver, timeout_seconds=20)
 
@@ -5390,8 +5627,18 @@ def write_pdf_source_html(recipe_url, html_text):
         else:
             source_html = f"{print_fix_tag}\n{source_html}"
 
-    source_path = LOG_FOLDER / f"{safe_filename(recipe_url)}_PDF_SOURCE.html"
-    source_path.write_text(source_html, encoding="utf-8")
+    temp_root = Path(
+        os.getenv("RECIPE_PDF_TEMP_DIR", "").strip()
+        or (Path(tempfile.gettempdir()) / "recipe-pdf")
+    )
+    temp_root.mkdir(parents=True, exist_ok=True)
+    source_identity = safe_unique_filename(recipe_url, max_length=40, hash_length=12)
+    source_path = temp_root / f"{source_identity}_{uuid.uuid4().hex[:12]}.html"
+    try:
+        source_path.write_text(source_html, encoding="utf-8")
+    except Exception:
+        remove_temporary_pdf_source(source_path)
+        raise
     return source_path
 
 
@@ -5820,6 +6067,7 @@ def write_menu_source_page_pdf(menu_url, pdf_path, expected_names=None):
                 continue
 
             prepare_page_for_pdf_print(driver)
+            ensure_browser_page_is_printable(driver, menu_url)
             print_current_browser_page_to_pdf(driver, pdf_path)
             pdf_validation = validate_menu_source_pdf_file(
                 pdf_path,
@@ -5981,6 +6229,194 @@ def create_menu_source_pdf(menu_url, sections=None, progress_callback=None, canc
         )
 
 
+def normalize_pdf_evidence_text(value):
+    value = unicodedata.normalize("NFKD", str(value or "")).casefold()
+    return re.sub(r"[^a-z0-9]+", " ", value).strip()
+
+
+def _pdf_evidence_phrase(value, max_words=16):
+    normalized = normalize_pdf_evidence_text(value)
+    words = normalized.split()
+    if not words or len("".join(words)) < 3:
+        return ""
+    return " ".join(words[:max_words])
+
+
+def pdf_evidence_is_present(evidence, normalized_pdf_text):
+    """Match recipe evidence despite harmless PDF text-extraction word splits."""
+    evidence = normalize_pdf_evidence_text(evidence)
+    normalized_pdf_text = normalize_pdf_evidence_text(normalized_pdf_text)
+    if not evidence:
+        return False
+    if evidence in normalized_pdf_text:
+        return True
+
+    # Chrome/PDF font positioning can make an extractor return ``T omato`` for
+    # a visibly continuous word. Compact matching is limited to meaningful
+    # phrases so short tokens do not create broad semantic false positives.
+    compact_evidence = re.sub(r"[^a-z0-9]+", "", evidence)
+    compact_pdf_text = re.sub(r"[^a-z0-9]+", "", normalized_pdf_text)
+    return len(compact_evidence) >= 6 and compact_evidence in compact_pdf_text
+
+
+def _recipe_pdf_expected_evidence(expected_recipe=None, expected_title=""):
+    recipe = expected_recipe if isinstance(expected_recipe, dict) else {}
+    title = (
+        expected_title
+        or recipe.get("recipe_title")
+        or recipe.get("title")
+        or recipe.get("name")
+        or ""
+    )
+    title_evidence = _pdf_evidence_phrase(title, max_words=20)
+    content_evidence = []
+
+    for item in recipe.get("ingredients", []) if isinstance(recipe.get("ingredients"), list) else []:
+        if isinstance(item, dict):
+            value = item.get("ingredient") or item.get("name") or item.get("original_text")
+        else:
+            value = item
+        phrase = _pdf_evidence_phrase(value, max_words=12)
+        if phrase and phrase not in content_evidence:
+            content_evidence.append(phrase)
+        if len(content_evidence) >= 8:
+            break
+
+    for item in recipe.get("instructions", []) if isinstance(recipe.get("instructions"), list) else []:
+        if isinstance(item, dict):
+            value = item.get("instruction") or item.get("text")
+        else:
+            value = item
+        phrase = _pdf_evidence_phrase(value, max_words=12)
+        if phrase and phrase not in content_evidence:
+            content_evidence.append(phrase)
+        if len(content_evidence) >= 12:
+            break
+
+    if not content_evidence:
+        for item in recipe.get("equipment", []) if isinstance(recipe.get("equipment"), list) else []:
+            if isinstance(item, dict):
+                value = item.get("name") or item.get("equipment") or item.get("text")
+            else:
+                value = item
+            phrase = _pdf_evidence_phrase(value, max_words=8)
+            if phrase and phrase not in content_evidence:
+                content_evidence.append(phrase)
+            if len(content_evidence) >= 4:
+                break
+
+    return {
+        "title": title_evidence,
+        "content": content_evidence,
+    }
+
+
+def validate_generated_recipe_pdf(
+    pdf_path,
+    expected_recipe=None,
+    expected_title="",
+    *,
+    require_recipe_evidence=False,
+):
+    """Validate PDF structure, browser errors, and intended-recipe evidence."""
+    path = Path(pdf_path)
+    result = {
+        "ok": False,
+        "error": "",
+        "errors": [],
+        "validation_version": PDF_VALIDATION_VERSION,
+        "pdf_path": str(path),
+        "sha256": "",
+        "size_bytes": 0,
+        "page_count": 0,
+        "text_length": 0,
+        "matched_evidence": [],
+        "missing_evidence": [],
+        "browser_error": False,
+        "browser_error_code": "",
+        "semantic_validation_required": bool(require_recipe_evidence),
+    }
+
+    try:
+        pdf_bytes = path.read_bytes()
+    except Exception as exc:
+        result["errors"].append(f"PDF file could not be read: {exc}")
+        result["error"] = result["errors"][0]
+        return result
+
+    result["size_bytes"] = len(pdf_bytes)
+    result["sha256"] = hashlib.sha256(pdf_bytes).hexdigest()
+    if len(pdf_bytes) < PDF_MIN_VALID_BYTES:
+        result["errors"].append(
+            f"PDF file is too small to be a complete browser rendering ({len(pdf_bytes)} bytes)."
+        )
+
+    if not pdf_bytes.startswith(b"%PDF-"):
+        result["errors"].append("File does not have a PDF header.")
+
+    pdf_text = ""
+    try:
+        from PyPDF2 import PdfReader
+
+        reader = PdfReader(io.BytesIO(pdf_bytes), strict=False)
+        result["page_count"] = len(reader.pages)
+        if result["page_count"] < 1:
+            result["errors"].append("PDF does not contain any pages.")
+        pdf_text = "\n".join((page.extract_text() or "") for page in reader.pages)
+    except Exception as exc:
+        result["errors"].append(f"PDF structure or text extraction failed: {exc}")
+
+    result["text_length"] = len(pdf_text)
+    error_details = browser_error_page_details(page_source=pdf_text)
+    if error_details.get("is_error"):
+        result["browser_error"] = True
+        result["browser_error_code"] = error_details.get("error_code") or ""
+        marker = result["browser_error_code"] or error_details.get("marker") or "browser error"
+        result["errors"].append(f"PDF contains a Chrome/network error page ({marker}).")
+
+    expected = _recipe_pdf_expected_evidence(expected_recipe, expected_title)
+    normalized_pdf_text = normalize_pdf_evidence_text(pdf_text)
+    title_evidence = expected.get("title") or ""
+    content_evidence = expected.get("content") or []
+    semantic_validation_requested = bool(title_evidence or content_evidence)
+
+    if require_recipe_evidence and not title_evidence:
+        result["errors"].append(
+            "Generated recipe PDF validation requires a specific expected recipe title."
+        )
+    if require_recipe_evidence and not content_evidence:
+        result["errors"].append(
+            "Generated recipe PDF validation requires at least one expected ingredient, "
+            "instruction, or equipment item."
+        )
+
+    if title_evidence:
+        if pdf_evidence_is_present(title_evidence, normalized_pdf_text):
+            result["matched_evidence"].append(title_evidence)
+        else:
+            result["missing_evidence"].append(title_evidence)
+            result["errors"].append("PDF does not contain the expected recipe title.")
+
+    matched_content = [
+        evidence
+        for evidence in content_evidence
+        if pdf_evidence_is_present(evidence, normalized_pdf_text)
+    ]
+    result["matched_evidence"].extend(matched_content)
+    if content_evidence and not matched_content:
+        result["missing_evidence"].extend(content_evidence)
+        result["errors"].append(
+            "PDF does not contain any expected recipe ingredient, instruction, or equipment text."
+        )
+
+    if semantic_validation_requested and not normalize_pdf_evidence_text(pdf_text):
+        result["errors"].append("PDF does not contain extractable recipe text.")
+
+    result["ok"] = not result["errors"]
+    result["error"] = result["errors"][0] if result["errors"] else ""
+    return result
+
+
 def count_pdf_pages_from_bytes(pdf_bytes):
     try:
         from PyPDF2 import PdfReader
@@ -6074,10 +6510,45 @@ def measure_pdf_document(driver):
     return metrics if isinstance(metrics, dict) else {"height_px": 11 * 96, "width_px": PDF_PAPER_WIDTH_IN * 96}
 
 
-def write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
+def temporary_recipe_pdf_output_path(recipe_url, pdf_path):
+    final_path = Path(pdf_path)
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    identity = safe_unique_filename(recipe_url, max_length=32, hash_length=10)
+    return final_path.parent / f".{identity}_{uuid.uuid4().hex[:12]}.pdf"
+
+
+def finalize_validated_recipe_pdf(staging_pdf_path, pdf_path, attempts=6):
+    staging_pdf_path = Path(staging_pdf_path)
+    pdf_path = Path(pdf_path)
+    attempts = max(int(attempts or 1), 1)
+    lock_key = os.path.normcase(str(pdf_path.resolve())).encode("utf-8")
+    finalize_lock = _PDF_FINALIZE_LOCKS[hashlib.sha256(lock_key).digest()[0] % len(_PDF_FINALIZE_LOCKS)]
+
+    with finalize_lock:
+        for attempt in range(1, attempts + 1):
+            try:
+                os.replace(staging_pdf_path, pdf_path)
+                return pdf_path
+            except PermissionError:
+                if attempt >= attempts:
+                    raise
+                time.sleep(0.05 * attempt)
+
+
+def write_recipe_page_pdf(
+    recipe_url,
+    html_text,
+    html_path,
+    pdf_path,
+    expected_recipe=None,
+    expected_title="",
+    require_recipe_evidence=None,
+):
     driver = None
     last_error = None
     source_path = None
+    pdf_path = Path(pdf_path)
+    staging_pdf_path = temporary_recipe_pdf_output_path(recipe_url, pdf_path)
 
     try:
         driver = create_headless_chrome_driver(
@@ -6105,15 +6576,35 @@ def write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
             try:
                 try:
                     driver.get(target)
-                except Exception:
-                    if len(driver.page_source or "") < 1000:
-                        raise
+                except Exception as exc:
+                    # A large ``page_source`` is not evidence that navigation
+                    # succeeded: Chrome's own network-error document can be
+                    # sizeable and printable. Inspect it for a useful error,
+                    # then fail closed for every navigation exception.
+                    ensure_browser_page_is_printable(driver, target)
+                    raise RuntimeError(
+                        f"Browser navigation did not complete for PDF source {target}: {exc}"
+                    ) from exc
 
-                    print("PDF page load timed out after partial load; printing current page.")
-
+                ensure_browser_page_is_printable(driver, target)
                 prepare_page_for_pdf_print(driver)
-                print_current_browser_page_to_pdf(driver, pdf_path)
-                remove_temporary_pdf_source(source_path)
+                ensure_browser_page_is_printable(driver, target)
+                print_current_browser_page_to_pdf(driver, staging_pdf_path)
+                validation = validate_generated_recipe_pdf(
+                    staging_pdf_path,
+                    expected_recipe=expected_recipe,
+                    expected_title=expected_title,
+                    require_recipe_evidence=(
+                        bool(expected_recipe is not None or expected_title)
+                        if require_recipe_evidence is None
+                        else bool(require_recipe_evidence)
+                    ),
+                )
+                if not validation.get("ok"):
+                    raise RuntimeError(
+                        validation.get("error") or "Generated recipe PDF validation failed."
+                    )
+                finalize_validated_recipe_pdf(staging_pdf_path, pdf_path)
                 return pdf_path
             except PermissionError:
                 raise
@@ -6122,6 +6613,11 @@ def write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
 
         raise RuntimeError(f"Could not print recipe PDF: {last_error}") from last_error
     finally:
+        remove_temporary_pdf_source(source_path)
+        try:
+            staging_pdf_path.unlink(missing_ok=True)
+        except Exception:
+            pass
         if driver:
             try:
                 driver.quit()
@@ -8350,7 +8846,7 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
 def save_json_response(recipe_url, response_text, html_text=None, source_text=None):
     cleaned = clean_json_response(response_text)
 
-    base_name = safe_filename(recipe_url)
+    base_name = recipe_internal_filename(recipe_url)
     json_path = OUTPUT_FOLDER / f"{base_name}.json"
     raw_path = RAW_FOLDER / f"{base_name}_RAW.txt"
 
@@ -10433,7 +10929,7 @@ def save_extracted_recipe_json(recipe_url, json_data, source_text=""):
             recipe_archive_pdf_path(recipe_url),
         )
 
-    json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
+    json_path = recipe_output_json_path(recipe_url)
     json_path.write_text(
         json.dumps(json_data, indent=2, ensure_ascii=False),
         encoding="utf-8",
@@ -10489,7 +10985,7 @@ def mark_menu_recipe_import_failure(recipe_url, recipe_name="", stage="", error=
     if not recipe_url:
         return {"ok": False, "error": "Recipe URL is required."}
 
-    json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
+    json_path = recipe_output_json_path(recipe_url)
     try:
         json_data = json.loads(json_path.read_text(encoding="utf-8")) if json_path.exists() else {}
     except Exception:

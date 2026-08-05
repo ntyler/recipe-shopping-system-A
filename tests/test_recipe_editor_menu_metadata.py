@@ -1899,7 +1899,7 @@ def test_generated_recipe_pdf_includes_menu_metadata_for_menu_recipes(monkeypatc
     url, _detail = seed_menu_derived_recipe()
     captured = {}
 
-    def fake_write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
+    def fake_write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path, **_kwargs):
         captured["html"] = html_text
         path = Path(pdf_path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1934,7 +1934,7 @@ def test_normal_recipe_pdf_does_not_include_menu_metadata(monkeypatch, tmp_path)
     })
     captured = {}
 
-    def fake_write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
+    def fake_write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path, **_kwargs):
         captured["html"] = html_text
         path = Path(pdf_path)
         path.parent.mkdir(parents=True, exist_ok=True)

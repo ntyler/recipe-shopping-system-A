@@ -138,6 +138,7 @@ from PushShoppingList.services.recipe_edit_service import ensure_recipe_pdf_clou
 from PushShoppingList.services.recipe_edit_service import normalize_pdf_kind
 from PushShoppingList.services.recipe_edit_service import upload_recipe_pdf_to_cloudflare
 from PushShoppingList.services.recipe_edit_service import upload_all_recipe_pdfs_to_cloudflare
+from PushShoppingList.services.recipe_edit_service import validate_recipe_pdf_for_cloudflare_upload
 from PushShoppingList.services.recipe_edit_service import update_editable_restaurant_source
 from PushShoppingList.services.recipe_edit_service import update_editable_source_documents
 from PushShoppingList.services.recipe_edit_service import editable_restaurant_usage
@@ -4655,6 +4656,20 @@ def recipe_archive_pdf_route():
         if not pdf_path.exists():
             abort(404)
 
+        if kind == "generated_recipe":
+            validation = validate_recipe_pdf_for_cloudflare_upload(
+                pdf_path,
+                url=url,
+                pdf_kind=kind,
+            )
+            if not validation.get("ok"):
+                return Response(
+                    validation.get("error")
+                    or "The generated-recipe PDF failed validation and cannot be downloaded safely.",
+                    status=409,
+                    mimetype="text/plain",
+                )
+
         return send_file(
             pdf_path,
             mimetype="application/pdf",
@@ -4673,6 +4688,28 @@ def recipe_archive_pdf_route():
         log_recipe_pdf_timing("redirect", url, timings)
 
         return response
+
+    unsafe_local_fallback_codes = {
+        "invalid_pdf",
+        "local_pdf_invalid",
+        "stale_cloudflare_link",
+        "cloudflare_metadata_mismatch",
+        "cloudflare_verification_failed",
+        "upload_verification_failed",
+        "validation_mismatch",
+        "unvalidated_cloudflare_pdf",
+        "remote_pdf_invalid",
+        "duplicate_unvalidated",
+        "duplicate_content_mismatch",
+        "metadata_save_failed",
+        "overwrite_precondition_failed",
+    }
+    if result.get("code") in unsafe_local_fallback_codes:
+        return Response(
+            result.get("error") or "The recipe PDF failed validation and cannot be opened safely.",
+            status=409,
+            mimetype="text/plain",
+        )
 
     pdf_path = recipe_pdf_path(url, kind)
 

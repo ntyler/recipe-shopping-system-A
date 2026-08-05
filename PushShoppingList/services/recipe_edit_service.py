@@ -7,6 +7,7 @@ import mimetypes
 import os
 import re
 import subprocess
+import tempfile
 import threading
 import uuid
 from datetime import datetime
@@ -80,12 +81,14 @@ from PushShoppingList.services.recipe_extract_service import normalize_recipe_no
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_GENERATED_RECIPE
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_WEBPAGE_BACKUP
+from PushShoppingList.services.recipe_extract_service import PDF_VALIDATION_VERSION
 from PushShoppingList.services.recipe_extract_service import RECIPE_INFO_EMPTY_VALUES
 from PushShoppingList.services.recipe_extract_service import RECIPE_INFO_ESTIMATE_ALIASES
 from PushShoppingList.services.recipe_extract_service import RECIPE_INFO_ESTIMATE_DEFAULTS
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_pdf_path
+from PushShoppingList.services.recipe_extract_service import recipe_output_json_path
 from PushShoppingList.services.recipe_extract_service import safe_filename
 from PushShoppingList.services.recipe_extract_service import write_recipe_page_pdf
 from PushShoppingList.services.job_runtime_context import model_value_for_env as job_model_value_for_env
@@ -5104,6 +5107,13 @@ def utc_iso_now():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def normalize_pdf_size_bytes(value):
+    try:
+        return max(int(value or 0), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def normalize_recipe_pdf_storage_metadata(recipe_data, pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     pdf_kind = normalize_pdf_kind(pdf_kind)
@@ -5175,6 +5185,28 @@ def normalize_recipe_pdf_storage_metadata(recipe_data, pdf_kind=PDF_KIND_WEBPAGE
         "uploaded_at": uploaded_at,
         "cloud_status": cloud_status,
         "bucket": str(r2_metadata.get("bucket") or "").strip(),
+        "etag": (
+            str(kind_metadata.get("etag") or "").strip()
+            or str(r2_metadata.get("etag") or "").strip()
+        ),
+        "sha256": (
+            str(kind_metadata.get("sha256") or "").strip().lower()
+            or str(r2_metadata.get("sha256") or "").strip().lower()
+        ),
+        "size_bytes": normalize_pdf_size_bytes(
+            kind_metadata.get("size_bytes")
+            or r2_metadata.get("size_bytes")
+            or 0
+        ),
+        "verified_at": (
+            str(kind_metadata.get("verified_at") or "").strip()
+            or str(r2_metadata.get("verified_at") or "").strip()
+        ),
+        "validation": (
+            deepcopy(kind_metadata.get("validation"))
+            if isinstance(kind_metadata.get("validation"), dict)
+            else {}
+        ),
     }
 
 
@@ -5183,6 +5215,8 @@ def save_recipe_pdf_storage_metadata(
     upload_result,
     local_pdf_path=None,
     pdf_kind=PDF_KIND_WEBPAGE_BACKUP,
+    *,
+    recipe_output_path=None,
 ):
     url = str(url or "").strip()
     upload_result = upload_result if isinstance(upload_result, dict) else {}
@@ -5195,7 +5229,12 @@ def save_recipe_pdf_storage_metadata(
             "error": "Recipe URL is required.",
         }
 
-    recipe_data = load_recipe_output(url)
+    recipe_output_path = Path(recipe_output_path) if recipe_output_path else None
+    recipe_data = (
+        _read_recipe_output_json(recipe_output_path)
+        if recipe_output_path is not None
+        else load_recipe_output(url)
+    )
     if not recipe_data:
         return {
             "ok": False,
@@ -5211,23 +5250,81 @@ def save_recipe_pdf_storage_metadata(
             "error": "Cloudflare R2 upload metadata is incomplete.",
         }
 
-    uploaded_at = utc_iso_now()
+    existing_metadata = normalize_recipe_pdf_storage_metadata(recipe_data, pdf_kind)
+    duplicate_object = upload_result.get("code") == "duplicate_object"
+    uploaded_at = str(upload_result.get("uploaded_at") or "").strip()
+    if duplicate_object:
+        uploaded_at = str(existing_metadata.get("uploaded_at") or uploaded_at).strip()
+    elif not uploaded_at:
+        uploaded_at = utc_iso_now()
+    verified_at = str(upload_result.get("verified_at") or "").strip()
+    if upload_result.get("verified") and not verified_at:
+        verified_at = utc_iso_now()
+    sha256 = str(upload_result.get("sha256") or "").strip().lower()
+    etag = str(upload_result.get("etag") or "").strip()
+    size_bytes = normalize_pdf_size_bytes(upload_result.get("size_bytes"))
+    validation = (
+        deepcopy(upload_result.get("validation"))
+        if isinstance(upload_result.get("validation"), dict)
+        else {}
+    )
+    validation_summary = {
+        key: validation.get(key)
+        for key in (
+            "ok",
+            "validation_version",
+            "sha256",
+            "size_bytes",
+            "page_count",
+            "text_length",
+            "matched_evidence",
+            "semantic_validation_required",
+            "error",
+            "errors",
+            "browser_error",
+            "browser_error_code",
+            "remote_etag",
+            "remote_size_bytes",
+        )
+        if validation.get(key) not in (None, "", [])
+    }
     pdf_metadata = recipe_data.get("pdf") if isinstance(recipe_data.get("pdf"), dict) else {}
+    existing_kind_metadata = (
+        pdf_metadata.get(pdf_kind)
+        if isinstance(pdf_metadata.get(pdf_kind), dict)
+        else {}
+    )
+    existing_r2_metadata = (
+        existing_kind_metadata.get("cloudflare_r2")
+        if isinstance(existing_kind_metadata.get("cloudflare_r2"), dict)
+        else {}
+    )
     local_path = str(local_pdf_path or recipe_pdf_path(url, pdf_kind))
     kind_metadata = {
+        **(existing_kind_metadata if duplicate_object else {}),
         "local_path": local_path,
         "r2_object_key": object_key,
         "r2_public_url": public_url,
         "uploaded_at": uploaded_at,
         "cloud_status": "uploaded",
+        "etag": etag,
+        "sha256": sha256,
+        "size_bytes": size_bytes,
+        "verified_at": verified_at,
+        "validation": validation_summary,
     }
     kind_metadata["cloudflare_r2"] = {
+        **(existing_r2_metadata if duplicate_object else {}),
         "provider": "cloudflare_r2",
         "bucket": str(upload_result.get("bucket") or os.getenv("R2_BUCKET_NAME", "")).strip(),
         "object_key": object_key,
         "public_url": public_url,
         "uploaded_at": uploaded_at,
         "cloud_status": "uploaded",
+        "etag": etag,
+        "sha256": sha256,
+        "size_bytes": size_bytes,
+        "verified_at": verified_at,
     }
     pdf_metadata[pdf_kind] = kind_metadata
 
@@ -5237,6 +5334,10 @@ def save_recipe_pdf_storage_metadata(
         pdf_metadata["r2_public_url"] = public_url
         pdf_metadata["uploaded_at"] = uploaded_at
         pdf_metadata["cloud_status"] = "uploaded"
+        pdf_metadata["etag"] = etag
+        pdf_metadata["sha256"] = sha256
+        pdf_metadata["size_bytes"] = size_bytes
+        pdf_metadata["verified_at"] = verified_at
         pdf_metadata["cloudflare_r2"] = kind_metadata["cloudflare_r2"]
 
     recipe_data["pdf"] = pdf_metadata
@@ -5256,7 +5357,17 @@ def save_recipe_pdf_storage_metadata(
         recipe_data["cloudflare_pdf_url"] = public_url
     apply_recipe_pdf_asset_aliases(recipe_data)
     log_recipe_pdf_fields(f"save_pdf_metadata:{pdf_kind}", recipe_data)
-    save_recipe_output(url, recipe_data)
+    try:
+        if recipe_output_path is not None:
+            save_recipe_output_to_path(recipe_output_path, recipe_data, url=url)
+        else:
+            save_recipe_output(url, recipe_data)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "code": "metadata_save_failed",
+            "error": f"Unable to persist Cloudflare PDF metadata: {exc}",
+        }
 
     return {
         "ok": True,
@@ -5385,7 +5496,7 @@ def list_recipe_pdf_storage_metadata():
 
 
 def cloudflare_upload_success(upload_result):
-    return bool(upload_result and (upload_result.get("ok") or upload_result.get("code") == "duplicate_object"))
+    return bool(upload_result and upload_result.get("ok"))
 
 
 def recipe_pdf_timing_ms(start):
@@ -5495,6 +5606,331 @@ def recipe_pdf_cloudflare_result(
     return result
 
 
+def validate_recipe_pdf_for_cloudflare_upload(
+    pdf_path,
+    *,
+    url="",
+    pdf_kind=PDF_KIND_WEBPAGE_BACKUP,
+    validation=None,
+):
+    validation = validation if isinstance(validation, dict) else None
+    if validation is not None:
+        return validation
+
+    path = Path(pdf_path)
+    if not path.exists() or not path.is_file():
+        return {
+            "ok": False,
+            "error": "The local PDF was not found for validation.",
+        }
+
+    try:
+        from PushShoppingList.services import recipe_extract_service
+
+        validator = getattr(recipe_extract_service, "validate_generated_recipe_pdf", None)
+        if not callable(validator):
+            return {
+                "ok": False,
+                "error": "PDF content validation is unavailable; upload was refused.",
+            }
+
+        pdf_kind = normalize_pdf_kind(pdf_kind)
+        recipe_data = (
+            load_recipe_output(url) or {}
+            if pdf_kind == PDF_KIND_GENERATED_RECIPE and str(url or "").strip()
+            else {}
+        )
+        result = validator(
+            path,
+            expected_recipe=recipe_data or None,
+            expected_title=str(recipe_data.get("recipe_title") or "").strip(),
+            require_recipe_evidence=pdf_kind == PDF_KIND_GENERATED_RECIPE,
+        )
+        return result if isinstance(result, dict) else {
+            "ok": False,
+            "error": "PDF content validation returned an invalid result.",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"PDF content validation failed: {exc}",
+        }
+
+
+def stable_recipe_pdf_r2_object_key(url, pdf_kind, local_pdf_path=None):
+    """Preserve saved legacy keys while hashing new long recipe identities."""
+    url = str(url or "").strip()
+    if url:
+        key_path = recipe_pdf_path(url, normalize_pdf_kind(pdf_kind))
+    else:
+        key_path = Path(local_pdf_path or "")
+    return cloudflare_r2_storage.object_key_for_pdf(key_path)
+
+
+def generated_pdf_cache_has_positive_validation(metadata, remote_metadata):
+    """Return whether lightweight metadata proves a generated PDF was validated."""
+    metadata = metadata if isinstance(metadata, dict) else {}
+    remote_metadata = remote_metadata if isinstance(remote_metadata, dict) else {}
+    validation = metadata.get("validation") if isinstance(metadata.get("validation"), dict) else {}
+    metadata_sha = str(metadata.get("sha256") or "").strip().lower()
+    validation_sha = str(validation.get("sha256") or "").strip().lower()
+    remote_sha = str(remote_metadata.get("sha256") or "").strip().lower()
+    metadata_etag = str(metadata.get("etag") or "").strip()
+    remote_etag = str(remote_metadata.get("etag") or "").strip()
+    metadata_size = normalize_pdf_size_bytes(metadata.get("size_bytes"))
+    validation_size = normalize_pdf_size_bytes(validation.get("size_bytes"))
+    remote_size = normalize_pdf_size_bytes(remote_metadata.get("size_bytes"))
+
+    return bool(
+        validation.get("ok") is True
+        and validation.get("semantic_validation_required") is True
+        and str(validation.get("validation_version") or "").strip() == PDF_VALIDATION_VERSION
+        and metadata_sha
+        and metadata_sha == validation_sha
+        and metadata_size
+        and metadata_size == validation_size == remote_size
+        and str(metadata.get("verified_at") or "").strip()
+        and (
+            (remote_sha and remote_sha == metadata_sha)
+            or (not remote_sha and metadata_etag and metadata_etag == remote_etag)
+        )
+    )
+
+
+def generated_pdf_cache_has_current_negative_validation(metadata, remote_metadata):
+    metadata = metadata if isinstance(metadata, dict) else {}
+    remote_metadata = remote_metadata if isinstance(remote_metadata, dict) else {}
+    validation = metadata.get("validation") if isinstance(metadata.get("validation"), dict) else {}
+    return bool(
+        validation.get("ok") is False
+        and validation.get("semantic_validation_required") is True
+        and str(validation.get("validation_version") or "").strip() == PDF_VALIDATION_VERSION
+        and str(validation.get("remote_etag") or "").strip()
+        == str(remote_metadata.get("etag") or "").strip()
+        and normalize_pdf_size_bytes(validation.get("remote_size_bytes"))
+        == normalize_pdf_size_bytes(remote_metadata.get("size_bytes"))
+    )
+
+
+def cached_pdf_remote_mismatch(metadata, remote_metadata):
+    metadata = metadata if isinstance(metadata, dict) else {}
+    remote_metadata = remote_metadata if isinstance(remote_metadata, dict) else {}
+    expected_etag = str(metadata.get("etag") or "").strip()
+    remote_etag = str(remote_metadata.get("etag") or "").strip()
+    expected_sha256 = str(metadata.get("sha256") or "").strip().lower()
+    remote_sha256 = str(remote_metadata.get("sha256") or "").strip().lower()
+    expected_size = normalize_pdf_size_bytes(metadata.get("size_bytes"))
+    remote_size = normalize_pdf_size_bytes(remote_metadata.get("size_bytes"))
+
+    return bool(
+        (expected_etag and remote_etag and expected_etag != remote_etag)
+        or (expected_sha256 and remote_sha256 and expected_sha256 != remote_sha256)
+        or (expected_size and expected_size != remote_size)
+    )
+
+
+def stale_recipe_pdf_cloudflare_result(url, metadata, pdf_path, pdf_kind, error, code):
+    metadata = metadata if isinstance(metadata, dict) else {}
+    path = Path(pdf_path)
+    return {
+        "ok": False,
+        "success": False,
+        "cached": False,
+        "code": code,
+        "error": error,
+        "url": url,
+        "pdf_kind": pdf_kind,
+        "pdf_path": str(path),
+        "pdf_available": path.exists(),
+        "pdf_local_available": path.exists(),
+        "public_url": "",
+        "pdf_public_url": "",
+        "r2_public_url": "",
+        "pdf_object_key": metadata.get("object_key", ""),
+        "r2_object_key": metadata.get("object_key", ""),
+        "stale_public_url": metadata.get("public_url", ""),
+        "cloud_status": "missing" if code == "stale_cloudflare_link" else "verification_failed",
+    }
+
+
+def validate_and_promote_existing_generated_pdf(
+    url,
+    metadata,
+    remote,
+    pdf_path,
+    *,
+    timings=None,
+):
+    """Validate an unproven remote object once, then make later opens HEAD-only."""
+    metadata = metadata if isinstance(metadata, dict) else {}
+    remote = remote if isinstance(remote, dict) else {}
+    pdf_path = Path(pdf_path)
+    result_extras = {
+        "timings": timings or recipe_pdf_timing_log(),
+        "remote_metadata": remote,
+    }
+
+    if generated_pdf_cache_has_current_negative_validation(metadata, remote):
+        previous_validation = metadata.get("validation", {})
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            pdf_path,
+            PDF_KIND_GENERATED_RECIPE,
+            (
+                "The generated-recipe R2 object failed semantic validation and has not changed "
+                "since that check: "
+                f"{previous_validation.get('error') or 'invalid generated-recipe PDF'}"
+            ),
+            "remote_pdf_invalid",
+        ) | {**result_extras, "validation": previous_validation}
+
+    remote_sha = str(remote.get("sha256") or "").strip().lower()
+    remote_size = normalize_pdf_size_bytes(remote.get("size_bytes"))
+    remote_etag = str(remote.get("etag") or "").strip()
+    validation = None
+    validation_source = ""
+
+    # A custom R2 SHA plus a matching validated local artifact proves equality
+    # without downloading the object body.
+    if pdf_path.exists() and remote_sha:
+        local_validation = validate_recipe_pdf_for_cloudflare_upload(
+            pdf_path,
+            url=url,
+            pdf_kind=PDF_KIND_GENERATED_RECIPE,
+        )
+        local_sha = str(local_validation.get("sha256") or "").strip().lower()
+        local_size = normalize_pdf_size_bytes(local_validation.get("size_bytes"))
+        if (
+            local_validation.get("ok")
+            and local_sha == remote_sha
+            and local_size
+            and local_size == remote_size
+        ):
+            validation = local_validation
+            validation_source = "validated_local_hash_match"
+
+    # Legacy R2 objects have no custom SHA. Download them once with an ETag
+    # precondition, validate the actual remote bytes, and persist that proof.
+    if validation is None:
+        read_result = cloudflare_r2_storage.read_pdf_object_bytes(
+            str(remote.get("object_key") or metadata.get("object_key") or "").strip(),
+            expected_etag=remote_etag,
+        )
+        if not read_result.get("ok"):
+            return stale_recipe_pdf_cloudflare_result(
+                url,
+                metadata,
+                pdf_path,
+                PDF_KIND_GENERATED_RECIPE,
+                (
+                    "The generated-recipe R2 object could not be read for its one-time semantic "
+                    f"validation: {read_result.get('error') or 'remote read failed'}"
+                ),
+                "cloudflare_verification_failed",
+            ) | {**result_extras, "remote_read": read_result}
+
+        remote_bytes = read_result.get("bytes") or b""
+        if remote_size and len(remote_bytes) != remote_size:
+            return stale_recipe_pdf_cloudflare_result(
+                url,
+                metadata,
+                pdf_path,
+                PDF_KIND_GENERATED_RECIPE,
+                "The generated-recipe R2 object size changed during validation.",
+                "cloudflare_metadata_mismatch",
+            ) | {**result_extras, "remote_read": read_result}
+
+        with tempfile.TemporaryDirectory(prefix="recipe-pdf-cache-validation-") as temp_folder:
+            validation_path = Path(temp_folder) / "remote-generated-recipe.pdf"
+            validation_path.write_bytes(remote_bytes)
+            validation = validate_recipe_pdf_for_cloudflare_upload(
+                validation_path,
+                url=url,
+                pdf_kind=PDF_KIND_GENERATED_RECIPE,
+            )
+        validation_source = "validated_remote_body"
+
+    validation = dict(validation or {})
+    validation["remote_etag"] = remote_etag
+    validation["remote_size_bytes"] = remote_size
+    result_extras["validation"] = validation
+    result_extras["validation_source"] = validation_source
+    validated_sha = str(validation.get("sha256") or "").strip().lower()
+
+    if remote_sha and validated_sha != remote_sha:
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            pdf_path,
+            PDF_KIND_GENERATED_RECIPE,
+            (
+                "The generated-recipe R2 object's custom hash does not match the bytes that "
+                "were semantically validated. The object was not opened or overwritten."
+            ),
+            "cloudflare_metadata_mismatch",
+        ) | result_extras
+
+    proof = {
+        "ok": bool(validation.get("ok")),
+        "object_key": str(remote.get("object_key") or metadata.get("object_key") or "").strip(),
+        "public_url": str(remote.get("public_url") or metadata.get("public_url") or "").strip(),
+        "bucket": str(remote.get("bucket") or metadata.get("bucket") or "").strip(),
+        "uploaded_at": str(remote.get("uploaded_at") or metadata.get("uploaded_at") or "").strip(),
+        "etag": remote_etag,
+        "sha256": validated_sha,
+        "size_bytes": remote_size,
+        "verified": bool(validation.get("ok")),
+        "verified_at": utc_iso_now(),
+        "validation": validation,
+    }
+    metadata_result = save_recipe_pdf_storage_metadata(
+        url,
+        proof,
+        pdf_path,
+        PDF_KIND_GENERATED_RECIPE,
+    )
+
+    if not validation.get("ok"):
+        persisted_metadata = metadata_result.get("metadata", metadata)
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            persisted_metadata,
+            pdf_path,
+            PDF_KIND_GENERATED_RECIPE,
+            (
+                "The generated-recipe R2 object failed semantic validation and was not opened: "
+                f"{validation.get('error') or 'invalid generated-recipe PDF'}"
+            ),
+            "remote_pdf_invalid",
+        ) | result_extras
+    if not metadata_result.get("ok"):
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            pdf_path,
+            PDF_KIND_GENERATED_RECIPE,
+            (
+                "The generated-recipe PDF was validated, but its durable cache metadata "
+                f"could not be saved: {metadata_result.get('error') or 'metadata save failed'}"
+            ),
+            "metadata_save_failed",
+        ) | result_extras
+
+    return recipe_pdf_cloudflare_result(
+        url,
+        metadata_result.get("metadata", {}),
+        cached=True,
+        pdf_path=pdf_path,
+        timings=timings,
+        pdf_kind=PDF_KIND_GENERATED_RECIPE,
+    ) | {
+        **result_extras,
+        "remote_verified": True,
+        "validation_promoted": True,
+    }
+
+
 def cached_recipe_pdf_cloudflare_result(url, timings=None, pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
     recipe_data = load_recipe_output(url) or {}
     pdf_kind = normalize_pdf_kind(pdf_kind)
@@ -5503,7 +5939,162 @@ def cached_recipe_pdf_cloudflare_result(url, timings=None, pdf_kind=PDF_KIND_WEB
     if not cloudflare_metadata_is_uploaded(metadata):
         return None
 
-    return recipe_pdf_cloudflare_result(url, metadata, cached=True, timings=timings, pdf_kind=pdf_kind)
+    default_pdf_path = recipe_pdf_path(url, pdf_kind)
+    stored_pdf_path = Path(metadata.get("local_path") or default_pdf_path)
+    pdf_path = stored_pdf_path if stored_pdf_path.exists() else default_pdf_path
+    remote = cloudflare_r2_storage.head_pdf_object(metadata.get("object_key"))
+    if not remote.get("ok"):
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            pdf_path,
+            pdf_kind,
+            (
+                "The saved Cloudflare PDF link could not be verified. "
+                f"Check the R2 connection and try again: {remote.get('error') or 'metadata check failed'}"
+            ),
+            "cloudflare_verification_failed",
+        ) | {"timings": timings or recipe_pdf_timing_log(), "remote_metadata": remote}
+
+    remote_mismatch = bool(remote.get("exists")) and cached_pdf_remote_mismatch(metadata, remote)
+    if remote.get("exists") and not remote_mismatch:
+        if (
+            pdf_kind == PDF_KIND_GENERATED_RECIPE
+            and not generated_pdf_cache_has_positive_validation(metadata, remote)
+        ):
+            return validate_and_promote_existing_generated_pdf(
+                url,
+                metadata,
+                remote,
+                pdf_path,
+                timings=timings,
+            )
+        return recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            cached=True,
+            pdf_path=pdf_path,
+            timings=timings,
+            pdf_kind=pdf_kind,
+        ) | {"remote_metadata": remote, "remote_verified": True}
+
+    if remote_mismatch:
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            pdf_path,
+            pdf_kind,
+            (
+                "The saved Cloudflare PDF metadata no longer matches the remote object. "
+                "Regenerate and explicitly overwrite the PDF after validating the local replacement."
+            ),
+            "cloudflare_metadata_mismatch",
+        ) | {"timings": timings or recipe_pdf_timing_log(), "remote_metadata": remote}
+
+    if not pdf_path.exists():
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            pdf_path,
+            pdf_kind,
+            (
+                "The saved Cloudflare PDF link is stale because the remote object no longer "
+                "exists, and no local PDF is "
+                "available to repair it. Regenerate the PDF, then upload it again."
+            ),
+            "stale_cloudflare_link",
+        ) | {"timings": timings or recipe_pdf_timing_log(), "remote_metadata": remote}
+
+    validation = validate_recipe_pdf_for_cloudflare_upload(
+        pdf_path,
+        url=url,
+        pdf_kind=pdf_kind,
+    )
+    if not validation.get("ok"):
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            pdf_path,
+            pdf_kind,
+            (
+                "The saved Cloudflare PDF link is stale, and the local copy failed validation, "
+                f"so it was not uploaded: {validation.get('error') or 'invalid PDF content'}"
+            ),
+            "local_pdf_invalid",
+        ) | {
+            "timings": timings or recipe_pdf_timing_log(),
+            "remote_metadata": remote,
+            "validation": validation,
+        }
+
+    upload_result = cloudflare_r2_storage.upload_pdf(
+        pdf_path,
+        object_key=metadata.get("object_key"),
+        overwrite=False,
+        validated=True,
+        validation=validation,
+    )
+    upload_result["validation"] = validation
+    if not upload_result.get("ok"):
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            pdf_path,
+            pdf_kind,
+            (
+                "The saved Cloudflare PDF link is stale and automatic repair failed: "
+                f"{upload_result.get('error') or 'Cloudflare upload failed'}"
+            ),
+            "cloudflare_repair_failed",
+        ) | {
+            "timings": timings or recipe_pdf_timing_log(),
+            "remote_metadata": remote,
+            "validation": validation,
+            "cloudflare_upload": upload_result,
+        }
+
+    metadata_result = save_recipe_pdf_storage_metadata(
+        url,
+        upload_result,
+        pdf_path,
+        pdf_kind,
+    )
+    if not metadata_result.get("ok"):
+        return stale_recipe_pdf_cloudflare_result(
+            url,
+            metadata,
+            pdf_path,
+            pdf_kind,
+            (
+                "The missing Cloudflare PDF object was uploaded and verified, but its durable "
+                "cache metadata could not be saved: "
+                f"{metadata_result.get('error') or 'metadata save failed'}"
+            ),
+            "metadata_save_failed",
+        ) | {
+            "timings": timings or recipe_pdf_timing_log(),
+            "remote_metadata": remote,
+            "validation": validation,
+            "cloudflare_upload": upload_result,
+            "remote_uploaded": True,
+            "remote_verified": bool(upload_result.get("verified")),
+            "repaired": False,
+        }
+
+    repaired_metadata = metadata_result.get("metadata", {})
+    return recipe_pdf_cloudflare_result(
+        url,
+        repaired_metadata,
+        cached=False,
+        pdf_path=pdf_path,
+        timings=timings,
+        pdf_kind=pdf_kind,
+    ) | {
+        "repaired": True,
+        "remote_verified": True,
+        "cloudflare_upload": upload_result,
+        "validation": validation,
+    }
 
 
 def existing_r2_recipe_pdf_result(url, timings=None, pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
@@ -5514,9 +6105,10 @@ def existing_r2_recipe_pdf_result(url, timings=None, pdf_kind=PDF_KIND_WEBPAGE_B
     pdf_path = recipe_pdf_path(url, pdf_kind)
 
     try:
-        object_key = cloudflare_r2_storage.object_key_for_pdf(pdf_path)
+        object_key = stable_recipe_pdf_r2_object_key(url, pdf_kind, pdf_path)
         public_url = cloudflare_r2_storage.get_public_url(object_key)
-        if not cloudflare_r2_storage.object_exists(object_key):
+        remote = cloudflare_r2_storage.head_pdf_object(object_key)
+        if not remote.get("ok") or not remote.get("exists"):
             return None
     except Exception as exc:
         print(f"[recipe_pdf] R2 cache probe failed for {url}: {exc}")
@@ -5527,7 +6119,32 @@ def existing_r2_recipe_pdf_result(url, timings=None, pdf_kind=PDF_KIND_WEBPAGE_B
         "object_key": object_key,
         "public_url": public_url,
         "bucket": os.getenv("R2_BUCKET_NAME", "").strip(),
+        "etag": remote.get("etag", ""),
+        "sha256": remote.get("sha256", ""),
+        "size_bytes": remote.get("size_bytes", 0),
+        "uploaded_at": remote.get("uploaded_at", ""),
+        "verified": True,
     }
+    if pdf_kind == PDF_KIND_GENERATED_RECIPE:
+        return validate_and_promote_existing_generated_pdf(
+            url,
+            {
+                "local_path": str(pdf_path),
+                "object_key": object_key,
+                "public_url": public_url,
+                "uploaded_at": remote.get("uploaded_at", ""),
+                "cloud_status": "uploaded",
+                "bucket": remote.get("bucket", ""),
+                "etag": remote.get("etag", ""),
+                "sha256": remote.get("sha256", ""),
+                "size_bytes": remote.get("size_bytes", 0),
+                "validation": {},
+            },
+            remote,
+            pdf_path,
+            timings=timings,
+        )
+
     metadata_result = save_recipe_pdf_storage_metadata(url, upload_result, pdf_path, pdf_kind)
     metadata = (
         metadata_result.get("metadata", {})
@@ -5536,8 +6153,11 @@ def existing_r2_recipe_pdf_result(url, timings=None, pdf_kind=PDF_KIND_WEBPAGE_B
             "local_path": str(pdf_path),
             "object_key": object_key,
             "public_url": public_url,
-            "uploaded_at": utc_iso_now(),
+            "uploaded_at": remote.get("uploaded_at", ""),
             "cloud_status": "uploaded",
+            "etag": remote.get("etag", ""),
+            "sha256": remote.get("sha256", ""),
+            "size_bytes": remote.get("size_bytes", 0),
         }
     )
 
@@ -5559,39 +6179,263 @@ def delete_uploaded_local_pdf_if_configured(pdf_path):
         return False, f"PDF uploaded to Cloudflare R2, but the local file could not be deleted: {exc}"
 
 
-def upload_local_pdf_path_to_cloudflare(local_pdf_path, url="", pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
+def upload_local_pdf_path_to_cloudflare(
+    local_pdf_path,
+    url="",
+    pdf_kind=PDF_KIND_WEBPAGE_BACKUP,
+    *,
+    overwrite=False,
+    expected_etag=None,
+    object_key=None,
+    validation=None,
+):
     path = Path(local_pdf_path)
     pdf_kind = normalize_pdf_kind(pdf_kind)
     prefix = pdf_metadata_field_prefix(pdf_kind)
-    upload_result = cloudflare_r2_storage.upload_pdf(path)
+    recipe_data = load_recipe_output(url) or {} if str(url or "").strip() else {}
+    existing_metadata = normalize_recipe_pdf_storage_metadata(recipe_data, pdf_kind)
+    stable_object_key = (
+        str(object_key or "").strip()
+        or str(existing_metadata.get("object_key") or "").strip()
+    )
+    if not stable_object_key and str(url or "").strip():
+        try:
+            stable_object_key = stable_recipe_pdf_r2_object_key(url, pdf_kind, path)
+        except cloudflare_r2_storage.CloudflareR2StorageError:
+            stable_object_key = ""
+    validation_result = validation if isinstance(validation, dict) else None
+
+    if pdf_kind == PDF_KIND_GENERATED_RECIPE or overwrite:
+        validation_result = validate_recipe_pdf_for_cloudflare_upload(
+            path,
+            url=url,
+            pdf_kind=pdf_kind,
+            validation=validation_result,
+        )
+        if not validation_result.get("ok"):
+            return {
+                "ok": False,
+                "success": False,
+                "code": "invalid_pdf",
+                "url": str(url or ""),
+                "pdf_path": str(path),
+                "pdf_available": path.exists(),
+                "pdf_local_available": path.exists(),
+                "pdf_kind": pdf_kind,
+                "validation": validation_result,
+                "error": (
+                    validation_result.get("error")
+                    or "The PDF failed content validation and was not uploaded."
+                ),
+            }
+
+    upload_kwargs = {}
+    if stable_object_key:
+        upload_kwargs["object_key"] = stable_object_key
+    if overwrite:
+        upload_kwargs["overwrite"] = True
+        upload_kwargs["expected_etag"] = (
+            str(expected_etag or "").strip()
+            or str(existing_metadata.get("etag") or "").strip()
+        )
+    if validation_result:
+        upload_kwargs["validated"] = bool(validation_result.get("ok"))
+        upload_kwargs["validation"] = validation_result
+    upload_result = cloudflare_r2_storage.upload_pdf(path, **upload_kwargs)
+    if validation_result:
+        upload_result["validation"] = validation_result
+
+    if upload_result.get("code") == "duplicate_object":
+        duplicate_key = str(upload_result.get("object_key") or stable_object_key).strip()
+        remote = cloudflare_r2_storage.head_pdf_object(duplicate_key)
+        if not remote.get("ok") or not remote.get("exists"):
+            return {
+                "ok": False,
+                "success": False,
+                "code": "duplicate_verification_failed",
+                "url": str(url or ""),
+                "pdf_path": str(path),
+                "pdf_available": path.exists(),
+                "pdf_local_available": path.exists(),
+                "pdf_kind": pdf_kind,
+                "cloudflare_upload": upload_result,
+                "remote_metadata": remote,
+                "error": (
+                    remote.get("error")
+                    or "The existing Cloudflare R2 PDF could not be verified."
+                ),
+            }
+
+        if pdf_kind == PDF_KIND_GENERATED_RECIPE:
+            validation_sha = str((validation_result or {}).get("sha256") or "").strip().lower()
+            remote_sha = str(remote.get("sha256") or "").strip().lower()
+            validation_size = normalize_pdf_size_bytes(
+                (validation_result or {}).get("size_bytes")
+            )
+            remote_size = normalize_pdf_size_bytes(remote.get("size_bytes"))
+            if not remote_sha:
+                return {
+                    "ok": False,
+                    "success": False,
+                    "code": "duplicate_unvalidated",
+                    "url": str(url or ""),
+                    "pdf_path": str(path),
+                    "pdf_available": path.exists(),
+                    "pdf_local_available": path.exists(),
+                    "pdf_kind": pdf_kind,
+                    "cloudflare_upload": upload_result,
+                    "remote_metadata": remote,
+                    "validation": validation_result or {},
+                    "error": (
+                        "The existing generated-recipe R2 object has no content hash, so it "
+                        "cannot be proven equivalent to the validated local PDF. It was not "
+                        "overwritten; run the repair command or request an explicit overwrite."
+                    ),
+                }
+            if (
+                not validation_sha
+                or remote_sha != validation_sha
+                or not validation_size
+                or remote_size != validation_size
+            ):
+                return {
+                    "ok": False,
+                    "success": False,
+                    "code": "duplicate_content_mismatch",
+                    "url": str(url or ""),
+                    "pdf_path": str(path),
+                    "pdf_available": path.exists(),
+                    "pdf_local_available": path.exists(),
+                    "pdf_kind": pdf_kind,
+                    "cloudflare_upload": upload_result,
+                    "remote_metadata": remote,
+                    "validation": validation_result or {},
+                    "error": (
+                        "The existing generated-recipe R2 object does not match the validated "
+                        "local PDF. The stable object key was not overwritten."
+                    ),
+                }
+
+        uploaded_at = str(existing_metadata.get("uploaded_at") or remote.get("uploaded_at") or "").strip()
+        duplicate_metadata = {
+            **existing_metadata,
+            "local_path": str(path),
+            "object_key": duplicate_key,
+            "public_url": str(upload_result.get("public_url") or remote.get("public_url") or "").strip(),
+            "uploaded_at": uploaded_at,
+            "cloud_status": "uploaded",
+            "etag": str(remote.get("etag") or existing_metadata.get("etag") or "").strip(),
+            "sha256": str(remote.get("sha256") or existing_metadata.get("sha256") or "").strip().lower(),
+            "size_bytes": normalize_pdf_size_bytes(remote.get("size_bytes") or existing_metadata.get("size_bytes")),
+        }
+        if str(url or "").strip() and (
+            not cloudflare_metadata_is_uploaded(existing_metadata)
+            or (
+                pdf_kind == PDF_KIND_GENERATED_RECIPE
+                and not generated_pdf_cache_has_positive_validation(
+                    existing_metadata,
+                    remote,
+                )
+            )
+        ):
+            duplicate_save_result = save_recipe_pdf_storage_metadata(
+                url,
+                {
+                    **upload_result,
+                    **remote,
+                    "code": "duplicate_object",
+                    "uploaded_at": uploaded_at,
+                },
+                path,
+                pdf_kind,
+            )
+            if not duplicate_save_result.get("ok"):
+                return {
+                    "ok": False,
+                    "success": False,
+                    "code": "metadata_save_failed",
+                    "url": str(url or ""),
+                    "pdf_path": str(path),
+                    "pdf_available": path.exists(),
+                    "pdf_local_available": path.exists(),
+                    "pdf_kind": pdf_kind,
+                    "cloudflare_upload": upload_result,
+                    "remote_metadata": remote,
+                    "validation": validation_result or {},
+                    "error": (
+                        "The existing R2 PDF was verified, but its durable recipe metadata "
+                        f"could not be saved: {duplicate_save_result.get('error') or 'metadata save failed'}"
+                    ),
+                }
+            duplicate_metadata = duplicate_save_result.get("metadata", duplicate_metadata)
+
+        result = recipe_pdf_cloudflare_result(
+            str(url or ""),
+            duplicate_metadata,
+            cached=True,
+            pdf_path=path,
+            pdf_kind=pdf_kind,
+        )
+        result.update({
+            "already_exists": True,
+            "fresh_upload": False,
+            "deleted_local_pdf": False,
+            "delete_warning": "",
+            "cloudflare_upload": upload_result,
+            "remote_metadata": remote,
+        })
+        return result
 
     if not cloudflare_upload_success(upload_result):
         return {
             "ok": False,
             "success": False,
+            "code": upload_result.get("code", "upload_failed"),
             "url": str(url or ""),
             "pdf_path": str(path),
             "pdf_available": path.exists(),
             "pdf_local_available": path.exists(),
             "pdf_kind": pdf_kind,
             "cloudflare_upload": upload_result,
+            "validation": validation_result or {},
             "error": upload_result.get("error", "Unable to upload PDF to Cloudflare R2."),
         }
 
+    metadata = {}
     if str(url or "").strip():
-        save_recipe_pdf_storage_metadata(url, upload_result, path, pdf_kind)
+        metadata_result = save_recipe_pdf_storage_metadata(url, upload_result, path, pdf_kind)
+        if not metadata_result.get("ok"):
+            return {
+                "ok": False,
+                "success": False,
+                "code": "metadata_save_failed",
+                "url": str(url or ""),
+                "pdf_path": str(path),
+                "pdf_available": path.exists(),
+                "pdf_local_available": path.exists(),
+                "pdf_kind": pdf_kind,
+                "cloudflare_upload": upload_result,
+                "validation": validation_result or {},
+                "remote_uploaded": True,
+                "remote_verified": bool(upload_result.get("verified")),
+                "error": (
+                    "The PDF was uploaded and verified, but its durable recipe metadata could "
+                    f"not be saved: {metadata_result.get('error') or 'metadata save failed'}"
+                ),
+            }
+        metadata = metadata_result.get("metadata", {})
 
     deleted_local_pdf, delete_warning = delete_uploaded_local_pdf_if_configured(path)
     public_url = str(upload_result.get("public_url") or "").strip()
     object_key = str(upload_result.get("object_key") or "").strip()
-    uploaded_at = utc_iso_now()
+    uploaded_at = str(metadata.get("uploaded_at") or upload_result.get("uploaded_at") or "").strip()
 
     result = {
         "ok": True,
         "success": True,
         "url": str(url or ""),
         "pdf_kind": pdf_kind,
-        "cached": upload_result.get("code") == "duplicate_object",
+        "cached": False,
         "pdf_path": str(path),
         "pdf_available": path.exists() or bool(public_url),
         "pdf_local_available": path.exists(),
@@ -5605,7 +6449,10 @@ def upload_local_pdf_path_to_cloudflare(local_pdf_path, url="", pdf_kind=PDF_KIN
         "cloud_status": "uploaded",
         "deleted_local_pdf": deleted_local_pdf,
         "delete_warning": delete_warning,
-        "already_exists": upload_result.get("code") == "duplicate_object",
+        "already_exists": False,
+        "fresh_upload": True,
+        "remote_verified": bool(upload_result.get("verified")),
+        "validation": validation_result or {},
         "cloudflare_upload": upload_result,
     }
     result[f"{prefix}_path"] = str(path)
@@ -5623,7 +6470,12 @@ def upload_local_pdf_path_to_cloudflare(local_pdf_path, url="", pdf_kind=PDF_KIN
     return result
 
 
-def upload_recipe_pdf_to_cloudflare(url, pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
+def upload_recipe_pdf_to_cloudflare(
+    url,
+    pdf_kind=PDF_KIND_WEBPAGE_BACKUP,
+    *,
+    overwrite=False,
+):
     url = str(url or "").strip()
     pdf_kind = normalize_pdf_kind(pdf_kind)
 
@@ -5640,20 +6492,20 @@ def upload_recipe_pdf_to_cloudflare(url, pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
 
     if not pdf_path.exists():
         if cloudflare_metadata_is_uploaded(existing_metadata):
-            return recipe_pdf_cloudflare_result(
+            cached_result = cached_recipe_pdf_cloudflare_result(
                 url,
-                existing_metadata,
-                cached=True,
-                pdf_path=pdf_path,
                 pdf_kind=pdf_kind,
-            ) | {
-                "already_exists": True,
-                "cloudflare_upload": {
-                    "ok": True,
-                    "object_key": existing_metadata.get("object_key", ""),
-                    "public_url": existing_metadata.get("public_url", ""),
-                },
-            }
+            )
+            if cached_result:
+                return cached_result | {
+                    "already_exists": bool(cached_result.get("ok")),
+                    "cloudflare_upload": {
+                        "ok": bool(cached_result.get("ok")),
+                        "code": "cached_object",
+                        "object_key": existing_metadata.get("object_key", ""),
+                        "public_url": existing_metadata.get("public_url", ""),
+                    },
+                }
 
         return {
             "ok": False,
@@ -5666,7 +6518,12 @@ def upload_recipe_pdf_to_cloudflare(url, pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
             "error": "Create the recipe PDF before uploading it to Cloudflare R2.",
         }
 
-    return upload_local_pdf_path_to_cloudflare(pdf_path, url=url, pdf_kind=pdf_kind)
+    return upload_local_pdf_path_to_cloudflare(
+        pdf_path,
+        url=url,
+        pdf_kind=pdf_kind,
+        overwrite=overwrite,
+    )
 
 
 def upload_all_recipe_pdfs_to_cloudflare(url):
@@ -5845,7 +6702,14 @@ def generate_editable_recipe_pdf_file(url, pdf_kind=PDF_KIND_GENERATED_RECIPE):
         recipe_data=recipe_data_for_pdf,
     )
     pdf_path = recipe_pdf_path(url, pdf_kind)
-    saved_path = write_recipe_page_pdf(url, html_text, None, pdf_path)
+    saved_path = write_recipe_page_pdf(
+        url,
+        html_text,
+        None,
+        pdf_path,
+        expected_recipe=recipe_data_for_pdf,
+        expected_title=title,
+    )
     prefix = pdf_metadata_field_prefix(pdf_kind)
     local_path = str(saved_path)
     recipe_data[f"{prefix}_path"] = local_path
@@ -5925,6 +6789,7 @@ def ensure_recipe_pdf_cloudflare_link(
     allow_local_fallback=True,
     pdf_kind=PDF_KIND_WEBPAGE_BACKUP,
     force_regenerate=False,
+    overwrite_r2=False,
 ):
     url = str(url or "").strip()
     pdf_kind = normalize_pdf_kind(pdf_kind)
@@ -6004,9 +6869,38 @@ def ensure_recipe_pdf_cloudflare_link(
 
         pdf_path = Path(local_result.get("pdf_path") or recipe_pdf_path(url, pdf_kind))
 
+    if pdf_kind == PDF_KIND_GENERATED_RECIPE and pdf_path.exists():
+        local_validation = validate_recipe_pdf_for_cloudflare_upload(
+            pdf_path,
+            url=url,
+            pdf_kind=pdf_kind,
+        )
+        local_result["validation"] = local_validation
+        if not local_validation.get("ok"):
+            local_result.update({
+                "ok": False,
+                "success": False,
+                "cached": False,
+                "code": "local_pdf_invalid",
+                "error": (
+                    local_validation.get("error")
+                    or "The local generated-recipe PDF failed semantic validation."
+                ),
+                "pdf_available": True,
+                "pdf_local_available": True,
+                "timings": timings,
+            })
+            log_recipe_pdf_timing("local_validation_failed", url, timings)
+            return local_result
+
     if cloudflare_r2_storage.has_any_r2_config():
         upload_start = perf_counter()
-        upload_result = upload_local_pdf_path_to_cloudflare(pdf_path, url=url, pdf_kind=pdf_kind)
+        upload_result = upload_local_pdf_path_to_cloudflare(
+            pdf_path,
+            url=url,
+            pdf_kind=pdf_kind,
+            overwrite=bool(overwrite_r2),
+        )
         timings["r2_upload_ms"] = recipe_pdf_timing_ms(upload_start)
         upload_result["cached"] = upload_result.get("already_exists", False)
         upload_result["timings"] = timings
@@ -6021,6 +6915,7 @@ def ensure_recipe_pdf_cloudflare_link(
             return upload_result
 
         local_result["cloudflare_upload"] = upload_result.get("cloudflare_upload", upload_result)
+        local_result["code"] = upload_result.get("code", "upload_failed")
         local_result["error"] = upload_result.get("error", "Unable to upload PDF to Cloudflare R2.")
     else:
         local_result["error"] = "Cloudflare R2 is not configured; using local PDF fallback."
@@ -6041,11 +6936,12 @@ def ensure_recipe_pdf_cloudflare_link(
     return local_result
 
 
-def create_editable_recipe_pdf(url):
+def create_editable_recipe_pdf(url, *, overwrite_r2=False):
     result = ensure_recipe_pdf_cloudflare_link(
         url,
         pdf_kind=PDF_KIND_GENERATED_RECIPE,
         force_regenerate=True,
+        overwrite_r2=overwrite_r2,
     )
     log_recipe_pdf_fields("create_editable_recipe_pdf", load_recipe_output(url) or {"source_url": url})
     return result
@@ -9477,7 +10373,7 @@ def recipe_output_index():
 
 def load_recipe_output(url):
     recipe_key = normalize_recipe_url_key(url)
-    direct_path = OUTPUT_FOLDER / f"{safe_filename(url)}.json"
+    direct_path = recipe_output_json_path(url, output_folder=OUTPUT_FOLDER)
 
     if direct_path.exists():
         data = _read_recipe_output_json(direct_path)
@@ -9491,7 +10387,7 @@ def load_recipe_output(url):
 
 def remove_recipe_output_file(url):
     recipe_key = normalize_recipe_url_key(url)
-    json_path = Path(os.fspath(OUTPUT_FOLDER / f"{safe_filename(url)}.json"))
+    json_path = Path(os.fspath(recipe_output_json_path(url, output_folder=OUTPUT_FOLDER)))
     with _RECIPE_OUTPUT_WRITE_LOCK:
         json_path.unlink(missing_ok=True)
     if has_request_context():
@@ -9501,8 +10397,8 @@ def remove_recipe_output_file(url):
 
 
 def remove_stale_recipe_output(original_url, source_url):
-    original_path = Path(os.fspath(OUTPUT_FOLDER / f"{safe_filename(original_url)}.json"))
-    source_path = Path(os.fspath(OUTPUT_FOLDER / f"{safe_filename(source_url)}.json"))
+    original_path = Path(os.fspath(recipe_output_json_path(original_url, output_folder=OUTPUT_FOLDER)))
+    source_path = Path(os.fspath(recipe_output_json_path(source_url, output_folder=OUTPUT_FOLDER)))
     if original_path == source_path or not original_path.exists():
         return False
 
@@ -9517,9 +10413,9 @@ def remove_stale_recipe_output(original_url, source_url):
     return True
 
 
-def save_recipe_output(url, recipe_data):
+def save_recipe_output_to_path(json_path, recipe_data, *, url=""):
     normalize_recipe_unit_fields(recipe_data)
-    json_path = Path(os.fspath(OUTPUT_FOLDER / f"{safe_filename(url)}.json"))
+    json_path = Path(os.fspath(json_path))
     json_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = json_path.with_name(f".{json_path.name}.{uuid.uuid4().hex}.tmp")
     serialized = json.dumps(recipe_data, indent=2, ensure_ascii=False)
@@ -9538,6 +10434,11 @@ def save_recipe_output(url, recipe_data):
             if recipe_key:
                 cached[recipe_key] = recipe_data
     return json_path
+
+
+def save_recipe_output(url, recipe_data):
+    json_path = Path(os.fspath(recipe_output_json_path(url, output_folder=OUTPUT_FOLDER)))
+    return save_recipe_output_to_path(json_path, recipe_data, url=url)
 
 
 def replace_recipe_url(original_url, source_url):
