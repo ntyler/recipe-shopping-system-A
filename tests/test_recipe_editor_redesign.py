@@ -1891,7 +1891,9 @@ def test_recipe_editor_wide_ingredients_workspace_keeps_header_stack_sticky():
     assert "z-index: 36;" in sticky_headers
     assert "top: var(--recipe-edit-ingredients-toolbar-sticky-top, 66px);" in sticky_headers
     assert "margin-bottom: 0;" in sticky_headers
+    assert "border-bottom: 0;" in sticky_headers
     assert "background: var(--recipe-editor-surface);" in sticky_headers
+    assert "box-shadow: none;" in sticky_headers
     assert (
         "body.recipe-edit-standalone-page\n"
         "    .recipe-edit-ingredients-section\n"

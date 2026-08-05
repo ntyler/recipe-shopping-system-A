@@ -68902,8 +68902,9 @@ body.recipe-edit-standalone-page
     z-index: 36;
     top: var(--recipe-edit-ingredients-toolbar-sticky-top, 66px);
     margin-bottom: 0;
+    border-bottom: 0;
     background: var(--recipe-editor-surface);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, .2);
+    box-shadow: none;
 }
 
 body.recipe-edit-standalone-page
