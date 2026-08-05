@@ -195,6 +195,7 @@ def test_requirement_schema_is_idempotent_indexed_and_foreign_keyed(
         assert any(
             row["table"] == "ingredients"
             and row["from"] == "ingredient_id"
+            and row["on_delete"] == "SET NULL"
             for row in item_foreign_keys
         )
 
@@ -983,6 +984,68 @@ def test_deleting_requirement_cascades_to_options_and_items(monkeypatch, tmp_pat
             f"SELECT COUNT(*) FROM recipe_ingredient_option_items WHERE option_id IN ({placeholders})",
             option_ids,
         ).fetchone()[0] == 0
+
+
+def test_deleting_master_ingredient_nulls_reference_and_preserves_option_item(
+    monkeypatch,
+    tmp_path,
+):
+    configure_isolated_repository(monkeypatch, tmp_path)
+    recipe_url = "https://example.test/set-null-master-ingredient/"
+    repository.save_recipe_ingredient_requirements(
+        recipe_url,
+        {
+            "source_url": recipe_url,
+            "ingredients": [
+                {
+                    "recipe_ingredient_id": "requirement-preserved-leek",
+                    "ingredient": "Preserved leek",
+                    "quantity": "2",
+                    "unit": "count",
+                    "original_text": "2 preserved leeks",
+                }
+            ],
+        },
+        user_id="set-null-user",
+        sync_compatibility=False,
+    )
+
+    with master_data.recipe_master_connection() as connection:
+        before = connection.execute(
+            """
+            SELECT item.id, item.ingredient_id, item.option_id, item.raw_name,
+                   item.quantity, item.unit
+              FROM recipe_ingredient_option_items item
+              JOIN recipe_ingredient_options option ON option.id = item.option_id
+              JOIN recipe_ingredient_requirements requirement
+                ON requirement.id = option.requirement_id
+             WHERE requirement.user_id = ? AND requirement.recipe_id = ?
+            """,
+            ("set-null-user", master_data.recipe_id_for_url(recipe_url)),
+        ).fetchone()
+        assert before is not None
+        assert before["ingredient_id"] is not None
+
+        connection.execute(
+            "DELETE FROM ingredients WHERE id = ?",
+            (before["ingredient_id"],),
+        )
+
+        after = connection.execute(
+            """
+            SELECT id, ingredient_id, option_id, raw_name, quantity, unit
+              FROM recipe_ingredient_option_items
+             WHERE id = ?
+            """,
+            (before["id"],),
+        ).fetchone()
+        assert after is not None
+        assert after["ingredient_id"] is None
+        assert after["option_id"] == before["option_id"]
+        assert after["raw_name"] == before["raw_name"] == "Preserved leek"
+        assert after["quantity"] == before["quantity"] == "2"
+        assert after["unit"] == before["unit"] == "count"
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
 def test_corn_spoon_bread_backfill_is_idempotent_and_preserves_grouping(

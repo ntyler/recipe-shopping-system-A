@@ -114,15 +114,15 @@ def _json_dump(value):
 def _order(value, fallback=0):
     if isinstance(value, bool):
         return int(fallback)
+    try:
+        return int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return int(fallback)
 
 
 def _preserved_text(value):
     """Trim outer whitespace without altering authored internal spacing."""
     return str(value if value is not None else "").strip()
-    try:
-        return int(float(value))
-    except (TypeError, ValueError, OverflowError):
-        return int(fallback)
 
 
 def _recipe_source_hash(recipe_data):
@@ -725,7 +725,9 @@ def legacy_ingredients_from_requirements(requirements):
         else:
             parent.pop("recipe_ingredient_id", None)
         if "source_text" in legacy_parent:
-            parent["source_text"] = clean_text(requirement.get("source_text"))
+            parent["source_text"] = _preserved_text(
+                requirement.get("source_text")
+            )
         else:
             parent.pop("source_text", None)
         relational_default = clean_text(requirement.get("default_option_id"))
@@ -901,7 +903,7 @@ def _normalized_option_item(connection, user_id, item, sort_order):
         "classifier_version": clean_text(row.get("classifier_version") or item.get("classifier_version")),
         "store_section_reason": clean_text(row.get("store_section_reason") or item.get("store_section_reason")),
         "store_section_rule": clean_text(row.get("store_section_rule") or item.get("store_section_rule")),
-        "original_recipe_text": clean_text(
+        "original_recipe_text": _preserved_text(
             item.get("original_recipe_text")
             or item.get("original_text")
             or row.get("original_recipe_text")
