@@ -5442,7 +5442,7 @@ def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():
 
     assert 'class="recipe-edit-ingredient-columns-label">Columns</span>' in template
     assert 'class="recipe-edit-ingredient-columns-desktop-action"' in template
-    assert '{{ shell.svg_icon("settings") }}' in template
+    assert '{{ shell.svg_icon("columns") }}' in template
 
     mobile_start = css.index("/* Ingredient editor v24: real mobile folding for the current card-based layout. */")
     mobile_css = css[mobile_start:]

@@ -194,11 +194,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                 aria-controls="storeSectionMasterColumnsMenu"
                                 aria-expanded="false"
                                 data-store-section-master-columns-trigger>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M4 7h16M4 17h16"></path>
-                                <circle cx="9" cy="7" r="2"></circle>
-                                <circle cx="15" cy="17" r="2"></circle>
-                            </svg>
+                            {{ shell.svg_icon("columns") }}
                             Columns
                             <span aria-hidden="true">⌄</span>
                         </button>
