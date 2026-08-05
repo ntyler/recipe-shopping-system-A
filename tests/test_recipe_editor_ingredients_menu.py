@@ -6,6 +6,7 @@ from urllib.parse import parse_qs
 from urllib.parse import urlsplit
 
 import pytest
+from bs4 import BeautifulSoup
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import recipe_edit_service
@@ -5433,28 +5434,191 @@ def test_ingredients_toolbar_places_equal_height_columns_before_add():
     assert "height: 34px;" in shared_height
 
 
-def test_ingredient_view_switcher_is_centered_inside_the_ingredients_toolbar():
+def test_ingredient_view_switcher_is_right_aligned_beside_the_section_tabs():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",
     )
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
+    soup = BeautifulSoup(template, "html.parser")
+    tab_bar = soup.select_one(".recipe-edit-tab-bar")
+    assert tab_bar is not None
+    section_tablist = tab_bar.select_one(".recipe-edit-tab-list")
+    ingredient_view_tablist = tab_bar.select_one(".recipe-edit-ingredient-view-switcher")
+    ingredient_toolbar = soup.select_one("#recipeEditPanelIngredients > .ingredients-toolbar")
+
+    assert section_tablist is not None
+    assert ingredient_view_tablist is not None
+    assert ingredient_toolbar is not None
+    assert section_tablist.parent is tab_bar
+    assert ingredient_view_tablist.parent is tab_bar
+    assert section_tablist.get("role") == "tablist"
+    assert ingredient_view_tablist.get("role") == "tablist"
+    assert ingredient_view_tablist.get("aria-label") == "Ingredient view"
+    assert ingredient_toolbar.select_one("[data-recipe-ingredient-view-switcher]") is None
+
+    tab_bar_start = template.index('class="recipe-edit-tab-bar"')
+    tab_list_start = template.index('class="recipe-edit-tab-list"', tab_bar_start)
+    tab_list_end = template.index("</div>", tab_list_start)
+    switcher_index = template.index('class="recipe-edit-ingredient-view-switcher"', tab_list_end)
+    switcher_end = template.index("</div>", switcher_index)
+    panels_index = template.index('class="recipe-edit-tab-panels"', switcher_end)
     panel_start = template.index('id="recipeEditPanelIngredients"')
     panel_end = template.index('id="recipeEditPanelEquipment"', panel_start)
     ingredient_section = template[panel_start:panel_end]
     title_index = ingredient_section.index('id="recipeEditIngredientsTitle"')
-    switcher_index = ingredient_section.index('class="recipe-edit-ingredient-view-switcher-row"')
     actions_index = ingredient_section.index(
         'class="recipe-edit-section-actions recipe-edit-ingredient-actions ingredients-toolbar-actions"'
     )
     table_panel_index = ingredient_section.index('id="recipeEditIngredientViewTable"')
 
-    assert title_index < switcher_index < actions_index < table_panel_index
-    assert ingredient_section.count('class="recipe-edit-ingredient-view-switcher-row"') == 1
+    assert tab_bar_start < tab_list_start < tab_list_end < switcher_index < switcher_end < panels_index
+    assert template.count('class="recipe-edit-ingredient-view-switcher"') == 1
+    assert 'data-recipe-ingredient-view-switcher' not in ingredient_section
+    assert title_index < actions_index < table_panel_index
+    toolbar = ingredient_section[:table_panel_index]
+    assert toolbar.index('id="recipeEditIngredientsTitle"') < toolbar.index(
+        "recipe-edit-ingredient-column-menu-wrap"
+    )
+    assert toolbar.index("recipe-edit-ingredient-column-menu-wrap") < toolbar.index(
+        "recipe-edit-add-ingredient-button"
+    )
+    assert toolbar.index("recipe-edit-add-ingredient-button") < toolbar.index(
+        "recipe-edit-ingredients-menu-wrap"
+    )
     switcher_css = css[css.index("/* Ingredient editor v80:"):]
-    assert "flex: 1 1 auto;" in switcher_css
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in switcher_css
+    assert "height: 32px;" in switcher_css
+    assert "margin-inline-start: auto;" in switcher_css
     assert "@container recipe-editor-workspace (max-width: 760px)" in switcher_css
-    assert "flex-basis: 100%;" in switcher_css
+    assert "grid-template-columns: minmax(0, 1fr);" in switcher_css
+    assert "grid-row: 2;" in switcher_css
+    assert ".recipe-edit-ingredient-view-switcher[hidden]" in switcher_css
+    assert 'ingredientViewSwitcher.hidden = activeKey !== "ingredients";' in script
+
+
+def test_recipe_editor_tab_switchers_keep_separate_keyboard_and_visibility_behavior():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the recipe editor tab regression harness.")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    section_tabs_start = script.index("function recipeEditTabKey(value)")
+    section_tabs_end = script.index("function initRecipeEditTabs()", section_tabs_start)
+    ingredient_keys_start = script.index("function handleRecipeEditIngredientViewKeydown(event)")
+    ingredient_keys_end = script.index("function initRecipeEditIngredientViews()", ingredient_keys_start)
+    harness = """
+function makeClassList() {
+    const values = new Set();
+    return {
+        toggle(name, enabled) {
+            if (enabled) values.add(name);
+            else values.delete(name);
+        },
+        contains(name) { return values.has(name); },
+    };
+}
+function makeSectionTab(key) {
+    return {
+        dataset: { recipeEditTab: key },
+        classList: makeClassList(),
+        attributes: {},
+        tabIndex: -1,
+        focused: false,
+        setAttribute(name, value) { this.attributes[name] = value; },
+        focus() { this.focused = true; },
+    };
+}
+const sectionTabs = ["ingredients", "instructions", "equipment", "nutrition", "notes"].map(makeSectionTab);
+const sectionPanels = sectionTabs.map(tab => ({
+    dataset: { recipeEditTabPanel: tab.dataset.recipeEditTab },
+    hidden: false,
+}));
+const ingredientSwitcher = { hidden: false };
+const tabsRoot = {
+    querySelectorAll(selector) {
+        if (selector === "[data-recipe-edit-tab]") return sectionTabs;
+        if (selector === "[data-recipe-edit-tab-panel]") return sectionPanels;
+        return [];
+    },
+    querySelector(selector) {
+        return selector === "[data-recipe-ingredient-view-switcher]" ? ingredientSwitcher : null;
+    },
+};
+const document = { querySelector() { return tabsRoot; } };
+function clearRecipeIngredientScrollReserve() {}
+function appMainScrollRegion() { return null; }
+function updateRecipeEditStickyOffsets() {}
+""" + script[section_tabs_start:section_tabs_end] + """
+
+setRecipeEditActiveTab("instructions", { focus: true });
+const instructionsState = {
+    switcherHidden: ingredientSwitcher.hidden,
+    selected: sectionTabs.filter(tab => tab.attributes["aria-selected"] === "true").map(tab => tab.dataset.recipeEditTab),
+    visiblePanels: sectionPanels.filter(panel => !panel.hidden).map(panel => panel.dataset.recipeEditTabPanel),
+    focused: sectionTabs.filter(tab => tab.focused).map(tab => tab.dataset.recipeEditTab),
+};
+setRecipeEditActiveTab("ingredients");
+const ingredientsState = {
+    switcherHidden: ingredientSwitcher.hidden,
+    selected: sectionTabs.filter(tab => tab.attributes["aria-selected"] === "true").map(tab => tab.dataset.recipeEditTab),
+    visiblePanels: sectionPanels.filter(panel => !panel.hidden).map(panel => panel.dataset.recipeEditTabPanel),
+};
+
+const ingredientViewCalls = [];
+function setRecipeEditIngredientView(view, options) {
+    ingredientViewCalls.push({ view, focus: options.focus });
+}
+const ingredientTabs = ["recipe", "smart", "table"].map(view => ({
+    dataset: { recipeIngredientViewTab: view },
+    closest() { return ingredientTablist; },
+}));
+const ingredientTablist = {
+    querySelectorAll() { return ingredientTabs; },
+};
+""" + script[ingredient_keys_start:ingredient_keys_end] + """
+let prevented = false;
+handleRecipeEditIngredientViewKeydown({
+    currentTarget: ingredientTabs[1],
+    key: "ArrowRight",
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    preventDefault() { prevented = true; },
+});
+
+process.stdout.write(JSON.stringify({
+    instructionsState,
+    ingredientsState,
+    ingredientViewCalls,
+    prevented,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["instructionsState"] == {
+        "switcherHidden": True,
+        "selected": ["instructions"],
+        "visiblePanels": ["instructions"],
+        "focused": ["instructions"],
+    }
+    assert result["ingredientsState"] == {
+        "switcherHidden": False,
+        "selected": ["ingredients"],
+        "visiblePanels": ["ingredients"],
+    }
+    assert result["ingredientViewCalls"] == [{"view": "table", "focus": True}]
+    assert result["prevented"] is True
 
 
 def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():
@@ -5894,6 +6058,9 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
     ingredient_start = template.index('id="recipeEditPanelIngredients"')
     ingredient_end = template.index('id="recipeEditPanelEquipment"', ingredient_start)
     ingredient_section = template[ingredient_start:ingredient_end]
+    tab_bar_start = template.index('class="recipe-edit-tab-bar"')
+    tab_bar_end = template.index('class="recipe-edit-tab-panels"', tab_bar_start)
+    tab_bar = template[tab_bar_start:tab_bar_end]
     switch_start = script.index("function setRecipeEditIngredientView(value, options = {})")
     switch_end = script.index("function handleRecipeEditIngredientViewKeydown", switch_start)
     switch_function = script[switch_start:switch_end]
@@ -5901,13 +6068,13 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
     collect_end = script.index("function collectRecipeNutritionRows()", collect_start)
     collect_function = script[collect_start:collect_end]
 
-    assert 'role="tablist"' in ingredient_section
-    assert 'aria-label="Ingredient view"' in ingredient_section
+    assert 'role="tablist"' in tab_bar
+    assert 'aria-label="Ingredient view"' in tab_bar
     for view in ("recipe", "smart", "table"):
-        assert f'data-recipe-ingredient-view-tab="{view}"' in ingredient_section
+        assert f'data-recipe-ingredient-view-tab="{view}"' in tab_bar
         assert f'data-recipe-ingredient-view-panel="{view}"' in ingredient_section
-    assert 'data-recipe-ingredient-view-tab="table"' in ingredient_section
-    assert 'aria-selected="true"' in ingredient_section
+    assert 'data-recipe-ingredient-view-tab="table"' in tab_bar
+    assert 'aria-selected="true"' in tab_bar
     assert ingredient_section.count('id="recipeEditIngredients"') == 1
     assert "Recipe View will be implemented in Phase 2." not in ingredient_section
     assert "Smart View will be implemented in Phase 3." not in ingredient_section
@@ -5930,6 +6097,8 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
     assert 'if (recipeEditIngredientView === "table")' in script
     assert "addRecipeIngredientRow({}, { expanded: false });" in script
     assert 'tab.addEventListener("keydown", handleRecipeEditIngredientViewKeydown);' in script
+    assert 'switcher.querySelectorAll("[data-recipe-ingredient-view-tab]")' in switch_function
+    assert "const activeTab = switcher.querySelector(" in switch_function
     assert 'panel.hidden = panel.dataset.recipeIngredientViewPanel !== view;' in switch_function
     assert "syncRecipeEditIngredientViewActions(section, view);" in switch_function
     assert 'view === "smart"' in switch_function

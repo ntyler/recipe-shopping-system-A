@@ -26011,6 +26011,13 @@ function setRecipeEditActiveTab(tabKey, options = {}) {
         panel.hidden = recipeEditTabKey(panel.dataset.recipeEditTabPanel) !== activeKey;
     });
 
+    const ingredientViewSwitcher = tabsRoot.querySelector(
+        "[data-recipe-ingredient-view-switcher]",
+    );
+    if (ingredientViewSwitcher) {
+        ingredientViewSwitcher.hidden = activeKey !== "ingredients";
+    }
+
     updateRecipeEditStickyOffsets();
     return true;
 }
@@ -30127,7 +30134,8 @@ function addRecipeIngredientFromCurrentView() {
 
 function setRecipeEditIngredientView(value, options = {}) {
     const section = document.querySelector(".recipe-edit-ingredients-section");
-    if (!section) return false;
+    const switcher = document.querySelector("[data-recipe-ingredient-view-switcher]");
+    if (!section || !switcher) return false;
 
     const view = normalizeRecipeEditIngredientView(value);
     const scrollState = recipeEditIngredientViewScrollState();
@@ -30149,7 +30157,7 @@ function setRecipeEditIngredientView(value, options = {}) {
     } else if (view === "smart") {
         renderRecipeIngredientSmartView();
     }
-    section.querySelectorAll("[data-recipe-ingredient-view-tab]").forEach(tab => {
+    switcher.querySelectorAll("[data-recipe-ingredient-view-tab]").forEach(tab => {
         const selected = tab.dataset.recipeIngredientViewTab === view;
         tab.classList.toggle("is-active", selected);
         tab.setAttribute("aria-selected", selected ? "true" : "false");
@@ -30165,7 +30173,7 @@ function setRecipeEditIngredientView(value, options = {}) {
     }
 
     if (options.focus === true) {
-        const activeTab = section.querySelector(
+        const activeTab = switcher.querySelector(
             `[data-recipe-ingredient-view-tab="${view}"]`,
         );
         if (activeTab) activeTab.focus({ preventScroll: true });
