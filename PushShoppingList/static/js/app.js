@@ -30229,9 +30229,6 @@ function initRecipeEditIngredientViews() {
 function organizeRecipeEditIngredientTools() {
     const section = document.querySelector(".recipe-edit-ingredients-section");
     const ingredientList = document.getElementById("recipeEditIngredients");
-    const utilityActions = section
-        ? Array.from(section.querySelectorAll(".recipe-edit-ingredient-utility-action"))
-        : [];
     if (!section || !ingredientList) {
         return;
     }
@@ -30300,15 +30297,6 @@ function organizeRecipeEditIngredientTools() {
         );
     }
     syncRecipeEditIngredientTableHeaderScroll(tableScroll);
-
-    let footer = section.querySelector("[data-recipe-edit-ingredient-footer]");
-    if (!footer) {
-        footer = document.createElement("div");
-        footer.className = "recipe-edit-ingredient-footer-actions";
-        footer.dataset.recipeEditIngredientFooter = "";
-        tableScroll.insertAdjacentElement("afterend", footer);
-    }
-    utilityActions.forEach(action => footer.appendChild(action));
 
     const collapseToggle = section.querySelector("[data-recipe-ingredients-collapse-toggle]");
     const overflowMenu = section.querySelector(".recipe-edit-ingredients-image-menu");
@@ -38846,28 +38834,6 @@ function toggleRecipeEditIngredientGallery(button) {
     const expanded = button.getAttribute("aria-expanded") === "true";
     button.setAttribute("aria-expanded", expanded ? "false" : "true");
     updateRecipeEditIngredientGallery();
-    return false;
-}
-
-function beginRecipeIngredientReorder(button) {
-    setRecipeIngredientsCollapsed(false);
-    const handle = document.querySelector("#recipeEditIngredients .recipe-edit-drag-handle, #recipeEditIngredients [draggable='true']");
-    if (handle) {
-        handle.focus({ preventScroll: true });
-    }
-    setRecipeEditStatus("Drag ingredient handles to reorder the table.");
-    return false;
-}
-
-function focusRecipeIngredientGrouping(button) {
-    setRecipeIngredientsCollapsed(false);
-    const row = document.querySelector("#recipeEditIngredients > .recipe-edit-ingredient-row");
-    if (row) {
-        setRecipeIngredientEditMode(row, true);
-        const group = row.querySelector("[data-recipe-edit-type-trigger]");
-        if (group) group.focus({ preventScroll: false });
-    }
-    setRecipeEditStatus("Use the Type fields to group related ingredients.");
     return false;
 }
 

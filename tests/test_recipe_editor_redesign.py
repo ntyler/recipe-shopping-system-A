@@ -164,8 +164,9 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert "recipe-edit-ai-assistant-card" in template
     assert "recipeEditAiMissingFields" in template
     assert "recipeEditAiConfidenceCard" in template
-    assert "beginRecipeIngredientReorder(this)" in template
-    assert "focusRecipeIngredientGrouping(this)" in template
+    assert "beginRecipeIngredientReorder(this)" not in template
+    assert "focusRecipeIngredientGrouping(this)" not in template
+    assert 'class="recipe-edit-ingredient-utility-action"' not in template
 
 
 def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows():
@@ -1110,7 +1111,6 @@ def test_recipe_editor_ingredient_table_uses_mockup_icons_and_compact_controls()
 
     assert '{{ shell.svg_icon("plus") }}' in template
     assert '{{ shell.svg_icon("sort") }}' in template
-    assert '{{ shell.svg_icon("folder") }}' in template
     assert '{{ shell.svg_icon("chevron-down") }}' in template
     for icon_name in ("drag", "leaf", "dairy", "can", "jar", "oil", "edit", "trash", "chevron-down"):
         assert f"{icon_name}:" in script or f'"{icon_name}":' in script
@@ -1710,8 +1710,8 @@ def test_recipe_editor_redesign_javascript_wiring():
     assert "function recipeEditHealthChecks()" in script
     assert "row.hidden = !hasValue;" in script
     assert "function toggleRecipeEditIngredientGallery" in script
-    assert "function beginRecipeIngredientReorder" in script
-    assert "function focusRecipeIngredientGrouping" in script
+    assert "function beginRecipeIngredientReorder" not in script
+    assert "function focusRecipeIngredientGrouping" not in script
     assert "function previewRecipeFromEditor()" in script
     assert "function replaceRecipeIngredientWithSubstitution(button)" in script
     assert 'setValue("recipeEditDescription", recipe.description || "")' in script

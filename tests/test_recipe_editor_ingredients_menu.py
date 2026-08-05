@@ -4963,8 +4963,6 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert 'optionalInput.checked = recipeIngredientIsOptional({ section: typeSelect.value });' in script
     assert 'item.optional = recipeIngredientIsOptional(item);' in script
     assert 'syncRecipeIngredientTypeControl(input);' in script
-    assert 'row.querySelector("[data-recipe-edit-type-trigger]")' in script
-
     assert "/* Ingredient editor v11: managed custom Type picker. */" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot.is-optional" in css
@@ -5416,7 +5414,7 @@ def test_ingredients_toolbar_places_equal_height_columns_before_add():
     shared_height_end = desktop_css.index("}", shared_height_start)
     shared_height = desktop_css[shared_height_start:shared_height_end]
     assert ".recipe-edit-add-ingredient-button," in shared_height
-    assert ".recipe-edit-ingredient-columns-button," in shared_height
+    assert ".recipe-edit-ingredient-columns-button" in shared_height
     assert "min-height: 34px;" in shared_height
     assert "height: 34px;" in shared_height
 
