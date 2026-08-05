@@ -1766,43 +1766,6 @@
                         </div>
                     </div>
                     <div class="recipe-edit-section-actions recipe-edit-ingredient-actions ingredients-toolbar-actions">
-                        <button type="button"
-                                class="recipe-edit-add-ingredient-button"
-                                onclick="addRecipeIngredientFromCurrentView()">
-                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
-                            <span>Add Ingredient</span>
-                        </button>
-                        <button type="button"
-                                class="recipe-edit-ingredient-utility-action"
-                                data-recipe-ingredient-recipe-hidden
-                                onclick="return beginRecipeIngredientReorder(this)">
-                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("sort") }}</span>
-                            <span>Reorder</span>
-                        </button>
-                        <button type="button"
-                                class="recipe-edit-ingredient-utility-action"
-                                data-recipe-ingredient-recipe-hidden
-                                onclick="return focusRecipeIngredientGrouping(this)">
-                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("folder") }}</span>
-                            <span>Group</span>
-                        </button>
-                        <button type="button"
-                                data-recipe-ingredients-collapse-toggle
-                                data-recipe-ingredient-recipe-hidden
-                                onclick="toggleRecipeIngredientsCollapsed(this)">
-                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
-                            <span>Expand All</span>
-                        </button>
-                        <button type="button"
-                                class="recipe-edit-mobile-ingredients-collapse-toggle"
-                                data-recipe-ingredients-collapse-toggle
-                                data-recipe-ingredient-recipe-hidden
-                                aria-label="Collapse all ingredients"
-                                title="Collapse all ingredients"
-                                onclick="return toggleRecipeIngredientsCollapsed(this)">
-                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
-                            <span class="sr-only" data-recipe-ingredients-collapse-label>Collapse All</span>
-                        </button>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-ingredient-column-menu-wrap"
                              data-recipe-ingredient-table-action>
                             <button type="button"
@@ -1840,6 +1803,43 @@
                                 </div>
                             </div>
                         </div>
+                        <button type="button"
+                                class="recipe-edit-add-ingredient-button"
+                                onclick="addRecipeIngredientFromCurrentView()">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
+                            <span>Add Ingredient</span>
+                        </button>
+                        <button type="button"
+                                class="recipe-edit-ingredient-utility-action"
+                                data-recipe-ingredient-recipe-hidden
+                                onclick="return beginRecipeIngredientReorder(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("sort") }}</span>
+                            <span>Reorder</span>
+                        </button>
+                        <button type="button"
+                                class="recipe-edit-ingredient-utility-action"
+                                data-recipe-ingredient-recipe-hidden
+                                onclick="return focusRecipeIngredientGrouping(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("folder") }}</span>
+                            <span>Group</span>
+                        </button>
+                        <button type="button"
+                                data-recipe-ingredients-collapse-toggle
+                                data-recipe-ingredient-recipe-hidden
+                                onclick="toggleRecipeIngredientsCollapsed(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
+                            <span>Expand All</span>
+                        </button>
+                        <button type="button"
+                                class="recipe-edit-mobile-ingredients-collapse-toggle"
+                                data-recipe-ingredients-collapse-toggle
+                                data-recipe-ingredient-recipe-hidden
+                                aria-label="Collapse all ingredients"
+                                title="Collapse all ingredients"
+                                onclick="return toggleRecipeIngredientsCollapsed(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
+                            <span class="sr-only" data-recipe-ingredients-collapse-label>Collapse All</span>
+                        </button>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-ingredients-menu-wrap">
                             <button type="button"
                                     class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn"

@@ -5395,6 +5395,32 @@ def test_mobile_ingredient_quantity_formatter_uses_plain_slash_fractions_and_kee
     assert '.replace(new RegExp(`(\\\\d)\\\\s*${character}`, "g"), `$1 ${replacement}`)' in normalizer
 
 
+def test_ingredients_toolbar_places_equal_height_columns_before_add():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8",
+    )
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    actions_start = template.index("recipe-edit-ingredient-actions ingredients-toolbar-actions")
+    actions_end = template.index("recipe-edit-ingredients-menu-wrap", actions_start)
+    toolbar_actions = template[actions_start:actions_end]
+    assert toolbar_actions.index("recipe-edit-ingredient-column-menu-wrap") < toolbar_actions.index(
+        "recipe-edit-add-ingredient-button"
+    )
+
+    desktop_start = css.index("@media (min-width: 768px)")
+    desktop_css = css[desktop_start:]
+    shared_height_start = desktop_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredients-section :is("
+    )
+    shared_height_end = desktop_css.index("}", shared_height_start)
+    shared_height = desktop_css[shared_height_start:shared_height_end]
+    assert ".recipe-edit-add-ingredient-button," in shared_height
+    assert ".recipe-edit-ingredient-columns-button," in shared_height
+    assert "min-height: 34px;" in shared_height
+    assert "height: 34px;" in shared_height
+
+
 def test_mobile_ingredients_toolbar_shows_an_icon_only_columns_control():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",

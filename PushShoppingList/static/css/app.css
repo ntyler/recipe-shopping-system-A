@@ -57260,7 +57260,8 @@ body.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section-tit
     font-weight: 750;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section-actions > button:first-child {
+body.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-section-actions > button:first-child,
+body.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-ingredients-section .recipe-edit-add-ingredient-button {
     height: 34px;
     min-height: 34px;
     padding: 0 12px;
@@ -73542,8 +73543,8 @@ body.recipe-edit-standalone-page .recipe-edit-standalone-shell {
         .recipe-edit-ingredient-columns-button,
         .recipe-edit-ingredient-utility-action
     ) {
-        min-height: 40px;
-        height: 40px;
+        min-height: 34px;
+        height: 34px;
         font-size: 13px;
     }
 
