@@ -51,7 +51,6 @@ from PushShoppingList.services.meal_plan_service import sync_meal_recipe_ingredi
 from PushShoppingList.services.ingredient_option_service import shopping_item_name
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
 from PushShoppingList.services.ingredient_unit_service import normalize_recipe_fraction_fields
-from PushShoppingList.services.ingredient_unit_service import normalize_recipe_unit_fields
 from PushShoppingList.services.image_variant_service import IMAGE_VARIANTS
 from PushShoppingList.services.image_variant_service import cover_image_variant_payload
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
@@ -100,6 +99,7 @@ from PushShoppingList.services.recipe_ingredient_service import ingredient_detai
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
 from PushShoppingList.services.recipe_ingredient_service import remove_unused_ingredients_from_shopping_list
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
+from PushShoppingList.services import recipe_ingredient_requirement_service
 from PushShoppingList.services.recipe_master_data_service import clean_ingredient_store_section
 from PushShoppingList.services.recipe_master_data_service import classify_ingredient_store_section_result
 from PushShoppingList.services.recipe_master_data_service import classify_ingredient_store_section
@@ -1693,11 +1693,20 @@ def create_new_recipe():
         "generated_cloudflare_pdf_url": "",
     }
 
-    save_recipe_output(source_url, recipe_data)
+    recipe_data = save_recipe_output_with_requirements(
+        source_url,
+        recipe_data,
+        previous_recipe_data=None,
+    )
     save_recipe_urls(load_recipe_urls() + [source_url])
     save_recipe_url_quantity(source_url, 1)
     save_recipe_url_name(source_url, "New Recipe")
-    update_recipe_ingredient_record(source_url, 1, recipe_data)
+    update_recipe_ingredient_record(
+        source_url,
+        1,
+        recipe_data,
+        sync_master=False,
+    )
     ensure_unclassified_cookbook_for_recipes([{
         "url": source_url,
         "name": "New Recipe",
@@ -4681,10 +4690,27 @@ def backfill_editable_restaurant_sources():
 
 def load_editable_recipe(url):
     url = str(url or "").strip()
-    recipe_data = load_recipe_output(url) or {"source_url": url}
+    loaded_recipe_data = load_recipe_output(url)
+    has_saved_recipe_data = isinstance(loaded_recipe_data, dict) and bool(loaded_recipe_data)
+    recipe_data = loaded_recipe_data or {"source_url": url}
     recipe_data = lazy_backfill_editable_recipe_restaurant(url, recipe_data)
     apply_recipe_pdf_asset_aliases(recipe_data)
     source_url = str(recipe_data.get("source_url") or url).strip() or url
+    requirement_sync_checked = False
+    requirement_sync_status = None
+    if has_saved_recipe_data:
+        try:
+            requirement_sync_status = (
+                recipe_ingredient_requirement_service.recipe_requirement_sync_status(
+                    source_url
+                )
+            )
+            requirement_sync_checked = True
+        except Exception:
+            LOGGER.exception(
+                "Normalized ingredient requirement status could not be read for %s; keeping JSON ingredients.",
+                source_url,
+            )
     hydrate_source_pdf_assets_from_url(recipe_data, source_url)
     menu_metadata = editable_recipe_menu_metadata(recipe_data)
     menu_source_options = editable_menu_source_options()
@@ -4734,8 +4760,7 @@ def load_editable_recipe(url):
         recipe_notes,
     )
     recipe_data = migrate_recipe_ingredient_options(recipe_data)
-
-    return {
+    result = {
         "ok": True,
         "recipe": {
             "recipe_id": recipe_data.get("recipe_id") or "",
@@ -4822,6 +4847,26 @@ def load_editable_recipe(url):
         "store_sections": ingredient_store_section_options(),
         "store_section_details": ingredient_store_section_details(),
     }
+    # Build the first fallback response entirely from the legacy JSON view so
+    # lazy synchronization cannot change store-section presentation halfway
+    # through one load.  Subsequent loads prefer the committed SQL hierarchy.
+    if (
+        has_saved_recipe_data
+        and requirement_sync_checked
+        and requirement_sync_status is None
+    ):
+        try:
+            recipe_ingredient_requirement_service.save_recipe_ingredient_requirements(
+                source_url,
+                recipe_data,
+                sync_compatibility=True,
+            )
+        except Exception:
+            LOGGER.exception(
+                "Normalized ingredient requirement fallback synchronization failed for %s; keeping JSON ingredients.",
+                source_url,
+            )
+    return result
 
 
 def editable_recipe_cover_image(url, recipe_data, recipe_meta=None):
@@ -7005,6 +7050,109 @@ def recipe_save_error(error, message, field_errors=None, status_code=400):
     }
 
 
+def restore_recipe_requirement_sql_after_output_failure(
+    original_url,
+    original_recipe_data,
+    *,
+    failed_url="",
+    failed_url_previous_data=None,
+):
+    """Best-effort compensation after SQL committed but JSON persistence failed."""
+    original_url = str(original_url or "").strip()
+    failed_url = str(failed_url or original_url).strip() or original_url
+    had_original_recipe = bool(
+        isinstance(original_recipe_data, dict) and original_recipe_data
+    )
+    original_recipe_data = (
+        deepcopy(original_recipe_data)
+        if isinstance(original_recipe_data, dict)
+        else {"source_url": original_url}
+    )
+    identity_changed = (
+        bool(original_url and failed_url)
+        and normalize_recipe_url_key(original_url) != normalize_recipe_url_key(failed_url)
+    )
+
+    try:
+        if had_original_recipe:
+            recipe_ingredient_requirement_service.save_recipe_ingredient_requirements(
+                original_url or failed_url,
+                original_recipe_data,
+                previous_recipe_url=failed_url if identity_changed else None,
+                sync_compatibility=True,
+                force_store_sections_from_recipe=True,
+            )
+        else:
+            remove_recipe_master_records_for_recipe(failed_url)
+    except Exception:
+        LOGGER.exception(
+            "Recipe ingredient SQL compensation failed for %s after the JSON write failed.",
+            original_url or failed_url,
+        )
+
+    if (
+        identity_changed
+        and isinstance(failed_url_previous_data, dict)
+        and failed_url_previous_data
+    ):
+        try:
+            recipe_ingredient_requirement_service.save_recipe_ingredient_requirements(
+                failed_url,
+                failed_url_previous_data,
+                sync_compatibility=True,
+                force_store_sections_from_recipe=True,
+            )
+        except Exception:
+            LOGGER.exception(
+                "Recipe ingredient SQL compensation could not restore the prior destination recipe %s.",
+                failed_url,
+            )
+
+
+def save_recipe_output_with_requirements(
+    recipe_url,
+    recipe_data,
+    *,
+    previous_recipe_url=None,
+    previous_recipe_data=None,
+    destination_previous_data=None,
+    force_store_sections_from_recipe=True,
+):
+    """Save authoritative SQL first, then its legacy JSON projection."""
+    recipe_url = str(recipe_url or "").strip()
+    if previous_recipe_data is None:
+        previous_recipe_data = load_recipe_output(
+            previous_recipe_url or recipe_url
+        )
+    recipe_ingredient_requirement_service.save_recipe_ingredient_requirements(
+        recipe_url,
+        recipe_data,
+        previous_recipe_url=previous_recipe_url,
+        sync_compatibility=True,
+        force_store_sections_from_recipe=force_store_sections_from_recipe,
+    )
+    try:
+        compatibility_data = (
+            recipe_ingredient_requirement_service.recipe_data_with_sql_requirements(
+                recipe_url,
+                recipe_data,
+            )
+        )
+        save_recipe_output(recipe_url, compatibility_data)
+        return compatibility_data
+    except Exception:
+        LOGGER.exception(
+            "Recipe JSON write failed after ingredient SQL committed; attempting SQL compensation."
+        )
+        restore_recipe_requirement_sql_after_output_failure(
+            previous_recipe_url or recipe_url,
+            previous_recipe_data,
+            failed_url=recipe_url,
+            failed_url_previous_data=destination_previous_data,
+        )
+        raise
+
+
 def recipe_amount_is_valid(value):
     if value in (None, ""):
         return True
@@ -7494,7 +7642,14 @@ def save_editable_recipe(original_url, payload, require_existing=False):
     recipe_data = migrate_recipe_ingredient_options(recipe_data)
     normalize_extracted_equipment_fields(recipe_data)
     log_recipe_pdf_fields("save_editable_recipe:before_write", recipe_data)
-    save_recipe_output(source_url, recipe_data)
+    recipe_data = save_recipe_output_with_requirements(
+        source_url,
+        recipe_data,
+        previous_recipe_url=original_url if identity_changed else None,
+        previous_recipe_data=existing_data,
+        destination_previous_data=target_data_before,
+        force_store_sections_from_recipe=True,
+    )
 
     if identity_changed:
         try:
@@ -7513,6 +7668,12 @@ def save_editable_recipe(original_url, payload, require_existing=False):
                 move_recipe_meta(source_url, original_url)
             except Exception:
                 LOGGER.exception("Recipe identity migration rollback was incomplete.")
+            restore_recipe_requirement_sql_after_output_failure(
+                original_url,
+                existing_data,
+                failed_url=source_url,
+                failed_url_previous_data=target_data_before,
+            )
             raise
 
     quantity = normalize_recipe_quantity(payload.get("quantity", 1))
@@ -7522,7 +7683,15 @@ def save_editable_recipe(original_url, payload, require_existing=False):
     derived_syncs = (
         ("Recipe quantity metadata", lambda: save_recipe_url_quantity(source_url, quantity)),
         ("Recipe display name", lambda: save_recipe_url_name(source_url, display_name)),
-        ("Ingredient and equipment master data", lambda: update_recipe_ingredient_record(source_url, quantity, recipe_data)),
+        (
+            "Ingredient and equipment master data",
+            lambda: update_recipe_ingredient_record(
+                source_url,
+                quantity,
+                recipe_data,
+                sync_master=False,
+            ),
+        ),
         ("Scaled recipe quantities", lambda: update_recipe_quantity(source_url, quantity)),
         ("Shopping list", lambda: sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients)),
     )
@@ -7857,11 +8026,24 @@ def save_editable_recipe_ingredient(
         quantity = normalize_recipe_quantity(
             recipe_meta.get("quantity", 1) if isinstance(recipe_meta, dict) else 1
         )
-        save_recipe_output(source_url, recipe_data)
+        recipe_data = save_recipe_output_with_requirements(
+            source_url,
+            recipe_data,
+            previous_recipe_data=existing_data,
+            force_store_sections_from_recipe=True,
+        )
 
     warnings = []
     derived_syncs = (
-        ("Ingredient and equipment master data", lambda: update_recipe_ingredient_record(source_url, quantity, recipe_data)),
+        (
+            "Ingredient and equipment master data",
+            lambda: update_recipe_ingredient_record(
+                source_url,
+                quantity,
+                recipe_data,
+                sync_master=False,
+            ),
+        ),
         ("Scaled recipe quantities", lambda: update_recipe_quantity(source_url, quantity)),
         ("Shopping list", lambda: sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients)),
     )
@@ -8493,6 +8675,7 @@ def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
     recipe_data = load_recipe_output(original_url)
     if not recipe_data:
         return {"ok": False, "error": "Recipe data was not found."}
+    previous_recipe_data = deepcopy(recipe_data)
 
     recipe_source_url = str(recipe_data.get("source_url") or original_url).strip() or original_url
     recipe_data["source_url"] = recipe_source_url
@@ -8527,8 +8710,11 @@ def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
             "text": equipment_text,
         }
         recipe_data["equipment"] = equipment_items
-        save_recipe_output(recipe_source_url, recipe_data)
-        sync_recipe_master_records(recipe_source_url, recipe_data=recipe_data)
+        recipe_data = save_recipe_output_with_requirements(
+            recipe_source_url,
+            recipe_data,
+            previous_recipe_data=previous_recipe_data,
+        )
         finish_recipe_image_progress(
             "equipment",
             recipe_source_url,
@@ -8582,8 +8768,11 @@ def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
             "ingredient": ingredient_text,
         }
         recipe_data["ingredients"] = ingredients
-        save_recipe_output(recipe_source_url, recipe_data)
-        sync_recipe_master_records(recipe_source_url, recipe_data=recipe_data)
+        recipe_data = save_recipe_output_with_requirements(
+            recipe_source_url,
+            recipe_data,
+            previous_recipe_data=previous_recipe_data,
+        )
         finish_recipe_image_progress(
             "ingredient",
             recipe_source_url,
@@ -8663,6 +8852,7 @@ def remove_recipe_detail_image(original_url, kind, target):
     recipe_data = load_recipe_output(original_url)
     if not recipe_data:
         return {"ok": False, "error": "Recipe data was not found."}
+    previous_recipe_data = deepcopy(recipe_data)
 
     recipe_source_url = str(recipe_data.get("source_url") or original_url).strip() or original_url
     recipe_data["source_url"] = recipe_source_url
@@ -8691,8 +8881,11 @@ def remove_recipe_detail_image(original_url, kind, target):
             "text": equipment_text,
         }
         recipe_data["equipment"] = equipment_items
-        save_recipe_output(recipe_source_url, recipe_data)
-        sync_recipe_master_records(recipe_source_url, recipe_data=recipe_data)
+        recipe_data = save_recipe_output_with_requirements(
+            recipe_source_url,
+            recipe_data,
+            previous_recipe_data=previous_recipe_data,
+        )
 
         return {
             "ok": True,
@@ -8733,8 +8926,11 @@ def remove_recipe_detail_image(original_url, kind, target):
             "ingredient": ingredient_text,
         }
         recipe_data["ingredients"] = ingredients
-        save_recipe_output(recipe_source_url, recipe_data)
-        sync_recipe_master_records(recipe_source_url, recipe_data=recipe_data)
+        recipe_data = save_recipe_output_with_requirements(
+            recipe_source_url,
+            recipe_data,
+            previous_recipe_data=previous_recipe_data,
+        )
 
         return {
             "ok": True,
@@ -9469,6 +9665,7 @@ def generate_recipe_equipment_image(payload):
     recipe_data = load_recipe_output(url)
     if not recipe_data:
         return {"ok": False, "error": "Recipe data was not found."}
+    previous_recipe_data = deepcopy(recipe_data)
 
     recipe_title = str(recipe_data.get("recipe_title") or "").strip()
     if not recipe_title:
@@ -9579,8 +9776,11 @@ def generate_recipe_equipment_image(payload):
         "text": equipment_text,
     }
     recipe_data["equipment"] = equipment_items
-    save_recipe_output(url, recipe_data)
-    sync_recipe_master_records(url, recipe_data=recipe_data)
+    recipe_data = save_recipe_output_with_requirements(
+        url,
+        recipe_data,
+        previous_recipe_data=previous_recipe_data,
+    )
     finish_recipe_image_progress(
         "equipment",
         url,
@@ -9615,6 +9815,7 @@ def generate_recipe_ingredient_image(payload):
     recipe_data = load_recipe_output(url)
     if not recipe_data:
         return {"ok": False, "error": "Recipe data was not found."}
+    previous_recipe_data = deepcopy(recipe_data)
 
     recipe_title = str(recipe_data.get("recipe_title") or recipe_data.get("display_name") or "").strip()
     ingredients = [
@@ -9725,8 +9926,11 @@ def generate_recipe_ingredient_image(payload):
         "ingredient": ingredient_text,
     }
     recipe_data["ingredients"] = ingredients
-    save_recipe_output(url, recipe_data)
-    sync_recipe_master_records(url, recipe_data=recipe_data)
+    recipe_data = save_recipe_output_with_requirements(
+        url,
+        recipe_data,
+        previous_recipe_data=previous_recipe_data,
+    )
     finish_recipe_image_progress(
         "ingredient",
         url,
@@ -10308,7 +10512,26 @@ def normalize_estimated_nutrition_value(key, value):
 
 
 def resolved_recipe_shopping_items(recipe_data, selections=None):
-    return resolve_ingredient_requirements(recipe_data, selections)["items"]
+    preferred_recipe_data = recipe_data
+    source_url = (
+        str(recipe_data.get("source_url") or "").strip()
+        if isinstance(recipe_data, dict)
+        else ""
+    )
+    if source_url:
+        try:
+            preferred_recipe_data = (
+                recipe_ingredient_requirement_service.recipe_data_with_sql_requirements(
+                    source_url,
+                    recipe_data,
+                )
+            )
+        except Exception:
+            LOGGER.exception(
+                "Normalized ingredient requirements could not be loaded for shopping resolution of %s; using JSON ingredients.",
+                source_url,
+            )
+    return resolve_ingredient_requirements(preferred_recipe_data, selections)["items"]
 
 
 def resolved_recipe_shopping_item_names(recipe_data, selections=None):
@@ -10374,15 +10597,32 @@ def recipe_output_index():
 def load_recipe_output(url):
     recipe_key = normalize_recipe_url_key(url)
     direct_path = recipe_output_json_path(url, output_folder=OUTPUT_FOLDER)
+    data = None
 
     if direct_path.exists():
-        data = _read_recipe_output_json(direct_path)
-        if isinstance(data, dict):
-            source_key = normalize_recipe_url_key(data.get("source_url", ""))
+        direct_data = _read_recipe_output_json(direct_path)
+        if isinstance(direct_data, dict):
+            source_key = normalize_recipe_url_key(direct_data.get("source_url", ""))
             if not source_key or source_key == recipe_key:
-                return data
+                data = direct_data
 
-    return recipe_output_index().get(recipe_key)
+    if not isinstance(data, dict):
+        data = recipe_output_index().get(recipe_key)
+    if not isinstance(data, dict):
+        return data
+
+    source_url = str(data.get("source_url") or url).strip() or url
+    try:
+        return recipe_ingredient_requirement_service.recipe_data_with_sql_requirements(
+            source_url,
+            data,
+        )
+    except Exception:
+        LOGGER.exception(
+            "Normalized ingredient requirements could not be loaded for %s; using JSON ingredients.",
+            source_url,
+        )
+        return data
 
 
 def remove_recipe_output_file(url):
@@ -10414,7 +10654,6 @@ def remove_stale_recipe_output(original_url, source_url):
 
 
 def save_recipe_output_to_path(json_path, recipe_data, *, url=""):
-    normalize_recipe_unit_fields(recipe_data)
     json_path = Path(os.fspath(json_path))
     json_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = json_path.with_name(f".{json_path.name}.{uuid.uuid4().hex}.tmp")
@@ -10478,7 +10717,14 @@ def move_recipe_meta(original_url, source_url):
     remove_recipe_master_records_for_recipe(original_url)
 
 
-def update_recipe_ingredient_record(url, quantity, recipe_data, preserve_existing_cover=True):
+def update_recipe_ingredient_record(
+    url,
+    quantity,
+    recipe_data,
+    preserve_existing_cover=True,
+    *,
+    sync_master=True,
+):
     data = load_recipe_ingredients()
     key = normalize_recipe_url_key(url)
     existing = data.get(key, {})
@@ -10516,12 +10762,13 @@ def update_recipe_ingredient_record(url, quantity, recipe_data, preserve_existin
 
     data[key] = record
     save_recipe_ingredients(data)
-    sync_recipe_master_records(
-        url,
-        ingredients=record.get("ingredients", []),
-        recipe_data=recipe_data,
-        force_store_sections_from_recipe=True,
-    )
+    if sync_master:
+        sync_recipe_master_records(
+            url,
+            ingredients=record.get("ingredients", []),
+            recipe_data=recipe_data,
+            force_store_sections_from_recipe=True,
+        )
 
 
 def recipe_edit_log_value(value):

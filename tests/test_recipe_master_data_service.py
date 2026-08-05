@@ -1522,6 +1522,200 @@ def test_undo_last_ingredient_merge_restores_records_aliases_metadata_and_refere
     assert master_data.latest_undoable_ingredient_merge("user-a") is None
 
 
+def test_ingredient_merge_and_undo_restore_exact_normalized_option_item_references(
+    monkeypatch,
+    tmp_path,
+):
+    configure_master_db(monkeypatch, tmp_path)
+    source_url = "https://example.com/normalized-beans"
+    target_url = "https://example.com/normalized-bean"
+    later_target_url = "https://example.com/later-normalized-bean"
+    master_data.sync_recipe_master_records(
+        source_url,
+        recipe_data={"ingredients": [{"ingredient": "Beans"}]},
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        target_url,
+        recipe_data={"ingredients": [{"ingredient": "Bean"}]},
+        user_id="user-a",
+    )
+    source = master_data.master_record_for_name("ingredients", "user-a", "beans")
+    target = master_data.master_record_for_name("ingredients", "user-a", "bean")
+
+    with master_data.recipe_master_connection() as connection:
+        source_item_ids = master_data.normalized_ingredient_option_item_reference_ids(
+            connection,
+            "user-a",
+            source["id"],
+        )
+        target_item_ids = master_data.normalized_ingredient_option_item_reference_ids(
+            connection,
+            "user-a",
+            target["id"],
+        )
+    assert len(source_item_ids) == 1
+    assert len(target_item_ids) == 1
+
+    merge_result = master_data.merge_ingredient_master_records(
+        source["id"],
+        target["id"],
+        user_id="user-a",
+    )
+
+    assert merge_result["ok"] is True
+    assert merge_result["moved_reference_count"] == 1
+    assert merge_result["normalized_moved_reference_count"] == 1
+    with master_data.recipe_master_connection() as connection:
+        placeholders = ", ".join("?" for _value in source_item_ids + target_item_ids)
+        merged_items = connection.execute(
+            f"""
+            SELECT id, ingredient_id
+              FROM recipe_ingredient_option_items
+             WHERE id IN ({placeholders})
+             ORDER BY id ASC
+            """,
+            (*source_item_ids, *target_item_ids),
+        ).fetchall()
+        snapshot = json.loads(
+            connection.execute(
+                "SELECT snapshot_json FROM ingredient_merge_history WHERE id = ?",
+                (merge_result["merge_id"],),
+            ).fetchone()["snapshot_json"]
+        )
+    assert {int(row["ingredient_id"]) for row in merged_items} == {target["id"]}
+    assert snapshot["version"] == 2
+    assert snapshot["moved_option_item_ids"] == source_item_ids
+
+    # A target reference created after the merge must remain with the target
+    # when the exact snapshotted source references are restored.
+    master_data.sync_recipe_master_records(
+        later_target_url,
+        recipe_data={"ingredients": [{"ingredient": "Bean"}]},
+        user_id="user-a",
+    )
+    with master_data.recipe_master_connection() as connection:
+        target_ids_before_undo = set(
+            master_data.normalized_ingredient_option_item_reference_ids(
+                connection,
+                "user-a",
+                target["id"],
+            )
+        )
+    later_target_item_ids = target_ids_before_undo - set(source_item_ids) - set(target_item_ids)
+    assert len(later_target_item_ids) == 1
+
+    preview = master_data.ingredient_merge_undo_preview("user-a")
+    undo_result = master_data.undo_last_ingredient_master_merge("user-a")
+
+    assert preview["normalized_restored_reference_count"] == 1
+    assert undo_result["ok"] is True
+    assert undo_result["restored_reference_count"] == 1
+    assert undo_result["normalized_restored_reference_count"] == 1
+    with master_data.recipe_master_connection() as connection:
+        restored_source_ids = set(
+            master_data.normalized_ingredient_option_item_reference_ids(
+                connection,
+                "user-a",
+                source["id"],
+            )
+        )
+        remaining_target_ids = set(
+            master_data.normalized_ingredient_option_item_reference_ids(
+                connection,
+                "user-a",
+                target["id"],
+            )
+        )
+    assert restored_source_ids == set(source_item_ids)
+    assert remaining_target_ids == set(target_item_ids) | later_target_item_ids
+
+
+def test_recipe_sync_ignores_stale_same_user_ingredient_id_collision(
+    monkeypatch,
+    tmp_path,
+):
+    configure_master_db(monkeypatch, tmp_path)
+    master_data.sync_recipe_master_records(
+        "https://example.com/onion-master",
+        recipe_data={
+            "ingredients": [{
+                "ingredient": "Onion",
+                "ingredient_image_url": "/static/generated/onion.png",
+            }],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        "https://example.com/carrot-master",
+        recipe_data={
+            "ingredients": [{
+                "ingredient": "Carrot",
+                "ingredient_image_url": "/static/generated/carrot.png",
+            }],
+        },
+        user_id="user-a",
+    )
+    onion = master_data.master_record_for_name("ingredients", "user-a", "onion")
+    carrot = master_data.master_record_for_name("ingredients", "user-a", "carrot")
+    stale_recipe_url = "https://example.com/stale-carrot-id"
+
+    master_data.sync_recipe_master_records(
+        stale_recipe_url,
+        recipe_data={
+            "ingredients": [{
+                "ingredient_id": onion["id"],
+                "ingredient": "Carrot",
+                "normalized_name": "carrot",
+                "ingredient_image_url": "/static/generated/carrot-new.png",
+            }],
+        },
+        user_id="user-a",
+    )
+
+    refreshed_onion = master_data.master_record_for_name(
+        "ingredients",
+        "user-a",
+        "onion",
+    )
+    refreshed_carrot = master_data.master_record_for_name(
+        "ingredients",
+        "user-a",
+        "carrot",
+    )
+    compatibility_rows = master_data.recipe_master_rows(
+        "recipe_ingredients",
+        stale_recipe_url,
+        user_id="user-a",
+    )
+    with master_data.recipe_master_connection() as connection:
+        normalized_item_ids = master_data.normalized_ingredient_option_item_reference_ids(
+            connection,
+            "user-a",
+            refreshed_carrot["id"],
+        )
+        stale_normalized_rows = connection.execute(
+            """
+            SELECT item.id, item.ingredient_id
+              FROM recipe_ingredient_option_items item
+              JOIN recipe_ingredient_options option ON option.id = item.option_id
+              JOIN recipe_ingredient_requirements requirement
+                ON requirement.id = option.requirement_id
+             WHERE requirement.user_id = ? AND requirement.recipe_id = ?
+            """,
+            ("user-a", master_data.recipe_id_for_url(stale_recipe_url)),
+        ).fetchall()
+
+    assert refreshed_onion["id"] == onion["id"]
+    assert refreshed_onion["image_url"] == "/static/generated/onion.png"
+    assert refreshed_carrot["id"] == carrot["id"]
+    assert refreshed_carrot["image_url"] == "/static/generated/carrot-new.png"
+    assert [row["ingredient_id"] for row in compatibility_rows] == [carrot["id"]]
+    assert len(stale_normalized_rows) == 1
+    assert int(stale_normalized_rows[0]["ingredient_id"]) == carrot["id"]
+    assert int(stale_normalized_rows[0]["id"]) in normalized_item_ids
+
+
 def test_ingredient_merge_history_can_be_previewed_and_undone_repeatedly(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     for name in ("Carrot", "Carrots", "Bean", "Beans"):

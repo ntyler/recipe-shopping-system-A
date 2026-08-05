@@ -12,6 +12,9 @@ from PushShoppingList.services.ingredient_option_service import ingredient_name
 from PushShoppingList.services.ingredient_option_service import normalize_selection_map
 from PushShoppingList.services.ingredient_option_service import option_item
 from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
+from PushShoppingList.services.recipe_ingredient_requirement_service import (
+    recipe_data_with_sql_requirements,
+)
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import scoped_package_path
 
@@ -286,6 +289,7 @@ def sync_meal_recipe_ingredients(recipe_url, recipe_data):
     recipe_key = normalize_recipe_url_key(recipe_url)
     if not recipe_key:
         return 0
+    recipe_data = recipe_data_with_sql_requirements(recipe_url, recipe_data)
 
     updated_count = 0
     with MEAL_PLAN_LOCK:

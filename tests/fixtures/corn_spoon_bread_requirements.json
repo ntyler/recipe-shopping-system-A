@@ -1,0 +1,165 @@
+{
+  "source_url": "https://vegetablerecipes.com/corn-spoon-bread/",
+  "recipe_id": "5b16705e57484b40a8fcdb30a1dff4b8",
+  "recipe_title": "Corn Spoon Bread",
+  "ingredients": [
+    {
+      "recipe_ingredient_id": "requirement-96cfb642d9b18709",
+      "ingredient": "yellow cornmeal",
+      "quantity": "3/4",
+      "unit": "cup",
+      "original_text": "3/4 cup yellow cornmeal"
+    },
+    {
+      "recipe_ingredient_id": "requirement-cb42f6b9ba6f23a2",
+      "ingredient": "all-purpose flour",
+      "quantity": "3/4",
+      "unit": "cup",
+      "original_text": "3/4 cup all-purpose flour"
+    },
+    {
+      "recipe_ingredient_id": "requirement-ff5a9d0395c2bf32",
+      "ingredient": "sugar",
+      "quantity": "1/2",
+      "unit": "cup",
+      "original_text": "1/2 cup sugar"
+    },
+    {
+      "recipe_ingredient_id": "requirement-210b5a7d0b097782",
+      "ingredient": "baking powder",
+      "quantity": "2",
+      "unit": "teaspoon",
+      "original_text": "2 teaspoons baking powder"
+    },
+    {
+      "recipe_ingredient_id": "requirement-baa6dccc2a9588e5",
+      "ingredient": "kosher salt",
+      "quantity": "1/2",
+      "unit": "teaspoon",
+      "original_text": "1/2 teaspoon kosher salt"
+    },
+    {
+      "recipe_ingredient_id": "requirement-c5b9c6908f57293b",
+      "ingredient": "egg",
+      "quantity": "2",
+      "unit": "",
+      "original_text": "2 eggs"
+    },
+    {
+      "recipe_ingredient_id": "requirement-36ae61e00eb9883b",
+      "ingredient": "sour cream",
+      "quantity": "2/3",
+      "unit": "cup",
+      "original_text": "2/3 cup sour cream"
+    },
+    {
+      "recipe_ingredient_id": "requirement-e919369467e87fe1",
+      "ingredient": "butter",
+      "quantity": "1/2",
+      "unit": "cup",
+      "preparation": "melted",
+      "original_text": "1/2 cup butter (melted)",
+      "default_option_id": "original:requirement-e919369467e87fe1",
+      "selection_required": true,
+      "substitutions": [
+        {
+          "alternative_id": "9eb050db-3429-48af-9ecb-65cae20d67c5",
+          "alternative_order": 0,
+          "alternative_component_order": 0,
+          "alternative_label": "unsalted butter",
+          "option_type": "custom",
+          "recipe_authored": false,
+          "ingredient": "unsalted butter",
+          "optional": true,
+          "store_section": "DAIRY & EGGS",
+          "original_text": "unsalted butter"
+        }
+      ]
+    },
+    {
+      "recipe_ingredient_id": "requirement-c323c1efdfba2256",
+      "ingredient": "canned cream-style corn",
+      "quantity": "14",
+      "unit": "ounce",
+      "original_text": "14 ounce canned cream-style corn"
+    },
+    {
+      "recipe_ingredient_id": "requirement-1b9b67bcc2c17d1f",
+      "ingredient": "corn",
+      "quantity": "1",
+      "unit": "cup",
+      "preparation": "fresh",
+      "original_text": "1 cup fresh or frozen corn",
+      "default_option_id": "251b794a-0bd2-4669-8fc9-8093e1fa5aa3",
+      "selection_required": true,
+      "substitutions": [
+        {
+          "alternative_id": "251b794a-0bd2-4669-8fc9-8093e1fa5aa3",
+          "alternative_order": 0,
+          "alternative_component_order": 0,
+          "alternative_label": "corn",
+          "option_type": "original",
+          "recipe_authored": true,
+          "ingredient": "corn",
+          "quantity": "1",
+          "unit": "cup",
+          "preparation": "fresh",
+          "optional": false,
+          "store_section": "PRODUCE",
+          "original_text": "1 cup fresh or frozen corn"
+        },
+        {
+          "alternative_id": "251b794a-0bd2-4669-8fc9-8093e1fa5aa3",
+          "alternative_order": 0,
+          "alternative_component_order": 1,
+          "alternative_label": "corn",
+          "option_type": "original",
+          "recipe_authored": true,
+          "ingredient": "cumin",
+          "optional": false,
+          "store_section": "SPICES & SEASONINGS",
+          "original_text": "cumin"
+        },
+        {
+          "alternative_id": "251b794a-0bd2-4669-8fc9-8093e1fa5aa3",
+          "alternative_order": 0,
+          "alternative_component_order": 2,
+          "alternative_label": "corn",
+          "option_type": "original",
+          "recipe_authored": false,
+          "ingredient": "onion",
+          "optional": true,
+          "store_section": "PRODUCE",
+          "original_text": "onion"
+        },
+        {
+          "alternative_id": "inline-form-frozen-corn",
+          "alternative_order": 1,
+          "alternative_component_order": 0,
+          "alternative_label": "frozen corn",
+          "option_type": "recipe_choice",
+          "recipe_authored": true,
+          "ingredient": "corn",
+          "quantity": "1",
+          "unit": "cup",
+          "preparation": "frozen",
+          "optional": true,
+          "store_section": "FROZEN",
+          "original_text": "1 cup frozen corn"
+        },
+        {
+          "alternative_id": "inline-form-frozen-corn",
+          "alternative_order": 1,
+          "alternative_component_order": 1,
+          "alternative_label": "frozen corn",
+          "option_type": "recipe_choice",
+          "recipe_authored": true,
+          "ingredient": "onion",
+          "optional": true,
+          "store_section": "PRODUCE",
+          "original_text": "onion"
+        }
+      ]
+    }
+  ]
+}

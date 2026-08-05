@@ -1647,7 +1647,12 @@ def regenerate_ingredients_for_recipe(
         recipe_edit_service.save_recipe_output(saved_url, saved_output)
         recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(saved_url), {})
         quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
-        recipe_edit_service.update_recipe_ingredient_record(saved_url, quantity, saved_output)
+        recipe_edit_service.update_recipe_ingredient_record(
+            saved_url,
+            quantity,
+            saved_output,
+            sync_master=False,
+        )
         recipe_edit_service.update_recipe_quantity(saved_url, quantity)
         update_cookbook_recipe_snapshot(cookbook_context.get("cookbook_id", ""), saved_url, saved_output)
         loaded = recipe_edit_service.load_editable_recipe(saved_url)
@@ -2009,15 +2014,36 @@ def update_cookbook_recipe_snapshot(cookbook_id, recipe_url, recipe_data):
 def save_inferred_recipe(recipe_url, recipe_data, cookbook_id=""):
     recipe_url = clean_text(recipe_url)
     recipe_data["source_url"] = clean_text(recipe_data.get("source_url")) or recipe_url
-    recipe_edit_service.save_recipe_output(recipe_data["source_url"], recipe_data)
-    if normalize_recipe_url_key(recipe_data["source_url"]) != normalize_recipe_url_key(recipe_url):
-        recipe_edit_service.replace_recipe_url(recipe_url, recipe_data["source_url"])
-        recipe_edit_service.move_recipe_meta(recipe_url, recipe_data["source_url"])
-        recipe_url = recipe_data["source_url"]
+    source_url = recipe_data["source_url"]
+    identity_changed = (
+        normalize_recipe_url_key(source_url) != normalize_recipe_url_key(recipe_url)
+    )
+    previous_recipe_data = recipe_edit_service.load_recipe_output(recipe_url)
+    destination_previous_data = (
+        recipe_edit_service.load_recipe_output(source_url)
+        if identity_changed
+        else None
+    )
+    recipe_data = recipe_edit_service.save_recipe_output_with_requirements(
+        source_url,
+        recipe_data,
+        previous_recipe_url=recipe_url if identity_changed else None,
+        previous_recipe_data=previous_recipe_data,
+        destination_previous_data=destination_previous_data,
+    )
+    if identity_changed:
+        recipe_edit_service.replace_recipe_url(recipe_url, source_url)
+        recipe_edit_service.move_recipe_meta(recipe_url, source_url)
+        recipe_url = source_url
 
     recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_url), {})
     quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
-    recipe_edit_service.update_recipe_ingredient_record(recipe_url, quantity, recipe_data)
+    recipe_edit_service.update_recipe_ingredient_record(
+        recipe_url,
+        quantity,
+        recipe_data,
+        sync_master=False,
+    )
     recipe_edit_service.update_recipe_quantity(recipe_url, quantity)
     update_cookbook_recipe_snapshot(cookbook_id, recipe_url, recipe_data)
     return recipe_url

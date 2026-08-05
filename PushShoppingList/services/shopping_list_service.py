@@ -4,6 +4,9 @@ from pathlib import Path
 
 from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
 from PushShoppingList.services.ingredient_option_service import shopping_item_name
+from PushShoppingList.services.recipe_ingredient_requirement_service import (
+    recipe_data_with_sql_requirements,
+)
 from PushShoppingList.services.recipe_extract_service import normalize_ingredient_for_shopping_list
 from PushShoppingList.services.storage_service import scoped_package_path
 
@@ -115,6 +118,7 @@ def add_items(new_items):
 
 
 def finalize_recipe_items(recipe_url, recipe_data, selections=None):
+    recipe_data = recipe_data_with_sql_requirements(recipe_url, recipe_data)
     resolution = resolve_ingredient_requirements(
         recipe_data,
         selections,

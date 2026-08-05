@@ -306,7 +306,7 @@ def test_single_ingredient_save_patches_only_the_stable_target_and_runs_existing
     monkeypatch.setattr(
         recipe_edit_service,
         "update_recipe_ingredient_record",
-        lambda saved_url, quantity, recipe: sync_calls.append(
+        lambda saved_url, quantity, recipe, **_kwargs: sync_calls.append(
             ("master", saved_url, quantity, recipe["ingredients"][1]["notes"])
         ),
     )
@@ -1368,3 +1368,62 @@ def test_recipe_output_uses_atomic_replace(monkeypatch, tmp_path):
     assert len(replacements) == 1
     assert replacements[0][1] == output_dir / "example_test_atomic.json"
     assert not list(output_dir.glob("*.tmp"))
+
+
+def test_sql_first_save_restores_previous_requirements_when_json_write_fails(
+    monkeypatch,
+    tmp_path,
+):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/sql-json-compensation"
+    original = {
+        "source_url": url,
+        "recipe_title": "Original",
+        "ingredients": [{
+            "recipe_ingredient_id": "requirement-broth",
+            "ingredient": "Broth",
+            "quantity": "1",
+            "unit": "cup",
+        }],
+    }
+    recipe_edit_service.save_recipe_output_with_requirements(
+        url,
+        original,
+        previous_recipe_data={},
+    )
+
+    changed = {
+        **original,
+        "recipe_title": "Changed",
+        "ingredients": [{
+            **original["ingredients"][0],
+            "quantity": "9",
+        }],
+    }
+
+    def fail_json_write(*_args, **_kwargs):
+        raise OSError("simulated JSON write failure")
+
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_output", fail_json_write)
+    with pytest.raises(OSError, match="simulated JSON write failure"):
+        recipe_edit_service.save_recipe_output_with_requirements(
+            url,
+            changed,
+            previous_recipe_data=original,
+        )
+
+    requirements = (
+        recipe_edit_service.recipe_ingredient_requirement_service
+        .load_recipe_ingredient_requirements(url, user_id="local")
+    )
+    original_item = requirements[0]["options"][0]["items"][0]
+    assert original_item["quantity"] == "1"
+
+    raw_output = recipe_edit_service._read_recipe_output_json(
+        recipe_edit_service.recipe_output_json_path(
+            url,
+            output_folder=recipe_edit_service.OUTPUT_FOLDER,
+        )
+    )
+    assert raw_output["recipe_title"] == "Original"
+    assert raw_output["ingredients"][0]["quantity"] == "1"

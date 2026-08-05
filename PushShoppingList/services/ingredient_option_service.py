@@ -125,7 +125,12 @@ def substitution_rows(item):
         if not isinstance(option, dict):
             name = clean_text(option)
             if name:
-                rows.append({"ingredient": name, "_legacy_index": alternative_index})
+                rows.append({
+                    "ingredient": name,
+                    "_legacy_index": alternative_index,
+                    "_legacy_present_fields": ["ingredient"],
+                    "_legacy_was_nested": False,
+                })
             continue
 
         components = next(
@@ -137,7 +142,12 @@ def substitution_rows(item):
             None,
         )
         if components is None:
-            rows.append({**option, "_legacy_index": alternative_index})
+            rows.append({
+                **option,
+                "_legacy_index": alternative_index,
+                "_legacy_present_fields": sorted(str(key) for key in option),
+                "_legacy_was_nested": False,
+            })
             continue
 
         shared = {
@@ -157,6 +167,16 @@ def substitution_rows(item):
                 **shared,
                 **component,
                 "_legacy_index": alternative_index,
+                # Preserve the pre-migration generated ID for ordinary flat
+                # and one-component alternatives.  Only a genuinely grouped
+                # nested alternative needs an ID shared independently of each
+                # component name.
+                "_legacy_group_size": len(components),
+                "_legacy_present_fields": sorted({
+                    *(str(key) for key in shared),
+                    *(str(key) for key in component),
+                }),
+                "_legacy_was_nested": True,
                 "alternative_component_order": component.get(
                     "alternative_component_order",
                     component_index,
@@ -205,14 +225,18 @@ def grouped_substitution_rows(item, index=0):
             row.get("alternative_id")
             or row.get("group_id")
             or row.get("substitution_group_id")
+            or row.get("substitution_id")
+            or row.get("id")
         )
         if not group_id:
-            group_id = stable_identifier(
-                "alternative",
+            identity_values = [
                 parent_id,
                 row.get("_legacy_index", row_index),
-                ingredient_name(row),
-            )
+            ]
+            legacy_group_size = row.get("_legacy_group_size")
+            if not isinstance(legacy_group_size, (int, float)) or legacy_group_size <= 1:
+                identity_values.append(ingredient_name(row))
+            group_id = stable_identifier("alternative", *identity_values)
         group = by_id.get(group_id)
         if group is None:
             group = {
@@ -225,6 +249,7 @@ def grouped_substitution_rows(item, index=0):
             groups.append(group)
         row["alternative_id"] = group_id
         row.pop("_legacy_index", None)
+        row.pop("_legacy_group_size", None)
         group["rows"].append(row)
 
     def numeric_order(value, fallback):
@@ -273,7 +298,13 @@ def option_item(item):
     return {
         key: deepcopy(value)
         for key, value in (item if isinstance(item, dict) else {"ingredient": item}).items()
-        if not str(key).startswith("_") and key not in GROUP_ONLY_ITEM_FIELDS
+        if key not in {
+            "_legacy_index",
+            "_legacy_group_size",
+            "_legacy_present_fields",
+            "_legacy_was_nested",
+        }
+        and key not in GROUP_ONLY_ITEM_FIELDS
     }
 
 
@@ -334,7 +365,11 @@ def ingredient_requirement(item, index=0):
         "label": clean_text(item.get("requirement_label") or ingredient_name(item)),
         "source_text": clean_text(item.get("source_text") or item.get("original_text")),
         "default_option_id": default_option_id or None,
-        "selection_required": len(options) > 1,
+        "selection_required": (
+            truthy(item.get("selection_required"))
+            if "selection_required" in item
+            else len(options) > 1
+        ),
         "sort_order": index,
         "options": options,
     }
@@ -471,7 +506,11 @@ def migrate_ingredient_requirement(item, index=0):
         None,
     )
     migrated["selection_required"] = (
-        len(groups) > 1 if explicit_original_group else bool(flat_rows)
+        truthy(migrated.get("selection_required"))
+        if "selection_required" in migrated
+        else len(groups) > 1
+        if explicit_original_group
+        else bool(flat_rows)
     )
     default_option_id = clean_text(migrated.get("default_option_id"))
     if (

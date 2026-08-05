@@ -3975,9 +3975,10 @@ def saved_recipe_output_index():
 
 
 def load_saved_recipe_output(recipe_url):
-    recipe_key = normalize_recipe_url_key(recipe_url)
-
-    return saved_recipe_output_index().get(recipe_key, {})
+    # The editor loader overlays the user-scoped normalized SQLite hierarchy
+    # when it exists. Keep route-level meal/shopping resolution on that same
+    # source of truth instead of consulting the JSON-only index directly.
+    return load_recipe_output(recipe_url) or {}
 
 
 def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=None, image_variants=None):

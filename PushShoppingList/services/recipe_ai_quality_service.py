@@ -856,7 +856,11 @@ def apply_recipe_ai_quality_safe_fixes(url):
         return {"ok": False, "error": "Recipe not found."}
     updated, changes, safe_updates = _prepare_recipe_ai_quality_safe_fixes(current)
     if changes:
-        recipe_edit_service.save_recipe_output(url, updated)
+        updated = recipe_edit_service.save_recipe_output_with_requirements(
+            url,
+            updated,
+            previous_recipe_data=current,
+        )
     return {
         "ok": True,
         "changed_count": len(changes),

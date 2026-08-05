@@ -5,6 +5,7 @@ import sqlite3
 import threading
 import unicodedata
 from contextlib import contextmanager
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 
@@ -885,6 +886,118 @@ def ensure_recipe_master_schema(connection=None):
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS recipe_ingredient_requirements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            requirement_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            recipe_id TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            source_text TEXT NOT NULL DEFAULT '',
+            default_option_id TEXT DEFAULT NULL,
+            selection_required INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(user_id, recipe_id, requirement_id),
+            FOREIGN KEY(id, default_option_id)
+                REFERENCES recipe_ingredient_options(requirement_id, option_id)
+                DEFERRABLE INITIALLY DEFERRED
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recipe_ingredient_options (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            option_id TEXT NOT NULL,
+            requirement_id INTEGER NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            option_type TEXT NOT NULL DEFAULT 'substitution'
+                CHECK(option_type IN ('original', 'recipe_choice', 'substitution', 'custom')),
+            recipe_authored INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(requirement_id, option_id),
+            FOREIGN KEY(requirement_id)
+                REFERENCES recipe_ingredient_requirements(id) ON DELETE CASCADE
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recipe_ingredient_option_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            option_id INTEGER NOT NULL,
+            ingredient_id INTEGER DEFAULT NULL,
+            raw_name TEXT NOT NULL DEFAULT '',
+            normalized_name TEXT NOT NULL DEFAULT '',
+            canonical_ingredient TEXT NOT NULL DEFAULT '',
+            form TEXT NOT NULL DEFAULT '',
+            quantity TEXT NOT NULL DEFAULT '',
+            unit TEXT NOT NULL DEFAULT '',
+            unit_id TEXT DEFAULT NULL,
+            unit_raw TEXT NOT NULL DEFAULT '',
+            size TEXT NOT NULL DEFAULT '',
+            preparation TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            unit_review_required INTEGER NOT NULL DEFAULT 0,
+            unit_review_value TEXT NOT NULL DEFAULT '',
+            unit_custom INTEGER NOT NULL DEFAULT 0,
+            buy_as TEXT NOT NULL DEFAULT '',
+            purchasable_item TEXT NOT NULL DEFAULT '',
+            store_section TEXT NOT NULL DEFAULT '',
+            store_section_source TEXT NOT NULL DEFAULT 'legacy',
+            store_section_confidence REAL NOT NULL DEFAULT 0,
+            store_section_user_confirmed INTEGER NOT NULL DEFAULT 0,
+            classifier_version TEXT NOT NULL DEFAULT '',
+            store_section_reason TEXT NOT NULL DEFAULT '',
+            store_section_rule TEXT NOT NULL DEFAULT '',
+            original_recipe_text TEXT NOT NULL DEFAULT '',
+            optional INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(option_id)
+                REFERENCES recipe_ingredient_options(id) ON DELETE CASCADE,
+            FOREIGN KEY(ingredient_id)
+                REFERENCES ingredients(id) ON DELETE SET NULL,
+            FOREIGN KEY(unit_id) REFERENCES canonical_units(id)
+        )
+        """
+    )
+    migrate_recipe_ingredient_option_item_ingredient_fk(connection)
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recipe_ingredient_requirement_sync (
+            user_id TEXT NOT NULL,
+            recipe_id TEXT NOT NULL,
+            source_hash TEXT NOT NULL DEFAULT '',
+            requirement_count INTEGER NOT NULL DEFAULT 0,
+            synced_at TEXT NOT NULL,
+            PRIMARY KEY(user_id, recipe_id)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recipe_ingredient_requirement_migration_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL DEFAULT '',
+            mode TEXT NOT NULL,
+            source_root TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'running',
+            summary_json TEXT NOT NULL DEFAULT '{}',
+            started_at TEXT NOT NULL,
+            completed_at TEXT DEFAULT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS recipe_equipment (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -1020,6 +1133,13 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_user_recipe ON recipe_ingredients(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient ON recipe_ingredients(ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_unit ON recipe_ingredients(unit_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_requirements_user_recipe_order ON recipe_ingredient_requirements(user_id, recipe_id, sort_order, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_options_requirement_order ON recipe_ingredient_options(requirement_id, sort_order, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_option_items_option_order ON recipe_ingredient_option_items(option_id, sort_order, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_option_items_ingredient ON recipe_ingredient_option_items(ingredient_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_option_items_unit ON recipe_ingredient_option_items(unit_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_requirement_sync_synced ON recipe_ingredient_requirement_sync(synced_at)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_requirement_migration_runs_status_started ON recipe_ingredient_requirement_migration_runs(status, started_at)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_user_recipe ON recipe_equipment(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_equipment ON recipe_equipment(equipment_id)")
 
@@ -1030,6 +1150,90 @@ def recipe_master_column_names(connection, table_name):
         str(row["name"] if isinstance(row, sqlite3.Row) else row[1])
         for row in rows
     }
+
+
+def migrate_recipe_ingredient_option_item_ingredient_fk(connection):
+    """Upgrade early draft schemas from RESTRICT to lossless SET NULL."""
+    foreign_keys = connection.execute(
+        "PRAGMA foreign_key_list(recipe_ingredient_option_items)"
+    ).fetchall()
+    ingredient_fk = next(
+        (
+            row
+            for row in foreign_keys
+            if str(row["table"]) == "ingredients"
+            and str(row["from"]) == "ingredient_id"
+        ),
+        None,
+    )
+    if ingredient_fk and str(ingredient_fk["on_delete"]).upper() == "SET NULL":
+        return False
+
+    replacement_table = "recipe_ingredient_option_items_fk_v2"
+    connection.execute(f"DROP TABLE IF EXISTS {replacement_table}")
+    connection.execute(
+        f"""
+        CREATE TABLE {replacement_table} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            option_id INTEGER NOT NULL,
+            ingredient_id INTEGER DEFAULT NULL,
+            raw_name TEXT NOT NULL DEFAULT '',
+            normalized_name TEXT NOT NULL DEFAULT '',
+            canonical_ingredient TEXT NOT NULL DEFAULT '',
+            form TEXT NOT NULL DEFAULT '',
+            quantity TEXT NOT NULL DEFAULT '',
+            unit TEXT NOT NULL DEFAULT '',
+            unit_id TEXT DEFAULT NULL,
+            unit_raw TEXT NOT NULL DEFAULT '',
+            size TEXT NOT NULL DEFAULT '',
+            preparation TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            unit_review_required INTEGER NOT NULL DEFAULT 0,
+            unit_review_value TEXT NOT NULL DEFAULT '',
+            unit_custom INTEGER NOT NULL DEFAULT 0,
+            buy_as TEXT NOT NULL DEFAULT '',
+            purchasable_item TEXT NOT NULL DEFAULT '',
+            store_section TEXT NOT NULL DEFAULT '',
+            store_section_source TEXT NOT NULL DEFAULT 'legacy',
+            store_section_confidence REAL NOT NULL DEFAULT 0,
+            store_section_user_confirmed INTEGER NOT NULL DEFAULT 0,
+            classifier_version TEXT NOT NULL DEFAULT '',
+            store_section_reason TEXT NOT NULL DEFAULT '',
+            store_section_rule TEXT NOT NULL DEFAULT '',
+            original_recipe_text TEXT NOT NULL DEFAULT '',
+            optional INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            metadata_json TEXT NOT NULL DEFAULT '{{}}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(option_id)
+                REFERENCES recipe_ingredient_options(id) ON DELETE CASCADE,
+            FOREIGN KEY(ingredient_id)
+                REFERENCES ingredients(id) ON DELETE SET NULL,
+            FOREIGN KEY(unit_id) REFERENCES canonical_units(id)
+        )
+        """
+    )
+    columns = (
+        "id", "option_id", "ingredient_id", "raw_name", "normalized_name",
+        "canonical_ingredient", "form", "quantity", "unit", "unit_id",
+        "unit_raw", "size", "preparation", "notes", "unit_review_required",
+        "unit_review_value", "unit_custom", "buy_as", "purchasable_item",
+        "store_section", "store_section_source", "store_section_confidence",
+        "store_section_user_confirmed", "classifier_version",
+        "store_section_reason", "store_section_rule", "original_recipe_text",
+        "optional", "sort_order", "metadata_json", "created_at", "updated_at",
+    )
+    column_list = ", ".join(columns)
+    connection.execute(
+        f"INSERT INTO {replacement_table} ({column_list}) "
+        f"SELECT {column_list} FROM recipe_ingredient_option_items"
+    )
+    connection.execute("DROP TABLE recipe_ingredient_option_items")
+    connection.execute(
+        f"ALTER TABLE {replacement_table} RENAME TO recipe_ingredient_option_items"
+    )
+    return True
 
 
 def migrate_existing_recipe_ingredient_units(connection):
@@ -1105,25 +1309,6 @@ def migrate_existing_recipe_ingredient_units(connection):
                 int(stored_row["id"]),
             ),
         )
-        connection.execute(
-            """
-            UPDATE ingredient_store_sections
-               SET icon = ?,
-                   updated_at = ?
-             WHERE user_id = ?
-               AND section_key = ?
-               AND is_builtin = 1
-               AND icon <> ?
-            """,
-            (
-                section["icon"],
-                timestamp,
-                user_id,
-                section["section_key"],
-                section["icon"],
-            ),
-        )
-
     mark_migration_applied(connection, UNIT_NORMALIZATION_MIGRATION_NAME)
     connection.execute(
         """
@@ -4436,6 +4621,29 @@ INGREDIENT_MERGE_ALIAS_FIELDS = (
 )
 
 
+def normalized_ingredient_option_item_reference_ids(
+    connection,
+    user_id,
+    ingredient_id,
+):
+    """Return normalized option-item references owned by one workspace."""
+    rows = connection.execute(
+        """
+        SELECT item.id
+          FROM recipe_ingredient_option_items item
+          JOIN recipe_ingredient_options option
+            ON option.id = item.option_id
+          JOIN recipe_ingredient_requirements requirement
+            ON requirement.id = option.requirement_id
+         WHERE requirement.user_id = ?
+           AND item.ingredient_id = ?
+         ORDER BY item.id ASC
+        """,
+        (user_id, ingredient_id),
+    ).fetchall()
+    return [int(row["id"]) for row in rows]
+
+
 def validate_ingredient_merge_undo_candidate(connection, history, scoped_user_id):
     def failure(message):
         return {"ok": False, "status": 409, "error": message}
@@ -4558,6 +4766,35 @@ def validate_ingredient_merge_undo_candidate(connection, history, scoped_user_id
         ):
             return failure("A moved recipe reference changed after this merge, so it cannot be safely restored.")
 
+    moved_option_item_ids = sorted({
+        int(reference_id)
+        for reference_id in snapshot.get("moved_option_item_ids", [])
+        if str(reference_id).isdigit() and int(reference_id) > 0
+    })
+    if moved_option_item_ids:
+        placeholders = ", ".join("?" for _value in moved_option_item_ids)
+        moved_option_item_rows = connection.execute(
+            f"""
+            SELECT item.id, item.ingredient_id
+              FROM recipe_ingredient_option_items item
+              JOIN recipe_ingredient_options option
+                ON option.id = item.option_id
+              JOIN recipe_ingredient_requirements requirement
+                ON requirement.id = option.requirement_id
+             WHERE requirement.user_id = ?
+               AND item.id IN ({placeholders})
+            """,
+            (scoped_user_id, *moved_option_item_ids),
+        ).fetchall()
+        if len(moved_option_item_rows) != len(moved_option_item_ids) or any(
+            int(row["ingredient_id"] or 0) != target_id
+            for row in moved_option_item_rows
+        ):
+            return failure(
+                "A moved normalized recipe option reference changed after this merge, "
+                "so it cannot be safely restored."
+            )
+
     return {
         "ok": True,
         "snapshot": snapshot,
@@ -4569,6 +4806,7 @@ def validate_ingredient_merge_undo_candidate(connection, history, scoped_user_id
         "source_id": source_id,
         "target_id": target_id,
         "moved_reference_ids": moved_reference_ids,
+        "moved_option_item_ids": moved_option_item_ids,
     }
 
 
@@ -4587,12 +4825,18 @@ def ingredient_merge_undo_stack_summary(row, index, total, validation=None):
         for reference_id in snapshot.get("moved_reference_ids", [])
         if str(reference_id).isdigit() and int(reference_id) > 0
     }
+    moved_option_item_ids = {
+        int(reference_id)
+        for reference_id in snapshot.get("moved_option_item_ids", [])
+        if str(reference_id).isdigit() and int(reference_id) > 0
+    }
     summary.update({
         "undo_order": index + 1,
         "is_next_undo": index == 0,
         "newer_undo_count": index,
         "older_undo_count": max(0, total - index - 1),
         "restored_reference_count": len(moved_reference_ids),
+        "normalized_restored_reference_count": len(moved_option_item_ids),
         "source_image_url": clean_text(source.get("image_url")),
         "target_image_url": clean_text(target.get("image_url")),
         "can_undo_now": bool(validation and validation.get("ok")),
@@ -4679,6 +4923,11 @@ def ingredient_merge_undo_preview(user_id=None, reference_limit=8, merge_id=None
         moved_reference_ids = sorted({
             int(reference_id)
             for reference_id in snapshot.get("moved_reference_ids", [])
+            if str(reference_id).isdigit() and int(reference_id) > 0
+        })
+        moved_option_item_ids = sorted({
+            int(reference_id)
+            for reference_id in snapshot.get("moved_option_item_ids", [])
             if str(reference_id).isdigit() and int(reference_id) > 0
         })
         reference_rows = []
@@ -4771,6 +5020,7 @@ def ingredient_merge_undo_preview(user_id=None, reference_limit=8, merge_id=None
             },
             "target_changes": target_changes,
             "restored_reference_count": len(moved_reference_ids),
+            "normalized_restored_reference_count": len(moved_option_item_ids),
             "reference_previews": references,
             "reference_preview_truncated": len(moved_reference_ids) > len(references),
             "older_undo_count": older_undo_count,
@@ -4882,6 +5132,11 @@ def merge_ingredient_master_records(
             """,
             (source["user_id"], source_ingredient_id),
         ).fetchall()
+        moved_option_item_ids = normalized_ingredient_option_item_reference_ids(
+            connection,
+            source["user_id"],
+            source_ingredient_id,
+        )
         duplicate_review_rows = connection.execute(
             """
             SELECT id, status, classification, suggested_target_id, updated_at
@@ -4952,6 +5207,26 @@ def merge_ingredient_master_records(
             """,
             (target_ingredient_id, source["user_id"], source_ingredient_id),
         )
+        normalized_moved_reference_count = 0
+        if moved_option_item_ids:
+            placeholders = ", ".join("?" for _value in moved_option_item_ids)
+            moved_option_item_cursor = connection.execute(
+                f"""
+                UPDATE recipe_ingredient_option_items
+                   SET ingredient_id = ?
+                 WHERE ingredient_id = ?
+                   AND id IN ({placeholders})
+                """,
+                (
+                    target_ingredient_id,
+                    source_ingredient_id,
+                    *moved_option_item_ids,
+                ),
+            )
+            normalized_moved_reference_count = max(
+                0,
+                int(moved_option_item_cursor.rowcount or 0),
+            )
         connection.execute(
             """
             UPDATE ingredient_aliases
@@ -5054,11 +5329,12 @@ def merge_ingredient_master_records(
             (source["user_id"], target_ingredient_id),
         ).fetchall()
         merge_snapshot = {
-            "version": 1,
+            "version": 2,
             "source": source_snapshot,
             "target": target_snapshot,
             "aliases_before": aliases_before_merge,
             "moved_reference_ids": [int(row["id"]) for row in moved_reference_rows],
+            "moved_option_item_ids": moved_option_item_ids,
             "duplicate_reviews_before": [dict(row) for row in duplicate_review_rows],
             "merged_target": dict(merged_target),
             "merged_aliases": [dict(row) for row in merged_alias_rows],
@@ -5092,6 +5368,7 @@ def merge_ingredient_master_records(
             "target_name": clean_text(target["name"]),
             "target_normalized_name": normalized_master_name(target["normalized_name"]),
             "moved_reference_count": max(0, int(moved_reference_cursor.rowcount or 0)),
+            "normalized_moved_reference_count": normalized_moved_reference_count,
             "combined_usage_count": int(combined_usage_row["usage_count"] or 0),
             "aliases": [clean_text(alias_row["alias_name"]) for alias_row in alias_rows],
             "store_section": merged_section,
@@ -5151,6 +5428,7 @@ def undo_last_ingredient_master_merge(user_id=None, expected_merge_id=None):
         source_id = validation["source_id"]
         target_id = validation["target_id"]
         moved_reference_ids = validation["moved_reference_ids"]
+        moved_option_item_ids = validation["moved_option_item_ids"]
 
         connection.execute(
             """
@@ -5212,6 +5490,23 @@ def undo_last_ingredient_master_merge(user_id=None, expected_merge_id=None):
             )
             restored_reference_count = max(0, int(restored_cursor.rowcount or 0))
 
+        normalized_restored_reference_count = 0
+        if moved_option_item_ids:
+            placeholders = ", ".join("?" for _value in moved_option_item_ids)
+            restored_option_item_cursor = connection.execute(
+                f"""
+                UPDATE recipe_ingredient_option_items
+                   SET ingredient_id = ?
+                 WHERE ingredient_id = ?
+                   AND id IN ({placeholders})
+                """,
+                (source_id, target_id, *moved_option_item_ids),
+            )
+            normalized_restored_reference_count = max(
+                0,
+                int(restored_option_item_cursor.rowcount or 0),
+            )
+
         duplicate_reviews = snapshot.get("duplicate_reviews_before", [])
         for review in duplicate_reviews if isinstance(duplicate_reviews, list) else []:
             if not isinstance(review, dict):
@@ -5259,6 +5554,7 @@ def undo_last_ingredient_master_merge(user_id=None, expected_merge_id=None):
             "target_ingredient_id": target_id,
             "target_name": clean_text(target.get("name")),
             "restored_reference_count": restored_reference_count,
+            "normalized_restored_reference_count": normalized_restored_reference_count,
             "undone_at": undone_at,
             "next_merge": ingredient_merge_history_summary(next_history),
         }
@@ -5461,7 +5757,12 @@ def equipment_name_from_item(item):
     return clean_text(item)
 
 
-def ingredient_rows_from_sources(ingredients=None, recipe_data=None, user_id=None):
+def ingredient_rows_from_sources(
+    ingredients=None,
+    recipe_data=None,
+    user_id=None,
+    connection=None,
+):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     raw_data = recipe_data.get("raw") if isinstance(recipe_data.get("raw"), dict) else {}
     candidates = None
@@ -5525,6 +5826,7 @@ def ingredient_rows_from_sources(ingredients=None, recipe_data=None, user_id=Non
                     ingredient_store_section_from_source(
                         custom_store_section,
                         user_id=user_id,
+                        connection=connection,
                     )
                     or custom_store_section
                 )
@@ -6017,30 +6319,60 @@ def update_ingredient_master_record_from_recipe_row(
         ingredient_id = int(row.get("ingredient_id") or 0)
     except (TypeError, ValueError):
         ingredient_id = 0
-    normalized_name = normalized_master_name(row.get("normalized_name"))
+    normalized_name = normalized_master_name(
+        row.get("normalized_name")
+        or row.get("name")
+        or row.get("raw_name")
+    )
     if ingredient_id <= 0 and not normalized_name:
         return None
 
-    params = [user_id]
-    if ingredient_id > 0:
-        match_clause = "id = ?"
-        params.insert(0, ingredient_id)
-    else:
-        match_clause = "normalized_name = ?"
-        params.insert(0, normalized_name)
+    master_row = None
+    if ingredient_id > 0 and normalized_name:
+        # IDs embedded in saved recipe JSON can outlive a merge or otherwise
+        # become stale. Trust one only when the row name still identifies that
+        # same user's master record, either canonically or through an alias.
+        master_row = connection.execute(
+            """
+            SELECT ingredient.id, ingredient.name, ingredient.normalized_name,
+                   ingredient.store_section, ingredient.store_section_source,
+                   ingredient.store_section_confidence,
+                   ingredient.store_section_user_confirmed,
+                   ingredient.classifier_version,
+                   ingredient.store_section_reason,
+                   ingredient.store_section_rule,
+                   ingredient.canonical_ingredient, ingredient.form,
+                   ingredient.image_url, ingredient.image_path
+              FROM ingredients ingredient
+             WHERE ingredient.id = ?
+               AND ingredient.user_id = ?
+               AND (
+                    ingredient.normalized_name = ?
+                    OR EXISTS (
+                        SELECT 1
+                          FROM ingredient_aliases alias
+                         WHERE alias.user_id = ingredient.user_id
+                           AND alias.ingredient_id = ingredient.id
+                           AND alias.normalized_alias = ?
+                    )
+               )
+            """,
+            (ingredient_id, user_id, normalized_name, normalized_name),
+        ).fetchone()
 
-    master_row = connection.execute(
-        f"""
-        SELECT id, name, normalized_name, store_section, store_section_source,
-               store_section_confidence, store_section_user_confirmed,
-               classifier_version, store_section_reason, store_section_rule,
-               canonical_ingredient, form, image_url, image_path
-          FROM ingredients
-         WHERE {match_clause}
-           AND user_id = ?
-        """,
-        params,
-    ).fetchone()
+    if master_row is None and normalized_name:
+        master_row = connection.execute(
+            """
+            SELECT id, name, normalized_name, store_section, store_section_source,
+                   store_section_confidence, store_section_user_confirmed,
+                   classifier_version, store_section_reason, store_section_rule,
+                   canonical_ingredient, form, image_url, image_path
+              FROM ingredients
+             WHERE normalized_name = ?
+               AND user_id = ?
+            """,
+            (normalized_name, user_id),
+        ).fetchone()
     if not master_row:
         return None
 
@@ -6148,26 +6480,31 @@ def update_ingredient_master_record_from_recipe_row(
     }
 
 
-def sync_recipe_master_records(
+def _sync_recipe_master_records_with_connection(
+    connection,
     recipe_url,
     ingredients=None,
     recipe_data=None,
     user_id=None,
     force_store_sections_from_recipe=False,
 ):
+    """Synchronize compatibility rows inside the caller-owned transaction."""
     user_id = scoped_recipe_user_id(user_id)
     recipe_id = recipe_id_for_url(recipe_url)
     if not user_id or not recipe_id:
         return {"ok": False, "error": "Recipe URL and user id are required."}
+    if connection is None:
+        raise ValueError("A recipe master database connection is required.")
 
     ingredient_rows = ingredient_rows_from_sources(
         ingredients=ingredients,
         recipe_data=recipe_data,
         user_id=user_id,
+        connection=connection,
     )
     equipment_rows = equipment_rows_from_recipe_data(recipe_data)
 
-    with recipe_master_connection() as connection:
+    with nullcontext(connection) as connection:
         connection.execute(
             "DELETE FROM recipe_ingredients WHERE user_id = ? AND recipe_id = ?",
             (user_id, recipe_id),
@@ -6316,6 +6653,48 @@ def sync_recipe_master_records(
     }
 
 
+def sync_recipe_master_records(
+    recipe_url,
+    ingredients=None,
+    recipe_data=None,
+    user_id=None,
+    force_store_sections_from_recipe=False,
+):
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    if not scoped_user_id or not recipe_id_for_url(recipe_url):
+        return {"ok": False, "error": "Recipe URL and user id are required."}
+
+    with recipe_master_connection() as connection:
+        if (
+            isinstance(recipe_data, dict)
+            and isinstance(recipe_data.get("ingredients"), list)
+        ):
+            # Import lazily to keep schema initialization independent from the
+            # normalized repository module.  Existing callers (image edits,
+            # extraction, purchase mappings, and explicit master syncs) now
+            # update the authoritative hierarchy and legacy rows together.
+            from PushShoppingList.services.recipe_ingredient_requirement_service import (
+                save_recipe_ingredient_requirements,
+            )
+
+            return save_recipe_ingredient_requirements(
+                recipe_url,
+                recipe_data,
+                user_id=scoped_user_id,
+                connection=connection,
+                sync_compatibility=True,
+                force_store_sections_from_recipe=force_store_sections_from_recipe,
+            )
+        return _sync_recipe_master_records_with_connection(
+            connection,
+            recipe_url,
+            ingredients=ingredients,
+            recipe_data=recipe_data,
+            user_id=scoped_user_id,
+            force_store_sections_from_recipe=force_store_sections_from_recipe,
+        )
+
+
 def remove_recipe_master_records_for_recipe(recipe_url, user_id=None):
     user_id = scoped_recipe_user_id(user_id)
     recipe_id = recipe_id_for_url(recipe_url)
@@ -6323,6 +6702,14 @@ def remove_recipe_master_records_for_recipe(recipe_url, user_id=None):
         return 0
 
     with recipe_master_connection() as connection:
+        connection.execute(
+            "DELETE FROM recipe_ingredient_requirements WHERE user_id = ? AND recipe_id = ?",
+            (user_id, recipe_id),
+        )
+        connection.execute(
+            "DELETE FROM recipe_ingredient_requirement_sync WHERE user_id = ? AND recipe_id = ?",
+            (user_id, recipe_id),
+        )
         ingredient_cursor = connection.execute(
             "DELETE FROM recipe_ingredients WHERE user_id = ? AND recipe_id = ?",
             (user_id, recipe_id),
