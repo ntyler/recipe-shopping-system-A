@@ -29969,17 +29969,19 @@ function toggleRecipeIngredientSmartView(button) {
     const key = String(card?.dataset.smartViewIngredientId || "");
     if (!card || !key) return false;
 
-    const shouldExpand = recipeEditExpandedSmartViewIngredientId !== key;
-    const openCard = card.parentElement?.querySelector(
-        ":scope > .recipe-edit-ingredient-smart-card.is-expanded",
-    );
-    if (openCard && openCard !== card) {
-        syncRecipeIngredientSmartViewCardExpanded(openCard, false);
-    }
-    recipeEditExpandedSmartViewIngredientId = shouldExpand ? key : "";
-    syncRecipeIngredientSmartViewCardExpanded(card, shouldExpand);
-    scheduleRecipeIngredientSmartViewLayout();
-    return false;
+    return toggleRecipeIngredientExpansionWithAnchor(card, button, () => {
+        const shouldExpand = recipeEditExpandedSmartViewIngredientId !== key;
+        const openCard = card.parentElement?.querySelector(
+            ":scope > .recipe-edit-ingredient-smart-card.is-expanded",
+        );
+        if (openCard && openCard !== card) {
+            syncRecipeIngredientSmartViewCardExpanded(openCard, false);
+        }
+        recipeEditExpandedSmartViewIngredientId = shouldExpand ? key : "";
+        syncRecipeIngredientSmartViewCardExpanded(card, shouldExpand);
+        scheduleRecipeIngredientSmartViewLayout();
+        return false;
+    });
 }
 
 function selectRecipeIngredientSmartViewOption(button, event = null) {

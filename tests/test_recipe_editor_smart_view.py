@@ -209,6 +209,13 @@ def test_smart_expansion_is_single_stable_view_only_state_and_accessible():
     assert "recipeEditExpandedSmartViewIngredientId !== key" in toggle
     assert "syncRecipeIngredientSmartViewCardExpanded(openCard, false);" in toggle
     assert "recipeEditExpandedSmartViewIngredientId = shouldExpand ? key : \"\";" in toggle
+    assert "toggleRecipeIngredientExpansionWithAnchor(" in toggle
+    assert toggle.index("toggleRecipeIngredientExpansionWithAnchor(") < toggle.index(
+        "const shouldExpand"
+    )
+    assert toggle.index("const shouldExpand") < toggle.index(
+        "scheduleRecipeIngredientSmartViewLayout();"
+    )
     assert "updateRecipeEditorDirtyState" not in toggle
     assert "scrollIntoView" not in toggle
     assert "scrollTop" not in toggle
@@ -227,6 +234,213 @@ def test_smart_expansion_is_single_stable_view_only_state_and_accessible():
     assert ".recipe-edit-ingredient-smart-card.is-expanded" in css
     assert ".recipe-edit-ingredient-smart-disclosure:focus-visible" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
+
+
+def test_smart_expansion_preserves_the_clicked_card_through_masonry_scroll_clamping():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the Smart View scroll-anchor regression")
+
+    scroll_helpers_start = script.index("function recipeIngredientScrollMaximum")
+    scroll_helpers_end = script.index(
+        "function setRecipeIngredientSubstitutionsExpanded",
+        scroll_helpers_start,
+    )
+    scroll_helpers = script[scroll_helpers_start:scroll_helpers_end]
+    schedule = _function(
+        script,
+        "scheduleRecipeIngredientSmartViewLayout()",
+        "initRecipeIngredientSmartViewLayout",
+    )
+    toggle = _function(
+        script,
+        "toggleRecipeIngredientSmartView(button)",
+        "selectRecipeIngredientSmartViewOption",
+    )
+    harness = r"""
+const recipeEditIngredientScrollReserveStates = new WeakMap();
+let recipeEditExpandedSmartViewIngredientId = "";
+let recipeEditIngredientSmartViewLayoutFrame = 0;
+let nextFrameId = 1;
+let clampCount = 0;
+let expectedAnchorRow = null;
+let expectedAnchorControl = null;
+const queuedFrames = [];
+const queuedFrameKinds = [];
+
+const document = {
+    createElement() {
+        return {
+            className: "",
+            dataset: {},
+            parentElement: null,
+            style: {
+                height: "",
+                removeProperty(name) {
+                    if (name === "height") this.height = "";
+                },
+            },
+            setAttribute() {},
+            remove() {
+                const parent = this.parentElement;
+                if (!parent) return;
+                if (parent.spacer === this) parent.spacer = null;
+                this.parentElement = null;
+            },
+        };
+    },
+};
+const window = {
+    requestAnimationFrame(callback) {
+        const id = nextFrameId++;
+        queuedFrameKinds.push(
+            callback === layoutRecipeIngredientSmartView ? "layout" : "anchor",
+        );
+        queuedFrames.push({ id, callback });
+        return id;
+    },
+    cancelAnimationFrame(id) {
+        const index = queuedFrames.findIndex(frame => frame.id === id);
+        if (index >= 0) queuedFrames.splice(index, 1);
+    },
+    scrollBy() {
+        throw new Error("Smart View should use its element scroll container");
+    },
+};
+const scrollContainer = {
+    baseScrollHeight: 600,
+    clientHeight: 500,
+    _scrollTop: 100,
+    spacer: null,
+    isConnected: true,
+    classList: {
+        values: new Set(),
+        add(value) { this.values.add(value); },
+        remove(value) { this.values.delete(value); },
+    },
+    get scrollHeight() {
+        return this.baseScrollHeight
+            + Number.parseFloat(this.spacer?.style.height || "0");
+    },
+    get scrollTop() {
+        const maximum = Math.max(0, this.scrollHeight - this.clientHeight);
+        if (this._scrollTop > maximum) {
+            this._scrollTop = maximum;
+            clampCount += 1;
+        }
+        return this._scrollTop;
+    },
+    set scrollTop(value) {
+        const maximum = Math.max(0, this.scrollHeight - this.clientHeight);
+        this._scrollTop = Math.min(maximum, Math.max(0, Number(value) || 0));
+    },
+    addEventListener() {},
+    appendChild(element) {
+        this.spacer = element;
+        element.parentElement = this;
+    },
+};
+const grid = {
+    querySelector() {
+        return card.expanded ? card : null;
+    },
+};
+const card = {
+    dataset: { smartViewIngredientId: "onion" },
+    parentElement: grid,
+    isConnected: true,
+    expanded: false,
+    documentTop: 570,
+    classList: {
+        contains(name) {
+            return name === "is-expanded" && card.expanded;
+        },
+    },
+    closest() { return null; },
+    getBoundingClientRect() {
+        return { top: this.documentTop - scrollContainer.scrollTop };
+    },
+};
+const button = {
+    closest() { return card; },
+};
+
+function recipeIngredientExpansionViewportAnchor(row, control) {
+    expectedAnchorRow = row;
+    expectedAnchorControl = control;
+    return row;
+}
+function recipeIngredientVerticalScrollContainer() { return scrollContainer; }
+function syncRecipeIngredientSmartViewCardExpanded(target, expanded) {
+    target.expanded = expanded;
+    scrollContainer.baseScrollHeight = expanded ? 1000 : 650;
+}
+function layoutRecipeIngredientSmartView() {
+    recipeEditIngredientSmartViewLayoutFrame = 0;
+    scrollContainer.baseScrollHeight = card.expanded ? 1000 : 600;
+    card.documentTop = card.expanded ? 620 : 570;
+}
+function drainAnimationFrames() {
+    while (queuedFrames.length) {
+        const frame = queuedFrames.shift();
+        frame.callback();
+    }
+}
+""" + scroll_helpers + schedule + toggle + r"""
+
+const collapsedTop = card.getBoundingClientRect().top;
+toggleRecipeIngredientSmartView(button);
+drainAnimationFrames();
+const expandQueue = queuedFrameKinds.splice(0);
+const expandedTop = card.getBoundingClientRect().top;
+
+// Match the reported failure: scroll to the native maximum before collapsing
+// a lower card, then let the content shrink and clamp scrollTop synchronously.
+scrollContainer.scrollTop = 500;
+const beforeCollapseTop = card.getBoundingClientRect().top;
+toggleRecipeIngredientSmartView(button);
+drainAnimationFrames();
+const collapseQueue = queuedFrameKinds.splice(0);
+const afterCollapseTop = card.getBoundingClientRect().top;
+const reserveState = recipeEditIngredientScrollReserveStates.get(scrollContainer);
+
+process.stdout.write(JSON.stringify({
+    anchorRowIsCard: expectedAnchorRow === card,
+    anchorControlIsButton: expectedAnchorControl === button,
+    expandQueue,
+    collapseQueue,
+    collapsedTop,
+    expandedTop,
+    beforeCollapseTop,
+    afterCollapseTop,
+    clampCount,
+    reserveHeight: reserveState?.height || 0,
+    stabilizing: scrollContainer.classList.values.has(
+        "recipe-edit-ingredient-scroll-stabilizing",
+    ),
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["anchorRowIsCard"] is True
+    assert result["anchorControlIsButton"] is True
+    assert result["expandQueue"][:2] == ["layout", "anchor"]
+    assert result["collapseQueue"][:2] == ["layout", "anchor"]
+    assert abs(result["expandedTop"] - result["collapsedTop"]) <= 0.5
+    assert abs(result["afterCollapseTop"] - result["beforeCollapseTop"]) <= 0.5
+    assert result["clampCount"] >= 1
+    assert result["reserveHeight"] > 0
+    assert result["stabilizing"] is False
 
 
 def test_smart_projection_refreshes_with_row_edits_and_reordering():
