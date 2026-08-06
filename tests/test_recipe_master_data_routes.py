@@ -461,6 +461,8 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="col">Updated</th>' in equipment_html
     assert '<th scope="col">Created At</th>' not in equipment_html
     assert 'class="master-data-created-cell"' not in equipment_html
+    assert "<code>large pot</code>" not in equipment_html
+    assert "<code>whisk</code>" not in equipment_html
     assert 'class="master-data-equipment-details"' in equipment_html
     assert ">Details</summary>" in equipment_html
     assert ">Created</span>" in equipment_html
