@@ -45728,6 +45728,15 @@ function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
                     onclick="return addRecipeIngredientCustomUnit(this)">
                 <span>${recipeEditSvgIcon("plus")} Add custom unit…</span>
             </button>
+            <a href="${escapeAttribute(masterDataViewerUrl("/admin/master-data/units"))}"
+               target="_blank"
+               rel="noopener"
+               class="recipe-edit-unit-option recipe-edit-unit-manage-option"
+               aria-label="Manage Units in a new tab"
+               onclick="event.stopPropagation()">
+                <span>${recipeEditSvgIcon("edit")} Manage Units…</span>
+                ${recipeEditSvgIcon("arrow-right")}
+            </a>
         </div>
     `;
 

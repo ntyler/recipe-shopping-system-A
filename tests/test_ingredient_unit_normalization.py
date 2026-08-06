@@ -585,6 +585,10 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert "Open ingredient rows using it will be cleared." in app_js
     assert 'document.querySelectorAll(\'.recipe-edit-ingredient-row [data-field="unit"]\')' in app_js
     assert "Add custom unit…" in app_js
+    assert "Manage Units…" in app_js
+    assert 'masterDataViewerUrl("/admin/master-data/units")' in app_js
+    assert 'aria-label="Manage Units in a new tab"' in app_js
+    assert "recipe-edit-unit-manage-option" in app_js
     assert 'input.setAttribute("aria-controls", "recipeIngredientUnitMenu")' in app_js
     assert 'input.setAttribute("aria-expanded", "false")' in app_js
     assert 'input.removeAttribute("list")' in app_js
@@ -596,11 +600,13 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert 'input.addEventListener("keydown", event => handleRecipeIngredientUnitKeydown(event, input))' in app_js
     assert 'typeof input.showPicker !== "function"' not in app_js
     assert ".recipe-edit-row-menu.recipe-edit-unit-menu" in app_css
+    assert ".recipe-edit-unit-option {\n    display: flex;\n    align-items: center;" in app_css
     assert ".recipe-edit-unit-option.is-selected" in app_css
     assert ".recipe-edit-unit-option.is-active" in app_css
     assert ".recipe-edit-unit-add-option" in app_css
     assert ".recipe-edit-unit-menu-list" in app_css
     assert ".recipe-edit-unit-menu-footer" in app_css
+    assert ".recipe-edit-unit-manage-option" in app_css
     assert ".recipe-edit-unit-custom-row" in app_css
     assert ".recipe-edit-unit-edit-button" in app_css
     assert ".recipe-edit-unit-delete-button" in app_css
