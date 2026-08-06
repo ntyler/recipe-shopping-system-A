@@ -6816,7 +6816,7 @@ def test_nested_ingredient_hover_highlights_only_the_visual_row():
     )
 
     projected_marker = (
-        "/* Ingredient editor v105: grouped selected rows reach the same edges as standard rows. */"
+        "/* Ingredient editor v105: grouped selected rows reach the same horizontal edges without leaving their row. */"
     )
     assert css.index(projected_marker) > css.index(marker)
     projected_css = css[css.index(projected_marker):]
@@ -6854,18 +6854,5 @@ def test_nested_ingredient_hover_highlights_only_the_visual_row():
     assert "width: 100cqi;" in grouped_surface_rule
     assert "background: color-mix(" in grouped_surface_rule
     assert "box-shadow: inset 3px 0 0" in grouped_surface_rule
-
-    assert (
-        "> .recipe-edit-selected-option-line-item:first-child:is(:hover, :focus-within)::before {"
-        in projected_css
-    )
-    assert "top: -16px;" in projected_css
-    assert (
-        "> .recipe-edit-selected-option-line-item:not(.is-ingredient-column-grouped-away):not("
-        in projected_css
-    )
-    assert (
-        ":has(~ .recipe-edit-selected-option-line-item:not(.is-ingredient-column-grouped-away))"
-        in projected_css
-    )
-    assert "bottom: -8px;" in projected_css
+    assert "top: -16px;" not in projected_css
+    assert "bottom: -8px;" not in projected_css

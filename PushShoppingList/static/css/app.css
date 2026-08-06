@@ -73704,7 +73704,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 44%, transparent) !important;
 }
 
-/* Ingredient editor v105: grouped selected rows reach the same edges as standard rows. */
+/* Ingredient editor v105: grouped selected rows reach the same horizontal edges without leaving their row. */
 @media (min-width: 768px) {
     body.recipe-edit-standalone-page #recipeEditIngredients
         > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
@@ -73735,19 +73735,4 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 44%, transparent);
     }
 
-    body.recipe-edit-standalone-page #recipeEditIngredients
-        > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
-        > .recipe-edit-selected-option-line-items
-        > .recipe-edit-selected-option-line-item:first-child:is(:hover, :focus-within)::before {
-        top: -16px;
-    }
-
-    body.recipe-edit-standalone-page #recipeEditIngredients
-        > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
-        > .recipe-edit-selected-option-line-items
-        > .recipe-edit-selected-option-line-item:not(.is-ingredient-column-grouped-away):not(
-            :has(~ .recipe-edit-selected-option-line-item:not(.is-ingredient-column-grouped-away))
-        ):is(:hover, :focus-within)::before {
-        bottom: -8px;
-    }
 }
