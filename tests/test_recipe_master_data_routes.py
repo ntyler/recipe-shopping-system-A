@@ -3,6 +3,8 @@ from pathlib import Path
 from urllib.parse import parse_qsl
 from urllib.parse import urlsplit
 
+from bs4 import BeautifulSoup
+
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
 from PushShoppingList.services import recipe_master_data_service as master_data
@@ -474,8 +476,10 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Showing 1-2 of 2 equipment." in equipment_html
     assert '<th scope="col">Item</th>' in equipment_html
     assert '<th scope="col">Equipment Type</th>' not in equipment_html
-    assert '<th scope="col">Usage</th>' in equipment_html
+    assert '<th scope="col">Used In</th>' in equipment_html
+    assert '<th scope="col">Usage</th>' not in equipment_html
     assert '<th scope="col">Updated</th>' in equipment_html
+    assert '<th scope="col">Action</th>' in equipment_html
     assert '<th scope="col">Created At</th>' not in equipment_html
     assert 'class="master-data-created-cell"' not in equipment_html
     assert "<code>large pot</code>" not in equipment_html
@@ -876,6 +880,51 @@ def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp
     for response in (mine_response, specific_response, all_response):
         assert response.status_code == 200
 
+    mine_soup = BeautifulSoup(mine_response.get_data(as_text=True), "html.parser")
+    specific_soup = BeautifulSoup(specific_response.get_data(as_text=True), "html.parser")
+    all_soup = BeautifulSoup(all_response.get_data(as_text=True), "html.parser")
+
+    for table in mine_soup.select(".equipment-master-category table"):
+        assert [
+            header.get_text(" ", strip=True)
+            for header in table.select("thead th")
+        ] == ["Item", "Used In", "Updated", "Action"]
+        for row in table.select("tbody > .master-data-record-row"):
+            assert [cell.get("data-label") for cell in row.find_all("td", recursive=False)] == [
+                "Item",
+                "Used In",
+                "Updated",
+                "Action",
+            ]
+            item_cell = row.select_one(".master-data-item-cell")
+            action_cell = row.select_one(".equipment-master-action-cell")
+            edit_button = action_cell.select_one("[data-equipment-master-display-edit]")
+            assert item_cell.select_one("[data-equipment-master-display-edit]") is None
+            assert edit_button.get_text(strip=True) == "Edit"
+            assert edit_button["aria-label"].startswith("Edit display name for ")
+
+    for table in specific_soup.select(".equipment-master-category table"):
+        assert [
+            header.get_text(" ", strip=True)
+            for header in table.select("thead th")
+        ] == ["Item", "Used In", "Updated", "Action"]
+        assert table.select_one("[data-equipment-master-display-edit]") is None
+
+    for table in all_soup.select(".equipment-master-category table"):
+        assert [
+            header.get_text(" ", strip=True)
+            for header in table.select("thead th")
+        ] == ["Item", "User", "Used In", "Updated", "Action"]
+        for row in table.select("tbody > .master-data-record-row"):
+            assert [cell.get("data-label") for cell in row.find_all("td", recursive=False)] == [
+                "Item",
+                "User",
+                "Used In",
+                "Updated",
+                "Action",
+            ]
+        assert table.select_one("[data-equipment-master-display-edit]") is None
+
     mine_table = mine_response.get_data(as_text=True).split(
         '<table class="master-data-table', 1
     )[1].split("</table>", 1)[0]
@@ -958,8 +1007,8 @@ def test_equipment_registry_renders_single_name_created_details_and_unused_state
     assert "<small>0 uses</small>" in html
     assert "equipment-master-usage-button" not in registry_html
     assert ">Add" not in registry_html
-    assert "Edit display name" in registry_html
-    assert ">Edit<" not in registry_html
+    assert 'aria-label="Edit display name for Large pot"' in registry_html
+    assert ">Edit</button>" in registry_html
     assert ">Delete" not in registry_html
 
 
@@ -1843,6 +1892,8 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert ".equipment-master-read-only-badge" in css
     assert ".equipment-master-admin-view" in css
     assert ".equipment-master-display-dialog" in css
+    assert ".equipment-master-action-cell" in css
+    assert ".equipment-master-row-editable" in css
     assert "@media (max-width: 1280px)" in css
     assert ".equipment-master-category .master-data-equipment-details summary:is(:hover, :focus-visible)" in css
     assert "data-master-mobile-record-name" in template

@@ -64694,28 +64694,25 @@ body.recipe-edit-standalone-page :is(
     border-left: 2px solid color-mix(in srgb, var(--app-primary) 55%, var(--app-border));
 }
 
-.equipment-master-item-actions {
-    display: flex;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-}
-
 .equipment-master-display-edit {
-    min-height: 28px;
-    padding: 3px 7px;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    background: transparent;
+    display: inline-flex;
+    width: auto;
+    min-height: 36px !important;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 10px !important;
+    border: 1px solid var(--app-primary);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--app-primary) 16%, transparent);
     color: var(--app-primary);
     font: inherit;
-    font-size: 11px;
-    font-weight: 800;
+    font-size: 12px !important;
+    font-weight: 850;
+    white-space: nowrap;
 }
 
 .equipment-master-display-edit:is(:hover, :focus-visible) {
-    border-color: color-mix(in srgb, var(--app-primary) 40%, var(--app-border));
-    background: color-mix(in srgb, var(--app-primary) 8%, transparent);
+    background: color-mix(in srgb, var(--app-primary) 25%, transparent);
     outline: none;
 }
 
@@ -64783,11 +64780,11 @@ body.recipe-edit-standalone-page :is(
 }
 
 .equipment-master-category .master-data-equipment-table {
-    min-width: 520px;
+    min-width: 600px;
 }
 
 .equipment-master-category .master-data-equipment-table.master-data-table--show-user {
-    min-width: 680px;
+    min-width: 760px;
 }
 
 .equipment-master-category .master-data-equipment-table th:nth-child(1) {
@@ -64800,6 +64797,10 @@ body.recipe-edit-standalone-page :is(
 
 .equipment-master-category .master-data-equipment-table th:nth-child(3) {
     width: 126px;
+}
+
+.equipment-master-category .master-data-equipment-table th:nth-child(4) {
+    width: 76px;
 }
 
 .equipment-master-category .master-data-equipment-table.master-data-table--show-user th:nth-child(1) {
@@ -64818,9 +64819,22 @@ body.recipe-edit-standalone-page :is(
     width: 126px;
 }
 
+.equipment-master-category .master-data-equipment-table.master-data-table--show-user th:nth-child(5) {
+    width: 76px;
+}
+
 .equipment-master-category .master-data-table th,
 .equipment-master-category .master-data-table td {
     padding: 11px 12px;
+}
+
+.equipment-master-category .master-data-record-row > td {
+    vertical-align: middle;
+}
+
+.equipment-master-action-cell {
+    text-align: right !important;
+    white-space: nowrap;
 }
 
 .equipment-master-usage-button[aria-expanded="true"] {
@@ -65002,8 +65016,27 @@ body.recipe-edit-standalone-page :is(
     }
 
     .equipment-master-category .master-data-item-cell {
-        grid-column: 1 / -1;
+        grid-column: 1;
+        grid-row: 1;
         border-bottom: 1px solid var(--app-border) !important;
+    }
+
+    .equipment-master-category .equipment-master-action-cell {
+        display: flex;
+        grid-column: 2;
+        grid-row: 1;
+        align-items: center;
+        justify-content: flex-end;
+        border-bottom: 1px solid var(--app-border) !important;
+        text-align: right;
+    }
+
+    .equipment-master-category .master-data-record-row:not(.equipment-master-row-editable) .master-data-item-cell {
+        grid-column: 1 / -1;
+    }
+
+    .equipment-master-category .equipment-master-action-cell.is-read-only {
+        display: none;
     }
 
     .equipment-master-category :is(
@@ -65022,17 +65055,32 @@ body.recipe-edit-standalone-page :is(
     }
 
     .equipment-master-category .master-data-usage-cell {
+        grid-column: 1;
+        grid-row: 2;
         justify-self: end;
         text-align: right;
     }
 
     .equipment-master-category .master-data-updated-cell {
+        grid-column: 2;
+        grid-row: 2;
         align-self: center;
     }
 
-    .equipment-master-category .master-data-equipment-table.master-data-table--show-user .master-data-updated-cell {
+    .equipment-master-category .master-data-equipment-table.master-data-table--show-user .master-data-user-data-cell {
         grid-column: 1 / -1;
+        grid-row: 2;
         border-top: 1px solid var(--app-border);
+        border-bottom: 1px solid var(--app-border);
+    }
+
+    .equipment-master-category .master-data-equipment-table.master-data-table--show-user .master-data-usage-cell {
+        grid-row: 3;
+    }
+
+    .equipment-master-category .master-data-equipment-table.master-data-table--show-user .master-data-updated-cell {
+        grid-column: 2;
+        grid-row: 3;
     }
 
     .equipment-master-category .master-data-reference-row {

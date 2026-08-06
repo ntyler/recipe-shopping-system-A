@@ -1391,9 +1391,9 @@ def master_data_context(record_type, scope_info=None):
             if record_type == "ingredients" and scope_info["scope"] == "all"
             else 4
             if record_type == "ingredients"
-            else 4
+            else 5
             if record_type == "equipment" and scope_info["scope"] == "all"
-            else 3
+            else 4
         ),
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},

@@ -160,7 +160,7 @@
     {% set reference_row_id = 'masterDataReferences-' ~ master_data.record_type ~ '-' ~ row.id %}
     {% set ingredient_form_id = 'masterDataIngredientForm-' ~ row.id %}
     <tr id="masterDataRecord-{{ master_data.record_type }}-{{ row.id }}"
-        class="master-data-record-row{% if not row.usage_count %} master-data-record-row-unused{% endif %}"
+        class="master-data-record-row{% if not row.usage_count %} master-data-record-row-unused{% endif %}{% if master_data.record_type == 'equipment' and row.user_id == master_data.current_scope_user_id %} equipment-master-row-editable{% endif %}"
         data-master-record-id="{{ row.id }}"
         {% if not row.usage_count %}data-master-record-unused="true"{% endif %}>
         <td class="master-data-item-cell" data-label="Item">
@@ -242,31 +242,15 @@
                 {% else %}
                     <div class="master-data-item-copy">
                         <strong data-equipment-master-display-name>{{ row.name }}</strong>
-                        <div class="equipment-master-item-actions">
-                            <details class="master-data-equipment-details">
-                                <summary aria-label="Show created date for {{ row.name }}">Details</summary>
-                                <div>
-                                    <span>Created</span>
-                                    <time datetime="{{ row.created_at }}" title="{{ row.created_at }}">
-                                        {{ row.created_at_label }}
-                                    </time>
-                                </div>
-                            </details>
-                            {% if row.user_id == master_data.current_scope_user_id %}
-                                <button type="button"
-                                        class="equipment-master-display-edit"
-                                        data-equipment-master-display-edit
-                                        data-update-url="{{ url_for('main_bp.equipment_master_display_name_route', equipment_id=row.id) }}"
-                                        data-current-name="{{ row.name }}"
-                                        data-detected-name="{{ row.detected_name }}"
-                                        data-has-display-name-override="{{ 'true' if row.has_display_name_override else 'false' }}"
-                                        aria-haspopup="dialog"
-                                        aria-controls="equipmentMasterDisplayNameDialog"
-                                        title="Customize the display name for {{ row.name }}">
-                                    Edit display name
-                                </button>
-                            {% endif %}
-                        </div>
+                        <details class="master-data-equipment-details">
+                            <summary aria-label="Show created date for {{ row.name }}">Details</summary>
+                            <div>
+                                <span>Created</span>
+                                <time datetime="{{ row.created_at }}" title="{{ row.created_at }}">
+                                    {{ row.created_at_label }}
+                                </time>
+                            </div>
+                        </details>
                     </div>
                 {% endif %}
             </div>
@@ -304,7 +288,7 @@
                 </div>
             </td>
         {% endif %}
-        <td class="master-data-usage-cell" data-label="Usage">
+        <td class="master-data-usage-cell" data-label="{% if master_data.record_type == 'equipment' %}Used In{% else %}Usage{% endif %}">
             {% if row.usage_count %}
                 <button type="button"
                         class="master-data-usage-button{% if master_data.record_type == 'equipment' %} unit-master-usage-button equipment-master-usage-button{% endif %}"
@@ -350,6 +334,24 @@
                 </time>
             {% endif %}
         </td>
+        {% if master_data.record_type == 'equipment' %}
+            <td class="equipment-master-action-cell{% if row.user_id != master_data.current_scope_user_id %} is-read-only{% endif %}"
+                data-label="Action">
+                {% if row.user_id == master_data.current_scope_user_id %}
+                    <button type="button"
+                            class="unit-master-edit-button equipment-master-display-edit"
+                            data-equipment-master-display-edit
+                            data-update-url="{{ url_for('main_bp.equipment_master_display_name_route', equipment_id=row.id) }}"
+                            data-current-name="{{ row.name }}"
+                            data-detected-name="{{ row.detected_name }}"
+                            data-has-display-name-override="{{ 'true' if row.has_display_name_override else 'false' }}"
+                            aria-label="Edit display name for {{ row.name }}"
+                            aria-haspopup="dialog"
+                            aria-controls="equipmentMasterDisplayNameDialog"
+                            title="Edit display name for {{ row.name }}">Edit</button>
+                {% endif %}
+            </td>
+        {% endif %}
     </tr>
     {% if row.usage_count and master_data.record_type == 'ingredients' %}
         <tr class="master-data-reference-row"
@@ -1198,8 +1200,9 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                 {% if master_data.scope == 'all' %}
                                                     <th scope="col">User</th>
                                                 {% endif %}
-                                                <th scope="col">Usage</th>
+                                                <th scope="col">Used In</th>
                                                 <th scope="col">Updated</th>
+                                                <th scope="col">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
