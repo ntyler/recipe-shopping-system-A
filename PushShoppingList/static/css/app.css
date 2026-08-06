@@ -64885,6 +64885,17 @@ body.recipe-edit-standalone-page :is(
     white-space: nowrap;
 }
 
+.equipment-master-usage-button {
+    box-sizing: border-box;
+    min-width: 72px;
+    height: 36px;
+    align-items: center;
+}
+
+.equipment-master-usage-button span {
+    line-height: 1;
+}
+
 .equipment-master-usage-button[aria-expanded="true"] {
     border-color: var(--app-primary) !important;
     background: color-mix(in srgb, var(--app-primary) 20%, transparent) !important;

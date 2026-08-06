@@ -2020,6 +2020,24 @@ def test_equipment_usage_pill_uses_the_complete_units_visual_contract():
     assert ".unit-master-usage-button:focus-visible {" in css
 
 
+def test_equipment_usage_pills_are_centered_and_consistently_sized():
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    selector = ".equipment-master-usage-button {"
+    rule_start = css.index(selector)
+    rule = css[rule_start:css.index("}", rule_start)]
+
+    assert "box-sizing: border-box;" in rule
+    assert "min-width: 72px;" in rule
+    assert "height: 36px;" in rule
+    assert "align-items: center;" in rule
+    assert ".equipment-master-usage-button span {" in css
+    assert "line-height: 1;" in css[
+        css.index(".equipment-master-usage-button span {"):
+        css.index("}", css.index(".equipment-master-usage-button span {"))
+    ]
+
+
 def test_master_data_duplicate_review_ui_is_wired():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
