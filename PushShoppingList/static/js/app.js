@@ -45092,6 +45092,16 @@ function renderRecipeIngredientTypeMenu(menu, select) {
                 ${recipeEditSvgIcon("plus")}
                 <span class="recipe-edit-store-section-option-label recipe-edit-type-option-label">Add custom type…</span>
             </button>
+            <button type="button"
+                    id="recipeIngredientTypeManage"
+                    class="recipe-edit-store-section-option recipe-edit-type-manage-option"
+                    data-type-action="manage"
+                    aria-haspopup="dialog"
+                    aria-controls="recipeIngredientTypeManager"
+                    onclick="return openRecipeIngredientTypeManager(this)">
+                <span>${recipeEditSvgIcon("edit")} Manage Types…</span>
+                ${recipeEditSvgIcon("arrow-right")}
+            </button>
         </div>
     `;
     const options = recipeEditListboxOptions(menu);
@@ -45146,73 +45156,253 @@ function chooseRecipeIngredientType(button) {
     return false;
 }
 
-function addRecipeIngredientCustomType(button) {
+function ensureRecipeIngredientTypeManager() {
+    let dialog = document.getElementById("recipeIngredientTypeManager");
+    if (dialog) {
+        return dialog;
+    }
+    dialog = document.createElement("dialog");
+    dialog.id = "recipeIngredientTypeManager";
+    dialog.className = "recipe-edit-type-manager";
+    dialog.setAttribute("aria-labelledby", "recipeIngredientTypeManagerTitle");
+    dialog.addEventListener("click", event => {
+        if (event.target === dialog) {
+            dialog.close();
+        }
+    });
+    dialog.addEventListener("close", () => {
+        const trigger = dialog.recipeEditAnchorButton;
+        delete dialog.recipeEditTypeSelect;
+        delete dialog.recipeEditAnchorButton;
+        if (trigger && trigger.isConnected) {
+            trigger.focus({ preventScroll: true });
+        }
+    });
+    document.body.appendChild(dialog);
+    return dialog;
+}
+
+function renderRecipeIngredientTypeManager(dialog) {
+    if (!dialog) {
+        return;
+    }
+    const builtInMarkup = RECIPE_INGREDIENT_BUILT_IN_TYPES.map(type => `
+        <div class="recipe-edit-type-manager-row">
+            <span class="recipe-edit-type-option-dot${recipeIngredientTypeDotClassModifier(type.value)}" aria-hidden="true"></span>
+            <strong>${escapeHtml(type.label)}</strong>
+            <span class="recipe-edit-type-manager-source">Built-in</span>
+        </div>
+    `).join("");
+    const customNames = recipeIngredientCustomTypeNames();
+    const customMarkup = customNames.length
+        ? customNames.map(name => `
+            <div class="recipe-edit-type-manager-row is-custom">
+                <span class="recipe-edit-type-option-dot is-custom" aria-hidden="true"></span>
+                <strong>${escapeHtml(name)}</strong>
+                <div class="recipe-edit-type-manager-row-actions">
+                    <button type="button"
+                            data-type-action="edit-custom"
+                            data-type-value="${escapeAttribute(name)}"
+                            aria-label="Rename custom type ${escapeAttribute(name)}"
+                            title="Rename ${escapeAttribute(name)}"
+                            onclick="return editRecipeIngredientCustomType(this)">
+                        ${recipeEditSvgIcon("edit")}
+                    </button>
+                    <button type="button"
+                            class="is-danger"
+                            data-type-action="delete-custom"
+                            data-type-value="${escapeAttribute(name)}"
+                            aria-label="Delete custom type ${escapeAttribute(name)}"
+                            title="Delete ${escapeAttribute(name)}"
+                            onclick="return deleteRecipeIngredientCustomType(this)">
+                        ${recipeEditSvgIcon("trash")}
+                    </button>
+                </div>
+            </div>
+        `).join("")
+        : '<p class="recipe-edit-type-manager-empty">No custom types yet.</p>';
+    dialog.innerHTML = `
+        <div class="recipe-edit-type-manager-shell">
+            <header>
+                <div>
+                    <h2 id="recipeIngredientTypeManagerTitle">Manage Types</h2>
+                    <p>Built-in types stay available. Add, rename, or remove your custom types here.</p>
+                </div>
+                <button type="button"
+                        class="recipe-edit-type-manager-close"
+                        aria-label="Close type manager"
+                        onclick="return closeRecipeIngredientTypeManager(this)">×</button>
+            </header>
+            <div class="recipe-edit-type-manager-content">
+                <section aria-labelledby="recipeIngredientBuiltInTypesTitle">
+                    <h3 id="recipeIngredientBuiltInTypesTitle">Built-in types</h3>
+                    <div class="recipe-edit-type-manager-list">${builtInMarkup}</div>
+                </section>
+                <section aria-labelledby="recipeIngredientCustomTypesTitle">
+                    <h3 id="recipeIngredientCustomTypesTitle">Custom types</h3>
+                    <div class="recipe-edit-type-manager-list">${customMarkup}</div>
+                </section>
+            </div>
+            <footer>
+                <button type="button"
+                        class="recipe-edit-type-manager-add"
+                        data-type-action="add-custom"
+                        onclick="return addRecipeIngredientCustomType(this)">
+                    ${recipeEditSvgIcon("plus")}
+                    Add custom type
+                </button>
+                <button type="button"
+                        class="recipe-edit-type-manager-done"
+                        onclick="return closeRecipeIngredientTypeManager(this)">Done</button>
+            </footer>
+        </div>
+    `;
+}
+
+function openRecipeIngredientTypeManager(button) {
     const menu = button ? button.closest(".recipe-edit-type-menu") : null;
     const select = menu ? menu.recipeEditTypeSelect : null;
     const trigger = menu ? menu.recipeEditAnchorButton : null;
+    if (!menu || !select) {
+        return false;
+    }
+    const dialog = ensureRecipeIngredientTypeManager();
+    dialog.recipeEditTypeSelect = select;
+    dialog.recipeEditAnchorButton = trigger;
+    renderRecipeIngredientTypeManager(dialog);
+    closeRecipeEditRowMenus();
+    if (typeof dialog.showModal === "function") {
+        dialog.showModal();
+    } else {
+        dialog.setAttribute("open", "");
+    }
+    dialog.querySelector(".recipe-edit-type-manager-close")?.focus({ preventScroll: true });
+    return false;
+}
+
+function closeRecipeIngredientTypeManager(button) {
+    const dialog = button ? button.closest(".recipe-edit-type-manager") : null;
+    if (!dialog) {
+        return false;
+    }
+    if (typeof dialog.close === "function") {
+        dialog.close();
+    } else {
+        dialog.removeAttribute("open");
+        dialog.dispatchEvent(new Event("close"));
+    }
+    return false;
+}
+
+function recipeIngredientTypeActionContext(button) {
+    const menu = button ? button.closest(".recipe-edit-type-menu") : null;
+    const manager = button ? button.closest(".recipe-edit-type-manager") : null;
+    return {
+        menu,
+        manager,
+        select: menu ? menu.recipeEditTypeSelect : manager?.recipeEditTypeSelect,
+        trigger: menu ? menu.recipeEditAnchorButton : manager?.recipeEditAnchorButton,
+    };
+}
+
+function refreshRecipeIngredientTypeActionSurface(context, focusSelector = "") {
+    if (context.menu) {
+        renderRecipeIngredientTypeMenu(context.menu, context.select);
+        positionRecipeEditPopupMenu(context.menu, context.trigger);
+        if (context.trigger) context.trigger.focus({ preventScroll: true });
+        return;
+    }
+    if (context.manager) {
+        renderRecipeIngredientTypeManager(context.manager);
+        if (focusSelector) {
+            context.manager.querySelector(focusSelector)?.focus({ preventScroll: true });
+        }
+    }
+}
+
+function addRecipeIngredientCustomType(button) {
+    const context = recipeIngredientTypeActionContext(button);
+    const { menu, manager, select, trigger } = context;
     if (!select) {
         return false;
     }
     const requested = window.prompt("Add a custom ingredient type", "");
     if (requested === null) {
-        if (trigger) trigger.focus({ preventScroll: true });
+        if (manager) button.focus({ preventScroll: true });
+        else if (trigger) trigger.focus({ preventScroll: true });
         return false;
     }
     const name = String(requested || "").trim().replace(/\s+/g, " ").slice(0, 40);
     if (!name) {
-        if (trigger) trigger.focus({ preventScroll: true });
+        if (manager) button.focus({ preventScroll: true });
+        else if (trigger) trigger.focus({ preventScroll: true });
         return false;
     }
-    select.value = saveRecipeIngredientCustomTypeName(name);
-    select.dispatchEvent(new Event("change", { bubbles: true }));
+    const savedName = saveRecipeIngredientCustomTypeName(name);
+    if (menu) {
+        select.value = savedName;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (manager) {
+        renderRecipeIngredientTypeManager(manager);
+        manager.querySelector("[data-type-action='add-custom']")?.focus({ preventScroll: true });
+        setRecipeEditStatus(`Custom ingredient type "${savedName}" is available.`);
+        return false;
+    }
     closeRecipeEditRowMenus();
     if (trigger) trigger.focus({ preventScroll: true });
     return false;
 }
 
 function editRecipeIngredientCustomType(button) {
-    const menu = button ? button.closest(".recipe-edit-type-menu") : null;
-    const select = menu ? menu.recipeEditTypeSelect : null;
-    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    const context = recipeIngredientTypeActionContext(button);
+    const { menu, manager, select, trigger } = context;
     const currentName = String(button && button.dataset.typeValue || "").trim();
-    if (!menu || !select || !currentName || recipeIngredientBuiltInType(currentName)) {
+    if ((!menu && !manager) || !select || !currentName || recipeIngredientBuiltInType(currentName)) {
         return false;
     }
     const requested = window.prompt(`Rename custom type "${currentName}".`, currentName);
     if (requested === null) {
-        if (trigger) trigger.focus({ preventScroll: true });
+        if (manager) button.focus({ preventScroll: true });
+        else if (trigger) trigger.focus({ preventScroll: true });
         return false;
     }
     const nextName = String(requested || "").trim().replace(/\s+/g, " ").slice(0, 40);
     if (!nextName) {
-        if (trigger) trigger.focus({ preventScroll: true });
+        if (manager) button.focus({ preventScroll: true });
+        else if (trigger) trigger.focus({ preventScroll: true });
         return false;
     }
     replaceRecipeIngredientCustomTypeName(currentName, nextName);
-    renderRecipeIngredientTypeMenu(menu, select);
-    positionRecipeEditPopupMenu(menu, trigger);
-    if (trigger) trigger.focus({ preventScroll: true });
+    refreshRecipeIngredientTypeActionSurface(
+        context,
+        `[data-type-action="edit-custom"][data-type-value="${CSS.escape(nextName)}"]`,
+    );
+    if (manager) {
+        setRecipeEditStatus(`Custom ingredient type "${nextName}" renamed.`);
+    }
     return false;
 }
 
 function deleteRecipeIngredientCustomType(button) {
-    const menu = button ? button.closest(".recipe-edit-type-menu") : null;
-    const select = menu ? menu.recipeEditTypeSelect : null;
-    const trigger = menu ? menu.recipeEditAnchorButton : null;
+    const context = recipeIngredientTypeActionContext(button);
+    const { menu, manager, select, trigger } = context;
     const currentName = String(button && button.dataset.typeValue || "").trim();
-    if (!menu || !select || !currentName || recipeIngredientBuiltInType(currentName)) {
+    if ((!menu && !manager) || !select || !currentName || recipeIngredientBuiltInType(currentName)) {
         return false;
     }
     if (!window.confirm(
         `Delete custom type "${currentName}"? Open ingredient rows using it will be changed to Main.`,
     )) {
-        if (trigger) trigger.focus({ preventScroll: true });
+        if (manager) button.focus({ preventScroll: true });
+        else if (trigger) trigger.focus({ preventScroll: true });
         return false;
     }
     replaceRecipeIngredientCustomTypeName(currentName, "");
-    renderRecipeIngredientTypeMenu(menu, select);
-    positionRecipeEditPopupMenu(menu, trigger);
-    if (trigger) trigger.focus({ preventScroll: true });
+    refreshRecipeIngredientTypeActionSurface(context, "[data-type-action='add-custom']");
+    if (manager) {
+        setRecipeEditStatus(`Custom ingredient type "${currentName}" deleted.`);
+    }
     return false;
 }
 

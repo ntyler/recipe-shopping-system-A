@@ -4916,9 +4916,23 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert 'data-type-action="add-custom"' in script
     assert 'data-type-action="edit-custom"' in script
     assert 'data-type-action="delete-custom"' in script
+    assert 'data-type-action="manage"' in script
     assert "Add custom type…" in script
+    assert "Manage Types…" in script
+    assert 'aria-controls="recipeIngredientTypeManager"' in script
+    assert 'onclick="return openRecipeIngredientTypeManager(this)"' in script
     assert 'aria-label="Edit custom type ${escapeAttribute(value)}"' in script
     assert 'aria-label="Delete custom type ${escapeAttribute(value)}"' in script
+    assert "function ensureRecipeIngredientTypeManager()" in script
+    assert "function renderRecipeIngredientTypeManager(dialog)" in script
+    assert "function openRecipeIngredientTypeManager(button)" in script
+    assert "function closeRecipeIngredientTypeManager(button)" in script
+    assert 'dialog.id = "recipeIngredientTypeManager";' in script
+    assert 'dialog.setAttribute("aria-labelledby", "recipeIngredientTypeManagerTitle");' in script
+    assert 'dialog.showModal();' in script
+    assert 'id="recipeIngredientBuiltInTypesTitle"' in script
+    assert 'id="recipeIngredientCustomTypesTitle"' in script
+    assert "No custom types yet." in script
     assert "function addRecipeIngredientCustomType(button)" in script
     assert "function editRecipeIngredientCustomType(button)" in script
     assert "function deleteRecipeIngredientCustomType(button)" in script
@@ -4983,6 +4997,9 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot.is-optional" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot.is-custom" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-custom-row" in css
+    assert ".recipe-edit-type-menu .recipe-edit-type-manage-option" in css
+    assert ".recipe-edit-type-manager::backdrop" in css
+    assert ".recipe-edit-type-manager-row-actions" in css
     assert ".recipe-edit-ingredient-type-summary" in css
     assert ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger" in css
     assert 'border: 1px solid transparent;' in css

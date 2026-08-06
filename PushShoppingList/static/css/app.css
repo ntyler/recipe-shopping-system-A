@@ -53814,12 +53814,23 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-type-trigge
     background: var(--app-primary-hover);
 }
 
-.recipe-edit-type-menu .recipe-edit-type-option-dot.is-optional {
+.recipe-edit-type-manager .recipe-edit-type-option-dot {
+    display: inline-flex;
+    width: 8px;
+    min-width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--app-primary-hover);
+}
+
+.recipe-edit-type-menu .recipe-edit-type-option-dot.is-optional,
+.recipe-edit-type-manager .recipe-edit-type-option-dot.is-optional {
     background: var(--app-muted);
 }
 
 .recipe-edit-type-menu .recipe-edit-type-option-dot.is-custom,
-.recipe-edit-type-menu .recipe-edit-type-custom-row .recipe-edit-type-option-dot {
+.recipe-edit-type-menu .recipe-edit-type-custom-row .recipe-edit-type-option-dot,
+.recipe-edit-type-manager .recipe-edit-type-option-dot.is-custom {
     background: #60a5fa;
 }
 
@@ -53830,6 +53841,270 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-type-trigge
 
 .recipe-edit-row-menu.recipe-edit-type-menu .recipe-edit-type-add-option {
     color: var(--app-primary-hover);
+}
+
+.recipe-edit-row-menu.recipe-edit-type-menu .recipe-edit-type-manage-option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 16px;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 34px;
+    margin-top: 4px;
+    padding: 7px 9px;
+    border: 0;
+    border-top: 1px solid var(--submenu-divider);
+    border-radius: 0 0 6px 6px;
+    background: var(--app-surface);
+    color: var(--app-text);
+    font: inherit;
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.recipe-edit-row-menu.recipe-edit-type-menu .recipe-edit-type-manage-option:hover,
+.recipe-edit-row-menu.recipe-edit-type-menu .recipe-edit-type-manage-option:focus-visible {
+    background: var(--app-surface-soft);
+    outline: none;
+}
+
+.recipe-edit-row-menu.recipe-edit-type-menu .recipe-edit-type-manage-option > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.recipe-edit-row-menu.recipe-edit-type-menu .recipe-edit-type-manage-option :is(.recipe-edit-inline-icon, svg) {
+    width: 14px;
+    height: 14px;
+}
+
+.recipe-edit-row-menu.recipe-edit-type-menu .recipe-edit-type-manage-option > .recipe-edit-inline-icon-arrow-right {
+    color: var(--app-muted);
+}
+
+.recipe-edit-type-manager {
+    width: min(520px, calc(100vw - 32px));
+    max-height: min(720px, calc(100vh - 32px));
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 12px;
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: 0 24px 70px rgb(0 0 0 / 38%);
+}
+
+.recipe-edit-type-manager::backdrop {
+    background: rgb(0 0 0 / 62%);
+    backdrop-filter: blur(2px);
+}
+
+.recipe-edit-type-manager-shell {
+    display: flex;
+    max-height: min(720px, calc(100vh - 32px));
+    flex-direction: column;
+}
+
+.recipe-edit-type-manager-shell > header,
+.recipe-edit-type-manager-shell > footer {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+}
+
+.recipe-edit-type-manager-shell > header {
+    border-bottom: 1px solid var(--app-border);
+}
+
+.recipe-edit-type-manager-shell > header h2 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.25;
+}
+
+.recipe-edit-type-manager-shell > header p {
+    margin: 5px 0 0;
+    color: var(--app-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.recipe-edit-type-manager-close,
+.recipe-edit-type-manager-row-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: var(--app-muted);
+    cursor: pointer;
+}
+
+.recipe-edit-type-manager-close {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.recipe-edit-type-manager-close:hover,
+.recipe-edit-type-manager-close:focus-visible,
+.recipe-edit-type-manager-row-actions button:hover,
+.recipe-edit-type-manager-row-actions button:focus-visible {
+    background: var(--app-surface-soft);
+    color: var(--app-primary-hover);
+    outline: none;
+}
+
+.recipe-edit-type-manager-content {
+    display: grid;
+    gap: 18px;
+    padding: 18px;
+    overflow-y: auto;
+}
+
+.recipe-edit-type-manager-content section {
+    display: grid;
+    gap: 8px;
+}
+
+.recipe-edit-type-manager-content h3 {
+    margin: 0;
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.recipe-edit-type-manager-list {
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+}
+
+.recipe-edit-type-manager-row {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--app-border);
+    font-size: 12px;
+}
+
+.recipe-edit-type-manager-row:last-child {
+    border-bottom: 0;
+}
+
+.recipe-edit-type-manager-row > strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recipe-edit-type-manager-source {
+    color: var(--app-muted);
+    font-size: 10px;
+}
+
+.recipe-edit-type-manager-row-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.recipe-edit-type-manager-row-actions button {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+}
+
+.recipe-edit-type-manager-row-actions button.is-danger:hover,
+.recipe-edit-type-manager-row-actions button.is-danger:focus-visible {
+    background: color-mix(in srgb, var(--app-danger, #ff6b6b) 12%, var(--app-surface-soft));
+    color: var(--app-danger, #ff6b6b);
+}
+
+.recipe-edit-type-manager-row-actions :is(.recipe-edit-inline-icon, svg) {
+    width: 14px;
+    height: 14px;
+}
+
+.recipe-edit-type-manager-empty {
+    margin: 0;
+    padding: 18px;
+    color: var(--app-muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.recipe-edit-type-manager-shell > footer {
+    border-top: 1px solid var(--app-border);
+}
+
+.recipe-edit-type-manager-shell > footer button {
+    min-height: 36px;
+    padding: 8px 13px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 7px;
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.recipe-edit-type-manager-shell > footer .recipe-edit-type-manager-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border-color: color-mix(in srgb, var(--app-primary-hover) 42%, var(--app-border));
+    color: var(--app-primary-hover);
+}
+
+.recipe-edit-type-manager-shell > footer .recipe-edit-type-manager-done {
+    border-color: var(--app-primary-hover);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.recipe-edit-type-manager-shell > footer button:hover,
+.recipe-edit-type-manager-shell > footer button:focus-visible {
+    border-color: var(--app-primary-hover);
+    outline: none;
+}
+
+.recipe-edit-type-manager-shell > footer :is(.recipe-edit-inline-icon, svg) {
+    width: 14px;
+    height: 14px;
+}
+
+@media (max-width: 560px) {
+    .recipe-edit-type-manager {
+        width: calc(100vw - 16px);
+        max-height: calc(100vh - 16px);
+    }
+
+    .recipe-edit-type-manager-shell {
+        max-height: calc(100vh - 16px);
+    }
+
+    .recipe-edit-type-manager-shell > header,
+    .recipe-edit-type-manager-shell > footer,
+    .recipe-edit-type-manager-content {
+        padding: 14px;
+    }
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-type-summary {
