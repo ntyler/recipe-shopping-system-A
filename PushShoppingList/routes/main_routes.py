@@ -1452,17 +1452,12 @@ def master_data_equipment_route():
 
 
 def unit_master_data_context(scope_info):
-    registry = unit_registry_payload()
-    aliases_by_name = {}
-    for alias, canonical_name in registry["aliases"].items():
-        if alias != canonical_name:
-            aliases_by_name.setdefault(canonical_name, []).append(alias)
+    workspace_user_id = scope_info["current_scope_user_id"]
+    registry = recipe_master_data.ensure_workspace_unit_registry(workspace_user_id)
 
     category_labels = {
-        "volume": "Volume",
-        "weight": "Weight",
-        "count_package": "Count & Package",
-        "optional": "Small Amounts & Optional",
+        item["key"]: item["label"]
+        for item in registry.get("categories", [])
     }
     category_order = tuple(category_labels)
     categories = []
@@ -1473,8 +1468,8 @@ def unit_master_data_context(scope_info):
                 continue
             unit_data = dict(unit)
             unit_data["aliases"] = sorted(
-                aliases_by_name.get(unit["name"], []),
-                key=lambda value: (len(value), value),
+                unit.get("aliases", []),
+                key=lambda value: (len(value), value.lower()),
             )
             units.append(unit_data)
         categories.append({
@@ -1495,8 +1490,17 @@ def unit_master_data_context(scope_info):
         "scope_user_id": workspace_scope["user_id"],
         "registry": registry,
         "categories": categories,
-        "built_in_count": len(registry["units"]),
-        "alias_count": len(registry["aliases"]),
+        "seeded_count": sum(1 for unit in registry["units"] if unit.get("seeded")),
+        "custom_count": sum(1 for unit in registry["units"] if not unit.get("seeded")),
+        "alias_count": sum(len(unit.get("aliases", [])) for unit in registry["units"]),
+        "category_count": len({unit["category"] for unit in registry["units"]}),
+        "category_options": registry.get("categories", []),
+        "create_url": url_for("main_bp.master_data_units_api_route"),
+        "update_url_template": url_for(
+            "main_bp.master_data_unit_api_route",
+            unit_id="__UNIT_ID__",
+        ),
+        "import_url": url_for("main_bp.master_data_units_import_api_route"),
         "ingredient_url": build_canonical_master_data_url(
             "ingredients",
             scope_info=workspace_scope,
@@ -1533,6 +1537,46 @@ def master_data_units_route():
         app_js_version=static_asset_version("js/app.js"),
         units_js_version=static_asset_version("js/units.js"),
     )
+
+
+@main_bp.route("/api/master-data/units", methods=["GET", "POST"])
+def master_data_units_api_route():
+    workspace_user_id = recipe_master_data.scoped_recipe_user_id()
+    if request.method == "GET":
+        return jsonify({
+            "ok": True,
+            "registry": recipe_master_data.ensure_workspace_unit_registry(
+                workspace_user_id
+            ),
+        })
+
+    payload = request.get_json(silent=True) or {}
+    result = recipe_master_data.save_workspace_unit(
+        payload,
+        user_id=workspace_user_id,
+    )
+    status = int(result.pop("status", 201 if result.get("created") else 200))
+    return jsonify(result), status
+
+
+@main_bp.route("/api/master-data/units/<unit_id>", methods=["PUT", "PATCH"])
+def master_data_unit_api_route(unit_id):
+    result = recipe_master_data.save_workspace_unit(
+        request.get_json(silent=True) or {},
+        unit_id=unit_id,
+        user_id=recipe_master_data.scoped_recipe_user_id(),
+    )
+    status = int(result.pop("status", 200))
+    return jsonify(result), status
+
+
+@main_bp.route("/api/master-data/units/import-local", methods=["POST"])
+def master_data_units_import_api_route():
+    payload = request.get_json(silent=True) or {}
+    return jsonify(recipe_master_data.import_workspace_unit_names(
+        payload.get("units"),
+        user_id=recipe_master_data.scoped_recipe_user_id(),
+    ))
 
 
 def store_section_master_data_context():

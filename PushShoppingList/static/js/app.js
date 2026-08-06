@@ -45376,8 +45376,7 @@ function replaceRecipeIngredientCustomUnitName(previousValue, nextValue) {
 function recipeIngredientUnitRegistry() {
     const source = document.getElementById("ingredientUnitConfig");
     const sourceText = source ? source.textContent : "";
-    const customNames = recipeIngredientCustomUnitNames();
-    const signature = `${sourceText}\n${JSON.stringify(customNames)}`;
+    const signature = sourceText;
     if (recipeIngredientUnitRegistryCache && recipeIngredientUnitRegistryCache.signature === signature) {
         return recipeIngredientUnitRegistryCache;
     }
@@ -45388,18 +45387,10 @@ function recipeIngredientUnitRegistry() {
     } catch (error) {
         console.warn("Unable to load the ingredient unit registry.", error);
     }
-    const canonicalUnits = Array.isArray(payload.units) ? payload.units : [];
-    const canonicalKeys = new Set(canonicalUnits.map(unit => recipeIngredientUnitKey(unit.name)));
-    const customUnits = customNames
-        .filter(name => !canonicalKeys.has(recipeIngredientUnitKey(name)))
-        .map(name => ({ id: "", name, category: "custom", custom: true }));
-    const units = [...customUnits, ...canonicalUnits];
+    const units = Array.isArray(payload.units) ? payload.units : [];
     const aliases = {
         ...(payload.aliases && typeof payload.aliases === "object" ? payload.aliases : {}),
     };
-    customUnits.forEach(unit => {
-        aliases[recipeIngredientUnitKey(unit.name)] = unit.name;
-    });
     recipeIngredientUnitRegistryCache = {
         signature,
         units,
@@ -45408,6 +45399,40 @@ function recipeIngredientUnitRegistry() {
     };
     return recipeIngredientUnitRegistryCache;
 }
+
+let recipeIngredientUnitRegistryRefreshPromise = null;
+
+function refreshRecipeIngredientUnitRegistry() {
+    const source = document.getElementById("ingredientUnitConfig");
+    if (!source || recipeIngredientUnitRegistryRefreshPromise) {
+        return recipeIngredientUnitRegistryRefreshPromise || Promise.resolve(false);
+    }
+    recipeIngredientUnitRegistryRefreshPromise = fetch("/api/master-data/units", {
+        headers: { "Accept": "application/json", "X-Requested-With": "fetch" },
+    })
+        .then(response => response.ok ? response.json() : null)
+        .then(payload => {
+            if (!payload?.ok || !payload.registry) return false;
+            const nextText = JSON.stringify(payload.registry);
+            if (source.textContent === nextText) return false;
+            source.textContent = nextText;
+            recipeIngredientUnitRegistryCache = null;
+            ensureRecipeIngredientUnitOption();
+            const menu = document.getElementById("recipeIngredientUnitMenu");
+            if (menu && !menu.hidden && menu.recipeEditAnchorButton) {
+                renderRecipeIngredientUnitMenu(menu, menu.recipeEditAnchorButton, { showAll: true });
+                positionRecipeEditPopupMenu(menu, menu.recipeEditAnchorButton);
+            }
+            return true;
+        })
+        .catch(() => false)
+        .finally(() => {
+            recipeIngredientUnitRegistryRefreshPromise = null;
+        });
+    return recipeIngredientUnitRegistryRefreshPromise;
+}
+
+window.addEventListener("focus", refreshRecipeIngredientUnitRegistry);
 
 function recipeIngredientUnitKey(value) {
     return String(value || "")
@@ -45485,11 +45510,11 @@ function canonicalizeRecipeIngredientUnitControl(input, options = {}) {
         return true;
     }
     if (unit || savedAsCustom) {
-        const shouldStoreAsCustom = Boolean((unit && unit.custom) || savedAsCustom);
+        const shouldStoreAsCustom = Boolean(!unit && savedAsCustom);
         input.value = unit ? unit.name : raw;
         input.setCustomValidity("");
         input.removeAttribute("aria-invalid");
-        if (unitId) unitId.value = unit && !unit.custom ? unit.id || "" : "";
+        if (unitId) unitId.value = unit ? unit.id || "" : "";
         if (reviewRequired) reviewRequired.value = "false";
         if (reviewValue) reviewValue.value = "";
         if (customUnit) customUnit.value = shouldStoreAsCustom ? "true" : "false";
@@ -45681,38 +45706,7 @@ function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
                 <span class="recipe-edit-unit-option-check" aria-hidden="true">${recipeEditSvgIcon("check")}</span>
             </button>
         `;
-        if (!unit.custom) {
-            return option;
-        }
-        return `
-            <div class="recipe-edit-unit-custom-row">
-                ${option}
-                <button type="button"
-                        id="recipeIngredientUnitEdit${index}"
-                        role="option"
-                        aria-selected="false"
-                        class="recipe-edit-unit-edit-button"
-                        data-unit-action="edit-custom"
-                        data-unit-value="${escapeAttribute(value)}"
-                        aria-label="Edit custom unit ${escapeAttribute(value)}"
-                        title="Rename ${escapeAttribute(value)}"
-                        onclick="return editRecipeIngredientCustomUnit(this)">
-                    ${recipeEditSvgIcon("edit")}
-                </button>
-                <button type="button"
-                        id="recipeIngredientUnitDelete${index}"
-                        role="option"
-                        aria-selected="false"
-                        class="recipe-edit-unit-delete-button"
-                        data-unit-action="delete-custom"
-                        data-unit-value="${escapeAttribute(value)}"
-                        aria-label="Delete custom unit ${escapeAttribute(value)}"
-                        title="Delete ${escapeAttribute(value)}"
-                        onclick="return deleteRecipeIngredientCustomUnit(this)">
-                    ${recipeEditSvgIcon("trash")}
-                </button>
-            </div>
-        `;
+        return option;
     }).join("");
 
     menu.innerHTML = `
@@ -45795,23 +45789,8 @@ function addRecipeIngredientCustomUnit(button) {
     if (!input) {
         return false;
     }
-
-    const requested = window.prompt("Add a custom ingredient unit", "");
-    if (requested === null) {
-        input.focus({ preventScroll: true });
-        return false;
-    }
-    const name = String(requested || "").trim().replace(/\s+/g, " ").slice(0, 40);
-    if (!name) {
-        input.focus({ preventScroll: true });
-        return false;
-    }
-
-    const existing = recipeIngredientUnitRegistry().aliases[recipeIngredientUnitKey(name)] || "";
-    input.value = existing || saveRecipeIngredientCustomUnitName(name);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
     closeRecipeEditRowMenus();
+    window.open(masterDataViewerUrl("/admin/master-data/units"), "_blank", "noopener");
     input.focus({ preventScroll: true });
     return false;
 }

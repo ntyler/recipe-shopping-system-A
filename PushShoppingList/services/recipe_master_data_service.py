@@ -4,6 +4,7 @@ import re
 import sqlite3
 import threading
 import unicodedata
+import uuid
 from contextlib import contextmanager
 from contextlib import nullcontext
 from datetime import datetime
@@ -708,6 +709,49 @@ def ensure_recipe_master_schema(connection=None):
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS workspace_units (
+            user_id TEXT NOT NULL,
+            id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            is_seeded INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(user_id, id),
+            UNIQUE(user_id, normalized_name),
+            FOREIGN KEY(id) REFERENCES canonical_units(id) ON DELETE RESTRICT
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workspace_unit_aliases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            canonical_unit_id TEXT NOT NULL,
+            alias TEXT NOT NULL,
+            normalized_alias TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(user_id, normalized_alias),
+            FOREIGN KEY(user_id, canonical_unit_id)
+                REFERENCES workspace_units(user_id, id) ON DELETE CASCADE
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workspace_unit_registry_seeds (
+            user_id TEXT PRIMARY KEY,
+            seed_version TEXT NOT NULL,
+            seeded_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS ingredients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -1133,6 +1177,8 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_user_recipe ON recipe_ingredients(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient ON recipe_ingredients(ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_unit ON recipe_ingredients(unit_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_units_user_order ON workspace_units(user_id, sort_order, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_unit_aliases_unit ON workspace_unit_aliases(user_id, canonical_unit_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_requirements_user_recipe_order ON recipe_ingredient_requirements(user_id, recipe_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_options_requirement_order ON recipe_ingredient_options(requirement_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_option_items_option_order ON recipe_ingredient_option_items(option_id, sort_order, id)")
@@ -1142,6 +1188,520 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_requirement_migration_runs_status_started ON recipe_ingredient_requirement_migration_runs(status, started_at)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_user_recipe ON recipe_equipment(user_id, recipe_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_equipment ON recipe_equipment(equipment_id)")
+
+
+UNIT_REGISTRY_SEED_VERSION = "canonical_units_v1"
+UNIT_REGISTRY_CATEGORIES = (
+    ("volume", "Volume"),
+    ("weight", "Weight"),
+    ("count_package", "Count & Package"),
+    ("optional", "Small Amounts & Optional"),
+)
+UNIT_REGISTRY_CATEGORY_KEYS = frozenset(key for key, _label in UNIT_REGISTRY_CATEGORIES)
+
+
+def clean_unit_registry_text(value):
+    return re.sub(
+        r"\s+",
+        " ",
+        unicodedata.normalize("NFKC", str(value or "")).strip(),
+    )
+
+
+def unit_registry_key(value):
+    value = clean_unit_registry_text(value).lower().replace(".", "")
+    value = re.sub(r"[_-]+", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _workspace_unit_registry_payload_from_connection(connection, user_id):
+    unit_rows = connection.execute(
+        """
+        SELECT id, name, category, is_seeded, sort_order, created_at, updated_at
+          FROM workspace_units
+         WHERE user_id = ?
+         ORDER BY sort_order ASC, normalized_name ASC, id ASC
+        """,
+        (user_id,),
+    ).fetchall()
+    if not unit_rows:
+        return None
+
+    alias_rows = connection.execute(
+        """
+        SELECT canonical_unit_id, alias, normalized_alias
+          FROM workspace_unit_aliases
+         WHERE user_id = ?
+         ORDER BY LENGTH(alias) ASC, normalized_alias ASC
+        """,
+        (user_id,),
+    ).fetchall()
+    aliases_by_id = {}
+    for row in alias_rows:
+        aliases_by_id.setdefault(str(row["canonical_unit_id"]), []).append(
+            str(row["alias"])
+        )
+
+    units = []
+    aliases = {}
+    for row in unit_rows:
+        unit_id = str(row["id"])
+        name = str(row["name"])
+        unit_aliases = aliases_by_id.get(unit_id, [])
+        unit = {
+            "id": unit_id,
+            "name": name,
+            "category": str(row["category"]),
+            "sort_order": int(row["sort_order"] or 0),
+            "seeded": bool(row["is_seeded"]),
+            "custom": not bool(row["is_seeded"]),
+            "aliases": unit_aliases,
+            "updated_at": str(row["updated_at"] or ""),
+        }
+        units.append(unit)
+        aliases[unit_registry_key(name)] = name
+        for alias in unit_aliases:
+            aliases[unit_registry_key(alias)] = name
+
+    return {
+        "units": units,
+        "aliases": aliases,
+        "categories": [
+            {"key": key, "label": label}
+            for key, label in UNIT_REGISTRY_CATEGORIES
+        ],
+    }
+
+
+def read_workspace_unit_registry(user_id=None):
+    """Read a seeded workspace registry without triggering schema recursion."""
+    user_id = str(user_id or "").strip()
+    db_path = recipe_master_db_path()
+    if not user_id or not db_path.is_file():
+        return None
+
+    with RECIPE_MASTER_DB_LOCK:
+        connection = sqlite3.connect(str(db_path), timeout=30)
+        connection.row_factory = sqlite3.Row
+        try:
+            table = connection.execute(
+                """
+                SELECT name FROM sqlite_master
+                 WHERE type = 'table' AND name = 'workspace_units'
+                """
+            ).fetchone()
+            if not table:
+                return None
+            return _workspace_unit_registry_payload_from_connection(connection, user_id)
+        except sqlite3.OperationalError:
+            return None
+        finally:
+            connection.close()
+
+
+def _seed_workspace_unit_registry(connection, user_id):
+    marker = connection.execute(
+        "SELECT seed_version FROM workspace_unit_registry_seeds WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    if marker:
+        return False
+
+    timestamp = utc_now_iso()
+    for unit in canonical_unit_options():
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO workspace_units (
+                user_id, id, name, normalized_name, category, is_seeded,
+                sort_order, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+            """,
+            (
+                user_id,
+                unit["id"],
+                unit["name"],
+                unit_registry_key(unit["name"]),
+                unit["category"],
+                int(unit["sort_order"]),
+                timestamp,
+                timestamp,
+            ),
+        )
+
+    unit_id_by_name = {unit["name"]: unit["id"] for unit in canonical_unit_options()}
+    for alias, canonical_name in canonical_unit_aliases().items():
+        if unit_registry_key(alias) == unit_registry_key(canonical_name):
+            continue
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO workspace_unit_aliases (
+                user_id, canonical_unit_id, alias, normalized_alias,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                unit_id_by_name[canonical_name],
+                clean_unit_registry_text(alias),
+                unit_registry_key(alias),
+                timestamp,
+                timestamp,
+            ),
+        )
+
+    connection.execute(
+        """
+        INSERT INTO workspace_unit_registry_seeds (user_id, seed_version, seeded_at)
+        VALUES (?, ?, ?)
+        """,
+        (user_id, UNIT_REGISTRY_SEED_VERSION, timestamp),
+    )
+    return True
+
+
+def ensure_workspace_unit_registry(user_id=None):
+    user_id = str(user_id or scoped_recipe_user_id()).strip()
+    with recipe_master_connection() as connection:
+        _seed_workspace_unit_registry(connection, user_id)
+        payload = _workspace_unit_registry_payload_from_connection(connection, user_id)
+    from PushShoppingList.services.ingredient_unit_service import clear_unit_registry_cache
+
+    clear_unit_registry_cache()
+    return payload
+
+
+def _unit_registry_validation(connection, user_id, values, unit_id=""):
+    canonical_name = clean_unit_registry_text(values.get("canonical_name") or values.get("name"))
+    category = unit_registry_key(values.get("category")).replace(" ", "_")
+    raw_aliases = values.get("aliases", [])
+    if not isinstance(raw_aliases, list):
+        raw_aliases = []
+
+    errors = {}
+    alias_errors = {}
+    if not canonical_name:
+        errors["canonical_name"] = "Enter a canonical name."
+    elif len(canonical_name) > 60:
+        errors["canonical_name"] = "Canonical names must be 60 characters or fewer."
+    canonical_key = unit_registry_key(canonical_name)
+    if canonical_name and not canonical_key:
+        errors["canonical_name"] = "Enter a canonical name with letters or numbers."
+    if category not in UNIT_REGISTRY_CATEGORY_KEYS:
+        errors["category"] = "Choose a unit category."
+
+    aliases = []
+    alias_keys = set()
+    for index, raw_alias in enumerate(raw_aliases):
+        alias = clean_unit_registry_text(raw_alias)
+        alias_key = unit_registry_key(alias)
+        if not alias:
+            alias_errors[str(index)] = "Aliases cannot be blank."
+        elif len(alias) > 60:
+            alias_errors[str(index)] = "Aliases must be 60 characters or fewer."
+        elif not alias_key:
+            alias_errors[str(index)] = "Enter an alias with letters or numbers."
+        elif alias_key == canonical_key:
+            alias_errors[str(index)] = "The canonical name does not need to be an alias."
+        elif alias_key in alias_keys:
+            alias_errors[str(index)] = "Remove this duplicate alias."
+        else:
+            aliases.append(alias)
+            alias_keys.add(alias_key)
+
+    rows = connection.execute(
+        """
+        SELECT id, name, normalized_name, is_seeded, category
+          FROM workspace_units WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchall()
+    units_by_key = {
+        str(row["normalized_name"]): row
+        for row in rows
+        if str(row["id"]) != unit_id
+    }
+    alias_rows = connection.execute(
+        """
+        SELECT a.canonical_unit_id, a.alias, a.normalized_alias, u.name
+          FROM workspace_unit_aliases a
+          JOIN workspace_units u
+            ON u.user_id = a.user_id AND u.id = a.canonical_unit_id
+         WHERE a.user_id = ?
+        """,
+        (user_id,),
+    ).fetchall()
+    aliases_by_key = {
+        str(row["normalized_alias"]): row
+        for row in alias_rows
+        if str(row["canonical_unit_id"]) != unit_id
+    }
+
+    if canonical_key in units_by_key:
+        errors["canonical_name"] = (
+            f'{units_by_key[canonical_key]["name"]} is already a canonical unit.'
+        )
+    elif canonical_key in aliases_by_key:
+        errors["canonical_name"] = (
+            f'{aliases_by_key[canonical_key]["alias"]} is already an alias for '
+            f'{aliases_by_key[canonical_key]["name"]}.'
+        )
+
+    for index, alias in enumerate(raw_aliases):
+        if str(index) in alias_errors:
+            continue
+        alias_key = unit_registry_key(alias)
+        if alias_key in units_by_key:
+            alias_errors[str(index)] = (
+                f'{units_by_key[alias_key]["name"]} is already a canonical unit.'
+            )
+        elif alias_key in aliases_by_key:
+            alias_errors[str(index)] = (
+                f'{aliases_by_key[alias_key]["alias"]} is already an alias for '
+                f'{aliases_by_key[alias_key]["name"]}.'
+            )
+    if alias_errors:
+        errors["aliases"] = alias_errors
+
+    return {
+        "canonical_name": canonical_name,
+        "canonical_key": canonical_key,
+        "category": category,
+        "aliases": aliases,
+        "alias_keys": alias_keys,
+        "errors": errors,
+    }
+
+
+def _workspace_unit_alias_keys(connection, user_id, unit_id):
+    return {
+        str(row["normalized_alias"])
+        for row in connection.execute(
+            """
+            SELECT normalized_alias FROM workspace_unit_aliases
+             WHERE user_id = ? AND canonical_unit_id = ?
+            """,
+            (user_id, unit_id),
+        ).fetchall()
+    }
+
+
+def save_workspace_unit(values, unit_id="", user_id=None):
+    """Create or edit one scoped unit in a duplicate-safe transaction."""
+    user_id = str(user_id or scoped_recipe_user_id()).strip()
+    unit_id = str(unit_id or "").strip()
+    values = values if isinstance(values, dict) else {}
+    with recipe_master_connection() as connection:
+        _seed_workspace_unit_registry(connection, user_id)
+        existing = None
+        if unit_id:
+            existing = connection.execute(
+                """
+                SELECT id, name, normalized_name, category, is_seeded, sort_order,
+                       created_at, updated_at
+                  FROM workspace_units WHERE user_id = ? AND id = ?
+                """,
+                (user_id, unit_id),
+            ).fetchone()
+            if not existing:
+                return {"ok": False, "status": 404, "error": "Unit not found."}
+
+        validated = _unit_registry_validation(
+            connection,
+            user_id,
+            values,
+            unit_id=unit_id,
+        )
+        if validated["errors"]:
+            if not unit_id and "canonical_name" in validated["errors"]:
+                repeated = connection.execute(
+                    """
+                    SELECT id, category, is_seeded
+                      FROM workspace_units
+                     WHERE user_id = ? AND normalized_name = ?
+                    """,
+                    (user_id, validated["canonical_key"]),
+                ).fetchone()
+                if repeated and not bool(repeated["is_seeded"]):
+                    repeated_aliases = _workspace_unit_alias_keys(
+                        connection,
+                        user_id,
+                        str(repeated["id"]),
+                    )
+                    if (
+                        str(repeated["category"]) == validated["category"]
+                        and repeated_aliases == validated["alias_keys"]
+                    ):
+                        payload = _workspace_unit_registry_payload_from_connection(
+                            connection,
+                            user_id,
+                        )
+                        return {
+                            "ok": True,
+                            "created": False,
+                            "unit_id": str(repeated["id"]),
+                            "message": f'{validated["canonical_name"]} is already saved.',
+                            "registry": payload,
+                        }
+            return {
+                "ok": False,
+                "status": 422,
+                "error": "Correct the highlighted unit fields.",
+                "errors": validated["errors"],
+            }
+
+        timestamp = utc_now_iso()
+        previous_name = str(existing["name"]) if existing else ""
+        previous_keys = {unit_registry_key(previous_name)} if previous_name else set()
+        if existing:
+            previous_keys.update(_workspace_unit_alias_keys(connection, user_id, unit_id))
+            connection.execute(
+                """
+                UPDATE workspace_units
+                   SET name = ?, normalized_name = ?, category = ?, updated_at = ?
+                 WHERE user_id = ? AND id = ?
+                """,
+                (
+                    validated["canonical_name"],
+                    validated["canonical_key"],
+                    validated["category"],
+                    timestamp,
+                    user_id,
+                    unit_id,
+                ),
+            )
+        else:
+            unit_id = f"custom_{uuid.uuid4().hex}"
+            sort_order = int(connection.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workspace_units WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()[0])
+            connection.execute(
+                """
+                INSERT INTO canonical_units (id, name, category, sort_order)
+                VALUES (?, ?, 'custom', ?)
+                """,
+                (unit_id, unit_id, sort_order),
+            )
+            connection.execute(
+                """
+                INSERT INTO workspace_units (
+                    user_id, id, name, normalized_name, category, is_seeded,
+                    sort_order, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    unit_id,
+                    validated["canonical_name"],
+                    validated["canonical_key"],
+                    validated["category"],
+                    sort_order,
+                    timestamp,
+                    timestamp,
+                ),
+            )
+
+        aliases = list(validated["aliases"])
+        if previous_name and unit_registry_key(previous_name) != validated["canonical_key"]:
+            if unit_registry_key(previous_name) not in {unit_registry_key(item) for item in aliases}:
+                aliases.append(previous_name)
+        connection.execute(
+            "DELETE FROM workspace_unit_aliases WHERE user_id = ? AND canonical_unit_id = ?",
+            (user_id, unit_id),
+        )
+        for alias in aliases:
+            connection.execute(
+                """
+                INSERT INTO workspace_unit_aliases (
+                    user_id, canonical_unit_id, alias, normalized_alias,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    unit_id,
+                    alias,
+                    unit_registry_key(alias),
+                    timestamp,
+                    timestamp,
+                ),
+            )
+
+        if existing and previous_name != validated["canonical_name"]:
+            rows = connection.execute(
+                """
+                SELECT id, unit, unit_id FROM recipe_ingredients
+                 WHERE user_id = ? AND (unit_id = ? OR unit_id IS NULL OR unit_id = '')
+                """,
+                (user_id, unit_id),
+            ).fetchall()
+            for row in rows:
+                if str(row["unit_id"] or "") == unit_id or unit_registry_key(row["unit"]) in previous_keys:
+                    connection.execute(
+                        "UPDATE recipe_ingredients SET unit = ?, unit_id = ? WHERE id = ?",
+                        (validated["canonical_name"], unit_id, int(row["id"])),
+                    )
+            option_rows = connection.execute(
+                """
+                SELECT item.id, item.unit, item.unit_id
+                  FROM recipe_ingredient_option_items item
+                  JOIN recipe_ingredient_options option ON option.id = item.option_id
+                  JOIN recipe_ingredient_requirements requirement
+                    ON requirement.id = option.requirement_id
+                 WHERE requirement.user_id = ?
+                   AND (item.unit_id = ? OR item.unit_id IS NULL OR item.unit_id = '')
+                """,
+                (user_id, unit_id),
+            ).fetchall()
+            for row in option_rows:
+                if str(row["unit_id"] or "") == unit_id or unit_registry_key(row["unit"]) in previous_keys:
+                    connection.execute(
+                        "UPDATE recipe_ingredient_option_items SET unit = ?, unit_id = ? WHERE id = ?",
+                        (validated["canonical_name"], unit_id, int(row["id"])),
+                    )
+
+        payload = _workspace_unit_registry_payload_from_connection(connection, user_id)
+
+    from PushShoppingList.services.ingredient_unit_service import clear_unit_registry_cache
+
+    clear_unit_registry_cache()
+    return {
+        "ok": True,
+        "created": not bool(existing),
+        "unit_id": unit_id,
+        "message": (
+            f'{validated["canonical_name"]} added.'
+            if not existing
+            else f'{validated["canonical_name"]} updated.'
+        ),
+        "registry": payload,
+    }
+
+
+def import_workspace_unit_names(values, user_id=None):
+    user_id = str(user_id or scoped_recipe_user_id()).strip()
+    values = values if isinstance(values, list) else []
+    imported = []
+    skipped = []
+    for value in values:
+        name = clean_unit_registry_text(value)
+        if not name:
+            continue
+        result = save_workspace_unit(
+            {"canonical_name": name, "category": "count_package", "aliases": []},
+            user_id=user_id,
+        )
+        if result.get("ok") and result.get("created"):
+            imported.append(name)
+        else:
+            skipped.append({"name": name, "error": result.get("error") or result.get("message")})
+    return {
+        "ok": True,
+        "imported": imported,
+        "skipped": skipped,
+        "message": f"Imported {len(imported)} browser unit{'s' if len(imported) != 1 else ''}.",
+        "registry": ensure_workspace_unit_registry(user_id),
+    }
 
 
 def recipe_master_column_names(connection, table_name):

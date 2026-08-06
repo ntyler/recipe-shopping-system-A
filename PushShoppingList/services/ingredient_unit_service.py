@@ -1,7 +1,8 @@
 """Canonical ingredient-unit registry and deterministic field normalization.
 
-This module is intentionally independent of Flask and recipe extraction so every
-import, editor save, migration, and display surface can share the same rules.
+The normalization rules remain usable without Flask, while request-scoped calls
+read the persistent workspace registry through a lazy adapter. This lets every
+import, editor save, migration, and display surface share the same rules.
 Quantity values are not recalculated here; Unicode fraction typography is only
 normalized to portable slash fractions before unit metadata is processed.
 """
@@ -308,22 +309,93 @@ def canonical_unit_aliases():
     return dict(UNIT_ALIAS_TO_NAME)
 
 
-def unit_registry_payload():
+def _static_unit_registry_payload():
     return {
         "units": canonical_unit_options(),
         "aliases": canonical_unit_aliases(),
     }
 
 
-def canonical_unit(value):
+def clear_unit_registry_cache():
+    """Clear the request-local persistent registry cache after a mutation."""
+    try:
+        from flask import g
+        from flask import has_request_context
+
+        if has_request_context():
+            g.pop("_ingredient_unit_registry_payloads", None)
+    except (ImportError, RuntimeError):
+        pass
+
+
+def unit_registry_payload(user_id=None):
+    """Return the active workspace registry, falling back to the seed data.
+
+    Persistent registry reads are deliberately read-only here. Schema creation
+    and seeding live in ``recipe_master_data_service`` so normalization can run
+    safely while that service is upgrading an older database.
+    """
+    resolved_user_id = str(user_id or "").strip()
+    request_cache = None
+    try:
+        from flask import g
+        from flask import has_request_context
+        from PushShoppingList.services.storage_service import active_guest_session_id
+        from PushShoppingList.services.storage_service import active_user_id
+
+        if not resolved_user_id:
+            resolved_user_id = active_user_id()
+            if not resolved_user_id:
+                guest_id = active_guest_session_id()
+                resolved_user_id = f"guest:{guest_id}" if guest_id else ""
+        if has_request_context():
+            request_cache = g.setdefault("_ingredient_unit_registry_payloads", {})
+            cached = request_cache.get(resolved_user_id)
+            if cached:
+                return cached
+    except (ImportError, RuntimeError):
+        request_cache = None
+
+    payload = None
+    if resolved_user_id:
+        try:
+            from PushShoppingList.services import recipe_master_data_service
+
+            payload = recipe_master_data_service.read_workspace_unit_registry(
+                resolved_user_id
+            )
+        except (ImportError, RuntimeError):
+            payload = None
+
+    payload = payload or _static_unit_registry_payload()
+    if request_cache is not None:
+        request_cache[resolved_user_id] = payload
+    return payload
+
+
+def canonical_unit(value, user_id=None):
     """Return registry metadata for a canonical name or accepted alias."""
-    name = UNIT_ALIAS_TO_NAME.get(_unit_key(value))
-    return dict(CANONICAL_BY_NAME[name]) if name else None
+    registry = unit_registry_payload(user_id=user_id)
+    name = registry.get("aliases", {}).get(_unit_key(value))
+    if not name:
+        return None
+    matched = next(
+        (
+            unit
+            for unit in registry.get("units", [])
+            if _unit_key(unit.get("name")) == _unit_key(name)
+        ),
+        None,
+    )
+    return dict(matched) if matched else None
 
 
 def canonical_unit_alias_pattern():
     """Regex fragment matching accepted aliases, longest first."""
-    aliases = sorted(UNIT_ALIAS_TO_NAME, key=lambda item: (-len(item), item))
+    aliases = sorted(
+        unit_registry_payload().get("aliases", {}),
+        key=lambda item: (-len(item), item),
+    )
     return "(?:" + "|".join(re.escape(alias) + r"\.?" for alias in aliases) + ")"
 
 
@@ -352,8 +424,8 @@ def misplaced_unit_ingredient_details(ingredient, original_text, unit=""):
     original_key = re.sub(r"[^a-z0-9]+", " ", _unit_key(original)).strip()
     matching_aliases = (
         alias
-        for alias, canonical_name in UNIT_ALIAS_TO_NAME.items()
-        if canonical_name == misplaced_unit["name"]
+        for alias, canonical_name in unit_registry_payload().get("aliases", {}).items()
+        if _unit_key(canonical_name) == _unit_key(misplaced_unit["name"])
     )
     if any(re.search(rf"(?:^|\s){re.escape(alias)}(?:$|\s)", original_key) for alias in matching_aliases):
         return None
@@ -410,7 +482,7 @@ def _append_preparation(existing, value):
 
 
 def _set_piece(row):
-    piece = CANONICAL_BY_NAME["piece"]
+    piece = canonical_unit("piece") or CANONICAL_BY_NAME["piece"]
     row["unit"] = piece["name"]
     row["unit_id"] = piece["id"]
 

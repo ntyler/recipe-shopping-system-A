@@ -176,7 +176,7 @@ def test_registered_master_data_pages_accept_exact_matching_viewer(
     assert_private_no_store(response)
 
 
-def test_units_page_renders_the_shared_registry_and_custom_unit_manager(
+def test_units_page_renders_the_persistent_registry_and_unit_editor(
     master_data_app,
 ):
     with master_data_app.test_client() as client:
@@ -192,10 +192,10 @@ def test_units_page_renders_the_shared_registry_and_custom_unit_manager(
     assert soup.title.get_text(strip=True) == "Units"
     assert soup.select_one("[data-unit-master-page]") is not None
     assert soup.select_one("h1#unitsTitle").get_text(strip=True) == "Units"
-    assert soup.select_one("[data-unit-master-add-form]") is not None
-    assert soup.select_one("[data-unit-master-custom-list]") is not None
-    assert soup.select_one("[data-unit-master-custom-empty]") is not None
-    built_in_rows = soup.select("[data-unit-master-built-in-row]")
+    assert soup.select_one("[data-unit-master-add-button]") is not None
+    assert soup.select_one("[data-unit-master-dialog]") is not None
+    assert soup.select_one("[data-unit-master-alias-chips]") is not None
+    built_in_rows = soup.select("[data-unit-master-row]")
     assert len(built_in_rows) == len(unit_registry_payload()["units"])
     assert {row.select_one("strong").get_text(strip=True) for row in built_in_rows} >= {
         "teaspoon",
@@ -211,9 +211,11 @@ def test_units_page_renders_the_shared_registry_and_custom_unit_manager(
     units_script = Path("PushShoppingList/static/js/units.js").read_text(
         encoding="utf-8",
     )
-    assert 'CUSTOM_UNITS_KEY = "recipeIngredientCustomUnits"' in units_script
-    assert "recipeIngredientCustomUnitNames" in units_script
-    assert "storeRecipeIngredientCustomUnitNames" in units_script
+    assert 'LEGACY_CUSTOM_UNITS_KEY = "recipeIngredientCustomUnits"' in units_script
+    assert "legacyUnitNames" in units_script
+    assert 'fetch(root.dataset.createUrl' not in units_script
+    assert "const saveUnit = async event =>" in units_script
+    assert "updateRegistry(result.registry)" in units_script
     assert "data-unit-master-search" in response.get_data(as_text=True)
 
 

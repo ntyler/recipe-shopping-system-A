@@ -570,20 +570,24 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert "function replaceRecipeIngredientCustomUnitName(previousValue, nextValue)" in app_js
     assert "function editRecipeIngredientCustomUnit(button)" in app_js
     assert "function deleteRecipeIngredientCustomUnit(button)" in app_js
-    assert 'const signature = `${sourceText}\\n${JSON.stringify(customNames)}`;' in app_js
+    assert "const signature = sourceText;" in app_js
     assert 'payload = JSON.parse(sourceText || "{}") || payload;' in app_js
-    assert "const units = [...customUnits, ...canonicalUnits];" in app_js
+    assert "const units = Array.isArray(payload.units) ? payload.units : [];" in app_js
+    registry_function = app_js[
+        app_js.index("function recipeIngredientUnitRegistry()") :
+        app_js.index("function recipeIngredientUnitKey")
+    ]
+    assert "customUnits" not in registry_function
+    assert 'fetch("/api/master-data/units"' in app_js
+    assert "function refreshRecipeIngredientUnitRegistry()" in app_js
     assert "if (savedAsCustom && selectedValue)" in app_js
     assert "saveRecipeIngredientCustomUnitName(selectedValue);" in app_js
     assert 'data-unit-action="add-custom"' in app_js
-    assert 'data-unit-action="edit-custom"' in app_js
-    assert 'data-unit-action="delete-custom"' in app_js
+    assert 'data-unit-action="edit-custom"' not in app_js
+    assert 'data-unit-action="delete-custom"' not in app_js
     assert 'class="recipe-edit-unit-menu-list" data-unit-menu-list' in app_js
     assert 'class="recipe-edit-unit-menu-footer"' in app_js
-    assert 'aria-label="Edit custom unit ${escapeAttribute(value)}"' in app_js
-    assert 'aria-label="Delete custom unit ${escapeAttribute(value)}"' in app_js
-    assert "Open ingredient rows using it will be cleared." in app_js
-    assert 'document.querySelectorAll(\'.recipe-edit-ingredient-row [data-field="unit"]\')' in app_js
+    assert 'window.open(masterDataViewerUrl("/admin/master-data/units")' in app_js
     assert "Add custom unit…" in app_js
     assert "Manage Units…" in app_js
     assert 'masterDataViewerUrl("/admin/master-data/units")' in app_js
