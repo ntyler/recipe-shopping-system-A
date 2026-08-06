@@ -54,3 +54,20 @@ The command refuses any other approval phrase. It verifies a SQLite backup and
 per-file JSON hashes before schema installation, checks the legacy equipment
 tables before and after the transaction, leaves application feature flags off,
 and records a source hash so an unchanged rerun is a read-only no-op.
+
+## Approved Phase 3C-1 high-confidence batch
+
+Phase 3C-1 is a separately gated operation. It creates a fresh verified backup,
+checks the exact Phase 3B decision boundary, and applies only the approved
+high-confidence canonicalization inside one transaction:
+
+```powershell
+python scripts/apply_equipment_canonicalization_phase3c1.py --approval PHASE3C1_APPROVED
+```
+
+The command fails closed unless the staged counts and the six explicitly
+verified same-tenant targets match the approved matrix. It preserves every
+pre-existing equipment row and recipe association, creates canonical rows with
+blank image fields, leaves medium-confidence and individual-decision cases
+pending, and keeps all application feature flags disabled. An unchanged rerun
+after completion performs no writes and creates no additional backup.
