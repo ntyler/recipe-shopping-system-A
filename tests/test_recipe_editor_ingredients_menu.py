@@ -6849,7 +6849,9 @@ def test_nested_ingredient_hover_highlights_only_the_visual_row():
     assert 'content: "";' in grouped_surface_rule
     assert "position: absolute;" in grouped_surface_rule
     assert "z-index: -1;" in grouped_surface_rule
-    assert "inset: 0 -12px;" in grouped_surface_rule
+    assert "inset-block: 0;" in grouped_surface_rule
+    assert "inset-inline-start: -12px;" in grouped_surface_rule
+    assert "width: 100cqi;" in grouped_surface_rule
     assert "background: color-mix(" in grouped_surface_rule
     assert "box-shadow: inset 3px 0 0" in grouped_surface_rule
 

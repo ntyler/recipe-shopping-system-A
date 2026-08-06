@@ -73728,7 +73728,9 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         content: "";
         position: absolute;
         z-index: -1;
-        inset: 0 -12px;
+        inset-block: 0;
+        inset-inline-start: -12px;
+        width: 100cqi;
         background: color-mix(in srgb, var(--app-surface-soft) 80%, transparent);
         box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 44%, transparent);
     }
