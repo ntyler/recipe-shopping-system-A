@@ -241,9 +241,8 @@ def validate_master_data_viewer_scope():
 def validate_optional_master_data_viewer_parameter():
     """Reject supplied viewer values that conflict with the signed session.
 
-    Master-data HTML GET routes additionally require the viewer and redirect
-    old/missing URLs below. APIs and mutation actions remain backward
-    compatible when it is absent, while never trusting a supplied value.
+    Master-data URLs derive the viewer from the session. Legacy URLs may still
+    supply the value, but it is never trusted and is removed canonically.
     """
 
     if not (
@@ -1368,6 +1367,8 @@ def master_data_context(record_type, scope_info=None):
             else 4
             if record_type == "ingredients"
             else 6
+            if scope_info["scope"] == "all"
+            else 5
         ),
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},

@@ -35,7 +35,11 @@ function masterDataViewerUrl(rawUrl, values = {}) {
     const viewerUserId = String(
         body && body.dataset.viewerUserId || "",
     ).trim();
-    if (url.origin !== window.location.origin) {
+    const isMasterDataPage = url.origin === window.location.origin && (
+        url.pathname === "/admin/master-data" ||
+        url.pathname.startsWith("/admin/master-data/")
+    );
+    if (url.origin !== window.location.origin || isMasterDataPage) {
         url.searchParams.delete("viewer_user_id");
     } else if (viewerUserId) {
         url.searchParams.set("viewer_user_id", viewerUserId);

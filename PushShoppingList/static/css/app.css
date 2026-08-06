@@ -25822,7 +25822,7 @@ img[data-deferred-src] {
         .master-data-image-form,
         .master-data-filter-form {
             display: grid;
-            grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(140px, 1fr)) auto;
+            grid-template-columns: minmax(220px, 1.6fr) repeat(4, minmax(130px, 1fr)) auto;
             gap: 10px;
             align-items: end;
             padding: 12px;
@@ -26626,6 +26626,11 @@ img[data-deferred-src] {
             margin-top: -2px;
         }
 
+        .master-data-user-filter-field[hidden],
+        .master-data-filter-form .master-data-user-filter-note[hidden] {
+            display: none;
+        }
+
         .master-data-filter-form--ingredients {
             grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(130px, 1fr)) auto;
         }
@@ -26771,7 +26776,7 @@ img[data-deferred-src] {
         }
 
         .master-data-equipment-table {
-            min-width: 1080px;
+            min-width: 900px;
         }
 
         .master-data-ingredients-table {
@@ -26862,7 +26867,7 @@ img[data-deferred-src] {
         }
 
         .master-data-equipment-table th:nth-child(1) {
-            width: 34%;
+            width: 42%;
         }
 
         .master-data-equipment-table th:nth-child(2) {
@@ -26870,18 +26875,39 @@ img[data-deferred-src] {
         }
 
         .master-data-equipment-table th:nth-child(3) {
-            width: 18%;
+            width: 92px;
         }
 
         .master-data-equipment-table th:nth-child(4) {
-            width: 92px;
+            width: 130px;
         }
 
         .master-data-equipment-table th:nth-child(5) {
             width: 130px;
         }
 
-        .master-data-equipment-table th:nth-child(6) {
+        .master-data-equipment-table.master-data-table--show-user {
+            min-width: 1080px;
+        }
+
+        .master-data-equipment-table.master-data-table--show-user th:nth-child(1) {
+            width: 34%;
+        }
+
+        .master-data-equipment-table.master-data-table--show-user th:nth-child(2) {
+            width: 180px;
+        }
+
+        .master-data-equipment-table.master-data-table--show-user th:nth-child(3) {
+            width: 18%;
+        }
+
+        .master-data-equipment-table.master-data-table--show-user th:nth-child(4) {
+            width: 92px;
+        }
+
+        .master-data-equipment-table.master-data-table--show-user th:nth-child(5),
+        .master-data-equipment-table.master-data-table--show-user th:nth-child(6) {
             width: 130px;
         }
 

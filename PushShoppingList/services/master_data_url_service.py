@@ -71,9 +71,9 @@ def clean_master_data_query_parameters(
     pairs.extend(override_pairs)
 
     cleaned = []
-    viewer_user_id = str(viewer_user_id or "")
-    if viewer_user_id:
-        cleaned.append(("viewer_user_id", viewer_user_id))
+    # The active viewer is session-derived. Keep accepting the argument so
+    # existing callers remain compatible, but never expose identity in page
+    # URLs. Incoming legacy values are removed via MASTER_DATA_IDENTITY_QUERY_KEYS.
 
     normalized_scope = str(scope or "mine").strip().lower()
     target_user_id = str(target_user_id or "").strip()

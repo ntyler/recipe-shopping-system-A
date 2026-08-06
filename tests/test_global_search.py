@@ -287,7 +287,7 @@ def test_global_search_typed_group_order_and_header_caps():
     assert page_urls["Import Menus"] == "/#menuUrlPage"
 
 
-def test_master_data_search_candidate_uses_viewer_not_target_identity(monkeypatch, tmp_path):
+def test_master_data_search_candidate_uses_session_scoped_page_url(monkeypatch, tmp_path):
     app, _user_data = configured_app(monkeypatch, tmp_path)
     from flask import session
     from PushShoppingList.services import global_search_service
@@ -306,7 +306,6 @@ def test_master_data_search_candidate_uses_viewer_not_target_identity(monkeypatc
     split = urlsplit(item["url"])
     assert split.path == "/admin/master-data/ingredients"
     assert parse_qsl(split.query) == [
-        ("viewer_user_id", "user-one"),
         ("search", "Café & Honey"),
     ]
     assert "user_id" not in parse_qs(split.query)

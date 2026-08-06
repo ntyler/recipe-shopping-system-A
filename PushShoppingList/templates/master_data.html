@@ -131,7 +131,7 @@
                 {{ row.equipment_section }}
             </td>
         {% endif %}
-        {% if master_data.record_type != 'ingredients' or master_data.scope == 'all' %}
+        {% if master_data.scope == 'all' %}
             <td class="master-data-user-data-cell" data-label="User">
                 <div class="master-data-user-cell">
                     <strong>{{ row.user_identity.display_name }}</strong>
@@ -243,11 +243,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         <form class="master-data-filter-form {% if master_data.record_type == 'ingredients' %}master-data-filter-form--ingredients{% endif %}"
               method="GET"
               action="{{ url_for(master_data.route_endpoint) }}">
-            {% if master_data.viewer_user_id %}
-                <input type="hidden"
-                       name="viewer_user_id"
-                       value="{{ master_data.viewer_user_id }}">
-            {% endif %}
             <label class="master-data-search-field">
                 <span>Search</span>
                 <input type="search"
@@ -264,7 +259,9 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         <option value="user" {% if master_data.scope == 'user' %}selected{% endif %}>Specific user</option>
                     </select>
                 </label>
-                <label class="master-data-user-filter-field">
+                <label class="master-data-user-filter-field"
+                       data-master-target-user-field
+                       {% if master_data.scope != 'user' %}hidden{% endif %}>
                     <span>User</span>
                     <input type="text"
                            name="user_id"
@@ -280,7 +277,10 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         {% endfor %}
                     </datalist>
                 </label>
-                <span id="masterDataUserHint" class="master-data-user-field-note master-data-user-filter-note">
+                <span id="masterDataUserHint"
+                      class="master-data-user-field-note master-data-user-filter-note"
+                      data-master-target-user-note
+                      {% if master_data.scope != 'user' %}hidden{% endif %}>
                     {% if master_data.scope == 'user' and master_data.scope_user.user_id %}
                         {{ master_data.scope_user.label }}
                     {% else %}
@@ -1100,7 +1100,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         <div data-master-record-results>
             {% if master_data.rows %}
                 <div class="master-data-table-wrap">
-                    <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}{% if master_data.store_section %} master-data-table--section-filtered{% endif %}">
+                    <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}{% if master_data.store_section %} master-data-table--section-filtered{% endif %}">
                     <thead>
                         <tr>
                             <th scope="col">Item</th>
@@ -1113,7 +1113,9 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                 <th scope="col">Last Updated</th>
                             {% elif master_data.record_type == 'equipment' %}
                                 <th scope="col">Equipment Type</th>
-                                <th scope="col">User</th>
+                                {% if master_data.scope == 'all' %}
+                                    <th scope="col">User</th>
+                                {% endif %}
                                 <th scope="col">Usage Count</th>
                                 <th scope="col">Updated At</th>
                                 <th scope="col">Created At</th>

@@ -720,6 +720,44 @@ def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch,
     assert '<tr class="master-data-section-row">' not in cookware_html
 
 
+def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        mine_response = client.get("/admin/master-data/equipment")
+        sign_in(client, "admin-user")
+        specific_response = client.get(
+            "/admin/master-data/equipment?scope=user&user_id=user-b",
+        )
+        all_response = client.get("/admin/master-data/equipment?scope=all")
+
+    for response in (mine_response, specific_response, all_response):
+        assert response.status_code == 200
+
+    mine_table = mine_response.get_data(as_text=True).split(
+        '<table class="master-data-table', 1
+    )[1].split("</table>", 1)[0]
+    specific_table = specific_response.get_data(as_text=True).split(
+        '<table class="master-data-table', 1
+    )[1].split("</table>", 1)[0]
+    all_table = all_response.get_data(as_text=True).split(
+        '<table class="master-data-table', 1
+    )[1].split("</table>", 1)[0]
+
+    for single_user_table in (mine_table, specific_table):
+        assert '<th scope="col">User</th>' not in single_user_table
+        assert 'class="master-data-user-data-cell"' not in single_user_table
+        assert 'colspan="5"' in single_user_table
+        assert "master-data-table--show-user" not in single_user_table
+
+    assert '<th scope="col">User</th>' in all_table
+    assert 'class="master-data-user-data-cell"' in all_table
+    assert 'colspan="6"' in all_table
+    assert "master-data-table--show-user" in all_table
+
+
 def test_ingredient_master_store_section_update_is_user_scoped(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     master_data.sync_recipe_master_records(
@@ -771,7 +809,7 @@ def test_ingredient_master_options_are_scoped_for_recipe_editor(monkeypatch, tmp
     assert payload["ok"] is True
     manage_url = urlsplit(payload["manage_url"])
     assert manage_url.path == "/admin/master-data/ingredients"
-    assert parse_qsl(manage_url.query) == [("viewer_user_id", "user-a")]
+    assert parse_qsl(manage_url.query) == []
     assert payload["ingredients"] == [{
         "ingredient_id": payload["ingredients"][0]["ingredient_id"],
         "name": "Tomato",
@@ -844,7 +882,6 @@ def test_ingredient_master_merge_routes_scope_candidates_and_resolve_aliases(mon
     merge_redirect = urlsplit(merge_payload["redirect_url"])
     assert merge_redirect.path == "/admin/master-data/ingredients"
     assert dict(parse_qsl(merge_redirect.query)) == {
-        "viewer_user_id": "user-a",
         "search": "potato",
     }
     assert picker_response.status_code == 200
@@ -1959,10 +1996,10 @@ def test_account_menu_links_to_master_data_pages(monkeypatch, tmp_path):
     assert "Equipment Master Data" in html
     assert ">Units<" in html
     assert "Store Sections" in html
-    assert "/admin/master-data/ingredients?viewer_user_id=user-a" in html
-    assert "/admin/master-data/equipment?viewer_user_id=user-a" in html
-    assert "/admin/master-data/units?viewer_user_id=user-a" in html
-    assert "/admin/master-data/store-sections?viewer_user_id=user-a" in html
+    assert 'href="/admin/master-data/ingredients"' in html
+    assert 'href="/admin/master-data/equipment"' in html
+    assert 'href="/admin/master-data/units"' in html
+    assert 'href="/admin/master-data/store-sections"' in html
 
 
 def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_path):

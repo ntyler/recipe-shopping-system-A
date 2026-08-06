@@ -30,11 +30,6 @@
         return String(value == null ? "" : value);
     }
 
-    function masterDataViewerUserId() {
-        const body = document.body;
-        return text(body && body.dataset.viewerUserId).trim();
-    }
-
     function canonicalMasterDataUrl(rawUrl, values = {}) {
         const url = new URL(rawUrl || window.location.href, window.location.href);
 
@@ -66,12 +61,7 @@
             url.searchParams.delete("page");
         }
 
-        const viewerUserId = masterDataViewerUserId();
-        if (viewerUserId) {
-            url.searchParams.set("viewer_user_id", viewerUserId);
-        } else {
-            url.searchParams.delete("viewer_user_id");
-        }
+        url.searchParams.delete("viewer_user_id");
         return url;
     }
 
@@ -381,8 +371,16 @@
         const targetUser = filterForm.querySelector("[data-master-target-user-filter]");
         if (!scope || !targetUser) return;
         const selectingUser = text(scope.value).trim().toLowerCase() === "user";
+        const targetUserField = filterForm.querySelector("[data-master-target-user-field]");
+        const targetUserNote = filterForm.querySelector("[data-master-target-user-note]");
         targetUser.disabled = !selectingUser;
         targetUser.required = selectingUser;
+        if (targetUserField) {
+            targetUserField.hidden = !selectingUser;
+        }
+        if (targetUserNote) {
+            targetUserNote.hidden = !selectingUser;
+        }
     }
 
     function initMasterDataFilterForm() {

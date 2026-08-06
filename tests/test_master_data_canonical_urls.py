@@ -142,7 +142,7 @@ def canonical_query_from_href(href):
 
 
 @pytest.mark.parametrize("path", MASTER_DATA_PAGES)
-def test_registered_master_data_pages_redirect_missing_viewer_to_canonical_url(
+def test_registered_master_data_pages_derive_viewer_from_session(
     master_data_app,
     path,
 ):
@@ -150,31 +150,30 @@ def test_registered_master_data_pages_redirect_missing_viewer_to_canonical_url(
         sign_in(client, "user-a")
         response = client.get(path)
 
-        assert response.status_code == 302
-        assert_private_no_store(response)
-        redirect_path, pairs = location_parts(response)
-        assert redirect_path == path
-        assert pairs == [("viewer_user_id", "user-a")]
-
-        canonical = client.get(response.headers["Location"])
-
-    assert canonical.status_code == 200
-    assert "Location" not in canonical.headers
-    assert_private_no_store(canonical)
+    assert response.status_code == 200
+    assert "Location" not in response.headers
+    assert response.request.query_string == b""
+    assert_private_no_store(response)
 
 
 @pytest.mark.parametrize("path", MASTER_DATA_PAGES)
-def test_registered_master_data_pages_accept_exact_matching_viewer(
+def test_registered_master_data_pages_remove_legacy_matching_viewer(
     master_data_app,
     path,
 ):
     with master_data_app.test_client() as client:
         sign_in(client, "user-a")
         response = client.get(path, query_string={"viewer_user_id": "user-a"})
+        canonical = client.get(response.headers["Location"])
 
-    assert response.status_code == 200
-    assert "Location" not in response.headers
+    assert response.status_code == 302
+    redirect_path, pairs = location_parts(response)
+    assert redirect_path == path
+    assert pairs == []
     assert_private_no_store(response)
+    assert canonical.status_code == 200
+    assert "Location" not in canonical.headers
+    assert_private_no_store(canonical)
 
 
 def test_units_page_renders_the_persistent_registry_and_unit_editor(
@@ -182,10 +181,7 @@ def test_units_page_renders_the_persistent_registry_and_unit_editor(
 ):
     with master_data_app.test_client() as client:
         sign_in(client, "user-a")
-        response = client.get(
-            "/admin/master-data/units",
-            query_string={"viewer_user_id": "user-a"},
-        )
+        response = client.get("/admin/master-data/units")
 
     assert response.status_code == 200
     assert_private_no_store(response)
@@ -256,7 +252,6 @@ def test_blank_viewer_redirects_and_duplicate_viewer_parameters_are_bad_request(
     blank_path, blank_pairs = location_parts(blank)
     assert blank_path == "/admin/master-data/ingredients"
     assert query_multimap(blank_pairs) == {
-        "viewer_user_id": ["user-a"],
         "search": ["butter"],
     }
     assert_private_no_store(blank)
@@ -289,6 +284,7 @@ def test_complex_query_values_are_preserved_and_encoded_exactly_once(master_data
                 "store_section": "SPICES & SEASONINGS",
                 "sort": "name_asc",
                 "limit": "250",
+                "scope": "mine",
             },
         )
 
@@ -297,7 +293,6 @@ def test_complex_query_values_are_preserved_and_encoded_exactly_once(master_data
     params = query_multimap(pairs)
     assert path == "/admin/master-data/ingredients"
     assert params == {
-        "viewer_user_id": ["user-a"],
         "search": [search],
         "store_section": ["SPICES & SEASONINGS"],
         "sort": ["name_asc"],
@@ -321,7 +316,6 @@ def test_canonical_cleanup_removes_blank_and_redundant_parameters(master_data_ap
         params = query_multimap(pairs)
         assert path == "/admin/master-data/ingredients"
         assert params == {
-            "viewer_user_id": ["user-a"],
             "search": ["butter"],
             "sort": ["updated_at_desc"],
             "limit": ["100"],
@@ -360,7 +354,7 @@ def test_normal_user_scope_spoof_is_canonicalized_to_own_workspace(
         path, pairs = location_parts(response)
         params = query_multimap(pairs)
         assert path == "/admin/master-data/ingredients"
-        assert params.get("viewer_user_id") == ["user-a"]
+        assert "viewer_user_id" not in params
         assert "scope" not in params
         assert "user_id" not in params
         assert_private_no_store(response)
@@ -378,16 +372,13 @@ def test_admin_mine_specific_user_and_all_scopes_remain_distinct(master_data_app
     seed_workspace_records()
     with master_data_app.test_client() as client:
         sign_in(client, "admin-user")
-        mine = client.get(
-            "/admin/master-data/ingredients?viewer_user_id=admin-user",
-        )
+        mine = client.get("/admin/master-data/ingredients")
         user = client.get(
             "/admin/master-data/ingredients"
-            "?viewer_user_id=admin-user&scope=user&user_id=user-b",
+            "?scope=user&user_id=user-b",
         )
         all_users = client.get(
-            "/admin/master-data/ingredients"
-            "?viewer_user_id=admin-user&scope=all",
+            "/admin/master-data/ingredients?scope=all",
         )
 
     mine_html = mine.get_data(as_text=True)
@@ -423,7 +414,6 @@ def test_admin_legacy_target_bookmark_redirects_to_explicit_user_scope(
     path, pairs = location_parts(response)
     assert path == "/admin/master-data/equipment"
     assert query_multimap(pairs) == {
-        "viewer_user_id": ["admin-user"],
         "scope": ["user"],
         "user_id": ["user-b"],
         "search": ["whisk"],
@@ -444,7 +434,7 @@ def test_store_section_page_discards_irrelevant_admin_target_scope(
     assert response.status_code == 302
     path, pairs = location_parts(response)
     assert path == "/admin/master-data/store-sections"
-    assert pairs == [("viewer_user_id", "admin-user")]
+    assert pairs == []
     assert_private_no_store(response)
 
 
@@ -473,7 +463,7 @@ def test_viewer_id_never_replaces_admin_target_workspace(master_data_app):
         sign_in(client, "admin-user")
         response = client.get(
             "/admin/master-data/ingredients"
-            "?viewer_user_id=admin-user&scope=user&user_id=user-b",
+            "?scope=user&user_id=user-b",
         )
         mismatched_viewer = client.get(
             "/admin/master-data/ingredients"
@@ -534,7 +524,6 @@ def test_canonical_redirect_completes_once_without_a_loop(master_data_app):
     assert response.history[0].status_code == 302
     assert response.request.path == "/admin/master-data/ingredients"
     assert parse_qsl(response.request.query_string.decode("utf-8")) == [
-        ("viewer_user_id", "user-a"),
         ("search", "butter"),
     ]
     assert_private_no_store(response.history[0])
@@ -546,16 +535,13 @@ def test_filter_forms_only_submit_target_user_for_explicit_user_scope(
 ):
     with master_data_app.test_client() as client:
         sign_in(client, "admin-user")
-        mine = client.get(
-            "/admin/master-data/ingredients?viewer_user_id=admin-user",
-        )
+        mine = client.get("/admin/master-data/ingredients")
         all_users = client.get(
-            "/admin/master-data/ingredients"
-            "?viewer_user_id=admin-user&scope=all",
+            "/admin/master-data/ingredients?scope=all",
         )
         specific = client.get(
             "/admin/master-data/ingredients"
-            "?viewer_user_id=admin-user&scope=user&user_id=user-b",
+            "?scope=user&user_id=user-b",
         )
 
     for response in (mine, all_users, specific):
@@ -565,24 +551,29 @@ def test_filter_forms_only_submit_target_user_for_explicit_user_scope(
             "html.parser",
         ).select_one("form.master-data-filter-form")
         viewer = form.find("input", attrs={"name": "viewer_user_id"})
-        assert viewer is not None
-        assert viewer.get("value") == "admin-user"
+        assert viewer is None
 
         target = form.find(attrs={"name": "user_id"})
+        target_field = form.select_one("[data-master-target-user-field]")
+        target_note = form.select_one("[data-master-target-user-note]")
         if response is specific:
             assert target is not None
             assert target.get("value") == "user-b"
             assert not target.has_attr("disabled")
+            assert not target_field.has_attr("hidden")
+            assert not target_note.has_attr("hidden")
         else:
             assert target is None or target.has_attr("disabled")
+            assert target_field.has_attr("hidden")
+            assert target_note.has_attr("hidden")
 
 
-def test_page_tabs_keep_canonical_viewer_and_admin_target_scope(master_data_app):
+def test_page_tabs_keep_canonical_admin_target_scope(master_data_app):
     with master_data_app.test_client() as client:
         sign_in(client, "admin-user")
         response = client.get(
             "/admin/master-data/ingredients"
-            "?viewer_user_id=admin-user&scope=user&user_id=user-b",
+            "?scope=user&user_id=user-b",
         )
 
     assert response.status_code == 200
@@ -599,10 +590,9 @@ def test_page_tabs_keep_canonical_viewer_and_admin_target_scope(master_data_app)
         }:
             # These definitions belong to one session/browser workspace and do
             # not have a coherent aggregate/all-users view.
-            assert params == {"viewer_user_id": ["admin-user"]}
+            assert params == {}
         else:
             assert params == {
-                "viewer_user_id": ["admin-user"],
                 "scope": ["user"],
                 "user_id": ["user-b"],
             }
@@ -615,7 +605,6 @@ def test_pagination_links_preserve_state_and_remove_page_one(master_data_app):
         first = client.get(
             "/admin/master-data/ingredients",
             query_string={
-                "viewer_user_id": "user-a",
                 "search": "a",
                 "sort": "name_asc",
                 "limit": "1",
@@ -643,7 +632,6 @@ def test_pagination_links_preserve_state_and_remove_page_one(master_data_app):
     assert first.status_code == 200
     assert next_path == "/admin/master-data/ingredients"
     assert next_params == {
-        "viewer_user_id": ["user-a"],
         "search": ["a"],
         "sort": ["name_asc"],
         "limit": ["1"],
@@ -653,7 +641,6 @@ def test_pagination_links_preserve_state_and_remove_page_one(master_data_app):
     assert "Location" not in second.headers
     assert previous_path == "/admin/master-data/ingredients"
     assert previous_params == {
-        "viewer_user_id": ["user-a"],
         "search": ["a"],
         "sort": ["name_asc"],
         "limit": ["1"],
@@ -671,7 +658,7 @@ def test_store_section_mutation_redirect_is_canonical(master_data_app):
         assert response.status_code == 302
         path, pairs = location_parts(response)
         assert path == "/admin/master-data/store-sections"
-        assert pairs == [("viewer_user_id", "user-a")]
+        assert pairs == []
         assert_private_no_store(response)
 
         rendered = client.get(response.headers["Location"])
@@ -702,7 +689,6 @@ def test_ingredient_mutation_cleans_return_redirect(master_data_app):
     path, pairs = location_parts(response)
     assert path == "/admin/master-data/ingredients"
     assert query_multimap(pairs) == {
-        "viewer_user_id": ["user-a"],
         "search": ["tomato"],
     }
     assert_private_no_store(response)
@@ -737,7 +723,7 @@ def test_master_data_json_gets_are_no_store_and_emit_canonical_management_links(
         options.get_json()["manage_url"],
     )
     assert options_path == "/admin/master-data/ingredients"
-    assert options_params == {"viewer_user_id": ["user-a"]}
+    assert options_params == {}
 
     assert usage.status_code == 200
     assert_private_no_store(usage)
@@ -750,12 +736,12 @@ def test_master_data_json_gets_are_no_store_and_emit_canonical_management_links(
     for href in ingredient_links:
         path, params = canonical_query_from_href(href)
         assert path == "/admin/master-data/ingredients"
-        assert params["viewer_user_id"] == ["user-a"]
+        assert "viewer_user_id" not in params
         assert params["store_section"] == ["PRODUCE"]
         assert params["sort"] == ["name_asc"]
 
 
-def test_javascript_navigation_uses_shared_canonical_viewer_url_builders():
+def test_javascript_navigation_keeps_master_data_page_urls_userless():
     app_script = Path("PushShoppingList/static/js/app.js").read_text(
         encoding="utf-8",
     )
@@ -772,6 +758,7 @@ def test_javascript_navigation_uses_shared_canonical_viewer_url_builders():
     assert 'href="/admin/master-data/store-sections"' not in app_script
     assert 'href="/admin/master-data/units"' not in app_script
     assert 'url.searchParams.set("viewer_user_id", viewerUserId)' in app_script
+    assert 'url.pathname.startsWith("/admin/master-data/")' in app_script
 
     assert (
         "function canonicalMasterDataUrl(rawUrl, values = {})"
@@ -779,9 +766,10 @@ def test_javascript_navigation_uses_shared_canonical_viewer_url_builders():
     )
     assert "function filterRedirectUrl(filterForm)" in master_script
     assert "function initMasterDataFilterForm()" in master_script
-    assert "body.dataset.viewerUserId" in master_script
-    assert "body.dataset.viewerUserId || body.dataset.userId" not in master_script
+    assert 'url.searchParams.delete("viewer_user_id");' in master_script
+    assert "body.dataset.viewerUserId" not in master_script
     assert "targetUser.disabled = !selectingUser;" in master_script
+    assert "targetUserField.hidden = !selectingUser;" in master_script
     assert (
         "window.location.assign(filterRedirectUrl(filterForm));"
         in master_script

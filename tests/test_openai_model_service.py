@@ -140,9 +140,7 @@ def test_openai_usage_master_data_links_include_the_authenticated_viewer(monkeyp
         session["user_id"] = "viewer-user"
         usage = models.openai_model_usage("OPENAI_INGREDIENT_REVIEW_MODEL")
 
-    assert usage["href"] == (
-        "/admin/master-data/ingredients?viewer_user_id=viewer-user"
-    )
+    assert usage["href"] == "/admin/master-data/ingredients"
 
 
 def test_dashboard_registry_covers_model_variables_referenced_by_the_application(monkeypatch, tmp_path):
