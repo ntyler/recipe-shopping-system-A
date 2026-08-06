@@ -64828,6 +64828,13 @@ body.recipe-edit-standalone-page :is(
     padding: 11px 12px;
 }
 
+.equipment-master-category .master-data-table th {
+    padding: 10px 12px;
+    border-bottom-color: var(--app-border);
+    background: transparent;
+    color: var(--app-muted);
+}
+
 .equipment-master-category .master-data-record-row > td {
     vertical-align: middle;
 }

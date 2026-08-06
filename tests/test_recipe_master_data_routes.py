@@ -1956,6 +1956,20 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "overflow-x: clip;" in css
 
 
+def test_equipment_registry_header_uses_the_units_surface_treatment():
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    selector = ".equipment-master-category .master-data-table th {"
+    rule_start = css.index(selector)
+    rule = css[rule_start:css.index("}", rule_start)]
+
+    assert "padding: 10px 12px;" in rule
+    assert "border-bottom-color: var(--app-border);" in rule
+    assert "background: transparent;" in rule
+    assert "color: var(--app-muted);" in rule
+    assert "#0b1420" not in rule
+
+
 def test_master_data_duplicate_review_ui_is_wired():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
