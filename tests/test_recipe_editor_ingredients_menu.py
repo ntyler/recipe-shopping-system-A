@@ -4886,7 +4886,7 @@ def test_master_ingredient_selection_batches_field_updates_before_one_summary_re
     assert selection.count("updateRecipeIngredientSummary(") == 4
 
 
-def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional_state():
+def test_recipe_editor_type_picker_uses_workspace_registry_and_drives_optional_state():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -4894,10 +4894,13 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert "const RECIPE_INGREDIENT_BUILT_IN_TYPES = [" in script
     for value in ("main", "optional", "garnish", "topping", "sauce", "substitute"):
         assert f'{{ value: "{value}"' in script
+    assert "function recipeIngredientTypeRegistry()" in script
+    assert 'document.getElementById("ingredientTypeConfig")' in script
     assert "function recipeIngredientCustomTypeNames()" in script
-    assert "function storeRecipeIngredientCustomTypeNames(values)" in script
-    assert "function saveRecipeIngredientCustomTypeName(value)" in script
-    assert "function replaceRecipeIngredientCustomTypeName(previousValue, nextValue)" in script
+    assert "async function saveRecipeIngredientCustomTypeName(value)" in script
+    assert 'masterDataViewerUrl("/api/master-data/types")' in script
+    assert "function refreshRecipeIngredientTypeRegistryFromServer()" in script
+    assert 'window.addEventListener("focus"' in script
     assert "function refreshRecipeIngredientTypeSelectOptions(scope = document)" in script
     assert 'data-custom="${type.custom ? "true" : "false"}"' in script
 
@@ -4912,41 +4915,15 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert 'class="recipe-edit-type-option-dot${recipeIngredientTypeDotClassModifier(value)}"' in script
     assert 'data-type-trigger-dot' not in script
     assert 'trigger.querySelector("[data-type-trigger-dot]")' not in script
-    assert "if (!custom)" in script
     assert 'data-type-action="add-custom"' in script
-    assert 'data-type-action="edit-custom"' in script
-    assert 'data-type-action="delete-custom"' in script
-    assert 'data-type-action="manage"' in script
     assert "Add custom type…" in script
     assert "Manage Types…" in script
-    assert 'aria-controls="recipeIngredientTypeManager"' in script
-    assert 'onclick="return openRecipeIngredientTypeManager(this)"' in script
-    assert 'aria-label="Edit custom type ${escapeAttribute(value)}"' in script
-    assert 'aria-label="Delete custom type ${escapeAttribute(value)}"' in script
-    assert "function ensureRecipeIngredientTypeManager()" in script
-    assert "function renderRecipeIngredientTypeManager(dialog)" in script
-    assert "function openRecipeIngredientTypeManager(button)" in script
-    assert "function closeRecipeIngredientTypeManager(button)" in script
-    assert 'dialog.id = "recipeIngredientTypeManager";' in script
-    assert 'dialog.setAttribute("aria-labelledby", "recipeIngredientTypeManagerTitle");' in script
-    assert 'dialog.showModal();' in script
-    assert 'id="recipeIngredientBuiltInTypesTitle"' in script
-    assert 'id="recipeIngredientCustomTypesTitle"' in script
-    assert "No custom types yet." in script
-    assert "function addRecipeIngredientCustomType(button)" in script
-    assert "function editRecipeIngredientCustomType(button)" in script
-    assert "function deleteRecipeIngredientCustomType(button)" in script
-    assert "recipeIngredientBuiltInType(currentName)" in script
-
-    replace_start = script.index("function replaceRecipeIngredientCustomTypeName")
-    replace_end = script.index("function syncRecipeIngredientTypeControl", replace_start)
-    replace = script[replace_start:replace_end]
-    assert "document.querySelectorAll('select[data-field=\"section\"]')" in replace
-    assert 'select.dispatchEvent(new Event("change", { bubbles: true }));' in replace
-    assert 'snapshot.section = replacement;' in replace
-    assert 'snapshot.optional = replacement === "optional";' in replace
-    assert ': storedNames.find(name => recipeIngredientTypeKey(name) === recipeIngredientTypeKey(nextName)) || "main"' in replace
-    assert "Open ingredient rows using it will be changed to Main." in script
+    assert 'href="${escapeAttribute(masterDataViewerUrl("/admin/master-data/types"))}"' in script
+    assert 'target="_blank"' in script
+    assert 'rel="noopener"' in script
+    assert 'aria-label="Manage Types in a new tab"' in script
+    assert "async function addRecipeIngredientCustomType(button)" in script
+    assert "function ensureRecipeIngredientTypeManager()" not in script
 
     assert "function bindRecipeIngredientTypeControls(scope)" in script
     assert "function createRecipeIngredientTypeTrigger(select, options = {})" in script
@@ -4996,10 +4973,7 @@ def test_recipe_editor_type_picker_supports_custom_type_crud_and_drives_optional
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot.is-optional" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-option-dot.is-custom" in css
-    assert ".recipe-edit-type-menu .recipe-edit-type-custom-row" in css
     assert ".recipe-edit-type-menu .recipe-edit-type-manage-option" in css
-    assert ".recipe-edit-type-manager::backdrop" in css
-    assert ".recipe-edit-type-manager-row-actions" in css
     assert ".recipe-edit-ingredient-type-summary" in css
     assert ".recipe-edit-ingredient-type-summary > .recipe-edit-type-trigger" in css
     assert 'border: 1px solid transparent;' in css

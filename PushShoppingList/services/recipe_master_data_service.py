@@ -753,6 +753,32 @@ def ensure_recipe_master_schema(connection=None):
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS workspace_ingredient_types (
+            user_id TEXT NOT NULL,
+            id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL,
+            is_seeded INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(user_id, id),
+            UNIQUE(user_id, normalized_name)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workspace_ingredient_type_registry_seeds (
+            user_id TEXT PRIMARY KEY,
+            seed_version TEXT NOT NULL,
+            seeded_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS ingredients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -922,6 +948,7 @@ def ensure_recipe_master_schema(connection=None):
             store_section_reason TEXT NOT NULL DEFAULT '',
             store_section_rule TEXT NOT NULL DEFAULT '',
             original_recipe_text TEXT NOT NULL DEFAULT '',
+            ingredient_type TEXT NOT NULL DEFAULT 'main',
             optional INTEGER NOT NULL DEFAULT 0,
             sort_order INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE,
@@ -1001,6 +1028,7 @@ def ensure_recipe_master_schema(connection=None):
             store_section_reason TEXT NOT NULL DEFAULT '',
             store_section_rule TEXT NOT NULL DEFAULT '',
             original_recipe_text TEXT NOT NULL DEFAULT '',
+            ingredient_type TEXT NOT NULL DEFAULT 'main',
             optional INTEGER NOT NULL DEFAULT 0,
             sort_order INTEGER NOT NULL DEFAULT 0,
             metadata_json TEXT NOT NULL DEFAULT '{}',
@@ -1137,12 +1165,22 @@ def ensure_recipe_master_schema(connection=None):
         "classifier_version": "TEXT NOT NULL DEFAULT ''",
         "store_section_reason": "TEXT NOT NULL DEFAULT ''",
         "store_section_rule": "TEXT NOT NULL DEFAULT ''",
+        "ingredient_type": "TEXT NOT NULL DEFAULT 'main'",
     }
     for column_name, column_definition in recipe_ingredient_column_definitions.items():
         if column_name not in recipe_ingredient_columns:
             connection.execute(
                 f"ALTER TABLE recipe_ingredients ADD COLUMN {column_name} {column_definition}"
             )
+    option_item_columns = recipe_master_column_names(
+        connection,
+        "recipe_ingredient_option_items",
+    )
+    if "ingredient_type" not in option_item_columns:
+        connection.execute(
+            "ALTER TABLE recipe_ingredient_option_items "
+            "ADD COLUMN ingredient_type TEXT NOT NULL DEFAULT 'main'"
+        )
     duplicate_review_columns = recipe_master_column_names(
         connection,
         "ingredient_duplicate_reviews",
@@ -1180,11 +1218,15 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_unit ON recipe_ingredients(unit_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_units_user_order ON workspace_units(user_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_unit_aliases_unit ON workspace_unit_aliases(user_id, canonical_unit_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_ingredient_types_user_order ON workspace_ingredient_types(user_id, sort_order, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_ingredient_types_user_active ON workspace_ingredient_types(user_id, is_active, sort_order)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_requirements_user_recipe_order ON recipe_ingredient_requirements(user_id, recipe_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_options_requirement_order ON recipe_ingredient_options(requirement_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_option_items_option_order ON recipe_ingredient_option_items(option_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_option_items_ingredient ON recipe_ingredient_option_items(ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_option_items_unit ON recipe_ingredient_option_items(unit_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_type ON recipe_ingredients(user_id, ingredient_type)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_option_items_type ON recipe_ingredient_option_items(ingredient_type)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_requirement_sync_synced ON recipe_ingredient_requirement_sync(synced_at)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_requirement_migration_runs_status_started ON recipe_ingredient_requirement_migration_runs(status, started_at)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_equipment_user_recipe ON recipe_equipment(user_id, recipe_id)")
@@ -6738,6 +6780,11 @@ def ingredient_rows_from_sources(
                         "store_section_rule": "manual.master_data",
                     })
             optional = truthy(item.get("optional"))
+            ingredient_type = clean_text(
+                item.get("section")
+                or item.get("ingredient_type")
+                or item.get("type")
+            ) or ("optional" if optional else "main")
             image_url, image_path = compact_image_fields(item, "ingredient_image_url", "image_url")
         else:
             ingredient_id = 0
@@ -6767,6 +6814,7 @@ def ingredient_rows_from_sources(
                 "store_section_rule": "",
             }
             optional = False
+            ingredient_type = "main"
             image_url = ""
             image_path = ""
 
@@ -6804,6 +6852,7 @@ def ingredient_rows_from_sources(
             "store_section_reason": classification.get("store_section_reason") or "",
             "store_section_rule": classification.get("store_section_rule") or "",
             "original_recipe_text": original_text,
+            "ingredient_type": ingredient_type,
             "optional": optional,
             "sort_order": index,
             "image_url": image_url,
@@ -7431,9 +7480,9 @@ def _sync_recipe_master_records_with_connection(
                     store_section_source, store_section_confidence,
                     store_section_user_confirmed, classifier_version,
                     store_section_reason, store_section_rule,
-                    original_recipe_text, optional, sort_order
+                    original_recipe_text, ingredient_type, optional, sort_order
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -7462,6 +7511,7 @@ def _sync_recipe_master_records_with_connection(
                     row.get("store_section_reason", ""),
                     row.get("store_section_rule", ""),
                     row.get("original_recipe_text", ""),
+                    row.get("ingredient_type", "main"),
                     1 if row.get("optional") else 0,
                     int(row.get("sort_order") or 0),
                 ),

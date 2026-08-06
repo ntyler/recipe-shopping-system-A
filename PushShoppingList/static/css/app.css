@@ -53860,6 +53860,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-type-trigge
     font: inherit;
     font-size: 11px;
     text-align: left;
+    text-decoration: none;
     cursor: pointer;
 }
 
@@ -64332,6 +64333,121 @@ body.recipe-edit-standalone-page :is(
     .unit-master-usage-recipe > header {
         align-items: flex-start;
         flex-direction: column;
+    }
+}
+
+/* Type master data: workspace ingredient-role registry. */
+.type-master-category {
+    margin-top: 16px;
+}
+
+.type-master-table > .unit-master-table-head,
+.type-master-table .unit-master-row {
+    grid-template-columns: minmax(180px, 1fr) minmax(90px, .55fr) 130px 90px 58px;
+}
+
+.type-master-status-badge {
+    display: inline-flex;
+    justify-content: center;
+    padding: 4px 7px;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 54%, var(--app-border));
+    border-radius: 999px;
+    color: var(--app-primary);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.type-master-status-badge.is-inactive {
+    border-color: var(--app-border);
+    color: var(--app-muted);
+}
+
+.type-master-editor-fields {
+    display: grid;
+    gap: 15px;
+}
+
+.type-master-availability {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    padding: 13px 14px;
+    border: 1px solid var(--app-border);
+    border-radius: 9px;
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
+    cursor: pointer;
+}
+
+.type-master-page .type-master-availability > input[type="checkbox"] {
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    min-height: 18px;
+    margin: 1px 0 0;
+    accent-color: var(--app-primary);
+}
+
+.type-master-availability > span {
+    display: grid;
+    gap: 4px;
+}
+
+.type-master-availability strong {
+    font-size: 12px;
+}
+
+.type-master-availability small {
+    color: var(--app-muted);
+    font-size: 10px;
+    line-height: 1.4;
+}
+
+.type-master-editor .type-master-footer-spacer {
+    flex: 1 1 auto;
+}
+
+@media (max-width: 760px) {
+    .type-master-table .unit-master-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 9px;
+    }
+
+    .type-master-table .unit-master-row > strong {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .type-master-table .unit-master-usage {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .type-master-table .unit-master-source-badge {
+        grid-column: 1;
+        grid-row: 3;
+        justify-self: start;
+    }
+
+    .type-master-table .type-master-status-badge {
+        grid-column: 2;
+        grid-row: 2;
+    }
+
+    .type-master-table .unit-master-edit-button {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .type-master-editor > footer {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .type-master-editor > footer .type-master-delete,
+    .type-master-editor > footer .type-master-footer-spacer {
+        grid-column: 1 / -1;
     }
 }
 

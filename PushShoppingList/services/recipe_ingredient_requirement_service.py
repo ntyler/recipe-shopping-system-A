@@ -78,6 +78,8 @@ ITEM_RELATIONAL_FIELDS = {
     "store_section_rule",
     "original_recipe_text",
     "original_text",
+    "section",
+    "ingredient_type",
     "optional",
     "sort_order",
 }
@@ -590,6 +592,10 @@ def _legacy_item_from_domain(item):
         "store_section_reason": clean_text(item.get("store_section_reason")),
         "store_section_rule": clean_text(item.get("store_section_rule")),
         "original_text": _preserved_text(item.get("original_recipe_text")),
+        "section": clean_text(
+            item.get("ingredient_type")
+            or item.get("section")
+        ) or ("optional" if item.get("optional") else "main"),
         "optional": bool(item.get("optional")),
     })
     if "legacy_raw_name" in component_compatibility:
@@ -652,6 +658,7 @@ def _legacy_item_from_domain(item):
             "store_section_reason": {"store_section_reason"},
             "store_section_rule": {"store_section_rule"},
             "original_text": {"original_text", "original_recipe_text"},
+            "section": {"section", "ingredient_type", "type"},
             "optional": {"optional"},
         }
         for output_field, source_fields in output_sources.items():
@@ -908,6 +915,16 @@ def _normalized_option_item(connection, user_id, item, sort_order):
             or item.get("original_text")
             or row.get("original_recipe_text")
         ),
+        "ingredient_type": clean_text(
+            row.get("ingredient_type")
+            or item.get("section")
+            or item.get("ingredient_type")
+            or item.get("type")
+        ) or (
+            "optional"
+            if bool(row.get("optional") or truthy(item.get("optional")))
+            else "main"
+        ),
         "optional": bool(row.get("optional") or truthy(item.get("optional"))),
         "sort_order": int(sort_order),
         "metadata_json": _json_dump(_item_metadata(item)),
@@ -1046,10 +1063,10 @@ def _save_requirements_with_connection(
                         store_section_source, store_section_confidence,
                         store_section_user_confirmed, classifier_version,
                         store_section_reason, store_section_rule,
-                        original_recipe_text, optional, sort_order,
+                        original_recipe_text, ingredient_type, optional, sort_order,
                         metadata_json, created_at, updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         option_row_id,
@@ -1078,6 +1095,7 @@ def _save_requirements_with_connection(
                         normalized["store_section_reason"],
                         normalized["store_section_rule"],
                         normalized["original_recipe_text"],
+                        normalized["ingredient_type"],
                         1 if normalized["optional"] else 0,
                         normalized["sort_order"],
                         normalized["metadata_json"],

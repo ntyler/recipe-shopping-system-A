@@ -18,6 +18,7 @@ MASTER_DATA_PAGES = (
     "/admin/master-data/ingredients",
     "/admin/master-data/equipment",
     "/admin/master-data/units",
+    "/admin/master-data/types",
     "/admin/master-data/store-sections",
 )
 
@@ -587,11 +588,15 @@ def test_page_tabs_keep_canonical_viewer_and_admin_target_scope(master_data_app)
     assert response.status_code == 200
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
     tab_links = soup.select("nav.master-data-tabs a[href]")
-    assert len(tab_links) == 4
+    assert len(tab_links) == len(MASTER_DATA_PAGES)
     assert {urlsplit(link["href"]).path for link in tab_links} == set(MASTER_DATA_PAGES)
     for link in tab_links:
         path, params = canonical_query_from_href(link["href"])
-        if path in {"/admin/master-data/store-sections", "/admin/master-data/units"}:
+        if path in {
+            "/admin/master-data/store-sections",
+            "/admin/master-data/units",
+            "/admin/master-data/types",
+        }:
             # These definitions belong to one session/browser workspace and do
             # not have a coherent aggregate/all-users view.
             assert params == {"viewer_user_id": ["admin-user"]}

@@ -40,6 +40,7 @@ from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.extraction_progress_service import update_menu_recipe_step
 from PushShoppingList.services.file_lock_service import workspace_write_lock
 from PushShoppingList.services.ingredient_unit_service import unit_registry_payload
+from PushShoppingList.services.ingredient_type_service import ingredient_type_registry_payload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_cover_image_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
@@ -3668,6 +3669,7 @@ def edit_recipe_page_route():
         current_recipe_count=0,
         cookbook_view=recipe_edit_cookbook_view(),
         ingredient_unit_config=unit_registry_payload(),
+        ingredient_type_config=ingredient_type_registry_payload(),
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
     )
