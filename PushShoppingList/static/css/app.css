@@ -63495,6 +63495,45 @@ body.recipe-edit-standalone-page :is(
     gap: 12px;
 }
 
+.unit-master-ai-assist {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--app-info, #60a5fa) 42%, var(--app-border));
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--app-info, #60a5fa) 7%, var(--app-surface-soft));
+}
+
+.unit-master-ai-assist > div {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.unit-master-ai-assist > div > span {
+    color: var(--app-info, #60a5fa);
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.unit-master-ai-assist strong {
+    color: var(--app-text-strong);
+    font-size: 12px;
+}
+
+.unit-master-ai-suggest {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.unit-master-ai-suggest > span:first-child {
+    font-size: 12px;
+}
+
 .unit-master-field-error {
     color: var(--app-danger);
     font-size: 10px;
@@ -63576,6 +63615,19 @@ body.recipe-edit-standalone-page :is(
     font-weight: 750;
 }
 
+.unit-master-editor-feedback[data-status="success"] {
+    border-color: color-mix(in srgb, var(--app-primary) 56%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary) 9%, transparent);
+    color: var(--app-primary);
+}
+
+.unit-master-editor-feedback[data-status="warning"],
+.unit-master-editor-feedback[data-status="pending"] {
+    border-color: color-mix(in srgb, var(--app-warning, #f59e0b) 52%, var(--app-border));
+    background: color-mix(in srgb, var(--app-warning, #f59e0b) 8%, transparent);
+    color: var(--app-warning, #f59e0b);
+}
+
 .unit-master-editor > footer {
     justify-content: flex-end;
 }
@@ -63636,6 +63688,15 @@ body.recipe-edit-standalone-page :is(
     .unit-master-editor-grid,
     .unit-master-alias-entry {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .unit-master-ai-assist {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .unit-master-ai-suggest {
+        width: 100%;
     }
 
     .unit-master-editor > footer button,

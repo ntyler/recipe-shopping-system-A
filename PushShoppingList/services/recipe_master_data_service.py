@@ -1472,6 +1472,43 @@ def _unit_registry_validation(connection, user_id, values, unit_id=""):
     }
 
 
+def validate_workspace_unit_candidate(values, unit_id="", user_id=None):
+    """Validate a unit draft without saving it.
+
+    This keeps AI-assisted drafts and normal form submissions on exactly the
+    same normalization and collision rules.
+    """
+    user_id = str(user_id or scoped_recipe_user_id()).strip()
+    unit_id = str(unit_id or "").strip()
+    values = values if isinstance(values, dict) else {}
+    with recipe_master_connection() as connection:
+        _seed_workspace_unit_registry(connection, user_id)
+        if unit_id:
+            existing = connection.execute(
+                "SELECT id FROM workspace_units WHERE user_id = ? AND id = ?",
+                (user_id, unit_id),
+            ).fetchone()
+            if not existing:
+                return {"ok": False, "status": 404, "error": "Unit not found."}
+        validated = _unit_registry_validation(
+            connection,
+            user_id,
+            values,
+            unit_id=unit_id,
+        )
+
+    return {
+        "ok": not bool(validated["errors"]),
+        "status": 200 if not validated["errors"] else 422,
+        "candidate": {
+            "canonical_name": validated["canonical_name"],
+            "category": validated["category"],
+            "aliases": list(validated["aliases"]),
+        },
+        "errors": validated["errors"],
+    }
+
+
 def _workspace_unit_alias_keys(connection, user_id, unit_id):
     return {
         str(row["normalized_alias"])

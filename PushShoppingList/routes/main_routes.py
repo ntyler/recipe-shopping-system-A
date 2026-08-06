@@ -31,6 +31,7 @@ from PushShoppingList.services import recipe_master_image_service as recipe_mast
 from PushShoppingList.services import master_data_url_service
 from PushShoppingList.services import ingredient_store_section_review_service as ingredient_store_section_reviews
 from PushShoppingList.services import ingredient_duplicate_review_service as ingredient_duplicate_reviews
+from PushShoppingList.services import unit_suggestion_service as unit_suggestions
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
@@ -1501,6 +1502,7 @@ def unit_master_data_context(scope_info):
             unit_id="__UNIT_ID__",
         ),
         "import_url": url_for("main_bp.master_data_units_import_api_route"),
+        "suggest_url": url_for("main_bp.master_data_units_suggest_api_route"),
         "ingredient_url": build_canonical_master_data_url(
             "ingredients",
             scope_info=workspace_scope,
@@ -1564,6 +1566,16 @@ def master_data_unit_api_route(unit_id):
     result = recipe_master_data.save_workspace_unit(
         request.get_json(silent=True) or {},
         unit_id=unit_id,
+        user_id=recipe_master_data.scoped_recipe_user_id(),
+    )
+    status = int(result.pop("status", 200))
+    return jsonify(result), status
+
+
+@main_bp.route("/api/master-data/units/suggest", methods=["POST"])
+def master_data_units_suggest_api_route():
+    result = unit_suggestions.suggest_workspace_unit(
+        request.get_json(silent=True) or {},
         user_id=recipe_master_data.scoped_recipe_user_id(),
     )
     status = int(result.pop("status", 200))

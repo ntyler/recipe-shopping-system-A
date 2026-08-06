@@ -17,7 +17,8 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
              data-unit-master-page
              data-create-url="{{ master_data.create_url }}"
              data-update-url-template="{{ master_data.update_url_template }}"
-             data-import-url="{{ master_data.import_url }}">
+             data-import-url="{{ master_data.import_url }}"
+             data-suggest-url="{{ master_data.suggest_url }}">
         <header class="master-data-header">
             <div>
                 <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
@@ -165,6 +166,21 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         <small class="unit-master-field-error" id="unitCategoryError" data-unit-master-category-error hidden></small>
                     </label>
                 </div>
+
+                <section class="unit-master-ai-assist" aria-labelledby="unitAiAssistTitle">
+                    <div>
+                        <span>AI assist</span>
+                        <strong id="unitAiAssistTitle">Build the unit details for me</strong>
+                        <p id="unitAiAssistHelp">Enter a canonical name first. AI can refine the name, choose a category, and suggest aliases. Nothing is saved until you use the Save button.</p>
+                    </div>
+                    <button type="button"
+                            class="secondary unit-master-ai-suggest"
+                            data-unit-master-ai-suggest
+                            aria-describedby="unitAiAssistHelp">
+                        <span aria-hidden="true">&#10024;</span>
+                        <span data-unit-master-ai-suggest-label>Suggest details</span>
+                    </button>
+                </section>
 
                 <fieldset class="unit-master-alias-editor">
                     <legend>Accepted aliases</legend>

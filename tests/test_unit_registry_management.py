@@ -10,6 +10,7 @@ from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import storage_service
+from PushShoppingList.services import unit_suggestion_service
 from PushShoppingList.services import user_account_service
 from PushShoppingList.services.ingredient_unit_service import canonical_unit
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
@@ -364,6 +365,13 @@ def test_units_page_exposes_accessible_persistent_editor_and_import_offer(
     assert dialog.select_one("[data-unit-master-category-select]") is not None
     assert dialog.select_one("[data-unit-master-alias-chips]") is not None
     assert dialog.select_one("[data-unit-master-save]") is not None
+    ai_button = dialog.select_one("[data-unit-master-ai-suggest]")
+    assert ai_button is not None
+    assert ai_button.get("aria-describedby") == "unitAiAssistHelp"
+    assert "Nothing is saved" in dialog.select_one("#unitAiAssistHelp").get_text(" ", strip=True)
+    assert soup.select_one("[data-unit-master-page]")["data-suggest-url"] == (
+        "/api/master-data/units/suggest"
+    )
     assert soup.select_one("[data-unit-master-import]") is not None
     assert len(soup.select("[data-unit-master-edit-button]")) >= 30
 
@@ -390,6 +398,197 @@ def test_unit_editor_resets_legacy_button_sizing_and_uses_contextual_save_label(
     assert "width: 24px;" in alias_button_rules
     assert 'saveButtonLabel = unit ? "Save Changes" : "Add Unit";' in script
     assert 'saveButton.textContent = saveButtonLabel;' in script
+
+
+def test_ai_suggestion_populates_valid_details_without_persisting(
+    unit_registry_app,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        unit_suggestion_service,
+        "request_openai_unit_suggestion",
+        lambda values, user_id=None: (
+            {
+                "canonical_name": "serving scoop",
+                "category": "volume",
+                "aliases": ["ss", "scoops", "cup", "SS", "serving scoop"],
+            },
+            "test-model",
+            "test",
+        ),
+    )
+
+    with unit_registry_app.test_client() as client:
+        sign_in(client, "user-a")
+        before = registry_for(client)
+        response = client.post(
+            "/api/master-data/units/suggest",
+            headers={"X-Requested-With": "fetch"},
+            json={
+                "canonical_name": "scoop",
+                "category": "count_package",
+                "aliases": ["scoopful"],
+            },
+        )
+        after = registry_for(client)
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["suggestion"] == {
+        "canonical_name": "serving scoop",
+        "category": "volume",
+        "aliases": ["scoopful", "ss", "scoops", "scoop"],
+    }
+    assert any('Ignored "cup"' in warning for warning in payload["warnings"])
+    assert len(after["units"]) == len(before["units"])
+    assert all(unit["name"] != "serving scoop" for unit in after["units"])
+
+
+def test_ai_suggestion_keeps_entered_name_when_ai_canonical_collides(
+    unit_registry_app,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        unit_suggestion_service,
+        "request_openai_unit_suggestion",
+        lambda values, user_id=None: (
+            {
+                "canonical_name": "cup",
+                "category": "volume",
+                "aliases": ["scp", "cups"],
+            },
+            "test-model",
+            "test",
+        ),
+    )
+
+    with unit_registry_app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.post(
+            "/api/master-data/units/suggest",
+            json={
+                "canonical_name": "scoop",
+                "category": "count_package",
+                "aliases": [],
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["suggestion"]["canonical_name"] == "scoop"
+    assert payload["suggestion"]["aliases"] == ["scp"]
+    assert any("canonical name already used" in warning for warning in payload["warnings"])
+
+
+def test_ai_suggestion_collision_filter_is_workspace_scoped(
+    unit_registry_app,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        unit_suggestion_service,
+        "request_openai_unit_suggestion",
+        lambda values, user_id=None: (
+            {
+                "canonical_name": values["canonical_name"],
+                "category": "volume",
+                "aliases": ["workspace-only"],
+            },
+            "test-model",
+            "test",
+        ),
+    )
+
+    with unit_registry_app.test_client() as user_a:
+        sign_in(user_a, "user-a")
+        created = user_a.post(
+            "/api/master-data/units",
+            json={
+                "canonical_name": "private measure",
+                "category": "count_package",
+                "aliases": ["workspace-only"],
+            },
+        )
+        assert created.status_code == 201
+        response_a = user_a.post(
+            "/api/master-data/units/suggest",
+            json={"canonical_name": "ladleful", "category": "volume", "aliases": []},
+        )
+
+    with unit_registry_app.test_client() as user_b:
+        sign_in(user_b, "user-b")
+        response_b = user_b.post(
+            "/api/master-data/units/suggest",
+            json={"canonical_name": "ladleful", "category": "volume", "aliases": []},
+        )
+
+    assert response_a.get_json()["suggestion"]["aliases"] == []
+    assert response_b.get_json()["suggestion"]["aliases"] == ["workspace-only"]
+
+
+def test_ai_suggestion_rejects_invalid_or_unauthorized_requests(
+    unit_registry_app,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    calls = []
+    monkeypatch.setattr(
+        unit_suggestion_service,
+        "request_openai_unit_suggestion",
+        lambda values, user_id=None: calls.append(values),
+    )
+
+    with unit_registry_app.test_client() as anonymous:
+        unauthorized = anonymous.post(
+            "/api/master-data/units/suggest",
+            headers={"X-Requested-With": "fetch"},
+            json={"canonical_name": "scoop"},
+        )
+    with unit_registry_app.test_client() as client:
+        sign_in(client, "user-a")
+        blank = client.post(
+            "/api/master-data/units/suggest",
+            json={"canonical_name": "   ", "category": "volume"},
+        )
+        existing = client.post(
+            "/api/master-data/units/suggest",
+            json={"canonical_name": "TBSP", "category": "volume"},
+        )
+
+    assert unauthorized.status_code == 401
+    assert blank.status_code == 422
+    assert blank.get_json()["errors"]["canonical_name"]
+    assert existing.status_code == 422
+    assert "tablespoon" in existing.get_json()["errors"]["canonical_name"]
+    assert calls == []
+
+
+def test_ai_suggestion_failure_does_not_change_the_registry(
+    unit_registry_app,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        unit_suggestion_service,
+        "request_openai_unit_suggestion",
+        lambda values, user_id=None: (_ for _ in ()).throw(RuntimeError("temporary")),
+    )
+
+    with unit_registry_app.test_client() as client:
+        sign_in(client, "user-a")
+        before = registry_for(client)
+        response = client.post(
+            "/api/master-data/units/suggest",
+            json={"canonical_name": "scoop", "category": "count_package"},
+        )
+        after = registry_for(client)
+
+    assert response.status_code == 503
+    assert "not changed" in response.get_json()["error"]
+    assert after == before
 
 
 def test_legacy_browser_unit_import_skips_existing_names(unit_registry_app):

@@ -61,6 +61,8 @@
         let editorAliasErrors = {};
         let returnFocus = null;
         let saveButtonLabel = "Add Unit";
+        let aiSuggestionPending = false;
+        let suggestionRequestToken = 0;
 
         const source = document.getElementById("ingredientUnitConfig");
         const status = root.querySelector("[data-unit-master-status]");
@@ -74,6 +76,9 @@
         const aliasInput = root.querySelector("[data-unit-master-alias-input]");
         const aliasChips = root.querySelector("[data-unit-master-alias-chips]");
         const saveButton = root.querySelector("[data-unit-master-save]");
+        const suggestButton = root.querySelector("[data-unit-master-ai-suggest]");
+        const suggestButtonLabel = root.querySelector("[data-unit-master-ai-suggest-label]");
+        const aliasAddButton = root.querySelector("[data-unit-master-alias-add]");
         const editorTitle = root.querySelector("[data-unit-master-editor-title]");
         const editorKicker = root.querySelector("[data-unit-master-editor-kicker]");
         const editorFeedback = root.querySelector("[data-unit-master-editor-feedback]");
@@ -96,13 +101,33 @@
             input.toggleAttribute("aria-invalid", Boolean(text));
         };
 
+        const setEditorFeedback = (message, type = "error") => {
+            editorFeedback.textContent = String(message || "");
+            editorFeedback.dataset.status = type;
+            editorFeedback.hidden = !editorFeedback.textContent;
+        };
+
+        const setAiPending = pending => {
+            aiSuggestionPending = Boolean(pending);
+            dialog.toggleAttribute("aria-busy", aiSuggestionPending);
+            suggestButton.disabled = aiSuggestionPending;
+            suggestButtonLabel.textContent = aiSuggestionPending ? "Suggesting…" : "Suggest details";
+            saveButton.disabled = aiSuggestionPending;
+            nameInput.disabled = aiSuggestionPending;
+            categorySelect.disabled = aiSuggestionPending;
+            aliasInput.disabled = aiSuggestionPending;
+            aliasAddButton.disabled = aiSuggestionPending;
+            aliasChips.querySelectorAll("button").forEach(button => {
+                button.disabled = aiSuggestionPending;
+            });
+        };
+
         const clearErrors = () => {
             editorAliasErrors = {};
             setFieldError(nameInput, nameError, "");
             setFieldError(categorySelect, categoryError, "");
             setFieldError(aliasInput, aliasError, "");
-            editorFeedback.textContent = "";
-            editorFeedback.hidden = true;
+            setEditorFeedback("");
             renderAliasChips();
         };
 
@@ -120,6 +145,7 @@
                 const remove = document.createElement("button");
                 remove.type = "button";
                 remove.textContent = "×";
+                remove.disabled = aiSuggestionPending;
                 remove.setAttribute("aria-label", `Remove alias ${alias}`);
                 remove.addEventListener("click", () => {
                     editorAliases.splice(index, 1);
@@ -264,6 +290,7 @@
         };
 
         const openEditor = (unit = null, trigger = null) => {
+            suggestionRequestToken += 1;
             returnFocus = trigger || document.activeElement;
             editorUnitId = unit ? String(unit.id) : "";
             editorAliases = unit && Array.isArray(unit.aliases) ? [...unit.aliases] : [];
@@ -274,6 +301,7 @@
             nameInput.value = unit?.name || "";
             categorySelect.value = unit?.category || "count_package";
             aliasInput.value = "";
+            setAiPending(false);
             clearErrors();
             renderAliasChips();
             dialog.showModal();
@@ -281,6 +309,7 @@
         };
 
         const closeEditor = () => {
+            suggestionRequestToken += 1;
             if (dialog.open) dialog.close();
             if (returnFocus && typeof returnFocus.focus === "function") {
                 returnFocus.focus();
@@ -295,10 +324,66 @@
             renderAliasChips();
             const aliasMessages = Object.values(editorAliasErrors);
             setFieldError(aliasInput, aliasError, aliasMessages.length ? "Review the highlighted aliases." : "");
-            editorFeedback.textContent = payload.error || "Unable to save this unit.";
-            editorFeedback.hidden = false;
+            setEditorFeedback(payload.error || "Unable to save this unit.");
             const firstInvalid = form.querySelector('[aria-invalid="true"]');
             if (firstInvalid) firstInvalid.focus();
+        };
+
+        const suggestUnitDetails = async () => {
+            const canonicalName = cleanText(nameInput.value);
+            if (!canonicalName) {
+                setFieldError(nameInput, nameError, "Enter a canonical name before asking AI for suggestions.");
+                nameInput.focus();
+                return;
+            }
+
+            const pendingAlias = cleanText(aliasInput.value);
+            const payload = {
+                unit_id: editorUnitId,
+                canonical_name: canonicalName,
+                category: categorySelect.value,
+                aliases: [...editorAliases, ...(pendingAlias ? [pendingAlias] : [])],
+            };
+            clearErrors();
+            const requestToken = ++suggestionRequestToken;
+            setAiPending(true);
+            setEditorFeedback("AI is reviewing the unit name and possible aliases.", "pending");
+            try {
+                const response = await fetch(root.dataset.suggestUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json().catch(() => ({}));
+                if (requestToken !== suggestionRequestToken || !dialog.open) return;
+                if (!response.ok || !result.ok) {
+                    setAiPending(false);
+                    applyServerErrors(result);
+                    return;
+                }
+
+                const suggestion = result.suggestion || {};
+                nameInput.value = cleanText(suggestion.canonical_name) || canonicalName;
+                if (registry.categories.some(category => category.key === suggestion.category)) {
+                    categorySelect.value = suggestion.category;
+                }
+                editorAliases = Array.isArray(suggestion.aliases)
+                    ? suggestion.aliases.map(cleanText).filter(Boolean)
+                    : [...editorAliases];
+                aliasInput.value = "";
+                renderAliasChips();
+                const warnings = Array.isArray(result.warnings) ? result.warnings.filter(Boolean) : [];
+                setEditorFeedback(
+                    [result.message || "Unit details suggested. Review before saving.", ...warnings].join(" "),
+                    warnings.length ? "warning" : "success",
+                );
+            } catch (error) {
+                if (requestToken !== suggestionRequestToken) return;
+                setEditorFeedback("AI suggestions are unavailable right now. Your entered values were not changed.");
+                console.error("Unable to suggest unit details.", error);
+            } finally {
+                if (requestToken === suggestionRequestToken) setAiPending(false);
+            }
         };
 
         const saveUnit = async event => {
@@ -330,8 +415,7 @@
                 closeEditor();
                 setStatus(result.message || "Unit saved.");
             } catch (error) {
-                editorFeedback.textContent = "The unit could not be saved. Check your connection and try again.";
-                editorFeedback.hidden = false;
+                setEditorFeedback("The unit could not be saved. Check your connection and try again.");
                 console.error("Unable to save unit.", error);
             } finally {
                 saveButton.disabled = false;
@@ -345,7 +429,8 @@
             if (!button) return;
             openEditor(unitById(button.dataset.unitId), button);
         });
-        root.querySelector("[data-unit-master-alias-add]").addEventListener("click", addPendingAlias);
+        aliasAddButton.addEventListener("click", addPendingAlias);
+        suggestButton.addEventListener("click", suggestUnitDetails);
         aliasInput.addEventListener("keydown", event => {
             if (event.key === "Enter" || event.key === ",") {
                 event.preventDefault();
