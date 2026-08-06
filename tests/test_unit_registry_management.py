@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from bs4 import BeautifulSoup
@@ -365,6 +366,30 @@ def test_units_page_exposes_accessible_persistent_editor_and_import_offer(
     assert dialog.select_one("[data-unit-master-save]") is not None
     assert soup.select_one("[data-unit-master-import]") is not None
     assert len(soup.select("[data-unit-master-edit-button]")) >= 30
+
+
+def test_unit_editor_resets_legacy_button_sizing_and_uses_contextual_save_label():
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = Path("PushShoppingList/static/js/units.js").read_text(encoding="utf-8")
+    unit_button_rules = css[
+        css.index(".unit-master-page button {"):
+        css.index(".unit-master-page button:is(:hover, :focus-visible)")
+    ]
+    close_button_rules = css[
+        css.index(".unit-master-dialog-close {"):
+        css.index(".unit-master-editor-grid {")
+    ]
+    alias_button_rules = css[
+        css.index(".unit-master-alias-chip button {"):
+        css.index(".unit-master-alias-chip small {")
+    ]
+
+    assert "width: auto;" in unit_button_rules
+    assert "margin: 0;" in unit_button_rules
+    assert "width: 38px;" in close_button_rules
+    assert "width: 24px;" in alias_button_rules
+    assert 'saveButtonLabel = unit ? "Save Changes" : "Add Unit";' in script
+    assert 'saveButton.textContent = saveButtonLabel;' in script
 
 
 def test_legacy_browser_unit_import_skips_existing_names(unit_registry_app):

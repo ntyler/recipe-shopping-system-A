@@ -60,6 +60,7 @@
         let editorAliases = [];
         let editorAliasErrors = {};
         let returnFocus = null;
+        let saveButtonLabel = "Add Unit";
 
         const source = document.getElementById("ingredientUnitConfig");
         const status = root.querySelector("[data-unit-master-status]");
@@ -268,6 +269,8 @@
             editorAliases = unit && Array.isArray(unit.aliases) ? [...unit.aliases] : [];
             editorTitle.textContent = unit ? `Edit ${unit.name}` : "Add Unit";
             editorKicker.textContent = unit?.seeded ? "System-seeded unit" : unit ? "User-created unit" : "New workspace unit";
+            saveButtonLabel = unit ? "Save Changes" : "Add Unit";
+            saveButton.textContent = saveButtonLabel;
             nameInput.value = unit?.name || "";
             categorySelect.value = unit?.category || "count_package";
             aliasInput.value = "";
@@ -332,7 +335,7 @@
                 console.error("Unable to save unit.", error);
             } finally {
                 saveButton.disabled = false;
-                saveButton.textContent = "Save Unit";
+                saveButton.textContent = saveButtonLabel;
             }
         };
 

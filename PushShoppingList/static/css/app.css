@@ -63212,8 +63212,13 @@ body.recipe-edit-standalone-page :is(
 }
 
 .unit-master-page button {
+    display: inline-flex;
+    width: auto;
     min-height: 38px;
+    align-items: center;
+    justify-content: center;
     padding: 7px 13px;
+    margin: 0;
     border: 1px solid var(--app-primary);
     border-radius: 7px;
     background: color-mix(in srgb, var(--app-primary) 16%, transparent);
@@ -63472,7 +63477,11 @@ body.recipe-edit-standalone-page :is(
 }
 
 .unit-master-dialog-close {
+    flex: 0 0 38px;
+    width: 38px;
     min-width: 38px;
+    height: 38px;
+    align-self: flex-start;
     padding: 5px !important;
     border-color: var(--app-border) !important;
     color: var(--app-muted) !important;
@@ -63541,8 +63550,11 @@ body.recipe-edit-standalone-page :is(
 }
 
 .unit-master-alias-chip button {
+    flex: 0 0 24px;
+    width: 24px;
     min-width: 24px;
     min-height: 24px;
+    margin: 0;
     padding: 0;
     border-color: transparent;
     border-radius: 50%;
