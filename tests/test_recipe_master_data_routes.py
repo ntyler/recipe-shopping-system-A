@@ -457,11 +457,24 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert equipment_response.status_code == 200
     assert '<th scope="col">Item</th>' in equipment_html
     assert '<th scope="col">Equipment Type</th>' in equipment_html
-    assert 'class="master-data-created-cell"' in equipment_html
+    assert '<th scope="col">Usage</th>' in equipment_html
+    assert '<th scope="col">Updated</th>' in equipment_html
+    assert '<th scope="col">Created At</th>' not in equipment_html
+    assert 'class="master-data-created-cell"' not in equipment_html
+    assert 'class="master-data-equipment-details"' in equipment_html
+    assert ">Details</summary>" in equipment_html
+    assert ">Created</span>" in equipment_html
+    assert 'class="master-data-updated-cell"' in equipment_html
     assert '<th scope="col">Normalized Name</th>' not in equipment_html
     assert '<th scope="col">Image</th>' not in equipment_html
-    assert '<th scope="rowgroup" colspan="6">COOKWARE</th>' in equipment_html
-    assert '<th scope="rowgroup" colspan="6">PREP TOOLS</th>' in equipment_html
+    assert '<th scope="rowgroup" colspan="5">COOKWARE</th>' in equipment_html
+    assert '<th scope="rowgroup" colspan="5">PREP TOOLS</th>' in equipment_html
+    assert '<strong data-equipment-master-total-count>2</strong>' in equipment_html
+    assert '<strong data-equipment-master-type-count>2</strong>' in equipment_html
+    assert '<strong data-equipment-master-used-count>2</strong>' in equipment_html
+    assert '<strong data-equipment-master-unused-count>0</strong>' in equipment_html
+    assert 'aria-label="Equipment summary"' in equipment_html
+    assert 'aria-current="page"' in equipment_html
     assert "Generate Missing Images" in equipment_html
     assert "Store Sections" in equipment_html
     assert 'name="store_section"' not in equipment_html
@@ -749,13 +762,45 @@ def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp
     for single_user_table in (mine_table, specific_table):
         assert '<th scope="col">User</th>' not in single_user_table
         assert 'class="master-data-user-data-cell"' not in single_user_table
-        assert 'colspan="5"' in single_user_table
+        assert 'colspan="4"' in single_user_table
         assert "master-data-table--show-user" not in single_user_table
 
     assert '<th scope="col">User</th>' in all_table
     assert 'class="master-data-user-data-cell"' in all_table
-    assert 'colspan="6"' in all_table
+    assert 'colspan="5"' in all_table
     assert "master-data-table--show-user" in all_table
+
+
+def test_equipment_summary_counts_include_unused_records(monkeypatch, tmp_path):
+    configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "DELETE FROM recipe_equipment WHERE user_id = ?",
+            ("user-a",),
+        )
+
+    user_summary = master_data.equipment_summary_counts("user-a")
+    all_summary = master_data.equipment_summary_counts(include_all_users=True)
+
+    assert user_summary == {
+        "total_count": 1,
+        "type_count": 1,
+        "in_use_count": 0,
+        "unused_count": 1,
+    }
+    assert all_summary == {
+        "total_count": 2,
+        "type_count": 2,
+        "in_use_count": 1,
+        "unused_count": 1,
+    }
+
+
+def test_master_data_date_label_is_human_readable():
+    assert main_routes.master_data_date_label("2026-08-03T22:36:11Z") == "Aug 3, 2026"
+    assert main_routes.master_data_date_label("") == "Unknown"
 
 
 def test_ingredient_master_store_section_update_is_user_scoped(monkeypatch, tmp_path):

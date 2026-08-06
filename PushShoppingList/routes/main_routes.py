@@ -904,12 +904,25 @@ def master_data_user_identity_lookup(user_ids):
     }
 
 
+def master_data_date_label(value):
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return "Unknown"
+    try:
+        parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+    except ValueError:
+        return raw_value
+    return f"{parsed.strftime('%b')} {parsed.day}, {parsed.year}"
+
+
 def enrich_master_data_rows_with_users(rows, user_identities):
     enriched = []
     for row in rows:
         row_data = dict(row)
         user_id = str(row_data.get("user_id") or "").strip()
         row_data["user_identity"] = user_identities.get(user_id) or master_data_user_identity(user_id)
+        row_data["updated_at_label"] = master_data_date_label(row_data.get("updated_at"))
+        row_data["created_at_label"] = master_data_date_label(row_data.get("created_at"))
         enriched.append(row_data)
     return enriched
 
@@ -1140,6 +1153,12 @@ def master_data_context(record_type, scope_info=None):
 
     rows = []
     total_count = 0
+    equipment_summary = {
+        "total_count": 0,
+        "type_count": 0,
+        "in_use_count": 0,
+        "unused_count": 0,
+    }
     available_user_ids = []
     if status["exists"]:
         rows = config["list_func"](
@@ -1159,6 +1178,11 @@ def master_data_context(record_type, scope_info=None):
             store_section=store_section if record_type == "ingredients" else None,
             equipment_section=equipment_section if record_type == "equipment" else None,
         )
+        if record_type == "equipment":
+            equipment_summary = recipe_master_data.equipment_summary_counts(
+                user_id=scope_info["user_id"],
+                include_all_users=scope_info["include_all_users"],
+            )
         if is_admin:
             registered_user_ids = master_data_registered_user_ids()
             available_user_ids = [
@@ -1356,6 +1380,7 @@ def master_data_context(record_type, scope_info=None):
             for section in store_section_details
         },
         "equipment_section": equipment_section,
+        "equipment_summary": equipment_summary,
         "equipment_section_options": recipe_master_data.equipment_section_options()
         if record_type == "equipment"
         else [],
@@ -1366,9 +1391,9 @@ def master_data_context(record_type, scope_info=None):
             if record_type == "ingredients" and scope_info["scope"] == "all"
             else 4
             if record_type == "ingredients"
-            else 6
-            if scope_info["scope"] == "all"
             else 5
+            if scope_info["scope"] == "all"
+            else 4
         ),
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},

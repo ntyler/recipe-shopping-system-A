@@ -101,6 +101,15 @@
                     <div class="master-data-item-copy">
                         <strong>{{ row.name }}</strong>
                         <code>{{ row.normalized_name }}</code>
+                        <details class="master-data-equipment-details">
+                            <summary>Details</summary>
+                            <div>
+                                <span>Created</span>
+                                <time datetime="{{ row.created_at }}" title="{{ row.created_at }}">
+                                    {{ row.created_at_label }}
+                                </time>
+                            </div>
+                        </details>
                     </div>
                 {% endif %}
             </div>
@@ -181,12 +190,11 @@
             {% if master_data.record_type == 'ingredients' %}
                 <time datetime="{{ row.updated_at }}" title="{{ row.updated_at }}">{{ row.updated_at[:10] }}</time>
             {% else %}
-                {{ row.updated_at }}
+                <time datetime="{{ row.updated_at }}" title="{{ row.updated_at }}">
+                    {{ row.updated_at_label }}
+                </time>
             {% endif %}
         </td>
-        {% if master_data.record_type != 'ingredients' %}
-            <td class="master-data-created-cell" data-label="Created">{{ row.created_at }}</td>
-        {% endif %}
     </tr>
     {% if row.usage_count %}
         <tr class="master-data-reference-row"
@@ -208,20 +216,29 @@ data-user-id="{{ master_data.viewer_user_id }}"
 data-viewer-user-id="{{ master_data.viewer_user_id }}"
 {% endblock %}
 {% block app_content %}
-    <section class="master-data-page" aria-labelledby="masterDataTitle">
+    <section class="master-data-page{% if master_data.record_type == 'equipment' %} equipment-master-page{% endif %}"
+             aria-labelledby="masterDataTitle">
         <header class="master-data-header">
             <div>
                 <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
                 <h1 id="masterDataTitle">{{ master_data.title }}</h1>
-                <p>Browse normalized reusable recipe records for the active workspace.</p>
+                <p>
+                    {% if master_data.record_type == 'equipment' %}
+                        Review normalized equipment detected across recipes in this workspace.
+                    {% else %}
+                        Browse normalized reusable recipe records for the active workspace.
+                    {% endif %}
+                </p>
             </div>
             <nav class="master-data-tabs" aria-label="Master data">
                 <a href="{{ master_data.ingredient_url }}"
-                   class="{% if master_data.record_type == 'ingredients' %}active{% endif %}">
+                   class="{% if master_data.record_type == 'ingredients' %}active{% endif %}"
+                   {% if master_data.record_type == 'ingredients' %}aria-current="page"{% endif %}>
                     Ingredients
                 </a>
                 <a href="{{ master_data.equipment_url }}"
-                   class="{% if master_data.record_type == 'equipment' %}active{% endif %}">
+                   class="{% if master_data.record_type == 'equipment' %}active{% endif %}"
+                   {% if master_data.record_type == 'equipment' %}aria-current="page"{% endif %}>
                     Equipment
                 </a>
                 <a href="{{ master_data.units_url }}">Units</a>
@@ -231,6 +248,27 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </a>
             </nav>
         </header>
+
+        {% if master_data.record_type == 'equipment' %}
+            <div class="unit-master-stats equipment-master-stats" aria-label="Equipment summary">
+                <article>
+                    <span>Total equipment</span>
+                    <strong data-equipment-master-total-count>{{ master_data.equipment_summary.total_count }}</strong>
+                </article>
+                <article>
+                    <span>Equipment types</span>
+                    <strong data-equipment-master-type-count>{{ master_data.equipment_summary.type_count }}</strong>
+                </article>
+                <article>
+                    <span>In use</span>
+                    <strong data-equipment-master-used-count>{{ master_data.equipment_summary.in_use_count }}</strong>
+                </article>
+                <article>
+                    <span>Unused</span>
+                    <strong data-equipment-master-unused-count>{{ master_data.equipment_summary.unused_count }}</strong>
+                </article>
+            </div>
+        {% endif %}
 
         {% if master_data.messages %}
             <div class="master-data-messages" aria-live="polite">
@@ -1046,12 +1084,17 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         </details>
 
         <div class="master-data-results-header" data-master-results-header>
-            <div class="master-data-results-summary" aria-live="polite">
-                {% if master_data.total_count %}
-                    Showing {{ master_data.offset + 1 }}-{{ master_data.offset + (master_data.rows|length) }} of {{ master_data.total_count }} {{ master_data.empty_label }}.
-                {% else %}
-                    No {{ master_data.empty_label }} found.
+            <div class="master-data-results-copy">
+                {% if master_data.record_type == 'equipment' %}
+                    <span class="master-data-results-kicker">Workspace registry</span>
                 {% endif %}
+                <div class="master-data-results-summary" aria-live="polite">
+                    {% if master_data.total_count %}
+                        Showing {{ master_data.offset + 1 }}-{{ master_data.offset + (master_data.rows|length) }} of {{ master_data.total_count }} {{ master_data.empty_label }}.
+                    {% else %}
+                        No {{ master_data.empty_label }} found.
+                    {% endif %}
+                </div>
             </div>
             <div class="master-data-thumbnail-size-section">
                 <span class="master-data-thumbnail-size-label">Thumbnail Size</span>
@@ -1116,9 +1159,8 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                 {% if master_data.scope == 'all' %}
                                     <th scope="col">User</th>
                                 {% endif %}
-                                <th scope="col">Usage Count</th>
-                                <th scope="col">Updated At</th>
-                                <th scope="col">Created At</th>
+                                <th scope="col">Usage</th>
+                                <th scope="col">Updated</th>
                             {% endif %}
                         </tr>
                     </thead>

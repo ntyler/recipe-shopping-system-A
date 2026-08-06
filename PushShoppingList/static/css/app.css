@@ -26679,6 +26679,19 @@ img[data-deferred-src] {
             font-weight: 900;
         }
 
+        .master-data-results-copy {
+            display: grid;
+            gap: 4px;
+        }
+
+        .master-data-results-kicker {
+            color: var(--app-primary);
+            font-size: 11px;
+            font-weight: 850;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
         .master-data-results-header {
             display: flex;
             align-items: flex-end;
@@ -26776,7 +26789,7 @@ img[data-deferred-src] {
         }
 
         .master-data-equipment-table {
-            min-width: 900px;
+            min-width: 760px;
         }
 
         .master-data-ingredients-table {
@@ -26867,27 +26880,23 @@ img[data-deferred-src] {
         }
 
         .master-data-equipment-table th:nth-child(1) {
-            width: 42%;
+            width: 50%;
         }
 
         .master-data-equipment-table th:nth-child(2) {
-            width: 180px;
+            width: 24%;
         }
 
         .master-data-equipment-table th:nth-child(3) {
-            width: 92px;
+            width: 100px;
         }
 
         .master-data-equipment-table th:nth-child(4) {
-            width: 130px;
-        }
-
-        .master-data-equipment-table th:nth-child(5) {
-            width: 130px;
+            width: 145px;
         }
 
         .master-data-equipment-table.master-data-table--show-user {
-            min-width: 1080px;
+            min-width: 980px;
         }
 
         .master-data-equipment-table.master-data-table--show-user th:nth-child(1) {
@@ -26906,9 +26915,53 @@ img[data-deferred-src] {
             width: 92px;
         }
 
-        .master-data-equipment-table.master-data-table--show-user th:nth-child(5),
-        .master-data-equipment-table.master-data-table--show-user th:nth-child(6) {
+        .master-data-equipment-table.master-data-table--show-user th:nth-child(5) {
             width: 130px;
+        }
+
+        .equipment-master-page {
+            gap: 16px;
+        }
+
+        .equipment-master-page .master-data-filter-form,
+        .equipment-master-page .master-data-results-header {
+            border-color: var(--app-border);
+            border-radius: 10px;
+            background: var(--app-surface);
+        }
+
+        .equipment-master-page .master-data-results-header {
+            align-items: center;
+            padding: 12px 14px;
+        }
+
+        .master-data-equipment-details {
+            margin-top: 4px;
+            color: var(--app-muted);
+            font-size: 11px;
+        }
+
+        .master-data-equipment-details summary {
+            width: max-content;
+            cursor: pointer;
+            font-weight: 800;
+        }
+
+        .master-data-equipment-details > div {
+            display: flex;
+            gap: 6px;
+            align-items: baseline;
+            margin-top: 5px;
+        }
+
+        .master-data-equipment-details span {
+            color: var(--app-primary);
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .master-data-equipment-table .master-data-updated-cell time {
+            white-space: nowrap;
         }
 
         .master-data-usage-button {

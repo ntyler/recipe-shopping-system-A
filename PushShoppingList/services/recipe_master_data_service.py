@@ -3650,6 +3650,54 @@ def count_equipment(user_id=None, search=None, include_all_users=False, store_se
     )
 
 
+def equipment_summary_counts(user_id=None, include_all_users=False):
+    """Return unfiltered equipment registry totals for one resolved scope."""
+
+    where, params = master_record_filters(
+        "equipment",
+        user_id=user_id,
+        include_all_users=include_all_users,
+    )
+    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
+
+    with existing_recipe_master_connection() as connection:
+        if connection is None:
+            return {
+                "total_count": 0,
+                "type_count": 0,
+                "in_use_count": 0,
+                "unused_count": 0,
+            }
+
+        row = connection.execute(
+            f"""
+            SELECT
+                COUNT(*) AS total_count,
+                COUNT(DISTINCT NULLIF(TRIM(m.equipment_section), '')) AS type_count,
+                COALESCE(SUM(
+                    CASE WHEN EXISTS (
+                        SELECT 1
+                          FROM recipe_equipment usage
+                         WHERE usage.user_id = m.user_id
+                           AND usage.equipment_id = m.id
+                    ) THEN 1 ELSE 0 END
+                ), 0) AS in_use_count
+              FROM equipment m
+              {where_clause}
+            """,
+            params,
+        ).fetchone()
+
+    total_count = int(row["total_count"] or 0) if row else 0
+    in_use_count = int(row["in_use_count"] or 0) if row else 0
+    return {
+        "total_count": total_count,
+        "type_count": int(row["type_count"] or 0) if row else 0,
+        "in_use_count": in_use_count,
+        "unused_count": max(0, total_count - in_use_count),
+    }
+
+
 def count_master_usage(table_name, record_id, user_id=None):
     config = master_record_table_config(table_name)
     try:
