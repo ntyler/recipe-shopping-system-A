@@ -1457,6 +1457,9 @@ def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
             "recipe_id": recipe_id,
             "recipe_url": recipe_url,
             "recipe_title": recipe_reference_title(recipe_id, metadata_record),
+            "cover_image": dict(metadata_record.get("cover_image"))
+            if isinstance(metadata_record.get("cover_image"), dict)
+            else {},
             "matches": [],
         })
         original_text = clean_text(row["original_recipe_text"])

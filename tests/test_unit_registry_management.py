@@ -382,7 +382,16 @@ def test_units_page_exposes_accessible_persistent_editor_and_import_offer(
 
 def test_unit_usage_counts_distinct_recipes_and_lists_matching_lines(
     unit_registry_app,
+    monkeypatch,
 ):
+    monkeypatch.setattr(
+        "PushShoppingList.routes.main_routes.recipe_cover_image_for_view",
+        lambda *_args, **_kwargs: {
+            "thumb_url": "/static/generated/recipe-thumb.webp",
+            "srcset": "/static/generated/recipe-thumb.webp 52w",
+            "alt": "Recipe thumbnail",
+        },
+    )
     first_url = "https://example.test/recipes/teaspoon-first"
     second_url = "https://example.test/recipes/teaspoon-option"
     master_data.sync_recipe_master_records(
@@ -443,6 +452,15 @@ def test_unit_usage_counts_distinct_recipes_and_lists_matching_lines(
         payload = response.get_json()
         assert payload["total"] == 2
         assert payload["total_reference_count"] >= 3
+        assert all(
+            reference["recipe_image_url"]
+            == "/static/generated/recipe-thumb.webp"
+            for reference in payload["references"]
+        )
+        assert all(
+            reference["recipe_image_alt"] == "Recipe thumbnail"
+            for reference in payload["references"]
+        )
         assert {row["recipe_id"] for row in payload["references"]} == {
             master_data.recipe_id_for_url(first_url),
             master_data.recipe_id_for_url(second_url),
@@ -513,6 +531,14 @@ def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
     assert soup.select_one("[data-unit-master-page]")["data-usage-url-template"] == (
         "/api/master-data/units/__UNIT_ID__/references"
     )
+    script = Path("PushShoppingList/static/js/units.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    assert "const createUsageRecipeVisual = reference =>" in script
+    assert 'image.loading = "lazy";' in script
+    assert 'image.addEventListener("error", revealFallback, { once: true });' in script
+    assert "unit-master-usage-recipe-fallback" in script
+    assert ".unit-master-usage-recipe-visual" in css
+    assert ".unit-master-usage-recipe-fallback" in css
 
 
 def test_unit_editor_resets_legacy_button_sizing_and_uses_contextual_save_label():

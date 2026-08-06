@@ -366,6 +366,61 @@
             return item;
         };
 
+        const createUsageRecipeVisual = reference => {
+            const editUrl = String(reference.edit_url || "");
+            const recipeTitle = reference.recipe_title || reference.recipe_id || "Recipe";
+            const visual = document.createElement(editUrl ? "a" : "span");
+            visual.className = "unit-master-usage-recipe-visual";
+            if (editUrl) {
+                visual.href = editUrl;
+                visual.target = "_blank";
+                visual.rel = "noopener noreferrer";
+                visual.setAttribute("aria-label", `Open ${recipeTitle}`);
+            }
+
+            const fallback = document.createElement("span");
+            fallback.className = "unit-master-usage-recipe-fallback";
+            fallback.setAttribute("aria-hidden", "true");
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("viewBox", "0 0 24 24");
+            svg.setAttribute("focusable", "false");
+            const documentOutline = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            documentOutline.setAttribute("d", "M6 3h8l4 4v14H6zM14 3v5h4");
+            const recipeLines = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            recipeLines.setAttribute("d", "M9 12h6M9 16h6");
+            svg.append(documentOutline, recipeLines);
+            fallback.appendChild(svg);
+
+            const imageUrl = String(reference.recipe_image_url || "");
+            if (!imageUrl) {
+                visual.appendChild(fallback);
+                return visual;
+            }
+
+            visual.classList.add("has-image");
+            const image = document.createElement("img");
+            image.src = imageUrl;
+            image.alt = String(reference.recipe_image_alt || `${recipeTitle} image`);
+            image.loading = "lazy";
+            image.decoding = "async";
+            const srcset = String(reference.recipe_image_srcset || "");
+            if (srcset) {
+                image.srcset = srcset;
+                image.sizes = "52px";
+            }
+            fallback.hidden = true;
+            const revealFallback = () => {
+                image.hidden = true;
+                image.removeAttribute("srcset");
+                visual.classList.remove("has-image");
+                fallback.hidden = false;
+            };
+            image.addEventListener("error", revealFallback, { once: true });
+            visual.append(image, fallback);
+            if (image.complete && !image.naturalWidth) revealFallback();
+            return visual;
+        };
+
         const renderUsageReferences = data => {
             usageResults.replaceChildren();
             const references = Array.isArray(data.references) ? data.references : [];
@@ -381,9 +436,20 @@
             references.forEach(reference => {
                 const card = document.createElement("article");
                 card.className = "unit-master-usage-recipe";
+                const visual = createUsageRecipeVisual(reference);
                 const header = document.createElement("header");
                 const heading = document.createElement("h3");
-                heading.textContent = reference.recipe_title || reference.recipe_id || "Recipe";
+                const recipeTitle = reference.recipe_title || reference.recipe_id || "Recipe";
+                if (reference.edit_url) {
+                    const titleLink = document.createElement("a");
+                    titleLink.href = reference.edit_url;
+                    titleLink.target = "_blank";
+                    titleLink.rel = "noopener noreferrer";
+                    titleLink.textContent = recipeTitle;
+                    heading.appendChild(titleLink);
+                } else {
+                    heading.textContent = recipeTitle;
+                }
                 header.appendChild(heading);
                 if (reference.edit_url) {
                     const link = document.createElement("a");
@@ -393,7 +459,7 @@
                     link.textContent = "Open Recipe";
                     header.appendChild(link);
                 }
-                card.appendChild(header);
+                card.append(visual, header);
 
                 const matches = document.createElement("ul");
                 (Array.isArray(reference.matches) ? reference.matches : []).forEach(match => {

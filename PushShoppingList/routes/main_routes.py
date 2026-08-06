@@ -1603,6 +1603,31 @@ def master_data_unit_references_route(unit_id):
     for reference in result.get("references", []):
         recipe_url = recipe_master_data.clean_text(reference.get("recipe_url"))
         reference["edit_url"] = recipe_edit_page_url(recipe_url) if recipe_url else ""
+        cover_image = (
+            reference.get("cover_image")
+            if isinstance(reference.get("cover_image"), dict)
+            else {}
+        )
+        rendered_cover_image = recipe_cover_image_for_view(
+            recipe_url,
+            {
+                "recipe_title": reference.get("recipe_title"),
+                "cover_image": cover_image,
+            },
+            {"cover_image": cover_image},
+            variants=("thumb", "detail"),
+        )
+        reference["recipe_image_url"] = (
+            rendered_cover_image.get("thumb_url")
+            or rendered_cover_image.get("display_url")
+            or rendered_cover_image.get("src")
+            or ""
+        )
+        reference["recipe_image_srcset"] = rendered_cover_image.get("srcset") or ""
+        reference["recipe_image_alt"] = (
+            rendered_cover_image.get("alt")
+            or f"{reference.get('recipe_title') or 'Recipe'} image"
+        )
 
     return jsonify({
         "ok": True,

@@ -63565,24 +63565,86 @@ body.recipe-edit-standalone-page :is(
 
 .unit-master-usage-recipe {
     display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
     gap: 10px;
+    align-items: start;
     padding: 13px 14px;
     border: 1px solid var(--app-border);
     border-radius: 9px;
     background: var(--app-surface-soft);
 }
 
+.unit-master-usage-recipe-visual {
+    display: grid;
+    width: 52px;
+    height: 52px;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    overflow: hidden;
+    place-items: center;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--app-primary) 8%, var(--app-surface));
+    color: var(--app-primary-hover);
+    text-decoration: none;
+}
+
+.unit-master-usage-recipe-visual:is(:hover, :focus-visible) {
+    border-color: var(--app-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary) 18%, transparent);
+}
+
+.unit-master-usage-recipe-visual img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.unit-master-usage-recipe-fallback {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
+}
+
+.unit-master-usage-recipe-fallback[hidden] {
+    display: none;
+}
+
+.unit-master-usage-recipe-fallback svg {
+    width: 25px;
+    height: 25px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+}
+
 .unit-master-usage-recipe > header {
     display: flex;
+    min-width: 0;
+    grid-column: 2;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
 }
 
 .unit-master-usage-recipe h3 {
+    min-width: 0;
     margin: 0;
     color: var(--app-text-strong);
     font-size: 14px;
+}
+
+.unit-master-usage-recipe h3 > a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.unit-master-usage-recipe h3 > a:is(:hover, :focus-visible) {
+    color: var(--app-primary-hover);
+    text-decoration: underline;
 }
 
 .unit-master-usage-recipe > header > a {
@@ -63599,6 +63661,7 @@ body.recipe-edit-standalone-page :is(
 
 .unit-master-usage-recipe ul {
     display: grid;
+    grid-column: 2;
     gap: 7px;
     margin: 0;
     padding: 0;
