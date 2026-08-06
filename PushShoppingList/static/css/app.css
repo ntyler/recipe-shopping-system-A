@@ -70981,7 +70981,6 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-recipe-empty button {
 body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-view:not([hidden]) {
     display: block;
     min-width: 0;
-    min-height: var(--recipe-edit-ingredient-view-table-height, 0);
     padding: 14px;
     box-sizing: border-box;
     overflow-x: clip;

@@ -29872,7 +29872,9 @@ function layoutRecipeIngredientSmartView() {
 }
 
 function scheduleRecipeIngredientSmartViewLayout() {
-    if (recipeEditIngredientSmartViewLayoutFrame) return;
+    if (recipeEditIngredientSmartViewLayoutFrame) {
+        window.cancelAnimationFrame(recipeEditIngredientSmartViewLayoutFrame);
+    }
     recipeEditIngredientSmartViewLayoutFrame = window.requestAnimationFrame(
         layoutRecipeIngredientSmartView,
     );
@@ -30145,6 +30147,9 @@ function setRecipeEditIngredientView(value, options = {}) {
 
     recipeEditIngredientView = view;
     section.dataset.recipeIngredientView = view;
+    section.querySelectorAll("[data-recipe-ingredient-view-panel]").forEach(panel => {
+        panel.hidden = panel.dataset.recipeIngredientViewPanel !== view;
+    });
     if (view === "recipe") {
         renderRecipeIngredientRecipeView();
     } else if (view === "smart") {
@@ -30154,9 +30159,6 @@ function setRecipeEditIngredientView(value, options = {}) {
         const selected = option.dataset.recipeIngredientViewOption === view;
         option.classList.toggle("is-active", selected);
         option.setAttribute("aria-checked", selected ? "true" : "false");
-    });
-    section.querySelectorAll("[data-recipe-ingredient-view-panel]").forEach(panel => {
-        panel.hidden = panel.dataset.recipeIngredientViewPanel !== view;
     });
     syncRecipeEditIngredientViewActions(section, view);
 

@@ -67,6 +67,237 @@ def test_smart_view_replaces_the_placeholder_and_reuses_shared_actions():
     assert "return addRecipeIngredientRow({}, { expanded: true });" in script
 
 
+def test_populated_table_to_smart_transition_remeasures_after_showing_panel():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    css = CSS_PATH.read_text(encoding="utf-8")
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the Smart View transition regression")
+
+    layout = _function(
+        script,
+        "layoutRecipeIngredientSmartView()",
+        "scheduleRecipeIngredientSmartViewLayout",
+    )
+    schedule = _function(
+        script,
+        "scheduleRecipeIngredientSmartViewLayout()",
+        "initRecipeIngredientSmartViewLayout",
+    )
+    render = _function(
+        script,
+        "renderRecipeIngredientSmartView()",
+        "toggleRecipeIngredientSmartView",
+    )
+    switch = _function(
+        script,
+        "setRecipeEditIngredientView(value, options = {})",
+        "recipeEditIngredientViewMenuItems",
+    )
+    smart_rule = _css_rule(
+        css,
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-smart-view:not([hidden])",
+    )
+
+    harness = r"""
+let recipeEditIngredientView = "table";
+let recipeEditExpandedSmartViewIngredientId = "";
+let recipeEditIngredientSmartViewLayoutFrame = 41;
+let recipeEditIngredientSmartViewLayoutWidth = 0;
+let recipeEditIngredientSmartViewResizeObserver = null;
+let nextFrameId = 42;
+let layoutCount = 0;
+let recipeRenderCount = 0;
+const frames = new Map();
+
+function makeCard() {
+    return {
+        dataset: {},
+        style: {},
+        isConnected: true,
+        getBoundingClientRect() {
+            return { height: smartPanel.hidden ? 0 : 96 };
+        },
+        remove() {
+            const index = grid.children.indexOf(this);
+            if (index >= 0) grid.children.splice(index, 1);
+            this.isConnected = false;
+        },
+    };
+}
+
+const rows = [
+    { id: "onion", values: { ingredient: "onion" }, querySelectorAll() { return []; } },
+    { id: "garlic", values: { ingredient: "garlic" }, querySelectorAll() { return []; } },
+];
+const grid = {
+    children: [],
+    dataset: {},
+    hidden: false,
+    get offsetHeight() { return smartPanel.hidden ? 0 : 192; },
+    appendChild(card) {
+        const currentIndex = this.children.indexOf(card);
+        if (currentIndex >= 0) this.children.splice(currentIndex, 1);
+        this.children.push(card);
+        card.isConnected = true;
+    },
+    closest() { return smartPanel; },
+    getBoundingClientRect() {
+        if (!smartPanel.hidden) layoutCount += 1;
+        return { width: smartPanel.hidden ? 0 : 820 };
+    },
+    querySelectorAll() { return this.children; },
+};
+const empty = { hidden: false };
+const add = { hidden: true };
+const tablePanel = {
+    dataset: { recipeIngredientViewPanel: "table" },
+    hidden: false,
+    getBoundingClientRect() { return { height: 880 }; },
+};
+const recipePanel = {
+    dataset: { recipeIngredientViewPanel: "recipe" },
+    hidden: true,
+};
+const smartPanel = {
+    dataset: { recipeIngredientViewPanel: "smart" },
+    hidden: true,
+};
+const panels = [tablePanel, recipePanel, smartPanel];
+const menuOptions = ["recipe", "smart", "table"].map(view => ({
+    dataset: { recipeIngredientViewOption: view },
+    classList: { toggle() {} },
+    setAttribute() {},
+}));
+const menu = { querySelectorAll() { return menuOptions; } };
+const section = {
+    dataset: {},
+    style: { setProperty() {} },
+    querySelector(selector) {
+        return selector.includes('="table"') ? tablePanel : null;
+    },
+    querySelectorAll() { return panels; },
+};
+const document = {
+    querySelector(selector) {
+        if (selector === ".recipe-edit-ingredients-section") return section;
+        if (selector === "[data-recipe-ingredient-view-menu]") return menu;
+        if (selector === "[data-recipe-ingredient-smart-grid]") return grid;
+        if (selector === "[data-recipe-ingredient-smart-empty]") return empty;
+        if (selector === "[data-recipe-ingredient-smart-add]") return add;
+        return null;
+    },
+};
+const window = {
+    requestAnimationFrame(callback) {
+        const id = nextFrameId++;
+        frames.set(id, callback);
+        return id;
+    },
+    cancelAnimationFrame(id) { frames.delete(id); },
+};
+
+function normalizeRecipeEditIngredientView(value) { return value; }
+function recipeEditIngredientViewScrollState() { return { top: 120 }; }
+function restoreRecipeEditIngredientViewScroll() {}
+function renderRecipeIngredientRecipeView() { recipeRenderCount += 1; }
+function syncRecipeEditIngredientViewActions() {}
+function saveRecipeEditIngredientView() {}
+function refreshRecipeEditIngredientColumnLayout() {}
+function syncRecipeEditIngredientTableHeaderScroll() {}
+function recipeEditIngredientRows() { return rows; }
+function fieldValuesFromRow(row) { return row.values; }
+function recipeIngredientSubstitutionDomGroups() { return []; }
+function recipeIngredientRecipeViewHasContent(values) { return Boolean(values.ingredient); }
+function recipeIngredientSmartViewEntries(row, values) {
+    return [{
+        key: row.id,
+        row,
+        sourceRow: row,
+        values,
+        alternativeGroups: [],
+        choiceParentValues: values,
+        choiceAlternativeGroups: [],
+        showChoiceControls: true,
+        isProjectedChoiceComponent: false,
+    }];
+}
+function createRecipeIngredientSmartViewCard() { return makeCard(); }
+function renderRecipeIngredientSmartViewCard(card, row, values, alternatives, options) {
+    card.dataset.smartViewIngredientId = options.key;
+    card.renderedIngredient = values.ingredient;
+    card.renderedWhileHidden = smartPanel.hidden;
+}
+function initRecipeIngredientSmartViewLayout() {}
+""" + layout + schedule + render + switch + r"""
+
+function drainFrames() {
+    while (frames.size) {
+        const pending = [...frames.entries()];
+        frames.clear();
+        pending.forEach(([, callback]) => callback());
+    }
+}
+function smartState() {
+    return {
+        panelVisible: !smartPanel.hidden,
+        gridVisible: !grid.hidden,
+        emptyHidden: empty.hidden,
+        addVisible: !add.hidden,
+        cards: grid.children.map(card => ({
+            ingredient: card.renderedIngredient,
+            renderedWhileHidden: card.renderedWhileHidden,
+            visible: !smartPanel.hidden && !grid.hidden && Boolean(card.style.gridRow),
+        })),
+        columns: grid.dataset.smartColumns || "",
+        measuredWidth: recipeEditIngredientSmartViewLayoutWidth,
+        layoutCount,
+    };
+}
+
+setRecipeEditIngredientView("smart");
+drainFrames();
+const firstSmart = smartState();
+
+setRecipeEditIngredientView("recipe");
+drainFrames();
+setRecipeEditIngredientView("table");
+drainFrames();
+setRecipeEditIngredientView("smart");
+drainFrames();
+const secondSmart = smartState();
+
+process.stdout.write(JSON.stringify({ firstSmart, secondSmart, recipeRenderCount }));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    expected_cards = [
+        {"ingredient": "onion", "renderedWhileHidden": False, "visible": True},
+        {"ingredient": "garlic", "renderedWhileHidden": False, "visible": True},
+    ]
+    for state in (result["firstSmart"], result["secondSmart"]):
+        assert state["panelVisible"] is True
+        assert state["gridVisible"] is True
+        assert state["emptyHidden"] is True
+        assert state["addVisible"] is True
+        assert state["cards"] == expected_cards
+        assert state["columns"] == "2"
+        assert state["measuredWidth"] == 820
+    assert result["firstSmart"]["layoutCount"] >= 1
+    assert result["secondSmart"]["layoutCount"] > result["firstSmart"]["layoutCount"]
+    assert result["recipeRenderCount"] == 1
+    assert "--recipe-edit-ingredient-view-table-height" not in smart_rule
+
+
 def test_smart_cards_reuse_images_status_store_sections_and_structured_options():
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
