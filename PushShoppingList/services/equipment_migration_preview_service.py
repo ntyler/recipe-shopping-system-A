@@ -77,11 +77,11 @@ def workspace_id_for_output_root(output_root):
     parts = list(Path(output_root).parts)
     lowered = [part.casefold() for part in parts]
     if "users" in lowered:
-        index = lowered.index("users")
+        index = max(index for index, part in enumerate(lowered) if part == "users")
         if index + 1 < len(parts):
             return parts[index + 1]
     if "guests" in lowered:
-        index = lowered.index("guests")
+        index = max(index for index, part in enumerate(lowered) if part == "guests")
         if index + 1 < len(parts):
             return f"guest:{parts[index + 1]}"
     return "local"

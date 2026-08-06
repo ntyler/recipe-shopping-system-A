@@ -19,6 +19,7 @@ from PushShoppingList.services.equipment_normalization_service import (
 
 
 TRUE_VALUES = {"1", "true", "yes", "y", "on"}
+PHASE3A_MIGRATION_TOKEN = "phase3a-additive-stage-v1"
 
 
 def _env_enabled(name):
@@ -122,9 +123,19 @@ def structured_equipment_schema_available(connection):
     return required.issubset(existing)
 
 
-def ensure_structured_equipment_schema(connection, *, authorized=False):
+def ensure_structured_equipment_schema(
+    connection,
+    *,
+    authorized=False,
+    migration_token="",
+):
     """Create the additive schema only after an explicit caller authorization."""
-    if not authorized or not structured_equipment_schema_writes_enabled():
+    migration_authorized = (
+        authorized and str(migration_token or "") == PHASE3A_MIGRATION_TOKEN
+    )
+    if not authorized or not (
+        structured_equipment_schema_writes_enabled() or migration_authorized
+    ):
         raise PermissionError(
             "Structured equipment schema writes are locked. Set "
             "RECIPE_EQUIPMENT_SCHEMA_WRITES_ENABLED=true and pass authorized=True."
@@ -295,8 +306,21 @@ def ensure_structured_equipment_schema(connection, *, authorized=False):
     return True
 
 
-def replace_recipe_requirements(connection, user_id, recipe_id, requirements, *, authorized=False):
-    if not authorized or not structured_equipment_write_enabled():
+def replace_recipe_requirements(
+    connection,
+    user_id,
+    recipe_id,
+    requirements,
+    *,
+    authorized=False,
+    migration_token="",
+):
+    migration_authorized = (
+        authorized and str(migration_token or "") == PHASE3A_MIGRATION_TOKEN
+    )
+    if not authorized or not (
+        structured_equipment_write_enabled() or migration_authorized
+    ):
         raise PermissionError(
             "Structured equipment writes are locked. Set "
             "RECIPE_EQUIPMENT_STRUCTURED_WRITE_ENABLED=true and pass authorized=True."

@@ -1,6 +1,7 @@
 import hashlib
 import json
 import sqlite3
+from pathlib import Path
 
 from PushShoppingList.services.equipment_migration_preview_service import (
     build_equipment_migration_preview,
@@ -100,3 +101,13 @@ def test_preview_discovery_excludes_hidden_backup_outputs(tmp_path):
     from PushShoppingList.services.equipment_migration_preview_service import discover_output_roots
 
     assert discover_output_roots(repository_root) == [active.resolve()]
+
+
+def test_workspace_resolution_uses_repository_users_segment_on_windows_style_path():
+    from PushShoppingList.services.equipment_migration_preview_service import workspace_id_for_output_root
+
+    path = Path(
+        "C:/Users/Tyler/repo/PushShoppingList/user_data/users/workspace-a/"
+        "recipe-extractor/data/output"
+    )
+    assert workspace_id_for_output_root(path) == "workspace-a"

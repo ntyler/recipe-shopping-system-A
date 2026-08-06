@@ -40,3 +40,17 @@ python scripts/preview_equipment_requirement_migration.py
 The command supports no apply mode. It opens SQLite with `mode=ro`, enables
 `PRAGMA query_only`, reads recipe JSON, prints JSON to stdout, and verifies the
 database hash is unchanged before exiting.
+
+## Approved Phase 3A staging
+
+After explicit approval, create verified backups and stage only the additive
+schema and new-table records with:
+
+```powershell
+python scripts/stage_equipment_requirement_migration.py --approval PHASE3A_APPROVED
+```
+
+The command refuses any other approval phrase. It verifies a SQLite backup and
+per-file JSON hashes before schema installation, checks the legacy equipment
+tables before and after the transaction, leaves application feature flags off,
+and records a source hash so an unchanged rerun is a read-only no-op.
