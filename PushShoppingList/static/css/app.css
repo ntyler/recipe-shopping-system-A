@@ -73700,6 +73700,52 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         .recipe-edit-selected-option-line-item,
         .recipe-edit-alternative-component-summary
     ):is(:hover, :focus-within) {
-    background: color-mix(in srgb, var(--app-primary-soft) 18%, var(--app-surface)) !important;
-    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 52%, transparent) !important;
+    background: color-mix(in srgb, var(--app-surface-soft) 80%, transparent) !important;
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 44%, transparent) !important;
+}
+
+/* Ingredient editor v105: grouped selected rows reach the same edges as standard rows. */
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
+        > .recipe-edit-selected-option-line-items
+        > .recipe-edit-selected-option-line-item {
+        isolation: isolate;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
+        > .recipe-edit-selected-option-line-items
+        > .recipe-edit-selected-option-line-item:is(:hover, :focus-within) {
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
+        > .recipe-edit-selected-option-line-items
+        > .recipe-edit-selected-option-line-item:is(:hover, :focus-within)::before {
+        content: "";
+        position: absolute;
+        z-index: -1;
+        inset: 0 -12px;
+        background: color-mix(in srgb, var(--app-surface-soft) 80%, transparent);
+        box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 44%, transparent);
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
+        > .recipe-edit-selected-option-line-items
+        > .recipe-edit-selected-option-line-item:first-child:is(:hover, :focus-within)::before {
+        top: -16px;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice
+        > .recipe-edit-selected-option-line-items
+        > .recipe-edit-selected-option-line-item:not(.is-ingredient-column-grouped-away):not(
+            :has(~ .recipe-edit-selected-option-line-item:not(.is-ingredient-column-grouped-away))
+        ):is(:hover, :focus-within)::before {
+        bottom: -8px;
+    }
 }

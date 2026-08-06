@@ -6806,5 +6806,64 @@ def test_nested_ingredient_hover_highlights_only_the_visual_row():
     leaf_rule = hover_css[leaf_start:hover_css.index("}", leaf_start)]
     assert ".recipe-edit-alternative-component-summary" in leaf_rule
     assert "):is(:hover, :focus-within)" in leaf_rule
-    assert "background: color-mix(" in leaf_rule
-    assert "box-shadow: inset 3px 0 0" in leaf_rule
+    assert (
+        "background: color-mix(in srgb, var(--app-surface-soft) 80%, transparent) !important;"
+        in leaf_rule
+    )
+    assert (
+        "box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 44%, transparent) !important;"
+        in leaf_rule
+    )
+
+    projected_marker = (
+        "/* Ingredient editor v105: grouped selected rows reach the same edges as standard rows. */"
+    )
+    assert css.index(projected_marker) > css.index(marker)
+    projected_css = css[css.index(projected_marker):]
+
+    grouped_row_start = projected_css.index(
+        "> .recipe-edit-ingredient-row.is-ingredient-store-section-grouped-choice\n"
+        "        > .recipe-edit-selected-option-line-items\n"
+        "        > .recipe-edit-selected-option-line-item {"
+    )
+    grouped_row_rule = projected_css[
+        grouped_row_start:projected_css.index("}", grouped_row_start)
+    ]
+    assert "isolation: isolate;" in grouped_row_rule
+
+    grouped_hover_start = projected_css.index(
+        "> .recipe-edit-selected-option-line-item:is(:hover, :focus-within) {"
+    )
+    grouped_hover_rule = projected_css[
+        grouped_hover_start:projected_css.index("}", grouped_hover_start)
+    ]
+    assert "background: transparent !important;" in grouped_hover_rule
+    assert "box-shadow: none !important;" in grouped_hover_rule
+
+    grouped_surface_start = projected_css.index(
+        "> .recipe-edit-selected-option-line-item:is(:hover, :focus-within)::before {"
+    )
+    grouped_surface_rule = projected_css[
+        grouped_surface_start:projected_css.index("}", grouped_surface_start)
+    ]
+    assert 'content: "";' in grouped_surface_rule
+    assert "position: absolute;" in grouped_surface_rule
+    assert "z-index: -1;" in grouped_surface_rule
+    assert "inset: 0 -12px;" in grouped_surface_rule
+    assert "background: color-mix(" in grouped_surface_rule
+    assert "box-shadow: inset 3px 0 0" in grouped_surface_rule
+
+    assert (
+        "> .recipe-edit-selected-option-line-item:first-child:is(:hover, :focus-within)::before {"
+        in projected_css
+    )
+    assert "top: -16px;" in projected_css
+    assert (
+        "> .recipe-edit-selected-option-line-item:not(.is-ingredient-column-grouped-away):not("
+        in projected_css
+    )
+    assert (
+        ":has(~ .recipe-edit-selected-option-line-item:not(.is-ingredient-column-grouped-away))"
+        in projected_css
+    )
+    assert "bottom: -8px;" in projected_css
