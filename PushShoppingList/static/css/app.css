@@ -64422,16 +64422,47 @@ body.recipe-edit-standalone-page :is(
 }
 
 .equipment-master-registry > header {
-    align-items: flex-start;
+    display: block;
+}
+
+.equipment-master-registry-copy {
+    max-width: 760px;
+}
+
+.equipment-master-heading-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+}
+
+.equipment-master-read-only-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding: 3px 8px;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 45%, var(--app-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--app-primary) 9%, transparent);
+    color: var(--app-primary);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .025em;
+    line-height: 1;
+    text-transform: uppercase;
 }
 
 .equipment-master-result-count {
-    max-width: 360px;
-    color: var(--app-muted);
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    margin-top: 8px;
+    color: var(--app-text);
     font-size: 12px;
-    font-weight: 750;
+    font-weight: 800;
     line-height: 1.4;
-    text-align: right;
+    text-align: left;
 }
 
 .equipment-master-page .equipment-master-toolbar {
@@ -64449,6 +64480,10 @@ body.recipe-edit-standalone-page :is(
 .equipment-master-thumbnail-field {
     grid-column: span 2;
     min-width: 0;
+}
+
+.equipment-master-toolbar .master-data-search-field {
+    grid-column: span 3;
 }
 
 .equipment-master-page .equipment-master-toolbar label > span,
@@ -64499,6 +64534,18 @@ body.recipe-edit-standalone-page :is(
     color: var(--app-text);
 }
 
+.equipment-master-page .equipment-master-toolbar .master-data-thumbnail-size-reset {
+    border-color: transparent;
+    background: transparent;
+    color: var(--app-muted);
+}
+
+.equipment-master-page .equipment-master-toolbar .master-data-thumbnail-size-reset:is(:hover, :focus-visible) {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text-strong);
+}
+
 .equipment-master-toolbar .master-data-user-filter-note {
     grid-column: auto;
     grid-row: auto;
@@ -64510,8 +64557,65 @@ body.recipe-edit-standalone-page :is(
     justify-items: stretch;
 }
 
+.equipment-master-thumbnail-field .master-data-thumbnail-size-controls {
+    grid-template-columns: 34px minmax(54px, 1fr) 34px auto;
+    gap: 6px;
+}
+
 .equipment-master-category-list {
+    align-items: start;
     margin-top: 0;
+}
+
+.equipment-master-category .master-data-equipment-details {
+    margin-top: 6px;
+}
+
+.equipment-master-category .master-data-equipment-details summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    width: auto;
+    min-height: 28px;
+    margin-left: -7px;
+    padding: 3px 7px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--app-muted);
+    list-style: none;
+    transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.equipment-master-category .master-data-equipment-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.equipment-master-category .master-data-equipment-details summary::after {
+    width: 5px;
+    height: 5px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    content: "";
+    transform: rotate(45deg) translateY(-1px);
+    transition: transform 140ms ease;
+}
+
+.equipment-master-category .master-data-equipment-details[open] summary::after {
+    transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.equipment-master-category .master-data-equipment-details summary:is(:hover, :focus-visible),
+.equipment-master-category .master-data-equipment-details[open] summary {
+    border-color: color-mix(in srgb, var(--app-primary) 40%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary) 8%, transparent);
+    color: var(--app-primary);
+    outline: none;
+}
+
+.equipment-master-category .master-data-equipment-details > div {
+    margin-top: 4px;
+    padding: 4px 8px;
+    border-left: 2px solid color-mix(in srgb, var(--app-primary) 55%, var(--app-border));
 }
 
 .equipment-master-category .master-data-table-wrap {
@@ -64614,6 +64718,12 @@ body.recipe-edit-standalone-page :is(
     text-underline-offset: 3px;
 }
 
+@media (max-width: 1280px) {
+    .equipment-master-category-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 @media (max-width: 760px) {
     .equipment-master-registry {
         padding: 14px;
@@ -64625,9 +64735,13 @@ body.recipe-edit-standalone-page :is(
         gap: 8px;
     }
 
-    .equipment-master-result-count {
+    .equipment-master-registry-copy {
         max-width: none;
-        text-align: left;
+    }
+
+    .equipment-master-heading-row {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .equipment-master-page .equipment-master-toolbar {

@@ -459,6 +459,10 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<span>Workspace registry</span>' in equipment_html
     assert '<h2 id="equipmentRegistryTitle">Equipment Registry</h2>' in equipment_html
     assert "Recipe-derived equipment is grouped by type and remains read-only." in equipment_html
+    assert "Use recipe counts to review its source recipes." in equipment_html
+    assert 'data-equipment-master-read-only' in equipment_html
+    assert "Recipe-derived" in equipment_html
+    assert "Read-only" in equipment_html
     assert 'class="master-data-results-header"' not in equipment_html
     assert "Showing 1-2 of 2 equipment." in equipment_html
     assert '<th scope="col">Item</th>' in equipment_html
@@ -476,10 +480,10 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="col">Normalized Name</th>' not in equipment_html
     assert '<th scope="col">Image</th>' not in equipment_html
     assert '<section class="unit-master-category equipment-master-category"' in equipment_html
-    assert '<h3 id="equipmentCategory-1">COOKWARE</h3>' in equipment_html
-    assert '<h3 id="equipmentCategory-2">PREP TOOLS</h3>' in equipment_html
-    assert 'aria-label="COOKWARE equipment"' in equipment_html
-    assert 'aria-label="PREP TOOLS equipment"' in equipment_html
+    assert '<h3 id="equipmentCategory-1">Cookware</h3>' in equipment_html
+    assert '<h3 id="equipmentCategory-2">Prep Tools</h3>' in equipment_html
+    assert 'aria-label="Cookware equipment"' in equipment_html
+    assert 'aria-label="Prep Tools equipment"' in equipment_html
     assert 'unit-master-usage-button equipment-master-usage-button' in equipment_html
     assert 'data-equipment-master-usage-button' in equipment_html
     assert 'aria-controls="equipmentMasterUsageDialog"' in equipment_html
@@ -800,8 +804,8 @@ def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch,
     assert "Large pot" in cookware_html
     assert "Whisk" not in cookware_html
     assert '<section class="unit-master-category equipment-master-category"' in cookware_html
-    assert '<h3 id="equipmentCategory-1">COOKWARE</h3>' in cookware_html
-    assert 'aria-label="COOKWARE equipment"' in cookware_html
+    assert '<h3 id="equipmentCategory-1">Cookware</h3>' in cookware_html
+    assert 'aria-label="Cookware equipment"' in cookware_html
 
 
 def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp_path):
@@ -891,11 +895,12 @@ def test_equipment_registry_renders_single_name_created_details_and_unused_state
 
     assert response.status_code == 200
     assert "Showing 1-1 of 1 equipment." in html
-    assert '<h3 id="equipmentCategory-1">COOKWARE</h3>' in html
+    assert '<h3 id="equipmentCategory-1">Cookware</h3>' in html
     assert html.count("<strong>Large pot</strong>") == 1
     assert "<code>large pot</code>" not in html
     assert '<details class="master-data-equipment-details">' in html
     assert ">Details</summary>" in html
+    assert 'aria-label="Show created date for Large pot"' in html
     assert ">Created</span>" in html
     assert "<strong>Unused</strong>" in html
     assert "<small>0 uses</small>" in html
@@ -1782,6 +1787,9 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert 'class="unit-master-category equipment-master-category"' in template
     assert ".equipment-master-category-list" in css
     assert ".equipment-master-category .master-data-record-row" in css
+    assert ".equipment-master-read-only-badge" in css
+    assert "@media (max-width: 1280px)" in css
+    assert ".equipment-master-category .master-data-equipment-details summary:is(:hover, :focus-visible)" in css
     assert "data-master-mobile-record-name" in template
     assert "data-master-mobile-section-summary" in template
     assert "data-master-mobile-record-toggle" in template

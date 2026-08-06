@@ -82,7 +82,7 @@
                     <option value="" {% if not master_data.equipment_section %}selected{% endif %}>All types</option>
                     {% for section in master_data.equipment_section_options %}
                         <option value="{{ section }}" {% if master_data.equipment_section == section %}selected{% endif %}>
-                            {{ section }}
+                            {{ section | title }}
                         </option>
                     {% endfor %}
                 </select>
@@ -219,7 +219,7 @@
                     <div class="master-data-item-copy">
                         <strong>{{ row.name }}</strong>
                         <details class="master-data-equipment-details">
-                            <summary>Details</summary>
+                            <summary aria-label="Show created date for {{ row.name }}">Details</summary>
                             <div>
                                 <span>Created</span>
                                 <time datetime="{{ row.created_at }}" title="{{ row.created_at }}">
@@ -1111,18 +1111,24 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                      aria-labelledby="equipmentRegistryTitle"
                      data-equipment-master-registry>
                 <header data-master-results-header>
-                    <div>
+                    <div class="equipment-master-registry-copy">
                         <span>Workspace registry</span>
-                        <h2 id="equipmentRegistryTitle">Equipment Registry</h2>
-                        <p>Recipe-derived equipment is grouped by type and remains read-only.</p>
+                        <div class="equipment-master-heading-row">
+                            <h2 id="equipmentRegistryTitle">Equipment Registry</h2>
+                            <span class="equipment-master-read-only-badge"
+                                  data-equipment-master-read-only>
+                                Recipe-derived <span aria-hidden="true">&middot;</span> Read-only
+                            </span>
+                        </div>
+                        <p>Recipe-derived equipment is grouped by type and remains read-only. Use recipe counts to review its source recipes.</p>
+                        <strong class="equipment-master-result-count" aria-live="polite">
+                            {% if master_data.total_count %}
+                                Showing {{ master_data.offset + 1 }}-{{ master_data.offset + (master_data.rows|length) }} of {{ master_data.total_count }} {{ master_data.empty_label }}.
+                            {% else %}
+                                No {{ master_data.empty_label }} found.
+                            {% endif %}
+                        </strong>
                     </div>
-                    <strong class="equipment-master-result-count" aria-live="polite">
-                        {% if master_data.total_count %}
-                            Showing {{ master_data.offset + 1 }}-{{ master_data.offset + (master_data.rows|length) }} of {{ master_data.total_count }} {{ master_data.empty_label }}.
-                        {% else %}
-                            No {{ master_data.empty_label }} found.
-                        {% endif %}
-                    </strong>
                 </header>
 
                 {{ render_master_data_filters(master_data, include_thumbnail_controls=true) }}
@@ -1134,12 +1140,12 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             <section class="unit-master-category equipment-master-category"
                                      aria-labelledby="equipmentCategory-{{ loop.index }}">
                                 <header>
-                                    <h3 id="equipmentCategory-{{ loop.index }}">{{ group.section }}</h3>
+                                    <h3 id="equipmentCategory-{{ loop.index }}">{{ group.section | title }}</h3>
                                     <span>{{ group.rows | length }} {% if group.rows | length == 1 %}item{% else %}items{% endif %}</span>
                                 </header>
                                 <div class="master-data-table-wrap">
                                     <table class="master-data-table master-data-equipment-table{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}"
-                                           aria-label="{{ group.section }} equipment">
+                                           aria-label="{{ group.section | title }} equipment">
                                         <thead>
                                             <tr>
                                                 <th scope="col">Item</th>
