@@ -178,12 +178,18 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         <small class="unit-master-field-error" id="unitCanonicalError" data-unit-master-name-error hidden></small>
                     </label>
                     <label class="unit-master-field">
-                        <span>Category</span>
-                        <select data-unit-master-category-select aria-describedby="unitCategoryError">
+                        <span class="unit-master-field-label">
+                            <span>Category</span>
+                            <small>System-managed</small>
+                        </span>
+                        <select data-unit-master-category-select aria-describedby="unitCategoryHelp unitCategoryError">
                             {% for category in master_data.category_options %}
                                 <option value="{{ category.key }}">{{ category.label }}</option>
                             {% endfor %}
                         </select>
+                        <small class="unit-master-field-help" id="unitCategoryHelp">
+                            Choose the closest culinary group. Time, temperature, size, and preparation are captured elsewhere.
+                        </small>
                         <small class="unit-master-field-error" id="unitCategoryError" data-unit-master-category-error hidden></small>
                     </label>
                 </div>

@@ -304,6 +304,19 @@ def test_collisions_and_repeated_submissions_do_not_create_duplicates(
         assert duplicate_aliases.status_code == 422
         assert set(duplicate_aliases.get_json()["errors"]["aliases"]) == {"1", "2"}
 
+        invented_category = client.post(
+            "/api/master-data/units",
+            json={
+                "canonical_name": "recipe minute",
+                "category": "time",
+                "aliases": [],
+            },
+        )
+        assert invented_category.status_code == 422
+        assert invented_category.get_json()["errors"]["category"] == (
+            "Choose one of the system-managed unit categories."
+        )
+
 
 def test_registry_is_workspace_isolated_and_unit_routes_require_authorization(
     unit_registry_app,
@@ -367,6 +380,19 @@ def test_units_page_exposes_accessible_persistent_editor_and_import_offer(
     assert dialog is not None
     assert dialog.select_one("[data-unit-master-name]") is not None
     assert dialog.select_one("[data-unit-master-category-select]") is not None
+    category_select = dialog.select_one("[data-unit-master-category-select]")
+    assert category_select.get("aria-describedby") == "unitCategoryHelp unitCategoryError"
+    assert [option.get_text(strip=True) for option in category_select.select("option")] == [
+        "Volume",
+        "Weight",
+        "Count & Package",
+        "Small Amounts & Optional",
+    ]
+    assert "System-managed" in dialog.select_one(".unit-master-field-label").get_text(
+        " ", strip=True
+    )
+    category_help = dialog.select_one("#unitCategoryHelp").get_text(" ", strip=True)
+    assert "Time, temperature, size, and preparation" in category_help
     assert dialog.select_one("[data-unit-master-alias-chips]") is not None
     assert dialog.select_one("[data-unit-master-save]") is not None
     ai_button = dialog.select_one("[data-unit-master-ai-suggest]")

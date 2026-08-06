@@ -1651,7 +1651,7 @@ def _unit_registry_validation(connection, user_id, values, unit_id=""):
     if canonical_name and not canonical_key:
         errors["canonical_name"] = "Enter a canonical name with letters or numbers."
     if category not in UNIT_REGISTRY_CATEGORY_KEYS:
-        errors["category"] = "Choose a unit category."
+        errors["category"] = "Choose one of the system-managed unit categories."
 
     aliases = []
     alias_keys = set()
