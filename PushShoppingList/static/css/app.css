@@ -64737,6 +64737,7 @@ body.recipe-edit-standalone-page :is(
     min-height: 36px !important;
     align-items: center;
     justify-content: center;
+    margin: 0;
     padding: 5px 10px !important;
     border: 1px solid var(--app-primary);
     border-radius: 7px;

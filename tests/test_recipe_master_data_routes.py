@@ -2057,6 +2057,11 @@ def test_equipment_usage_pills_are_centered_and_consistently_sized():
     ):
         assert declaration in date_rule
 
+    edit_selector = ".equipment-master-display-edit {"
+    edit_start = css.index(edit_selector)
+    edit_rule = css[edit_start:css.index("}", edit_start)]
+    assert "margin: 0;" in edit_rule
+
     assert ".equipment-master-usage-button span {" in css
     assert "line-height: 1;" in css[
         css.index(".equipment-master-usage-button span {"):
