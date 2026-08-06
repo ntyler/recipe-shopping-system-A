@@ -16,6 +16,7 @@ from PushShoppingList.services.ingredient_unit_service import canonical_unit_opt
 from PushShoppingList.services.ingredient_unit_service import canonical_unit
 from PushShoppingList.services.ingredient_unit_service import misplaced_unit_ingredient_details
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
+from PushShoppingList.services.ingredient_unit_service import UNIT_REGISTRY_CATEGORIES
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import recipe_url_name
 
@@ -1191,12 +1192,6 @@ def ensure_recipe_master_schema(connection=None):
 
 
 UNIT_REGISTRY_SEED_VERSION = "canonical_units_v1"
-UNIT_REGISTRY_CATEGORIES = (
-    ("volume", "Volume"),
-    ("weight", "Weight"),
-    ("count_package", "Count & Package"),
-    ("optional", "Small Amounts & Optional"),
-)
 UNIT_REGISTRY_CATEGORY_KEYS = frozenset(key for key, _label in UNIT_REGISTRY_CATEGORIES)
 
 

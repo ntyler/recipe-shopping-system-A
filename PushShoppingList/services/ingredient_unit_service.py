@@ -198,6 +198,14 @@ def normalize_recipe_fraction_fields(recipe_data):
     return recipe_data
 
 
+UNIT_REGISTRY_CATEGORIES = (
+    ("volume", "Volume"),
+    ("weight", "Weight"),
+    ("count_package", "Count & Package"),
+    ("optional", "Small Amounts & Optional"),
+)
+
+
 CANONICAL_UNITS = (
     ("volume_teaspoon", "teaspoon", "volume"),
     ("volume_tablespoon", "tablespoon", "volume"),
@@ -313,6 +321,10 @@ def _static_unit_registry_payload():
     return {
         "units": canonical_unit_options(),
         "aliases": canonical_unit_aliases(),
+        "categories": [
+            {"key": key, "label": label}
+            for key, label in UNIT_REGISTRY_CATEGORIES
+        ],
     }
 
 

@@ -45381,19 +45381,21 @@ function recipeIngredientUnitRegistry() {
         return recipeIngredientUnitRegistryCache;
     }
 
-    let payload = { units: [], aliases: {} };
+    let payload = { units: [], aliases: {}, categories: [] };
     try {
         payload = JSON.parse(sourceText || "{}") || payload;
     } catch (error) {
         console.warn("Unable to load the ingredient unit registry.", error);
     }
     const units = Array.isArray(payload.units) ? payload.units : [];
+    const categories = Array.isArray(payload.categories) ? payload.categories : [];
     const aliases = {
         ...(payload.aliases && typeof payload.aliases === "object" ? payload.aliases : {}),
     };
     recipeIngredientUnitRegistryCache = {
         signature,
         units,
+        categories,
         aliases,
         byName: new Map(units.map(unit => [String(unit.name || "").toLowerCase(), unit])),
     };
@@ -45687,9 +45689,9 @@ function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
         const name = String(unit.name || "");
         return !query || recipeIngredientUnitKey(name).includes(query);
     });
-    const optionRows = [{ id: "", name: "No unit", custom: false }, ...units];
-
-    const optionMarkup = optionRows.map((unit, index) => {
+    let optionIndex = 0;
+    const unitOptionMarkup = (unit, extraClass = "") => {
+        const index = optionIndex++;
         const value = String(unit.name || "");
         const selected = value
             ? value.toLowerCase() === String(selectedName).toLowerCase()
@@ -45699,7 +45701,7 @@ function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
                     id="recipeIngredientUnitOption${index}"
                     role="option"
                     aria-selected="${selected ? "true" : "false"}"
-                    class="recipe-edit-unit-option${selected ? " is-selected" : ""}"
+                    class="recipe-edit-unit-option${extraClass}${selected ? " is-selected" : ""}"
                     data-unit-value="${escapeAttribute(value)}"
                     onclick="return chooseRecipeIngredientUnit(this)">
                 <span>${escapeHtml(value || "No unit")}</span>
@@ -45707,11 +45709,31 @@ function renderRecipeIngredientUnitMenu(menu, input, options = {}) {
             </button>
         `;
         return option;
+    };
+    const noUnitMarkup = unitOptionMarkup(
+        { id: "", name: "", custom: false },
+        " recipe-edit-unit-no-unit-option",
+    );
+    const categoryMarkup = registry.categories.map((category, categoryIndex) => {
+        const categoryKey = String(category.key || "");
+        const categoryUnits = units.filter(unit => String(unit.category || "") === categoryKey);
+        if (!categoryUnits.length) return "";
+        const labelId = `recipeIngredientUnitCategory${categoryIndex}`;
+        return `
+            <div class="recipe-edit-menu-group recipe-edit-unit-category"
+                 role="group"
+                 aria-labelledby="${labelId}">
+                <div class="recipe-edit-menu-group-label recipe-edit-unit-category-label"
+                     id="${labelId}">${escapeHtml(category.label || categoryKey)}</div>
+                ${categoryUnits.map(unit => unitOptionMarkup(unit)).join("")}
+            </div>
+        `;
     }).join("");
 
     menu.innerHTML = `
         <div class="recipe-edit-unit-menu-list" data-unit-menu-list>
-            ${optionMarkup}
+            ${noUnitMarkup}
+            ${categoryMarkup}
             ${!units.length && query ? '<div class="recipe-edit-unit-empty">No matching units</div>' : ""}
         </div>
         <div class="recipe-edit-unit-menu-footer">

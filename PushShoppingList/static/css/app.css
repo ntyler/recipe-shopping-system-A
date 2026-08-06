@@ -51793,6 +51793,22 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel .recipe-e
     scrollbar-width: thin;
 }
 
+.recipe-edit-row-menu.recipe-edit-unit-menu .recipe-edit-unit-category {
+    gap: 1px;
+    padding: 5px 0 3px;
+}
+
+.recipe-edit-row-menu.recipe-edit-unit-menu .recipe-edit-unit-category-label {
+    position: sticky;
+    z-index: 2;
+    top: 0;
+    padding: 5px 9px 4px;
+    background: var(--app-surface);
+    color: var(--app-primary-hover);
+    pointer-events: none;
+    user-select: none;
+}
+
 .recipe-edit-row-menu.recipe-edit-unit-menu .recipe-edit-unit-menu-footer {
     flex: 0 0 auto;
     margin-top: 6px;

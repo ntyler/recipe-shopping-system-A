@@ -6,6 +6,8 @@ import pytest
 
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services.ingredient_unit_service import CANONICAL_UNITS
+from PushShoppingList.services.ingredient_unit_service import UNIT_REGISTRY_CATEGORIES
+from PushShoppingList.services.ingredient_unit_service import _static_unit_registry_payload
 from PushShoppingList.services.ingredient_unit_service import canonical_unit
 from PushShoppingList.services.ingredient_unit_service import display_unit
 from PushShoppingList.services.ingredient_unit_service import misplaced_unit_ingredient_details
@@ -573,11 +575,13 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert "const signature = sourceText;" in app_js
     assert 'payload = JSON.parse(sourceText || "{}") || payload;' in app_js
     assert "const units = Array.isArray(payload.units) ? payload.units : [];" in app_js
+    assert "const categories = Array.isArray(payload.categories) ? payload.categories : [];" in app_js
     registry_function = app_js[
         app_js.index("function recipeIngredientUnitRegistry()") :
         app_js.index("function recipeIngredientUnitKey")
     ]
     assert "customUnits" not in registry_function
+    assert "categories," in registry_function
     assert 'fetch("/api/master-data/units"' in app_js
     assert "function refreshRecipeIngredientUnitRegistry()" in app_js
     assert "if (savedAsCustom && selectedValue)" in app_js
@@ -586,6 +590,11 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert 'data-unit-action="edit-custom"' not in app_js
     assert 'data-unit-action="delete-custom"' not in app_js
     assert 'class="recipe-edit-unit-menu-list" data-unit-menu-list' in app_js
+    assert 'class="recipe-edit-menu-group recipe-edit-unit-category"' in app_js
+    assert 'role="group"' in app_js
+    assert 'class="recipe-edit-menu-group-label recipe-edit-unit-category-label"' in app_js
+    assert '" recipe-edit-unit-no-unit-option"' in app_js
+    assert '{ id: "", name: "", custom: false }' in app_js
     assert 'class="recipe-edit-unit-menu-footer"' in app_js
     assert 'window.open(masterDataViewerUrl("/admin/master-data/units")' in app_js
     assert "Add custom unit…" in app_js
@@ -609,6 +618,9 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert ".recipe-edit-unit-option.is-active" in app_css
     assert ".recipe-edit-unit-add-option" in app_css
     assert ".recipe-edit-unit-menu-list" in app_css
+    assert ".recipe-edit-unit-category" in app_css
+    assert ".recipe-edit-unit-category-label" in app_css
+    assert "pointer-events: none;" in app_css
     assert ".recipe-edit-unit-menu-footer" in app_css
     assert ".recipe-edit-unit-manage-option" in app_css
     assert ".recipe-edit-unit-custom-row" in app_css
@@ -623,3 +635,17 @@ def test_editor_uses_registry_backed_combobox_and_separate_metadata_fields():
     assert 'data-field="notes"' in app_js
     assert "const savedForReview = Boolean(" in app_js
     assert 'item.unit = String(unitInput.value || "").trim();' in app_js
+
+
+def test_static_unit_registry_exposes_fixed_category_headers():
+    payload = _static_unit_registry_payload()
+    assert payload["categories"] == [
+        {"key": key, "label": label}
+        for key, label in UNIT_REGISTRY_CATEGORIES
+    ]
+    assert [category["label"] for category in payload["categories"]] == [
+        "Volume",
+        "Weight",
+        "Count & Package",
+        "Small Amounts & Optional",
+    ]
