@@ -50441,6 +50441,7 @@ function bindRecipeEditDragAndDrop(row, requestedHandle = null) {
                 );
                 return;
             }
+            handle.classList.add("recipe-edit-drag-handle-active");
             recipeEditDraggedRow = row;
             recipeEditDraggedDisplayRow = handle.closest(
                 "[data-ingredient-selected-option-line-item]",
@@ -50560,6 +50561,7 @@ function startRecipeEditPointerDrag(row, handle, event) {
         targetRow: null,
     };
 
+    handle.classList.add("recipe-edit-drag-handle-active");
     displayRow.classList.add("recipe-edit-row-dragging");
 
     try {
@@ -50704,6 +50706,9 @@ function clearRecipeEditDragState() {
 
     document.querySelectorAll(".recipe-edit-row-dragging").forEach(row => {
         row.classList.remove("recipe-edit-row-dragging");
+    });
+    document.querySelectorAll(".recipe-edit-drag-handle-active").forEach(handle => {
+        handle.classList.remove("recipe-edit-drag-handle-active");
     });
 
     recipeEditDraggedRow = null;

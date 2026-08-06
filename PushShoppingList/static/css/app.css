@@ -73741,3 +73741,34 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-row.has-selected-ingredient-choice:is(:hover, :focus-within) {
     box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 44%, transparent);
 }
+
+/* Ingredient editor v107: every ingredient drag handle shares one row-scoped color contract. */
+body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-row-handle {
+    color: var(--app-muted) !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row:is(:hover, :focus-within):not(:has(
+        > .recipe-edit-selected-choice-group-header:is(:hover, :focus-within),
+        > .recipe-edit-selected-option-line-items:is(:hover, :focus-within),
+        > [data-ingredient-substitutions]:is(:hover, :focus-within)
+    ))
+    > .recipe-edit-row-handle:not([aria-disabled="true"]),
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-choice-group-header:is(:hover, :focus-within)
+    > .recipe-edit-row-handle:not([aria-disabled="true"]),
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-alternative-component-summary:is(:hover, :focus-within)
+    > .recipe-edit-alternative-component-handle-cell
+    > .recipe-edit-row-handle:not([aria-disabled="true"]),
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-row-handle.recipe-edit-drag-handle-active:not([aria-disabled="true"]) {
+    color: var(--app-text-strong) !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-row-handle[aria-disabled="true"] {
+    color: var(--app-muted) !important;
+    opacity: .34;
+    cursor: not-allowed;
+}

@@ -6869,3 +6869,64 @@ def test_nested_ingredient_hover_highlights_only_the_visual_row():
         single_choice_start:single_choice_css.index("}", single_choice_start)
     ]
     assert "box-shadow: inset 3px 0 0" in single_choice_rule
+
+
+def test_ingredient_drag_handles_share_muted_rest_color_across_visual_row_types():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    marker = (
+        "/* Ingredient editor v107: every ingredient drag handle shares one row-scoped color contract. */"
+    )
+    assert css.index(marker) > css.index("/* Ingredient editor v106:")
+    handle_css = css[css.index(marker):]
+    rest_rule_start = handle_css.index(
+        "body.recipe-edit-standalone-page #recipeEditIngredients .recipe-edit-row-handle {"
+    )
+    rest_rule = handle_css[rest_rule_start:handle_css.index("}", rest_rule_start)]
+
+    assert "color: var(--app-muted) !important;" in rest_rule
+    assert "> .recipe-edit-ingredient-row:is(:hover, :focus-within):not(:has(" in handle_css
+    assert ".recipe-edit-selected-choice-group-header:is(:hover, :focus-within)" in handle_css
+    assert ".recipe-edit-alternative-component-summary:is(:hover, :focus-within)" in handle_css
+    assert "> .recipe-edit-alternative-component-handle-cell" in handle_css
+    assert "> .recipe-edit-row-handle:not([aria-disabled=\"true\"])" in handle_css
+
+
+def test_ingredient_drag_handle_brightening_is_local_active_and_disabled_safe():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    marker = (
+        "/* Ingredient editor v107: every ingredient drag handle shares one row-scoped color contract. */"
+    )
+    handle_css = css[css.index(marker):]
+    drag_binding = script[
+        script.index("function bindRecipeEditDragAndDrop"):
+        script.index("function startRecipeEditPointerDrag")
+    ]
+    pointer_drag = script[
+        script.index("function startRecipeEditPointerDrag"):
+        script.index("function moveRecipeEditPointerDrag")
+    ]
+    clear_drag = script[
+        script.index("function clearRecipeEditDragState"):
+        script.index("function dropRecipeEditRow")
+    ]
+
+    assert '> .recipe-edit-selected-option-line-items:is(:hover, :focus-within)' in handle_css
+    assert '> [data-ingredient-substitutions]:is(:hover, :focus-within)' in handle_css
+    assert ".recipe-edit-drag-handle-active:not([aria-disabled=\"true\"])" in handle_css
+    assert "color: var(--app-text-strong) !important;" in handle_css
+    assert 'handle.classList.add("recipe-edit-drag-handle-active");' in drag_binding
+    assert 'handle.classList.add("recipe-edit-drag-handle-active");' in pointer_drag
+    assert 'handle.classList.remove("recipe-edit-drag-handle-active");' in clear_drag
+
+    disabled_start = handle_css.index(
+        '.recipe-edit-row-handle[aria-disabled="true"] {'
+    )
+    disabled_rule = handle_css[disabled_start:handle_css.index("}", disabled_start)]
+    assert "color: var(--app-muted) !important;" in disabled_rule
+    assert "opacity: .34;" in disabled_rule
+    assert "cursor: not-allowed;" in disabled_rule
+    assert "background:" not in handle_css
+    assert "box-shadow:" not in handle_css
