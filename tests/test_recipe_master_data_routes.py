@@ -2023,14 +2023,40 @@ def test_equipment_usage_pill_uses_the_complete_units_visual_contract():
 def test_equipment_usage_pills_are_centered_and_consistently_sized():
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
+    alignment_selector = ".equipment-master-category :is("
+    alignment_start = css.index(alignment_selector)
+    alignment_rule = css[alignment_start:css.index("}", alignment_start)]
+
+    for selector in (
+        ".equipment-master-usage-button,",
+        ".master-data-updated-cell time,",
+        ".equipment-master-display-edit",
+    ):
+        assert selector in alignment_rule
+    for declaration in (
+        "box-sizing: border-box;",
+        "height: 36px;",
+        "vertical-align: middle;",
+    ):
+        assert declaration in alignment_rule
+
     selector = ".equipment-master-usage-button {"
     rule_start = css.index(selector)
     rule = css[rule_start:css.index("}", rule_start)]
 
-    assert "box-sizing: border-box;" in rule
     assert "min-width: 72px;" in rule
-    assert "height: 36px;" in rule
     assert "align-items: center;" in rule
+
+    date_selector = ".equipment-master-category .master-data-updated-cell time {"
+    date_start = css.index(date_selector)
+    date_rule = css[date_start:css.index("}", date_start)]
+    for declaration in (
+        "display: inline-flex;",
+        "align-items: center;",
+        "line-height: 1;",
+    ):
+        assert declaration in date_rule
+
     assert ".equipment-master-usage-button span {" in css
     assert "line-height: 1;" in css[
         css.index(".equipment-master-usage-button span {"):

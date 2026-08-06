@@ -64885,10 +64885,24 @@ body.recipe-edit-standalone-page :is(
     white-space: nowrap;
 }
 
-.equipment-master-usage-button {
+.equipment-master-category :is(
+    .equipment-master-usage-button,
+    .master-data-updated-cell time,
+    .equipment-master-display-edit
+) {
     box-sizing: border-box;
-    min-width: 72px;
     height: 36px;
+    vertical-align: middle;
+}
+
+.equipment-master-category .master-data-updated-cell time {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+}
+
+.equipment-master-usage-button {
+    min-width: 72px;
     align-items: center;
 }
 
