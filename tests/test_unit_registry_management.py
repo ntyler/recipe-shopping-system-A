@@ -400,6 +400,35 @@ def test_unit_editor_resets_legacy_button_sizing_and_uses_contextual_save_label(
     assert 'saveButton.textContent = saveButtonLabel;' in script
 
 
+def test_unit_registry_uses_readable_type_at_normal_browser_zoom():
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    table_head_start = css.index(".unit-master-table-head {")
+    row_start = css.index(".unit-master-row {", table_head_start)
+    table_head_rules = css[
+        table_head_start:
+        row_start
+    ]
+    row_rules = css[
+        row_start:
+        css.index(".unit-master-row:last-child")
+    ]
+    alias_rules = css[
+        css.index(".unit-master-aliases code {"):
+        css.index(".unit-master-aliases > span")
+    ]
+    source_badge_rules = css[
+        css.index(".unit-master-source-badge {"):
+        css.index(".unit-master-source-badge.user-created")
+    ]
+
+    assert "font-size: 12px;" in table_head_rules
+    assert "font-size: 14px;" in row_rules
+    assert "min-height: 58px;" in row_rules
+    assert "font-size: 13px;" in alias_rules
+    assert "color: var(--app-text);" in alias_rules
+    assert "font-size: 12px;" in source_badge_rules
+
+
 def test_ai_suggestion_populates_valid_details_without_persisting(
     unit_registry_app,
     monkeypatch,
