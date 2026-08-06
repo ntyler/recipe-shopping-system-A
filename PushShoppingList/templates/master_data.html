@@ -1276,14 +1276,15 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <footer>
                         <button type="button"
                                 class="secondary equipment-master-display-reset"
-                                data-equipment-master-display-reset>
-                            Reset to detected name
-                        </button>
+                                data-equipment-master-display-reset
+                                aria-label="Reset display name to detected name">Reset</button>
                         <div>
                             <button type="button"
                                     class="secondary"
                                     data-equipment-master-display-close>Cancel</button>
-                            <button type="submit" data-equipment-master-display-save>Save display name</button>
+                            <button type="submit"
+                                    data-equipment-master-display-save
+                                    aria-label="Save display name">Save</button>
                         </div>
                     </footer>
                 </form>

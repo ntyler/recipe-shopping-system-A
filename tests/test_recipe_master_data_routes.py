@@ -697,7 +697,18 @@ def test_equipment_display_name_route_updates_only_the_active_workspace(monkeypa
     assert 'data-has-display-name-override="true"' in renamed_html
     assert "Edit display name" in renamed_html
     assert "data-equipment-master-display-dialog" in renamed_html
-    assert "Reset to detected name" in renamed_html
+    renamed_soup = BeautifulSoup(renamed_html, "html.parser")
+    display_dialog = renamed_soup.select_one("[data-equipment-master-display-dialog]")
+    reset_button = display_dialog.select_one("[data-equipment-master-display-reset]")
+    save_button = display_dialog.select_one("[data-equipment-master-display-save]")
+    cancel_button = display_dialog.select_one(
+        "footer [data-equipment-master-display-close]"
+    )
+    assert reset_button.get_text(strip=True) == "Reset"
+    assert reset_button["aria-label"] == "Reset display name to detected name"
+    assert cancel_button.get_text(strip=True) == "Cancel"
+    assert save_button.get_text(strip=True) == "Save"
+    assert save_button["aria-label"] == "Save display name"
     assert reset_response.status_code == 200
     assert reset_response.get_json()["record"]["name"] == "Large pot"
     assert reset_response.get_json()["record"]["has_display_name_override"] is False
@@ -1968,6 +1979,16 @@ def test_equipment_registry_header_uses_the_units_surface_treatment():
     assert "background: transparent;" in rule
     assert "color: var(--app-muted);" in rule
     assert "#0b1420" not in rule
+
+
+def test_equipment_display_dialog_reuses_compact_units_button_styles():
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert css.count(".equipment-master-display-dialog") >= 7
+    assert ") button {" in css
+    assert ") button.secondary {" in css
+    assert ".equipment-master-display-form > footer button {" in css
+    assert "white-space: nowrap;" in css
 
 
 def test_master_data_duplicate_review_ui_is_wired():

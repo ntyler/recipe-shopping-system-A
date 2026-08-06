@@ -63577,7 +63577,11 @@ body.recipe-edit-standalone-page :is(
     font: inherit;
 }
 
-:is(.unit-master-page, .equipment-master-usage-dialog) :is(input, select, button):focus-visible {
+:is(
+    .unit-master-page,
+    .equipment-master-usage-dialog,
+    .equipment-master-display-dialog
+) :is(input, select, button):focus-visible {
     outline: 2px solid color-mix(in srgb, var(--app-primary) 64%, white);
     outline-offset: 1px;
 }
@@ -63609,7 +63613,11 @@ body.recipe-edit-standalone-page :is(
     line-height: 1.4;
 }
 
-:is(.unit-master-page, .equipment-master-usage-dialog) button {
+:is(
+    .unit-master-page,
+    .equipment-master-usage-dialog,
+    .equipment-master-display-dialog
+) button {
     display: inline-flex;
     width: auto;
     min-height: 38px;
@@ -63627,22 +63635,38 @@ body.recipe-edit-standalone-page :is(
     cursor: pointer;
 }
 
-:is(.unit-master-page, .equipment-master-usage-dialog) button:is(:hover, :focus-visible) {
+:is(
+    .unit-master-page,
+    .equipment-master-usage-dialog,
+    .equipment-master-display-dialog
+) button:is(:hover, :focus-visible) {
     background: color-mix(in srgb, var(--app-primary) 25%, transparent);
 }
 
-:is(.unit-master-page, .equipment-master-usage-dialog) button:disabled {
+:is(
+    .unit-master-page,
+    .equipment-master-usage-dialog,
+    .equipment-master-display-dialog
+) button:disabled {
     cursor: wait;
     opacity: .62;
 }
 
-:is(.unit-master-page, .equipment-master-usage-dialog) button.secondary {
+:is(
+    .unit-master-page,
+    .equipment-master-usage-dialog,
+    .equipment-master-display-dialog
+) button.secondary {
     border-color: var(--app-border);
     background: transparent;
     color: var(--app-muted);
 }
 
-:is(.unit-master-page, .equipment-master-usage-dialog) button.danger {
+:is(
+    .unit-master-page,
+    .equipment-master-usage-dialog,
+    .equipment-master-display-dialog
+) button.danger {
     border-color: color-mix(in srgb, var(--app-danger) 56%, var(--app-border));
     background: transparent;
     color: var(--app-danger);
@@ -64766,6 +64790,10 @@ body.recipe-edit-standalone-page :is(
 .equipment-master-display-form > footer > div {
     display: flex;
     gap: 8px;
+}
+
+.equipment-master-display-form > footer button {
+    white-space: nowrap;
 }
 
 .equipment-master-display-form button[disabled] {
