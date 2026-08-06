@@ -1978,6 +1978,13 @@
                      aria-label="Table ingredient view"
                      data-recipe-ingredient-view-panel="table">
                     <div id="recipeEditIngredients" class="recipe-edit-ingredients"></div>
+                    <button type="button"
+                            class="recipe-edit-ingredient-recipe-add recipe-edit-ingredient-table-add"
+                            data-recipe-ingredient-table-add
+                            onclick="addRecipeIngredientFromCurrentView()">
+                        <span aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
+                        <span>Add Ingredient</span>
+                    </button>
                 </div>
                 <div id="recipeEditIngredientViewRecipe"
                      class="recipe-edit-ingredient-view-panel recipe-edit-ingredient-recipe-view"

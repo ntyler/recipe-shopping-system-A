@@ -5508,6 +5508,15 @@ def test_ingredient_view_menu_replaces_upper_switcher_and_stays_inside_ingredien
     assert toolbar.index("recipe-edit-add-ingredient-button") < toolbar.index(
         "recipe-edit-ingredients-menu-wrap"
     )
+    table_panel_end = ingredient_section.index(
+        'id="recipeEditIngredientViewRecipe"', table_panel_index
+    )
+    table_panel = ingredient_section[table_panel_index:table_panel_end]
+    assert table_panel.index('id="recipeEditIngredients"') < table_panel.index(
+        "data-recipe-ingredient-table-add"
+    )
+    assert "recipe-edit-ingredient-recipe-add" in table_panel
+    assert "addRecipeIngredientFromCurrentView()" in table_panel
     menu_css = css[css.index("/* Ingredient editor v80:"):]
     assert ".recipe-edit-ingredient-view-menu > [role=\"menuitemradio\"]" in menu_css
     assert '[role="menuitemradio"]:focus-visible' in menu_css
@@ -6286,7 +6295,7 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
     assert ingredient_section.count("data-recipe-ingredient-recipe-add") == 1
     assert ingredient_section.count("data-recipe-ingredient-smart-add") == 1
     assert "data-recipe-ingredient-table-action" in ingredient_section
-    assert ingredient_section.count("addRecipeIngredientFromCurrentView()") == 5
+    assert ingredient_section.count("addRecipeIngredientFromCurrentView()") == 6
 
     assert 'const RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY = "ai-pantry-ingredient-view";' in script
     assert 'new Set(["recipe", "smart", "table"])' in script

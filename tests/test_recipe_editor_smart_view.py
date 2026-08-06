@@ -49,7 +49,7 @@ def test_smart_view_replaces_the_placeholder_and_reuses_shared_actions():
     assert "data-recipe-ingredient-smart-grid" in ingredient_section
     assert "data-recipe-ingredient-smart-empty" in ingredient_section
     assert ingredient_section.count("data-recipe-ingredient-smart-add") == 1
-    assert ingredient_section.count("addRecipeIngredientFromCurrentView()") == 5
+    assert ingredient_section.count("addRecipeIngredientFromCurrentView()") == 6
 
     assert "recipeEditIngredientRows().flatMap(row =>" in render
     assert "fieldValuesFromRow(row)" in render
