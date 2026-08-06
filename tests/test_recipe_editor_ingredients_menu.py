@@ -714,7 +714,6 @@ def test_recipe_editor_ingredient_rows_use_read_first_table_and_on_demand_editin
         edit_mode.index("if (shouldEdit) {"):
         edit_mode.index("} else if (options.restore && panel.dataset.editSnapshot)")
     ]
-    assert "closeOtherRecipeIngredientSubstitutionExpansions(row" in open_branch
     assert "setRecipeIngredientSubstitutionsExpanded" not in open_branch
     assert "recipeIngredientSubstitutionContainer" not in open_branch
     assert ".recipe-edit-alternative-card.is-editing" not in open_branch
@@ -1316,7 +1315,6 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "recipeEditExpandedIngredientIds.add(expansionId);" in expansion
 
     assert "mountRecipeIngredientExpansion(row, container, control);" in toggle
-    assert "closeOtherRecipeIngredientSubstitutionExpansions(row" in toggle
     assert "recipeIngredientExpansionIsOpen(row, button)" in toggle
     assert "setRecipeIngredientSubstitutionsExpanded(row, button, true, options);" in toggle
     assert "setRecipeIngredientSubstitutionsExpanded(row, control, false, options);" in toggle
@@ -1335,90 +1333,6 @@ def test_ingredient_choice_panel_mounts_below_the_exact_disclosure_row():
     assert "margin-inline: -12px;" in attached_panel
     assert "background: color-mix(" in attached_panel
     assert ".is-ingredient-expansion-anchor" in attached_panel
-
-
-def test_opening_ingredient_choice_closes_every_other_expanded_row():
-    node = shutil.which("node")
-    if not node:
-        pytest.skip("Node.js is required for the ingredient disclosure regression harness.")
-
-    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
-    helper_start = script.index(
-        "function closeOtherRecipeIngredientSubstitutionExpansions"
-    )
-    helper_end = script.index(
-        "function setRecipeIngredientSubstitutionsExpanded",
-        helper_start,
-    )
-    helper = script[helper_start:helper_end]
-    expanded_start = helper_end
-    expanded_end = script.index(
-        "function toggleRecipeIngredientSubstitutions",
-        expanded_start,
-    )
-    expanded = script[expanded_start:expanded_end]
-    harness = """
-const activeRow = {
-    id: "active",
-    container: { hidden: false },
-    querySelector() { return null; },
-};
-const openRow = {
-    id: "open",
-    container: { hidden: false },
-    recipeIngredientActiveExpansionId: "ingredient-group:open",
-    querySelector() { return { id: "open-toggle" }; },
-};
-const closedRow = {
-    id: "closed",
-    container: { hidden: true },
-    recipeIngredientActiveExpansionId: "",
-    querySelector() { return null; },
-};
-const calls = [];
-function recipeEditIngredientRows() {
-    return [activeRow, openRow, closedRow];
-}
-function recipeIngredientSubstitutionContainer(row) {
-    return row.container;
-}
-function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, options) {
-    calls.push({
-        row: row.id,
-        control: control.id,
-        shouldOpen,
-        restoreOtherEdits: options.restoreOtherEdits,
-    });
-}
-""" + helper + """
-closeOtherRecipeIngredientSubstitutionExpansions(activeRow, {
-    restoreOtherEdits: false,
-});
-process.stdout.write(JSON.stringify(calls));
-"""
-    completed = subprocess.run(
-        [node],
-        input=harness,
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=10,
-    )
-
-    assert completed.returncode == 0, completed.stderr
-    assert json.loads(completed.stdout) == [
-        {
-            "row": "open",
-            "control": "open-toggle",
-            "shouldOpen": False,
-            "restoreOtherEdits": False,
-        }
-    ]
-    assert expanded.index(
-        "closeOtherRecipeIngredientSubstitutionExpansions(row"
-    ) < expanded.index(
-        'document.querySelectorAll("#recipeEditIngredients > .recipe-edit-ingredient-row.is-editing")'
-    )
 
 
 def test_grouped_choice_disclosure_ignores_hidden_modal_preview_rows():
@@ -6857,3 +6771,40 @@ def test_ingredient_modal_selected_option_edit_action_is_centered_and_boxed():
     assert "height: 32px !important;" in button_rule
     assert "border: 1px solid" in button_rule
     assert "background: color-mix(" in button_rule
+
+
+def test_nested_ingredient_hover_highlights_only_the_visual_row():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    marker = "/* Ingredient editor v104: highlight one visual ingredient row, not its choice group. */"
+    hover_css = css[css.index(marker):]
+    selected_line_item = script[
+        script.index("function createRecipeIngredientSelectedOptionLineItem"):
+        script.index("function resizeRecipeIngredientChoiceTitleInput")
+    ]
+    grouped_projection = script[
+        script.index("function syncRecipeIngredientColumnViewGroupProjection"):
+        script.index("function prepareRecipeIngredientColumnViewDisplayRows")
+    ]
+
+    assert css.index(marker) > css.index("/* Ingredient editor v103:")
+    assert '"recipe-edit-selected-option-line-item"' in selected_line_item
+    assert 'summary.dataset.ingredientSelectedOptionLineItem = "";' in selected_line_item
+    assert 'summary.classList.add("is-ingredient-column-group-projection-row");' in grouped_projection
+
+    parent_start = hover_css.index("> .recipe-edit-ingredient-row:has(")
+    parent_rule = hover_css[parent_start:hover_css.index("}", parent_start)]
+    assert "> .recipe-edit-selected-option-line-items" in parent_rule
+    assert ".recipe-edit-selected-option-line-item:is(:hover, :focus-within)" in parent_rule
+    assert "> [data-ingredient-substitutions]" in parent_rule
+    assert ".recipe-edit-alternative-component-summary:is(:hover, :focus-within)" in parent_rule
+    assert "background: var(--app-surface) !important;" in parent_rule
+    assert "box-shadow: none !important;" in parent_rule
+
+    leaf_start = hover_css.index(":is(\n        .recipe-edit-selected-option-line-item,")
+    leaf_rule = hover_css[leaf_start:hover_css.index("}", leaf_start)]
+    assert ".recipe-edit-alternative-component-summary" in leaf_rule
+    assert "):is(:hover, :focus-within)" in leaf_rule
+    assert "background: color-mix(" in leaf_rule
+    assert "box-shadow: inset 3px 0 0" in leaf_rule

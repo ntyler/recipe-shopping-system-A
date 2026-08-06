@@ -73682,3 +73682,24 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     line-height: 1.2 !important;
     letter-spacing: normal !important;
 }
+
+/* Ingredient editor v104: highlight one visual ingredient row, not its choice group. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row:has(
+        > .recipe-edit-selected-option-line-items
+        .recipe-edit-selected-option-line-item:is(:hover, :focus-within),
+        > [data-ingredient-substitutions]
+        .recipe-edit-alternative-component-summary:is(:hover, :focus-within)
+    ) {
+    background: var(--app-surface) !important;
+    box-shadow: none !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    :is(
+        .recipe-edit-selected-option-line-item,
+        .recipe-edit-alternative-component-summary
+    ):is(:hover, :focus-within) {
+    background: color-mix(in srgb, var(--app-primary-soft) 18%, var(--app-surface)) !important;
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 52%, transparent) !important;
+}

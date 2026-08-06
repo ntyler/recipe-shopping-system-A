@@ -35187,9 +35187,6 @@ function setRecipeIngredientEditMode(row, shouldEdit, options = {}) {
 
     if (shouldEdit) {
         const restoreOtherEdits = options.restoreOtherEdits !== false;
-        closeOtherRecipeIngredientSubstitutionExpansions(row, {
-            restoreOtherEdits,
-        });
         document.querySelectorAll("#recipeEditIngredients > .recipe-edit-ingredient-row.is-editing").forEach(otherRow => {
             if (otherRow !== row) {
                 setRecipeIngredientEditMode(otherRow, false, {
@@ -47746,32 +47743,6 @@ function toggleRecipeIngredientExpansionWithAnchor(row, control, toggleExpansion
     return result;
 }
 
-function closeOtherRecipeIngredientSubstitutionExpansions(row, options = {}) {
-    const restoreOtherEdits = options.restoreOtherEdits !== false;
-    recipeEditIngredientRows().forEach(otherRow => {
-        if (otherRow === row) {
-            return;
-        }
-        const otherContainer = recipeIngredientSubstitutionContainer(otherRow);
-        const hasOpenExpansion = Boolean(
-            otherContainer
-            && (
-                !otherContainer.hidden
-                || otherRow.recipeIngredientActiveExpansionId
-            )
-        );
-        if (!hasOpenExpansion) {
-            return;
-        }
-        setRecipeIngredientSubstitutionsExpanded(
-            otherRow,
-            otherRow.querySelector("[data-ingredient-substitutions-toggle]") || otherRow,
-            false,
-            { restoreOtherEdits },
-        );
-    });
-}
-
 function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, options = {}) {
     const container = recipeIngredientSubstitutionContainer(row, control);
     if (!row || !container) {
@@ -47781,9 +47752,6 @@ function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, opti
     const restoreOtherEdits = options.restoreOtherEdits !== false;
     closeRecipeEditRowMenus();
     if (shouldOpen) {
-        closeOtherRecipeIngredientSubstitutionExpansions(row, {
-            restoreOtherEdits,
-        });
         document.querySelectorAll("#recipeEditIngredients > .recipe-edit-ingredient-row.is-editing").forEach(editingRow => {
             setRecipeIngredientEditMode(editingRow, false, { restore: restoreOtherEdits });
         });
