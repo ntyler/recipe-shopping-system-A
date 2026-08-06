@@ -1241,9 +1241,10 @@ def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monk
     assert result["recipes_created"] == 1
     assert result["model_used"] == "gpt-5.5"
     assert result["model_source"] == "default:OPENAI_MENU_RECIPE_MODEL"
-    assert result["recipes"][0]["source_url"].startswith(source_url + "&menu_item=")
-    assert saved[0][1]["source_url"] == source_url
-    assert saved[0][1]["recipe_record_url"].startswith(source_url + "&menu_item=")
+    assert result["recipes"][0]["source_url"].startswith(source_url + "&menu_item_id=MIT1")
+    assert saved[0][1]["source_url"].startswith(source_url + "&menu_item_id=MIT1")
+    assert saved[0][1]["recipe_record_url"].startswith(source_url + "&menu_item_id=MIT1")
+    assert saved[0][1]["menu_source_url"] == source_url
     assert saved[0][1]["menu_description"] == "Chicken with basil sauce."
     assert saved[0][1]["menu_price"] == "$13.99"
     assert saved[0][1]["menu_order_url"] == (
@@ -1251,6 +1252,30 @@ def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monk
         "resInput=RES1&menuIdInput=MEN1&menuItemIdInput=MIT1&orderType=null"
     )
     assert result["recipes"][0]["menu_order_url"] == saved[0][1]["menu_order_url"]
+
+
+def test_menu_item_record_identity_is_stable_when_title_or_order_changes():
+    source_url = "menu://menu-stable"
+
+    first = recipe_extract_service.menu_item_source_url(
+        source_url,
+        "Original title",
+        0,
+        menu_item_id="item-stable",
+        menu_id="menu-stable",
+        menu_section_id="section-a",
+    )
+    renamed = recipe_extract_service.menu_item_source_url(
+        source_url,
+        "Renamed title",
+        99,
+        menu_item_id="item-stable",
+        menu_id="menu-stable",
+        menu_section_id="section-a",
+    )
+
+    assert renamed == first
+    assert "menu_item_id=item-stable" in first
 
 
 def test_menu_item_parallel_inference_preserves_original_menu_order(monkeypatch, tmp_path):

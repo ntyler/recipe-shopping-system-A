@@ -1155,6 +1155,75 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         </details>
 
         {% if master_data.record_type == 'equipment' %}
+            {% if master_data.equipment_review_enabled %}
+                <section class="equipment-normalization-review"
+                         aria-labelledby="equipmentNormalizationReviewTitle"
+                         data-equipment-normalization-review>
+                    <header>
+                        <div>
+                            <span>Structured migration preview</span>
+                            <h2 id="equipmentNormalizationReviewTitle">Equipment review queue</h2>
+                            <p>
+                                Review proposed alternatives, conjunctions, attributes, and non-equipment classifications.
+                                This preview does not modify recipes or master records.
+                            </p>
+                        </div>
+                        <strong>{{ master_data.equipment_review_queue|length }} on this page</strong>
+                    </header>
+                    {% if not master_data.equipment_review_writes_enabled %}
+                        <div class="equipment-normalization-review-lock" role="status">
+                            Decision writes are locked until the migration dry run is approved.
+                        </div>
+                    {% endif %}
+                    <div class="equipment-normalization-review-list">
+                        {% for review in master_data.equipment_review_queue %}
+                            <details class="equipment-normalization-review-item is-{{ review.review_status }}">
+                                <summary>
+                                    <span>
+                                        <strong>{{ review.name }}</strong>
+                                        <small>ID {{ review.equipment_id }} &middot; {{ review.usage_count }} recipe{% if review.usage_count != 1 %}s{% endif %}</small>
+                                    </span>
+                                    <span class="equipment-normalization-review-status">
+                                        {{ review.review_status | replace('_', ' ') | title }}
+                                    </span>
+                                </summary>
+                                <div class="equipment-normalization-requirements">
+                                    {% for requirement in review.requirements %}
+                                        <article>
+                                            <header>
+                                                <strong>
+                                                    {% if requirement.connector == 'or' %}Use one of{% elif requirement.connector == 'and' %}Also required{% else %}Required{% endif %}
+                                                </strong>
+                                                <span>{{ '%.0f'|format(requirement.parse_confidence * 100) }}% confidence</span>
+                                            </header>
+                                            <ul>
+                                                {% for option in requirement.options %}
+                                                    <li>
+                                                        <strong>{{ option.canonical_name }}</strong>
+                                                        <span>{{ option.option_kind | title }}</span>
+                                                        {% if option.attributes %}<code>{{ option.attributes | tojson }}</code>{% endif %}
+                                                        {% if option.notes %}<small>{{ option.notes }}</small>{% endif %}
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </article>
+                                    {% endfor %}
+                                </div>
+                                <footer>
+                                    <button type="button" disabled>Accept</button>
+                                    <button type="button" disabled>Edit</button>
+                                    <button type="button" disabled>Defer</button>
+                                    <button type="button" disabled>Reject</button>
+                                </footer>
+                            </details>
+                        {% else %}
+                            <p class="equipment-normalization-review-empty">
+                                No structured-equipment decisions are needed on this page.
+                            </p>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
             <section class="unit-master-panel equipment-master-registry"
                      aria-labelledby="equipmentRegistryTitle"
                      data-equipment-master-registry>

@@ -10874,6 +10874,12 @@ def normalize_extracted_equipment_fields(json_data):
         json_data["equipment"] = infer_equipment_from_instructions(instructions)
 
     add_equipment_used_to_instructions(instructions, json_data.get("equipment", []))
+    # Structured equipment output is dark-launched.  The default path remains
+    # the legacy flat list until the migration preview has been approved.
+    from PushShoppingList.services.recipe_equipment_requirement_service import (
+        add_structured_equipment_preview,
+    )
+    add_structured_equipment_preview(json_data)
 
 
 def extract_ingredients_from_result(json_data):
@@ -14880,23 +14886,49 @@ def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0, model_resoluti
     return combined
 
 
-def menu_item_source_url(menu_url, title, index):
+def menu_item_source_url(
+    menu_url,
+    title,
+    index,
+    *,
+    menu_item_id="",
+    menu_id="",
+    menu_section_id="",
+):
     base_url = str(menu_url or "").split("#", 1)[0].strip() or "menu-item://uploaded-menu"
-    slug = quote(safe_filename(title or f"menu item {index + 1}")[:90])
-    marker = f"menu-item-{index + 1}-{slug}"
+    stable_item_id = clean_recipe_text(menu_item_id)
+    stable_menu_id = clean_recipe_text(menu_id)
+    stable_section_id = clean_recipe_text(menu_section_id)
+    if stable_item_id:
+        identity_pairs = [("menu_item_id", stable_item_id)]
+        if stable_menu_id:
+            identity_pairs.append(("menu_id", stable_menu_id))
+        if stable_section_id:
+            identity_pairs.append(("menu_section_id", stable_section_id))
+    else:
+        slug = safe_filename(title or f"menu item {index + 1}")[:90]
+        identity_pairs = [("menu_item", f"menu-item-{index + 1}-{slug}")]
+
     parsed = urlparse(base_url)
     if parsed.scheme and parsed.netloc:
-        query = f"{parsed.query}&menu_item={marker}" if parsed.query else f"menu_item={marker}"
+        query_pairs = parse_qsl(parsed.query or "", keep_blank_values=True)
+        identity_keys = {key.casefold() for key, _value in identity_pairs}
+        query_pairs = [
+            (key, value)
+            for key, value in query_pairs
+            if key.casefold() not in identity_keys
+        ]
+        query_pairs.extend(identity_pairs)
         return urlunparse((
             parsed.scheme,
             parsed.netloc,
             parsed.path,
             parsed.params,
-            query,
+            urlencode(query_pairs, doseq=True),
             "",
         ))
     separator = "&" if "?" in base_url else "?"
-    return f"{base_url}{separator}menu_item={marker}"
+    return f"{base_url}{separator}{urlencode(identity_pairs, doseq=True)}"
 
 
 RESTAURANT_MENU_ITEM_TEXT_METADATA_FIELDS = (
@@ -15012,8 +15044,16 @@ def normalize_menu_item_recipe(recipe, menu_url, section_name, item_name, index,
     if not notes:
         notes = ["AI-inferred from a restaurant menu item."]
     recipe["confidence_notes"] = notes
-    recipe["source_url"] = str(menu_url or "").strip()
-    recipe["recipe_record_url"] = menu_item_source_url(menu_url, title, index)
+    recipe_record_url = clean_recipe_text(recipe.get("recipe_record_url")) or menu_item_source_url(
+        menu_url,
+        title,
+        index,
+        menu_item_id=recipe.get("menu_item_id"),
+        menu_id=recipe.get("menu_id"),
+        menu_section_id=recipe.get("menu_section_id"),
+    )
+    recipe["recipe_record_url"] = recipe_record_url
+    recipe["source_url"] = recipe_record_url
     normalize_extracted_recipe_identity(recipe)
     normalize_extracted_ingredient_fields(recipe)
     normalize_extracted_equipment_fields(recipe)
@@ -15811,7 +15851,14 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
     section_name = clean_recipe_text(menu_item.get("menu_section") or menu_item.get("section_name") or "")
     description = clean_recipe_text(menu_item.get("description") or menu_item.get("item_description") or "")
     price = clean_recipe_text(menu_item.get("price_text") or menu_item.get("price") or "")
-    recipe_url = menu_item_source_url(menu_url, title, index)
+    recipe_url = menu_item_source_url(
+        menu_url,
+        title,
+        index,
+        menu_item_id=menu_item.get("menu_item_id"),
+        menu_id=menu_item.get("menu_id"),
+        menu_section_id=menu_item.get("menu_section_id") or menu_item.get("section_id"),
+    )
     deep_link_url = menu_item_deep_link(menu_url, menu_item)
     menu_order_url = clean_recipe_text(menu_item.get("menu_order_url") or deep_link_url)
     raw_text = clean_recipe_text(menu_item.get("raw_text") or menu_item_raw_text(menu_item))
@@ -16490,7 +16537,14 @@ def build_menu_extract_result(
         )
         if not structured_recipe_data_is_usable(normalized):
             continue
-        recipe_url = normalized.get("recipe_record_url") or menu_item_source_url(source_url, normalized.get("recipe_title"), index)
+        recipe_url = normalized.get("recipe_record_url") or menu_item_source_url(
+            source_url,
+            normalized.get("recipe_title"),
+            index,
+            menu_item_id=normalized.get("menu_item_id"),
+            menu_id=normalized.get("menu_id"),
+            menu_section_id=normalized.get("menu_section_id"),
+        )
         save_extracted_recipe_json(recipe_url, normalized)
         result = build_extract_result(recipe_url, normalized, "menu_extract")
         result["source_url"] = recipe_url
@@ -16823,7 +16877,14 @@ def build_menu_extract_result_from_items(
             })
             continue
 
-        recipe_url = normalized.get("recipe_record_url") or menu_item_source_url(source_url, normalized.get("recipe_title"), index)
+        recipe_url = normalized.get("recipe_record_url") or menu_item_source_url(
+            source_url,
+            normalized.get("recipe_title"),
+            index,
+            menu_item_id=normalized.get("menu_item_id"),
+            menu_id=normalized.get("menu_id"),
+            menu_section_id=normalized.get("menu_section_id"),
+        )
         save_extracted_recipe_json(recipe_url, normalized)
         result = build_extract_result(recipe_url, normalized, "menu_extract")
         apply_menu_source_pdf_metadata(result, menu_source_pdf)

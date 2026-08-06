@@ -117,6 +117,25 @@ def seed_master_records():
     )
 
 
+def test_equipment_structured_review_ui_is_dark_launched(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    with app.app_context():
+        seed_master_records()
+
+    client = app.test_client()
+    sign_in(client, "user-a")
+
+    default_html = client.get("/admin/master-data/equipment").get_data(as_text=True)
+    assert "data-equipment-normalization-review" not in default_html
+
+    monkeypatch.setenv("RECIPE_EQUIPMENT_STRUCTURED_UI_ENABLED", "true")
+    preview_html = client.get("/admin/master-data/equipment").get_data(as_text=True)
+    assert "data-equipment-normalization-review" in preview_html
+    assert "Decision writes are locked until the migration dry run is approved." in preview_html
+    assert "Large pot" in preview_html
+    assert '<button type="button" disabled>Accept</button>' in preview_html
+
+
 def test_master_data_page_does_not_create_missing_database(monkeypatch, tmp_path):
     app, db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
 

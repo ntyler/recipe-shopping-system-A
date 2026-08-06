@@ -132,6 +132,44 @@ def test_recipe_save_route_round_trips_encoded_source_url(monkeypatch, tmp_path)
     assert loaded_recipe["rating"] == 4
 
 
+def test_recipe_output_index_prefers_legacy_menu_record_url(monkeypatch, tmp_path):
+    output_dir = configure_recipe_save_storage(monkeypatch, tmp_path)
+    menu_url = "menu://shared-menu"
+    first_url = f"{menu_url}?menu_item=first"
+    second_url = f"{menu_url}?menu_item=second"
+
+    for recipe_url, title in ((first_url, "First"), (second_url, "Second")):
+        path = recipe_extract_service.recipe_output_json_path(recipe_url, output_folder=output_dir)
+        recipe_edit_service.save_recipe_output_to_path(path, {
+            "source_url": menu_url,
+            "recipe_record_url": recipe_url,
+            "recipe_title": title,
+            "ingredients": [],
+            "equipment": [],
+            "instructions": [],
+        })
+
+    assert recipe_edit_service.load_recipe_output(first_url)["recipe_title"] == "First"
+    assert recipe_edit_service.load_recipe_output(second_url)["recipe_title"] == "Second"
+    assert recipe_edit_service.load_recipe_output(menu_url) is None
+
+
+def test_recipe_output_index_omits_ambiguous_duplicate_identity(monkeypatch, tmp_path):
+    output_dir = configure_recipe_save_storage(monkeypatch, tmp_path)
+    shared_url = "https://example.test/recipes/shared"
+
+    for filename, title in (("first.json", "First"), ("second.json", "Second")):
+        recipe_edit_service.save_recipe_output_to_path(output_dir / filename, {
+            "source_url": shared_url,
+            "recipe_title": title,
+            "ingredients": [],
+            "equipment": [],
+            "instructions": [],
+        })
+
+    assert shared_url not in recipe_edit_service.build_recipe_output_index()
+
+
 def test_recipe_load_and_save_preserve_ingredient_match_analysis_metadata(monkeypatch, tmp_path):
     configure_recipe_save_storage(monkeypatch, tmp_path)
     url = "https://example.test/ingredient-match-analysis-round-trip"

@@ -7923,16 +7923,27 @@ def recipe_outputs_by_key(output_folder):
         return {}
 
     outputs = {}
-    for json_path in output_folder.glob("*.json"):
+    collisions = set()
+    for json_path in sorted(output_folder.glob("*.json"), key=lambda path: path.name.casefold()):
         if json_path.name == "sorted_ingredients.json":
             continue
         payload = load_json_file(json_path)
         if not isinstance(payload, dict):
             continue
-        source_url = clean_text(payload.get("source_url"))
-        recipe_key = recipe_id_for_url(source_url)
-        if recipe_key:
-            outputs[recipe_key] = payload
+        identity_url = clean_text(
+            payload.get("recipe_record_url")
+            or payload.get("source_url")
+            or payload.get("url")
+            or payload.get("original_url")
+        )
+        recipe_key = recipe_id_for_url(identity_url)
+        if not recipe_key or recipe_key in collisions:
+            continue
+        if recipe_key in outputs:
+            outputs.pop(recipe_key, None)
+            collisions.add(recipe_key)
+            continue
+        outputs[recipe_key] = payload
     return outputs
 
 

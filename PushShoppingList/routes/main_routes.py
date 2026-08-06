@@ -28,6 +28,7 @@ from flask import url_for
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services import recipe_master_data_service as recipe_master_data
 from PushShoppingList.services import recipe_master_image_service as recipe_master_images
+from PushShoppingList.services import recipe_equipment_requirement_service as recipe_equipment_requirements
 from PushShoppingList.services import master_data_url_service
 from PushShoppingList.services import ingredient_store_section_review_service as ingredient_store_section_reviews
 from PushShoppingList.services import ingredient_duplicate_review_service as ingredient_duplicate_reviews
@@ -1355,6 +1356,16 @@ def master_data_context(record_type, scope_info=None):
                     "rows": section_rows,
                 })
 
+    equipment_review_enabled = bool(
+        record_type == "equipment"
+        and recipe_equipment_requirements.structured_equipment_ui_enabled()
+    )
+    equipment_review_queue = (
+        recipe_equipment_requirements.review_queue_from_master_rows(rows)
+        if equipment_review_enabled
+        else []
+    )
+
     return {
         "record_type": record_type,
         "title": config["title"],
@@ -1381,6 +1392,12 @@ def master_data_context(record_type, scope_info=None):
         },
         "equipment_section": equipment_section,
         "equipment_summary": equipment_summary,
+        "equipment_review_enabled": equipment_review_enabled,
+        "equipment_review_writes_enabled": bool(
+            equipment_review_enabled
+            and recipe_equipment_requirements.structured_equipment_review_writes_enabled()
+        ),
+        "equipment_review_queue": equipment_review_queue,
         "equipment_section_options": recipe_master_data.equipment_section_options()
         if record_type == "equipment"
         else [],

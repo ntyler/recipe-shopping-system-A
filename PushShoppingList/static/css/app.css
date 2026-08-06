@@ -64458,6 +64458,128 @@ body.recipe-edit-standalone-page :is(
     gap: 16px;
 }
 
+.equipment-normalization-review {
+    display: grid;
+    gap: 1rem;
+    margin: 0 0 1.25rem;
+    padding: 1.15rem;
+    border: 1px solid color-mix(in srgb, var(--border-color, #d7dce5) 82%, #7c3aed);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--surface, #fff) 96%, #ede9fe);
+}
+
+.equipment-normalization-review > header,
+.equipment-normalization-review-item > summary,
+.equipment-normalization-requirements article > header,
+.equipment-normalization-review-item > footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.equipment-normalization-review > header h2,
+.equipment-normalization-review > header p {
+    margin: .2rem 0 0;
+}
+
+.equipment-normalization-review > header > div > span,
+.equipment-normalization-review-status {
+    color: #6d28d9;
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.equipment-normalization-review-lock {
+    padding: .7rem .85rem;
+    border-radius: .7rem;
+    background: color-mix(in srgb, #f59e0b 13%, transparent);
+    color: var(--text-color, #20242c);
+    font-weight: 700;
+}
+
+.equipment-normalization-review-list,
+.equipment-normalization-requirements {
+    display: grid;
+    gap: .75rem;
+}
+
+.equipment-normalization-review-item {
+    border: 1px solid var(--border-color, #d7dce5);
+    border-radius: .8rem;
+    background: var(--surface, #fff);
+    overflow: clip;
+}
+
+.equipment-normalization-review-item > summary {
+    padding: .85rem 1rem;
+    cursor: pointer;
+}
+
+.equipment-normalization-review-item > summary > span:first-child {
+    display: grid;
+    gap: .2rem;
+}
+
+.equipment-normalization-review-item > summary small,
+.equipment-normalization-requirements article header span,
+.equipment-normalization-requirements li span,
+.equipment-normalization-requirements li small {
+    color: var(--muted-text, #667085);
+}
+
+.equipment-normalization-requirements {
+    padding: 0 1rem 1rem;
+}
+
+.equipment-normalization-requirements article {
+    padding: .8rem;
+    border-radius: .7rem;
+    background: color-mix(in srgb, var(--surface, #fff) 93%, #ede9fe);
+}
+
+.equipment-normalization-requirements article header span {
+    font-size: .82rem;
+}
+
+.equipment-normalization-requirements ul {
+    display: grid;
+    gap: .45rem;
+    margin: .65rem 0 0;
+    padding-left: 1.2rem;
+}
+
+.equipment-normalization-requirements li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .45rem;
+}
+
+.equipment-normalization-requirements code {
+    padding: .12rem .35rem;
+    border-radius: .3rem;
+    background: color-mix(in srgb, #111827 8%, transparent);
+}
+
+.equipment-normalization-review-item > footer {
+    justify-content: flex-end;
+    padding: .75rem 1rem;
+    border-top: 1px solid var(--border-color, #d7dce5);
+}
+
+.equipment-normalization-review-item > footer button:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+}
+
+.equipment-normalization-review-empty {
+    margin: 0;
+    color: var(--muted-text, #667085);
+}
+
 .equipment-master-registry > header {
     display: block;
 }

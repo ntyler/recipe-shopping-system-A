@@ -10565,10 +10565,32 @@ def _read_recipe_output_json(json_path):
         return None
 
 
+def recipe_output_identity_url(recipe_data, fallback_url=""):
+    """Return the unique record URL used to address one saved recipe.
+
+    Older menu-item JSON files stored the shared menu page in ``source_url``
+    and the unique item URL in ``recipe_record_url``.  Prefer the latter so
+    those files remain independently addressable without rewriting them.
+    """
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    for field in ("recipe_record_url", "source_url", "url", "original_url"):
+        value = str(recipe_data.get(field) or "").strip()
+        if value:
+            return value
+    return str(fallback_url or "").strip()
+
+
+def recipe_output_identity_key(recipe_data, fallback_url=""):
+    return normalize_recipe_url_key(
+        recipe_output_identity_url(recipe_data, fallback_url=fallback_url)
+    )
+
+
 def build_recipe_output_index():
     index = {}
+    collisions = set()
 
-    for json_path in OUTPUT_FOLDER.glob("*.json"):
+    for json_path in sorted(OUTPUT_FOLDER.glob("*.json"), key=lambda path: path.name.casefold()):
         if json_path.name == "sorted_ingredients.json":
             continue
 
@@ -10576,9 +10598,21 @@ def build_recipe_output_index():
         if not isinstance(data, dict):
             continue
 
-        recipe_key = normalize_recipe_url_key(data.get("source_url", ""))
-        if recipe_key:
-            index[recipe_key] = data
+        recipe_key = recipe_output_identity_key(data)
+        if not recipe_key or recipe_key in collisions:
+            continue
+
+        if recipe_key in index:
+            # Ambiguous identities must never fall back to filesystem order.
+            index.pop(recipe_key, None)
+            collisions.add(recipe_key)
+            LOGGER.warning(
+                "Ignoring duplicate saved-recipe identity %s while building the output index.",
+                recipe_key,
+            )
+            continue
+
+        index[recipe_key] = data
 
     return index
 
@@ -10602,8 +10636,8 @@ def load_recipe_output(url):
     if direct_path.exists():
         direct_data = _read_recipe_output_json(direct_path)
         if isinstance(direct_data, dict):
-            source_key = normalize_recipe_url_key(direct_data.get("source_url", ""))
-            if not source_key or source_key == recipe_key:
+            identity_key = recipe_output_identity_key(direct_data, fallback_url=url)
+            if not identity_key or identity_key == recipe_key:
                 data = direct_data
 
     if not isinstance(data, dict):
@@ -10631,9 +10665,7 @@ def remove_recipe_output_file(url):
     with _RECIPE_OUTPUT_WRITE_LOCK:
         json_path.unlink(missing_ok=True)
     if has_request_context():
-        cached = getattr(g, "_recipe_edit_output_index", None)
-        if isinstance(cached, dict):
-            cached.pop(recipe_key, None)
+        g._recipe_edit_output_index = None
 
 
 def remove_stale_recipe_output(original_url, source_url):
@@ -10665,13 +10697,8 @@ def save_recipe_output_to_path(json_path, recipe_data, *, url=""):
         finally:
             temporary_path.unlink(missing_ok=True)
     if has_request_context():
-        cached = getattr(g, "_recipe_edit_output_index", None)
-        if isinstance(cached, dict):
-            recipe_key = normalize_recipe_url_key(
-                recipe_data.get("source_url", "") if isinstance(recipe_data, dict) else ""
-            ) or normalize_recipe_url_key(url)
-            if recipe_key:
-                cached[recipe_key] = recipe_data
+        # Rebuild on the next lookup so collision detection remains correct.
+        g._recipe_edit_output_index = None
     return json_path
 
 
