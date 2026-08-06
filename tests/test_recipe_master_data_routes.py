@@ -481,6 +481,15 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'aria-label="COOKWARE equipment"' in equipment_html
     assert 'aria-label="PREP TOOLS equipment"' in equipment_html
     assert 'unit-master-usage-button equipment-master-usage-button' in equipment_html
+    assert 'data-equipment-master-usage-button' in equipment_html
+    assert 'aria-controls="equipmentMasterUsageDialog"' in equipment_html
+    assert 'aria-haspopup="dialog"' in equipment_html
+    assert 'data-equipment-master-usage-dialog' in equipment_html
+    assert 'data-equipment-master-usage-title' in equipment_html
+    assert 'data-equipment-master-usage-summary' in equipment_html
+    assert 'data-equipment-master-usage-results' in equipment_html
+    assert 'data-equipment-master-usage-close' in equipment_html
+    assert 'data-master-reference-row' not in equipment_html
     assert '<strong aria-hidden="true">1</strong>' in equipment_html
     assert "recipe" in equipment_html
     assert '<strong data-equipment-master-total-count>2</strong>' in equipment_html
@@ -589,6 +598,49 @@ def test_master_data_reference_api_returns_scoped_recipe_links(monkeypatch, tmp_
     ]
     assert blocked_response.status_code == 404
     assert blocked_payload["ok"] is False
+
+
+def test_equipment_usage_modal_endpoint_preserves_workspace_scope(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+    user_a_equipment = master_data.master_record_for_name(
+        "equipment",
+        "user-a",
+        "large pot",
+    )
+    user_b_equipment = master_data.master_record_for_name(
+        "equipment",
+        "user-b",
+        "whisk",
+    )
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        own_response = client.get(
+            f"/api/master-data/equipment/{user_a_equipment['id']}/references",
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+        blocked_response = client.get(
+            f"/api/master-data/equipment/{user_b_equipment['id']}/references",
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+        sign_in(client, "admin-user")
+        admin_response = client.get(
+            f"/api/master-data/equipment/{user_b_equipment['id']}/references?scope=all",
+            headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        )
+
+    own_payload = own_response.get_json()
+    admin_payload = admin_response.get_json()
+    assert own_response.status_code == 200
+    assert own_payload["record"]["name"] == "Large pot"
+    assert own_payload["total"] == 1
+    assert own_payload["references"][0]["original_recipe_text"] == "Large pot"
+    assert urlsplit(own_payload["references"][0]["edit_url"]).path == "/recipe/edit"
+    assert blocked_response.status_code == 404
+    assert admin_response.status_code == 200
+    assert admin_payload["record"]["name"] == "Whisk"
+    assert admin_payload["references"][0]["edit_url"] == ""
 
 
 def test_ingredient_master_data_filters_and_groups_by_store_section(monkeypatch, tmp_path):
@@ -781,12 +833,12 @@ def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp
     for single_user_table in (mine_table, specific_table):
         assert '<th scope="col">User</th>' not in single_user_table
         assert 'class="master-data-user-data-cell"' not in single_user_table
-        assert 'colspan="3"' in single_user_table
+        assert 'data-master-reference-row' not in single_user_table
         assert "master-data-table--show-user" not in single_user_table
 
     assert '<th scope="col">User</th>' in all_table
     assert 'class="master-data-user-data-cell"' in all_table
-    assert 'colspan="4"' in all_table
+    assert 'data-master-reference-row' not in all_table
     assert "master-data-table--show-user" in all_table
 
 
@@ -1974,6 +2026,9 @@ def test_master_data_reference_expander_is_wired():
     assert "master-data-item-copy" in template
     assert "data-master-reference-toggle" in template
     assert "data-master-reference-row" in template
+    assert "row.usage_count and master_data.record_type == 'ingredients'" in template
+    assert "data-equipment-master-usage-dialog" in template
+    assert "data-equipment-master-usage-button" in template
     assert "master_data_record_references_route" in template
     assert "aria-expanded=\"false\"" in template
     assert "aria-label=\"Show {{ row.usage_count }} recipe" in template
@@ -2001,6 +2056,11 @@ def test_master_data_reference_expander_is_wired():
     assert ".master-data-usage-empty strong" in css
 
     assert "function toggleReferenceRow" in script
+    assert "function openEquipmentMasterUsage(button)" in script
+    assert "function closeEquipmentMasterUsage()" in script
+    assert "function restoreEquipmentMasterUsageFocus()" in script
+    assert 'button.matches("[data-equipment-master-usage-button]")' in script
+    assert "equipmentMasterUsageRequestId" in script
     assert "function renderReferences" in script
     assert "master-data-reference-usage-breakdown" in script
     assert "Ingredient Name ${ingredientNameCount}" in script
@@ -2024,6 +2084,8 @@ def test_master_data_reference_expander_is_wired():
     assert "master-data-reference-title-link" in script
     assert "has-title-image" in script
     assert "Open Recipe" in script
+    assert ".equipment-master-usage-dialog .master-data-reference-main code" in css
+    assert ".equipment-master-usage-dialog .master-data-reference-link" in css
     assert 'details.push(`Preparation: ${reference.preparation}`)' in script
     assert 'details.push(`Notes: ${reference.notes}`)' in script
     assert "function ensureMasterDataImageLightbox" in script

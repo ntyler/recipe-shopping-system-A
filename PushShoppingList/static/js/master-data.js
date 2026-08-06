@@ -13,6 +13,8 @@
     let imagePollTimer = null;
     let imageRefreshTimer = null;
     let masterDataMobileReferenceReturnFocus = null;
+    let equipmentMasterUsageReturnFocus = null;
+    let equipmentMasterUsageRequestId = 0;
     let masterDataThumbnailSize = MASTER_DATA_THUMBNAIL_DEFAULT_SIZE;
     let masterDataThumbnailSizeEventsBound = false;
     let masterDataMergeSearchTimer = null;
@@ -804,16 +806,28 @@
         decorateMasterDataLightboxImages(panel);
     }
 
+    function renderLoadedReferenceData(panel, data, options = {}) {
+        if (typeof options.shouldRender === "function" && !options.shouldRender()) {
+            return;
+        }
+        const renderer = typeof options.renderer === "function"
+            ? options.renderer
+            : renderReferences;
+        renderer(panel, data, options);
+    }
+
     async function loadReferenceData(button, panel, options = {}) {
         if (!button || !panel) return null;
         if (button.masterDataReferenceData) {
-            renderReferences(panel, button.masterDataReferenceData, options);
+            renderLoadedReferenceData(panel, button.masterDataReferenceData, options);
             return button.masterDataReferenceData;
         }
 
         const referenceUrl = button.dataset.referenceUrl;
         if (!referenceUrl || !window.fetch) {
-            setReferenceError(panel, "Recipe references are not available in this browser.");
+            if (typeof options.shouldRender !== "function" || options.shouldRender()) {
+                setReferenceError(panel, "Recipe references are not available in this browser.");
+            }
             return null;
         }
 
@@ -827,14 +841,18 @@
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || data.ok === false) {
-                setReferenceError(panel, data.error || data.message || "Recipe references could not be loaded.");
+                if (typeof options.shouldRender !== "function" || options.shouldRender()) {
+                    setReferenceError(panel, data.error || data.message || "Recipe references could not be loaded.");
+                }
                 return null;
             }
             button.masterDataReferenceData = data;
-            renderReferences(panel, data, options);
+            renderLoadedReferenceData(panel, data, options);
             return data;
         } catch (error) {
-            setReferenceError(panel, error && error.message ? error.message : "Recipe references could not be loaded.");
+            if (typeof options.shouldRender !== "function" || options.shouldRender()) {
+                setReferenceError(panel, error && error.message ? error.message : "Recipe references could not be loaded.");
+            }
             return null;
         }
     }
@@ -846,7 +864,7 @@
             }
             button.setAttribute("aria-expanded", "false");
             const row = referenceRowForButton(button);
-            if (row) {
+            if (row && row.matches("[data-master-reference-row]")) {
                 row.hidden = true;
             }
         });
@@ -903,6 +921,85 @@
         }
 
         await loadReferenceData(button, els.panel, { hideHeader: true });
+        return true;
+    }
+
+    function equipmentMasterUsageElements() {
+        const dialog = document.querySelector("[data-equipment-master-usage-dialog]");
+        return {
+            dialog,
+            title: dialog && dialog.querySelector("[data-equipment-master-usage-title]"),
+            summary: dialog && dialog.querySelector("[data-equipment-master-usage-summary]"),
+            results: dialog && dialog.querySelector("[data-equipment-master-usage-results]"),
+            closeButtons: dialog
+                ? Array.from(dialog.querySelectorAll("[data-equipment-master-usage-close]"))
+                : [],
+        };
+    }
+
+    function equipmentNameForUsageButton(button) {
+        const row = button && button.closest(".master-data-record-row");
+        const name = row && row.querySelector(".master-data-item-copy > strong");
+        return text(name && name.textContent).trim() || "this equipment";
+    }
+
+    function restoreEquipmentMasterUsageFocus() {
+        const returnFocus = equipmentMasterUsageReturnFocus;
+        equipmentMasterUsageReturnFocus = null;
+        if (returnFocus) returnFocus.setAttribute("aria-expanded", "false");
+        if (returnFocus && returnFocus.isConnected) returnFocus.focus();
+    }
+
+    function closeEquipmentMasterUsage() {
+        const els = equipmentMasterUsageElements();
+        if (!els.dialog) return;
+
+        equipmentMasterUsageRequestId += 1;
+        if (typeof els.dialog.close === "function" && els.dialog.open) {
+            els.dialog.close();
+        } else {
+            els.dialog.removeAttribute("open");
+            restoreEquipmentMasterUsageFocus();
+        }
+    }
+
+    async function openEquipmentMasterUsage(button) {
+        const els = equipmentMasterUsageElements();
+        if (!button || !els.dialog || !els.results) return false;
+
+        document.querySelectorAll("[data-equipment-master-usage-button]").forEach((usageButton) => {
+            usageButton.setAttribute("aria-expanded", usageButton === button ? "true" : "false");
+        });
+        equipmentMasterUsageReturnFocus = button;
+        const equipmentName = equipmentNameForUsageButton(button);
+        if (els.title) els.title.textContent = `Recipes using ${equipmentName}`;
+        if (els.summary) els.summary.textContent = "";
+        setReferenceLoading(els.results);
+
+        if (typeof els.dialog.showModal === "function") {
+            if (!els.dialog.open) els.dialog.showModal();
+        } else {
+            els.dialog.setAttribute("open", "");
+        }
+
+        const requestId = ++equipmentMasterUsageRequestId;
+        const shouldRender = () => (
+            requestId === equipmentMasterUsageRequestId
+            && (els.dialog.open || els.dialog.hasAttribute("open"))
+        );
+        const data = await loadReferenceData(button, els.results, {
+            hideHeader: true,
+            shouldRender,
+        });
+        if (!data || !shouldRender()) return true;
+
+        const recordName = text(data.record && data.record.name).trim() || equipmentName;
+        const total = Math.max(0, Number(data.total) || 0);
+        const referenceCount = Math.max(0, Number(data.total_reference_count) || 0);
+        if (els.title) els.title.textContent = `Recipes using ${recordName}`;
+        if (els.summary) {
+            els.summary.textContent = `${total} distinct recipe${total === 1 ? "" : "s"} · ${referenceCount} matching equipment reference${referenceCount === 1 ? "" : "s"}`;
+        }
         return true;
     }
 
@@ -964,6 +1061,21 @@
             });
         }
 
+        const equipmentEls = equipmentMasterUsageElements();
+        if (equipmentEls.dialog) {
+            equipmentEls.closeButtons.forEach((button) => {
+                button.addEventListener("click", closeEquipmentMasterUsage);
+            });
+            equipmentEls.dialog.addEventListener("cancel", (event) => {
+                event.preventDefault();
+                closeEquipmentMasterUsage();
+            });
+            equipmentEls.dialog.addEventListener("click", (event) => {
+                if (event.target === equipmentEls.dialog) closeEquipmentMasterUsage();
+            });
+            equipmentEls.dialog.addEventListener("close", restoreEquipmentMasterUsageFocus);
+        }
+
         document.addEventListener("click", (event) => {
             const target = event.target && event.target.closest ? event.target : null;
             const button = target ? target.closest("[data-master-reference-toggle]") : null;
@@ -971,7 +1083,11 @@
                 return;
             }
             event.preventDefault();
-            toggleReferenceRow(button);
+            if (button.matches("[data-equipment-master-usage-button]")) {
+                openEquipmentMasterUsage(button);
+            } else {
+                toggleReferenceRow(button);
+            }
         });
     }
 

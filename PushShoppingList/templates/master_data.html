@@ -269,9 +269,11 @@
                 <button type="button"
                         class="master-data-usage-button{% if master_data.record_type == 'equipment' %} unit-master-usage-button equipment-master-usage-button{% endif %}"
                         data-master-reference-toggle
+                        {% if master_data.record_type == 'equipment' %}data-equipment-master-usage-button{% endif %}
                         data-reference-url="{{ master_data_reference_url(row, master_data) }}"
                         aria-expanded="false"
-                        aria-controls="{{ reference_row_id }}"
+                        aria-controls="{% if master_data.record_type == 'equipment' %}equipmentMasterUsageDialog{% else %}{{ reference_row_id }}{% endif %}"
+                        {% if master_data.record_type == 'equipment' %}aria-haspopup="dialog"{% endif %}
                         aria-label="Show {{ row.usage_count }} recipe{% if row.usage_count != 1 %}s{% endif %} referencing {{ row.name }}{% if master_data.record_type == 'ingredients' %}: {{ row.ingredient_name_usage_count }} by Ingredient Name and {{ row.buy_as_usage_count }} by Buy As; these counts may overlap{% endif %}"
                         title="Show recipes referencing {{ row.name }}">
                     {% if master_data.record_type == 'ingredients' %}
@@ -309,7 +311,7 @@
             {% endif %}
         </td>
     </tr>
-    {% if row.usage_count %}
+    {% if row.usage_count and master_data.record_type == 'ingredients' %}
         <tr class="master-data-reference-row"
             id="{{ reference_row_id }}"
             data-master-reference-row
@@ -1178,6 +1180,39 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     {% endif %}
                 </div>
             </section>
+
+            <dialog id="equipmentMasterUsageDialog"
+                    class="unit-master-usage-dialog equipment-master-usage-dialog"
+                    data-equipment-master-usage-dialog
+                    aria-labelledby="equipmentMasterUsageTitle"
+                    aria-describedby="equipmentMasterUsageContext">
+                <div class="unit-master-usage-dialog-shell">
+                    <header>
+                        <div>
+                            <span>Recipe usage</span>
+                            <h2 id="equipmentMasterUsageTitle"
+                                data-equipment-master-usage-title>Recipes using this equipment</h2>
+                            <p id="equipmentMasterUsageContext">
+                                Review every recipe connected to this recipe-derived equipment record.
+                            </p>
+                        </div>
+                        <button type="button"
+                                class="unit-master-usage-dialog-close"
+                                data-equipment-master-usage-close
+                                aria-label="Close equipment recipe usage">&times;</button>
+                    </header>
+                    <div class="unit-master-usage-dialog-summary"
+                         data-equipment-master-usage-summary></div>
+                    <div class="unit-master-usage-results equipment-master-usage-results"
+                         data-equipment-master-usage-results
+                         role="region"
+                         aria-live="polite"></div>
+                    <footer>
+                        <span>Recipe links open in a new tab.</span>
+                        <button type="button" data-equipment-master-usage-close>Close</button>
+                    </footer>
+                </div>
+            </dialog>
         {% else %}
         <div class="master-data-results-header" data-master-results-header>
             <div class="master-data-results-copy">
