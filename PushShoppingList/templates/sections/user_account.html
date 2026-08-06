@@ -367,6 +367,12 @@
                             </a>
                             <a class="user-account-menu-item"
                                role="menuitem"
+                               href="{{ url_for('main_bp.master_data_units_route', viewer_user_id=current_user.user_id if current_user else none) }}">
+                                <span class="user-account-menu-item-icon" aria-hidden="true">U</span>
+                                <span class="user-account-menu-item-label">Units</span>
+                            </a>
+                            <a class="user-account-menu-item"
+                               role="menuitem"
                                href="{{ url_for('main_bp.master_data_store_sections_route', viewer_user_id=current_user.user_id if current_user else none) }}">
                                 <span class="user-account-menu-item-icon" aria-hidden="true">S</span>
                                 <span class="user-account-menu-item-label">Store Sections</span>

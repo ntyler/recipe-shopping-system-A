@@ -1957,9 +1957,11 @@ def test_account_menu_links_to_master_data_pages(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert "Ingredient Master Data" in html
     assert "Equipment Master Data" in html
+    assert ">Units<" in html
     assert "Store Sections" in html
     assert "/admin/master-data/ingredients?viewer_user_id=user-a" in html
     assert "/admin/master-data/equipment?viewer_user_id=user-a" in html
+    assert "/admin/master-data/units?viewer_user_id=user-a" in html
     assert "/admin/master-data/store-sections?viewer_user_id=user-a" in html
 
 
@@ -1976,6 +1978,7 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert "Produce" in html
         assert "/admin/master-data/ingredients" in html
         assert "/admin/master-data/equipment" in html
+        assert "/admin/master-data/units" in html
         assert "data-store-section-master-icon-picker" in html
         assert 'data-store-section-master-icon-option="leaf"' in html
         assert "recipe-edit-store-section-icon is-leaf" in html

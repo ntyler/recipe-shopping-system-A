@@ -915,6 +915,7 @@ def enrich_master_data_rows_with_users(rows, user_identities):
 MASTER_DATA_PAGE_ENDPOINTS = {
     "ingredients": "main_bp.master_data_ingredients_route",
     "equipment": "main_bp.master_data_equipment_route",
+    "units": "main_bp.master_data_units_route",
     "store_sections": "main_bp.master_data_store_sections_route",
 }
 
@@ -1044,7 +1045,7 @@ def canonicalize_master_data_redirect_url(
         scope_info = validate_master_data_target_scope(
             is_admin_user(current_public_user()),
             parameters,
-            allow_admin_scope=page != "store_sections",
+            allow_admin_scope=page not in {"store_sections", "units"},
         )
     else:
         page = default_page
@@ -1271,6 +1272,14 @@ def master_data_context(record_type, scope_info=None):
             "viewer_user_id": scope_info.get("viewer_user_id") or active_user_id(),
         },
     )
+    units_url = build_canonical_master_data_url(
+        "units",
+        scope_info={
+            "scope": "mine",
+            "user_id": scope_info["current_scope_user_id"],
+            "viewer_user_id": scope_info.get("viewer_user_id") or active_user_id(),
+        },
+    )
 
     row_groups = []
     if record_type == "ingredients" and rows and not store_section:
@@ -1367,6 +1376,7 @@ def master_data_context(record_type, scope_info=None):
         "messages": session.pop("recipe_master_data_messages", []),
         "ingredient_url": ingredient_url,
         "equipment_url": equipment_url,
+        "units_url": units_url,
         "store_section_url": store_section_url,
         "backfill_status_url": url_for("main_bp.recipe_master_data_backfill_status_route"),
         "image_generation_url": url_for("main_bp.recipe_master_data_generate_missing_images_route"),
@@ -1441,6 +1451,90 @@ def master_data_equipment_route():
     return render_master_data_page("equipment", scope_info)
 
 
+def unit_master_data_context(scope_info):
+    registry = unit_registry_payload()
+    aliases_by_name = {}
+    for alias, canonical_name in registry["aliases"].items():
+        if alias != canonical_name:
+            aliases_by_name.setdefault(canonical_name, []).append(alias)
+
+    category_labels = {
+        "volume": "Volume",
+        "weight": "Weight",
+        "count_package": "Count & Package",
+        "optional": "Small Amounts & Optional",
+    }
+    category_order = tuple(category_labels)
+    categories = []
+    for category in category_order:
+        units = []
+        for unit in registry["units"]:
+            if unit["category"] != category:
+                continue
+            unit_data = dict(unit)
+            unit_data["aliases"] = sorted(
+                aliases_by_name.get(unit["name"], []),
+                key=lambda value: (len(value), value),
+            )
+            units.append(unit_data)
+        categories.append({
+            "key": category,
+            "label": category_labels[category],
+            "units": units,
+        })
+
+    workspace_scope = {
+        "scope": "mine",
+        "user_id": scope_info["current_scope_user_id"],
+        "viewer_user_id": scope_info.get("viewer_user_id") or active_user_id(),
+    }
+    return {
+        "title": "Units",
+        "record_type": "units",
+        "viewer_user_id": workspace_scope["viewer_user_id"],
+        "scope_user_id": workspace_scope["user_id"],
+        "registry": registry,
+        "categories": categories,
+        "built_in_count": len(registry["units"]),
+        "alias_count": len(registry["aliases"]),
+        "ingredient_url": build_canonical_master_data_url(
+            "ingredients",
+            scope_info=workspace_scope,
+        ),
+        "equipment_url": build_canonical_master_data_url(
+            "equipment",
+            scope_info=workspace_scope,
+        ),
+        "units_url": build_canonical_master_data_url(
+            "units",
+            scope_info=workspace_scope,
+        ),
+        "store_section_url": build_canonical_master_data_url(
+            "store_sections",
+            scope_info=workspace_scope,
+        ),
+    }
+
+
+@main_bp.route("/admin/master-data/units")
+def master_data_units_route():
+    scope_info, canonical_redirect = validate_canonical_master_data_page_request(
+        "units",
+        allow_admin_scope=False,
+    )
+    if canonical_redirect:
+        return canonical_redirect
+    return render_template(
+        "units.html",
+        master_data=unit_master_data_context(scope_info),
+        current_user=current_public_user(),
+        is_guest_demo=is_guest_session(),
+        app_css_version=static_asset_version("css/app.css"),
+        app_js_version=static_asset_version("js/app.js"),
+        units_js_version=static_asset_version("js/units.js"),
+    )
+
+
 def store_section_master_data_context():
     user_id = recipe_master_data.scoped_recipe_user_id()
     viewer_user_id = active_user_id()
@@ -1470,6 +1564,7 @@ def store_section_master_data_context():
         "messages": session.pop("recipe_master_data_messages", []),
         "ingredient_url": build_canonical_master_data_url("ingredients"),
         "equipment_url": build_canonical_master_data_url("equipment"),
+        "units_url": build_canonical_master_data_url("units"),
         "store_section_url": build_canonical_master_data_url("store_sections"),
         "create_url": build_canonical_master_data_url("store_sections"),
     }

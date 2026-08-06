@@ -1,0 +1,139 @@
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = master_data.title %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "settings" %}
+{% set app_search_id = "unitsGlobalSearch" %}
+{% set app_content_class = "master-data-app-content" %}
+
+{% block app_body_attributes %}
+data-user-id="{{ master_data.viewer_user_id }}"
+data-viewer-user-id="{{ master_data.viewer_user_id }}"
+{% endblock %}
+
+{% block app_content %}
+    <script id="ingredientUnitConfig" type="application/json">{{ master_data.registry | tojson }}</script>
+    <section class="master-data-page unit-master-page"
+             aria-labelledby="unitsTitle"
+             data-unit-master-page>
+        <header class="master-data-header">
+            <div>
+                <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
+                <h1 id="unitsTitle">Units</h1>
+                <p>Browse built-in ingredient units and manage the custom units available in this browser.</p>
+            </div>
+            <nav class="master-data-tabs" aria-label="Master data">
+                <a href="{{ master_data.ingredient_url }}">Ingredients</a>
+                <a href="{{ master_data.equipment_url }}">Equipment</a>
+                <a href="{{ master_data.units_url }}" class="active" aria-current="page">Units</a>
+                <a href="{{ master_data.store_section_url }}">Store Sections</a>
+            </nav>
+        </header>
+
+        <div class="unit-master-stats" aria-label="Unit summary">
+            <article>
+                <span>Built-in units</span>
+                <strong>{{ master_data.built_in_count }}</strong>
+            </article>
+            <article>
+                <span>Accepted names</span>
+                <strong>{{ master_data.alias_count }}</strong>
+            </article>
+            <article>
+                <span>Categories</span>
+                <strong>{{ master_data.categories | length }}</strong>
+            </article>
+            <article>
+                <span>Custom units</span>
+                <strong data-unit-master-custom-count>0</strong>
+            </article>
+        </div>
+
+        <section class="unit-master-panel unit-master-custom" aria-labelledby="customUnitsTitle">
+            <header>
+                <div>
+                    <span>Browser setup</span>
+                    <h2 id="customUnitsTitle">Custom Units</h2>
+                    <p>Custom units use the same browser storage as the Recipe Editor unit menu.</p>
+                </div>
+                <form class="unit-master-add-form" data-unit-master-add-form>
+                    <label>
+                        <span>Unit name</span>
+                        <input type="text"
+                               maxlength="40"
+                               autocomplete="off"
+                               placeholder="For example, scoop"
+                               data-unit-master-add-input>
+                    </label>
+                    <button type="submit">Add Unit</button>
+                </form>
+            </header>
+            <p class="unit-master-storage-note">
+                Custom units stay on this browser. Built-in units and accepted aliases are protected.
+            </p>
+            <div class="unit-master-status" role="status" aria-live="polite" data-unit-master-status hidden></div>
+            <div class="unit-master-custom-list" data-unit-master-custom-list></div>
+            <div class="unit-master-empty" data-unit-master-custom-empty>
+                No custom units yet. Add one above or from an ingredient’s Unit menu.
+            </div>
+        </section>
+
+        <section class="unit-master-panel unit-master-catalog" aria-labelledby="builtInUnitsTitle">
+            <header>
+                <div>
+                    <span>Shared registry</span>
+                    <h2 id="builtInUnitsTitle">Built-in Units</h2>
+                    <p>These canonical units and aliases are used for imports, validation, saving, and display.</p>
+                </div>
+                <label class="unit-master-search">
+                    <span>Search units</span>
+                    <input type="search"
+                           placeholder="Name or alias"
+                           autocomplete="off"
+                           data-unit-master-search>
+                </label>
+            </header>
+            <div class="unit-master-category-list">
+                {% for category in master_data.categories %}
+                    <section class="unit-master-category"
+                             data-unit-master-category
+                             aria-labelledby="unitCategory-{{ category.key }}">
+                        <header>
+                            <h3 id="unitCategory-{{ category.key }}">{{ category.label }}</h3>
+                            <span>{{ category.units | length }} units</span>
+                        </header>
+                        <div class="unit-master-table" role="table" aria-label="{{ category.label }} units">
+                            <div class="unit-master-table-head" role="row">
+                                <span role="columnheader">Canonical name</span>
+                                <span role="columnheader">Accepted aliases</span>
+                                <span role="columnheader">Status</span>
+                            </div>
+                            {% for unit in category.units %}
+                                <div class="unit-master-row"
+                                     role="row"
+                                     data-unit-master-built-in-row
+                                     data-unit-master-search-value="{{ unit.name }} {{ unit.aliases | join(' ') }}">
+                                    <strong role="cell">{{ unit.name }}</strong>
+                                    <div class="unit-master-aliases" role="cell">
+                                        {% for alias in unit.aliases %}
+                                            <code>{{ alias }}</code>
+                                        {% else %}
+                                            <span>Canonical name only</span>
+                                        {% endfor %}
+                                    </div>
+                                    <span class="unit-master-built-in-badge" role="cell">Built-in</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endfor %}
+            </div>
+            <div class="unit-master-empty" data-unit-master-search-empty hidden>
+                No built-in units match that search.
+            </div>
+        </section>
+    </section>
+{% endblock %}
+
+{% block app_scripts %}
+<script src="{{ url_for('static', filename='js/units.js', v=units_js_version) }}" defer></script>
+{% endblock %}

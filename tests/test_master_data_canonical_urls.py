@@ -11,11 +11,13 @@ from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
+from PushShoppingList.services.ingredient_unit_service import unit_registry_payload
 
 
 MASTER_DATA_PAGES = (
     "/admin/master-data/ingredients",
     "/admin/master-data/equipment",
+    "/admin/master-data/units",
     "/admin/master-data/store-sections",
 )
 
@@ -172,6 +174,47 @@ def test_registered_master_data_pages_accept_exact_matching_viewer(
     assert response.status_code == 200
     assert "Location" not in response.headers
     assert_private_no_store(response)
+
+
+def test_units_page_renders_the_shared_registry_and_custom_unit_manager(
+    master_data_app,
+):
+    with master_data_app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.get(
+            "/admin/master-data/units",
+            query_string={"viewer_user_id": "user-a"},
+        )
+
+    assert response.status_code == 200
+    assert_private_no_store(response)
+    soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
+    assert soup.title.get_text(strip=True) == "Units"
+    assert soup.select_one("[data-unit-master-page]") is not None
+    assert soup.select_one("h1#unitsTitle").get_text(strip=True) == "Units"
+    assert soup.select_one("[data-unit-master-add-form]") is not None
+    assert soup.select_one("[data-unit-master-custom-list]") is not None
+    assert soup.select_one("[data-unit-master-custom-empty]") is not None
+    built_in_rows = soup.select("[data-unit-master-built-in-row]")
+    assert len(built_in_rows) == len(unit_registry_payload()["units"])
+    assert {row.select_one("strong").get_text(strip=True) for row in built_in_rows} >= {
+        "teaspoon",
+        "cup",
+        "gram",
+        "piece",
+    }
+    active_tab = soup.select_one("nav.master-data-tabs a.active")
+    assert active_tab.get_text(strip=True) == "Units"
+    assert urlsplit(active_tab["href"]).path == "/admin/master-data/units"
+    assert soup.select_one('script[src*="/static/js/units.js"]') is not None
+
+    units_script = Path("PushShoppingList/static/js/units.js").read_text(
+        encoding="utf-8",
+    )
+    assert 'CUSTOM_UNITS_KEY = "recipeIngredientCustomUnits"' in units_script
+    assert "recipeIngredientCustomUnitNames" in units_script
+    assert "storeRecipeIngredientCustomUnitNames" in units_script
+    assert "data-unit-master-search" in response.get_data(as_text=True)
 
 
 @pytest.mark.parametrize("supplied_viewer", ("user-b", "USER-A"))
@@ -542,12 +585,12 @@ def test_page_tabs_keep_canonical_viewer_and_admin_target_scope(master_data_app)
     assert response.status_code == 200
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
     tab_links = soup.select("nav.master-data-tabs a[href]")
-    assert len(tab_links) == 3
+    assert len(tab_links) == 4
     assert {urlsplit(link["href"]).path for link in tab_links} == set(MASTER_DATA_PAGES)
     for link in tab_links:
         path, params = canonical_query_from_href(link["href"])
-        if path == "/admin/master-data/store-sections":
-            # Store-section definitions belong to one session workspace and do
+        if path in {"/admin/master-data/store-sections", "/admin/master-data/units"}:
+            # These definitions belong to one session/browser workspace and do
             # not have a coherent aggregate/all-users view.
             assert params == {"viewer_user_id": ["admin-user"]}
         else:
@@ -718,7 +761,9 @@ def test_javascript_navigation_uses_shared_canonical_viewer_url_builders():
         'masterDataViewerUrl("/admin/master-data/store-sections")'
         in app_script
     )
+    assert 'masterDataViewerUrl("/admin/master-data/units")' in app_script
     assert 'href="/admin/master-data/store-sections"' not in app_script
+    assert 'href="/admin/master-data/units"' not in app_script
     assert 'url.searchParams.set("viewer_user_id", viewerUserId)' in app_script
 
     assert (

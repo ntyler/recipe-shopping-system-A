@@ -13,6 +13,7 @@ from urllib.parse import urlencode
 MASTER_DATA_PAGE_PATHS = {
     "ingredients": "/admin/master-data/ingredients",
     "equipment": "/admin/master-data/equipment",
+    "units": "/admin/master-data/units",
     "store_sections": "/admin/master-data/store-sections",
 }
 
