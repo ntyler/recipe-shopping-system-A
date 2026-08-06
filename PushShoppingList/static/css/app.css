@@ -73734,5 +73734,10 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         background: color-mix(in srgb, var(--app-surface-soft) 80%, transparent);
         box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 44%, transparent);
     }
+}
 
+/* Ingredient editor v106: selected single-component choices keep the standard active-row strip. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.has-selected-ingredient-choice:is(:hover, :focus-within) {
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--app-primary) 44%, transparent);
 }

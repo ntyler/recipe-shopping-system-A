@@ -6856,3 +6856,16 @@ def test_nested_ingredient_hover_highlights_only_the_visual_row():
     assert "box-shadow: inset 3px 0 0" in grouped_surface_rule
     assert "top: -16px;" not in projected_css
     assert "bottom: -8px;" not in projected_css
+
+    single_choice_marker = (
+        "/* Ingredient editor v106: selected single-component choices keep the standard active-row strip. */"
+    )
+    assert css.index(single_choice_marker) > css.index(projected_marker)
+    single_choice_css = css[css.index(single_choice_marker):]
+    single_choice_start = single_choice_css.index(
+        "> .recipe-edit-ingredient-row.has-selected-ingredient-choice:is(:hover, :focus-within) {"
+    )
+    single_choice_rule = single_choice_css[
+        single_choice_start:single_choice_css.index("}", single_choice_start)
+    ]
+    assert "box-shadow: inset 3px 0 0" in single_choice_rule
