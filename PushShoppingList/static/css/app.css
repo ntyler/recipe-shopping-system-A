@@ -63356,7 +63356,7 @@ body.recipe-edit-standalone-page :is(
 .unit-master-table-head,
 .unit-master-row {
     display: grid;
-    grid-template-columns: minmax(118px, .72fr) minmax(170px, 1.35fr) 112px 58px;
+    grid-template-columns: minmax(105px, .7fr) minmax(145px, 1.22fr) minmax(76px, .5fr) 108px 58px;
     gap: 12px;
     align-items: center;
 }
@@ -63406,6 +63406,49 @@ body.recipe-edit-standalone-page :is(
     font-size: 12px;
 }
 
+.unit-master-usage {
+    min-width: 0;
+}
+
+.unit-master-usage-button {
+    display: inline-flex;
+    min-height: 36px !important;
+    align-items: baseline;
+    gap: 4px;
+    padding: 5px 8px !important;
+    border-color: color-mix(in srgb, var(--app-primary) 52%, var(--app-border)) !important;
+    background: color-mix(in srgb, var(--app-primary) 9%, transparent) !important;
+    color: var(--app-primary-hover) !important;
+    white-space: nowrap;
+}
+
+.unit-master-usage-button:is(:hover, :focus-visible) {
+    border-color: var(--app-primary) !important;
+    background: color-mix(in srgb, var(--app-primary) 18%, transparent) !important;
+}
+
+.unit-master-usage-button strong {
+    color: var(--app-text-strong);
+    font-size: 15px;
+    line-height: 1;
+}
+
+.unit-master-usage-button span {
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.unit-master-usage-empty {
+    display: inline-flex;
+    min-width: 34px;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    color: var(--app-muted);
+    font-size: 13px;
+    font-weight: 750;
+}
+
 .unit-master-source-badge {
     display: inline-flex;
     justify-content: center;
@@ -63426,6 +63469,188 @@ body.recipe-edit-standalone-page :is(
     min-height: 36px !important;
     padding: 5px 10px !important;
     font-size: 12px !important;
+}
+
+.unit-master-usage-dialog {
+    width: min(760px, calc(100vw - 28px));
+    max-height: min(820px, calc(100vh - 28px));
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 12px;
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .56);
+}
+
+.unit-master-usage-dialog:not([open]) {
+    display: none;
+}
+
+.unit-master-usage-dialog::backdrop {
+    background: rgba(2, 6, 12, .72);
+    backdrop-filter: blur(2px);
+}
+
+.unit-master-usage-dialog-shell {
+    display: grid;
+    grid-template-rows: auto auto minmax(140px, 1fr) auto;
+    max-height: min(820px, calc(100vh - 28px));
+}
+
+.unit-master-usage-dialog-shell > header,
+.unit-master-usage-dialog-shell > footer {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px 20px;
+}
+
+.unit-master-usage-dialog-shell > header {
+    border-bottom: 1px solid var(--app-border);
+}
+
+.unit-master-usage-dialog-shell > header > div > span {
+    color: var(--app-primary);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.unit-master-usage-dialog-shell h2 {
+    margin: 4px 0;
+    color: var(--app-text-strong);
+    font-size: 21px;
+}
+
+.unit-master-usage-dialog-shell > header p {
+    max-width: 610px;
+    margin: 0;
+    color: var(--app-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.unit-master-usage-dialog-close {
+    flex: 0 0 38px;
+    width: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    padding: 4px !important;
+    border-color: var(--app-border) !important;
+    color: var(--app-muted) !important;
+    font-size: 21px !important;
+    line-height: 1;
+}
+
+.unit-master-usage-dialog-summary {
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-surface-soft);
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.unit-master-usage-results {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    min-height: 180px;
+    padding: 14px 20px 18px;
+    overflow: auto;
+}
+
+.unit-master-usage-recipe {
+    display: grid;
+    gap: 10px;
+    padding: 13px 14px;
+    border: 1px solid var(--app-border);
+    border-radius: 9px;
+    background: var(--app-surface-soft);
+}
+
+.unit-master-usage-recipe > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.unit-master-usage-recipe h3 {
+    margin: 0;
+    color: var(--app-text-strong);
+    font-size: 14px;
+}
+
+.unit-master-usage-recipe > header > a {
+    flex: 0 0 auto;
+    color: var(--app-primary-hover);
+    font-size: 11px;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.unit-master-usage-recipe > header > a:is(:hover, :focus-visible) {
+    text-decoration: underline;
+}
+
+.unit-master-usage-recipe ul {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.unit-master-usage-recipe li {
+    display: grid;
+    gap: 3px;
+    padding-left: 12px;
+    border-left: 2px solid color-mix(in srgb, var(--app-primary) 64%, var(--app-border));
+}
+
+.unit-master-usage-recipe li strong {
+    color: var(--app-text);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.unit-master-usage-recipe li span {
+    color: var(--app-muted);
+    font-size: 10px;
+}
+
+.unit-master-usage-state {
+    display: grid;
+    min-height: 150px;
+    place-items: center;
+    color: var(--app-muted);
+    font-size: 13px;
+    text-align: center;
+}
+
+.unit-master-usage-state.is-error {
+    color: var(--app-danger);
+}
+
+.unit-master-usage-limit-note {
+    margin: 2px 0 0;
+    color: var(--app-muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+.unit-master-usage-dialog-shell > footer {
+    align-items: center;
+    border-top: 1px solid var(--app-border);
+}
+
+.unit-master-usage-dialog-shell > footer > span {
+    color: var(--app-muted);
+    font-size: 11px;
 }
 
 .unit-master-dialog {
@@ -63681,6 +63906,11 @@ body.recipe-edit-standalone-page :is(
         grid-row: 2;
     }
 
+    .unit-master-usage {
+        grid-column: 1 / -1;
+        grid-row: 3;
+    }
+
     .unit-master-source-badge {
         grid-column: 2;
         grid-row: 1;
@@ -63709,6 +63939,18 @@ body.recipe-edit-standalone-page :is(
     .unit-master-import-actions button,
     .unit-master-toolbar > button {
         width: 100%;
+    }
+
+    .unit-master-usage-dialog-shell > header,
+    .unit-master-usage-dialog-shell > footer,
+    .unit-master-usage-results {
+        padding-right: 14px;
+        padding-left: 14px;
+    }
+
+    .unit-master-usage-recipe > header {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
 

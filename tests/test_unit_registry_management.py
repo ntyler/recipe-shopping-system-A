@@ -345,6 +345,10 @@ def test_registry_is_workspace_isolated_and_unit_routes_require_authorization(
         )
         assert forbidden_edit.status_code == 404
         assert "scoop" not in forbidden_edit.get_data(as_text=True).lower()
+        forbidden_usage = user_b.get(
+            f"/api/master-data/units/{unit_id}/references"
+        )
+        assert forbidden_usage.status_code == 404
 
 
 def test_units_page_exposes_accessible_persistent_editor_and_import_offer(
@@ -374,6 +378,141 @@ def test_units_page_exposes_accessible_persistent_editor_and_import_offer(
     )
     assert soup.select_one("[data-unit-master-import]") is not None
     assert len(soup.select("[data-unit-master-edit-button]")) >= 30
+
+
+def test_unit_usage_counts_distinct_recipes_and_lists_matching_lines(
+    unit_registry_app,
+):
+    first_url = "https://example.test/recipes/teaspoon-first"
+    second_url = "https://example.test/recipes/teaspoon-option"
+    master_data.sync_recipe_master_records(
+        first_url,
+        recipe_data={
+            "ingredients": [
+                {
+                    "recipe_ingredient_id": "salt",
+                    "ingredient": "salt",
+                    "quantity": "1",
+                    "unit": "tsp",
+                    "original_text": "1 tsp salt",
+                },
+                {
+                    "recipe_ingredient_id": "vanilla",
+                    "ingredient": "vanilla",
+                    "quantity": "2",
+                    "unit": "teaspoons",
+                    "original_text": "2 teaspoons vanilla",
+                },
+            ],
+        },
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(
+        second_url,
+        recipe_data={
+            "ingredients": [{
+                "recipe_ingredient_id": "sweetener",
+                "ingredient": "sugar",
+                "quantity": "1",
+                "unit": "tablespoon",
+                "original_text": "1 tablespoon sugar",
+                "substitutions": [{
+                    "alternative_id": "honey-option",
+                    "alternative_label": "Honey",
+                    "option_type": "substitution",
+                    "ingredient": "honey",
+                    "quantity": "1",
+                    "unit": "tsp",
+                    "original_text": "1 tsp honey",
+                }],
+            }],
+        },
+        user_id="user-a",
+    )
+
+    with unit_registry_app.test_client() as client:
+        sign_in(client, "user-a")
+        registry = registry_for(client)
+        teaspoon = unit_named(registry, "teaspoon")
+        assert teaspoon["recipe_count"] == 2
+
+        response = client.get(
+            f'/api/master-data/units/{teaspoon["id"]}/references'
+        )
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["total"] == 2
+        assert payload["total_reference_count"] >= 3
+        assert {row["recipe_id"] for row in payload["references"]} == {
+            master_data.recipe_id_for_url(first_url),
+            master_data.recipe_id_for_url(second_url),
+        }
+        all_matches = [
+            match
+            for reference in payload["references"]
+            for match in reference["matches"]
+        ]
+        assert {match["ingredient_line"] for match in all_matches} >= {
+            "1 tsp salt",
+            "2 teaspoons vanilla",
+            "1 tsp honey",
+        }
+        honey_match = next(
+            match for match in all_matches if match["ingredient_line"] == "1 tsp honey"
+        )
+        assert honey_match["kind"] == "option"
+        assert honey_match["context"] == "Honey"
+
+
+def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
+    unit_registry_app,
+):
+    master_data.sync_recipe_master_records(
+        "https://example.test/recipes/usage-page",
+        recipe_data={
+            "ingredients": [{
+                "ingredient": "salt",
+                "quantity": "1",
+                "unit": "teaspoon",
+                "original_text": "1 teaspoon salt",
+            }],
+        },
+        user_id="user-a",
+    )
+
+    with unit_registry_app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.get(
+            "/admin/master-data/units",
+            query_string={"viewer_user_id": "user-a"},
+        )
+
+    assert response.status_code == 200
+    soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
+    headers = [
+        header.get_text(" ", strip=True)
+        for header in soup.select(".unit-master-table-head [role='columnheader']")[:5]
+    ]
+    assert headers == [
+        "Canonical name",
+        "Accepted aliases",
+        "Used in",
+        "Source",
+        "Action",
+    ]
+    teaspoon_row = next(
+        row
+        for row in soup.select("[data-unit-master-row]")
+        if row.select_one("strong[role='cell']").get_text(strip=True) == "teaspoon"
+    )
+    usage_button = teaspoon_row.select_one("[data-unit-master-usage-button]")
+    assert usage_button is not None
+    assert usage_button.select_one("strong").get_text(strip=True) == "1"
+    assert usage_button["aria-controls"] == "unitMasterUsageDialog"
+    assert soup.select_one("dialog[data-unit-master-usage-dialog]") is not None
+    assert soup.select_one("[data-unit-master-page]")["data-usage-url-template"] == (
+        "/api/master-data/units/__UNIT_ID__/references"
+    )
 
 
 def test_unit_editor_resets_legacy_button_sizing_and_uses_contextual_save_label():

@@ -63,6 +63,8 @@
         let saveButtonLabel = "Add Unit";
         let aiSuggestionPending = false;
         let suggestionRequestToken = 0;
+        let usageRequestToken = 0;
+        let usageReturnFocus = null;
 
         const source = document.getElementById("ingredientUnitConfig");
         const status = root.querySelector("[data-unit-master-status]");
@@ -87,6 +89,11 @@
         const aliasError = root.querySelector("[data-unit-master-alias-error]");
         const importPanel = root.querySelector("[data-unit-master-import]");
         const importButton = root.querySelector("[data-unit-master-import-button]");
+        const usageDialog = root.querySelector("[data-unit-master-usage-dialog]");
+        const usageTitle = root.querySelector("[data-unit-master-usage-title]");
+        const usageContext = root.querySelector("[data-unit-master-usage-context]");
+        const usageSummary = root.querySelector("[data-unit-master-usage-summary]");
+        const usageResults = root.querySelector("[data-unit-master-usage-results]");
 
         const setStatus = (message, type = "success") => {
             status.textContent = String(message || "");
@@ -209,6 +216,42 @@
             );
         };
 
+        const createUsageCell = unit => {
+            const usage = document.createElement("div");
+            usage.className = "unit-master-usage";
+            usage.setAttribute("role", "cell");
+            const recipeCount = Math.max(0, Number(unit.recipe_count) || 0);
+            if (!recipeCount) {
+                const empty = document.createElement("span");
+                empty.className = "unit-master-usage-empty";
+                empty.textContent = "0";
+                empty.setAttribute("aria-label", `No recipes use ${unit.name}`);
+                empty.title = `No recipes currently use ${unit.name}`;
+                usage.appendChild(empty);
+                return usage;
+            }
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "unit-master-usage-button";
+            button.dataset.unitMasterUsageButton = "";
+            button.dataset.unitId = unit.id;
+            button.setAttribute("aria-haspopup", "dialog");
+            button.setAttribute("aria-controls", "unitMasterUsageDialog");
+            button.setAttribute(
+                "aria-label",
+                `Show ${recipeCount} recipe${recipeCount === 1 ? "" : "s"} using ${unit.name}`,
+            );
+            button.title = `Show recipes using ${unit.name}`;
+            const count = document.createElement("strong");
+            count.textContent = String(recipeCount);
+            const label = document.createElement("span");
+            label.textContent = recipeCount === 1 ? "recipe" : "recipes";
+            button.append(count, label);
+            usage.appendChild(button);
+            return usage;
+        };
+
         const createUnitRow = unit => {
             const row = document.createElement("div");
             row.className = "unit-master-row";
@@ -238,6 +281,7 @@
             sourceBadge.className = `unit-master-source-badge${unit.seeded ? "" : " user-created"}`;
             sourceBadge.setAttribute("role", "cell");
             sourceBadge.textContent = unit.seeded ? "System-seeded" : "User-created";
+            const usage = createUsageCell(unit);
             const edit = document.createElement("button");
             edit.type = "button";
             edit.className = "unit-master-edit-button";
@@ -245,7 +289,7 @@
             edit.dataset.unitId = unit.id;
             edit.textContent = "Edit";
             edit.setAttribute("aria-label", `Edit ${unit.name}`);
-            row.append(name, aliases, sourceBadge, edit);
+            row.append(name, aliases, usage, sourceBadge, edit);
             return row;
         };
 
@@ -287,6 +331,126 @@
                 recipeIngredientUnitRegistryCache = null;
             }
             renderRegistry();
+        };
+
+        const setUsageState = (message, state = "loading") => {
+            usageSummary.textContent = "";
+            usageResults.replaceChildren();
+            const output = document.createElement("div");
+            output.className = `unit-master-usage-state is-${state}`;
+            output.textContent = message;
+            usageResults.appendChild(output);
+        };
+
+        const renderUsageMatch = match => {
+            const item = document.createElement("li");
+            const line = document.createElement("strong");
+            line.textContent = match.ingredient_line || match.ingredient_name || "Ingredient line";
+            item.appendChild(line);
+
+            const details = [];
+            if (match.kind === "option") {
+                details.push(match.context ? `Recipe option: ${match.context}` : "Recipe option");
+            } else if (match.context) {
+                details.push(match.context);
+            }
+            if (match.is_alias_match && match.matched_as) {
+                details.push(`Matched alias: ${match.matched_as}`);
+            }
+            if (match.optional) details.push("Optional");
+            if (details.length) {
+                const meta = document.createElement("span");
+                meta.textContent = details.join(" · ");
+                item.appendChild(meta);
+            }
+            return item;
+        };
+
+        const renderUsageReferences = data => {
+            usageResults.replaceChildren();
+            const references = Array.isArray(data.references) ? data.references : [];
+            const total = Math.max(0, Number(data.total) || references.length);
+            const lineCount = Math.max(0, Number(data.total_reference_count) || 0);
+            usageSummary.textContent = `${total} distinct recipe${total === 1 ? "" : "s"} · ${lineCount} matching ingredient line${lineCount === 1 ? "" : "s"}`;
+
+            if (!references.length) {
+                setUsageState("No connected recipes were found for this unit.", "empty");
+                return;
+            }
+
+            references.forEach(reference => {
+                const card = document.createElement("article");
+                card.className = "unit-master-usage-recipe";
+                const header = document.createElement("header");
+                const heading = document.createElement("h3");
+                heading.textContent = reference.recipe_title || reference.recipe_id || "Recipe";
+                header.appendChild(heading);
+                if (reference.edit_url) {
+                    const link = document.createElement("a");
+                    link.href = reference.edit_url;
+                    link.target = "_blank";
+                    link.rel = "noopener noreferrer";
+                    link.textContent = "Open Recipe";
+                    header.appendChild(link);
+                }
+                card.appendChild(header);
+
+                const matches = document.createElement("ul");
+                (Array.isArray(reference.matches) ? reference.matches : []).forEach(match => {
+                    matches.appendChild(renderUsageMatch(match || {}));
+                });
+                card.appendChild(matches);
+                usageResults.appendChild(card);
+            });
+
+            if (total > references.length) {
+                const note = document.createElement("p");
+                note.className = "unit-master-usage-limit-note";
+                note.textContent = `Showing the first ${references.length} recipes.`;
+                usageResults.appendChild(note);
+            }
+        };
+
+        const closeUsage = () => {
+            usageRequestToken += 1;
+            if (usageDialog.open) usageDialog.close();
+        };
+
+        const openUsage = async (unit, trigger) => {
+            if (!unit || !usageDialog) return;
+            usageReturnFocus = trigger || document.activeElement;
+            usageTitle.textContent = `Recipes using ${unit.name}`;
+            const aliases = Array.isArray(unit.aliases) ? unit.aliases : [];
+            usageContext.textContent = aliases.length
+                ? `Connections include ${unit.name} and its accepted aliases: ${aliases.join(", ")}.`
+                : `Connections include ingredient lines normalized to ${unit.name}.`;
+            setUsageState("Loading connected recipes…");
+            if (!usageDialog.open) usageDialog.showModal();
+
+            const requestToken = ++usageRequestToken;
+            const referenceUrl = root.dataset.usageUrlTemplate.replace(
+                "__UNIT_ID__",
+                encodeURIComponent(unit.id),
+            );
+            try {
+                const response = await fetch(referenceUrl, {
+                    headers: {
+                        Accept: "application/json",
+                        "X-Requested-With": "fetch",
+                    },
+                });
+                const data = await response.json().catch(() => ({}));
+                if (requestToken !== usageRequestToken || !usageDialog.open) return;
+                if (!response.ok || data.ok === false) {
+                    setUsageState(data.error || "Connected recipes could not be loaded.", "error");
+                    return;
+                }
+                renderUsageReferences(data);
+            } catch (error) {
+                if (requestToken !== usageRequestToken) return;
+                setUsageState("Connected recipes could not be loaded. Try again.", "error");
+                console.error("Unable to load unit recipe usage.", error);
+            }
         };
 
         const openEditor = (unit = null, trigger = null) => {
@@ -425,6 +589,11 @@
 
         root.querySelector("[data-unit-master-add-button]").addEventListener("click", event => openEditor(null, event.currentTarget));
         categoryList.addEventListener("click", event => {
+            const usageButton = event.target.closest("[data-unit-master-usage-button]");
+            if (usageButton) {
+                openUsage(unitById(usageButton.dataset.unitId), usageButton);
+                return;
+            }
             const button = event.target.closest("[data-unit-master-edit-button]");
             if (!button) return;
             openEditor(unitById(button.dataset.unitId), button);
@@ -442,6 +611,20 @@
         dialog.addEventListener("cancel", event => {
             event.preventDefault();
             closeEditor();
+        });
+        root.querySelectorAll("[data-unit-master-usage-close]").forEach(button => {
+            button.addEventListener("click", closeUsage);
+        });
+        usageDialog.addEventListener("cancel", event => {
+            event.preventDefault();
+            closeUsage();
+        });
+        usageDialog.addEventListener("click", event => {
+            if (event.target === usageDialog) closeUsage();
+        });
+        usageDialog.addEventListener("close", () => {
+            if (usageReturnFocus && usageReturnFocus.isConnected) usageReturnFocus.focus();
+            usageReturnFocus = null;
         });
         form.addEventListener("submit", saveUnit);
         search.addEventListener("input", applySearch);

@@ -17,6 +17,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
              data-unit-master-page
              data-create-url="{{ master_data.create_url }}"
              data-update-url-template="{{ master_data.update_url_template }}"
+             data-usage-url-template="{{ master_data.usage_url_template }}"
              data-import-url="{{ master_data.import_url }}"
              data-suggest-url="{{ master_data.suggest_url }}">
         <header class="master-data-header">
@@ -97,6 +98,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             <div class="unit-master-table-head" role="row">
                                 <span role="columnheader">Canonical name</span>
                                 <span role="columnheader">Accepted aliases</span>
+                                <span role="columnheader">Used in</span>
                                 <span role="columnheader">Source</span>
                                 <span role="columnheader">Action</span>
                             </div>
@@ -114,6 +116,25 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                             {% else %}
                                                 <span>Canonical name only</span>
                                             {% endfor %}
+                                        </div>
+                                        <div class="unit-master-usage" role="cell">
+                                            {% if unit.recipe_count %}
+                                                <button type="button"
+                                                        class="unit-master-usage-button"
+                                                        data-unit-master-usage-button
+                                                        data-unit-id="{{ unit.id }}"
+                                                        aria-haspopup="dialog"
+                                                        aria-controls="unitMasterUsageDialog"
+                                                        aria-label="Show {{ unit.recipe_count }} recipe{% if unit.recipe_count != 1 %}s{% endif %} using {{ unit.name }}"
+                                                        title="Show recipes using {{ unit.name }}">
+                                                    <strong>{{ unit.recipe_count }}</strong>
+                                                    <span>{{ "recipe" if unit.recipe_count == 1 else "recipes" }}</span>
+                                                </button>
+                                            {% else %}
+                                                <span class="unit-master-usage-empty"
+                                                      aria-label="No recipes use {{ unit.name }}"
+                                                      title="No recipes currently use {{ unit.name }}">0</span>
+                                            {% endif %}
                                         </div>
                                         <span class="unit-master-source-badge{% if not unit.seeded %} user-created{% endif %}" role="cell">
                                             {{ "System-seeded" if unit.seeded else "User-created" }}
@@ -205,6 +226,37 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <button type="submit" data-unit-master-save>Add Unit</button>
                 </footer>
             </form>
+        </dialog>
+
+        <dialog id="unitMasterUsageDialog"
+                class="unit-master-usage-dialog"
+                data-unit-master-usage-dialog
+                aria-labelledby="unitMasterUsageTitle"
+                aria-describedby="unitMasterUsageContext">
+            <div class="unit-master-usage-dialog-shell">
+                <header>
+                    <div>
+                        <span>Recipe usage</span>
+                        <h2 id="unitMasterUsageTitle" data-unit-master-usage-title>Recipes using this unit</h2>
+                        <p id="unitMasterUsageContext" data-unit-master-usage-context>
+                            Review every matching ingredient line connected through the canonical name or an accepted alias.
+                        </p>
+                    </div>
+                    <button type="button"
+                            class="unit-master-usage-dialog-close"
+                            data-unit-master-usage-close
+                            aria-label="Close recipe usage">&times;</button>
+                </header>
+                <div class="unit-master-usage-dialog-summary" data-unit-master-usage-summary></div>
+                <div class="unit-master-usage-results"
+                     data-unit-master-usage-results
+                     role="region"
+                     aria-live="polite"></div>
+                <footer>
+                    <span>Recipe links open in a new tab.</span>
+                    <button type="button" data-unit-master-usage-close>Close</button>
+                </footer>
+            </div>
         </dialog>
     </section>
 {% endblock %}

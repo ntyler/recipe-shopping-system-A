@@ -1214,6 +1214,61 @@ def unit_registry_key(value):
     return re.sub(r"\s+", " ", value).strip()
 
 
+def _workspace_unit_id_for_reference(row, unit_ids, unit_id_by_key):
+    direct_unit_id = clean_text(row["unit_id"])
+    if direct_unit_id in unit_ids:
+        return direct_unit_id
+
+    for field in ("unit", "unit_raw"):
+        resolved_unit_id = unit_id_by_key.get(unit_registry_key(row[field]))
+        if resolved_unit_id:
+            return resolved_unit_id
+    return ""
+
+
+def _workspace_unit_usage_counts(connection, user_id, units, aliases_by_id):
+    unit_ids = {str(unit["id"]) for unit in units}
+    unit_id_by_key = {}
+    recipe_ids_by_unit = {unit_id: set() for unit_id in unit_ids}
+    for unit in units:
+        unit_id = str(unit["id"])
+        unit_id_by_key[unit_registry_key(unit["name"])] = unit_id
+        for alias in aliases_by_id.get(unit_id, []):
+            unit_id_by_key[unit_registry_key(alias)] = unit_id
+
+    rows = connection.execute(
+        """
+        SELECT r.recipe_id, r.unit_id, r.unit, r.unit_raw
+          FROM recipe_ingredients r
+         WHERE r.user_id = ?
+        UNION ALL
+        SELECT requirement.recipe_id, item.unit_id, item.unit, item.unit_raw
+          FROM recipe_ingredient_option_items item
+          JOIN recipe_ingredient_options option ON option.id = item.option_id
+          JOIN recipe_ingredient_requirements requirement
+            ON requirement.id = option.requirement_id
+         WHERE requirement.user_id = ?
+        """,
+        (user_id, user_id),
+    ).fetchall()
+    for row in rows:
+        recipe_id = clean_text(row["recipe_id"])
+        if not recipe_id:
+            continue
+        unit_id = _workspace_unit_id_for_reference(
+            row,
+            unit_ids,
+            unit_id_by_key,
+        )
+        if unit_id:
+            recipe_ids_by_unit[unit_id].add(recipe_id)
+
+    return {
+        unit_id: len(recipe_ids)
+        for unit_id, recipe_ids in recipe_ids_by_unit.items()
+    }
+
+
 def _workspace_unit_registry_payload_from_connection(connection, user_id):
     unit_rows = connection.execute(
         """
@@ -1270,6 +1325,191 @@ def _workspace_unit_registry_payload_from_connection(connection, user_id):
             {"key": key, "label": label}
             for key, label in UNIT_REGISTRY_CATEGORIES
         ],
+    }
+
+
+def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
+    user_id = str(user_id or scoped_recipe_user_id()).strip()
+    unit_id = str(unit_id or "").strip()
+    try:
+        limit = max(1, min(int(limit or 100), 500))
+    except (TypeError, ValueError):
+        limit = 100
+
+    with recipe_master_connection() as connection:
+        _seed_workspace_unit_registry(connection, user_id)
+        registry = _workspace_unit_registry_payload_from_connection(connection, user_id)
+        unit = next(
+            (
+                item
+                for item in (registry or {}).get("units", [])
+                if str(item.get("id")) == unit_id
+            ),
+            None,
+        )
+        if not unit:
+            return {
+                "unit": None,
+                "references": [],
+                "total": 0,
+                "total_reference_count": 0,
+                "limit": limit,
+            }
+
+        unit_ids = {
+            str(item["id"])
+            for item in registry.get("units", [])
+        }
+        unit_id_by_key = {}
+        for item in registry.get("units", []):
+            item_id = str(item["id"])
+            unit_id_by_key[unit_registry_key(item["name"])] = item_id
+            for alias in item.get("aliases", []):
+                unit_id_by_key[unit_registry_key(alias)] = item_id
+
+        ingredient_rows = connection.execute(
+            """
+            SELECT
+                r.id,
+                'ingredient' AS reference_kind,
+                r.recipe_id,
+                COALESCE(NULLIF(source_ingredient.name, ''), NULLIF(r.raw_name, ''),
+                         NULLIF(r.normalized_name, ''), '') AS ingredient_name,
+                r.quantity,
+                r.unit,
+                r.unit_id,
+                r.unit_raw,
+                r.preparation,
+                r.notes,
+                r.original_recipe_text,
+                r.optional,
+                r.sort_order,
+                '' AS option_label,
+                '' AS requirement_label,
+                '' AS option_type
+              FROM recipe_ingredients r
+              LEFT JOIN ingredients source_ingredient
+                ON source_ingredient.id = r.ingredient_id
+               AND source_ingredient.user_id = r.user_id
+             WHERE r.user_id = ?
+            """,
+            (user_id,),
+        ).fetchall()
+        option_rows = connection.execute(
+            """
+            SELECT
+                item.id,
+                'option' AS reference_kind,
+                requirement.recipe_id,
+                COALESCE(NULLIF(source_ingredient.name, ''), NULLIF(item.raw_name, ''),
+                         NULLIF(item.normalized_name, ''), '') AS ingredient_name,
+                item.quantity,
+                item.unit,
+                item.unit_id,
+                item.unit_raw,
+                item.preparation,
+                item.notes,
+                item.original_recipe_text,
+                item.optional,
+                item.sort_order,
+                option.label AS option_label,
+                requirement.label AS requirement_label,
+                option.option_type AS option_type
+              FROM recipe_ingredient_option_items item
+              JOIN recipe_ingredient_options option ON option.id = item.option_id
+              JOIN recipe_ingredient_requirements requirement
+                ON requirement.id = option.requirement_id
+              LEFT JOIN ingredients source_ingredient
+                ON source_ingredient.id = item.ingredient_id
+               AND source_ingredient.user_id = requirement.user_id
+             WHERE requirement.user_id = ?
+            """,
+            (user_id,),
+        ).fetchall()
+
+    metadata = recipe_reference_metadata(user_id)
+    references_by_recipe = {}
+    total_reference_count = 0
+    matching_rows = sorted(
+        [*ingredient_rows, *option_rows],
+        key=lambda row: (
+            clean_text(row["recipe_id"]).lower(),
+            0 if clean_text(row["reference_kind"]) == "ingredient" else 1,
+            int(row["sort_order"] or 0),
+            int(row["id"] or 0),
+        ),
+    )
+    match_keys_by_recipe = {}
+    for row in matching_rows:
+        resolved_unit_id = _workspace_unit_id_for_reference(
+            row,
+            unit_ids,
+            unit_id_by_key,
+        )
+        if resolved_unit_id != unit_id:
+            continue
+
+        recipe_id = clean_text(row["recipe_id"])
+        metadata_record = metadata.get(recipe_id)
+        metadata_record = metadata_record if isinstance(metadata_record, dict) else {}
+        recipe_url = clean_text(metadata_record.get("url")) or recipe_id
+        reference = references_by_recipe.setdefault(recipe_id, {
+            "recipe_id": recipe_id,
+            "recipe_url": recipe_url,
+            "recipe_title": recipe_reference_title(recipe_id, metadata_record),
+            "matches": [],
+        })
+        original_text = clean_text(row["original_recipe_text"])
+        ingredient_name = clean_text(row["ingredient_name"])
+        quantity = clean_text(row["quantity"])
+        unit_name = clean_text(row["unit"])
+        preparation = clean_text(row["preparation"])
+        notes = clean_text(row["notes"])
+        if original_text:
+            ingredient_line = original_text
+        else:
+            ingredient_line = " ".join(
+                value for value in (quantity, unit_name, ingredient_name) if value
+            )
+            if preparation:
+                ingredient_line = f"{ingredient_line}, {preparation}" if ingredient_line else preparation
+            if notes:
+                ingredient_line = f"{ingredient_line} ({notes})" if ingredient_line else notes
+        matched_as = clean_text(row["unit_raw"]) or unit_name
+        option_label = clean_text(row["option_label"])
+        requirement_label = clean_text(row["requirement_label"])
+        option_type = clean_text(row["option_type"])
+        match_key = (
+            unit_registry_key(ingredient_line or ingredient_name),
+            unit_registry_key(matched_as),
+            unit_registry_key(ingredient_name),
+        )
+        recipe_match_keys = match_keys_by_recipe.setdefault(recipe_id, set())
+        if option_type == "original" and match_key in recipe_match_keys:
+            continue
+        recipe_match_keys.add(match_key)
+        total_reference_count += 1
+        reference["matches"].append({
+            "id": int(row["id"] or 0),
+            "kind": clean_text(row["reference_kind"]),
+            "ingredient_line": ingredient_line or ingredient_name or "Ingredient line",
+            "ingredient_name": ingredient_name,
+            "matched_as": matched_as,
+            "is_alias_match": bool(
+                matched_as
+                and unit_registry_key(matched_as) != unit_registry_key(unit["name"])
+            ),
+            "context": option_label or requirement_label,
+            "optional": bool(row["optional"]),
+        })
+
+    references = list(references_by_recipe.values())
+    return {
+        "unit": unit,
+        "references": references[:limit],
+        "total": len(references),
+        "total_reference_count": total_reference_count,
+        "limit": limit,
     }
 
 
@@ -1367,6 +1607,27 @@ def ensure_workspace_unit_registry(user_id=None):
     from PushShoppingList.services.ingredient_unit_service import clear_unit_registry_cache
 
     clear_unit_registry_cache()
+    return payload
+
+
+def workspace_unit_registry_with_usage(user_id=None):
+    user_id = str(user_id or scoped_recipe_user_id()).strip()
+    with recipe_master_connection() as connection:
+        _seed_workspace_unit_registry(connection, user_id)
+        payload = _workspace_unit_registry_payload_from_connection(connection, user_id)
+        usage_counts = _workspace_unit_usage_counts(
+            connection,
+            user_id,
+            payload.get("units", []),
+            {
+                str(unit["id"]): list(unit.get("aliases", []))
+                for unit in payload.get("units", [])
+            },
+        )
+        for unit in payload.get("units", []):
+            unit["recipe_count"] = int(
+                usage_counts.get(str(unit["id"])) or 0
+            )
     return payload
 
 
