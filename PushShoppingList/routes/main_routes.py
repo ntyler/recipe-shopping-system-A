@@ -1342,7 +1342,7 @@ def master_data_context(record_type, scope_info=None):
                     "section_key": section,
                     "rows": section_rows,
                 })
-    elif record_type == "equipment" and rows and not equipment_section:
+    elif record_type == "equipment" and rows:
         for section in recipe_master_data.equipment_section_options():
             section_rows = [
                 row
@@ -1385,15 +1385,15 @@ def master_data_context(record_type, scope_info=None):
         if record_type == "equipment"
         else [],
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
-        "group_by_equipment_section": bool(record_type == "equipment" and not equipment_section),
+        "group_by_equipment_section": bool(record_type == "equipment"),
         "table_column_count": (
             5
             if record_type == "ingredients" and scope_info["scope"] == "all"
             else 4
             if record_type == "ingredients"
-            else 5
-            if scope_info["scope"] == "all"
             else 4
+            if record_type == "equipment" and scope_info["scope"] == "all"
+            else 3
         ),
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},

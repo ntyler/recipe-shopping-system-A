@@ -455,8 +455,14 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'class="master-data-user-data-cell"' not in filtered_html
     assert '<th scope="rowgroup" colspan="4">SPICES &amp; SEASONINGS</th>' in filtered_html
     assert equipment_response.status_code == 200
+    assert 'data-equipment-master-registry' in equipment_html
+    assert '<span>Workspace registry</span>' in equipment_html
+    assert '<h2 id="equipmentRegistryTitle">Equipment Registry</h2>' in equipment_html
+    assert "Recipe-derived equipment is grouped by type and remains read-only." in equipment_html
+    assert 'class="master-data-results-header"' not in equipment_html
+    assert "Showing 1-2 of 2 equipment." in equipment_html
     assert '<th scope="col">Item</th>' in equipment_html
-    assert '<th scope="col">Equipment Type</th>' in equipment_html
+    assert '<th scope="col">Equipment Type</th>' not in equipment_html
     assert '<th scope="col">Usage</th>' in equipment_html
     assert '<th scope="col">Updated</th>' in equipment_html
     assert '<th scope="col">Created At</th>' not in equipment_html
@@ -469,8 +475,14 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'class="master-data-updated-cell"' in equipment_html
     assert '<th scope="col">Normalized Name</th>' not in equipment_html
     assert '<th scope="col">Image</th>' not in equipment_html
-    assert '<th scope="rowgroup" colspan="5">COOKWARE</th>' in equipment_html
-    assert '<th scope="rowgroup" colspan="5">PREP TOOLS</th>' in equipment_html
+    assert '<section class="unit-master-category equipment-master-category"' in equipment_html
+    assert '<h3 id="equipmentCategory-1">COOKWARE</h3>' in equipment_html
+    assert '<h3 id="equipmentCategory-2">PREP TOOLS</h3>' in equipment_html
+    assert 'aria-label="COOKWARE equipment"' in equipment_html
+    assert 'aria-label="PREP TOOLS equipment"' in equipment_html
+    assert 'unit-master-usage-button equipment-master-usage-button' in equipment_html
+    assert '<strong aria-hidden="true">1</strong>' in equipment_html
+    assert "recipe" in equipment_html
     assert '<strong data-equipment-master-total-count>2</strong>' in equipment_html
     assert '<strong data-equipment-master-type-count>2</strong>' in equipment_html
     assert '<strong data-equipment-master-used-count>2</strong>' in equipment_html
@@ -481,6 +493,8 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Store Sections" in equipment_html
     assert 'name="store_section"' not in equipment_html
     assert 'name="equipment_section"' in equipment_html
+    assert 'class="master-data-filter-form equipment-master-toolbar"' in equipment_html
+    assert 'class="master-data-thumbnail-size-section equipment-master-thumbnail-field"' in equipment_html
     assert "All types" in equipment_html
     assert "COOKWARE" in equipment_html
     assert "PREP TOOLS" in equipment_html
@@ -725,14 +739,17 @@ def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch,
     cookware_html = cookware_response.get_data(as_text=True)
 
     assert all_response.status_code == 200
-    assert '<tr class="master-data-section-row">' in all_html
+    assert 'data-equipment-master-registry' in all_html
+    assert '<section class="unit-master-category equipment-master-category"' in all_html
     assert "COOKWARE" in all_html
     assert "PREP TOOLS" in all_html
     assert cookware_response.status_code == 200
     assert 'value="COOKWARE" selected' in cookware_html
     assert "Large pot" in cookware_html
     assert "Whisk" not in cookware_html
-    assert '<tr class="master-data-section-row">' not in cookware_html
+    assert '<section class="unit-master-category equipment-master-category"' in cookware_html
+    assert '<h3 id="equipmentCategory-1">COOKWARE</h3>' in cookware_html
+    assert 'aria-label="COOKWARE equipment"' in cookware_html
 
 
 def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp_path):
@@ -764,12 +781,12 @@ def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp
     for single_user_table in (mine_table, specific_table):
         assert '<th scope="col">User</th>' not in single_user_table
         assert 'class="master-data-user-data-cell"' not in single_user_table
-        assert 'colspan="4"' in single_user_table
+        assert 'colspan="3"' in single_user_table
         assert "master-data-table--show-user" not in single_user_table
 
     assert '<th scope="col">User</th>' in all_table
     assert 'class="master-data-user-data-cell"' in all_table
-    assert 'colspan="5"' in all_table
+    assert 'colspan="4"' in all_table
     assert "master-data-table--show-user" in all_table
 
 
@@ -798,6 +815,42 @@ def test_equipment_summary_counts_include_unused_records(monkeypatch, tmp_path):
         "in_use_count": 1,
         "unused_count": 1,
     }
+
+
+def test_equipment_registry_renders_single_name_created_details_and_unused_state(
+    monkeypatch,
+    tmp_path,
+):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+
+    with master_data.recipe_master_connection() as connection:
+        connection.execute(
+            "DELETE FROM recipe_equipment WHERE user_id = ?",
+            ("user-a",),
+        )
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.get("/admin/master-data/equipment")
+
+    html = response.get_data(as_text=True)
+    registry_html = html.split('data-equipment-master-registry', 1)[1].split("</section>", 1)[0]
+
+    assert response.status_code == 200
+    assert "Showing 1-1 of 1 equipment." in html
+    assert '<h3 id="equipmentCategory-1">COOKWARE</h3>' in html
+    assert html.count("<strong>Large pot</strong>") == 1
+    assert "<code>large pot</code>" not in html
+    assert '<details class="master-data-equipment-details">' in html
+    assert ">Details</summary>" in html
+    assert ">Created</span>" in html
+    assert "<strong>Unused</strong>" in html
+    assert "<small>0 uses</small>" in html
+    assert "equipment-master-usage-button" not in registry_html
+    assert ">Add" not in registry_html
+    assert ">Edit" not in registry_html
+    assert ">Delete" not in registry_html
 
 
 def test_master_data_date_label_is_human_readable():
@@ -1674,7 +1727,9 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "data-master-maintenance open" not in template
     assert "<span>Maintenance tools</span>" in template
     assert 'data-label="Store section"' in template
-    assert 'class="master-data-mobile-usage-label"' in template
+    assert 'class="unit-master-category equipment-master-category"' in template
+    assert ".equipment-master-category-list" in css
+    assert ".equipment-master-category .master-data-record-row" in css
     assert "data-master-mobile-record-name" in template
     assert "data-master-mobile-section-summary" in template
     assert "data-master-mobile-record-toggle" in template

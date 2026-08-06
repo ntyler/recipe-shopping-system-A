@@ -64415,6 +64415,326 @@ body.recipe-edit-standalone-page :is(
     }
 }
 
+/* Equipment master data: read-only registry using the Unit Registry hierarchy. */
+.equipment-master-registry {
+    display: grid;
+    gap: 16px;
+}
+
+.equipment-master-registry > header {
+    align-items: flex-start;
+}
+
+.equipment-master-result-count {
+    max-width: 360px;
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 750;
+    line-height: 1.4;
+    text-align: right;
+}
+
+.equipment-master-page .equipment-master-toolbar {
+    grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+    gap: 10px;
+    align-items: end;
+    margin: 0;
+    padding: 12px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--app-surface-soft);
+}
+
+.equipment-master-toolbar .master-data-search-field,
+.equipment-master-thumbnail-field {
+    grid-column: span 2;
+    min-width: 0;
+}
+
+.equipment-master-page .equipment-master-toolbar label > span,
+.equipment-master-page .equipment-master-thumbnail-field > span {
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.equipment-master-page .equipment-master-toolbar :is(input, select) {
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-surface);
+    color: var(--app-text-strong);
+    font: inherit;
+}
+
+.equipment-master-page .equipment-master-toolbar > button[type="submit"] {
+    min-height: 38px;
+    padding: 7px 13px;
+    border: 1px solid var(--app-primary);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--app-primary) 16%, transparent);
+    color: var(--app-primary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 850;
+}
+
+.equipment-master-page .equipment-master-toolbar > button[type="submit"]:is(:hover, :focus-visible) {
+    background: color-mix(in srgb, var(--app-primary) 25%, transparent);
+}
+
+.equipment-master-page .equipment-master-toolbar :is(
+    .master-data-thumbnail-size-button,
+    .master-data-thumbnail-size-reset
+) {
+    width: auto;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-surface);
+    color: var(--app-text);
+}
+
+.equipment-master-toolbar .master-data-user-filter-note {
+    grid-column: auto;
+    grid-row: auto;
+    align-self: end;
+    margin-top: 0;
+}
+
+.equipment-master-thumbnail-field {
+    justify-items: stretch;
+}
+
+.equipment-master-category-list {
+    margin-top: 0;
+}
+
+.equipment-master-category .master-data-table-wrap {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.equipment-master-category .master-data-equipment-table {
+    min-width: 520px;
+}
+
+.equipment-master-category .master-data-equipment-table.master-data-table--show-user {
+    min-width: 680px;
+}
+
+.equipment-master-category .master-data-equipment-table th:nth-child(1) {
+    width: auto;
+}
+
+.equipment-master-category .master-data-equipment-table th:nth-child(2) {
+    width: 108px;
+}
+
+.equipment-master-category .master-data-equipment-table th:nth-child(3) {
+    width: 126px;
+}
+
+.equipment-master-category .master-data-equipment-table.master-data-table--show-user th:nth-child(1) {
+    width: 42%;
+}
+
+.equipment-master-category .master-data-equipment-table.master-data-table--show-user th:nth-child(2) {
+    width: 25%;
+}
+
+.equipment-master-category .master-data-equipment-table.master-data-table--show-user th:nth-child(3) {
+    width: 102px;
+}
+
+.equipment-master-category .master-data-equipment-table.master-data-table--show-user th:nth-child(4) {
+    width: 126px;
+}
+
+.equipment-master-category .master-data-table th,
+.equipment-master-category .master-data-table td {
+    padding: 11px 12px;
+}
+
+.equipment-master-usage-button[aria-expanded="true"] {
+    border-color: var(--app-primary) !important;
+    background: color-mix(in srgb, var(--app-primary) 20%, transparent) !important;
+}
+
+.equipment-master-pagination {
+    padding-top: 14px;
+    border-top: 1px solid var(--app-border);
+}
+
+.equipment-master-empty-state {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 760px) {
+    .equipment-master-registry {
+        padding: 14px;
+        overflow: hidden;
+    }
+
+    .equipment-master-registry > header {
+        display: grid;
+        gap: 8px;
+    }
+
+    .equipment-master-result-count {
+        max-width: none;
+        text-align: left;
+    }
+
+    .equipment-master-page .equipment-master-toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        order: initial;
+        overflow: visible;
+    }
+
+    .equipment-master-toolbar > *,
+    .equipment-master-toolbar .master-data-search-field,
+    .equipment-master-toolbar .master-data-equipment-filter-field,
+    .equipment-master-toolbar .master-data-sort-filter-field,
+    .equipment-master-toolbar .master-data-limit-filter-field,
+    .equipment-master-thumbnail-field {
+        grid-column: auto;
+    }
+
+    .equipment-master-toolbar .master-data-scope-filter-field,
+    .equipment-master-toolbar .master-data-user-filter-field,
+    .equipment-master-toolbar .master-data-limit-filter-field {
+        display: grid;
+    }
+
+    .equipment-master-toolbar .master-data-user-filter-field[hidden],
+    .equipment-master-toolbar .master-data-user-filter-note[hidden] {
+        display: none;
+    }
+
+    .equipment-master-toolbar .master-data-user-filter-note:not([hidden]) {
+        display: block;
+    }
+
+    .equipment-master-thumbnail-field {
+        display: grid;
+        justify-items: start;
+    }
+
+    .equipment-master-thumbnail-field .master-data-thumbnail-size-controls {
+        width: 100%;
+    }
+
+    .equipment-master-thumbnail-field :is(.master-data-thumbnail-size-button, .master-data-thumbnail-size-reset) {
+        width: auto;
+    }
+
+    .equipment-master-category-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .equipment-master-category .master-data-table-wrap {
+        overflow: visible;
+    }
+
+    .equipment-master-category .master-data-equipment-table,
+    .equipment-master-category .master-data-equipment-table.master-data-table--show-user {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        table-layout: auto;
+    }
+
+    .equipment-master-category .master-data-equipment-table thead {
+        display: none;
+    }
+
+    .equipment-master-category .master-data-equipment-table tbody {
+        display: grid;
+        gap: 10px;
+        min-width: 0;
+        padding: 10px;
+    }
+
+    .equipment-master-category .master-data-record-row {
+        display: grid;
+        width: 100%;
+        min-width: 0;
+        grid-template-columns: minmax(0, 1fr) auto;
+        overflow: hidden;
+        border: 1px solid var(--app-border);
+        border-radius: 8px;
+        background: var(--app-surface);
+    }
+
+    .equipment-master-category .master-data-record-row > td {
+        display: block;
+        width: auto;
+        min-width: 0;
+        padding: 10px 12px;
+        border: 0;
+        background: transparent;
+    }
+
+    .equipment-master-category .master-data-item-cell {
+        grid-column: 1 / -1;
+        border-bottom: 1px solid var(--app-border) !important;
+    }
+
+    .equipment-master-category :is(
+        .master-data-user-data-cell,
+        .master-data-usage-cell,
+        .master-data-updated-cell
+    )::before {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--app-muted);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+        content: attr(data-label);
+    }
+
+    .equipment-master-category .master-data-usage-cell {
+        justify-self: end;
+        text-align: right;
+    }
+
+    .equipment-master-category .master-data-updated-cell {
+        align-self: center;
+    }
+
+    .equipment-master-category .master-data-equipment-table.master-data-table--show-user .master-data-updated-cell {
+        grid-column: 1 / -1;
+        border-top: 1px solid var(--app-border);
+    }
+
+    .equipment-master-category .master-data-reference-row {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--app-primary);
+        border-radius: 8px;
+    }
+
+    .equipment-master-category .master-data-reference-row[hidden] {
+        display: none;
+    }
+
+    .equipment-master-category .master-data-reference-row > td {
+        display: block;
+        width: auto;
+        padding: 0;
+    }
+}
+
 /* Type master data: workspace ingredient-role registry. */
 .type-master-category {
     margin-top: 16px;
