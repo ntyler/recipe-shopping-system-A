@@ -13,6 +13,7 @@
     let imagePollTimer = null;
     let imageRefreshTimer = null;
     let masterDataMobileReferenceReturnFocus = null;
+    let equipmentMasterDisplayNameReturnFocus = null;
     let equipmentMasterUsageReturnFocus = null;
     let equipmentMasterUsageRequestId = 0;
     let masterDataThumbnailSize = MASTER_DATA_THUMBNAIL_DEFAULT_SIZE;
@@ -922,6 +923,166 @@
 
         await loadReferenceData(button, els.panel, { hideHeader: true });
         return true;
+    }
+
+    function equipmentMasterDisplayNameElements() {
+        const dialog = document.querySelector("[data-equipment-master-display-dialog]");
+        return {
+            dialog,
+            form: dialog && dialog.querySelector("[data-equipment-master-display-form]"),
+            input: dialog && dialog.querySelector("[data-equipment-master-display-input]"),
+            detectedName: dialog && dialog.querySelector("[data-equipment-master-detected-name]"),
+            feedback: dialog && dialog.querySelector("[data-equipment-master-display-feedback]"),
+            resetButton: dialog && dialog.querySelector("[data-equipment-master-display-reset]"),
+            closeButtons: dialog
+                ? Array.from(dialog.querySelectorAll("[data-equipment-master-display-close]"))
+                : [],
+        };
+    }
+
+    function setEquipmentMasterDisplayNameFeedback(message, status = "error") {
+        const { feedback } = equipmentMasterDisplayNameElements();
+        if (!feedback) return;
+        feedback.textContent = text(message);
+        feedback.dataset.status = status;
+        feedback.hidden = !text(message).trim();
+    }
+
+    function setEquipmentMasterDisplayNameBusy(busy) {
+        const { form } = equipmentMasterDisplayNameElements();
+        if (!form) return;
+        form.setAttribute("aria-busy", busy ? "true" : "false");
+        form.querySelectorAll("button, input").forEach((control) => {
+            control.disabled = Boolean(busy);
+        });
+        if (!busy) {
+            const hasOverride = form.dataset.hasDisplayNameOverride === "true";
+            const resetButton = form.querySelector("[data-equipment-master-display-reset]");
+            if (resetButton) resetButton.disabled = !hasOverride;
+        }
+    }
+
+    function restoreEquipmentMasterDisplayNameFocus() {
+        const returnFocus = equipmentMasterDisplayNameReturnFocus;
+        equipmentMasterDisplayNameReturnFocus = null;
+        if (returnFocus && returnFocus.isConnected) returnFocus.focus();
+    }
+
+    function closeEquipmentMasterDisplayName() {
+        const { dialog } = equipmentMasterDisplayNameElements();
+        if (!dialog) return;
+        if (typeof dialog.close === "function" && dialog.open) {
+            dialog.close();
+        } else {
+            dialog.removeAttribute("open");
+            restoreEquipmentMasterDisplayNameFocus();
+        }
+    }
+
+    function openEquipmentMasterDisplayName(button) {
+        const els = equipmentMasterDisplayNameElements();
+        if (!button || !els.dialog || !els.form || !els.input) return;
+
+        const currentName = text(button.dataset.currentName).trim();
+        const detectedName = text(button.dataset.detectedName).trim() || currentName;
+        const hasOverride = button.dataset.hasDisplayNameOverride === "true";
+        equipmentMasterDisplayNameReturnFocus = button;
+        els.form.dataset.updateUrl = text(button.dataset.updateUrl);
+        els.form.dataset.hasDisplayNameOverride = hasOverride ? "true" : "false";
+        els.input.value = currentName;
+        els.input.setAttribute("aria-label", `Display name for ${currentName}`);
+        if (els.detectedName) els.detectedName.textContent = detectedName;
+        if (els.resetButton) els.resetButton.disabled = !hasOverride;
+        setEquipmentMasterDisplayNameFeedback("");
+
+        if (typeof els.dialog.showModal === "function") {
+            if (!els.dialog.open) els.dialog.showModal();
+        } else {
+            els.dialog.setAttribute("open", "");
+        }
+        window.requestAnimationFrame(() => {
+            els.input.focus();
+            els.input.select();
+        });
+    }
+
+    async function saveEquipmentMasterDisplayName(reset = false) {
+        const els = equipmentMasterDisplayNameElements();
+        if (!els.form || !els.input) return;
+        const updateUrl = text(els.form.dataset.updateUrl).trim();
+        const displayName = text(els.input.value).trim();
+        if (!updateUrl) {
+            setEquipmentMasterDisplayNameFeedback("This equipment display name cannot be updated.");
+            return;
+        }
+        if (!reset && !displayName) {
+            setEquipmentMasterDisplayNameFeedback("Enter a display name.");
+            els.input.focus();
+            return;
+        }
+
+        setEquipmentMasterDisplayNameBusy(true);
+        setEquipmentMasterDisplayNameFeedback(reset ? "Resetting display name…" : "Saving display name…", "pending");
+        let saved = false;
+        try {
+            const response = await fetch(updateUrl, {
+                method: "PATCH",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({ display_name: displayName, reset: Boolean(reset) }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "Display name could not be updated.");
+            }
+            saved = true;
+            const resolvedName = text(data.record && data.record.name).trim() || displayName;
+            setEquipmentMasterDisplayNameFeedback(
+                reset ? `Display name reset to ${resolvedName}.` : `Display name saved as ${resolvedName}.`,
+                "success"
+            );
+            window.setTimeout(() => window.location.reload(), 450);
+        } catch (error) {
+            setEquipmentMasterDisplayNameFeedback(
+                error && error.message ? error.message : "Display name could not be updated."
+            );
+        } finally {
+            if (!saved) setEquipmentMasterDisplayNameBusy(false);
+        }
+    }
+
+    function initEquipmentMasterDisplayName() {
+        const els = equipmentMasterDisplayNameElements();
+        if (!els.dialog || !els.form) return;
+
+        document.addEventListener("click", (event) => {
+            const target = event.target && event.target.closest ? event.target : null;
+            const openButton = target && target.closest("[data-equipment-master-display-edit]");
+            if (!openButton) return;
+            event.preventDefault();
+            openEquipmentMasterDisplayName(openButton);
+        });
+        els.closeButtons.forEach((button) => {
+            button.addEventListener("click", closeEquipmentMasterDisplayName);
+        });
+        els.form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            void saveEquipmentMasterDisplayName(false);
+        });
+        if (els.resetButton) {
+            els.resetButton.addEventListener("click", () => void saveEquipmentMasterDisplayName(true));
+        }
+        els.dialog.addEventListener("cancel", (event) => {
+            event.preventDefault();
+            closeEquipmentMasterDisplayName();
+        });
+        els.dialog.addEventListener("click", (event) => {
+            if (event.target === els.dialog) closeEquipmentMasterDisplayName();
+        });
+        els.dialog.addEventListener("close", restoreEquipmentMasterDisplayNameFocus);
     }
 
     function equipmentMasterUsageElements() {
@@ -5630,6 +5791,7 @@
     function initMasterDataPage() {
         initMasterDataFilterForm();
         initMasterDataMaintenance();
+        initEquipmentMasterDisplayName();
         initMasterDataReferences();
         initMasterDataThumbnailSizeControls();
         initMasterDataImageLightbox();

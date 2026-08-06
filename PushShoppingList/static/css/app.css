@@ -64415,7 +64415,7 @@ body.recipe-edit-standalone-page :is(
     }
 }
 
-/* Equipment master data: read-only registry using the Unit Registry hierarchy. */
+/* Equipment registry: recipe-derived identity with user-scoped presentation controls. */
 .equipment-master-registry {
     display: grid;
     gap: 16px;
@@ -64553,6 +64553,82 @@ body.recipe-edit-standalone-page :is(
     margin-top: 0;
 }
 
+.equipment-master-admin-view {
+    position: relative;
+    grid-column: span 2;
+    min-width: 0;
+}
+
+.equipment-master-admin-view > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--app-muted);
+    cursor: pointer;
+    list-style: none;
+}
+
+.equipment-master-admin-view > summary::-webkit-details-marker {
+    display: none;
+}
+
+.equipment-master-admin-view > summary::after {
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    content: "";
+    transform: rotate(45deg) translateY(-1px);
+}
+
+.equipment-master-admin-view[open] > summary::after {
+    transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.equipment-master-admin-view > summary:is(:hover, :focus-visible),
+.equipment-master-admin-view[open] > summary {
+    border-color: color-mix(in srgb, var(--app-primary) 45%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary) 7%, transparent);
+    color: var(--app-primary);
+    outline: none;
+}
+
+.equipment-master-admin-view > summary > span {
+    color: inherit;
+    font-size: 12px;
+    font-weight: 850;
+}
+
+.equipment-master-admin-view > summary > small {
+    overflow: hidden;
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.equipment-master-admin-view > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-surface);
+}
+
+.equipment-master-admin-view .master-data-user-filter-note {
+    grid-column: 1 / -1;
+}
+
 .equipment-master-thumbnail-field {
     justify-items: stretch;
 }
@@ -64616,6 +64692,88 @@ body.recipe-edit-standalone-page :is(
     margin-top: 4px;
     padding: 4px 8px;
     border-left: 2px solid color-mix(in srgb, var(--app-primary) 55%, var(--app-border));
+}
+
+.equipment-master-item-actions {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+}
+
+.equipment-master-display-edit {
+    min-height: 28px;
+    padding: 3px 7px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-primary);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.equipment-master-display-edit:is(:hover, :focus-visible) {
+    border-color: color-mix(in srgb, var(--app-primary) 40%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary) 8%, transparent);
+    outline: none;
+}
+
+.equipment-master-display-dialog {
+    width: min(560px, calc(100vw - 28px));
+}
+
+.equipment-master-display-form .unit-master-field {
+    display: grid;
+    gap: 7px;
+}
+
+.equipment-master-display-form .unit-master-field > span {
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.equipment-master-display-form .unit-master-field input {
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 11px;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
+    font: inherit;
+}
+
+.equipment-master-display-form .unit-master-field input:focus-visible {
+    border-color: var(--app-primary);
+    outline: 2px solid color-mix(in srgb, var(--app-primary) 28%, transparent);
+    outline-offset: 1px;
+}
+
+.equipment-master-detected-name {
+    padding: 10px 12px;
+    border-left: 2px solid var(--app-border);
+    background: var(--app-surface-soft);
+}
+
+.equipment-master-detected-name strong {
+    color: var(--app-text-strong);
+}
+
+.equipment-master-display-form > footer {
+    align-items: center;
+    justify-content: space-between;
+}
+
+.equipment-master-display-form > footer > div {
+    display: flex;
+    gap: 8px;
+}
+
+.equipment-master-display-form button[disabled] {
+    opacity: .5;
+    cursor: not-allowed;
 }
 
 .equipment-master-category .master-data-table-wrap {
@@ -64760,6 +64918,14 @@ body.recipe-edit-standalone-page :is(
         grid-column: auto;
     }
 
+    .equipment-master-admin-view {
+        grid-column: auto;
+    }
+
+    .equipment-master-admin-view > div {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     .equipment-master-toolbar .master-data-scope-filter-field,
     .equipment-master-toolbar .master-data-user-filter-field,
     .equipment-master-toolbar .master-data-limit-filter-field {
@@ -64893,6 +65059,20 @@ body.recipe-edit-standalone-page :is(
 
     .equipment-master-usage-dialog .master-data-reference-link {
         justify-self: start;
+    }
+
+    .equipment-master-display-form > footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .equipment-master-display-form > footer > div {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .equipment-master-display-form > footer button {
+        width: 100%;
     }
 }
 

@@ -72,6 +72,53 @@ def test_sync_recipe_master_records_keeps_same_name_separate_per_user(monkeypatc
     assert user_b_rows[0]["quantity"] == "2"
 
 
+def test_equipment_display_name_override_is_user_scoped_and_survives_sync(monkeypatch, tmp_path):
+    configure_master_db(monkeypatch, tmp_path)
+    recipe_url = "https://example.com/display-name-pot"
+    recipe_data = {"equipment": [{"equipment": "Large pot"}]}
+    master_data.sync_recipe_master_records(recipe_url, recipe_data=recipe_data, user_id="user-a")
+    master_data.sync_recipe_master_records(recipe_url, recipe_data=recipe_data, user_id="user-b")
+    user_a_equipment = master_data.master_record_for_name("equipment", "user-a", "large pot")
+    user_b_equipment = master_data.master_record_for_name("equipment", "user-b", "large pot")
+
+    saved = master_data.update_equipment_display_name(
+        user_a_equipment["id"],
+        "Family stockpot",
+        user_id="user-a",
+    )
+    blocked = master_data.update_equipment_display_name(
+        user_b_equipment["id"],
+        "Not mine",
+        user_id="user-a",
+    )
+    master_data.sync_recipe_master_records(recipe_url, recipe_data=recipe_data, user_id="user-a")
+
+    user_a_rows = master_data.list_equipment(user_id="user-a")
+    user_b_rows = master_data.list_equipment(user_id="user-b")
+    assert saved["ok"] is True
+    assert saved["record"] == {
+        "name": "Family stockpot",
+        "detected_name": "Large pot",
+        "has_display_name_override": True,
+    }
+    assert blocked["status"] == 404
+    assert user_a_rows[0]["name"] == "Family stockpot"
+    assert user_a_rows[0]["detected_name"] == "Large pot"
+    assert user_a_rows[0]["has_display_name_override"] is True
+    assert user_b_rows[0]["name"] == "Large pot"
+    assert master_data.count_equipment(user_id="user-a", search="family stockpot") == 1
+    assert master_data.count_equipment(user_id="user-a", search="large pot") == 1
+
+    reset = master_data.update_equipment_display_name(
+        user_a_equipment["id"],
+        reset=True,
+        user_id="user-a",
+    )
+    assert reset["record"]["name"] == "Large pot"
+    assert reset["record"]["has_display_name_override"] is False
+    assert master_data.list_equipment(user_id="user-a")[0]["name"] == "Large pot"
+
+
 def test_store_section_definitions_are_workspace_scoped_and_manageable(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
 

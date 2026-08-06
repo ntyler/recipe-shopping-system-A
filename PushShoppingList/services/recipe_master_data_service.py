@@ -909,6 +909,7 @@ def ensure_recipe_master_schema(connection=None):
             user_id TEXT NOT NULL,
             name TEXT NOT NULL,
             normalized_name TEXT NOT NULL,
+            display_name_override TEXT NOT NULL DEFAULT '',
             equipment_section TEXT NOT NULL DEFAULT 'MISC',
             image_url TEXT NOT NULL DEFAULT '',
             image_path TEXT NOT NULL DEFAULT '',
@@ -1141,6 +1142,10 @@ def ensure_recipe_master_schema(connection=None):
                 f"ALTER TABLE ingredients ADD COLUMN {column_name} {column_definition}"
             )
     equipment_columns = recipe_master_column_names(connection, "equipment")
+    if "display_name_override" not in equipment_columns:
+        connection.execute(
+            "ALTER TABLE equipment ADD COLUMN display_name_override TEXT NOT NULL DEFAULT ''"
+        )
     if "equipment_section" not in equipment_columns:
         connection.execute(
             "ALTER TABLE equipment ADD COLUMN equipment_section TEXT NOT NULL DEFAULT 'MISC'"
@@ -3391,8 +3396,16 @@ def master_record_filters(
             )
             params.extend([search_like, search_like, search_like, search_like])
         else:
-            where.append("(LOWER(m.name) LIKE ? OR LOWER(m.normalized_name) LIKE ?)")
-            params.extend([search_like, search_like])
+            where.append(
+                """
+                (
+                    LOWER(m.name) LIKE ?
+                    OR LOWER(m.normalized_name) LIKE ?
+                    OR LOWER(m.display_name_override) LIKE ?
+                )
+                """
+            )
+            params.extend([search_like, search_like, search_like])
 
     if table_name == "ingredients":
         section = ingredient_store_section_from_source(
@@ -3426,6 +3439,11 @@ def list_master_records(
     limit = bounded_master_limit(limit)
     offset = bounded_master_offset(offset)
     order_clause = MASTER_RECORD_SORTS.get(sort, MASTER_RECORD_SORTS["updated_at_desc"])
+    if table_name == "equipment" and sort == "name_asc":
+        order_clause = (
+            "LOWER(COALESCE(NULLIF(TRIM(m.display_name_override), ''), m.name)) ASC, "
+            "m.normalized_name ASC, m.id ASC"
+        )
     where, params = master_record_filters(
         table_name,
         user_id=user_id,
@@ -3491,7 +3509,7 @@ def list_master_records(
                       ) unique_usage_recipes
                 ) AS usage_count"""
     elif table_name == "equipment":
-        section_select = ",\n                m.equipment_section"
+        section_select = ",\n                m.display_name_override,\n                m.equipment_section"
         alias_select = ""
         usage_select = ",\n                COUNT(u.id) AS usage_count"
     else:
@@ -3544,6 +3562,11 @@ def list_master_records(
             )
             row_data["buy_as_usage_count"] = int(row["buy_as_usage_count"] or 0)
         elif table_name == "equipment":
+            detected_name = clean_text(row_data.get("name"))
+            display_name_override = clean_text(row_data.pop("display_name_override", ""))
+            row_data["detected_name"] = detected_name
+            row_data["has_display_name_override"] = bool(display_name_override)
+            row_data["name"] = display_name_override or detected_name
             row_data["equipment_section"] = clean_equipment_section(row_data.get("equipment_section"))
             row_data["equipment_section_order"] = equipment_section_sort_key(row_data["equipment_section"])
         row_data["usage_count"] = int(row["usage_count"] or 0)
@@ -3648,6 +3671,64 @@ def count_equipment(user_id=None, search=None, include_all_users=False, store_se
         include_all_users=include_all_users,
         equipment_section=equipment_section or store_section,
     )
+
+
+def update_equipment_display_name(record_id, display_name=None, *, reset=False, user_id=None):
+    """Set or clear one workspace's presentation-only equipment name override."""
+
+    try:
+        record_id = int(record_id or 0)
+    except (TypeError, ValueError):
+        record_id = 0
+    if record_id <= 0:
+        return {"ok": False, "status": 404, "error": "Equipment was not found."}
+
+    workspace_user_id = scoped_recipe_user_id(user_id)
+    requested_name = clean_text(display_name)
+    if not reset and not requested_name:
+        return {"ok": False, "status": 400, "error": "Enter a display name."}
+    if len(requested_name) > 160:
+        return {
+            "ok": False,
+            "status": 400,
+            "error": "Display name must be 160 characters or fewer.",
+        }
+
+    with recipe_master_connection() as connection:
+        record = connection.execute(
+            """
+            SELECT id, name, display_name_override
+              FROM equipment
+             WHERE id = ?
+               AND user_id = ?
+            """,
+            (record_id, workspace_user_id),
+        ).fetchone()
+        if not record:
+            return {"ok": False, "status": 404, "error": "Equipment was not found."}
+
+        detected_name = clean_text(record["name"])
+        display_name_override = "" if reset or requested_name == detected_name else requested_name
+        connection.execute(
+            """
+            UPDATE equipment
+               SET display_name_override = ?,
+                   updated_at = ?
+             WHERE id = ?
+               AND user_id = ?
+            """,
+            (display_name_override, utc_now_iso(), record_id, workspace_user_id),
+        )
+
+    return {
+        "ok": True,
+        "status": 200,
+        "record": {
+            "name": display_name_override or detected_name,
+            "detected_name": detected_name,
+            "has_display_name_override": bool(display_name_override),
+        },
+    }
 
 
 def equipment_summary_counts(user_id=None, include_all_users=False):
@@ -3756,7 +3837,7 @@ def master_record_for_id(table_name, record_id, user_id=None, include_all_users=
     if table_name == "ingredients":
         section_select = ", store_section"
     elif table_name == "equipment":
-        section_select = ", equipment_section"
+        section_select = ", display_name_override, equipment_section"
     else:
         section_select = ""
     with existing_recipe_master_connection() as connection:
@@ -3787,6 +3868,8 @@ def master_record_for_id(table_name, record_id, user_id=None, include_all_users=
     if table_name == "ingredients":
         row_data["store_section"] = clean_ingredient_store_section(row_data.get("store_section"))
     elif table_name == "equipment":
+        display_name_override = clean_text(row_data.pop("display_name_override", ""))
+        row_data["name"] = display_name_override or clean_text(row_data.get("name"))
         row_data["equipment_section"] = clean_equipment_section(row_data.get("equipment_section"))
     return row_data
 

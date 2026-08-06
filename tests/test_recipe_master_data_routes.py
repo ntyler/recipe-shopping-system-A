@@ -151,6 +151,10 @@ def test_master_data_pages_scope_normal_users_to_their_records(monkeypatch, tmp_
     assert equipment_response.status_code == 200
     assert "Large pot" in equipment_html
     assert "Whisk" not in equipment_html
+    assert '<h1 id="masterDataTitle">Equipment</h1>' in equipment_html
+    assert "Review equipment detected across your recipes." in equipment_html
+    assert 'name="scope"' not in equipment_html
+    assert "data-equipment-master-admin-view" not in equipment_html
 
 
 def test_misc_reclassification_route_requires_previewable_unconfirmed_rows(monkeypatch, tmp_path):
@@ -458,11 +462,14 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'data-equipment-master-registry' in equipment_html
     assert '<span>Workspace registry</span>' in equipment_html
     assert '<h2 id="equipmentRegistryTitle">Equipment Registry</h2>' in equipment_html
-    assert "Recipe-derived equipment is grouped by type and remains read-only." in equipment_html
-    assert "Use recipe counts to review its source recipes." in equipment_html
+    assert "Equipment identity and recipe links remain read-only." in equipment_html
+    assert "Customize display names without changing source recipes." in equipment_html
     assert 'data-equipment-master-read-only' in equipment_html
     assert "Recipe-derived" in equipment_html
-    assert "Read-only" in equipment_html
+    assert "Names customizable" in equipment_html
+    assert "data-equipment-master-admin-view" in equipment_html
+    assert "Viewing all users" in equipment_html
+    assert 'name="scope"' in equipment_html
     assert 'class="master-data-results-header"' not in equipment_html
     assert "Showing 1-2 of 2 equipment." in equipment_html
     assert '<th scope="col">Item</th>' in equipment_html
@@ -645,6 +652,51 @@ def test_equipment_usage_modal_endpoint_preserves_workspace_scope(monkeypatch, t
     assert admin_response.status_code == 200
     assert admin_payload["record"]["name"] == "Whisk"
     assert admin_payload["references"][0]["edit_url"] == ""
+
+
+def test_equipment_display_name_route_updates_only_the_active_workspace(monkeypatch, tmp_path):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+    user_a_equipment = master_data.master_record_for_name("equipment", "user-a", "large pot")
+    user_b_equipment = master_data.master_record_for_name("equipment", "user-b", "whisk")
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        saved_response = client.patch(
+            f"/api/master-data/equipment/{user_a_equipment['id']}/display-name",
+            json={"display_name": "Family stockpot"},
+        )
+        blocked_response = client.patch(
+            f"/api/master-data/equipment/{user_b_equipment['id']}/display-name",
+            json={"display_name": "Not mine"},
+        )
+        renamed_page = client.get("/admin/master-data/equipment")
+        reset_response = client.patch(
+            f"/api/master-data/equipment/{user_a_equipment['id']}/display-name",
+            json={"reset": True},
+        )
+        sign_in(client, "admin-user")
+        admin_blocked_response = client.patch(
+            f"/api/master-data/equipment/{user_a_equipment['id']}/display-name",
+            json={"display_name": "Admin overwrite"},
+        )
+
+    renamed_html = renamed_page.get_data(as_text=True)
+    assert saved_response.status_code == 200
+    assert saved_response.get_json()["record"]["name"] == "Family stockpot"
+    assert saved_response.get_json()["record"]["has_display_name_override"] is True
+    assert blocked_response.status_code == 404
+    assert admin_blocked_response.status_code == 404
+    assert '<strong data-equipment-master-display-name>Family stockpot</strong>' in renamed_html
+    assert 'data-current-name="Family stockpot"' in renamed_html
+    assert 'data-detected-name="Large pot"' in renamed_html
+    assert 'data-has-display-name-override="true"' in renamed_html
+    assert "Edit display name" in renamed_html
+    assert "data-equipment-master-display-dialog" in renamed_html
+    assert "Reset to detected name" in renamed_html
+    assert reset_response.status_code == 200
+    assert reset_response.get_json()["record"]["name"] == "Large pot"
+    assert reset_response.get_json()["record"]["has_display_name_override"] is False
 
 
 def test_ingredient_master_data_filters_and_groups_by_store_section(monkeypatch, tmp_path):
@@ -896,7 +948,7 @@ def test_equipment_registry_renders_single_name_created_details_and_unused_state
     assert response.status_code == 200
     assert "Showing 1-1 of 1 equipment." in html
     assert '<h3 id="equipmentCategory-1">Cookware</h3>' in html
-    assert html.count("<strong>Large pot</strong>") == 1
+    assert html.count('<strong data-equipment-master-display-name>Large pot</strong>') == 1
     assert "<code>large pot</code>" not in html
     assert '<details class="master-data-equipment-details">' in html
     assert ">Details</summary>" in html
@@ -906,7 +958,8 @@ def test_equipment_registry_renders_single_name_created_details_and_unused_state
     assert "<small>0 uses</small>" in html
     assert "equipment-master-usage-button" not in registry_html
     assert ">Add" not in registry_html
-    assert ">Edit" not in registry_html
+    assert "Edit display name" in registry_html
+    assert ">Edit<" not in registry_html
     assert ">Delete" not in registry_html
 
 
@@ -1788,6 +1841,8 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert ".equipment-master-category-list" in css
     assert ".equipment-master-category .master-data-record-row" in css
     assert ".equipment-master-read-only-badge" in css
+    assert ".equipment-master-admin-view" in css
+    assert ".equipment-master-display-dialog" in css
     assert "@media (max-width: 1280px)" in css
     assert ".equipment-master-category .master-data-equipment-details summary:is(:hover, :focus-visible)" in css
     assert "data-master-mobile-record-name" in template
@@ -1812,12 +1867,16 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "function masterDataMobileReferenceElements()" in script
     assert "async function openMasterDataMobileReferences(button)" in script
     assert "function closeMasterDataMobileReferences()" in script
+    assert "function initEquipmentMasterDisplayName()" in script
+    assert "async function saveEquipmentMasterDisplayName(reset = false)" in script
+    assert 'method: "PATCH"' in script
     assert 'window.matchMedia("(max-width: 760px)").matches' in script
     assert "await loadReferenceData(button, els.panel, { hideHeader: true });" in script
     assert "if (referenceRow) referenceRow.hidden = true;" in script
     assert 'window.matchMedia("(max-width: 760px)")' in script
     assert "initMasterDataMaintenance();" in script
     assert "initMasterDataMobileRecords();" in script
+    assert "initEquipmentMasterDisplayName();" in script
     assert "@media (max-width: 760px)" in css
     assert ".master-data-maintenance:not([open]) > .master-data-maintenance-content" in css
     assert ".master-data-maintenance {" in css
@@ -2165,7 +2224,7 @@ def test_account_menu_links_to_master_data_pages(monkeypatch, tmp_path):
     html = response.get_data(as_text=True)
     assert response.status_code == 200
     assert "Ingredient Master Data" in html
-    assert "Equipment Master Data" in html
+    assert '<span class="user-account-menu-item-label">Equipment</span>' in html
     assert ">Units<" in html
     assert "Store Sections" in html
     assert 'href="/admin/master-data/ingredients"' in html

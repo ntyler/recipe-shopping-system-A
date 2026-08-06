@@ -204,7 +204,7 @@ MASTER_DATA_PAGE_CONFIG = {
         "count_func": recipe_master_data.count_ingredients,
     },
     "equipment": {
-        "title": "Equipment Master Data",
+        "title": "Equipment",
         "nav_label": "Equipment",
         "empty_label": "equipment",
         "route_endpoint": "main_bp.master_data_equipment_route",
@@ -1488,6 +1488,29 @@ def master_data_equipment_route():
     if canonical_redirect:
         return canonical_redirect
     return render_master_data_page("equipment", scope_info)
+
+
+@main_bp.route(
+    "/api/master-data/equipment/<int:equipment_id>/display-name",
+    methods=["PATCH", "POST", "DELETE"],
+)
+def equipment_master_display_name_route(equipment_id):
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    reset = request.method == "DELETE" or str(payload.get("reset") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    result = recipe_master_data.update_equipment_display_name(
+        equipment_id,
+        payload.get("display_name"),
+        reset=reset,
+        user_id=active_user_id(),
+    )
+    status = int(result.pop("status", 200 if result.get("ok") else 400))
+    return jsonify({**result, "success": result.get("ok", False)}), status
 
 
 def unit_master_data_context(scope_info):

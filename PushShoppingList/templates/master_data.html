@@ -14,6 +14,44 @@
         user_id=master_data.scope_user_id if master_data.scope == 'user' else none
     ) -}}
 {%- endmacro %}
+{% macro render_master_data_scope_controls(master_data) -%}
+    <label class="master-data-scope-filter-field">
+        <span>Scope</span>
+        <select name="scope" data-master-scope-filter>
+            <option value="mine" {% if master_data.scope == 'mine' %}selected{% endif %}>My data</option>
+            <option value="all" {% if master_data.scope == 'all' %}selected{% endif %}>All users</option>
+            <option value="user" {% if master_data.scope == 'user' %}selected{% endif %}>Specific user</option>
+        </select>
+    </label>
+    <label class="master-data-user-filter-field"
+           data-master-target-user-field
+           {% if master_data.scope != 'user' %}hidden{% endif %}>
+        <span>User</span>
+        <input type="text"
+               name="user_id"
+               value="{% if master_data.scope == 'user' %}{{ master_data.scope_user_id }}{% endif %}"
+               list="masterDataUserIds"
+               placeholder="{{ master_data.current_scope_user.label }}"
+               aria-describedby="masterDataUserHint"
+               data-master-target-user-filter
+               {% if master_data.scope == 'user' %}required{% else %}disabled{% endif %}>
+        <datalist id="masterDataUserIds">
+            {% for user in master_data.available_users %}
+                <option value="{{ user.user_id }}" label="{{ user.label }}">{{ user.label }}</option>
+            {% endfor %}
+        </datalist>
+    </label>
+    <span id="masterDataUserHint"
+          class="master-data-user-field-note master-data-user-filter-note"
+          data-master-target-user-note
+          {% if master_data.scope != 'user' %}hidden{% endif %}>
+        {% if master_data.scope == 'user' and master_data.scope_user.user_id %}
+            {{ master_data.scope_user.label }}
+        {% else %}
+            {{ master_data.current_scope_user.label }}
+        {% endif %}
+    </span>
+{%- endmacro %}
 {% macro render_master_data_filters(master_data, include_thumbnail_controls=false) -%}
     <form class="master-data-filter-form{% if master_data.record_type == 'ingredients' %} master-data-filter-form--ingredients{% else %} equipment-master-toolbar{% endif %}"
           method="GET"
@@ -25,43 +63,8 @@
                    value="{{ master_data.search }}"
                    placeholder="{% if master_data.record_type == 'equipment' %}Equipment name{% else %}Name or normalized name{% endif %}">
         </label>
-        {% if master_data.is_admin %}
-            <label class="master-data-scope-filter-field">
-                <span>Scope</span>
-                <select name="scope" data-master-scope-filter>
-                    <option value="mine" {% if master_data.scope == 'mine' %}selected{% endif %}>My data</option>
-                    <option value="all" {% if master_data.scope == 'all' %}selected{% endif %}>All users</option>
-                    <option value="user" {% if master_data.scope == 'user' %}selected{% endif %}>Specific user</option>
-                </select>
-            </label>
-            <label class="master-data-user-filter-field"
-                   data-master-target-user-field
-                   {% if master_data.scope != 'user' %}hidden{% endif %}>
-                <span>User</span>
-                <input type="text"
-                       name="user_id"
-                       value="{% if master_data.scope == 'user' %}{{ master_data.scope_user_id }}{% endif %}"
-                       list="masterDataUserIds"
-                       placeholder="{{ master_data.current_scope_user.label }}"
-                       aria-describedby="masterDataUserHint"
-                       data-master-target-user-filter
-                       {% if master_data.scope == 'user' %}required{% else %}disabled{% endif %}>
-                <datalist id="masterDataUserIds">
-                    {% for user in master_data.available_users %}
-                        <option value="{{ user.user_id }}" label="{{ user.label }}">{{ user.label }}</option>
-                    {% endfor %}
-                </datalist>
-            </label>
-            <span id="masterDataUserHint"
-                  class="master-data-user-field-note master-data-user-filter-note"
-                  data-master-target-user-note
-                  {% if master_data.scope != 'user' %}hidden{% endif %}>
-                {% if master_data.scope == 'user' and master_data.scope_user.user_id %}
-                    {{ master_data.scope_user.label }}
-                {% else %}
-                    {{ master_data.current_scope_user.label }}
-                {% endif %}
-            </span>
+        {% if master_data.is_admin and master_data.record_type != 'equipment' %}
+            {{ render_master_data_scope_controls(master_data) }}
         {% endif %}
         {% if master_data.record_type == 'ingredients' %}
             <label class="master-data-store-section-filter-field">
@@ -128,6 +131,27 @@
                             data-master-thumbnail-size-reset>Reset</button>
                 </div>
             </div>
+        {% endif %}
+        {% if master_data.is_admin and master_data.record_type == 'equipment' %}
+            <details class="equipment-master-admin-view"
+                     data-equipment-master-admin-view
+                     {% if master_data.scope != 'mine' %}open{% endif %}>
+                <summary>
+                    <span>Admin view</span>
+                    <small>
+                        {% if master_data.scope == 'all' %}
+                            Viewing all users
+                        {% elif master_data.scope == 'user' and master_data.scope_user.user_id %}
+                            Viewing {{ master_data.scope_user.label }}
+                        {% else %}
+                            Viewing my data
+                        {% endif %}
+                    </small>
+                </summary>
+                <div>
+                    {{ render_master_data_scope_controls(master_data) }}
+                </div>
+            </details>
         {% endif %}
         <button type="submit">Apply</button>
     </form>
@@ -217,16 +241,32 @@
                     </button>
                 {% else %}
                     <div class="master-data-item-copy">
-                        <strong>{{ row.name }}</strong>
-                        <details class="master-data-equipment-details">
-                            <summary aria-label="Show created date for {{ row.name }}">Details</summary>
-                            <div>
-                                <span>Created</span>
-                                <time datetime="{{ row.created_at }}" title="{{ row.created_at }}">
-                                    {{ row.created_at_label }}
-                                </time>
-                            </div>
-                        </details>
+                        <strong data-equipment-master-display-name>{{ row.name }}</strong>
+                        <div class="equipment-master-item-actions">
+                            <details class="master-data-equipment-details">
+                                <summary aria-label="Show created date for {{ row.name }}">Details</summary>
+                                <div>
+                                    <span>Created</span>
+                                    <time datetime="{{ row.created_at }}" title="{{ row.created_at }}">
+                                        {{ row.created_at_label }}
+                                    </time>
+                                </div>
+                            </details>
+                            {% if row.user_id == master_data.current_scope_user_id %}
+                                <button type="button"
+                                        class="equipment-master-display-edit"
+                                        data-equipment-master-display-edit
+                                        data-update-url="{{ url_for('main_bp.equipment_master_display_name_route', equipment_id=row.id) }}"
+                                        data-current-name="{{ row.name }}"
+                                        data-detected-name="{{ row.detected_name }}"
+                                        data-has-display-name-override="{{ 'true' if row.has_display_name_override else 'false' }}"
+                                        aria-haspopup="dialog"
+                                        aria-controls="equipmentMasterDisplayNameDialog"
+                                        title="Customize the display name for {{ row.name }}">
+                                    Edit display name
+                                </button>
+                            {% endif %}
+                        </div>
                     </div>
                 {% endif %}
             </div>
@@ -339,7 +379,13 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <h1 id="masterDataTitle">{{ master_data.title }}</h1>
                 <p>
                     {% if master_data.record_type == 'equipment' %}
-                        Review normalized equipment detected across recipes in this workspace.
+                        {% if master_data.scope == 'all' %}
+                            Review equipment detected across all recipe workspaces.
+                        {% elif master_data.scope == 'user' %}
+                            Review equipment detected in the selected user's recipes.
+                        {% else %}
+                            Review equipment detected across your recipes.
+                        {% endif %}
                     {% else %}
                         Browse normalized reusable recipe records for the active workspace.
                     {% endif %}
@@ -1117,10 +1163,10 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             <h2 id="equipmentRegistryTitle">Equipment Registry</h2>
                             <span class="equipment-master-read-only-badge"
                                   data-equipment-master-read-only>
-                                Recipe-derived <span aria-hidden="true">&middot;</span> Read-only
+                                Recipe-derived <span aria-hidden="true">&middot;</span> Names customizable
                             </span>
                         </div>
-                        <p>Recipe-derived equipment is grouped by type and remains read-only. Use recipe counts to review its source recipes.</p>
+                        <p>Equipment identity and recipe links remain read-only. Customize display names without changing source recipes.</p>
                         <strong class="equipment-master-result-count" aria-live="polite">
                             {% if master_data.total_count %}
                                 Showing {{ master_data.offset + 1 }}-{{ master_data.offset + (master_data.rows|length) }} of {{ master_data.total_count }} {{ master_data.empty_label }}.
@@ -1186,6 +1232,59 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     {% endif %}
                 </div>
             </section>
+
+            <dialog id="equipmentMasterDisplayNameDialog"
+                    class="unit-master-dialog equipment-master-display-dialog"
+                    data-equipment-master-display-dialog
+                    aria-labelledby="equipmentMasterDisplayNameTitle"
+                    aria-describedby="equipmentMasterDisplayNameContext">
+                <form method="dialog"
+                      class="unit-master-editor equipment-master-display-form"
+                      data-equipment-master-display-form
+                      novalidate>
+                    <header>
+                        <div>
+                            <span>Presentation only</span>
+                            <h2 id="equipmentMasterDisplayNameTitle">Edit display name</h2>
+                            <p id="equipmentMasterDisplayNameContext">
+                                This changes only the label you see. Recipe connections and equipment identity stay unchanged.
+                            </p>
+                        </div>
+                        <button type="button"
+                                class="unit-master-dialog-close"
+                                data-equipment-master-display-close
+                                aria-label="Close display name editor">&times;</button>
+                    </header>
+                    <label class="unit-master-field">
+                        <span>Display name</span>
+                        <input type="text"
+                               maxlength="160"
+                               autocomplete="off"
+                               required
+                               data-equipment-master-display-input>
+                    </label>
+                    <p class="equipment-master-detected-name">
+                        Detected name: <strong data-equipment-master-detected-name></strong>
+                    </p>
+                    <div class="unit-master-editor-feedback"
+                         role="alert"
+                         data-equipment-master-display-feedback
+                         hidden></div>
+                    <footer>
+                        <button type="button"
+                                class="secondary equipment-master-display-reset"
+                                data-equipment-master-display-reset>
+                            Reset to detected name
+                        </button>
+                        <div>
+                            <button type="button"
+                                    class="secondary"
+                                    data-equipment-master-display-close>Cancel</button>
+                            <button type="submit" data-equipment-master-display-save>Save display name</button>
+                        </div>
+                    </footer>
+                </form>
+            </dialog>
 
             <dialog id="equipmentMasterUsageDialog"
                     class="unit-master-usage-dialog equipment-master-usage-dialog"
