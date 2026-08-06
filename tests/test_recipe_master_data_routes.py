@@ -1991,6 +1991,35 @@ def test_equipment_display_dialog_reuses_compact_units_button_styles():
     assert "white-space: nowrap;" in css
 
 
+def test_equipment_usage_pill_uses_the_complete_units_visual_contract():
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    template = Path("PushShoppingList/templates/master_data.html").read_text(
+        encoding="utf-8"
+    )
+
+    selector = ".unit-master-usage-button {"
+    rule_start = css.index(selector)
+    rule = css[rule_start:css.index("}", rule_start)]
+
+    assert "unit-master-usage-button equipment-master-usage-button" in template
+    for declaration in (
+        "width: auto;",
+        "align-items: baseline;",
+        "justify-content: center;",
+        "gap: 4px;",
+        "padding: 5px 8px !important;",
+        "margin: 0;",
+        "border: 1px solid color-mix(",
+        "border-radius: 7px;",
+        "font: inherit;",
+        "font-size: 13px;",
+        "font-weight: 850;",
+        "white-space: nowrap;",
+    ):
+        assert declaration in rule
+    assert ".unit-master-usage-button:focus-visible {" in css
+
+
 def test_master_data_duplicate_review_ui_is_wired():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
