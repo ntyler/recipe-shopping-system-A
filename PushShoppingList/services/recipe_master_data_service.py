@@ -29,6 +29,32 @@ RECIPE_MASTER_DB_PATH = Path(
     )
 )
 RECIPE_MASTER_DB_LOCK = threading.RLock()
+RECIPE_MASTER_READ_SCHEMA_TABLES = frozenset({
+    "canonical_units",
+    "unit_aliases",
+    "workspace_units",
+    "workspace_unit_aliases",
+    "workspace_unit_registry_seeds",
+    "workspace_ingredient_types",
+    "workspace_ingredient_type_registry_seeds",
+    "ingredients",
+    "ingredient_aliases",
+    "ingredient_duplicate_reviews",
+    "ingredient_duplicate_scans",
+    "ingredient_merge_history",
+    "ingredient_store_section_reclassification_history",
+    "ingredient_store_sections",
+    "equipment",
+    "recipe_ingredients",
+    "recipe_ingredient_requirements",
+    "recipe_ingredient_options",
+    "recipe_ingredient_option_items",
+    "recipe_ingredient_requirement_sync",
+    "recipe_ingredient_requirement_migration_runs",
+    "recipe_equipment",
+    "recipe_master_migrations",
+    "unit_normalization_reports",
+})
 BACKFILL_MIGRATION_NAME = "recipe_master_user_scoped_store_section_backfill_v2"
 UNIT_NORMALIZATION_MIGRATION_NAME = "ingredient_unit_normalization_v1"
 INGREDIENT_STORE_SECTION_ORDER = {
@@ -701,6 +727,15 @@ def existing_recipe_master_read_connection():
         connection.row_factory = sqlite3.Row
         try:
             connection.execute("PRAGMA query_only=ON")
+            available_tables = {
+                str(row["name"])
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+            if not RECIPE_MASTER_READ_SCHEMA_TABLES.issubset(available_tables):
+                yield None
+                return
             yield connection
         finally:
             connection.close()
@@ -1399,6 +1434,44 @@ def _workspace_unit_registry_payload_from_connection(connection, user_id):
     }
 
 
+def default_workspace_unit_registry_payload():
+    """Return the built-in unit registry without creating persistent rows."""
+    aliases_by_name = {}
+    for alias, canonical_name in canonical_unit_aliases().items():
+        aliases_by_name.setdefault(canonical_name, []).append(alias)
+
+    units = []
+    aliases = {}
+    for option in canonical_unit_options():
+        unit = {
+            **option,
+            "seeded": True,
+            "custom": False,
+            "aliases": sorted(
+                {
+                    clean_unit_registry_text(alias)
+                    for alias in aliases_by_name.get(option["name"], [])
+                    if unit_registry_key(alias) != unit_registry_key(option["name"])
+                },
+                key=lambda value: (len(value), unit_registry_key(value)),
+            ),
+            "updated_at": "",
+        }
+        units.append(unit)
+        aliases[unit_registry_key(unit["name"])] = unit["name"]
+        for alias in unit["aliases"]:
+            aliases[unit_registry_key(alias)] = unit["name"]
+
+    return {
+        "units": units,
+        "aliases": aliases,
+        "categories": [
+            {"key": key, "label": label}
+            for key, label in UNIT_REGISTRY_CATEGORIES
+        ],
+    }
+
+
 def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
     user_id = str(user_id or scoped_recipe_user_id()).strip()
     unit_id = str(unit_id or "").strip()
@@ -1407,9 +1480,18 @@ def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
     except (TypeError, ValueError):
         limit = 100
 
-    with recipe_master_connection() as connection:
-        _seed_workspace_unit_registry(connection, user_id)
-        registry = _workspace_unit_registry_payload_from_connection(connection, user_id)
+    registry = default_workspace_unit_registry_payload()
+    ingredient_rows = []
+    option_rows = []
+    with existing_recipe_master_read_connection() as connection:
+        if connection is not None and all(
+            recipe_master_table_exists(connection, table_name)
+            for table_name in ("workspace_units", "workspace_unit_aliases")
+        ):
+            registry = (
+                _workspace_unit_registry_payload_from_connection(connection, user_id)
+                or registry
+            )
         unit = next(
             (
                 item
@@ -1438,65 +1520,78 @@ def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
             for alias in item.get("aliases", []):
                 unit_id_by_key[unit_registry_key(alias)] = item_id
 
-        ingredient_rows = connection.execute(
-            """
-            SELECT
-                r.id,
-                'ingredient' AS reference_kind,
-                r.recipe_id,
-                COALESCE(NULLIF(source_ingredient.name, ''), NULLIF(r.raw_name, ''),
-                         NULLIF(r.normalized_name, ''), '') AS ingredient_name,
-                r.quantity,
-                r.unit,
-                r.unit_id,
-                r.unit_raw,
-                r.preparation,
-                r.notes,
-                r.original_recipe_text,
-                r.optional,
-                r.sort_order,
-                '' AS option_label,
-                '' AS requirement_label,
-                '' AS option_type
-              FROM recipe_ingredients r
-              LEFT JOIN ingredients source_ingredient
-                ON source_ingredient.id = r.ingredient_id
-               AND source_ingredient.user_id = r.user_id
-             WHERE r.user_id = ?
-            """,
-            (user_id,),
-        ).fetchall()
-        option_rows = connection.execute(
-            """
-            SELECT
-                item.id,
-                'option' AS reference_kind,
-                requirement.recipe_id,
-                COALESCE(NULLIF(source_ingredient.name, ''), NULLIF(item.raw_name, ''),
-                         NULLIF(item.normalized_name, ''), '') AS ingredient_name,
-                item.quantity,
-                item.unit,
-                item.unit_id,
-                item.unit_raw,
-                item.preparation,
-                item.notes,
-                item.original_recipe_text,
-                item.optional,
-                item.sort_order,
-                option.label AS option_label,
-                requirement.label AS requirement_label,
-                option.option_type AS option_type
-              FROM recipe_ingredient_option_items item
-              JOIN recipe_ingredient_options option ON option.id = item.option_id
-              JOIN recipe_ingredient_requirements requirement
-                ON requirement.id = option.requirement_id
-              LEFT JOIN ingredients source_ingredient
-                ON source_ingredient.id = item.ingredient_id
-               AND source_ingredient.user_id = requirement.user_id
-             WHERE requirement.user_id = ?
-            """,
-            (user_id,),
-        ).fetchall()
+        if connection is None or not all(
+            recipe_master_table_exists(connection, table_name)
+            for table_name in (
+                "recipe_ingredients",
+                "ingredients",
+                "recipe_ingredient_option_items",
+                "recipe_ingredient_options",
+                "recipe_ingredient_requirements",
+            )
+        ):
+            ingredient_rows = []
+            option_rows = []
+        else:
+            ingredient_rows = connection.execute(
+                """
+                SELECT
+                    r.id,
+                    'ingredient' AS reference_kind,
+                    r.recipe_id,
+                    COALESCE(NULLIF(source_ingredient.name, ''), NULLIF(r.raw_name, ''),
+                             NULLIF(r.normalized_name, ''), '') AS ingredient_name,
+                    r.quantity,
+                    r.unit,
+                    r.unit_id,
+                    r.unit_raw,
+                    r.preparation,
+                    r.notes,
+                    r.original_recipe_text,
+                    r.optional,
+                    r.sort_order,
+                    '' AS option_label,
+                    '' AS requirement_label,
+                    '' AS option_type
+                  FROM recipe_ingredients r
+                  LEFT JOIN ingredients source_ingredient
+                    ON source_ingredient.id = r.ingredient_id
+                   AND source_ingredient.user_id = r.user_id
+                 WHERE r.user_id = ?
+                """,
+                (user_id,),
+            ).fetchall()
+            option_rows = connection.execute(
+                """
+                SELECT
+                    item.id,
+                    'option' AS reference_kind,
+                    requirement.recipe_id,
+                    COALESCE(NULLIF(source_ingredient.name, ''), NULLIF(item.raw_name, ''),
+                             NULLIF(item.normalized_name, ''), '') AS ingredient_name,
+                    item.quantity,
+                    item.unit,
+                    item.unit_id,
+                    item.unit_raw,
+                    item.preparation,
+                    item.notes,
+                    item.original_recipe_text,
+                    item.optional,
+                    item.sort_order,
+                    option.label AS option_label,
+                    requirement.label AS requirement_label,
+                    option.option_type AS option_type
+                  FROM recipe_ingredient_option_items item
+                  JOIN recipe_ingredient_options option ON option.id = item.option_id
+                  JOIN recipe_ingredient_requirements requirement
+                    ON requirement.id = option.requirement_id
+                  LEFT JOIN ingredients source_ingredient
+                    ON source_ingredient.id = item.ingredient_id
+                   AND source_ingredient.user_id = requirement.user_id
+                 WHERE requirement.user_id = ?
+                """,
+                (user_id,),
+            ).fetchall()
 
     metadata = recipe_reference_metadata(user_id)
     references_by_recipe = {}
@@ -1594,23 +1689,16 @@ def read_workspace_unit_registry(user_id=None):
     if not user_id or not db_path.is_file():
         return None
 
-    with RECIPE_MASTER_DB_LOCK:
-        connection = sqlite3.connect(str(db_path), timeout=30)
-        connection.row_factory = sqlite3.Row
+    with existing_recipe_master_read_connection() as connection:
+        if connection is None or not all(
+            recipe_master_table_exists(connection, table_name)
+            for table_name in ("workspace_units", "workspace_unit_aliases")
+        ):
+            return None
         try:
-            table = connection.execute(
-                """
-                SELECT name FROM sqlite_master
-                 WHERE type = 'table' AND name = 'workspace_units'
-                """
-            ).fetchone()
-            if not table:
-                return None
             return _workspace_unit_registry_payload_from_connection(connection, user_id)
         except sqlite3.OperationalError:
             return None
-        finally:
-            connection.close()
 
 
 def _seed_workspace_unit_registry(connection, user_id):
@@ -1686,18 +1774,35 @@ def ensure_workspace_unit_registry(user_id=None):
 
 def workspace_unit_registry_with_usage(user_id=None):
     user_id = str(user_id or scoped_recipe_user_id()).strip()
-    with recipe_master_connection() as connection:
-        _seed_workspace_unit_registry(connection, user_id)
-        payload = _workspace_unit_registry_payload_from_connection(connection, user_id)
-        usage_counts = _workspace_unit_usage_counts(
-            connection,
-            user_id,
-            payload.get("units", []),
-            {
-                str(unit["id"]): list(unit.get("aliases", []))
-                for unit in payload.get("units", [])
-            },
-        )
+    payload = default_workspace_unit_registry_payload()
+    usage_counts = {}
+    with existing_recipe_master_read_connection() as connection:
+        if connection is not None and all(
+            recipe_master_table_exists(connection, table_name)
+            for table_name in ("workspace_units", "workspace_unit_aliases")
+        ):
+            payload = (
+                _workspace_unit_registry_payload_from_connection(connection, user_id)
+                or payload
+            )
+        if connection is not None and all(
+            recipe_master_table_exists(connection, table_name)
+            for table_name in (
+                "recipe_ingredients",
+                "recipe_ingredient_option_items",
+                "recipe_ingredient_options",
+                "recipe_ingredient_requirements",
+            )
+        ):
+            usage_counts = _workspace_unit_usage_counts(
+                connection,
+                user_id,
+                payload.get("units", []),
+                {
+                    str(unit["id"]): list(unit.get("aliases", []))
+                    for unit in payload.get("units", [])
+                },
+            )
         for unit in payload.get("units", []):
             unit["recipe_count"] = int(
                 usage_counts.get(str(unit["id"])) or 0
@@ -1743,28 +1848,51 @@ def _unit_registry_validation(connection, user_id, values, unit_id=""):
             aliases.append(alias)
             alias_keys.add(alias_key)
 
-    rows = connection.execute(
-        """
-        SELECT id, name, normalized_name, is_seeded, category
-          FROM workspace_units WHERE user_id = ?
-        """,
-        (user_id,),
-    ).fetchall()
+    if connection is None:
+        registry = default_workspace_unit_registry_payload()
+        rows = [
+            {
+                "id": unit["id"],
+                "name": unit["name"],
+                "normalized_name": unit_registry_key(unit["name"]),
+                "is_seeded": 1,
+                "category": unit["category"],
+            }
+            for unit in registry["units"]
+        ]
+        alias_rows = [
+            {
+                "canonical_unit_id": unit["id"],
+                "alias": alias,
+                "normalized_alias": unit_registry_key(alias),
+                "name": unit["name"],
+            }
+            for unit in registry["units"]
+            for alias in unit.get("aliases", [])
+        ]
+    else:
+        rows = connection.execute(
+            """
+            SELECT id, name, normalized_name, is_seeded, category
+              FROM workspace_units WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchall()
+        alias_rows = connection.execute(
+            """
+            SELECT a.canonical_unit_id, a.alias, a.normalized_alias, u.name
+              FROM workspace_unit_aliases a
+              JOIN workspace_units u
+                ON u.user_id = a.user_id AND u.id = a.canonical_unit_id
+             WHERE a.user_id = ?
+            """,
+            (user_id,),
+        ).fetchall()
     units_by_key = {
         str(row["normalized_name"]): row
         for row in rows
         if str(row["id"]) != unit_id
     }
-    alias_rows = connection.execute(
-        """
-        SELECT a.canonical_unit_id, a.alias, a.normalized_alias, u.name
-          FROM workspace_unit_aliases a
-          JOIN workspace_units u
-            ON u.user_id = a.user_id AND u.id = a.canonical_unit_id
-         WHERE a.user_id = ?
-        """,
-        (user_id,),
-    ).fetchall()
     aliases_by_key = {
         str(row["normalized_alias"]): row
         for row in alias_rows
@@ -1816,13 +1944,27 @@ def validate_workspace_unit_candidate(values, unit_id="", user_id=None):
     user_id = str(user_id or scoped_recipe_user_id()).strip()
     unit_id = str(unit_id or "").strip()
     values = values if isinstance(values, dict) else {}
-    with recipe_master_connection() as connection:
-        _seed_workspace_unit_registry(connection, user_id)
+    with existing_recipe_master_read_connection() as read_connection:
+        connection = read_connection
+        if connection is not None and not all(
+            recipe_master_table_exists(connection, table_name)
+            for table_name in ("workspace_units", "workspace_unit_aliases")
+        ):
+            connection = None
         if unit_id:
-            existing = connection.execute(
-                "SELECT id FROM workspace_units WHERE user_id = ? AND id = ?",
-                (user_id, unit_id),
-            ).fetchone()
+            if connection is None:
+                existing = next(
+                    (
+                        unit for unit in default_workspace_unit_registry_payload()["units"]
+                        if str(unit["id"]) == unit_id
+                    ),
+                    None,
+                )
+            else:
+                existing = connection.execute(
+                    "SELECT id FROM workspace_units WHERE user_id = ? AND id = ?",
+                    (user_id, unit_id),
+                ).fetchone()
             if not existing:
                 return {"ok": False, "status": 404, "error": "Unit not found."}
         validated = _unit_registry_validation(
@@ -2404,7 +2546,7 @@ def ingredient_store_section_usage(section_id, user_id=None):
         return None
 
     scoped_user_id = scoped_recipe_user_id(user_id)
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return None
 
@@ -3579,7 +3721,7 @@ def list_master_records(
         alias_select = ""
         usage_select = ",\n                COUNT(u.id) AS usage_count"
 
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return []
 
@@ -3655,7 +3797,7 @@ def count_master_records(
     )
     where_clause = f"WHERE {' AND '.join(where)}" if where else ""
 
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return 0
 
@@ -3803,7 +3945,7 @@ def equipment_summary_counts(user_id=None, include_all_users=False):
     )
     where_clause = f"WHERE {' AND '.join(where)}" if where else ""
 
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return {
                 "total_count": 0,
@@ -3850,7 +3992,7 @@ def count_master_usage(table_name, record_id, user_id=None):
     if record_id <= 0:
         return 0
 
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return 0
 
@@ -3902,7 +4044,7 @@ def master_record_for_id(table_name, record_id, user_id=None, include_all_users=
         section_select = ", display_name_override, equipment_section"
     else:
         section_select = ""
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return None
 
@@ -4031,7 +4173,7 @@ def list_master_record_recipe_references(
                 r.sort_order
         """
 
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return {
                 "record": record,
@@ -4441,7 +4583,7 @@ def ingredient_store_section_reclassification_history_summary(row):
 
 def latest_undoable_ingredient_store_section_reclassification(user_id=None):
     scoped_user_id = scoped_recipe_user_id(user_id)
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return None
         row = connection.execute(
@@ -4481,7 +4623,7 @@ def misc_ingredient_store_section_review_candidates(
         if ingredient_id > 0:
             selected_ids.add(ingredient_id)
 
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return {"ok": False, "error": "Recipe master database was not found."}
         params = [scoped_user_id]
@@ -4902,7 +5044,12 @@ def undo_last_ingredient_store_section_reclassification(
     except (TypeError, ValueError):
         expected_ingredient_id = 0
 
-    with existing_recipe_master_connection() as connection:
+    connection_manager = (
+        existing_recipe_master_read_connection
+        if preview_only
+        else existing_recipe_master_connection
+    )
+    with connection_manager() as connection:
         if connection is None:
             return {
                 "ok": False,
@@ -5203,7 +5350,7 @@ def ingredient_store_section_reclassification_undo_preview(
     except (TypeError, ValueError):
         ingredient_id = 0
 
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return {
                 "ok": False,
@@ -5945,7 +6092,7 @@ def ingredient_merge_undo_preview(user_id=None, reference_limit=8, merge_id=None
         merge_id = int(merge_id or 0)
     except (TypeError, ValueError):
         merge_id = 0
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
         history_rows = connection.execute(
@@ -6128,7 +6275,7 @@ def ingredient_merge_undo_preview(user_id=None, reference_limit=8, merge_id=None
 
 def latest_undoable_ingredient_merge(user_id=None):
     scoped_user_id = scoped_recipe_user_id(user_id)
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return None
         row = connection.execute(
@@ -6760,7 +6907,7 @@ def ingredient_master_records_for_items(items, user_id=None):
 
 
 def recipe_master_user_ids():
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return []
 
@@ -8338,7 +8485,9 @@ def master_record_for_name(table_name, user_id, name):
         raise ValueError("Unsupported master table.")
     user_id = scoped_recipe_user_id(user_id)
     normalized_name = normalized_master_name(name)
-    with recipe_master_connection() as connection:
+    with existing_recipe_master_read_connection() as connection:
+        if connection is None:
+            return None
         row = connection.execute(
             f"""
             SELECT *

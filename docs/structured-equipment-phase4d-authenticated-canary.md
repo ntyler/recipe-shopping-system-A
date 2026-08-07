@@ -32,6 +32,26 @@ in-memory defaults without creating files, tables, or rows. Explicit
 administrative write paths retain their existing transactional seeding
 behavior.
 
+Phase 4D-R2B.3 extends that boundary to every recipe-master consumer reached
+from a GET or logically read-only operation. Master-data pages, reference and
+usage previews, unit and ingredient-type registries, duplicate-review lists,
+image candidate lists, global-search lookups, editor loads, and recipe reads
+open the existing database with SQLite `mode=ro` and `PRAGMA query_only=ON`.
+The read connection first verifies the non-additive recipe-master schema and
+fails closed when it is incomplete.
+
+Read operations never call `ensure_recipe_master_schema`, seed canonical units
+or aliases, create workspace unit/type rows, insert default store sections, or
+commit a transaction. When a registry has not yet been explicitly seeded, the
+UI receives the same built-in unit, ingredient-type, or store-section data from
+an in-memory payload. This fallback does not create a database file or advance
+`sqlite_sequence`.
+
+Schema initialization and seeding remain available only through explicit
+mutation operations. Unit/type saves, store-section administration, recipe
+synchronization, migrations, and other authorized writes retain their prior
+transaction boundaries and validation rules.
+
 Recipe GETs also do not opportunistically create normalized ingredient
 requirements. When the normalized ingredient synchronization ledger has no
 entry for a saved recipe, the response uses the existing legacy JSON view and

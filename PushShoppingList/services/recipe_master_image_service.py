@@ -237,7 +237,7 @@ def missing_master_image_rows(record_type="ingredients", user_id=None, search=No
         limit_clause = "LIMIT ?"
         params.append(int(limit))
 
-    with master_data.existing_recipe_master_connection() as connection:
+    with master_data.existing_recipe_master_read_connection() as connection:
         if connection is None:
             return []
 

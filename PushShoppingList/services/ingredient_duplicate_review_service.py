@@ -475,7 +475,7 @@ def attach_second_opinion_recipe_context(candidates, user_id, connection=None):
         for side in ("left", "right")
     }
     if connection is None:
-        with master_data.existing_recipe_master_connection() as existing_connection:
+        with master_data.existing_recipe_master_read_connection() as existing_connection:
             contexts = _recipe_contexts_by_ingredient_id(
                 existing_connection,
                 user_id,
@@ -605,7 +605,7 @@ def independent_ai_second_opinions(candidates, user_id, queue_results, force=Fal
     }
     cached_rows = {}
     if candidates and not force:
-        with master_data.existing_recipe_master_connection() as connection:
+        with master_data.existing_recipe_master_read_connection() as connection:
             if connection is not None:
                 rows = connection.execute(
                     """
@@ -754,7 +754,7 @@ def _ingredient_reference_quality_issues(connection, user_id, ingredient_names):
 
 def duplicate_scan_summary(user_id=None):
     scoped_user_id = master_data.scoped_recipe_user_id(user_id)
-    with master_data.existing_recipe_master_connection() as connection:
+    with master_data.existing_recipe_master_read_connection() as connection:
         if connection is None:
             return {}
         row = connection.execute(
@@ -943,7 +943,7 @@ def _decode_signals(value):
 def list_duplicate_reviews(user_id=None, status="pending"):
     scoped_user_id = master_data.scoped_recipe_user_id(user_id)
     status = master_data.clean_text(status).lower() or "pending"
-    with master_data.existing_recipe_master_connection() as connection:
+    with master_data.existing_recipe_master_read_connection() as connection:
         if connection is None:
             return []
         rows = connection.execute(
@@ -1077,7 +1077,7 @@ def list_duplicate_decision_history(user_id=None, limit=200):
         limit = max(1, min(int(limit or 200), 500))
     except (TypeError, ValueError):
         limit = 200
-    with master_data.existing_recipe_master_connection() as connection:
+    with master_data.existing_recipe_master_read_connection() as connection:
         if connection is None:
             return []
         rows = connection.execute(

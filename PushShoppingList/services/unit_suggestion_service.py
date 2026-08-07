@@ -248,7 +248,10 @@ def suggest_workspace_unit(values, user_id=None):
             "error": "OpenAI is not configured, so unit suggestions are unavailable.",
         }
 
-    registry = master_data.ensure_workspace_unit_registry(user_id)
+    registry = (
+        master_data.read_workspace_unit_registry(user_id)
+        or master_data.default_workspace_unit_registry_payload()
+    )
     current_unit = next(
         (unit for unit in registry.get("units", []) if str(unit.get("id")) == unit_id),
         None,

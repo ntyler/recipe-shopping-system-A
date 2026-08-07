@@ -100,6 +100,25 @@ def _registry_from_connection(connection, user_id):
     return {"types": types}
 
 
+def default_ingredient_type_registry_payload():
+    """Return built-in ingredient types without creating workspace rows."""
+    return {
+        "types": [
+            {
+                "id": type_id,
+                "name": name,
+                "value": type_id,
+                "seeded": True,
+                "custom": False,
+                "active": True,
+                "sort_order": sort_order,
+                "updated_at": "",
+            }
+            for sort_order, (type_id, name) in enumerate(INGREDIENT_TYPE_SEEDS)
+        ]
+    }
+
+
 def _type_lookup(registry):
     lookup = {}
     for item in registry.get("types", []):
@@ -189,11 +208,27 @@ def _usage_counts(connection, user_id, registry):
 
 def ingredient_type_registry_payload(user_id=None, include_usage=False):
     user_id = str(user_id or master_data.scoped_recipe_user_id()).strip()
-    with master_data.recipe_master_connection() as connection:
-        _seed_registry(connection, user_id)
-        registry = _registry_from_connection(connection, user_id)
-        if include_usage:
+    registry = default_ingredient_type_registry_payload()
+    counts = {}
+    with master_data.existing_recipe_master_read_connection() as connection:
+        if connection is not None and master_data.recipe_master_table_exists(
+            connection,
+            "workspace_ingredient_types",
+        ):
+            stored_registry = _registry_from_connection(connection, user_id)
+            if stored_registry.get("types"):
+                registry = stored_registry
+        if include_usage and connection is not None and all(
+            master_data.recipe_master_table_exists(connection, table_name)
+            for table_name in (
+                "recipe_ingredients",
+                "recipe_ingredient_option_items",
+                "recipe_ingredient_options",
+                "recipe_ingredient_requirements",
+            )
+        ):
             counts = _usage_counts(connection, user_id, registry)
+        if include_usage:
             for item in registry.get("types", []):
                 item["recipe_count"] = int(counts.get(str(item["id"])) or 0)
     return registry
@@ -207,9 +242,16 @@ def workspace_ingredient_type_recipe_references(type_id, user_id=None, limit=100
     except (TypeError, ValueError):
         limit = 100
 
-    with master_data.recipe_master_connection() as connection:
-        _seed_registry(connection, user_id)
-        registry = _registry_from_connection(connection, user_id)
+    registry = default_ingredient_type_registry_payload()
+    matching_rows = []
+    with master_data.existing_recipe_master_read_connection() as connection:
+        if connection is not None and master_data.recipe_master_table_exists(
+            connection,
+            "workspace_ingredient_types",
+        ):
+            stored_registry = _registry_from_connection(connection, user_id)
+            if stored_registry.get("types"):
+                registry = stored_registry
         ingredient_type = next(
             (
                 item for item in registry.get("types", [])
@@ -226,15 +268,24 @@ def workspace_ingredient_type_recipe_references(type_id, user_id=None, limit=100
                 "limit": limit,
             }
         lookup = _type_lookup(registry)
-        matching_rows = sorted(
-            _type_rows(connection, user_id),
-            key=lambda row: (
-                master_data.clean_text(row["recipe_id"]).lower(),
-                0 if row["reference_kind"] == "ingredient" else 1,
-                int(row["sort_order"] or 0),
-                int(row["id"] or 0),
-            ),
-        )
+        if connection is not None and all(
+            master_data.recipe_master_table_exists(connection, table_name)
+            for table_name in (
+                "recipe_ingredients",
+                "recipe_ingredient_option_items",
+                "recipe_ingredient_options",
+                "recipe_ingredient_requirements",
+            )
+        ):
+            matching_rows = sorted(
+                _type_rows(connection, user_id),
+                key=lambda row: (
+                    master_data.clean_text(row["recipe_id"]).lower(),
+                    0 if row["reference_kind"] == "ingredient" else 1,
+                    int(row["sort_order"] or 0),
+                    int(row["id"] or 0),
+                ),
+            )
 
     metadata = master_data.recipe_reference_metadata(user_id)
     references_by_recipe = {}

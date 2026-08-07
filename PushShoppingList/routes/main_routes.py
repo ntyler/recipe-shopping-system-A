@@ -1944,7 +1944,6 @@ def store_section_master_data_context():
     sections = recipe_master_data.ingredient_store_section_details(
         user_id=user_id,
         include_inactive=True,
-        create=True,
     )
     active_sections = [section for section in sections if section["is_active"]]
     return {
