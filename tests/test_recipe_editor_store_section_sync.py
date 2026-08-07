@@ -1,3 +1,7 @@
+import hashlib
+import sqlite3
+from contextlib import contextmanager
+
 from PushShoppingList.services import menu_mega_json_service
 from PushShoppingList.services import menu_store_service
 from PushShoppingList.services import recipe_edit_service
@@ -81,6 +85,27 @@ def test_recipe_editor_load_uses_user_master_store_section(monkeypatch, tmp_path
         },
         user_id=master_data.LOCAL_USER_ID,
     )
+    master_data.ingredient_store_section_details(
+        master_data.LOCAL_USER_ID,
+        include_inactive=True,
+        create=True,
+    )
+
+    db_path = master_data.recipe_master_db_path()
+    with sqlite3.connect(db_path) as connection:
+        before_sequence = connection.execute(
+            "SELECT seq FROM sqlite_sequence WHERE name = 'ingredient_store_sections'"
+        ).fetchone()[0]
+    before_bytes = db_path.read_bytes()
+    before_hash = hashlib.sha256(before_bytes).hexdigest()
+
+    @contextmanager
+    def forbidden_writer():
+        raise AssertionError("recipe editor read attempted a writable master-data connection")
+        yield
+
+    monkeypatch.setattr(master_data, "existing_recipe_master_connection", forbidden_writer)
+    monkeypatch.setattr(master_data, "recipe_master_connection", forbidden_writer)
 
     loaded = recipe_edit_service.load_editable_recipe(url)
     output = capsys.readouterr().out
@@ -96,6 +121,17 @@ def test_recipe_editor_load_uses_user_master_store_section(monkeypatch, tmp_path
     ] == loaded["store_sections"]
     assert loaded["store_section_details"][0]["display_name"] == "Produce"
     assert loaded["store_section_details"][0]["icon"] == "leaf"
+    after_bytes = db_path.read_bytes()
+    assert hashlib.sha256(after_bytes).hexdigest() == before_hash, [
+        index
+        for index, (before, after) in enumerate(zip(before_bytes, after_bytes))
+        if before != after
+    ]
+    with sqlite3.connect(db_path) as connection:
+        after_sequence = connection.execute(
+            "SELECT seq FROM sqlite_sequence WHERE name = 'ingredient_store_sections'"
+        ).fetchone()[0]
+    assert after_sequence == before_sequence
     assert (
         '[IngredientMaster] action=store_section_loaded_from_master '
         'recipe_id=https://example.com/chicken-broth-soup '

@@ -1,4 +1,6 @@
+import hashlib
 import json
+import sqlite3
 
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import recipe_master_image_service as master_images
@@ -8,6 +10,104 @@ def configure_master_db(monkeypatch, tmp_path):
     db_path = tmp_path / "recipe_master.sqlite3"
     monkeypatch.setattr(master_data, "RECIPE_MASTER_DB_PATH", db_path)
     return db_path
+
+
+def database_sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def store_section_sequence(path):
+    with sqlite3.connect(path) as connection:
+        row = connection.execute(
+            "SELECT seq FROM sqlite_sequence WHERE name = 'ingredient_store_sections'"
+        ).fetchone()
+    return int(row[0]) if row else None
+
+
+def test_store_section_read_path_is_byte_preserving_and_tenant_scoped(
+    monkeypatch, tmp_path
+):
+    db_path = configure_master_db(monkeypatch, tmp_path)
+    master_data.ingredient_store_section_details(
+        "user-a", include_inactive=True, create=True
+    )
+    master_data.ingredient_store_section_details(
+        "user-b", include_inactive=True, create=True
+    )
+    custom = master_data.create_ingredient_store_section(
+        "International Foods", "basket", user_id="user-a"
+    )
+    assert custom["ok"] is True
+    assert master_data.update_ingredient_store_section_definition(
+        custom["id"], action="archive", user_id="user-a"
+    )["ok"] is True
+
+    before_hash = database_sha256(db_path)
+    before_sequence = store_section_sequence(db_path)
+    user_a_first = master_data.ingredient_store_section_details(
+        "user-a", include_inactive=True
+    )
+    user_a_second = master_data.ingredient_store_section_details(
+        "user-a", include_inactive=True
+    )
+    user_a_active = master_data.ingredient_store_section_options("user-a")
+    user_b_active = master_data.ingredient_store_section_options("user-b")
+
+    assert user_a_first == user_a_second
+    assert [row["section_key"] for row in user_a_first[:3]] == [
+        "PRODUCE",
+        "MEAT & SEAFOOD",
+        "DAIRY & EGGS",
+    ]
+    archived = next(row for row in user_a_first if row["id"] == custom["id"])
+    assert archived["is_active"] is False
+    assert "INTERNATIONAL FOODS" not in user_a_active
+    assert "INTERNATIONAL FOODS" not in user_b_active
+    assert database_sha256(db_path) == before_hash
+    assert store_section_sequence(db_path) == before_sequence
+
+
+def test_store_section_read_path_missing_database_or_tables_is_non_creating(
+    monkeypatch, tmp_path
+):
+    db_path = configure_master_db(monkeypatch, tmp_path)
+    expected = master_data.default_ingredient_store_section_details()
+
+    assert master_data.ingredient_store_section_details("new-user") == expected
+    assert not db_path.exists()
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("CREATE TABLE unrelated (id INTEGER PRIMARY KEY)")
+    before_hash = database_sha256(db_path)
+
+    assert master_data.ingredient_store_section_details("new-user") == expected
+    assert master_data.ingredient_store_section_options("new-user") == [
+        row["section_key"] for row in expected
+    ]
+    assert database_sha256(db_path) == before_hash
+
+
+def test_store_section_create_and_explicit_admin_write_still_seed_transactionally(
+    monkeypatch, tmp_path
+):
+    db_path = configure_master_db(monkeypatch, tmp_path)
+
+    seeded = master_data.ingredient_store_section_details(
+        "new-user", include_inactive=True, create=True
+    )
+    assert len(seeded) == len(master_data.INGREDIENT_STORE_SECTION_ORDER)
+    assert all(row["id"] > 0 for row in seeded)
+    created = master_data.create_ingredient_store_section(
+        "International Foods", "basket", user_id="new-user"
+    )
+    assert created["ok"] is True
+
+    with sqlite3.connect(db_path) as connection:
+        count = connection.execute(
+            "SELECT COUNT(*) FROM ingredient_store_sections WHERE user_id = ?",
+            ("new-user",),
+        ).fetchone()[0]
+    assert count == len(master_data.INGREDIENT_STORE_SECTION_ORDER) + 1
 
 
 def test_sync_recipe_master_records_keeps_same_name_separate_per_user(monkeypatch, tmp_path):

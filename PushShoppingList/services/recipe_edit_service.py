@@ -4691,26 +4691,10 @@ def backfill_editable_restaurant_sources():
 def load_editable_recipe(url):
     url = str(url or "").strip()
     loaded_recipe_data = load_recipe_output(url, equipment_consumer="editor_api")
-    has_saved_recipe_data = isinstance(loaded_recipe_data, dict) and bool(loaded_recipe_data)
     recipe_data = loaded_recipe_data or {"source_url": url}
     recipe_data = lazy_backfill_editable_recipe_restaurant(url, recipe_data)
     apply_recipe_pdf_asset_aliases(recipe_data)
     source_url = str(recipe_data.get("source_url") or url).strip() or url
-    requirement_sync_checked = False
-    requirement_sync_status = None
-    if has_saved_recipe_data:
-        try:
-            requirement_sync_status = (
-                recipe_ingredient_requirement_service.recipe_requirement_sync_status(
-                    source_url
-                )
-            )
-            requirement_sync_checked = True
-        except Exception:
-            LOGGER.exception(
-                "Normalized ingredient requirement status could not be read for %s; keeping JSON ingredients.",
-                source_url,
-            )
     hydrate_source_pdf_assets_from_url(recipe_data, source_url)
     menu_metadata = editable_recipe_menu_metadata(recipe_data)
     menu_source_options = editable_menu_source_options()
@@ -4847,25 +4831,6 @@ def load_editable_recipe(url):
         "store_sections": ingredient_store_section_options(),
         "store_section_details": ingredient_store_section_details(),
     }
-    # Build the first fallback response entirely from the legacy JSON view so
-    # lazy synchronization cannot change store-section presentation halfway
-    # through one load.  Subsequent loads prefer the committed SQL hierarchy.
-    if (
-        has_saved_recipe_data
-        and requirement_sync_checked
-        and requirement_sync_status is None
-    ):
-        try:
-            recipe_ingredient_requirement_service.save_recipe_ingredient_requirements(
-                source_url,
-                recipe_data,
-                sync_compatibility=True,
-            )
-        except Exception:
-            LOGGER.exception(
-                "Normalized ingredient requirement fallback synchronization failed for %s; keeping JSON ingredients.",
-                source_url,
-            )
     return result
 
 

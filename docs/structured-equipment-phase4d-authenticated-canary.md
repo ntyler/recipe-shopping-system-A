@@ -22,6 +22,21 @@ token cannot authenticate a request without the normal application session.
 Do not expose this local application through a LAN alias, tunnel, proxy, public
 hostname, or alternate browser automation path merely to run the canary.
 
+### Read-path database immutability
+
+Store-section metadata used by `/api/recipe` is loaded through a SQLite
+`mode=ro` connection with `PRAGMA query_only=ON`. Nominal reads do not run
+schema setup or default-section seeding and therefore do not advance
+`sqlite_sequence`. Missing databases or required tables return deterministic
+in-memory defaults without creating files, tables, or rows. Explicit
+administrative write paths retain their existing transactional seeding
+behavior.
+
+Recipe GETs also do not opportunistically create normalized ingredient
+requirements. When the normalized ingredient synchronization ledger has no
+entry for a saved recipe, the response uses the existing legacy JSON view and
+leaves synchronization to an explicit save or migration operation.
+
 ## Default-off configuration
 
 All of the following are required for one exact tenant:

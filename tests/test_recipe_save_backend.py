@@ -1,3 +1,6 @@
+import hashlib
+import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import quote
 
@@ -8,6 +11,7 @@ from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import recipe_ingredient_service
+from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
 
@@ -27,6 +31,7 @@ def configure_recipe_save_storage(monkeypatch, tmp_path):
     monkeypatch.setattr(recipe_extract_service, "PDF_FOLDER", pdf_dir)
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "user-data")
     monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    monkeypatch.setattr(master_data, "RECIPE_MASTER_DB_PATH", tmp_path / "recipe_master.sqlite3")
     user_account_service.save_users({
         "users": [{
             "user_id": RECIPE_SAVE_TEST_USER_ID,
@@ -38,7 +43,6 @@ def configure_recipe_save_storage(monkeypatch, tmp_path):
     monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: {})
     monkeypatch.setattr(recipe_edit_service, "cookbook_recipe_assignment_for_url", lambda _url: {})
     monkeypatch.setattr(recipe_edit_service, "load_food_rules", lambda: {"require": [], "avoid": []})
-    monkeypatch.setattr(recipe_edit_service, "ingredient_store_section_options", lambda: [])
     monkeypatch.setattr(recipe_edit_service, "editable_menu_source_options", lambda: [])
     monkeypatch.setattr(
         recipe_edit_service,
@@ -130,6 +134,85 @@ def test_recipe_save_route_round_trips_encoded_source_url(monkeypatch, tmp_path)
     loaded_recipe = loaded.get_json()["recipe"]
     assert loaded_recipe["source_url"] == url
     assert loaded_recipe["rating"] == 4
+
+
+def test_recipe_get_route_preserves_database_bytes_and_store_section_sequence(
+    monkeypatch, tmp_path
+):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/read-only-store-sections"
+    output_path = recipe_edit_service.recipe_output_json_path(url)
+    seed_recipe(
+        url,
+        ingredients=[{
+            "ingredient": "broth",
+            "quantity": "2",
+            "unit": "cups",
+        }],
+        equipment=[{"equipment": "pot"}],
+        instructions=[{"step_number": 1, "instruction": "Simmer."}],
+    )
+    master_data.ingredient_store_section_details(
+        RECIPE_SAVE_TEST_USER_ID,
+        include_inactive=True,
+        create=True,
+    )
+    db_path = master_data.recipe_master_db_path()
+    with sqlite3.connect(db_path) as connection:
+        before_sequence = connection.execute(
+            "SELECT seq FROM sqlite_sequence WHERE name = 'ingredient_store_sections'"
+        ).fetchone()[0]
+    before_bytes = db_path.read_bytes()
+    before_hash = hashlib.sha256(before_bytes).hexdigest()
+    before_output = output_path.read_bytes()
+
+    @contextmanager
+    def forbidden_writer():
+        raise AssertionError("recipe GET attempted a writable master-data connection")
+        yield
+
+    monkeypatch.setattr(master_data, "existing_recipe_master_connection", forbidden_writer)
+    monkeypatch.setattr(master_data, "recipe_master_connection", forbidden_writer)
+
+    client = recipe_route_client()
+    response = client.get("/api/recipe", query_string={"url": url})
+    repeated = client.get("/api/recipe", query_string={"url": url})
+
+    assert response.status_code == 200
+    assert repeated.status_code == 200
+    payload = response.get_json()
+    assert repeated.get_json() == payload
+    assert payload["recipe"]["source_url"] == url
+    assert payload["recipe"]["ingredients"][0]["ingredient"] == "broth"
+    assert payload["recipe"]["equipment"][0]["equipment"] == "pot"
+    assert payload["store_sections"] == [
+        row["section_key"]
+        for row in payload["store_section_details"]
+        if row["is_active"]
+    ]
+    after_bytes = db_path.read_bytes()
+    assert output_path.read_bytes() == before_output
+    assert hashlib.sha256(after_bytes).hexdigest() == before_hash, [
+        index
+        for index, (before, after) in enumerate(zip(before_bytes, after_bytes))
+        if before != after
+    ]
+    with sqlite3.connect(db_path) as connection:
+        after_sequence = connection.execute(
+            "SELECT seq FROM sqlite_sequence WHERE name = 'ingredient_store_sections'"
+        ).fetchone()[0]
+    assert after_sequence == before_sequence
+    with sqlite3.connect(db_path) as connection:
+        assert connection.execute(
+            """
+            SELECT COUNT(*) FROM recipe_ingredient_requirement_sync
+             WHERE user_id = ? AND recipe_id = ?
+            """,
+            (
+                RECIPE_SAVE_TEST_USER_ID,
+                master_data.recipe_id_for_url(url),
+            ),
+        ).fetchone()[0] == 0
 
 
 def test_recipe_output_index_prefers_legacy_menu_record_url(monkeypatch, tmp_path):

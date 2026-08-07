@@ -684,6 +684,35 @@ def existing_recipe_master_connection():
             connection.close()
 
 
+@contextmanager
+def existing_recipe_master_read_connection():
+    """Open the existing recipe-master database without any write capability."""
+    db_path = recipe_master_db_path()
+    if not db_path.is_file():
+        yield None
+        return
+
+    with RECIPE_MASTER_DB_LOCK:
+        connection = sqlite3.connect(
+            f"{db_path.resolve().as_uri()}?mode=ro",
+            uri=True,
+            timeout=30,
+        )
+        connection.row_factory = sqlite3.Row
+        try:
+            connection.execute("PRAGMA query_only=ON")
+            yield connection
+        finally:
+            connection.close()
+
+
+def recipe_master_table_exists(connection, table_name):
+    return bool(connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (str(table_name or ""),),
+    ).fetchone())
+
+
 def ensure_recipe_master_schema(connection=None):
     if connection is None:
         with recipe_master_connection():
@@ -2284,18 +2313,29 @@ def ensure_ingredient_store_sections_for_user(connection, user_id):
 
 def ingredient_store_section_details(user_id=None, include_inactive=False, create=False):
     scoped_user_id = scoped_recipe_user_id(user_id)
-    db_path = recipe_master_db_path()
-    if not create and not db_path.is_file():
-        return default_ingredient_store_section_details()
+    if create:
+        connection_manager = recipe_master_connection
+    else:
+        connection_manager = existing_recipe_master_read_connection
 
-    connection_manager = recipe_master_connection if create else existing_recipe_master_connection
     with connection_manager() as connection:
         if connection is None:
             return default_ingredient_store_section_details()
-        ensure_ingredient_store_sections_for_user(connection, scoped_user_id)
-        active_clause = "" if include_inactive else "AND s.is_active = 1"
+
+        if create:
+            ensure_ingredient_store_sections_for_user(connection, scoped_user_id)
+        elif not all(
+            recipe_master_table_exists(connection, table_name)
+            for table_name in (
+                "ingredient_store_sections",
+                "ingredients",
+                "recipe_ingredients",
+            )
+        ):
+            return default_ingredient_store_section_details()
+
         rows = connection.execute(
-            f"""
+            """
             SELECT
                 s.id,
                 s.user_id,
@@ -2321,12 +2361,11 @@ def ingredient_store_section_details(user_id=None, include_inactive=False, creat
                 ) AS recipe_reference_count
               FROM ingredient_store_sections s
              WHERE s.user_id = ?
-               {active_clause}
              ORDER BY s.sort_order ASC, LOWER(s.display_name) ASC, s.id ASC
             """,
             (scoped_user_id,),
         ).fetchall()
-        return [
+        details = [
             {
                 **dict(row),
                 "is_builtin": bool(row["is_builtin"]),
@@ -2336,6 +2375,24 @@ def ingredient_store_section_details(user_id=None, include_inactive=False, creat
             }
             for row in rows
         ]
+        existing_keys = {
+            str(section.get("section_key") or "") for section in details
+        }
+        details.extend(
+            section
+            for section in default_ingredient_store_section_details()
+            if section["section_key"] not in existing_keys
+        )
+        if not include_inactive:
+            details = [section for section in details if section["is_active"]]
+        return sorted(
+            details,
+            key=lambda section: (
+                int(section.get("sort_order") or 0),
+                str(section.get("display_name") or "").lower(),
+                int(section.get("id") or 0),
+            ),
+        )
 
 
 def ingredient_store_section_usage(section_id, user_id=None):
@@ -2505,8 +2562,13 @@ def ingredient_store_section_from_source(value, user_id=None, connection=None):
         return clean_text(row["section_key"]) if row else ""
     if not recipe_master_db_path().is_file():
         return ""
-    with existing_recipe_master_connection() as existing_connection:
-        if existing_connection is None:
+    with existing_recipe_master_read_connection() as existing_connection:
+        if (
+            existing_connection is None
+            or not recipe_master_table_exists(
+                existing_connection, "ingredient_store_sections"
+            )
+        ):
             return ""
         return ingredient_store_section_from_source(
             section,
@@ -6648,8 +6710,12 @@ def ingredient_master_records_for_items(items, user_id=None):
 
     where_parts.append("(" + " OR ".join(match_parts) + ")")
 
-    with existing_recipe_master_connection() as connection:
-        if connection is None:
+    with existing_recipe_master_read_connection() as connection:
+        if (
+            connection is None
+            or not recipe_master_table_exists(connection, "ingredients")
+            or not recipe_master_table_exists(connection, "ingredient_aliases")
+        ):
             return {"by_id": {}, "by_normalized_name": {}}
 
         rows = connection.execute(
@@ -8310,8 +8376,12 @@ def recipe_master_rows(table_name, recipe_url, user_id=None):
 
     user_id = scoped_recipe_user_id(user_id)
     recipe_id = recipe_id_for_url(recipe_url)
-    with existing_recipe_master_connection() as connection:
-        if connection is None:
+    with existing_recipe_master_read_connection() as connection:
+        if (
+            connection is None
+            or not recipe_master_table_exists(connection, join_table)
+            or not recipe_master_table_exists(connection, master_table)
+        ):
             return []
 
         rows = connection.execute(
