@@ -129,11 +129,16 @@ def test_equipment_structured_review_ui_is_dark_launched(monkeypatch, tmp_path):
     assert "data-equipment-normalization-review" not in default_html
 
     monkeypatch.setenv("RECIPE_EQUIPMENT_STRUCTURED_UI_ENABLED", "true")
+    global_only_html = client.get("/admin/master-data/equipment").get_data(as_text=True)
+    assert "data-equipment-normalization-review" not in global_only_html
+
+    monkeypatch.setenv("RECIPE_EQUIPMENT_STRUCTURED_UI_TENANTS", "user-a")
     preview_html = client.get("/admin/master-data/equipment").get_data(as_text=True)
     assert "data-equipment-normalization-review" in preview_html
     assert "Decision writes are locked until the migration dry run is approved." in preview_html
     assert "Large pot" in preview_html
-    assert '<button type="button" disabled>Accept</button>' in preview_html
+    assert "No structured-equipment decisions are needed on this page." in preview_html
+    assert '<button type="button" disabled>Accept</button>' not in preview_html
 
 
 def test_master_data_page_does_not_create_missing_database(monkeypatch, tmp_path):

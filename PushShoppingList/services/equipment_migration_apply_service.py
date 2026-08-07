@@ -32,6 +32,8 @@ CLI_APPROVAL_PHRASE = "PHASE3A_APPROVED"
 MIGRATION_VERSION = "equipment-requirements-phase3a-v1"
 
 APPLICATION_FEATURE_FLAGS = {
+    "RECIPE_EQUIPMENT_STRUCTURED_SHADOW_ENABLED": requirements.structured_equipment_shadow_enabled,
+    "RECIPE_EQUIPMENT_STRUCTURED_DUAL_WRITE_ENABLED": requirements.structured_equipment_dual_write_enabled,
     "RECIPE_EQUIPMENT_STRUCTURED_UI_ENABLED": requirements.structured_equipment_ui_enabled,
     "RECIPE_EQUIPMENT_STRUCTURED_READ_ENABLED": requirements.structured_equipment_read_enabled,
     "RECIPE_EQUIPMENT_STRUCTURED_WRITE_ENABLED": requirements.structured_equipment_write_enabled,

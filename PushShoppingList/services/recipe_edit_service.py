@@ -4690,7 +4690,7 @@ def backfill_editable_restaurant_sources():
 
 def load_editable_recipe(url):
     url = str(url or "").strip()
-    loaded_recipe_data = load_recipe_output(url)
+    loaded_recipe_data = load_recipe_output(url, equipment_consumer="editor_api")
     has_saved_recipe_data = isinstance(loaded_recipe_data, dict) and bool(loaded_recipe_data)
     recipe_data = loaded_recipe_data or {"source_url": url}
     recipe_data = lazy_backfill_editable_recipe_restaurant(url, recipe_data)
@@ -6729,7 +6729,7 @@ def generate_editable_recipe_pdf_file(url, pdf_kind=PDF_KIND_GENERATED_RECIPE):
     if not url:
         return {"ok": False, "error": "Recipe URL is required."}
 
-    recipe_data = load_recipe_output(url)
+    recipe_data = load_recipe_output(url, equipment_consumer="pdf_export")
 
     if not recipe_data:
         return {"ok": False, "error": "Recipe data was not found."}
@@ -6988,7 +6988,11 @@ def create_editable_recipe_pdf(url, *, overwrite_r2=False):
         force_regenerate=True,
         overwrite_r2=overwrite_r2,
     )
-    log_recipe_pdf_fields("create_editable_recipe_pdf", load_recipe_output(url) or {"source_url": url})
+    log_recipe_pdf_fields(
+        "create_editable_recipe_pdf",
+        load_recipe_output(url, equipment_consumer="pdf_export")
+        or {"source_url": url},
+    )
     return result
 
 
@@ -10628,7 +10632,7 @@ def recipe_output_index():
     return build_recipe_output_index()
 
 
-def load_recipe_output(url):
+def load_recipe_output(url, *, equipment_consumer="recipe_output"):
     recipe_key = normalize_recipe_url_key(url)
     direct_path = recipe_output_json_path(url, output_folder=OUTPUT_FOLDER)
     data = None
@@ -10647,13 +10651,26 @@ def load_recipe_output(url):
 
     source_url = str(data.get("source_url") or url).strip() or url
     try:
-        return recipe_ingredient_requirement_service.recipe_data_with_sql_requirements(
+        data = recipe_ingredient_requirement_service.recipe_data_with_sql_requirements(
             source_url,
             data,
         )
     except Exception:
         LOGGER.exception(
             "Normalized ingredient requirements could not be loaded for %s; using JSON ingredients.",
+            source_url,
+        )
+    try:
+        from PushShoppingList.services import recipe_equipment_requirement_service
+
+        return recipe_equipment_requirement_service.apply_structured_equipment_read(
+            source_url,
+            data,
+            consumer=equipment_consumer,
+        )
+    except Exception:
+        LOGGER.exception(
+            "Structured equipment could not be evaluated for %s; using legacy equipment.",
             source_url,
         )
         return data

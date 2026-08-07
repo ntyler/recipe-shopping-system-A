@@ -1,3 +1,5 @@
+import pytest
+
 from PushShoppingList.services import equipment_normalization_service as normalization
 from PushShoppingList.services import recipe_equipment_requirement_service as requirements
 
@@ -105,6 +107,15 @@ def test_schema_and_structured_writes_require_separate_explicit_gates(monkeypatc
         raise AssertionError("Structured writes must remain independently locked")
 
     monkeypatch.setenv("RECIPE_EQUIPMENT_STRUCTURED_WRITE_ENABLED", "true")
+    with pytest.raises(PermissionError):
+        requirements.replace_recipe_requirements(
+            connection,
+            "user-a",
+            "recipe-a",
+            parsed,
+            authorized=True,
+        )
+    monkeypatch.setenv("RECIPE_EQUIPMENT_STRUCTURED_WRITE_TENANTS", "user-a")
     summary = requirements.replace_recipe_requirements(
         connection,
         "user-a",
@@ -127,6 +138,10 @@ def test_feature_flagged_preview_preserves_legacy_equipment(monkeypatch):
 
     monkeypatch.setenv("RECIPE_EQUIPMENT_STRUCTURED_WRITE_ENABLED", "true")
     requirements.add_structured_equipment_preview(recipe)
+    assert "equipment_requirements" not in recipe
+
+    monkeypatch.setenv("RECIPE_EQUIPMENT_STRUCTURED_WRITE_TENANTS", "user-a")
+    requirements.add_structured_equipment_preview(recipe, user_id="user-a")
     assert recipe["equipment"] == [{"equipment": "knife and cutting board"}]
     assert len(recipe["equipment_requirements"]) == 2
 

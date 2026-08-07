@@ -321,6 +321,23 @@ def build_workspace_candidates():
 def build_recipe_candidates():
     recipes = {}
     cookbook_names = {}
+    structured_recipe_loader = None
+    from PushShoppingList.services import recipe_equipment_requirement_service
+
+    scoped_user_id = recipe_master_data_service.scoped_recipe_user_id()
+    if (
+        recipe_equipment_requirement_service.structured_equipment_shadow_enabled(
+            scoped_user_id
+        )
+        or recipe_equipment_requirement_service.structured_equipment_read_enabled(
+            scoped_user_id
+        )
+    ):
+        # Lazy import avoids an editor/search import cycle and preserves the
+        # flags-off search path exactly.
+        from PushShoppingList.services.recipe_edit_service import load_recipe_output
+
+        structured_recipe_loader = load_recipe_output
 
     for row in recipe_url_service.recipe_url_rows():
         recipe_url = clean_text(row.get("url"))
@@ -367,6 +384,12 @@ def build_recipe_candidates():
     lookup = {}
     for key, recipe in recipes.items():
         recipe_url = clean_text(recipe.get("url"))
+        if structured_recipe_loader is not None and recipe_url:
+            structured_recipe = structured_recipe_loader(
+                recipe_url, equipment_consumer="global_search"
+            )
+            if isinstance(structured_recipe, dict) and structured_recipe:
+                recipe = {**recipe, **structured_recipe, "url": recipe_url}
         title = first_text(recipe.get("name"), recipe.get("display_name"), recipe.get("recipe_title"))
         if not title:
             title = recipe_url_service.recipe_url_name(recipe_url)

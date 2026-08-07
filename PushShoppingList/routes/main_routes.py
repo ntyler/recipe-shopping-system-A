@@ -1356,12 +1356,22 @@ def master_data_context(record_type, scope_info=None):
                     "rows": section_rows,
                 })
 
+    equipment_review_tenant = (
+        str(scope_info.get("user_id") or "").strip()
+        if scope_info.get("scope") != "all"
+        else ""
+    )
     equipment_review_enabled = bool(
         record_type == "equipment"
-        and recipe_equipment_requirements.structured_equipment_ui_enabled()
+        and equipment_review_tenant
+        and recipe_equipment_requirements.structured_equipment_ui_enabled(
+            equipment_review_tenant
+        )
     )
     equipment_review_queue = (
-        recipe_equipment_requirements.review_queue_from_master_rows(rows)
+        recipe_equipment_requirements.structured_equipment_review_queue(
+            equipment_review_tenant
+        )
         if equipment_review_enabled
         else []
     )
@@ -1393,10 +1403,9 @@ def master_data_context(record_type, scope_info=None):
         "equipment_section": equipment_section,
         "equipment_summary": equipment_summary,
         "equipment_review_enabled": equipment_review_enabled,
-        "equipment_review_writes_enabled": bool(
-            equipment_review_enabled
-            and recipe_equipment_requirements.structured_equipment_review_writes_enabled()
-        ),
+        # Phase 4B intentionally exposes no review-write endpoint. The controls
+        # remain disabled even if a review-write environment value is present.
+        "equipment_review_writes_enabled": False,
         "equipment_review_queue": equipment_review_queue,
         "equipment_section_options": recipe_master_data.equipment_section_options()
         if record_type == "equipment"
@@ -4468,7 +4477,7 @@ def load_saved_recipe_output(recipe_url):
     # The editor loader overlays the user-scoped normalized SQLite hierarchy
     # when it exists. Keep route-level meal/shopping resolution on that same
     # source of truth instead of consulting the JSON-only index directly.
-    return load_recipe_output(recipe_url) or {}
+    return load_recipe_output(recipe_url, equipment_consumer="recipe_display") or {}
 
 
 def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=None, image_variants=None):

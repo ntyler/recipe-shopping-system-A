@@ -956,6 +956,14 @@ def _save_requirements_with_connection(
     recipe_id = master_data.recipe_id_for_url(recipe_url)
     previous_recipe_id = master_data.recipe_id_for_url(previous_recipe_url)
     if previous_recipe_id and previous_recipe_id != recipe_id:
+        from PushShoppingList.services import recipe_equipment_requirement_service
+
+        if recipe_equipment_requirement_service.structured_equipment_dual_write_enabled(
+            user_id
+        ):
+            recipe_equipment_requirement_service.move_structured_recipe_identity(
+                connection, user_id, previous_recipe_id, recipe_id
+            )
         _delete_recipe_hierarchy(connection, user_id, previous_recipe_id)
         connection.execute(
             "DELETE FROM recipe_ingredients WHERE user_id = ? AND recipe_id = ?",

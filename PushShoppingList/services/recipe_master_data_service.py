@@ -7650,6 +7650,7 @@ def _sync_recipe_master_records_with_connection(
             ingredient_count += 1
 
         equipment_count = 0
+        newly_created_legacy_equipment_ids = set()
         for row in equipment_rows:
             equipment_result = upsert_master_record(
                 connection,
@@ -7663,6 +7664,8 @@ def _sync_recipe_master_records_with_connection(
             equipment_id = equipment_result["id"] if equipment_result else None
             if not equipment_id:
                 continue
+            if equipment_result.get("equipment_section_inserted"):
+                newly_created_legacy_equipment_ids.add(int(equipment_id))
             connection.execute(
                 """
                 INSERT INTO recipe_equipment (
@@ -7681,13 +7684,37 @@ def _sync_recipe_master_records_with_connection(
             )
             equipment_count += 1
 
-    return {
+        structured_equipment_result = None
+        # This import is deliberately inside the existing caller-owned SQL
+        # transaction. With the dual-write gate disabled it is a strict no-op;
+        # when enabled, legacy and structured rows succeed or roll back together.
+        from PushShoppingList.services import recipe_equipment_requirement_service
+
+        if recipe_equipment_requirement_service.structured_equipment_dual_write_enabled(
+            user_id
+        ):
+            structured_equipment_result = (
+                recipe_equipment_requirement_service.reconcile_recipe_requirements(
+                    connection,
+                    user_id,
+                    recipe_id,
+                    recipe_data if isinstance(recipe_data, dict) else {
+                        "equipment": [], "instructions": []
+                    },
+                    excluded_equipment_ids=newly_created_legacy_equipment_ids,
+                )
+            )
+
+    result = {
         "ok": True,
         "user_id": user_id,
         "recipe_id": recipe_id,
         "ingredient_count": ingredient_count,
         "equipment_count": equipment_count,
     }
+    if structured_equipment_result is not None:
+        result["structured_equipment"] = structured_equipment_result
+    return result
 
 
 def sync_recipe_master_records(
@@ -7755,6 +7782,14 @@ def remove_recipe_master_records_for_recipe(recipe_url, user_id=None):
             "DELETE FROM recipe_equipment WHERE user_id = ? AND recipe_id = ?",
             (user_id, recipe_id),
         )
+        from PushShoppingList.services import recipe_equipment_requirement_service
+
+        if recipe_equipment_requirement_service.structured_equipment_dual_write_enabled(
+            user_id
+        ):
+            recipe_equipment_requirement_service.delete_structured_recipe_requirements(
+                connection, user_id, recipe_id
+            )
         return int(ingredient_cursor.rowcount or 0) + int(equipment_cursor.rowcount or 0)
 
 
