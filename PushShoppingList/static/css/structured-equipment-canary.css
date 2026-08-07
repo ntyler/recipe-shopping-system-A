@@ -1,0 +1,118 @@
+:root {
+    color-scheme: dark;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    background: #111827;
+    color: #e5e7eb;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #1f2937, #0f172a 55%);
+}
+
+.canary-shell {
+    width: min(760px, calc(100% - 2rem));
+    margin: 0 auto;
+    padding: 3rem 0;
+}
+
+.canary-kicker {
+    color: #93c5fd;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+h1,
+h2 {
+    color: #f9fafb;
+}
+
+.canary-card {
+    margin-top: 1.25rem;
+    padding: 1.25rem;
+    border: 1px solid #374151;
+    border-radius: 0.9rem;
+    background: rgb(17 24 39 / 88%);
+}
+
+.canary-facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.canary-facts div {
+    padding: 0.85rem;
+    border-radius: 0.65rem;
+    background: #1f2937;
+}
+
+.canary-facts dt {
+    color: #9ca3af;
+    font-size: 0.8rem;
+}
+
+.canary-facts dd {
+    margin: 0.2rem 0 0;
+    color: #f9fafb;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.canary-note {
+    color: #cbd5e1;
+}
+
+.canary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+button {
+    min-height: 44px;
+    padding: 0.7rem 1rem;
+    border: 0;
+    border-radius: 0.65rem;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+}
+
+button.secondary {
+    background: #475569;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+progress {
+    width: 100%;
+    height: 1rem;
+}
+
+.canary-summary {
+    overflow: auto;
+    padding: 1rem;
+    border-radius: 0.65rem;
+    background: #020617;
+    color: #d1fae5;
+    white-space: pre-wrap;
+}
+
+@media (max-width: 540px) {
+    .canary-shell {
+        padding: 1.5rem 0;
+    }
+
+    .canary-facts {
+        grid-template-columns: 1fr;
+    }
+}

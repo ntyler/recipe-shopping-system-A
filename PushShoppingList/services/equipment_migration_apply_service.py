@@ -37,6 +37,9 @@ APPLICATION_FEATURE_FLAGS = {
     "RECIPE_EQUIPMENT_STRUCTURED_UI_ENABLED": requirements.structured_equipment_ui_enabled,
     "RECIPE_EQUIPMENT_STRUCTURED_READ_ENABLED": requirements.structured_equipment_read_enabled,
     "RECIPE_EQUIPMENT_STRUCTURED_WRITE_ENABLED": requirements.structured_equipment_write_enabled,
+    "RECIPE_EQUIPMENT_AUTHENTICATED_CANARY_ENABLED": (
+        requirements.authenticated_equipment_canary_enabled
+    ),
     "RECIPE_EQUIPMENT_SCHEMA_WRITES_ENABLED": requirements.structured_equipment_schema_writes_enabled,
     "RECIPE_EQUIPMENT_REVIEW_WRITES_ENABLED": requirements.structured_equipment_review_writes_enabled,
 }

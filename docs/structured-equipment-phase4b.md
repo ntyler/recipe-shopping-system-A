@@ -15,11 +15,19 @@ its comma-separated allowlist:
 | Transactional dual write | `RECIPE_EQUIPMENT_STRUCTURED_DUAL_WRITE_ENABLED` | `RECIPE_EQUIPMENT_STRUCTURED_DUAL_WRITE_TENANTS` |
 | Structured read | `RECIPE_EQUIPMENT_STRUCTURED_READ_ENABLED` | `RECIPE_EQUIPMENT_STRUCTURED_READ_TENANTS` |
 | Structured UI | `RECIPE_EQUIPMENT_STRUCTURED_UI_ENABLED` | `RECIPE_EQUIPMENT_STRUCTURED_UI_TENANTS` |
+| Owner-authenticated read canary | `RECIPE_EQUIPMENT_AUTHENTICATED_CANARY_ENABLED` | `RECIPE_EQUIPMENT_AUTHENTICATED_CANARY_TENANTS` |
 
 Blank allowlists, wildcard entries, unknown tenants, and false global switches
 all deny operation. Schema and review writes remain independently locked. The
 Phase 4B UI contains no review-write endpoint and its decision controls remain
 disabled.
+
+The authenticated canary always requires shadow comparison for the same exact
+tenant. With structured reads disabled it records a legacy-response latency
+baseline; with structured reads enabled it records the structured-selection
+run. Its sanitized append-only audit directory is configured separately with
+`RECIPE_EQUIPMENT_AUTHENTICATED_CANARY_AUDIT_DIR`. No directory or audit file
+is created while the canary gate is disabled.
 
 ## Read behavior
 
@@ -69,6 +77,11 @@ Shadow events include tenant, recipe, consumer, eligibility, fallback reason,
 pending identifier fingerprint, row counts, wording/order, optional, image,
 connector and attribute validation differences, and latency. Structured-write
 events report staged, idempotent-noop, or rolled-back outcomes.
+
+The optional authenticated-canary observer is request-local and does not alter
+ordinary structured-read responses. See
+`docs/structured-equipment-phase4d-authenticated-canary.md` for its bounded
+same-origin workflow and audit contract.
 
 The immediate rollback for a canary is to set the affected global switch to
 `false` (or remove the tenant from its allowlist). Legacy data remains

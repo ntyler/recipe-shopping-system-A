@@ -13,6 +13,7 @@ import os
 import sqlite3
 import time
 from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import deepcopy
 from datetime import datetime, timezone
 
@@ -30,6 +31,10 @@ from PushShoppingList.services.equipment_normalization_service import (
 TRUE_VALUES = {"1", "true", "yes", "y", "on"}
 PHASE3A_MIGRATION_TOKEN = "phase3a-additive-stage-v1"
 LOGGER = logging.getLogger(__name__)
+_STRUCTURED_EQUIPMENT_EVENT_CAPTURE = ContextVar(
+    "structured_equipment_event_capture",
+    default=None,
+)
 
 STRUCTURED_EQUIPMENT_FLAG_NAMES = (
     "RECIPE_EQUIPMENT_STRUCTURED_SHADOW_ENABLED",
@@ -37,6 +42,7 @@ STRUCTURED_EQUIPMENT_FLAG_NAMES = (
     "RECIPE_EQUIPMENT_STRUCTURED_READ_ENABLED",
     "RECIPE_EQUIPMENT_STRUCTURED_UI_ENABLED",
     "RECIPE_EQUIPMENT_STRUCTURED_WRITE_ENABLED",
+    "RECIPE_EQUIPMENT_AUTHENTICATED_CANARY_ENABLED",
     "RECIPE_EQUIPMENT_SCHEMA_WRITES_ENABLED",
     "RECIPE_EQUIPMENT_REVIEW_WRITES_ENABLED",
 )
@@ -56,6 +62,9 @@ TENANT_ALLOWLIST_ENV = {
     ),
     "RECIPE_EQUIPMENT_STRUCTURED_WRITE_ENABLED": (
         "RECIPE_EQUIPMENT_STRUCTURED_WRITE_TENANTS"
+    ),
+    "RECIPE_EQUIPMENT_AUTHENTICATED_CANARY_ENABLED": (
+        "RECIPE_EQUIPMENT_AUTHENTICATED_CANARY_TENANTS"
     ),
     "RECIPE_EQUIPMENT_REVIEW_WRITES_ENABLED": (
         "RECIPE_EQUIPMENT_REVIEW_WRITE_TENANTS"
@@ -117,6 +126,13 @@ def structured_equipment_read_enabled(user_id=None):
 
 def structured_equipment_write_enabled(user_id=None):
     return _tenant_gate_enabled("RECIPE_EQUIPMENT_STRUCTURED_WRITE_ENABLED", user_id)
+
+
+def authenticated_equipment_canary_enabled(user_id=None):
+    return _tenant_gate_enabled(
+        "RECIPE_EQUIPMENT_AUTHENTICATED_CANARY_ENABLED",
+        user_id,
+    )
 
 
 def structured_equipment_schema_writes_enabled():
@@ -191,6 +207,10 @@ def _canonical_json(value):
         separators=(",", ":"),
         default=str,
     )
+
+
+def _canonical_sha256(value):
+    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest().upper()
 
 
 def _json_object(value, *, field_name):
@@ -389,6 +409,42 @@ def load_structured_equipment_requirements(
     return requirements
 
 
+def structured_requirement_state_fingerprint(requirements):
+    """Hash the approved structured semantics without timestamps or image data."""
+    payload = []
+    for requirement in requirements if isinstance(requirements, list) else []:
+        payload.append({
+            "requirement_id": str(requirement.get("requirement_id") or ""),
+            "source_text": str(requirement.get("source_text") or ""),
+            "optional": bool(requirement.get("optional")),
+            "quantity": str(requirement.get("quantity") or ""),
+            "notes": str(requirement.get("notes") or ""),
+            "sort_order": int(requirement.get("sort_order") or 0),
+            "connector": str(requirement.get("connector") or "single"),
+            "conjunction_group": str(requirement.get("conjunction_group") or ""),
+            "parse_confidence": float(requirement.get("parse_confidence") or 0),
+            "review_status": str(requirement.get("review_status") or ""),
+            "parser_version": str(requirement.get("parser_version") or ""),
+            "source_metadata": deepcopy(requirement.get("source_metadata") or {}),
+            "options": [{
+                "option_id": str(option.get("option_id") or ""),
+                "equipment_id": option.get("equipment_id"),
+                "source_option_text": str(option.get("source_option_text") or ""),
+                "canonical_name": str(option.get("canonical_name") or ""),
+                "canonical_key": str(option.get("canonical_key") or ""),
+                "option_kind": str(option.get("option_kind") or ""),
+                "attributes": deepcopy(option.get("attributes") or {}),
+                "notes": str(option.get("notes") or ""),
+                "sort_order": int(option.get("sort_order") or 0),
+                "matched_alias_id": option.get("matched_alias_id"),
+                "match_type": str(option.get("match_type") or ""),
+                "match_confidence": float(option.get("match_confidence") or 0),
+                "review_status": str(option.get("review_status") or ""),
+            } for option in requirement.get("options", [])],
+        })
+    return _canonical_sha256(payload)
+
+
 def semantic_equipment_projection(requirements):
     """Collapse stored AND/derived rows back into authored equipment rows."""
     groups = {}
@@ -510,10 +566,15 @@ def compare_legacy_and_structured_rows(
         "row_count_difference": len(projected_rows) - len(legacy_rows),
         "wording_order_differences": 0,
         "optional_differences": 0,
+        "quantity_differences": 0,
         "image_differences": 0,
         "connector_differences": 0,
+        "conjunction_group_differences": 0,
+        "classification_differences": 0,
         "attribute_differences": 0,
         "attribute_validation_errors": 0,
+        "metadata_differences": 0,
+        "response_body_differences": 0,
     }
     image_keys = {
         "equipment_image_url", "equipment_image_path", "equipment_image_generated_at",
@@ -539,6 +600,20 @@ def compare_legacy_and_structured_rows(
     for legacy_semantic, structured_semantic in zip(parsed_legacy, semantic_rows):
         if legacy_semantic.get("connector") != structured_semantic.get("connector"):
             metrics["connector_differences"] += 1
+        if str(legacy_semantic.get("quantity") or "") != str(
+            structured_semantic.get("quantity") or ""
+        ):
+            metrics["quantity_differences"] += 1
+        legacy_group_shape = (
+            len(legacy_semantic.get("requirement_ids") or []),
+            bool(legacy_semantic.get("conjunction_group")),
+        )
+        structured_group_shape = (
+            len(structured_semantic.get("requirement_ids") or []),
+            bool(structured_semantic.get("conjunction_group")),
+        )
+        if legacy_group_shape != structured_group_shape:
+            metrics["conjunction_group_differences"] += 1
     return metrics
 
 
@@ -578,12 +653,16 @@ def structured_equipment_read_result(
         "semantic_rows": [],
         "metrics": {},
         "pending_identifier_fingerprint": "",
+        "structured_state_fingerprint": "",
     }
     semantic_rows = []
     candidate_rows = []
     try:
         requirements = load_structured_equipment_requirements(
             connection, user_id, recipe_id, require_ready=False
+        )
+        result["structured_state_fingerprint"] = (
+            structured_requirement_state_fingerprint(requirements)
         )
         pending_fingerprint = _pending_identifier_fingerprint(requirements)
         result["pending_identifier_fingerprint"] = pending_fingerprint
@@ -660,7 +739,21 @@ def structured_equipment_read_result(
 def emit_structured_equipment_event(event, **fields):
     payload = {"event": str(event or "structured_equipment"), **fields}
     LOGGER.info("structured_equipment_observability %s", _canonical_json(payload))
+    capture = _STRUCTURED_EQUIPMENT_EVENT_CAPTURE.get()
+    if isinstance(capture, list):
+        capture.append(deepcopy(payload))
     return payload
+
+
+@contextmanager
+def capture_structured_equipment_events():
+    """Capture structured read events in the current request context only."""
+    events = []
+    capture_token = _STRUCTURED_EQUIPMENT_EVENT_CAPTURE.set(events)
+    try:
+        yield events
+    finally:
+        _STRUCTURED_EQUIPMENT_EVENT_CAPTURE.reset(capture_token)
 
 
 @contextmanager
@@ -720,6 +813,20 @@ def apply_structured_equipment_read(
         with _readonly_master_connection() as managed_connection:
             result = resolve(managed_connection)
 
+    metrics = dict(result.get("metrics") or {})
+    comparison_result = recipe_data
+    if result.get("eligible"):
+        comparison_result = deepcopy(recipe_data)
+        comparison_result["equipment"] = deepcopy(result.get("equipment") or [])
+    source_metadata = {
+        key: value for key, value in recipe_data.items() if key != "equipment"
+    }
+    projected_metadata = {
+        key: value for key, value in comparison_result.items() if key != "equipment"
+    }
+    metrics["metadata_differences"] = int(source_metadata != projected_metadata)
+    metrics["response_body_differences"] = int(comparison_result != recipe_data)
+
     emit_structured_equipment_event(
         "shadow_compare" if shadow_enabled else "read_decision",
         user_id=user_id,
@@ -736,8 +843,11 @@ def apply_structured_equipment_read(
         pending_identifier_fingerprint=str(
             result.get("pending_identifier_fingerprint") or ""
         ),
+        structured_state_fingerprint=str(
+            result.get("structured_state_fingerprint") or ""
+        ),
         latency_ms=result.get("latency_ms", 0),
-        **(result.get("metrics") or {}),
+        **metrics,
     )
     if not read_enabled or not result.get("eligible"):
         return recipe_data

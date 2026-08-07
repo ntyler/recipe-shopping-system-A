@@ -222,12 +222,16 @@ from PushShoppingList.services.storage_service import workspace_data_root
 from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import is_admin_user
+from PushShoppingList.services import recipe_equipment_requirement_service
+from PushShoppingList.services import structured_equipment_canary_service
 
 recipe_bp = Blueprint("recipe_bp", __name__)
 
 
 PRIVATE_RECIPE_RESOURCE_ENDPOINTS = {
     "recipe_bp.edit_recipe_page_route",
+    "recipe_bp.structured_equipment_canary_page_route",
+    "recipe_bp.structured_equipment_canary_run_event_route",
     "recipe_bp.recipe_archive_pdf_route",
     "recipe_bp.recipe_cover_image_route",
     "recipe_bp.restaurant_source_logo_route",
@@ -4050,13 +4054,201 @@ def api_clear_recipe_urls_route():
     return redirect("/")
 
 
+def _authenticated_equipment_canary_tenant():
+    if is_guest_session():
+        abort(403)
+    user = current_user()
+    tenant = str(active_user_id() or "").strip()
+    if not user or not tenant:
+        abort(401)
+    if str(user.get("user_id") or "").strip() != tenant:
+        abort(403)
+    if not structured_equipment_canary_service.authenticated_canary_globally_enabled():
+        abort(404)
+    if not structured_equipment_canary_service.authenticated_canary_enabled(tenant):
+        abort(403)
+    if not recipe_equipment_requirement_service.structured_equipment_shadow_enabled(tenant):
+        abort(409)
+    return tenant
+
+
+def _canary_error_response(status_code):
+    response = jsonify({
+        "ok": False,
+        "error": "structured_equipment_canary_rejected",
+        "message": "The authenticated structured-equipment canary stopped safely.",
+    })
+    response.status_code = int(status_code)
+    return apply_private_no_store(response)
+
+
+def _canary_context(payload, manifest):
+    return {
+        "run_id": payload["run_id"],
+        "tenant": manifest["tenant"],
+        "manifest_fingerprint": manifest["manifest_fingerprint"],
+        "selection_mode": payload["selection_mode"],
+    }
+
+
+@recipe_bp.route("/structured-equipment/authenticated-canary", methods=["GET"])
+def structured_equipment_canary_page_route():
+    tenant = _authenticated_equipment_canary_tenant()
+    try:
+        with structured_equipment_canary_service.readonly_master_connection() as connection:
+            plan = structured_equipment_canary_service.issue_canary_plan(
+                connection,
+                tenant,
+                current_app.secret_key,
+                selection_mode=(
+                    "structured_read"
+                    if recipe_equipment_requirement_service.structured_equipment_read_enabled(
+                        tenant
+                    )
+                    else "legacy_baseline"
+                ),
+            )
+    except structured_equipment_canary_service.CanaryError as exc:
+        current_app.logger.warning(
+            "Authenticated structured-equipment canary page rejected: %s",
+            type(exc).__name__,
+        )
+        return _canary_error_response(409)
+    response = Response(
+        render_template("structured_equipment_canary.html", canary_plan=plan),
+        mimetype="text/html",
+    )
+    return apply_private_no_store(response)
+
+
+@recipe_bp.route("/api/structured-equipment/authenticated-canary/run-event", methods=["POST"])
+def structured_equipment_canary_run_event_route():
+    tenant = _authenticated_equipment_canary_tenant()
+    token = str(request.headers.get("X-Recipe-Equipment-Canary", "") or "").strip()
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _canary_error_response(400)
+    try:
+        with structured_equipment_canary_service.readonly_master_connection() as connection:
+            token_payload, manifest = (
+                structured_equipment_canary_service.authorize_canary_run(
+                    connection,
+                    token,
+                    tenant,
+                    current_app.secret_key,
+                )
+            )
+        context = _canary_context(token_payload, manifest)
+        record = structured_equipment_canary_service.run_event_audit_record(
+            context,
+            payload.get("event"),
+            payload.get("reason"),
+            payload.get("client_latencies_ms"),
+        )
+        structured_equipment_canary_service.append_audit_record(
+            context["run_id"],
+            record,
+        )
+        summary = structured_equipment_canary_service.summarize_canary_run(context)
+    except structured_equipment_canary_service.CanaryTokenError:
+        return _canary_error_response(403)
+    except structured_equipment_canary_service.CanaryInvariantError:
+        return _canary_error_response(409)
+    except structured_equipment_canary_service.CanaryAuditError:
+        return _canary_error_response(503)
+    return apply_private_no_store(jsonify({"ok": True, "summary": summary}))
+
+
+def _structured_equipment_canary_recipe_get(token, recipe_url):
+    request_started = perf_counter()
+    tenant = _authenticated_equipment_canary_tenant()
+    if len(request.args.getlist("url")) != 1:
+        return _canary_error_response(400)
+    try:
+        with structured_equipment_canary_service.readonly_master_connection() as connection:
+            context = structured_equipment_canary_service.authorize_canary_sample(
+                connection,
+                token,
+                tenant,
+                current_app.secret_key,
+                recipe_url,
+                request.headers.get("X-Recipe-Equipment-Canary-Pass", ""),
+                request.headers.get("X-Recipe-Equipment-Canary-Sequence", ""),
+            )
+    except structured_equipment_canary_service.CanaryTokenError:
+        return _canary_error_response(403)
+    except structured_equipment_canary_service.CanaryInvariantError:
+        return _canary_error_response(409)
+
+    application_status = 200
+    response_payload = {
+        "ok": False,
+        "error": "structured_equipment_canary_recipe_load_failed",
+    }
+    captured_events = []
+    try:
+        with recipe_equipment_requirement_service.capture_structured_equipment_events() as events:
+            response_payload = load_editable_recipe(recipe_url)
+        captured_events = list(events)
+        response = jsonify(response_payload)
+        application_status = int(response.status_code)
+    except Exception:
+        current_app.logger.exception(
+            "Authenticated structured-equipment canary recipe load failed."
+        )
+        response = _canary_error_response(500)
+        application_status = 500
+
+    expected_recipe_id = context["recipe"]["recipe_id"]
+    matching_events = [
+        event for event in captured_events
+        if event.get("event") in {"shadow_compare", "read_decision"}
+        and str(event.get("user_id") or "") == tenant
+        and str(event.get("recipe_id") or "") == expected_recipe_id
+    ]
+    if len(matching_events) == 1:
+        structured_event = matching_events[0]
+    else:
+        structured_event = {
+            "consumer": "editor_api",
+            "eligible": False,
+            "fallback_reason": "missing_or_ambiguous_canary_observation",
+            "latency_ms": 0,
+        }
+    record = structured_equipment_canary_service.sample_audit_record(
+        context,
+        structured_event,
+        response_payload=response_payload,
+        application_http_status=application_status,
+        handler_latency_ms=(perf_counter() - request_started) * 1000,
+    )
+    try:
+        structured_equipment_canary_service.append_audit_record(
+            context["run_id"],
+            record,
+        )
+    except structured_equipment_canary_service.CanaryAuditError:
+        return _canary_error_response(503)
+    if not record["passed"]:
+        return _canary_error_response(409)
+    return apply_private_no_store(response)
+
+
 @recipe_bp.route("/api/recipe", methods=["GET", "POST"])
 def api_recipe_route():
+    if request.method != "GET" and request.headers.get("X-Recipe-Equipment-Canary"):
+        return _canary_error_response(405)
     if request.method == "GET":
         url = str(request.args.get("url", "") or "").strip()
 
         if not url:
             return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+
+        canary_token = str(
+            request.headers.get("X-Recipe-Equipment-Canary", "") or ""
+        ).strip()
+        if canary_token:
+            return _structured_equipment_canary_recipe_get(canary_token, url)
 
         return jsonify(load_editable_recipe(url))
 

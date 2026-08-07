@@ -351,7 +351,13 @@ def test_shadow_comparison_never_changes_returned_data_and_emits_metrics(
     assert '"consumer":"pdf_export"' in message
     assert '"row_count_difference":0' in message
     assert '"wording_order_differences":0' in message
+    assert '"quantity_differences":0' in message
     assert '"image_differences":0' in message
+    assert '"conjunction_group_differences":0' in message
+    assert '"classification_differences":0' in message
+    assert '"metadata_differences":0' in message
+    assert '"response_body_differences":0' in message
+    assert '"structured_state_fingerprint":"' in message
     assert '"latency_ms":' in message
     connection.close()
 

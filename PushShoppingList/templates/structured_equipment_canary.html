@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Structured-equipment authenticated canary</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/structured-equipment-canary.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/ai-pantry-logo.svg') }}">
+</head>
+<body>
+    <main class="canary-shell" aria-labelledby="canaryTitle">
+        <header>
+            <p class="canary-kicker">Owner-authenticated verification</p>
+            <h1 id="canaryTitle">Structured-equipment read canary</h1>
+            <p>
+                This page will remain idle until you start it. It performs six
+                sequential passes over the server-approved 88-recipe manifest.
+            </p>
+        </header>
+
+        <section class="canary-card" aria-labelledby="scopeTitle">
+            <h2 id="scopeTitle">Bounded scope</h2>
+            <dl class="canary-facts">
+                <div><dt>Recipes</dt><dd>{{ canary_plan.recipe_count }}</dd></div>
+                <div><dt>Passes</dt><dd>{{ canary_plan.pass_count }}</dd></div>
+                <div><dt>Expected reads</dt><dd>{{ canary_plan.expected_sample_count }}</dd></div>
+                <div><dt>Selection mode</dt><dd class="canary-mode">{{ canary_plan.selection_mode | replace('_', ' ') }}</dd></div>
+            </dl>
+            <p class="canary-note">
+                Your normal signed-in browser session remains authoritative.
+                The canary correlation tokens cannot authenticate a request.
+            </p>
+        </section>
+
+        <section class="canary-card" aria-labelledby="runTitle">
+            <h2 id="runTitle">Run control</h2>
+            <div class="canary-actions">
+                <button id="canaryStart" type="button">Start authenticated canary</button>
+                <button id="canaryStop" type="button" class="secondary" disabled>Stop safely</button>
+            </div>
+            <p id="canaryStatus" role="status" aria-live="polite">Ready. No requests have been sent.</p>
+            <progress id="canaryProgress" max="{{ canary_plan.expected_sample_count }}" value="0">
+                0 of {{ canary_plan.expected_sample_count }}
+            </progress>
+            <pre id="canarySummary" class="canary-summary" aria-label="Canary summary" hidden></pre>
+        </section>
+
+        <noscript>This canary requires JavaScript to issue same-origin HTTP reads.</noscript>
+    </main>
+    <script id="structuredEquipmentCanaryPlan" type="application/json">{{ canary_plan | tojson }}</script>
+    <script src="{{ url_for('static', filename='js/structured-equipment-canary.js') }}" defer></script>
+</body>
+</html>
