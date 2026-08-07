@@ -1376,6 +1376,11 @@ def reconcile_recipe_requirements(
                     if key not in recipe_image_keys
                 }
                 next_metadata = {**preserved_metadata, **parser_metadata}
+                next_metadata_json = (
+                    current.get("metadata_json")
+                    if next_metadata == existing_metadata
+                    else _canonical_json(next_metadata)
+                )
                 updated = _update_if_changed(
                     connection,
                     "recipe_equipment_requirements",
@@ -1388,7 +1393,7 @@ def reconcile_recipe_requirements(
                         "notes": str(parsed_requirement.get("notes") or ""),
                         "sort_order": int(parsed_requirement.get("sort_order") or 0),
                         "parse_confidence": float(parsed_requirement.get("parse_confidence") or 0),
-                        "metadata_json": _canonical_json(next_metadata),
+                        "metadata_json": next_metadata_json,
                     },
                     now,
                 )

@@ -11,6 +11,14 @@ from PushShoppingList.services.equipment_normalization_service import PARSER_VER
 
 TENANT = "tenant-a"
 RECIPE = "https://example.com/recipe-a"
+PHASE4C_BLOCKER_RECIPES = (
+    "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd?"
+    "category=1&menu_item=menu-item-1-Papa_Potatoe_a_la_Huancaina",
+    "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd?"
+    "category=1&menu_item=menu-item-2-Yuca_cassava_la_Huancaina",
+    "https://fromtherestaurant.com/pisco-mar/menu/9546-Allisonville-Rd?"
+    "category=1&menu_item=menu-item-3-Papa_Rellena",
+)
 
 
 def _connection(path):
@@ -467,6 +475,199 @@ def test_dual_write_preserves_approvals_stages_uncertain_values_and_is_idempoten
             """,
             (TENANT,),
         ).fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("recipe_id", PHASE4C_BLOCKER_RECIPES)
+def test_dual_write_preserves_semantically_equal_metadata_bytes_for_phase4c_blockers(
+    monkeypatch, tmp_path, recipe_id
+):
+    connection = _connection(tmp_path / "metadata-noop.sqlite3")
+    _install_structured_schema(connection)
+    target_id = _insert_equipment(connection, "Whisk")
+    recipe_data = {
+        "equipment": [
+            {
+                "equipment": name,
+                "equipment_image_url": f"/recipe/{index}.png",
+                "equipment_image_path": f"recipe/{index}.png",
+                "equipment_image_prompt": f"Image prompt {index}",
+                "equipment_image_generated_at": f"2026-07-0{index}T00:00:00+00:00",
+            }
+            for index, name in enumerate(
+                ("Whisk", "Mixing bowl", "Skillet", "Saucepan"), start=1
+            )
+        ],
+        "instructions": [],
+    }
+    _stage(connection, recipe_data, recipe_id=recipe_id)
+    _resolve_all_equipment_options(connection, target_id)
+    stored_metadata = {}
+    for row in connection.execute(
+        "SELECT id, metadata_json FROM recipe_equipment_requirements ORDER BY id"
+    ).fetchall():
+        parsed = json.loads(row["metadata_json"])
+        reformatted = {
+            "owner_metadata": {"second": 2, "first": 1},
+            **dict(reversed(list(parsed.items()))),
+        }
+        serialized = json.dumps(reformatted, ensure_ascii=False, indent=2)
+        connection.execute(
+            """
+            UPDATE recipe_equipment_requirements
+               SET metadata_json = ?, updated_at = 'fixture-original'
+             WHERE id = ?
+            """,
+            (serialized, row["id"]),
+        )
+        stored_metadata[int(row["id"])] = serialized
+    _insert_sync(connection, recipe_data, recipe_id=recipe_id)
+    _enable(monkeypatch, "DUAL_WRITE")
+
+    before_changes = connection.total_changes
+    first = equipment.reconcile_recipe_requirements(
+        connection,
+        TENANT,
+        recipe_id,
+        recipe_data,
+        excluded_equipment_ids=set(),
+    )
+    assert first["outcome"] == "idempotent_noop"
+    assert first["requirements_updated"] == 0
+    assert connection.total_changes == before_changes
+
+    second = equipment.reconcile_recipe_requirements(
+        connection,
+        TENANT,
+        recipe_id,
+        recipe_data,
+        excluded_equipment_ids=set(),
+    )
+    assert second["outcome"] == "idempotent_noop"
+    assert second["requirements_updated"] == 0
+    assert connection.total_changes == before_changes
+    for row in connection.execute(
+        "SELECT id, metadata_json, updated_at FROM recipe_equipment_requirements"
+    ).fetchall():
+        assert row["metadata_json"] == stored_metadata[int(row["id"])]
+        assert row["updated_at"] == "fixture-original"
+    connection.close()
+
+
+def test_dual_write_applies_real_metadata_change_once_and_preserves_other_fields(
+    monkeypatch, tmp_path
+):
+    connection = _connection(tmp_path / "metadata-change.sqlite3")
+    _install_structured_schema(connection)
+    target_id = _insert_equipment(connection, "Whisk")
+    recipe_data = {
+        "equipment": [{
+            "equipment": "Whisk",
+            "equipment_image_url": "/recipe/whisk.png",
+            "equipment_image_prompt": "Original prompt",
+        }],
+        "instructions": [],
+    }
+    _stage(connection, recipe_data)
+    _resolve_all_equipment_options(connection, target_id)
+    requirement = dict(connection.execute(
+        "SELECT * FROM recipe_equipment_requirements"
+    ).fetchone())
+    original_metadata = {
+        "owner_metadata": {"preserve": True},
+        **json.loads(requirement["metadata_json"]),
+    }
+    connection.execute(
+        """
+        UPDATE recipe_equipment_requirements
+           SET metadata_json = ?, updated_at = 'fixture-original'
+         WHERE id = ?
+        """,
+        (json.dumps(original_metadata, indent=2), requirement["id"]),
+    )
+    option_before = dict(connection.execute(
+        "SELECT * FROM recipe_equipment_options"
+    ).fetchone())
+    _insert_sync(connection, recipe_data)
+    _enable(monkeypatch, "DUAL_WRITE")
+
+    changed_recipe = json.loads(json.dumps(recipe_data))
+    changed_recipe["equipment"][0]["equipment_image_prompt"] = "Updated prompt"
+    first = equipment.reconcile_recipe_requirements(
+        connection,
+        TENANT,
+        RECIPE,
+        changed_recipe,
+        excluded_equipment_ids=set(),
+    )
+    requirement_after = dict(connection.execute(
+        "SELECT * FROM recipe_equipment_requirements"
+    ).fetchone())
+    metadata_after = json.loads(requirement_after["metadata_json"])
+    assert first["requirements_updated"] == 1
+    assert first["outcome"] == "staged"
+    assert metadata_after["owner_metadata"] == {"preserve": True}
+    assert metadata_after["equipment_image_url"] == "/recipe/whisk.png"
+    assert metadata_after["equipment_image_prompt"] == "Updated prompt"
+    assert requirement_after["updated_at"] != "fixture-original"
+    for key in (
+        "requirement_id", "user_id", "recipe_id", "source_text", "optional",
+        "quantity", "notes", "sort_order", "connector", "conjunction_group",
+        "parse_confidence", "review_status", "parser_version", "created_at",
+    ):
+        assert requirement_after[key] == requirement[key]
+    assert dict(connection.execute(
+        "SELECT * FROM recipe_equipment_options"
+    ).fetchone()) == option_before
+
+    rows_before_repeat = [tuple(row) for row in connection.execute(
+        "SELECT * FROM recipe_equipment_requirements"
+    )]
+    second = equipment.reconcile_recipe_requirements(
+        connection,
+        TENANT,
+        RECIPE,
+        changed_recipe,
+        excluded_equipment_ids=set(),
+    )
+    assert second["outcome"] == "idempotent_noop"
+    assert [tuple(row) for row in connection.execute(
+        "SELECT * FROM recipe_equipment_requirements"
+    )] == rows_before_repeat
+    connection.close()
+
+
+@pytest.mark.parametrize("malformed_metadata", ("{not-json", "[]"))
+def test_dual_write_fails_closed_for_malformed_or_non_object_metadata(
+    monkeypatch, tmp_path, malformed_metadata
+):
+    connection = _connection(tmp_path / "malformed-metadata.sqlite3")
+    _install_structured_schema(connection)
+    recipe_data = {"equipment": [{"equipment": "Whisk"}], "instructions": []}
+    _stage(connection, recipe_data)
+    connection.execute(
+        "UPDATE recipe_equipment_requirements SET metadata_json = ?",
+        (malformed_metadata,),
+    )
+    before = [tuple(row) for row in connection.execute(
+        "SELECT * FROM recipe_equipment_requirements"
+    )]
+    _enable(monkeypatch, "DUAL_WRITE")
+
+    with pytest.raises(equipment.StructuredEquipmentFallback):
+        equipment.reconcile_recipe_requirements(
+            connection,
+            TENANT,
+            RECIPE,
+            recipe_data,
+            excluded_equipment_ids=set(),
+        )
+    assert [tuple(row) for row in connection.execute(
+        "SELECT * FROM recipe_equipment_requirements"
+    )] == before
+    assert connection.execute(
+        "SELECT COUNT(*) FROM recipe_equipment_requirement_sync"
+    ).fetchone()[0] == 0
+    connection.close()
 
 
 def test_dual_write_failure_injection_rolls_back_the_entire_structured_savepoint(
